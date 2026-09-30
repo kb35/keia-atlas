@@ -6,11 +6,12 @@
 // Props: rows: [{ label, sub?, cells: { roleId: 'R' | { letter, detail } } }], and optionally group
 //        rows between them: { group: 'Deploy', sub?: 'provision, install, configure, commission' }.
 //        cols: role ids. id: names this chart (data-raci) for links. caption: for screen readers.
+//        items: true marks the rows as a Section's items (data-items), so a Section with showAll or rows can fold them.
 // The table takes its natural height and the page scrolls (rule L8); its column names stick under the
 // top bar (and under a sticky filter bar: the page sets --raci-top). When the table does not fit its column
 // (L10) each piece of work becomes a card listing the roles that have a letter in it; it never scrolls sideways.
 import { ROLES, PEOPLE } from '../lib/demo.mjs';
-const { rows, cols, id = 'raci', caption = '' } = Astro.props;
+const { rows, cols, id = 'raci', caption = '', items = false } = Astro.props;
 const WORD = { R: 'Responsible', A: 'Accountable', C: 'Consulted', I: 'Informed' };
 const MEANS = { R: 'does the work', A: 'signs it off and answers for it', C: 'is asked before it is done', I: 'is told once it is done' };
 const holders = (r) => PEOPLE.filter((p) => p.roleId === r).map((p) => p.name);
@@ -29,7 +30,7 @@ let n = 0;
     <table class="raci2">
       {caption && <caption class="sr-only">{caption}</caption>}
       <thead><tr><th scope="col" class="rw-h">Work</th>{cols.map((c, ci) => <th scope="col" data-col={ci} data-help="raci.role" data-help-name={ROLES[c]?.name ?? c}><span class="rot">{ROLES[c]?.name ?? c}</span></th>)}</tr></thead>
-      <tbody>
+      <tbody data-items={items ? '' : undefined}>
         {rows.map((r) => {
           if (r.group) return (
             <tr class="raci-grp" data-grp>

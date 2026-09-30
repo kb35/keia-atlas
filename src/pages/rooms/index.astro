@@ -7,6 +7,7 @@ import RoomPlanSprite from '../../components/RoomPlanSprite.astro';
 import FilterBar from '../../components/FilterBar.astro';
 import PageBand from '../../components/PageBand.astro';
 import EmptyState from '../../components/EmptyState.astro';
+import Section from '../../components/Section.astro';
 import HealthGlyph from '../../components/HealthGlyph.astro';
 import { spaces, sites, spaceTypes, incidents, SITE_ORDER, KIND, KIND_LABEL, REGION_LABEL, INC_STATE, countryName, href } from '../../lib/data.mjs';
 import { NOW_YEAR, lifeOf } from '../../lib/refresh.mjs';
@@ -62,7 +63,10 @@ const SITES = Object.fromEntries(SITE_ORDER.map((sid) => {
 
     <section class="site-card card" hidden data-site-card aria-live="polite"></section>
 
-    <div class="room-grid" data-grid>
+    <!-- Eight rows, then Show all (UI-V2 §7): 16 cards on a phone, a few screens on a big one. The filters,
+         search and sort still reach every space; the fold counts only what they leave. -->
+    <Section rows={8} class="sp-fold">
+    <div class="room-grid" data-grid data-items>
       {rooms.map((s, i) => {
         const st = statusOf(s), n = units(s);
         return (
@@ -89,7 +93,7 @@ const SITES = Object.fromEntries(SITE_ORDER.map((sid) => {
         <thead><tr>
           {[['number', 'No.'], ['name', 'Space'], ['typeName', 'Space type'], ['siteName', 'Office'], ['floor', 'Floor'], ['devices', 'Devices'], ['status', 'Status'], ['issues', 'Signals']].map(([k, l]) => <th scope="col" aria-sort="none"><button type="button" data-sortcol={k}>{l}<i aria-hidden="true"></i></button></th>)}
         </tr></thead>
-        <tbody>
+        <tbody data-items>
           {rooms.map((s, i) => {
             const st = statusOf(s), inc = openInc[s.id] ?? [];
             return (
@@ -112,6 +116,7 @@ const SITES = Object.fromEntries(SITE_ORDER.map((sid) => {
         </tbody>
       </table>
     </div>
+    </Section>
     <EmptyState text="No spaces match these filters." />
   </div>
 

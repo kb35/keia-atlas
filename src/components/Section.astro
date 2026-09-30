@@ -10,6 +10,14 @@
                     filter bar has hidden (.fb-out) or that is [hidden] does not use up a place, and the
                     button says how many are showing ("Show all 38"). It follows the bar's filters, search,
                     sort and any change to the list.
+           rows     n: fold after n rows, not n items (UI-V2 §7: 8 rows, 16 in Compact). A row of a card grid is as
+                    many cards as its columns, counted as the page is laid out, so a grid folds after 8 rows of
+                    cards at every width: 16 cards in two columns on a phone, 40 in five on a wide screen. A list or
+                    a table has one item a row. Several boxes may carry data-items (the cards and the list of a
+                    Cards | List page); each folds on its own and the button counts the one showing. It follows
+                    the filters, search and sort as showAll does, so they still reach every item.
+           rowsAt   'phone': fold only below 768 px wide (a long table that is short enough on a big screen).
+                    data-sa-noun="kinds" adds a word to the button ("Show all 20 kinds") when a count alone is unclear.
            to       the page that owns this list (rule P10, docs/rules/platform.md): a path ('/incidents/?status=new')
                     or a filter on this page ('?status=problem'). With `to`, the section never expands in place:
                     it shows the first `showAll` items (all of them when showAll is left out) and a link that says
@@ -34,14 +42,15 @@
 import { href } from '../lib/data.mjs';
 // The shared-element name for a drill-down to a page: '/work/list/?kind=task' -> 'dd-work-list'.
 const ddId = (to: string) => 'dd' + new URL(to, 'http://x').pathname.replace(/[^a-z0-9]+/gi, '-').replace(/-$/, '');
-interface Props { title?: string; aside?: string; id?: string; showAll?: number; to?: string; place?: string; carry?: boolean | string[]; class?: string; help?: string; [attr: string]: unknown }
-const { title, aside, showAll, to, place, carry, class: cls, id: idProp, help, ...rest } = Astro.props;
+interface Props { title?: string; aside?: string; id?: string; showAll?: number; rows?: number; rowsAt?: 'phone'; to?: string; place?: string; carry?: boolean | string[]; class?: string; help?: string; [attr: string]: unknown }
+const { title, aside, showAll: showAllProp, rows, rowsAt, to, place, carry, class: cls, id: idProp, help, ...rest } = Astro.props;
+const showAll = showAllProp ?? rows;
 const id = idProp ?? (title ? title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : undefined);
 const hid = title && id ? `${id}-h` : undefined;
 const toHref = to ? (to.startsWith('/') ? href(to) : to) : undefined;
 const where = place ?? title ?? 'the list';
 ---
-<section class:list={['sec', cls]} id={id} aria-labelledby={hid} data-show-all={showAll ?? (to ? 100000 : undefined)} data-sa-place={to ? where : undefined} data-sa-carry={carry === true ? '*' : Array.isArray(carry) ? carry.join(',') : undefined} {...rest}>
+<section class:list={['sec', cls]} id={id} aria-labelledby={hid} data-show-all={showAll ?? (to ? 100000 : undefined)} data-sa-rows={rows ? '' : undefined} data-sa-at={rows ? rowsAt : undefined} data-sa-place={to ? where : undefined} data-sa-carry={carry === true ? '*' : Array.isArray(carry) ? carry.join(',') : undefined} {...rest}>
   {(title || aside || Astro.slots.has('aside')) && (
     <header class="section-head" data-help={help ?? 'section'} data-help-name={title}>
       {title && <h2 id={hid}>{title}</h2>}
@@ -58,29 +67,54 @@ const where = place ?? title ?? 'the list';
 <script is:inline data-astro-rerun>
   (function () {
     function bind(sec) {
-      if (sec.__sa) return; sec.__sa = true;
+      // A section can hold sections: a script inside it may run before this one's end has been read, so it is
+      // only marked bound once its button is there.
+      if (sec.__sa) return;
       var n = +sec.dataset.showAll, box = sec.querySelector('[data-items]');
       var link = sec.querySelector('[data-sa-to]:not([data-sa-default])') || sec.querySelector('[data-sa-to]');
-      if (link) return bindTo(sec, n, box, link);
+      if (link) { sec.__sa = true; return bindTo(sec, n, box, link); }
       var btn = sec.querySelector('[data-sa-btn]:not([data-sa-default])') || sec.querySelector('[data-sa-btn]');
       if (!box || !btn) return;
+      sec.__sa = true;
       // A button the page put in the content wins; drop the one the section added.
       sec.querySelectorAll('[data-sa-default]').forEach(function (d) { if (d !== btn) d.remove(); });
+      // rows: the limit is n rows, so a grid's columns (as it is laid out now) multiply it; Compact doubles it.
+      var boxes = Array.prototype.slice.call(sec.querySelectorAll('[data-items]'));
+      var byRows = sec.hasAttribute('data-sa-rows'), phoneOnly = sec.dataset.saAt === 'phone';
+      var colsOf = function (b) {
+        var cs = getComputedStyle(b);
+        if (cs.display.indexOf('grid') < 0) return 1;
+        var t = (cs.gridTemplateColumns || '').replace(/\[[^\]]*\]/g, ' ').trim();
+        return t && t !== 'none' ? t.split(/\s+/).length : 1;
+      };
+      var limit = function (b) {
+        if (!byRows) return n;
+        if (phoneOnly && !matchMedia('(max-width: 767px)').matches) return Infinity;
+        return n * (document.documentElement.dataset.density === 'compact' ? 2 : 1) * colsOf(b);
+      };
+      var shows = function (b) { var p = b.closest('[hidden]'); return !p || !sec.contains(p); };
       // Count what is showing, mark the ones past the limit, say how many there are.
       var apply = function () {
-        var open = sec.classList.contains('sa-open'), seen = 0;
-        Array.prototype.forEach.call(box.children, function (el) {
-          if (el.classList.contains('fb-out') || el.hidden) { el.classList.remove('sa-x'); return; }
-          seen++; el.classList.toggle('sa-x', seen > n);
+        var open = sec.classList.contains('sa-open'), seen = 0, fold = false, first = true;
+        boxes.forEach(function (b) {
+          var lim = limit(b), s = 0;
+          Array.prototype.forEach.call(b.children, function (el) {
+            if (el.classList.contains('fb-out') || el.hidden) { el.classList.remove('sa-x'); return; }
+            s++; el.classList.toggle('sa-x', s > lim);
+          });
+          // The button speaks for the box that is showing (the first, when none is hidden).
+          if (first && shows(b)) { seen = s; fold = s > lim; first = false; }
         });
-        btn.hidden = seen <= n;
-        btn.textContent = open ? 'Show fewer' : 'Show all ' + seen.toLocaleString('en-IE');
+        if (btn.hidden !== !fold) btn.hidden = !fold;
+        var t = open ? 'Show fewer' : 'Show all ' + seen.toLocaleString('en-IE') + (sec.dataset.saNoun ? ' ' + sec.dataset.saNoun : '');
+        if (btn.textContent !== t) btn.textContent = t;
         btn.setAttribute('aria-expanded', String(open));
       };
       sec.__saApply = apply;
       btn.addEventListener('click', function () {
         var y0 = btn.getBoundingClientRect().top, opening = !sec.classList.contains('sa-open');
         var M = window.rsMotion ? window.rsMotion() : { reduced: true };
+        var box = boxes.filter(shows)[0] || boxes[0];
         var was = opening ? Array.prototype.filter.call(box.children, function (el) { return el.classList.contains('sa-x'); }) : [];
         var h0 = box.getBoundingClientRect().height;
         sec.classList.toggle('sa-open');
@@ -103,9 +137,15 @@ const where = place ?? title ?? 'the list';
       // Rows added, removed or re-ordered by the page (a sort, a live update) are counted again.
       if (window.MutationObserver) {
         var raf = 0;
-        new MutationObserver(function () { cancelAnimationFrame(raf); raf = requestAnimationFrame(apply); }).observe(box, { childList: true });
+        var mo = new MutationObserver(function () { cancelAnimationFrame(raf); raf = requestAnimationFrame(apply); });
+        boxes.forEach(function (b) { mo.observe(b, { childList: true }); });
+        // Cards | List: the view that shows changes which box the button speaks for.
+        if (boxes.length > 1) mo.observe(sec, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
       }
       apply();
+      // A link to something folded away (#id) opens the fold, so the page can scroll to it.
+      var h = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
+      if (h && sec.contains(h) && h.closest('.sa-x')) { sec.classList.add('sa-open'); apply(); }
     }
     // Drill-down (rule P10): the first n items, then a link to the page that owns the list. Never expands here.
     function bindTo(sec, n, box, link) {
@@ -147,6 +187,10 @@ const where = place ?? title ?? 'the list';
       // The filter bar recounts after a filter, a search or a sort; a page can ask too ("rs:sa-refresh").
       document.addEventListener('fb:change', again);
       document.addEventListener('rs:sa-refresh', again);
+      // A fold by rows is counted from the columns as laid out: a new width or density counts it again.
+      var rz = 0;
+      window.addEventListener('resize', function () { cancelAnimationFrame(rz); rz = requestAnimationFrame(again); });
+      if (window.MutationObserver) new MutationObserver(again).observe(document.documentElement, { attributes: true, attributeFilter: ['data-density'] });
     }
   })();
 </script>
