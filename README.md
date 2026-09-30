@@ -16,6 +16,7 @@ Created by **Keith Brady**. Design decisions are recorded in [`docs/decisions/`]
 - **Try it (no sign-up):** [live demo](https://kb35.github.io/keia-atlas/)
 - **Read the method (ten minutes):** [on the site](https://kb35.github.io/keia-atlas/method/), or as text in [docs/keia-method.md](docs/keia-method.md)
 - **Run it for your own offices:** [GETTING-STARTED](GETTING-STARTED.md)
+- **Set it up from your own records:** [docs/setup-with-ai.md](docs/setup-with-ai.md): import from your tools, draft the rest with an AI agent if you want one, and review every change
 - **See how it runs in production:** [docs/architecture.md](docs/architecture.md): storage, modules, automation, connectors, security and operations, with what is built today and what is next
 - **Contribute:** [CONTRIBUTING](CONTRIBUTING.md)
 

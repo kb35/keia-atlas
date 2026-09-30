@@ -72,6 +72,8 @@ Start small. Start with one module. The smallest useful setup is the device cata
 
 **Already keep devices in a spreadsheet or NetBox?** Bring them in with a connector: `npm run connect -- csv your-devices.csv` shows what would change and writes to `data/connected/` only with `--apply`. See [docs/connectors/](docs/connectors/README.md).
 
+**Setting up from your own records, step by step:** [docs/setup-with-ai.md](docs/setup-with-ai.md) covers importers first, then optional AI help (with [AGENTS.md](AGENTS.md) for the agent), with a review for every change.
+
 The demo company is Aigna; every occurrence of its name, codes (`DUB`, `NYC`, ...), people and serials is demo data. `grep -ri aigna data/` finds what is left.
 
 ## 5. Validate, test, build
