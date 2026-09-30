@@ -1,6 +1,6 @@
 # Keia Atlas
 
-**Workplace technology, mapped.**
+The open-source platform for workplace technology and the IT work around it.
 
 Keia is a way of running IT from one living record of every room, device and job: kept by the work itself, readable in a minute, as deep as you need.
 
