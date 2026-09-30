@@ -257,6 +257,7 @@ const KEY = [['meeting', 'Meeting rooms'], ['small', 'Small rooms'], ['shared', 
 <script>
   import { motion } from '../../lib/motion-read.mjs';
   import { springEasing } from '../../lib/spring.mjs';
+  import { clock, addPicture, pauseButton, freezeMoves, stillWanted } from '../../lib/front-loop.mjs';
 
   const VW = 960, VH = 600;
   // A duration token in ms. The build writes "760ms" as ".76s", so the unit is read, not assumed.
@@ -338,16 +339,26 @@ const KEY = [['meeting', 'Meeting rooms'], ['small', 'Small rooms'], ['shared', 
       setStrip(L);
     }
     // The loop's gate: it moves only while the stage is on screen and the tab is shown, and waits otherwise.
-    let inView = false;
+    let inView = false, held = false;
+    const clk = clock();
     const waiters: (() => void)[] = [];
-    const visible = () => inView && document.visibilityState === 'visible';
+    const visible = () => inView && !held && document.visibilityState === 'visible';
     const wake = () => { if (visible()) waiters.splice(0).forEach((f) => f()); };
     const whenVisible = () => (visible() ? Promise.resolve() : new Promise<void>((r) => waiters.push(r)));
     if ('IntersectionObserver' in window) new IntersectionObserver((es) => { inView = es[es.length - 1].intersectionRatio >= 0.4; wake(); }, { threshold: [0, 0.4] }).observe(stage); else inView = true;
     document.addEventListener('visibilitychange', wake);
-    const wait = (t: number) => new Promise<void>((r) => setTimeout(r, t));
+    const wait = (t: number) => new Promise<void>((r) => { clk.later(t, r); });
     // The visitor takes over: the loop ends (each loop owns one generation, so a newer loop also ends an older one).
-    const stop = () => { auto = false; gen++; };
+    // Pause and play (WCAG 2.2.2): the loop, its waits, its moves and the 3D camera stop where they are, and carry on.
+    const capLive = (on: boolean) => cap.setAttribute('aria-live', on ? 'polite' : 'off');
+    let setBtn = (_p: boolean) => {}, btn: HTMLElement | null = null, removePicture = () => {};
+    const freeze = (on: boolean) => { if (on) clk.pause(); else clk.resume(); freezeMoves(root, on); if (on) hero?.pause?.(); else hero?.resume?.(); };
+    const picture = {
+      stage,
+      hold() { if (!auto || held) return; held = true; freeze(true); setBtn(true); },
+      resume() { if (!held) return; held = false; freeze(false); setBtn(false); wake(); },
+    };
+    const stop = () => { auto = false; gen++; if (held) { held = false; freeze(false); } capLive(true); btn?.remove(); btn = null; removePicture(); };
     // 2D soft reset: the end frame cross-fades to the first (opacity only, no zoom), and the strip goes home.
     const reset2d = () => new Promise<void>((res) => {
       const m = motion(), fromI = cur, from = layers[fromI], zero = layers[0];
@@ -365,6 +376,7 @@ const KEY = [['meeting', 'Meeting rooms'], ['small', 'Small rooms'], ['shared', 
     async function loop2d() {
       const my = ++gen, live = () => auto && my === gen;
       if (motion().reduced) return;
+      capLive(false);
       for (;;) {
         await whenVisible(); if (!live()) return;
         await wait(hold);
@@ -387,7 +399,8 @@ const KEY = [['meeting', 'Meeting rooms'], ['small', 'Small rooms'], ['shared', 
     const saveData = (navigator as any).connection?.saveData === true;
     let hero: any = null, hoverAt: (() => number[] | null) | null = null;
     const place = (el: HTMLElement, p: number[] | null, dy = -14) => { if (!p) { el.hidden = true; return; } el.hidden = false; el.style.left = `${Math.round(p[0])}px`; el.style.top = `${Math.round(p[1] + dy)}px`; };
-    const use3d = wide && !saveData && hasGL();
+    // Reduced motion, or Keep things still: the drawn picture, with its words, instead of the moving model.
+    const use3d = wide && !saveData && hasGL() && !motion().reduced && !stillWanted();
 
     // The device level in 3D: the product drawing over the scene, fading in; the scene stays behind it.
     let over = false;
@@ -419,6 +432,7 @@ const KEY = [['meeting', 'Meeting rooms'], ['small', 'Small rooms'], ['shared', 
     async function loop3d(h: any) {
       const my = ++gen, live = () => auto && my === gen;
       if (motion().reduced) { h.run(); return; }
+      capLive(false); if (held) h.pause();
       for (;;) {
         await whenVisible(); if (!live()) return;
         const done = await h.run(); if (!done || !live()) return;
@@ -467,6 +481,16 @@ const KEY = [['meeting', 'Meeting rooms'], ['small', 'Small rooms'], ['shared', 
     matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => hero?.recolour());
     new MutationObserver(() => hero?.recolour()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-look'] });
 
+    // Reduced motion: the floor, still, with its words and the fault named; every level a press away, at once.
+    if (motion().reduced) { go2d(1, false); return; }
+    removePicture = addPicture(picture);
+    setBtn = pauseButton(stage, 'the demo office', () => (held ? picture.resume() : picture.hold()));
+    btn = stage.querySelector(':scope > .rs-pause');
+    btn?.addEventListener('pointerdown', (e) => e.stopPropagation());
+    btn?.addEventListener('click', (e) => e.stopPropagation());
+    btn?.addEventListener('keydown', (e) => e.stopPropagation());
+    setBtn(false);
+    if (stillWanted()) picture.hold();
     if (use3d) {
       const kick = () => { mount3d().catch(() => { if (!hero && auto) loop2d(); }); };
       if ('requestIdleCallback' in window) (window as any).requestIdleCallback(kick, { timeout: 1200 }); else setTimeout(kick, 300);

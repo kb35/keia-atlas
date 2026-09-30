@@ -8,6 +8,7 @@ import { firmwareLines, sources, DEMO_TODAY } from './data.mjs';
 import { loadPrivacy, recordFor, privacyRows } from './privacy.mjs';
 import { supportStatus, monthLabel } from './security.mjs';
 import { RESTRICTED_VIEWS } from './classification.mjs';
+import { portsOfUnit, addressOf } from './switchports.mjs';
 import { vendors } from './data.mjs';
 import { warrantyWords, supportWords, money, dayMonthYear } from './cover.mjs';
 import { unitRepeats, FAULTS, symptomWords } from './repeats-view.mjs';
@@ -55,6 +56,20 @@ export function securityInfo(m) {
 
 const h = (str) => [...str].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 7);
 const hex = (v) => (v & 255).toString(16).padStart(2, '0').toUpperCase();
+
+// A unit's address as the page shows it.
+function netOf(s, p, u, networked, n) {
+  const a = addressOf(s.site, u.asset_tag);
+  if (a) return { ip: a.ip, prefix: a.address, mac: a.mac ?? null, fqdn: a.dns_name ?? `${p.hostname}.aigna.example`, how: a.assignment === 'static' ? 'Static' : 'DHCP reservation' };
+  if (!networked || !p.hostname || sites[s.site]?.kind !== 'remote') return null;
+  return { ip: `10.${(SITE_ORDER.indexOf(s.site) + 1) * 10}.${s.floor ?? 1}.${20 + (n % 200)}`, mac: ['02', hex(n), hex(n >> 8), hex(n >> 16), hex(n >> 24), hex(n >> 4)].join(':'), fqdn: `${p.hostname}.aigna.example`, how: 'From the home router' };
+}
+// One port of a unit, compact for data.json: where it goes (words), the VLAN, the check and the trace's hops.
+const hopRow = (h) => ({ k: h.kind, l: h.label, s: h.sub ?? '', ...(h.to ? { p: h.to.path, q: h.to.q ?? '', h: h.to.hash ?? '' } : {}), ...(h.vlan != null ? { v: h.vlan } : {}) });
+const portRow = (r) => ({
+  port: r.unitPort, sw: r.sw, swPort: r.port, slug: r.slug, state: r.state, mode: r.mode, native: r.native, vlan: r.vlanName, tagged: r.tagged,
+  words: r.words, ok: r.check?.ok ?? null, why: r.check?.why ?? '', drift: !!r.check?.drift, own: !!r.own, inRoom: !!r.inRoom, hops: r.hops.map(hopRow),
+});
 
 export function buildDevices() {
   const units = [];
@@ -111,7 +126,10 @@ export function buildDevices() {
           tag: u.asset_tag, serial: u.serial, host: p.hostname ?? null, name: deviceName(s, p), stage: u.stage, stageLabel: STAGE_LABEL[u.stage], installed: u.installed ?? null, arrived: u.arrived ?? null, retired: u.retired ?? null, spare: Boolean(p.spare), store: p.spare ? { cabinet: p.cabinet, shelf: p.shelf } : null, notes: u.notes ?? null, legacy: Boolean(u.legacy), older: Boolean(p.older),
           room: s.id,
           pos: { key: p.position, role: p.role ?? className(p.cls), cls: p.cls, className: className(p.cls), model: u.model ?? p.model ?? null, location: p.spare ? null : LOC_LABEL[p.equipment?.location ?? 'tbd'] ?? null },
-          net: networked && p.hostname ? { ip: `10.${(SITE_ORDER.indexOf(s.site) + 1) * 10}.${s.floor ?? 1}.${20 + (n % 200)}`, mac: ['02', hex(n), hex(n >> 8), hex(n >> 16), hex(n >> 24), hex(n >> 4)].join(':'), fqdn: `${p.hostname}.aigna.example` } : null,
+          // The address: the office's address plan (data/switch-ports addresses: an address in its VLAN's prefix, its MAC
+          // and DNS name). A home office's kit gets its address from the home router, so it keeps the old made-up one.
+          net: netOf(s, p, u, networked, n),
+          ports: portsOfUnit(s.site, u.asset_tag).map(portRow),
           conn, rack: rackItem ? { name: rack.name, u: rackItem.u, size: rackItem.size } : null,
           platforms: p.spare ? ['inventory'] : Object.keys(cls?.platforms ?? {}),
           usage: usageCard(u.asset_tag),

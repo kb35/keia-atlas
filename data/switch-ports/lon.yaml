@@ -1,0 +1,132 @@
+# Switch ports at the London office: its VLANs and prefixes, the kit that acts as one, the addresses, and every
+# switch interface with what it is connected to. Made up for the demo; written by tools/migrations/2026-09-30-switch-ports.mjs,
+# in NetBox's names (docs/connectors/netbox-ports.md). In a live setup NetBox and the switch platform's connector (UniFi,
+# Meraki or Netgear) fill it; here it is recorded. The record is the plan; `seen` is what the switch reports where it
+# differs (a drift finding). Each cable trace is checked against the patch cords, the runs and the room wiring by
+# tools/crossrefs-switchports.mjs.
+site: lon
+vlan_group: lon
+read_at: "2026-09-30T06:00:00Z"
+source: { system: keia, synced_at: "2026-09-30T06:00:00Z" }
+# The VLAN group: every VLAN in the plan, its role, its prefix (IPAM), the gateway, and where addresses come from.
+vlans:
+  - { vid: 10, role: management, prefix: 10.30.10.0/24, gateway: 10.30.10.1, reserved: 10.30.10.20-10.30.10.219, pool: 10.30.10.220-10.30.10.254 }
+  - { vid: 20, role: corporate, prefix: 10.30.20.0/22, gateway: 10.30.20.1, reserved: 10.30.20.20-10.30.20.219, pool: 10.30.21.1-10.30.23.254 }
+  - { vid: 30, role: room-systems, prefix: 10.30.30.0/24, gateway: 10.30.30.1, reserved: 10.30.30.20-10.30.30.219, pool: 10.30.30.220-10.30.30.254 }
+  - { vid: 31, role: displays-and-signage, prefix: 10.30.31.0/24, gateway: 10.30.31.1, reserved: 10.30.31.20-10.30.31.219, pool: 10.30.31.220-10.30.31.254 }
+  - { vid: 40, role: av, prefix: 169.254.0.0/16, note: "Link-local in each room, on the in-room switch only; not routed" }
+  - { vid: 50, role: building, prefix: 10.30.50.0/24, gateway: 10.30.50.1, reserved: 10.30.50.20-10.30.50.219, pool: 10.30.50.220-10.30.50.254 }
+  - { vid: 60, role: security, prefix: 10.30.60.0/24, gateway: 10.30.60.1, reserved: 10.30.60.20-10.30.60.219, pool: 10.30.60.220-10.30.60.254 }
+  - { vid: 70, role: printers, prefix: 10.30.70.0/24, gateway: 10.30.70.1, reserved: 10.30.70.20-10.30.70.219, pool: 10.30.70.220-10.30.70.254 }
+  - { vid: 90, role: guest, prefix: 10.30.90.0/23, gateway: 10.30.90.1, pool: 10.30.90.20-10.30.91.254 }
+# Kit that acts as one (NetBox: virtual chassis; an HA pair and a cluster are the same idea). A change to one member is a change to the group.
+groups:
+  - { id: lon-208-core, kind: virtual-chassis, name: "Core switches, one virtual chassis (StackWise Virtual)", members: [lon-208-cs01, lon-208-cs02] }
+  - { id: lon-208-fw, kind: ha-pair, name: "Firewalls A and B, an active and passive pair", members: [AG-001338, AG-001339] }
+# Addresses (IPAM): each networked unit in its VLAN's prefix, with its MAC and DNS name. Switches are static; the rest are DHCP reservations.
+addresses:
+  - { address: 10.30.10.20/24, device: AG-003264, interface: lan-1, mac: "02:82:EF:1F:C2:F8", dns_name: lon-2-ap01.aigna.example, assignment: dhcp-reservation }  # lon-2-ap01
+  - { address: 10.30.10.21/24, device: AG-003265, interface: lan-1, mac: "02:83:EF:1F:C2:F8", dns_name: lon-2-ap02.aigna.example, assignment: dhcp-reservation }  # lon-2-ap02
+  - { address: 10.30.10.22/24, device: AG-003266, interface: lan-1, mac: "02:84:EF:1F:C2:F8", dns_name: lon-2-ap03.aigna.example, assignment: dhcp-reservation }  # lon-2-ap03
+  - { address: 10.30.10.23/24, device: AG-003267, interface: lan-1, mac: "02:85:EF:1F:C2:F8", dns_name: lon-2-ap04.aigna.example, assignment: dhcp-reservation }  # lon-2-ap04
+  - { address: 10.30.10.24/24, device: AG-001318, mac: "02:EE:09:1F:C2:9E", dns_name: lon-203-sw01.aigna.example, assignment: dhcp-reservation }  # lon-203-sw01
+  - { address: 10.30.10.2/24, device: AG-001342, dns_name: lon-208-as01.aigna.example, assignment: static }  # lon-208-as01
+  - { address: 10.30.10.3/24, device: AG-001340, dns_name: lon-208-cs01.aigna.example, assignment: static }  # lon-208-cs01
+  - { address: 10.30.10.4/24, device: AG-001341, dns_name: lon-208-cs02.aigna.example, assignment: static }  # lon-208-cs02
+  - { address: 10.30.30.20/24, device: AG-001304, interface: lan-1, mac: "02:CB:09:1F:C2:9C", dns_name: lon-201-tc01.aigna.example, assignment: dhcp-reservation }  # lon-201-tc01
+  - { address: 10.30.30.21/24, device: AG-001303, interface: lan-1, mac: "02:CA:09:1F:C2:9C", dns_name: lon-201-vc01.aigna.example, assignment: dhcp-reservation }  # lon-201-vc01
+  - { address: 10.30.30.22/24, device: AG-001309, interface: lan-1, mac: "02:D0:09:1F:C2:9D", dns_name: lon-202-tc01.aigna.example, assignment: dhcp-reservation }  # lon-202-tc01
+  - { address: 10.30.30.23/24, device: AG-001308, interface: lan-1, mac: "02:CF:09:1F:C2:9C", dns_name: lon-202-vc01.aigna.example, assignment: dhcp-reservation }  # lon-202-vc01
+  - { address: 10.30.30.24/24, device: AG-001315, interface: lan-1, mac: "02:EB:09:1F:C2:9E", dns_name: lon-203-tc01.aigna.example, assignment: dhcp-reservation }  # lon-203-tc01
+  - { address: 10.30.30.25/24, device: AG-001314, interface: lan-1, mac: "02:EA:09:1F:C2:9E", dns_name: lon-203-vc01.aigna.example, assignment: dhcp-reservation }  # lon-203-vc01
+  - { address: 10.30.30.26/24, device: AG-001326, interface: lan-1, mac: "02:0B:0A:1F:C2:A0", dns_name: lon-204-tc01.aigna.example, assignment: dhcp-reservation }  # lon-204-tc01
+  - { address: 10.30.30.27/24, device: AG-001325, interface: lan-1, mac: "02:0A:0A:1F:C2:A0", dns_name: lon-204-vc01.aigna.example, assignment: dhcp-reservation }  # lon-204-vc01
+  - { address: 10.30.30.28/24, device: AG-001332, interface: lan-1, mac: "02:26:0A:1F:C2:A2", dns_name: lon-205-tc01.aigna.example, assignment: dhcp-reservation }  # lon-205-tc01
+  - { address: 10.30.30.29/24, device: AG-001331, interface: lan-1, mac: "02:25:0A:1F:C2:A2", dns_name: lon-205-vc01.aigna.example, assignment: dhcp-reservation }  # lon-205-vc01
+  - { address: 10.30.31.20/24, device: AG-001301, interface: lan-1, mac: "02:C8:09:1F:C2:9C", dns_name: lon-201-dsp01.aigna.example, assignment: dhcp-reservation }  # lon-201-dsp01
+  - { address: 10.30.31.21/24, device: AG-001302, interface: lan-1, mac: "02:C9:09:1F:C2:9C", dns_name: lon-201-dsp02.aigna.example, assignment: dhcp-reservation }  # lon-201-dsp02
+  - { address: 10.30.31.22/24, device: AG-001307, interface: lan-1, mac: "02:CE:09:1F:C2:9C", dns_name: lon-202-dsp01.aigna.example, assignment: dhcp-reservation }  # lon-202-dsp01
+  - { address: 10.30.31.23/24, device: AG-001312, interface: lan-1, mac: "02:E8:09:1F:C2:9E", dns_name: lon-203-dsp01.aigna.example, assignment: dhcp-reservation }  # lon-203-dsp01
+  - { address: 10.30.31.24/24, device: AG-001313, interface: lan-1, mac: "02:E9:09:1F:C2:9E", dns_name: lon-203-dsp02.aigna.example, assignment: dhcp-reservation }  # lon-203-dsp02
+  - { address: 10.30.31.25/24, device: AG-001324, interface: lan-1, mac: "02:09:0A:1F:C2:A0", dns_name: lon-204-dsp01.aigna.example, assignment: dhcp-reservation }  # lon-204-dsp01
+  - { address: 10.30.31.26/24, device: AG-001330, interface: lan-1, mac: "02:24:0A:1F:C2:A2", dns_name: lon-205-dsp01.aigna.example, assignment: dhcp-reservation }  # lon-205-dsp01
+  - { address: 10.30.70.20/24, device: AG-001337, interface: lan-1, mac: "02:2B:0A:1F:C2:A2", dns_name: lon-207-prn01.aigna.example, assignment: dhcp-reservation }  # lon-207-prn01
+switches:
+  # Core switch A · 2.08 Comms room (MDF), Rack 1, U18
+  - id: lon-208-cs01
+    rack: lon-2-08-r1
+    u: 18
+    platform: meraki
+    interfaces:
+      - { name: 1, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [lon-cb-02], device: lon-208-as01, interface: 49 } }  # trunk down to lon-208-as01
+      - { name: 3, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [lon-cb-05], device: AG-001338 } }  # Firewall A
+      - { name: 25, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [lon-cb-04], device: lon-208-cs02, interface: 25 } }  # trunk to lon-208-cs02
+      - { name: 26, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [lon-cb-04], device: lon-208-cs02, interface: 26 } }  # trunk to lon-208-cs02
+    disabled: "2,4-24,27-28"
+  # Core switch B · 2.08 Comms room (MDF), Rack 1, U17
+  - id: lon-208-cs02
+    rack: lon-2-08-r1
+    u: 17
+    platform: meraki
+    interfaces:
+      - { name: 1, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [lon-cb-03], device: lon-208-as01, interface: 50 } }  # trunk down to lon-208-as01
+      - { name: 3, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [lon-cb-06], device: AG-001339 } }  # Firewall B
+      - { name: 25, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [lon-cb-04], device: lon-208-cs01, interface: 25 } }  # trunk to lon-208-cs01
+      - { name: 26, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [lon-cb-04], device: lon-208-cs01, interface: 26 } }  # trunk to lon-208-cs01
+    disabled: "2,4-24,27-28"
+  # Access switch · 2.08 Comms room (MDF), Rack 1, U13
+  - id: lon-208-as01
+    rack: lon-2-08-r1
+    u: 13
+    platform: meraki
+    interfaces:
+      - { name: 1, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P01], device: AG-001301, interface: lan-1 } }  # 2.01 Kestrel, display 1
+      - { name: 2, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P02], device: AG-001303, interface: lan-1 } }  # 2.01 Kestrel, video bar
+      - { name: 3, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P03], device: AG-001302, interface: lan-1 } }  # 2.01 Kestrel, display 2
+      - { name: 4, enabled: false, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P04] } }  # 2.01 Kestrel, data/behind-display#4, nothing plugged in
+      - { name: 5, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P05], device: AG-001304, interface: lan-1 } }  # 2.01 Kestrel, touch controller
+      - { name: 6, enabled: false, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P06] } }  # 2.01 Kestrel, data/below-table#2, nothing plugged in
+      - { name: 7, enabled: false, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P07] } }  # 2.01 Kestrel, data/room-entrance#1, nothing plugged in
+      - { name: 8, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P08], device: AG-001307, interface: lan-1 } }  # 2.02 Heron, display
+      - { name: 9, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P09], device: AG-001308, interface: lan-1 } }  # 2.02 Heron, video bar
+      - { name: 10, enabled: false, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P10] } }  # 2.02 Heron, data/behind-display#3, nothing plugged in
+      - { name: 11, enabled: false, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P11] } }  # 2.02 Heron, data/behind-display#4, nothing plugged in
+      - { name: 12, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P12], device: AG-001309, interface: lan-1 } }  # 2.02 Heron, touch controller
+      - { name: 13, enabled: false, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P13] } }  # 2.02 Heron, data/below-table#2, nothing plugged in
+      - { name: 14, enabled: false, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P14] } }  # 2.02 Heron, data/room-entrance#1, nothing plugged in
+      - { name: 15, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P15], device: AG-001312, interface: lan-1 } }  # 2.03 Curlew, display 1
+      - { name: 16, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [30], connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P16], device: AG-001318, interface: lan-9 } }  # 2.03 Curlew, network switch
+      - { name: 17, enabled: false, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P17] } }  # 2.03 Curlew, data/behind-display#3, nothing plugged in
+      - { name: 18, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P18], device: AG-001313, interface: lan-1 } }  # 2.03 Curlew, display 2
+      - { name: 19, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P19], device: AG-001314, interface: lan-1 } }  # 2.03 Curlew, video bar
+      - { name: 20, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P20], device: AG-001315, interface: lan-1 } }  # 2.03 Curlew, touch controller
+      - { name: 21, enabled: false, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P21] } }  # 2.03 Curlew, data/below-table#2, nothing plugged in
+      - { name: 22, enabled: false, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P22] } }  # 2.03 Curlew, data/room-entrance#1, nothing plugged in
+      - { name: 23, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P23], device: AG-001324, interface: lan-1 } }  # 2.04 Wren, display
+      - { name: 24, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P24], device: AG-001325, interface: lan-1 } }  # 2.04 Wren, video bar (through the poe injector)
+      - { name: 25, enabled: false, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P25] } }  # 2.04 Wren, data/behind-display#3, nothing plugged in
+      - { name: 26, enabled: false, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P26] } }  # 2.04 Wren, data/behind-display#4, nothing plugged in
+      - { name: 27, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P27], device: AG-001326, interface: lan-1 } }  # 2.04 Wren, touch controller
+      - { name: 28, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P28], device: AG-001330, interface: lan-1 } }  # 2.05 Robin, display
+      - { name: 29, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P29], device: AG-001331, interface: lan-1 } }  # 2.05 Robin, video bar (through the poe injector)
+      - { name: 30, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P30], device: AG-001332, interface: lan-1 } }  # 2.05 Robin, touch controller
+      - { name: 31, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P31], device: AG-001336, interface: lan-1 } }  # 2.06 Goldcrest, monitor
+      - { name: 32, enabled: true, mode: access, untagged_vlan: 70, auth: mab, connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P32], device: AG-001337, interface: lan-1 } }  # 2.07 Copy and print, printer
+      - { name: 33, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 90], connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P33], device: AG-003264, interface: lan-1 } }  # access point lon-2-ap01
+      - { name: 34, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 90], connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P34], device: AG-003265, interface: lan-1 } }  # access point lon-2-ap02
+      - { name: 35, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 90], connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P35], device: AG-003266, interface: lan-1 } }  # access point lon-2-ap03
+      - { name: 36, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 90], connected: { cables: [lon-cb-01, LON-2.08-R1-U14-P36], device: AG-003267, interface: lan-1 } }  # access point lon-2-ap04
+      - { name: 49, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [lon-cb-02], device: lon-208-cs01, interface: 1 } }  # trunk to lon-208-cs01
+      - { name: 50, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [lon-cb-03], device: lon-208-cs02, interface: 1 } }  # trunk to lon-208-cs02
+    disabled: "37-48"
+  # Curlew, network switch · 2.03 Curlew
+  - id: lon-203-sw01
+    space: lon-2-03
+    position: network-switch
+    platform: netgear
+    interfaces:
+      - { name: lan-1, enabled: true, mode: access, untagged_vlan: 40, auth: mab, connected: { device: AG-001314, interface: lan-2 } }  # video bar, AV network in the room
+      - { name: lan-2, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { device: AG-001319, interface: lan-1 } }  # switcher
+      - { name: lan-9, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [30], connected: { cables: [LON-2.08-R1-U14-P16, lon-cb-01], device: lon-208-as01, interface: 16 } }  # uplink to lon-208-as01 port 16
+    disabled: [lan-3, lan-4, lan-5, lan-6, lan-7, lan-8, sfp-1, lan-10]
+demo: true

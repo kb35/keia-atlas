@@ -93,18 +93,18 @@ const fw = rule('firmware-to-standard');
 <script>
   import { motion } from '../../lib/motion-read.mjs';
   import { setGlyph } from '../../lib/health.mjs';
-  import { loop } from '../../lib/front-loop.mjs';
+  import { loop, clock as loopClock } from '../../lib/front-loop.mjs';
   function init(root: HTMLElement) {
     if ((root as any).__mt) return; (root as any).__mt = true;
-    let timers: number[] = [];
-    const later = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
+    const clk = loopClock();
+    const later = (ms: number, fn: () => void) => { clk.later(ms, fn); };
     const runs = Array.from(root.querySelectorAll<HTMLElement>('[data-mt-run]'));
     const sqs = Array.from(root.querySelectorAll<HTMLElement>('[data-mt-sq]'));
     const beat = root.querySelector<HTMLElement>('[data-mt-beat]')!;
     const finishRun = (li: HTMLElement) => { const g = li.querySelector<HTMLElement>('.hg'); if (li.dataset.result === 'done') setGlyph(g, 'fine', { title: 'done' }); li.classList.add('is-done'); };
     const finish = () => { runs.forEach((li) => { li.classList.add('is-in'); finishRun(li); }); sqs.forEach((s) => s.classList.add('is-in')); };
     const reset = () => {
-      timers.forEach(clearTimeout); timers = [];
+      clk.clear();
       runs.forEach((li) => { li.classList.remove('is-in', 'is-done'); setGlyph(li.querySelector<HTMLElement>('.hg'), li.dataset.result === 'done' ? 'progress' : 'off', { title: li.dataset.result === 'done' ? 'running' : 'not run' }); const card = li.querySelector<HTMLElement>('[data-mt-howcard]'); const how = li.querySelector<HTMLButtonElement>('[data-mt-how]'); if (card) card.hidden = true; how?.setAttribute('aria-expanded', 'false'); });
       sqs.forEach((s) => s.classList.remove('is-in'));
     };
@@ -131,7 +131,7 @@ const fw = rule('firmware-to-standard');
     const tick = () => { if (!root.isConnected) return; const s = Math.round((Date.now() - t0) / 10000) * 10; beat.textContent = s < 10 ? 'checked just now' : s < 60 ? `checked ${s} s ago` : `checked ${Math.floor(s / 60)} min ago`; setTimeout(tick, 10000); };
     setTimeout(tick, 10000);
     if (motion().reduced) { finish(); return; }
-    loop(root.querySelector<HTMLElement>('.mt-stage')!, { play: run, reset });
+    loop(root.querySelector<HTMLElement>('.mt-stage')!, { play: run, reset, finish, clock: clk });
   }
   const boot = () => document.querySelectorAll<HTMLElement>('[data-mt]').forEach(init);
   boot();

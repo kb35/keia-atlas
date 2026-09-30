@@ -1,25 +1,31 @@
-// Deploy, built around batches and checks.
+// Deploy, built around units and checks, delivered the way the team works.
 //
-// "Verify, don't tick." An engineer sets devices up in batches (every unit that shares one configuration,
-// such as three Poly Studio X72 video bars), not room by room, and Keia Atlas checks what it can see: the
-// records in the systems, the unit online on its switch port, the settings read back against the standard.
-// A person accepts what passed in one action and fixes only the exceptions. Commissioning stays room by
-// room: a short room test, "All passed" in one tap.
+// "Verify, don't tick." Keia Atlas checks what it can see for every unit: the records in the systems, the unit
+// online on its switch port, the settings read back against the standard. A person accepts what passed in one
+// action and fixes only the exceptions. How the units are grouped for the work is the team's choice ("Deliver
+// by", the project's `delivery.by`, and each person's own pick in the browser): batches by default (every unit
+// that shares one configuration, such as three Poly Studio X72 video bars); by room, by floor or one at a time
+// where the team works that way; or a set a person picks. Every grouping reads and writes the same unit-level
+// state, so switching never loses progress. Commissioning stays room by room: a short room test, "All passed"
+// in one tap.
 //
 // This module builds the plan a project's Deploy pages start from (the base). What happens after is
 // events in the live layer (src/lib/live.mjs), replayed in the browser by src/lib/integrate-client.mjs:
 //
 //   int:<PRJ>:<unit id>:unit        one unit: online, read, drift, fwOk, dnsOk, host, serial, photo,
 //                                   x-<step> (a person's tick or untick, with the reason in the note),
-//                                   su-<setup id> (a setup-order tick)
+//                                   su-<setup id> (a setup-order tick), applied (its setup guide sent to it
+//                                   alone, from a room, floor or set), accepted (one at a time)
 //   int:<PRJ>:<batch id>:batch      one batch: applied, prepared (the agent), accepted, su-<setup id>
 //   int:<PRJ>:<room id>:room        one room: tests, signed, accepted
-//   int:<PRJ>:all:project           the whole project: accepted
+//   int:<PRJ>:<zone id>:zone        one floor or side of a floor: accepted
+//   int:<PRJ>:all:project           the whole project: accepted (and a custom set's accepts, which name the set)
 //
-// "accepted" is a list of "<unit id>|<step>" a person has accepted (or confirmed by hand where Keia Atlas
-// cannot see), written as one event with the evidence in its note. Everything here is simulated: the
-// systems' answers are made up from the project's tasks, so the page is labelled Simulated live.
-import { readFileSync } from 'node:fs';
+// "accepted" maps "<unit id>|<step>" to who accepted it (or confirmed it by hand where Keia Atlas cannot see),
+// when, what passed for that unit and step (ev) and the group it was accepted in (in), written as one event
+// with a summary in its note. Everything here is simulated: the systems' answers are made up from the
+// project's tasks, so the page is labelled Simulated live.
+import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { parse } from 'yaml';
 import { spaces, sites, classes, configFor, standardFirmware, firmwareFor, advisoriesFor, ADV_LEVEL, REGION_LABEL, className, modelName, href, LOC_LABEL, INTEGRATE_STEPS, STEP_LABEL, PHASE_LABEL, PHASES, SITE_ORDER, deviceName, countryName, DEMO_TODAY } from './data.mjs';
@@ -56,6 +62,64 @@ const ALL_NEW = new Set(['fit-out', 'home-kit', 'custom-design', 'new-build']);
 const NAMED = [[/video bar/i, 'video-bar'], [/booking panel|scheduler/i, 'scheduler-panel'], [/signage/i, 'signage-player'], [/\bdisplay/i, 'display'], [/camera/i, 'camera'], [/switch/i, 'network-switch']];
 const PAIRS_WITH = { 'video-bar': ['touch-controller', 'microphone', 'camera'], codec: ['touch-controller', 'microphone', 'camera'] };
 const NEW_STAGES = new Set(['plan', 'procure', 'deploy']);
+
+// Where a space sits on its floor (metres from the outline's south-west corner), and the floor plan's core, so
+// a fit-out on one floor can be delivered side by side. A space turned a quarter swaps its width and depth.
+function centreOf(room) {
+  const g = room.geometry, at = g?.on_floor, sz = g?.size_m;
+  if (!at) return null;
+  if (!sz) return { x: at.x_m, y: at.y_m };   // built to its space type's size: its placed corner is near enough for a side
+  const quarter = Math.round(((at.turn_deg ?? 0) % 180) / 90) % 2 === 1;
+  const w = quarter ? sz.depth : sz.width, d = quarter ? sz.width : sz.depth;
+  return { x: at.x_m + w / 2, y: at.y_m + d / 2 };
+}
+const floorPlans = new Map();
+function floorPlan(site, floor) {
+  const k = `${site}-${floor}`;
+  if (!floorPlans.has(k)) {
+    const p = path.join(process.cwd(), 'data', 'floors', `${k}.yaml`);
+    floorPlans.set(k, existsSync(p) ? parse(readFileSync(p, 'utf8')) : null);
+  }
+  return floorPlans.get(k);
+}
+const floorName = (site, floor) => String(sites[site]?.floors?.find((f) => String(f.id) === String(floor))?.name ?? `Floor ${floor}`).split(':')[0].trim();
+// Rooms grouped for "Deliver by: floor or zone". Work over several floors goes floor by floor. Work on one
+// floor with four or more spaces goes by side of the floor (north and south of the core on a wide floor, west
+// and east on a deep one), the way a fit-out crew works a floor. Home offices go by the office they are near.
+function zonesOf(rooms) {
+  const withUnits = rooms.filter((r) => r.units.length);
+  const office = withUnits.filter((r) => r.floor != null);
+  const floorsUsed = [...new Set(office.map((r) => `${r.site}|${r.floor}`))];
+  const zones = [];
+  const zone = (id, title, sub) => { let z = zones.find((x) => x.id === id); if (!z) { z = { id, title, sub, rooms: [], units: [] }; zones.push(z); } return z; };
+  const sided = floorsUsed.length === 1 && office.length >= 4;
+  let split = null;
+  if (sided) {
+    const [site, floor] = floorsUsed[0].split('|');
+    const fp = floorPlan(site, floor), core = fp?.core ?? [];
+    const xs = (fp?.outline ?? []).map((p) => p[0]), ys = (fp?.outline ?? []).map((p) => p[1]);
+    if (core.length && xs.length && office.every((r) => r.at)) {
+      const cx = (Math.min(...core.map((c) => c.rect[0])) + Math.max(...core.map((c) => c.rect[2]))) / 2;
+      const cy = (Math.min(...core.map((c) => c.rect[1])) + Math.max(...core.map((c) => c.rect[3]))) / 2;
+      const wide = Math.max(...xs) - Math.min(...xs) >= Math.max(...ys) - Math.min(...ys);
+      split = wide ? { key: (r) => (r.at.y >= cy ? 'north' : 'south'), order: ['north', 'south'] } : { key: (r) => (r.at.x < cx ? 'west' : 'east'), order: ['west', 'east'] };
+      if (new Set(office.map(split.key)).size < 2) split = null;
+    }
+  }
+  const floorOrder = (r) => { const n = parseFloat(r.floor); return Number.isFinite(n) ? n : 999; };
+  const ordered = [...office].sort((a, b) => floorOrder(a) - floorOrder(b) || (split ? split.order.indexOf(split.key(a)) - split.order.indexOf(split.key(b)) : 0));
+  for (const r of ordered) {
+    const fl = floorName(r.site, r.floor);
+    const z = split ? zone(`${r.site}-${r.floor}-${split.key(r)}`, `${fl}, ${split.key(r)} side`, 'side') : zone(`${r.site}-${r.floor}`, fl, 'floor');
+    r.zone = z.id; z.rooms.push(r.id);
+  }
+  for (const r of withUnits.filter((x) => x.floor == null)) {
+    const near = r.near && sites[r.near] ? sites[r.near].name : null;
+    const z = zone(`${r.site}-near-${r.near ?? 'none'}`, near ? `Home offices near ${near}` : r.siteName, 'near');
+    r.zone = z.id; z.rooms.push(r.id);
+  }
+  return zones;
+}
 
 // The order an engineer sets things up in: the network first, then the room system, what pairs with it,
 // then the AV path, the panels and the screens.
@@ -164,7 +228,7 @@ export function integratePlan(project) {
     const newHere = positions.filter((p) => everything || scope.has(p.cls));
     const pairClasses = new Set(newHere.flatMap((p) => PAIRS_WITH[p.cls] ?? []));
     const hostOf = (cls) => positions.find((x) => x.cls === 'video-bar' || x.cls === 'codec') ?? null;
-    const r = { id: room.id, name: roomName, site: room.site, siteName: site.name, profile: room.type?.profile?.name ?? '', state: ps.state, note: ps.note ?? null, units: [], kept: [], tests: [], base: { tests: {}, signed: null } };
+    const r = { id: room.id, name: roomName, site: room.site, siteName: site.name, profile: room.type?.profile?.name ?? '', state: ps.state, note: ps.note ?? null, units: [], kept: [], tests: [], base: { tests: {}, signed: null }, floor: room.floor ?? null, near: room.near ?? null, at: centreOf(room) };
 
     for (const p of positions) {
       const isNew = everything || scope.has(p.cls);
@@ -362,11 +426,21 @@ export function integratePlan(project) {
   }
 
   const blocked = intTasks.filter((t) => t.status === 'blocked').map((t) => ({ id: t.id, title: t.title, why: t.blocked_by ?? 'Waiting on something', room: t.space ?? null, owner: t.owner, href: href(`/projects/${P.toLowerCase()}/tasks/${t.id.toLowerCase()}/`) }));
+
+  // Floors and sides of a floor, and the one-at-a-time queue: zone by zone, space by space, and in each space
+  // the work order (network, room system, what pairs with it, then the rest).
+  const zones = zonesOf(rooms);
+  for (const z of zones) z.units = z.rooms.flatMap((rid) => rooms.find((r) => r.id === rid).units);
+  const byOrder = (a, b) => orderOf(units.find((u) => u.id === a).cls) - orderOf(units.find((u) => u.id === b).cls);
+  const queue = zones.flatMap((z) => z.rooms.flatMap((rid) => [...rooms.find((r) => r.id === rid).units].sort(byOrder)));
+  for (const u of units) if (!queue.includes(u.id)) queue.push(u.id);
+  for (const r of rooms) delete r.at;
+  const delivery = { by: project.delivery?.by ?? 'type', note: project.delivery?.note ?? null, recorded: Boolean(project.delivery) };
   return {
     project: P, name: project.name, kind: project.kind, phaseLabel: PHASE_LABEL.integrate,
     steps: INTEGRATE_STEPS.map((s) => ({ id: s, label: STEP_LABEL[s], done: DONE_WORD[s] })),
     lead, leadName: person(lead).name, vendor: vendor ? { id: vendor.id, name: vendor.name, company: vendor.vendorName ?? '' } : null,
-    everything, scope: [...scope], units, kept, rooms, batches: ordered, blocked,
+    everything, scope: [...scope], units, kept, rooms, batches: ordered, blocked, zones, queue, delivery,
     home: href(`/projects/${P.toLowerCase()}/`), base: href(`/projects/${P.toLowerCase()}/integrate/`),
   };
 }

@@ -35,6 +35,7 @@ import { GUIDE_KINDS } from '../../lib/guide.mjs';
 import { base } from '../../lib/data.mjs';
 import Restricted from '../../components/Restricted.astro';
 import BlastRadius from '../../components/BlastRadius.astro';
+import VlanSummary from '../../components/VlanSummary.astro';
 import { explorersForRoom, BLAST_NOW } from '../../lib/blast-view.mjs';
 
 
@@ -174,6 +175,7 @@ const deskWord =kind === 'kits' ? 'kit' : 'desk';
         <CommsSummary facts={cf} size={size} />
         <CommsPower space={x} rackUps={cf.power.ups?.model ?? null} />
         {blast.length > 0 && <BlastRadius targets={blast} now={BLAST_NOW} pick="Take off" lede="Pick a switch, gateway or circuit here to see which spaces, meetings and services would lose the internet. Worked out from the recorded patching." />}
+        <VlanSummary site={x.site} space={x.id} />
       </>
     )}
     {store && (
@@ -293,7 +295,7 @@ const deskWord =kind === 'kits' ? 'kit' : 'desk';
       <div class:list={['card side-card ri-card s-4', { 'rs-radiate': openCount > 0 }]} id="incidents">
         <h3 data-help="room.incidents">Incidents</h3>
         {REP && (
-          <div class:list={['rp', { 'is-repeat': REP.repeat }]} data-feature="repeat-faults" data-arrive data-help="room.repeats">
+          <div class:list={['rp', { 'is-repeat': REP.repeat }]} data-feature="repeat-faults" data-settle data-help="room.repeats">
             <p class="rp-a">{REP.ordinal ? <><b class="rs-tick">{REP.ordinal}</b> fault this quarter</> : REP.text}</p>
             <TrendStrip bars={REP.bars} label="Faults here per month, the last 12 months" tone={REP.repeat ? 'fault' : 'quiet'} mark={REP.bars.length - 1} height={24} step={12} ends />
             <p class="rp-s">{REP.year} in the last 12 months{REP.repeat ? ' · worth a look at the model or the room, not another restart' : ''}</p>
@@ -339,7 +341,7 @@ const deskWord =kind === 'kits' ? 'kit' : 'desk';
     {(PLAT || ACC) && (
       <div class="g12 rf-row">
         {PLAT && (
-          <section class:list={['card side-card rf-card', ACC ? 's-5' : 's-12']} id="platforms" aria-labelledby="h-plat" data-feature="certified-platforms" data-arrive>
+          <section class:list={['card side-card rf-card', ACC ? 's-5' : 's-12']} id="platforms" aria-labelledby="h-plat" data-feature="certified-platforms" data-settle>
             <h3 id="h-plat" data-help="room.platforms">Meeting platforms</h3>
             <p class="rf-a">{PLAT.answer}</p>
             <ul class="rf-plat">
@@ -356,7 +358,7 @@ const deskWord =kind === 'kits' ? 'kit' : 'desk';
           </section>
         )}
         {ACC && (
-          <section class:list={['card side-card rf-card', PLAT ? 's-7' : 's-12']} id="accessibility" aria-labelledby="h-acc" data-feature="room-accessibility" data-arrive>
+          <section class:list={['card side-card rf-card', PLAT ? 's-7' : 's-12']} id="accessibility" aria-labelledby="h-acc" data-feature="room-accessibility" data-settle>
             <h3 id="h-acc" data-help="room.accessibility">Accessibility</h3>
             <p class:list={['rf-a', { 'is-review': ACC.due?.overdue }]}>{ACC.answer}</p>
             <dl class="rf-acc">
@@ -374,7 +376,7 @@ const deskWord =kind === 'kits' ? 'kit' : 'desk';
     )}
 
     {CAB && (
-      <Section title="Cable tests" id="cable-tests" help="room.cable-tests" data-feature="cable-tests" data-arrive showAll={8}>
+      <Section title="Cable tests" id="cable-tests" help="room.cable-tests" data-feature="cable-tests" data-settle showAll={8}>
         <span slot="aside"><Restricted view="rack" /></span>
         <p class:list={['rf-a rf-cab-a', { 'is-bad': CAB.failed }]}>{CAB.answer}{CAB.last ? <span class="faint"> · last tested {CAB.last}</span> : ''}</p>
         <div class="tablewrap">
@@ -485,7 +487,7 @@ const deskWord =kind === 'kits' ? 'kit' : 'desk';
   .ri:hover { background: var(--surface-2); color: inherit; }
   .ri.past { opacity: .8; }
   .ri-p { font: 500 var(--fs-overline)/1 var(--font-mono); padding: 4px 6px; border-radius: 4px; background: var(--surface-3); margin-top: 1px; }
-  .ri-p.p-1, .ri-p.p-2 { background: var(--red); color: #fff; } .ri-p.p-3 { background: var(--amber-soft); color: var(--amber-ink); }
+  .ri-p.p-1, .ri-p.p-2 { background: var(--h-fault-ink, var(--red-ink)); color: var(--surface); } .ri-p.p-3 { background: var(--amber-soft); color: var(--amber-ink); }
   .ri-t { display: grid; gap: 1px; min-width: 0; }
   .ri-t b { font-size: var(--fs-body); line-height: 1.3; }
   .ri-t small { font-size: var(--fs-code); color: var(--text-3); }

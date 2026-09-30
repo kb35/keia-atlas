@@ -14,6 +14,8 @@ import DeviceGlyph from '../../components/DeviceGlyph.astro';
 import Icon from '../../components/Icon.astro';
 import PageBand from '../../components/PageBand.astro';
 import SimTag from '../../components/SimTag.astro';
+import HealthGlyph from '../../components/HealthGlyph.astro';
+import '../../styles/vlan.css';
 import Arrive from '../../components/Arrive.astro';
 import { models, spaces, STAGES, STAGE_LABEL, TASK_STATUS, INC_STATE, DEMO_TODAY } from '../../lib/data.mjs';
 import { artParts, artSource } from '../../lib/art.mjs';
@@ -46,6 +48,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
   {used.map((m) => <template data-art={m} data-traced={artParts(m) ? '1' : ''} data-src={artSource(m) ?? ''} data-dims={dims(m)}><DeviceArt model={m} cls={models[m].class} label={`${models[m].manufacturer} ${models[m].model}, drawn front-on`} /></template>)}
   {clsUsed.map((c) => <template data-glyph={c}><DeviceGlyph cls={c} size={120} /></template>)}
   <template data-icon="check"><Icon name="check" size={12} /></template>
+  <template data-glyph-review><HealthGlyph state="review" size={16} /></template>
   <Arrive />
 
   <script is:inline data-astro-rerun slot="end">
@@ -57,6 +60,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
       var L = function (p) { return '../' + p + (preview ? 'index.html' : ''); };
       var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
       var tick = document.querySelector('template[data-icon=check]').innerHTML;
+      var reviewGlyph = document.querySelector('template[data-glyph-review]').innerHTML;
       // Each drawing keeps its own clip outline: give every copy a fresh id so two on one page never share one.
       var seq = 0;
       var artTpl = function (u) { return (u.pos.model && document.querySelector('template[data-art="' + u.pos.model + '"]')) || null; };
@@ -122,7 +126,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
           (sp ? row('Support', '<a href="' + L('vendors/' + sp.id + '/') + '">' + esc(sp.name) + '</a>' + (sp.ref ? ', contract <span class="mono">' + esc(sp.ref) + '</span>' : '') + (sp.until ? (sp.live ? ' until ' : ', ended ') + esc(sp.until) : '')) : '') +
           (p ? row('Bought', esc(p.date) + (p.order ? ' · order <span class="mono">' + esc(p.order) + '</span>' : '') + (p.demo ? demoVal() : '')) : '') +
           (p && p.cost ? row('Cost', esc(p.cost)) : '');
-        return '<div class="dv-cover t-' + tone + '" id="cover" data-feature="warranty" data-arrive data-help="unit.cover"><p class="overline">Warranty and purchase</p>' +
+        return '<div class="dv-cover t-' + tone + '" id="cover" data-feature="warranty" data-settle data-help="unit.cover"><p class="overline">Warranty and purchase</p>' +
           '<p class="dv-cover-a">' + answer + then + '</p><dl class="dv-kv dv-cover-kv">' + rows + '</dl></div>';
       }
       function head(title, aside) { return '<header class="dv-ch"><h2>' + title + '</h2>' + (aside || '') + '</header>'; }
@@ -188,6 +192,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
       }
       function show(u) {
         var r = D.rooms[u.room], s = D.sites[r.site], m = u.pos.model ? D.models[u.pos.model] : null;
+        var P = u.ports || [];
         var nm = u.name ? u.name.charAt(0).toUpperCase() + u.name.slice(1) : (u.host || u.pos.role);
         var status = u.legacy ? 'Being replaced' : (STAGE[u.stage] || u.stageLabel);
         var inc = r.incidents.filter(function (i) { return !i.position || i.position === u.pos.key; });
@@ -236,13 +241,14 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
             row('Hostname', u.host ? '<span class="mono">' + esc(u.host) + '</span>' : 'None') +
             row('Serial', '<span class="mono">' + esc(u.serial) + '</span>') +
             row('Asset tag', '<span class="mono">' + esc(u.tag) + '</span>') +
-            (u.net ? row('IP address', '<span class="mono">' + u.net.ip + '</span> ' + R(D.restricted.ipPlan)) + row('MAC', '<span class="mono">' + u.net.mac + '</span>') : '') +
+            (u.net ? row('IP address', '<span class="mono">' + esc(u.net.prefix || u.net.ip) + '</span> <span class="faint">' + esc(u.net.how || '') + '</span> ' + R(D.restricted.ipPlan)) + (u.net.mac ? row('MAC', '<span class="mono">' + u.net.mac + '</span>') : '') : '') +
             row('Installed', u.installed ? fmt(u.installed) : (u.stage === 'manage' || u.stage === 'retire' ? 'Not recorded' : 'Not yet')) +
             (u.retired ? row('Taken out', fmt(u.retired)) : '') +
             // No setup guide: one line here instead of an empty card (REVIEW-SITE fix 8).
             (m && m.config ? '' : row('Setup guide', '<span class="dv-none" data-help="unit.config">None: nothing to set on the unit itself</span>')) +
           '</dl></div></div>' + coverBlock(u) + '</section>';
 
+        body += portsCardOf();
         // Advisories for this model change what you do next: one line each, open for the action.
         if (m && m.advisories.length) {
           body += '<section class="card dv-card" data-help="unit.advisories" id="advisories">' + head('Advisories for the ' + esc(m.name), '<span class="faint dv-aside">' + m.advisories.length + '</span>') +
@@ -293,7 +299,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
 
         // Row 2: Health, Configuration, and the unit's history.
         var healthCard = '<section class="card dv-card s-4 c-health" data-help="unit.health">' + head('Health', '<button type="button" class="btn small" data-help="unit.check" data-dv-check>Check again</button>') + '<ul class="dv-checks">' +
-          u.platforms.map(function (p) { var bad = p === 'device_management' && u.stage === 'deploy'; return '<li><span class="dv-c" data-c' + (bad ? ' data-bad' : '') + '>' + '<span class="sp"></span>' + tick + '<svg class="x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg></span><b>' + (PLAT[p] || p) + '</b><span class="faint">' + ({ keia_atlas: 'Recorded where the space type expects it', inventory: 'Active record in this space', dhcp_dns: u.net ? 'Reservation ' + u.net.ip + ' and DNS ' + u.host : 'Not networked', device_management: bad ? 'Not enrolled yet: finish provisioning' : m && m.fw ? 'Online, firmware ' + m.fw.version + ' (standard)' : 'Online', room_booking: 'Calendar resource linked', monitoring: 'Reporting, no critical alerts' }[p] || '') + '</span></li>'; }).join('') +
+          u.platforms.map(function (p) { var bad = p === 'device_management' && u.stage === 'deploy'; return '<li><span class="dv-c" data-c' + (bad ? ' data-bad' : '') + '>' + '<span class="sp"></span>' + tick + '<svg class="x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg></span><b>' + (PLAT[p] || p) + '</b><span class="faint">' + ({ keia_atlas: 'Recorded where the space type expects it', inventory: 'Active record in this space', dhcp_dns: u.net ? (u.net.how === 'From the home router' ? 'Address from the home router' : 'Reservation ' + u.net.ip + ' and DNS ' + u.host) : 'No address recorded', device_management: bad ? 'Not enrolled yet: finish provisioning' : m && m.fw ? 'Online, firmware ' + m.fw.version + ' (standard)' : 'Online', room_booking: 'Calendar resource linked', monitoring: 'Reporting, no critical alerts' }[p] || '') + '</span></li>'; }).join('') +
           '</ul><p class="faint dv-foot">These checks are simulated. With real feeds they read the real systems.</p></section>';
 
         var cfg = '';
@@ -325,7 +331,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
         }).join('');
         // Repeat faults (the overlooked items, #15): this quarter's faults on this unit, with a strip by month.
         var rp = u.repeats;
-        var repBlock = rp ? '<div class="rp' + (rp.repeat ? ' is-repeat' : '') + '" data-feature="repeat-faults" data-arrive data-help="unit.repeats"><p class="rp-a">' + (rp.ordinal ? '<b class="rs-tick">' + rp.ordinal + '</b> fault this quarter' : esc(rp.text)) + '</p>' + rp.strip + '<p class="rp-s">' + rp.year + ' in the last 12 months' + (rp.repeat ? ' · a case for the manufacturer or a replacement' : '') + '</p></div>' : '';
+        var repBlock = rp ? '<div class="rp' + (rp.repeat ? ' is-repeat' : '') + '" data-feature="repeat-faults" data-settle data-help="unit.repeats"><p class="rp-a">' + (rp.ordinal ? '<b class="rs-tick">' + rp.ordinal + '</b> fault this quarter' : esc(rp.text)) + '</p>' + rp.strip + '<p class="rp-s">' + rp.year + ' in the last 12 months' + (rp.repeat ? ' · a case for the manufacturer or a replacement' : '') + '</p></div>' : '';
         var histCard = '<section class="card dv-card s-4 c-history" data-help="unit.history" id="history">' + head('Work and incidents', '<span class="faint dv-aside">Newest first</span>') + repBlock +
           (H.length ? '<ol class="dv-hx">' + hx + '</ol>' + (H.length >= FIRST ? '<button type="button" class="btn small dv-all" data-help="section.showall" data-show-all>Show all ' + H.length + '</button>' : '') : '<p class="faint">No work or incidents on this unit yet.</p>') + '</section>';
 
@@ -356,11 +362,34 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
             '<p class="src-note"><b>Source:</b> ' + esc(us.source) + '</p>' +
             '<a class="btn small" href="' + L('usage/equipment/') + '#' + us.tab + '">' + esc(us.label) + ' across the fleet</a></section>');
         }
-        if (u.conn.length) {
-          r3.push('<section class="card dv-card SPAN c-conn" data-help="unit.connections" id="connections">' + head('Connections', '<span class="faint dv-aside">' + u.conn.length + ' cable' + (u.conn.length > 1 ? 's' : '') + '</span>') + '<table class="dv-t"><thead><tr><th>Port</th><th>Goes to</th><th>Cable</th></tr></thead><tbody>' +
-            u.conn.map(function (c) { var pid = portSlug(c.port); return '<tr data-port="' + pid + '" data-port-name="' + esc(c.port) + '"><td class="mono"><a class="dv-port" href="#' + pid + '" data-help="unit.port">' + esc(c.port) + '</a></td><td>' + esc(c.to) + '</td><td>' + esc(c.cable) + '</td></tr>'; }).join('') + '</tbody></table></section>');
+        // Ports: each cable on the unit; a network port also says where it lands, all the way to the switch port and
+        // its VLAN, with the plan check and the trace (src/lib/switchports.mjs). Its own card, full width, after the facts.
+        function portsCardOf() {
+          if (!u.conn.length && !P.length) return '';
+          var rows = u.conn.map(function (c) { return { port: c.port, to: c.to, cable: c.cable, net: P.filter(function (x) { return x.port === c.port; }) }; });
+          P.forEach(function (x) { if (!rows.some(function (r0) { return r0.port === x.port; })) rows.push({ port: x.port, to: x.own ? '' : 'The network', cable: x.own ? 'Trunk' : 'Cat6', net: [x] }); });
+          // Where each port is wired matters most: the network ports first, in port order, then the rest as the space type lists them.
+          rows = rows.map(function (c, i) { return [c, i]; }).sort(function (a, b) { return (b[0].net.length ? 1 : 0) - (a[0].net.length ? 1 : 0) || (a[0].net.length && b[0].net.length ? String(a[0].port).localeCompare(String(b[0].port), 'en', { numeric: true }) : a[1] - b[1]); }).map(function (x) { return x[0]; });
+          var hop = function (h) {
+            var inner = '<b>' + esc(h.l) + '</b>' + (h.s ? '<small>' + esc(h.s) + '</small>' : '');
+            var cls = 'tr-hop' + (h.k === 'vlan' ? ' tr-vlan' : '');
+            var sty = h.k === 'vlan' && h.v != null ? ' style="--vl:var(--vl-' + h.v + ', var(--text))"' : '';
+            return '<li>' + (h.p ? '<a class="' + cls + '"' + sty + ' href="' + L(h.p) + (h.q || '') + (h.h || '') + '">' + inner + '</a>' : '<span class="' + cls + '"' + sty + '>' + inner + '</span>') + '</li>';
+          };
+          var netHtml = function (x) {
+            var vlan = x.state === 'active' ? 'VLAN ' + x.native + (x.vlan ? ' ' + x.vlan : '') : x.state === 'parked' ? 'Parked' : 'Disabled';
+            var chip = '<span class="vl"><span class="vl-sw" style="--vl:var(--vl-' + x.native + ', var(--text))"></span><span>' + esc(vlan) + '</span></span>';
+            var far = '<p class="dv-far">' + x.words.map(function (w) { return '<span>→ ' + esc(w) + '</span>'; }).join(' ') + ' · ' + chip + (x.mode === 'trunk' ? ' <span class="faint">trunk, tagged ' + esc((x.tagged || []).join(', ')) + '</span>' : '') + '</p>';
+            var warn = x.ok === false ? '<p class="dv-rev">' + reviewGlyph + '<span>' + esc(x.why) + '</span></p>' : x.ok === null && x.why ? '<p class="dv-note faint">' + esc(x.why) + '</p>' : '';
+            var trace = '<details class="dv-trace" data-help="unit.trace"><summary>Trace</summary><ol class="tr-chain" aria-label="From this port to the switch">' + x.hops.map(hop).join('') + '</ol></details>';
+            var change = x.sw ? '<a class="btn small dv-chg" data-help="vlan.change" href="' + L('switches/' + x.sw + '/') + '?change=' + x.slug + '#change-vlan">Change VLAN</a>' : '';
+            return '<div class="dv-net">' + far + warn + '<div class="dv-net-do">' + trace + change + '</div></div>';
+          };
+          return '<section class="card dv-card s-12 c-conn" data-help="unit.ports" id="connections">' + head('Ports', P.some(function (x) { return x.own; }) ? '<a class="btn small" href="' + L('switches/' + P[0].sw + '/') + '">Every port on ' + esc(P[0].sw) + '</a>' : '<span class="faint dv-aside">' + (P.length ? P.length + ' on the network · ' : '') + rows.length + ' cable' + (rows.length > 1 ? 's' : '') + '</span>') +
+            '<table class="dv-t dv-ports stack-sm"><thead><tr><th>Port</th><th>Goes to</th><th>Cable</th></tr></thead><tbody>' +
+            rows.map(function (c) { var pid = portSlug(c.port); return '<tr data-port="' + pid + '" data-port-name="' + esc(c.port) + '"><th scope="row" class="mono"><a class="dv-port" href="#' + pid + '" data-help="unit.port">' + esc(c.port) + '</a></th><td data-label="Goes to">' + (c.to ? esc(c.to) : '') + c.net.map(netHtml).join('') + '</td><td data-label="Cable">' + esc(c.cable) + '</td></tr>'; }).join('') + '</tbody></table></section>';
         }
-        if (u.net || r.path.idf || r.path.mdf) {
+        if (!P.length && (u.net || r.path.idf || r.path.mdf)) {
           r3.push('<section class="card dv-card SPAN c-net" data-help="unit.network">' + head('Network') + '<ol class="dv-path">' +
             '<li><b>' + esc(u.host || u.pos.role) + '</b>' + (u.net ? '<small class="mono">' + u.net.fqdn + '</small>' : '') + '</li>' +
             (r.path.idf ? '<li><a href="' + L('rooms/' + r.path.idf.id + '/') + '">' + esc(r.path.idf.name) + '</a><small>Floor switch</small></li>' : '<li><b>Floor comms room</b><small>Not recorded for this site yet</small></li>') +
@@ -569,6 +598,21 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
   .dv-t th, .dv-t td { text-align: left; padding: 5px 8px 5px 0; border-top: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
   .dv-t th { font: 500 var(--fs-overline)/1.2 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); border-top: 0; }
   .dv-t th:first-child { width: 28%; }
+  .dv-ports th[scope="row"] { font: 500 var(--fs-code)/1.4 var(--font-mono); text-align: left; padding: 8px 8px 8px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  .dv-ports td { padding-top: 8px; padding-bottom: 8px; }
+  .dv-ports th:first-child { width: 14%; } .dv-ports th:last-child { width: 14%; }
+  .dv-net { margin-top: 6px; }
+  .dv-far { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; font-size: var(--fs-support); color: var(--text); }
+  .dv-rev { margin: 6px 0 0; display: flex; gap: 6px; align-items: flex-start; font-size: var(--fs-support); color: var(--h-review-ink); }
+  .dv-note { margin: 4px 0 0; font-size: var(--fs-code); }
+  .dv-net-do { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 12px; margin-top: 6px; }
+  .dv-trace { flex: 1 1 240px; min-width: 0; }
+  .dv-trace > summary { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; cursor: pointer; list-style: none; font-size: var(--fs-code); color: var(--text-2); }
+  .dv-trace > summary::-webkit-details-marker { display: none; }
+  .dv-trace > summary::after { content: ""; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); transition: transform var(--dur-hover) var(--ease-settle); }
+  .dv-trace[open] > summary::after { transform: translateY(1px) rotate(-135deg); }
+  .dv-trace > summary:hover { color: var(--text); }
+  .dv-chg { order: 1; }
   .dv-path { list-style: none; margin: 0; padding: 0; display: grid; }
   .dv-path li { position: relative; padding: 6px 0 6px 22px; font-size: 13px; }
   .dv-path li::before { content: ""; position: absolute; left: 4px; top: 12px; width: 10px; height: 10px; border-radius: 50%; background: var(--green); }

@@ -18,7 +18,7 @@ const W = window, D = document;
 const BASE = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
 const inSite = (u) => { const p = u.pathname; return p.startsWith(BASE) ? p.slice(BASE.length) || '/' : p; };
 const levelOf = (u) => zoomLevel(inSite(u), u.search, u.hash);
-const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const reduced = () => (window.rsReducedNow ? window.rsReducedNow() : matchMedia('(prefers-reduced-motion: reduce)').matches);
 const M = () => (W.rsMotion ? W.rsMotion() : { reduced: true, zoom: 360, exit: 240, ease: 'ease' });
 const esc = (s) => (W.CSS && CSS.escape ? CSS.escape(s) : s);
 const recName = (id) => 'rec-' + String(id).replace(/[^a-zA-Z0-9_-]/g, '-');
@@ -84,7 +84,10 @@ D.addEventListener('astro:before-preparation', (e) => {
 D.addEventListener('astro:before-preparation', (e) => {
   W.__rsZoomOrigin = null; pending = null;
   const from = new URL(location.href), to = e.to;
-  const dir = zoomDir(levelOf(from), levelOf(to));
+  // A floor's thumbnail (FloorMap detail="thumb") is the same map as the plan and the space it opens, so pressing
+  // it zooms in even from a page that is not one level up (Home, leadership): data-zoom-in on the link says so.
+  const src0 = e.sourceElement && e.sourceElement.closest ? e.sourceElement : null;
+  const dir = zoomDir(levelOf(from), levelOf(to)) || (src0 && src0.closest('[data-zoom-in]') && levelOf(to) != null ? 'in' : null);
   if (!dir) return;
   W.__rsNavDir = 'zoom-' + dir;
   D.documentElement.setAttribute('data-nav-dir', W.__rsNavDir);
@@ -134,6 +137,9 @@ function showFloorNow() {
 }
 
 D.addEventListener('astro:after-swap', () => {
+  // Arriving on a floor (?floor=3), by any move: the floor is shown before the new page's picture is taken, so a
+  // thumbnail of that floor grows into its plan rather than into a hidden tab.
+  if (new URL(location.href).searchParams.get('floor')) showFloorNow();
   if (!String(D.documentElement.getAttribute('data-nav-dir') || '').startsWith('zoom')) return;
   if (pending && !reduced()) {
     const id = pending; pending = null;

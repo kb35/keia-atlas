@@ -1,9 +1,11 @@
 ---
 // A project's Deploy overview. List archetype.
 // The first block is the answer to "what needs me?": the exceptions to fix, and what Keia Atlas checked
-// and waits for someone to accept in one action. Then the work in batches (every unit that shares a
-// configuration, in the order an engineer sets them up), or by room for commissioning. A batch or a room
-// opens as its own page, flying in from its card. A vendor (View as) sees only their installs.
+// and waits for someone to accept in one action. Then the work, delivered the way the team works ("Deliver
+// by"): batches of units that share a setup guide, each space with its room test, floor by floor, one unit
+// at a time, or a set a person picks. Every way shows the same units and the same checks, so switching never
+// loses progress; the project records the team's way (delivery.by) and a person can pick another for
+// themselves in this browser. A vendor (View as) sees only their installs, space by space.
 import Shell from '../../../../layouts/Shell.astro';
 import PageBand from '../../../../components/PageBand.astro';
 import FilterBar from '../../../../components/FilterBar.astro';
@@ -14,7 +16,7 @@ import IntegrateLive from '../../../../components/IntegrateLive.astro';
 import HealthGlyph from '../../../../components/HealthGlyph.astro';
 import { projects, sites, PHASE_LABEL, TASK_STATUS, SITE_ORDER, phasesOf, fmtDate, DEMO_TODAY, href, className } from '../../../../lib/data.mjs';
 import { integratePlan, buildModel, batchHref, roomHref } from '../../../../lib/integrate.mjs';
-import { metersHtml, batchFootHtml, roomFootHtml, roomChipsHtml, needsHtml, readyHtml } from '../../../../lib/integrate-view.mjs';
+import { needsHtml, readyHtml, boardHtml, DELIVER_BY, DELIVER_WORD } from '../../../../lib/integrate-view.mjs';
 import { person } from '../../../../lib/demo.mjs';
 
 export function getStaticPaths() {
@@ -28,21 +30,30 @@ const home = `/projects/${p.id.toLowerCase()}/`;
 const PHASE = PHASE_LABEL.integrate;
 const siteIds = SITE_ORDER.filter((s) => plan.units.some((u) => u.site === s));
 const kinds = [...new Set(plan.units.map((u) => u.cls))].map((c) => ({ value: c, label: className(c) })).sort((a, b) => a.label.localeCompare(b.label));
+// A unit's status, the same in every way of delivering.
 const STATUS = [
-  { value: 'needs', label: 'Ready for you' }, { value: 'accept', label: 'Checked, to accept' }, { value: 'test', label: 'Ready for the room test' },
-  { value: 'doing', label: 'Under way' }, { value: 'todo', label: 'To do' }, { value: 'done', label: 'Done' },
+  { value: 'needs', label: 'Ready for you' }, { value: 'accept', label: 'Checked, to accept' },
+  { value: 'doing', label: 'Under way' }, { value: 'todo', label: 'To do' }, { value: 'done', label: 'Accepted' },
 ];
 const FACETS = [
   ...(siteIds.length > 1 ? [{ key: 'site', label: 'Office', options: siteIds.map((value) => ({ value, label: sites[value].name })) }] : []),
   { key: 'kind', label: 'Kind', options: kinds },
   { key: 'status', label: 'Status', options: STATUS },
-  { key: 'room', label: 'Space', options: plan.rooms.map((r) => ({ value: r.id, label: r.name, sub: siteIds.length > 1 ? r.siteName : undefined })) },
+  { key: 'room', label: 'Space', options: plan.rooms.filter((r) => r.units.length).map((r) => ({ value: r.id, label: r.name, sub: siteIds.length > 1 ? r.siteName : undefined })) },
 ];
-const next = plan.batches.find((b) => M.batchSum(b.id).status !== 'done') ?? plan.batches[0];
+const team = plan.delivery.by;
+// The band's one action follows the team's way: the next batch, the next space, or the next unit's build sheet.
+const nextBatch = plan.batches.find((b) => M.batchSum(b.id).status !== 'done') ?? plan.batches[0];
+const nextRoom = plan.rooms.filter((r) => r.units.length).find((r) => !M.roomSum(r.id).signed);
+const nextUnit = plan.queue.find((id) => !M.unitSteps(id).every((x) => x.st === 'done'));
+const action = team === 'one' && nextUnit ? { to: M.U.get(nextUnit).sheet, label: 'Open the next unit' }
+  : (team === 'room' || team === 'floor') && nextRoom ? { to: roomHref(plan, nextRoom.id), label: 'Open the next space' }
+    : nextBatch ? { to: batchHref(plan, nextBatch.id), label: 'Open the next batch' } : null;
 const intTasks = p.tasks.filter((t) => t.phase === 'integrate');
 const late = (t) => t.status !== 'done' && t.due && t.due < DEMO_TODAY;
 const keptByRoom = plan.rooms.map((r) => ({ r, kept: plan.kept.filter((k) => k.room === r.id) })).filter((x) => x.kept.length);
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many ?? `${one}s`}`;
+const roomsN = plan.rooms.filter((r) => r.units.length).length;
 ---
 <Shell title={`${PHASE}: ${p.name}`} section="projects" minStage={3} vendorOk about={{ kind: 'project', label: `${p.id} ${p.name}, ${PHASE}`, to: `${home}integrate/` }}
   crumbs={[{ label: 'Projects', to: '/projects/' }, { label: p.name, to: home }, { label: PHASE }]}>
@@ -51,20 +62,20 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many ?? `${one}s`}`;
       { n: F.needs, label: 'Ready for you', to: '#needs', tone: F.needs ? 'warn' : undefined, id: 'int-needs' },
       { n: F.toAccept, label: 'Checked, to accept', to: '#checked', tone: F.toAccept ? 'good' : undefined, id: 'int-accept' },
       { n: `${F.setUp}/${F.units}`, label: 'Units set up', fact: true, id: 'int-setup' },
-      { n: `${F.signed}/${F.rooms}`, label: 'Spaces signed off', to: '?view=rooms&status=done', id: 'int-rooms' },
+      { n: `${F.signed}/${F.rooms}`, label: 'Spaces signed off', to: '?by=room', id: 'int-rooms' },
     ]}>
     <Fragment slot="overline">
       <span>{sites[p.site].name}</span>
       <span class:list={['pill', p.phase === 'integrate' ? 'deploy' : 'plain']}>{PHASE_LABEL[p.phase]} phase</span>
     </Fragment>
-    <Fragment slot="lede"><a href={href(home)}>{p.name}</a>: {plural(plan.units.length, 'unit')} in {plural(plan.batches.length, 'batch', 'batches')}{plan.kept.length ? `; ${plan.kept.length} kept as they are` : ''}.</Fragment>
-    {next && <a slot="action" class="btn primary" data-help="integrate.next" href={batchHref(plan, next.id)}>Open the next batch</a>}
+    <Fragment slot="lede"><a href={href(home)}>{p.name}</a>: {plural(plan.units.length, 'unit')} in {plural(roomsN, 'space')}{plan.kept.length ? `; ${plan.kept.length} kept as they are` : ''}. The team delivers by {DELIVER_WORD[team].toLowerCase()}.</Fragment>
+    {action && <a slot="action" class="btn primary" data-help="integrate.next" href={action.to}>{action.label}</a>}
   </PageBand>
 
   <div class="content integrate iv" data-int data-page="overview">
-    <FilterBar facets={FACETS} placeholder="Find a unit, hostname or space" label="Find a unit" noun={['batch', 'batches']} scope=".content.integrate"
-      views={[{ value: 'batches', label: 'Batches', show: '[data-view-batches]', noun: ['batch', 'batches'] }, { value: 'rooms', label: 'Spaces', show: '[data-view-rooms]', noun: ['space', 'spaces'] }]}
-      viewsHelp="integrate.views" sort={{ options: [{ value: 'order', label: 'By work order' }, { value: 'needs', label: 'Ready for you first' }, { value: 'name', label: 'By name' }] }} />
+    <script is:inline>window.__rsDeliverQ = location.search;</script>
+    <FilterBar facets={FACETS} placeholder="Find a unit, hostname or space" label="Find a unit" noun={['unit', 'units']} scope=".content.integrate"
+      sort={{ options: [{ value: 'order', label: 'By work order' }, { value: 'needs', label: 'Ready for you first' }, { value: 'name', label: 'By name' }] }} />
 
     <p class="iv-vendor" data-vendor-only data-help="integrate.vendor">Viewing as <b data-vendor-name></b>. Only your installs show: select Installed when a unit is mounted, connected and powered on, and Keia Atlas confirms it when it comes online.</p>
     <p class="iv-vendor" data-vendor-empty>Nothing on this project is for you to install. Your own projects are on the <a href={href('/vendor/')}>vendor page</a>.</p>
@@ -76,57 +87,22 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many ?? `${one}s`}`;
       </section>
       <section class="card iv-box s-5" id="checked" aria-labelledby="iv-ready-h">
         <header class="iv-h" data-help="integrate.checked"><h2 id="iv-ready-h">Checked by Keia Atlas</h2><span class="faint">Passed, waiting for a person to accept</span></header>
-        <div data-slot="ready" data-by="follow" set:html={readyHtml(M, { by: 'batch' })} />
+        <div data-slot="ready" data-by="follow" set:html={readyHtml(M, { by: team })} />
       </section>
     </div>
 
-    <div data-view-batches>
-      {plan.batches.length === 0 && <EmptyState filter={false} text="This project changes no devices yet." action="See the project" to={home} />}
-      <div class="iv-grid" data-sortable>
-        {plan.batches.map((b) => {
-          const st = M.batchSum(b.id).status;
-          const units = b.units.map((id) => M.U.get(id));
-          return (
-            <a class="card iv-b" href={batchHref(plan, b.id)} data-fi data-bcard={b.id} data-st={st} data-order={b.n} data-name={b.title}
-              data-find={[b.title, b.clsName, ...b.models, b.cfg?.name, ...units.map((u) => `${u.host ?? ''} ${u.roomName}`)].filter(Boolean).join(' ')}
-              data-f-site={[...new Set(units.map((u) => u.site))].join('|')} data-f-kind={b.cls.join('|')} data-f-status={st} data-f-room={b.rooms.join('|')} data-help="integrate.batch">
-              <header class="iv-bh">
-                <span class="iv-n num" aria-hidden="true">{b.n}</span>
-                <span class="iv-bt"><b data-vt-rec={`int-${b.id}`}>{b.title}</b><small>{b.touched ? `Re-check: ${b.units.length === 1 ? 'it pairs' : 'they pair'} with the new ${plan.batches.find((x) => !x.touched && x.rooms.some((r) => b.rooms.includes(r)))?.noun ?? 'units'}` : b.cfg ? `${b.cfg.name} ${b.cfg.version}` : 'Nothing to set: provision and install'}</small></span>
-              </header>
-              <p class="iv-via faint">{b.via ? `Set once through ${b.via}` : `${plural(b.rooms.length, 'space')}`}{b.models.length > 1 ? ` · ${b.models.join(', ')}` : ''}</p>
-              <div class="iv-meters" data-slot="meters" data-b={b.id} set:html={metersHtml(M, b.id)} />
-              <footer class="iv-foot" data-slot="bfoot" data-b={b.id} set:html={batchFootHtml(M, b.id)} />
-            </a>
-          );
-        })}
+    <section class="dv-ctl" data-deliver-ctl data-engineer-only aria-labelledby="dv-by-h">
+      <h2 class="dv-ctl-h" id="dv-by-h" data-help="integrate.deliver-by">Deliver by</h2>
+      <div class="dv-seg" role="group" aria-labelledby="dv-by-h">
+        {DELIVER_BY.map((d) => <button type="button" class="dv-opt" data-act="deliver" data-by={d.by} aria-pressed={d.by === team ? 'true' : 'false'} title={d.what}><span class="dv-full">{d.label}</span><span class="dv-short" aria-hidden="true">{d.short}</span></button>)}
       </div>
-    </div>
+      <p class="dv-team" data-deliver-team><b>The team's way</b>{plan.delivery.note ? ` · ${plan.delivery.note}` : ` · by ${DELIVER_WORD[team].toLowerCase()}, the default`}</p>
+    </section>
 
-    <div data-view-rooms hidden>
-      <div class="iv-rgrid" data-sortable>
-        {plan.rooms.filter((r) => r.units.length).map((r, i) => {
-          const st = M.roomSum(r.id).status;
-          const units = r.units.map((id) => M.U.get(id));
-          return (
-            <article class="card iv-r" data-fi data-rcard={r.id} data-st={st} data-order={i} data-name={r.name}
-              data-find={[r.name, r.profile, ...units.map((u) => `${u.short} ${u.host ?? ''} ${u.modelName ?? ''}`)].join(' ')}
-              data-f-site={r.site} data-f-kind={[...new Set(units.map((u) => u.cls))].join('|')} data-f-status={st} data-f-room={r.id} data-help="integrate.room">
-              <header class="iv-rh">
-                <a class="iv-rt" href={roomHref(plan, r.id)}><b data-vt-rec={`int-r-${r.id}`}>{r.name}</b></a>
-                <span class="faint">{r.profile}{siteIds.length > 1 ? ` · ${r.siteName}` : ''}</span>
-              </header>
-              <div class="iv-chips" data-slot="rchips" data-r={r.id} data-engineer-only set:html={roomChipsHtml(M, r.id)} />
-              {r.kept.length > 0 && <p class="iv-kept faint" data-engineer-only>{plural(r.kept.length, 'more device')} kept as they are, covered by the room test</p>}
-              <div class="iv-vi" data-vendor-only data-slot="vinstall" data-r={r.id}></div>
-              <footer class="iv-rf">
-                <span data-slot="rfoot" data-r={r.id} data-engineer-only set:html={roomFootHtml(M, r.id)} />
-                <a class="btn small" href={roomHref(plan, r.id)} data-engineer-only>Open the space</a>
-              </footer>
-            </article>
-          );
-        })}
-      </div>
+    <div class="dv-box" data-board-box>
+      <div class="dv-setslot" data-setslot hidden></div>
+      {plan.units.length === 0 && <EmptyState filter={false} text="This project changes no devices yet." action="See the project" to={home} />}
+      <div data-board set:html={boardHtml(M, team)} />
     </div>
     <EmptyState text="Nothing matches these filters." />
 
@@ -161,8 +137,8 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many ?? `${one}s`}`;
     <Section title={`How ${PHASE} works`} help="integrate.how" data-engineer-only>
       <div class="g12">
         <div class="card side-card s-4">
-          <h3>Batches, not spaces</h3>
-          <p class="muted iv-p">Units that share a setup guide are set up together: the shared setup guide once, then only what differs per unit (its name and address). Batches run in the order an engineer works: network, room system, what pairs with it, then the rest.</p>
+          <h3>The team's way</h3>
+          <p class="muted iv-p">Batches by default: units that share a setup guide are set up together, the shared setup once, then only what differs per unit. By room, by floor or one at a time where the team works that way, or a set you pick. Every way shows the same units and checks, so switching loses nothing.</p>
         </div>
         <div class="card side-card s-4">
           <h3>Checked, not ticked</h3>

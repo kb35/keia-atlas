@@ -976,8 +976,11 @@ export function buildRoom(typeId, option, items, { plug = null, plugs = null, co
       else if (/cctv/.test(k)) put(it, (m) => b.prism(poly(12, 0.09, W - 0.35, D - 0.35), WALL_H - 0.12, WALL_H, 'ceil-dev', { ...m, ceiling: true }), 'ceiling');
       else if (/intercom/.test(k)) put(it, (m) => { const d = A.door; b.box(0, d.a0 - 0.3, 1.25, 0.03, d.a0 - 0.15, 1.45, 'dev', m); }, 'left');
       else if (/panic/.test(k)) put(it, (m) => { const C = A.desk; b.box(C.x0 + 0.7, C.y0 + 0.12, C.z - 0.12, C.x0 + 0.78, C.y0 + 0.2, C.z - 0.06, 'dev', { ...m, hid: true }); });
+      // The door controller: a small enclosure above the door, on the room side.
+      else if (/door/.test(k) && A.door) put(it, (m) => { const d = A.door; b.box(0, (d.a0 + d.a1) / 2 - 0.12, 2.25, 0.08, (d.a0 + d.a1) / 2 + 0.12, 2.45, 'dev', m); }, 'left');
       else put(it, (m) => smallBox(b, 0.5 + i * 0.3, 0.05, 1.2, 0.15, 0.04, 0.15, m, 'dev'));
-    } else put(it, (m) => smallBox(b, W / 2 + 1 + i * 0.3, 0.05, 1.0, 0.18, 0.05, 0.12, m, 'dev'));
+    } else if (c === 'building-sensor') put(it, (m) => b.prism(poly(10, 0.05, W / 2, D / 2), WALL_H - 0.04, WALL_H, 'ceil-dev', { ...m, ceiling: true }), 'ceiling');
+    else put(it, (m) => smallBox(b, W / 2 + 1 + i * 0.3, 0.05, 1.0, 0.18, 0.05, 0.12, m, 'dev'));
   });
   // A home desk: the worker's own broadband router on the sideboard.
   if (A.home) b.box(2.4, 0.12, 0.62, 2.62, 0.3, 0.66, 'router-home', { label: "Home broadband router (worker's own)", sk: 'home-router' });

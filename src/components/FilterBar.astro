@@ -195,7 +195,7 @@ const uid = `fb${Math.random().toString(36).slice(2, 8)}`;
       }
 
       function run(animate, before) {
-        var M = window.rsMotion ? window.rsMotion() : { reduced: matchMedia('(prefers-reduced-motion: reduce)').matches, ease: 'cubic-bezier(.22,1,.36,1)', morph: 520, enter: 440, stagger: 24 };
+        var M = window.rsMotion ? window.rsMotion() : { reduced: (window.rsReducedNow ? window.rsReducedNow() : matchMedia('(prefers-reduced-motion: reduce)').matches), ease: 'cubic-bezier(.22,1,.36,1)', morph: 520, enter: 440, stagger: 24 };
         if (bar.__rsOut) { bar.__rsOut(); bar.__rsOut = null; }   // a quick second pick ends the last exits first
         var els = Array.prototype.slice.call(scope.querySelectorAll('[data-fi]'));
         var words = q ? q.split(/\s+/) : [];
@@ -214,7 +214,6 @@ const uid = `fb${Math.random().toString(36).slice(2, 8)}`;
         }).filter(Boolean) : [];
         var parts = move ? Array.prototype.slice.call(bar.querySelectorAll('.fb-facets > .fb-chip, .fb-facets > .fb-toggle, .fb-facets > .fb-clear, .fb-end .fb-views, .fb-end .fb-chip, .fb-extra > *')) : [];
         var partsWas = parts.map(function (el) { return el.getBoundingClientRect(); });
-        var count0 = countEl ? countEl.textContent : '';
         var apply = function () {
           if (before) before();
           els.forEach(function (el) { el.classList.toggle('fb-out', misses(info(el), words).length > 0); });
@@ -258,10 +257,10 @@ const uid = `fb${Math.random().toString(36).slice(2, 8)}`;
           var nOn = Object.keys(sel).reduce(function (m, k) { return m + (atDefault(k) ? 0 : sel[k].size); }, 0) + Object.keys(on).filter(function (k) { return on[k]; }).length;
           nactEl.textContent = nOn ? String(nOn) : '';
         }
-        // Always "N of M", so the count keeps its width and place as filters come and go; a new number eases in.
+        // Always "N of M", so the count keeps its width and place as filters come and go; a new number ticks in.
         if (countEl) {
           countEl.textContent = fmt(shown) + ' of ' + fmt(total) + ' ' + (total === 1 ? one : many);
-          if (animate && !M.reduced && count0 && countEl.textContent !== count0 && countEl.animate) countEl.animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: M.state, easing: M.ease });
+          // The new number ticks into place (km-tick; the library's figure watcher in src/lib/motion-wire.js sees the change).
           // The page added items since the bar was laid out (a list drawn by its script): make room once.
           if (bar.rsLayout && countEl.scrollWidth > (parseFloat(countEl.style.minWidth) || 0) + 1) bar.rsLayout();
         }

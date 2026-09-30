@@ -27,6 +27,8 @@ sources:
     provides: Healthy state for the signage player class
   - file: data/device-classes/security-device.yaml
     provides: Healthy state for the security device class
+  - file: data/device-classes/building-sensor.yaml
+    provides: Healthy state for the building sensor class
   - file: data/device-classes/adapter.yaml
     provides: Healthy state for the adapter class
 
@@ -48,6 +50,11 @@ equipment_categories:
     description: Visitor, door and safety devices
     object_profile: data/device-classes/security-device.yaml
     quantity: "set by the integrator"
+  - category: building
+    description: A sensor for the building management system
+    object_profile: data/device-classes/building-sensor.yaml
+    quantity: "1"
+    notes: Only in the secured option
   - category: adapters
     description: Scalers, converters, PoE injectors and single-cable USB-C adapters
     object_profile: data/device-classes/adapter.yaml
@@ -225,6 +232,179 @@ keia_atlas:
           to: outlet:power/tbd#1
           cable: power
           when: wall-plate
+    - id: secured
+      name: Standard, with the door and building systems wired
+      standard: house
+      since: "2026-09-30"
+      summary: The standard reception, with its door controller, CCTV camera and an environment sensor each on a data outlet, so they sit on the Security and Building VLANs.
+      equipment:
+        - key: display
+          class: display
+          quantity: 1
+          requirement: required
+          location: display-wall
+          sizes_in: [43, 50, 55, 65, 75, 85]
+        - key: signage-player
+          class: signage-player
+          model: brightsign-xt1145
+          quantity: 1
+          requirement: required
+          location: behind-display
+          notes: PoE powered; includes a 64 GB microSD card
+        - key: wall-plate
+          class: av-extender
+          model: kramer-wp-20ct
+          role: Wall plate where a laptop plugs in (HDMI or USB-C); sends to the display over
+            HDBaseT
+          quantity: 1
+          requirement: optional
+          location: tbd
+          notes: Needs its own power supply to run and to charge laptops
+        - key: wall-plate-rx
+          class: av-extender
+          model: kramer-tp-580rxr
+          role: HDBaseT receiver at the display
+          quantity: 1
+          requirement: optional
+          location: behind-display
+        - key: scaler
+          class: adapter
+          model: kramer-vp-440h2
+          role: Switcher and scaler between the signage player and a laptop
+          quantity: 1
+          requirement: optional
+          location: behind-display
+        - key: visitor-system
+          class: security-device
+          role: Visitor sign-in system
+          quantity: tbd
+          requirement: required
+          location: tbd
+        - key: cctv-camera
+          class: security-device
+          role: CCTV camera
+          quantity: 1
+          requirement: required
+          location: ceiling
+          notes: PoE powered, from the security switch port
+        - key: door-controller
+          class: security-device
+          role: Door controller for the office entrance (badge readers and the door release)
+          quantity: 1
+          requirement: required
+          location: room-entrance
+          notes: Fails secure; its cable is red (critical) under the house cable standard
+        - key: environment-sensor
+          class: building-sensor
+          role: Temperature, humidity and CO2 sensor for the building management system
+          quantity: 1
+          requirement: required
+          location: ceiling
+          notes: Measures the air only; it counts nothing about people
+        - key: intercom
+          class: security-device
+          role: Video intercom and remote door release
+          quantity: tbd
+          requirement: required
+          location: tbd
+        - key: panic-button
+          class: security-device
+          role: Panic button at the desk
+          quantity: tbd
+          requirement: required
+          location: tbd
+      infrastructure:
+        - service: power
+          provided_by: it
+          quantity: 4
+          location: behind-display
+          serves: [display, signage player, spare, spare]
+        - service: data
+          provided_by: it
+          quantity: 3
+          location: behind-display
+          serves: [display, signage player, spare]
+        - service: data
+          provided_by: it
+          quantity: 1
+          location: tbd
+          serves: [wall plate for a laptop (optional)]
+          notes: Terminated as a plug so the installer can test it
+        - service: power
+          provided_by: it
+          quantity: 1
+          location: tbd
+          serves: [wall plate (optional)]
+          notes: The wall plate draws 5 V DC at 390 mA
+        - service: data
+          provided_by: it
+          quantity: 2
+          location: ceiling
+          serves: [CCTV camera, environment sensor]
+        - service: data
+          provided_by: it
+          quantity: 1
+          location: room-entrance
+          serves: [door controller]
+      wiring:
+        - from: signage-player.hdmi-out-1
+          to: display.hdmi-in-1
+          cable: hdmi
+          unless: scaler
+        - from: signage-player.hdmi-out-1
+          to: scaler.hdmi-in-1
+          cable: hdmi
+          when: scaler
+        - from: scaler.hdmi-out-1
+          to: display.hdmi-in-1
+          cable: hdmi
+          when: scaler
+        - from: wall-plate.hdbaset-1
+          to: wall-plate-rx.hdbaset-1
+          cable: cat6a
+          when: wall-plate
+        - from: wall-plate-rx.hdmi-out-1
+          to: scaler.hdmi-in-2
+          cable: hdmi
+          when: scaler
+        - from: wall-plate.usb-c-1
+          to: laptop
+          cable: usb-c
+          when: wall-plate
+        - from: display.lan-1
+          to: outlet:data/behind-display#1
+          cable: cat6
+        - from: signage-player.lan-1
+          to: outlet:data/behind-display#2
+          cable: cat6
+          notes: PoE+ powers the player
+        - from: display.power-in
+          to: outlet:power/behind-display#1
+          cable: power
+        - from: scaler.power-in
+          to: outlet:power/behind-display#3
+          cable: power
+          when: scaler
+        - from: wall-plate-rx.power-in
+          to: outlet:power/behind-display#4
+          cable: power
+          when: wall-plate-rx
+        - from: wall-plate.power-in
+          to: outlet:power/tbd#1
+          cable: power
+          when: wall-plate
+        - from: cctv-camera.lan-1
+          to: outlet:data/ceiling#1
+          cable: cat6
+          notes: PoE powers the camera
+        - from: environment-sensor.lan-1
+          to: outlet:data/ceiling#2
+          cable: cat6
+          notes: PoE powers the sensor
+        - from: door-controller.lan-1
+          to: outlet:data/room-entrance#1
+          cable: cat6
+          notes: PoE powers the controller and its readers
   notes:
     - Security devices are set per site with facilities and the security team; this profile names no models.
     - 'Optional cable TV: IT extends the remote control signal to a set-top box in the comms

@@ -1,0 +1,51 @@
+# Connected network (v1, Experimental): a network a device joins, or a block of addresses, as another system knows
+# it. One kind with a type: a VLAN (with the VLAN group its number is unique in), a prefix (a subnet), an IP range
+# (a DHCP pool) or a Wi-Fi network (an SSID). Keia's house standard is the plan (VLANs by purpose); these are its
+# instances per site, and `purpose` is Keia's link between the two.
+# Files live in data/connected/<system>/networks/<id>.yaml. See docs/connectors/model.md.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/connectors/network
+title: Connected network
+type: object
+additionalProperties: false
+required: [kind, id, name, type, source]
+allOf:
+  - if: { properties: { type: { const: vlan } }, required: [type] }
+    then: { properties: { vid: true }, required: [vid] }
+  - if: { properties: { type: { const: prefix } }, required: [type] }
+    then: { properties: { prefix: true }, required: [prefix] }
+  - if: { properties: { type: { const: range } }, required: [type] }
+    then: { properties: { start: true, end: true }, required: [start, end] }
+  - if: { properties: { type: { const: wifi } }, required: [type] }
+    then: { properties: { ssid: true }, required: [ssid] }
+properties:
+  kind: { const: network }
+  id: { $ref: "common#/$defs/id" }
+  name: { type: string, minLength: 1 }
+  type:
+    description: "vlan: a virtual LAN. prefix: a subnet. range: a run of addresses inside a subnet, such as a DHCP pool. wifi: a Wi-Fi network."
+    enum: [vlan, prefix, range, wifi]
+  vid: { type: integer, minimum: 1, maximum: 4094, description: "The VLAN number. A prefix may carry it too, when the system names only the number." }
+  vlan_group: { type: string, minLength: 1, description: "The group the VLAN number is unique in, usually one per site (VLAN 30 at Dublin is not VLAN 30 at Chicago)." }
+  prefix: { $ref: "common#/$defs/prefix" }
+  start: { $ref: "common#/$defs/ip", description: "A range's first address." }
+  end: { $ref: "common#/$defs/ip", description: "A range's last address." }
+  ssid: { type: string, minLength: 1, maxLength: 32, description: The Wi-Fi network's name as people see it. }
+  auth_native: { type: string, minLength: 1, description: "How a Wi-Fi network signs devices in, in the system's words (WPA Personal). Never the key: that is emptied on the way in." }
+  vlan: { $ref: "common#/$defs/id", description: "For a prefix or a Wi-Fi network: the connected VLAN it rides on." }
+  scope: { $ref: "common#/$defs/id", description: "The connected space it applies to (a site, usually)." }
+  role_native: { type: string, minLength: 1, description: "The system's own role for it (Room systems, DHCP pool)." }
+  status: { $ref: "common#/$defs/status" }
+  status_native: { type: string, minLength: 1 }
+  description: { type: string, minLength: 1 }
+  purpose: { $ref: "common#/$defs/id", description: "Keia's link to the house VLAN plan (room-systems, guest). Owned by Keia." }
+  atlas_site: { $ref: "common#/$defs/id", description: "Keia's link to an office in data/sites, when the system names a site but Keia holds no connected space for it. Owned by Keia." }
+  team: { $ref: "common#/$defs/team" }
+  contacts: { $ref: "common#/$defs/contacts" }
+  notes: { $ref: "common#/$defs/notes" }
+  source: { $ref: "common#/$defs/source" }
+  field_sources: { $ref: "common#/$defs/field_sources" }
+  seen: { $ref: "common#/$defs/seen" }
+  raw: { $ref: "common#/$defs/raw" }
+  raw_redacted: { $ref: "common#/$defs/raw_redacted" }

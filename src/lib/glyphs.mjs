@@ -21,6 +21,7 @@ export const GLYPHS = {
   'signage-player': '<rect x="10" y="8" width="20" height="12" rx="2"/><path d="M18 11.5l4 2.5-4 2.5z"/>',
   printer: '<rect x="5" y="11" width="30" height="10" rx="2"/><path d="M11 11V4h18v7M11 17h18v7H11z"/>',
   'security-device': '<path d="M20 3l12 5v6c0 7-5 11-12 12C13 25 8 21 8 14V8z"/>',
+  'building-sensor': '<circle cx="20" cy="14" r="9"/><path d="M20 9v5l3 3"/><path d="M8 25h24"/>',
 };
 GLYPHS.outlet = '<rect x="12" y="5" width="16" height="18" rx="3"/><path d="M17 11v3M23 11v3M18 18h4"/>';
 GLYPHS['outlet-data'] = '<rect x="12" y="5" width="16" height="18" rx="2"/><path d="M16 19v-5h2.5v-2.5h3v2.5H24v5z"/>';

@@ -211,7 +211,7 @@ export function usageCard(tag) {
 export const PRICE = {
   display: 2400, monitor: 320, 'video-bar': 3600, codec: 6500, 'touch-controller': 900, camera: 1200, microphone: 450, amplifier: 800, loudspeaker: 350,
   'av-extender': 520, 'av-switcher': 1400, 'signage-player': 700, 'scheduler-panel': 600, 'network-switch': 4800, 'network-gateway': 260, adapter: 60, dock: 280,
-  printer: 3200, 'desk-video-device': 2600, 'security-device': 900,
+  printer: 3200, 'desk-video-device': 2600, 'security-device': 900, 'building-sensor': 350,
 };
 export const HOUR_RATE = 95;
 

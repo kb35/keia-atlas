@@ -16,11 +16,11 @@ const { rule, runs, to = 'log', size = 'small', words } = Astro.props;
 const label = (r: any) => `${at(r.at, DEMO_TODAY)}: ${RESULT[r.result]?.word ?? r.result}${r.target && !r.quiet ? `, ${r.target}` : ''}`;
 ---
 <div class:list={['rs-strip', `rs-${size}`]} data-run-strip={rule} data-run-to={to} data-help="rule.strip">
-  <ol class="rs-sq" role="img" aria-label={`Runs, oldest first: ${words ?? ''}`}>
+  <div class="rs-sq" role="img" aria-label={`Runs, oldest first: ${words ?? ''}`}>
     {runs.map((r) => (
-      <li><span class={`sq sq-${RESULT[r.result]?.square ?? 'done'}`} title={label(r)} data-run-id={r.id}></span></li>
+      <span class="rs-i"><span class={`sq sq-${RESULT[r.result]?.square ?? 'done'}`} title={label(r)} data-run-id={r.id}></span></span>
     ))}
-  </ol>
+  </div>
   {words && <p class="rs-w" data-run-words>{words}</p>}
 </div>
 
@@ -38,7 +38,7 @@ const label = (r: any) => `${at(r.at, DEMO_TODAY)}: ${RESULT[r.result]?.word ?? 
       const sq = RESULT[r.result]?.square ?? 'done';
       if (a) { a.className = `sq sq-${sq}`; continue; }
       if (have.has(r.id)) continue;
-      const li = D.createElement('li');
+      const li = D.createElement('span'); li.className = 'rs-i';
       li.innerHTML = `<span class="sq sq-${sq}" data-run-id="${r.id}" title="Just now: ${RESULT[r.result]?.word ?? r.result}"></span>`;
       list.appendChild(li);
       const m = W.rsMotion ? W.rsMotion() : { reduced: true };
@@ -63,7 +63,7 @@ const label = (r: any) => `${at(r.at, DEMO_TODAY)}: ${RESULT[r.result]?.word ?? 
 <style is:global>
   .rs-strip { display: grid; gap: 6px; min-width: 0; }
   .rs-sq { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 3px; }
-  .rs-sq li { display: block; }
+  .rs-sq .rs-i { display: block; }
   .sq { --s: 10px; display: block; width: var(--s); height: var(--s); border-radius: 2px; background: color-mix(in srgb, var(--h-fine) 55%, var(--surface)); transition: transform var(--dur-hover) var(--ease-settle), background-color var(--dur-state) var(--ease-settle); }
   .rs-large .sq { --s: 16px; border-radius: 3px; }
   .rs-large .rs-sq { gap: 4px; }

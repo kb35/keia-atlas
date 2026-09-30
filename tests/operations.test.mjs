@@ -267,9 +267,9 @@ test('platforms: the room\'s call system first, from the model choices', () => {
 test('the trend strip is drawn at its own size, one stroke a period, and says its numbers', () => {
   const html = trendStrip({ bars: [{ label: 'Aug', n: 0 }, { label: 'Sep', n: 2 }], label: 'Faults', step: 10, height: 20, mark: 1 });
   assert.match(html, /width="20" height="20"/);
-  assert.equal((html.match(/class="ts-bar km-draw/g) ?? []).length, 1, 'an empty month draws no bar');
+  assert.equal((html.match(/class="ts-bar/g) ?? []).length, 1, 'an empty month draws no bar');
   assert.match(html, /aria-label="Faults: Aug 0, Sep 2"/);
-  assert.match(html, /data-draw/);
+  assert.match(html, /<svg data-chart/, 'the library draws it in (km-draw-in)');
 });
 
 // ---- Every new block can be switched off -------------------------------------------------------------------------
