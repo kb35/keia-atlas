@@ -61,7 +61,7 @@ export const DATE_FIELDS = {
   'model-choices': { shift: ['since', 'review'] },
   'on-call': { shift: ['weeks[].from'] },
   // An integrator's own records (Northlight AV, data/providers/): all story, so every date moves with the demo.
-  providers: { shift: ['counted', 'jobs[].days[]', 'orders[].expected', 'orders[].raised', 'orders[].received', 'packs[].accepted.at', 'packs[].handed_over', 'packs[].sent', 'packs[].training[].on', 'people[].certs[].expires', 'reviews[].generated', 'reviews[].reviewed', 'rota[].from', 'rota[].to', 'surveys[].surveyed', 'visits[].days[]'] },
+  providers: { shift: ['counted', 'jobs[].days[]', 'orders[].expected', 'orders[].raised', 'orders[].received', 'packs[].accepted.at', 'packs[].handed_over', 'packs[].sent', 'packs[].training[].on', 'people[].certs[].expires', 'reviews[].generated', 'reviews[].reviewed', 'rota[].from', 'rota[].to', 'surveys[].surveyed', 'visits[].days[]', 'accepted', 'design.surveyed', 'lost.on', 'opened', 'updated', 'versions[].date'] },
   'out-of-service': { shift: ['since', 'until'] },
   // The year plan's bounds and its calendar events (quarterly reviews, the year-end freeze, the budget deadline) are
   // tied to the financial year, so they move with it; the proposed work in the pipeline is story, so it moves by weeks.
