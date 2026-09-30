@@ -85,28 +85,7 @@ html { scroll-padding-top: calc(var(--mast-h, 60px) + var(--fb-h, 0px) + 16px); 
 .list > :focus-visible, .tablewrap :focus-visible, .dt-list :focus-visible { outline-offset: -2px; }
 a.card:focus-visible, a.site-card:focus-visible, .card :focus-visible { outline-offset: 2px; }
 
-/* ---------- 4.12 Loading: a skeleton, at its final size, still ----------
-   rsFill(box, fill) in Motion.astro shows it only when content takes longer than --skeleton-skip, and never
-   longer than --skeleton-max; then the content cross-fades in over --dur-state. The wash never shimmers. */
-.skel { position: relative; }
-.skel.skel-on > * { visibility: hidden; }
-.skel.skel-on::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: repeating-linear-gradient(to bottom, var(--surface-2) 0 14px, transparent 14px 26px); pointer-events: none; }
-.skel-line { display: block; height: 12px; border-radius: 6px; background: var(--surface-2); }
-.skel-line + .skel-line { margin-top: 10px; }
-.skel-line.short { width: 40%; } .skel-line.mid { width: 70%; }
-
-/* ---------- 4.23 Toasts ----------
-   One at a time, from the bottom (--dur-enter), stays --toast-stay (paused while pointed at or focused) or until
-   dismissed, then leaves downward (--dur-exit on --ease-exit). A second one replaces the first in place.
-   window.rsToast(text, { action, onAction }) in Motion.astro. */
-.rs-toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); z-index: 95; display: flex; align-items: center; gap: 12px; max-width: min(560px, calc(100vw - 32px)); padding: 10px 10px 10px 16px; border-radius: var(--radius-lg); background: var(--ink); color: var(--on-ink); box-shadow: var(--shadow-lg); font: 500 var(--fs-body)/1.4 var(--font-sans); transform: translateX(-50%); }
-.rs-toast[hidden] { display: none; }
-.rs-toast .rs-toast-t { min-width: 0; }
-.rs-toast .btn { flex: none; padding: 6px 12px; font-size: var(--fs-support); color: var(--on-ink); border-color: color-mix(in srgb, var(--on-ink) 40%, transparent); background: transparent; }
-.rs-toast .btn:hover { background: color-mix(in srgb, var(--on-ink) 14%, transparent); color: var(--on-ink); }
-.rs-toast .rs-toast-x { flex: none; width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: var(--radius); background: none; color: color-mix(in srgb, var(--on-ink) 70%, transparent); cursor: pointer; font-size: 18px; line-height: 1; }
-.rs-toast .rs-toast-x:hover { color: var(--on-ink); background: color-mix(in srgb, var(--on-ink) 12%, transparent); }
-@media (max-width: 767px) { .rs-toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); } }
+/* 4.12 Loading and 4.23 Toasts are the motion library's (km-skeleton, km-toast in src/styles/motion-library.css). */
 
 /* ---------- Empty states (UI-V2 section 10, States) ----------
    One sentence and one action where the list would be, in the page's own words: a quiet dashed box. */
@@ -115,8 +94,35 @@ a.card:focus-visible, a.site-card:focus-visible, .card :focus-visible { outline-
 
 /* ---------- Reduced motion ----------
    base.css already stops CSS animation and transition; the scripts in Motion.astro check rsMotion().reduced. */
-@media (prefers-reduced-motion: reduce) {
-  .rs-toast { animation: none !important; }
-}
 
-@media print { .rs-toast { display: none !important; } }
+
+/* ---------- Useful colour: one colour per service and per lens (Keith, 30 Sept) ----------
+   Seven categorical hues chosen away from the health palette (no green, amber, vermillion or plain blue), each at
+   least 3:1 against the page and a card in every look, light and dark, so they can mark a chart, a section's
+   accent line or a small highlight. They never mean health: health is the glyph, its word and the --h-* tokens.
+   Services: AV raspberry, Network cerulean, Infrastructure bronze. Lenses: Health the fine colour, Network the
+   network colour, Support indigo, Projects violet, Vendors steel, Knowledge walnut. */
+:root {
+  --cat-1: #A4457E; --cat-2: #1F7FA6; --cat-3: #8A6D2B; --cat-4: #4F5BC4; --cat-5: #7A4FB8; --cat-6: #4E6A85; --cat-7: #8B5A3C;
+  --svc-av: var(--cat-1); --svc-network: var(--cat-2); --svc-infrastructure: var(--cat-3);
+  --lens-health: var(--h-fine); --lens-network: var(--cat-2); --lens-support: var(--cat-4); --lens-projects: var(--cat-5); --lens-vendors: var(--cat-6); --lens-knowledge: var(--cat-7);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --cat-1: #E58FC2; --cat-2: #6CC3E8; --cat-3: #D6BD7A; --cat-4: #9EA7F2; --cat-5: #C3A2F0; --cat-6: #A5BCD3; --cat-7: #D9A882; }
+}
+:root[data-theme="dark"] { --cat-1: #E58FC2; --cat-2: #6CC3E8; --cat-3: #D6BD7A; --cat-4: #9EA7F2; --cat-5: #C3A2F0; --cat-6: #A5BCD3; --cat-7: #D9A882; }
+/* Playful: the same hues, brighter. High contrast: the same hues, as dark (or, in dark, as light) as they go. */
+:root[data-look="classic"]:not([data-theme="dark"]) { --cat-1: #C2388A; --cat-2: #0A87BA; --cat-3: #94731C; --cat-4: #4B5CE0; --cat-5: #8A48D9; --cat-6: #3F74A6; --cat-7: #A0582C; }
+:root[data-look="classic"][data-theme="dark"] { --cat-1: #FF8FCF; --cat-2: #5CD0FF; --cat-3: #F0C85A; --cat-4: #A3AEFF; --cat-5: #D0A2FF; --cat-6: #9CC6EE; --cat-7: #F2A874; }
+:root[data-contrast="high"]:not([data-theme="dark"]) { --cat-1: #7D2A5E; --cat-2: #0B5775; --cat-3: #5E4A12; --cat-4: #2F3A96; --cat-5: #53308F; --cat-6: #33485E; --cat-7: #603A22; }
+:root[data-contrast="high"][data-theme="dark"] { --cat-1: #F4B0D8; --cat-2: #9ADCF5; --cat-3: #E8D49A; --cat-4: #C3C9FA; --cat-5: #DCC5FA; --cat-6: #C8D8E8; --cat-7: #EDC4A6; }
+@media (prefers-color-scheme: dark) {
+  :root[data-look="classic"]:not([data-theme]) { --cat-1: #FF8FCF; --cat-2: #5CD0FF; --cat-3: #F0C85A; --cat-4: #A3AEFF; --cat-5: #D0A2FF; --cat-6: #9CC6EE; --cat-7: #F2A874; }
+  :root[data-contrast="high"]:not([data-theme]) { --cat-1: #F4B0D8; --cat-2: #9ADCF5; --cat-3: #E8D49A; --cat-4: #C3C9FA; --cat-5: #DCC5FA; --cat-6: #C8D8E8; --cat-7: #EDC4A6; }
+}
+/* A service's own colour: data-svc="av | network | infrastructure" sets --svc for everything inside. */
+[data-svc="av"] { --svc: var(--svc-av); }
+[data-svc="network"] { --svc: var(--svc-network); }
+[data-svc="infrastructure"] { --svc: var(--svc-infrastructure); }
+.svc-accent { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--svc, transparent) 45%, transparent); } /* a tinted outline, never a stripe on a rounded box (looks.md) */
+.svc-dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--svc, var(--text-3)); flex: none; }
