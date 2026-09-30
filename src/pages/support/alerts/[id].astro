@@ -1,0 +1,90 @@
+---
+// One alert rule (the Alert rules capability, src/lib/modules.mjs; src/lib/alerts.mjs). Record archetype: the band
+// answers with the last 30 days (sent, silenced by planned work, waited for the morning); then the rule as one
+// sentence with its facts, who gets it at each office now, what silences it, and every alert in the 30 days with
+// where it was, who it went to and why it waited or was silenced. The alerts are simulated, from the connected
+// monitoring tool named in the rule.
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import Section from '../../../components/Section.astro';
+import HealthGlyph from '../../../components/HealthGlyph.astro';
+import FeatureGate from '../../../components/FeatureGate.astro';
+import SourceMark from '../../../components/SourceMark.astro';
+import { href, sites, plural } from '../../../lib/data.mjs';
+import { PEOPLE, ROLES } from '../../../lib/demo.mjs';
+import { alertViews } from '../../../lib/capabilities-view.mjs';
+import { ruleAnswer, SOURCE_LABEL, STATUS_WORD, quietWords, silenceWords, WINDOW_DAYS } from '../../../lib/alerts.mjs';
+import '../../../styles/capabilities.css';
+
+export function getStaticPaths() { return alertViews.map((v) => ({ params: { id: v.rule.id.toLowerCase() } })); }
+const v = alertViews.find((x) => x.rule.id.toLowerCase() === Astro.params.id);
+const R = v.rule, C = v.counts;
+const name = (id) => PEOPLE.find((p) => p.id === id)?.name ?? 'Nobody yet';
+const when = (t) => `${new Date(`${t.slice(0, 10)}T00:00:00Z`).toLocaleDateString('en-IE', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })}, ${t.slice(11, 16)}`;
+const STATE = { sent: 'fault', silenced: 'off', held: 'review' };
+const silences = silenceWords(R);
+const cond = R.condition;
+const NUMBERS = [
+  { n: C.sent, label: 'Sent', to: '#alerts' },
+  { n: C.silenced, label: 'Silenced', to: '#alerts' },
+  { n: C.held, label: 'Waited', to: '#alerts' },
+  { n: `P${R.priority}`, label: 'Priority', fact: true },
+];
+---
+<Shell title={R.name} section="alerts" crumbs={[{ label: 'Support', to: '/support/' }, { label: 'Alert rules', to: '/support/alerts/' }, { label: R.name }]} about={{ kind: 'alert-rule', label: R.name, to: `/support/alerts/${R.id.toLowerCase()}/` }}>
+  <FeatureGate id="alerts">
+    <PageBand overline={`Alert rule ${R.id}`} title={R.name} answer={ruleAnswer(C)} lede={v.sentence} sim heartbeat={false} numbers={NUMBERS} rec={R.id}>
+      <SourceMark slot="overline" from={SOURCE_LABEL[R.source]} />
+    </PageBand>
+    <div class="content alrd">
+      <section class="card pad alrd-rule" aria-labelledby="alrd-h" data-help="alerts.sentence">
+        <h2 id="alrd-h" class="overline">The rule</h2>
+        <p class="alrd-s">{v.sentence}</p>
+        <dl class="kv">
+          <div><dt>Watches</dt><dd>{plural(v.targets.length, R.applies_to.classes ? 'unit' : 'comms room')} in {plural(v.people.length, 'office')}</dd></div>
+          <div><dt>Condition</dt><dd>{cond.signal === 'offline' ? 'Offline' : cond.signal === 'packet-loss' ? `Packet loss over ${cond.above}${cond.unit ?? ''}` : cond.signal === 'port-down' ? 'An uplink down' : cond.signal === 'on-battery' ? 'On battery' : `Over ${cond.above} ${cond.unit ?? ''}`}, for {plural(cond.for_min, 'minute')}</dd></div>
+          <div><dt>When</dt><dd>{R.when === 'office-hours' ? 'Office hours, each office\'s own' : 'At any hour'}</dd></div>
+          <div><dt>Quiet hours</dt><dd>{quietWords(R)}</dd></div>
+          <div><dt>Raised by</dt><dd>{SOURCE_LABEL[R.source]}, connected</dd></div>
+          <div><dt>Owner</dt><dd>{ROLES[R.owner_role]?.name ?? R.owner_role}</dd></div>
+        </dl>
+      </section>
+
+      <Section title="Who gets it now" id="who" help="alerts.who" aside={v.route}>
+        <ul class="cap-list card pad">
+          {v.people.map((p) => <li><b>{sites[p.site]?.name}</b><span>{name(p.person)}, {ROLES[R.route.role]?.name ?? R.route.role}</span><small>{plural(p.n, R.applies_to.classes ? 'unit' : 'comms room')} watched</small></li>)}
+        </ul>
+      </Section>
+
+      {silences.length > 0 && (
+        <Section title="What silences it" id="silences" help="alerts.silences">
+          <ul class="cap-list card pad">{silences.map((s) => <li>{s[0].toUpperCase() + s.slice(1)}</li>)}</ul>
+        </Section>
+      )}
+
+      <Section title={`The last ${WINDOW_DAYS} days`} id="alerts" showAll={8} help="alerts.log">
+        <span slot="aside" class="faint">Simulated, from {SOURCE_LABEL[R.source]}</span>
+        <div class="card cap-t">
+          <table class="to-cards cap-tbl">
+            <thead><tr><th>Alert</th><th>Where</th><th>Went to</th></tr></thead>
+            <tbody data-items>
+              {v.alerts.map((e) => (
+                <tr>
+                  <td data-label=""><span class="cap-g"><HealthGlyph state={STATE[e.status]} size={16} word={STATUS_WORD[e.status]} /></span><b>{when(e.at)}</b><small>Lasted {plural(e.lasted, 'minute')}</small></td>
+                  <td data-label="Where"><a href={href(e.target.to)}>{e.target.label}</a></td>
+                  <td data-label="Went to">{e.to ? name(e.to) : 'Nobody'}{e.why && <small>{e.status === 'silenced' ? `Silenced: ${e.why}` : `Waited: ${e.why}`}</small>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+    </div>
+  </FeatureGate>
+</Shell>
+
+<style>
+  .alrd-rule { display: grid; gap: 10px; }
+  .alrd-rule h2 { margin: 0; }
+  .alrd-s { margin: 0; font-size: 20px; line-height: 1.35; max-width: 60ch; font-weight: 500; }
+</style>

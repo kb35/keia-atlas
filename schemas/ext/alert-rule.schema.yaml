@@ -1,0 +1,57 @@
+# Alert rule: what counts as an alert, who gets it, when it stays quiet and what silences it (the Alert rules
+# capability, src/lib/modules.mjs). The monitoring tool raises the alert; Atlas owns the routing to a role and the
+# silences that follow its own records (room check rounds and standing rules' run windows).
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/alert-rule
+title: Alert rule
+type: object
+additionalProperties: false
+required: [id, name, source, applies_to, condition, priority, when, route, silenced_by, owner_role, demo]
+properties:
+  id: { type: string, pattern: "^AR-[0-9]{2}$" }
+  name: { type: string }
+  source: { description: The monitoring tool that raises it., enum: [datadog, alertmanager, librenms] }
+  applies_to:
+    description: What it watches. Device classes, comms rooms (space types), or both; offices narrow it.
+    type: object
+    additionalProperties: false
+    minProperties: 1
+    properties:
+      classes: { type: array, minItems: 1, items: { type: string } }
+      space_types: { type: array, minItems: 1, items: { type: string } }
+      sites: { type: array, minItems: 1, items: { type: string } }
+  condition:
+    type: object
+    additionalProperties: false
+    required: [signal, for_min]
+    properties:
+      signal: { enum: [offline, packet-loss, port-down, on-battery, temperature] }
+      above: { type: number }
+      unit: { type: string }
+      for_min: { description: Minutes the condition must last before it alerts., type: integer, minimum: 0 }
+  priority: { type: integer, minimum: 1, maximum: 4 }
+  when: { description: Office hours are the office's own (src/lib/livesim.mjs)., enum: [office-hours, always] }
+  route:
+    type: object
+    additionalProperties: false
+    required: [role, at]
+    properties:
+      role: { description: A role in src/lib/demo.mjs., type: string }
+      at: { description: "Whose: the role at the office the alert is in, in its region, or anyone in the role.", enum: [office, region, all] }
+  quiet_hours:
+    description: "Local hours when the alert waits for the morning instead of waking someone. A priority 1 alert never waits."
+    type: object
+    additionalProperties: false
+    required: [from, to]
+    properties:
+      from: { type: string, pattern: "^\\d\\d:\\d\\d$" }
+      to: { type: string, pattern: "^\\d\\d:\\d\\d$" }
+  silenced_by:
+    description: The Atlas records that silence it while they run.
+    type: object
+    additionalProperties: false
+    properties:
+      room_checks: { description: "A room check round in the office, for the spaces it covers, until 09:00 on its day.", type: boolean }
+      standing_rules: { description: "A standing rule's run window (data/standing-rules/), for the units it acts on.", type: boolean }
+  owner_role: { type: string }
+  demo: { description: Made up for the demo., const: true }

@@ -11,6 +11,7 @@ import { parse } from 'yaml';
 import { validate } from '../tools/validate.mjs';
 import { seatHolders, licenceRows, licenceSummary, licenceAnswer, inDays } from '../src/lib/licences.mjs';
 import { outNow, lostBookings, noticeLines, whenWords, alternativesFor } from '../src/lib/outofservice.mjs';
+import { sentence, quietWords, simulatedAlerts, alertCounts, ruleAnswer } from '../src/lib/alerts.mjs';
 import { nthWeekday, planDates, rounds, checksForSpace, checksSummary, checksAnswer, checkItem, addMonths } from '../src/lib/checks.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -34,7 +35,7 @@ for (const f of readdirSync(join(ROOT, 'data/installs'))) for (const n of readdi
   for (const u of inst.older_kit ?? []) add(u, u.model);
 }
 
-const FOLDERS = ['licences', 'checks', 'out-of-service'];
+const FOLDERS = ['licences', 'checks', 'out-of-service', 'alert-rules'];
 let result;
 test('each capability\'s data validates: schema, secrets and cross-references', async () => {
   result = await validate(ROOT);
@@ -119,6 +120,34 @@ test('out of service: the notices (simulated) name the bookings moved and the pe
   assert.match(lines[0], /^The booking system blocks 4\.01 Kingfisher until Thu, 1 Oct, 17:00 and moves \d+ bookings? to 3\.05 Gannet$/);
   assert.match(lines[1], /^\d+ people booked in are told by email/);
   assert.equal(whenWords('2026-10-01T17:00'), 'Thu, 1 Oct, 17:00');
+});
+
+// ---- Alert rules ---------------------------------------------------------------------------------------------------
+test('alert rules: each rule is one plain sentence', () => {
+  const rules = Object.fromEntries(read('alert-rules').map((r) => [r.id, r]));
+  const ctx = { className: (c) => ({ 'video-bar': 'Video bar', 'touch-controller': 'Touch controller', codec: 'Video codec' }[c] ?? c), siteName: (s) => ({ dub: 'Dublin office' }[s] ?? s) };
+  assert.equal(sentence(rules['AR-01'], ctx), 'When a video bar in the Dublin office is offline for 10 minutes during office hours, tell the Dublin on-site technician.');
+  assert.equal(sentence(rules['AR-02'], ctx), "When a touch controller is offline for 15 minutes during office hours, tell that office's on-site technician.");
+  assert.equal(sentence(rules['AR-05'], ctx), "When a comms room runs on its UPS battery for 2 minutes at any hour, tell that office's on-site technician.");
+  assert.match(sentence(rules['AR-03'], ctx), /loses more than 2% of its packets for 5 minutes during office hours, tell the region's network engineer\.$/);
+  assert.equal(quietWords(rules['AR-05']), 'A priority 1 alert never waits: it wakes someone at any hour.');
+  assert.equal(quietWords(rules['AR-02']), 'Between 19:00 and 07:00 it waits for the morning.');
+});
+
+test('alert rules: the simulated alerts keep to office hours, silence for planned work, and a P1 never waits', () => {
+  const rules = Object.fromEntries(read('alert-rules').map((r) => [r.id, r]));
+  const targets = [{ id: 'AG-1', label: 'x', site: 'dub', space: 'dub-3-09' }, { id: 'AG-2', label: 'y', site: 'dub', space: 'dub-3-05' }];
+  const ctx = { targets, rounds: [{ date: '2026-09-03', site: 'dub', spaces: ['dub-3-09'], name: 'Monthly meeting room check' }], night: { name: 'Firmware rule', from: '22:00', to: '05:00' }, who: () => 'liam', today: TODAY };
+  const a = simulatedAlerts(rules['AR-01'], ctx);
+  assert.deepEqual(a, simulatedAlerts(rules['AR-01'], ctx), 'seeded');
+  const own = a.filter((e) => e.status === 'sent');
+  assert.ok(own.every((e) => { const d = new Date(`${e.at.slice(0, 10)}T00:00:00Z`).getUTCDay(); const h = +e.at.slice(11, 13); return d > 0 && d < 6 && h >= 8 && h < 18; }), 'office hours, weekdays');
+  assert.ok(a.some((e) => e.status === 'silenced' && /room check/.test(e.why)), 'a round silences it');
+  assert.ok(a.some((e) => e.status === 'silenced' && /Firmware rule/.test(e.why)), 'a standing rule silences it');
+  assert.ok(a.filter((e) => e.status === 'silenced').every((e) => e.to === null), 'a silenced alert goes to nobody');
+  const ups = simulatedAlerts(rules['AR-05'], { ...ctx, targets: [{ id: 'dub-3-21', label: 'MDF', site: 'dub', space: 'dub-3-21' }] });
+  assert.ok(ups.every((e) => e.status !== 'held'), 'priority 1 never waits');
+  assert.match(ruleAnswer(alertCounts(a)), /^Sent (once|\d+ times) in 30 days · \d+ silenced by planned work/);
 });
 
 test('out of service: the space offered instead is the same kind in the same office, same floor first, never one that is out', () => {

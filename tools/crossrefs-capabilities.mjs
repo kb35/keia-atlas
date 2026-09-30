@@ -77,5 +77,18 @@ export function crossCheckCapabilities(records) {
     role(rec, ['by_role'], d.by_role);
   }
 
+  // Alert rules: real classes, space types, offices and roles; the file is named after the rule.
+  const classes = ids('device-classes');
+  for (const rec of inFolder('alert-rules')) {
+    const d = rec.data;
+    if (d.id.toLowerCase() !== rec.id) report(rec, ['id'], `id "${d.id}" does not match the file name "${rec.id}"`);
+    (d.applies_to.classes ?? []).forEach((c, i) => { if (!classes.has(c)) report(rec, ['applies_to', 'classes', i], `device class "${c}" does not exist`); });
+    (d.applies_to.space_types ?? []).forEach((t, i) => { if (!spaceTypes.has(t)) report(rec, ['applies_to', 'space_types', i], `space type "${t}" does not exist`); });
+    (d.applies_to.sites ?? []).forEach((s, i) => site(rec, ['applies_to', 'sites', i], s));
+    role(rec, ['route', 'role'], d.route.role);
+    role(rec, ['owner_role'], d.owner_role);
+    if (d.priority === 1 && d.quiet_hours) report(rec, ['quiet_hours'], 'a priority 1 alert never waits for quiet hours to end');
+  }
+
   return problems;
 }

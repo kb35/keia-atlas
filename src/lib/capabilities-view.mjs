@@ -5,7 +5,8 @@
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { parse } from 'yaml';
-import { spaces, sites, models, DEMO_TODAY, href, KIND } from './data.mjs';
+import { spaces, sites, models, classes, DEMO_TODAY, href, KIND } from './data.mjs';
+import { sentence, subjectOf, routeWords, simulatedAlerts, alertCounts } from './alerts.mjs';
 import { alternativesFor } from './outofservice.mjs';
 import { PEOPLE } from './demo.mjs';
 import { licenceRows, licenceSummary, inDays } from './licences.mjs';
@@ -76,6 +77,37 @@ export const oosCandidates = (spaceId) => {
   return alternativesFor(candidate(s), Object.values(spaces).filter((x) => x.site === s.site).map(candidate)).slice(0, 6);
 };
 export const oosOf = (spaceId) => oosSeed.find((r) => r.space === spaceId) ?? null;
+
+// ---- Alert rules -----------------------------------------------------------------------------------------------------
+// Each rule with its sentence, what it watches, who gets it at each office and its last 30 days (simulated).
+export const alertRules = readRecords('alert-rules').sort((a, b) => a.id.localeCompare(b.id));
+const nightRule = readRecords('standing-rules').find((r) => r.id === 'firmware-to-standard');
+const night = nightRule?.window ? { name: nightRule.name, from: nightRule.window.split(' to ')[0], to: nightRule.window.split(' to ')[1] } : null;
+const siteLabel = (s) => sites[s]?.name ?? s;
+// (the switch class is named for its in-room use; in a comms room it is simply a network switch, gap 17)
+const alertCtx = { className: (c) => (c === 'network-switch' ? 'network switch' : classes[c]?.profile.name ?? c), siteName: siteLabel };
+/** Who a rule's alert goes to at an office: the office's technician, the region's network engineer, the service desk. */
+export function alertPerson(rule, site) {
+  const r = rule.route, region = sites[site]?.region;
+  if (r.role === 'tech') return techOf[site] ?? null;
+  const all = PEOPLE.filter((p) => p.roleId === r.role);
+  if (r.at === 'region') return (all.find((p) => p.region === region) ?? all.find((p) => !p.region) ?? all[0])?.id ?? null;
+  return all[0]?.id ?? null;
+}
+export function alertTargets(rule) {
+  const a = rule.applies_to;
+  const inSite = (s) => !a.sites || a.sites.includes(s);
+  if (a.classes) return fleetUnits.filter((u) => a.classes.includes(u.cls) && inSite(u.site) && (!a.space_types || a.space_types.includes(spaces[u.space]?.space_type)) && u.stage === 'manage')
+    .map((u) => ({ id: u.tag, label: `${u.host ?? u.tag}, ${spaceTitle(u.space)}, ${siteLabel(u.site)}`, site: u.site, space: u.space, to: `/device/?tag=${u.tag}` }));
+  return Object.values(spaces).filter((s) => a.space_types.includes(s.space_type) && inSite(s.site)).map((s) => ({ id: s.id, label: `${spaceTitle(s.id)}, ${siteLabel(s.site)}`, site: s.site, space: s.id, to: `/rooms/${s.id}/` }));
+}
+export const alertViews = alertRules.map((rule) => {
+  const targets = alertTargets(rule);
+  const alerts = simulatedAlerts(rule, { targets, rounds: checkRounds, night, who: (s) => alertPerson(rule, s), today: DEMO_TODAY });
+  const officeIds = [...new Set(targets.map((t) => t.site))];
+  return { rule, sentence: sentence(rule, alertCtx), subject: subjectOf(rule, alertCtx), route: routeWords(rule, alertCtx), targets, alerts, counts: alertCounts(alerts),
+    people: officeIds.map((s) => ({ site: s, person: alertPerson(rule, s), n: targets.filter((t) => t.site === s).length })) };
+});
 
 // ---- The unit page's cards (/device/caps.json, UnitCapabilities.astro) --------------------------------------------
 // Each card already worded: { feature, help, title, answer, tone?, items: [{ b, text?, w?, tone?, small?, to? }], more? }.

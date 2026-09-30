@@ -1,0 +1,70 @@
+---
+// Alert rules (the Alert rules capability, src/lib/modules.mjs; src/lib/alerts.mjs): what counts as an alert and who
+// gets it, each rule said as one sentence. The answer first (alerts sent in 30 days, and how many Atlas silenced for
+// its own planned work), then the rules, worst priority first, each opening its page. The monitoring tools raise the
+// alerts; they are simulated here (there is no monitoring feed in the demo). Connected by default: from monitoring.
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import FilterBar from '../../../components/FilterBar.astro';
+import EmptyState from '../../../components/EmptyState.astro';
+import FeatureGate from '../../../components/FeatureGate.astro';
+import FeatureSource from '../../../components/FeatureSource.astro';
+import SourceMark from '../../../components/SourceMark.astro';
+import { href, plural } from '../../../lib/data.mjs';
+import { ROLES } from '../../../lib/demo.mjs';
+import { alertViews } from '../../../lib/capabilities-view.mjs';
+import { alertsAnswer, ruleAnswer, SOURCE_LABEL, quietWords, WINDOW_DAYS } from '../../../lib/alerts.mjs';
+import '../../../styles/capabilities.css';
+
+const V = [...alertViews].sort((a, b) => a.rule.priority - b.rule.priority || a.rule.id.localeCompare(b.rule.id));
+const T = V.reduce((a, v) => ({ sent: a.sent + v.counts.sent, silenced: a.silenced + v.counts.silenced, held: a.held + v.counts.held }), { sent: 0, silenced: 0, held: 0 });
+const FACETS = [
+  { key: 'source', label: 'Source', options: Object.entries(SOURCE_LABEL).filter(([k]) => V.some((v) => v.rule.source === k)).map(([value, label]) => ({ value, label })) },
+  { key: 'priority', label: 'Priority', options: [1, 2, 3, 4].filter((p) => V.some((v) => v.rule.priority === p)).map((p) => ({ value: String(p), label: `P${p}` })) },
+  { key: 'role', label: 'Goes to', options: [...new Set(V.map((v) => v.rule.route.role))].map((r) => ({ value: r, label: ROLES[r]?.name ?? r })) },
+];
+const NUMBERS = [
+  { n: V.length, label: 'Rules', fact: true },
+  { n: T.sent, label: `Sent in ${WINDOW_DAYS} days`, fact: true },
+  { n: T.silenced, label: 'Silenced by planned work', fact: true },
+  { n: T.held, label: 'Waited for the morning', fact: true },
+];
+---
+<Shell title="Alert rules" section="alerts" crumbs={[{ label: 'Support', to: '/support/' }, { label: 'Alert rules' }]}>
+  <FeatureGate id="alerts">
+    <PageBand overline="Alert rules" title="Alert rules" answer={alertsAnswer(V.map((v) => v.rule), V.map((v) => v.counts))} lede="What counts as an alert, who gets it, when it waits and what silences it." sim heartbeat={false} numbers={NUMBERS}>
+      <FeatureSource slot="overline" id="alerts" from="Datadog, Alertmanager and LibreNMS" />
+    </PageBand>
+    <div class="content alr">
+      <FilterBar facets={FACETS} placeholder="Find a rule, device or person" label="Find a rule" noun={['rule', 'rules']} scope=".content.alr" />
+      <ul class="alr-list">
+        {V.map((v) => (
+          <li class="card pad alr-row" data-fi data-help="alerts.rule" data-find={`${v.rule.id} ${v.rule.name} ${v.sentence}`} data-f-source={v.rule.source} data-f-priority={String(v.rule.priority)} data-f-role={v.rule.route.role}>
+            <a class="alr-a" href={href(`/support/alerts/${v.rule.id.toLowerCase()}/`)} data-vt-rec={v.rule.id}>
+              <span class="alr-top"><span class={`alr-p p-${v.rule.priority}`}>P{v.rule.priority}</span><b>{v.rule.name}</b><span class="mono faint">{v.rule.id}</span><SourceMark from={SOURCE_LABEL[v.rule.source]} /></span>
+              <span class="alr-s">{v.sentence}</span>
+              <small>{quietWords(v.rule)} {ruleAnswer(v.counts)}. Watches {plural(v.targets.length, v.rule.applies_to.classes ? 'unit' : 'comms room')} in {plural(v.people.length, 'office')}.</small>
+            </a>
+          </li>
+        ))}
+      </ul>
+      <EmptyState text="No rules match these filters." />
+      <p class="cap-note">The monitoring tools raise the alerts; Atlas sends each to the role the rule names at the office it is in, holds it through quiet hours unless it is priority 1, and silences it while its own planned work runs: a room check round before 09:00, or a standing rule's run window. The alerts on these pages are simulated.</p>
+    </div>
+  </FeatureGate>
+</Shell>
+
+<style>
+  .alr-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .alr-a { display: grid; gap: 6px; color: inherit; text-decoration: none; }
+  .alr-a:hover b { text-decoration: underline; text-underline-offset: 2px; }
+  .alr-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  .alr-top b { font-size: var(--fs-h3); font-weight: 600; }
+  .alr-top .mono { font-size: var(--fs-code); }
+  .alr-top .srcm { margin-left: auto; }
+  .alr-s { font-size: var(--fs-lede, 17px); line-height: 1.4; max-width: 72ch; }
+  .alr-a small { font-size: var(--fs-code); color: var(--text-3); }
+  :global(.alr-p) { font: 500 var(--fs-overline)/1 var(--font-mono); padding: 4px 6px; border-radius: 4px; background: var(--surface-3); }
+  :global(.alr-p.p-1), :global(.alr-p.p-2) { background: var(--red); color: #fff; }
+  :global(.alr-p.p-3) { background: var(--amber-soft); color: var(--amber-ink); }
+</style>
