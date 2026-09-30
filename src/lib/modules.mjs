@@ -92,6 +92,7 @@ export const CAPABILITIES = [
   { id: 'maintenance', module: 'projects', label: 'Room checks', what: 'Recurring checks and planned maintenance, scheduled with a checklist', state: 'on', source: 'the maintenance planner', requires: ['locations'] },
   // Vendors
   { id: 'engagements', module: 'vendors', label: 'Service providers', what: 'Engagements with service providers: scope, service levels and reviews', state: 'on', source: 'the supplier portal' },
+  { id: 'provider-sales', module: 'vendors', label: 'Provider sales', what: 'For a provider: opportunities, designs, quotes and statements of work', state: 'on', source: 'the provider\'s own Keia', requires: ['engagements'] },
   // Team
   { id: 'oncall', module: 'team', label: 'On-call', what: 'Who is on call now, by region and service', state: 'on', source: 'the paging tool', requires: ['support'], helper: true },
 ];
