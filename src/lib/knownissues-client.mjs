@@ -21,13 +21,13 @@ export function describe(e) {
   let w;
   if (f.startsWith('link:')) { const n = f.slice(5); w = a === 'linked' ? `Linked ${n}` : a === 'not-this' ? `Said ${n} is not this issue` : `Put ${n} back to decide`; }
   else if (f === 'plan') w = a ? 'Proposed a firmware rollout for the fix' : 'Took back the rollout proposal';
-  else if (f === 'told') w = a ? `Left a note on ${a} ${a === 1 ? 'room' : 'rooms'}` : 'Took the room notes back';
-  else if (f === 'decision') w = a === 'raise' ? 'Chose to raise it with the maker' : a === 'not-now' ? 'Chose not to raise it now' : 'Put it back to decide';
+  else if (f === 'told') w = a ? `Left a note on ${a} ${a === 1 ? 'space' : 'spaces'}` : 'Took the space notes back';
+  else if (f === 'decision') w = a === 'raise' ? 'Chose to raise it with the manufacturer' : a === 'not-now' ? 'Chose not to raise it now' : 'Put it back to decide';
   else if (f === 'status') w = a === 'draft' ? 'Put the case back to being prepared' : `Case: ${CASE_STATUS[a] ?? a}`;
   else if (f === 'summary') w = 'Changed what the case says';
-  else if (f === 'ref') w = a ? `Maker's reference: ${a}` : "Cleared the maker's reference";
-  else if (f === 'known_issue') w = a ? `Linked to known issue ${a}` : 'Unlinked the known issue';
-  else if (f.startsWith('ki:')) w = a ? `Note about known issue ${f.slice(3)}` : `Removed the note about ${f.slice(3)}`;
+  else if (f === 'ref') w = a ? `Manufacturer's reference: ${a}` : "Cleared the manufacturer's reference";
+  else if (f === 'known_issue') w = a ? `Linked to known error ${a}` : 'Unlinked the known error';
+  else if (f.startsWith('ki:')) w = a ? `Note about known error ${f.slice(3)}` : `Removed the note about ${f.slice(3)}`;
   else w = `${f} changed`;
   return e.undoes ? `${e.note}: ${lower1(w)}` : w;
 }
@@ -104,7 +104,7 @@ function bind(mark0) {
     root.querySelectorAll('[data-ki-plan]').forEach((b) => { b.hidden = Boolean(st.plan); });
     root.querySelectorAll('[data-ki-unplan]').forEach((b) => { b.hidden = !st.plan; });
     const told = root.querySelector('[data-ki-toldstate]');
-    if (told) { told.textContent = st.told ? `Note left on ${st.told} ${st.told === 1 ? 'room' : 'rooms'} by ${byLine(L, lastOn(L, item, 'told'))}.` : ''; told.hidden = !st.told; }
+    if (told) { told.textContent = st.told ? `Note left on ${st.told} ${st.told === 1 ? 'space' : 'spaces'} by ${byLine(L, lastOn(L, item, 'told'))}.` : ''; told.hidden = !st.told; }
     root.querySelectorAll('[data-ki-tell-open]').forEach((b) => { b.hidden = Boolean(st.told); });
     root.querySelectorAll('[data-ki-tell-undo]').forEach((b) => { b.hidden = !st.told; });
     root.querySelectorAll('[data-ki-room]').forEach((r) => {
@@ -138,7 +138,7 @@ function bind(mark0) {
     const kiLink = root.querySelector('[data-case-kilink]');
     if (kiLink) { const o = ki?.querySelector(`option[value="${CSS.escape(st.known_issue ?? '')}"]`); kiLink.hidden = !st.known_issue; if (st.known_issue && o) { kiLink.href = o.dataset.href; kiLink.textContent = `Open ${st.known_issue}`; } }
     root.querySelectorAll('[data-case-to]').forEach((b) => { const k = CASE_ORDER.indexOf(b.dataset.caseTo); b.disabled = status === 'draft' || k <= i; });
-    root.querySelectorAll('[data-case-primary]').forEach((b) => { b.textContent = status === 'draft' ? `Send to ${CASE.maker}` : "Record the maker's answer"; });
+    root.querySelectorAll('[data-case-primary]').forEach((b) => { b.textContent = status === 'draft' ? `Send to ${CASE.maker}` : "Record the manufacturer's answer"; });
     const sent = root.querySelector('[data-case-sentline]');
     if (sent) { const e = lastOn(L, CASE.item, 'status'); sent.hidden = status === 'draft'; sent.textContent = status === 'draft' ? '' : e && e.after === 'sent' ? `Sent to ${CASE.maker} by ${byLine(L, e)}. Simulated: nothing left Keia Atlas.` : CASE.sentLine || ''; }
     root.querySelectorAll('[data-case-draftonly]').forEach((el) => { el.hidden = status !== 'draft'; });

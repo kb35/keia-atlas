@@ -120,7 +120,7 @@ function weekOf(p) {
   const team = reportsOf(p.id).flatMap((r) => (workByPerson.get(r.id) ?? []).filter((it) => it.kind === 'time-off' && overlaps(it, WK0, WK_END)).map((it) => ({ person: r, when: span(it.start < WK0 ? WK0 : it.start, it.end > WK_END ? WK_END : it.end) })));
   return {
     label: `${fmtShort(WK0)} to ${fmtShort(WK_END)}`, days, items, next, team,
-    plan: plan.length ? `Work plan: ${plan.length} ${plan.length === 1 ? 'room' : 'rooms'} with devices due this year, about ${planHours} h` : null,
+    plan: plan.length ? `Work plan: ${plan.length} ${plan.length === 1 ? 'space' : 'spaces'} with devices due this year, about ${planHours} h` : null,
   };
 }
 
@@ -131,8 +131,8 @@ const RACI_COLS = ['head', 'sm-av', 'sm-infra', 'programme', 'delivery-manager',
 const RACI = [
   { group: PHASE_LABEL.plan, sub: 'what, where, when and for how much' },
   { label: 'Scope, budget and dates', cells: { programme: { letter: 'A', detail: 'Owns the year plan, so the budget line is theirs.' }, pm: { letter: 'R', detail: 'Writes the scope and the dates.' }, 'sm-av': 'C', 'sm-infra': 'C', head: 'I' } },
-  { group: PHASE_LABEL.design, sub: 'rooms to the room profiles, the network to the port maps' },
-  { label: 'Room design', cells: { 'sm-av': { letter: 'A', detail: 'Signs off the design gate against the house standard.' }, delivery: { letter: 'R', detail: 'Draws the design from the nearest room profiles.' }, vendor: { letter: 'C', detail: 'Details it; says what is buildable.' }, innovation: 'C', pm: 'I' } },
+  { group: PHASE_LABEL.design, sub: 'spaces to the space types, the network to the port maps' },
+  { label: 'Space design', cells: { 'sm-av': { letter: 'A', detail: 'Signs off the design gate against the house standard.' }, delivery: { letter: 'R', detail: 'Draws the design from the nearest space types.' }, vendor: { letter: 'C', detail: 'Details it; says what is buildable.' }, innovation: 'C', pm: 'I' } },
   { label: 'Network and comms room design', cells: { 'sm-infra': { letter: 'A', detail: 'Signs off port maps, VLANs and rack layouts.' }, network: { letter: 'R' }, delivery: 'C', pm: 'I' } },
   { group: PHASE_LABEL.procure, sub: 'orders, deliveries and the vendor' },
   { label: 'Orders and the vendor', cells: { pm: { letter: 'A', detail: 'Places the orders and books the vendor.' }, programme: 'C', delivery: { letter: 'C', detail: 'Checks the models against the design.' }, vendor: 'I' } },
@@ -140,12 +140,12 @@ const RACI = [
   { label: 'Provision', sub: 'Asset record, DNS, device management and monitoring', cells: { delivery: { letter: 'A', detail: 'Makes the records before a device goes on the network.' }, network: { letter: 'C', detail: 'Gives the port and the VLAN.' }, 'sm-infra': 'I', pm: 'I' } },
   { label: 'Install', cells: { delivery: { letter: 'A', detail: 'Accepts the install before it is configured.' }, tech: { letter: 'R', detail: 'Aigna installs.' }, vendor: { letter: 'R', detail: 'Vendor installs, on bigger jobs.' }, pm: 'I' } },
   { label: 'Serials and MACs recorded', cells: { delivery: { letter: 'A', detail: 'Reviews every record before it counts.' }, vendor: 'R', tech: 'R' } },
-  { label: 'Configure', cells: { delivery: { letter: 'A', detail: 'Loads the configuration the standard names, at its version.' }, vendor: { letter: 'R', detail: 'Sets devices up in their setup order, on vendor jobs.' }, tech: 'C', 'sm-av': { letter: 'C', detail: 'Owns the configurations.' } } },
-  { label: 'Commission', cells: { delivery: { letter: 'A', detail: 'Runs the checks and signs the room off.' }, tech: 'R', vendor: 'C', pm: 'I' } },
+  { label: 'Configure', cells: { delivery: { letter: 'A', detail: 'Loads the setup guide the standard names, at its version.' }, vendor: { letter: 'R', detail: 'Sets devices up in their setup order, on vendor jobs.' }, tech: 'C', 'sm-av': { letter: 'C', detail: 'Owns the setup guides.' } } },
+  { label: 'Commission', cells: { delivery: { letter: 'A', detail: 'Runs the checks and signs the space off.' }, tech: 'R', vendor: 'C', pm: 'I' } },
   { group: PHASE_LABEL.handover, sub: 'to the service desk and the site' },
   { label: 'Handover to the service desk', cells: { pm: { letter: 'A' }, delivery: 'R', 'sm-av': 'I', 'sm-infra': 'I' } },
   { group: PHASE_LABEL.closed, sub: 'what the project taught' },
-  { label: 'Close the project', cells: { pm: { letter: 'A', detail: 'Closes it once the service desk has taken the rooms.' }, 'pm-manager': 'I', programme: { letter: 'I', detail: 'Updates the year plan.' } } },
+  { label: 'Close the project', cells: { pm: { letter: 'A', detail: 'Closes it once the service desk has taken the spaces.' }, 'pm-manager': 'I', programme: { letter: 'I', detail: 'Updates the year plan.' } } },
   { label: 'Adding a new task to the playbook', cells: { programme: { letter: 'A', detail: 'Approves playbook changes with the service manager.' }, 'sm-av': { letter: 'C', detail: 'Checks it against the house standard.' }, 'sm-infra': { letter: 'C', detail: 'Checks it for network playbooks.' }, pm: { letter: 'R', detail: 'Proposes it from a project.' }, delivery: 'R', tech: 'R', vendor: 'I' } },
   { group: 'People and escalation', sub: 'who works on what, and where problems go' },
   { label: 'Staffing engineers on a project', cells: { 'eng-manager': { letter: 'A', detail: 'Puts an engineer from their region on the project, and answers for their workload.' }, pm: { letter: 'C', detail: 'Asks for the people a project needs.' }, 'delivery-manager': { letter: 'C', detail: 'Steps in when regions compete for the same engineer.' }, delivery: 'I', programme: 'I' } },
@@ -153,10 +153,10 @@ const RACI = [
   { label: 'On-site cover and technician rotas', cells: { 'tech-manager': { letter: 'A', detail: 'Owns who covers which site, including holidays and sickness.' }, tech: { letter: 'R', detail: 'Covers the site and swaps shifts when asked.' }, pm: { letter: 'C', detail: 'Says when a project needs extra hands on site.' }, 'delivery-manager': 'I' } },
   { label: 'People shared between regions', cells: { 'delivery-manager': { letter: 'A', detail: 'Settles it when two regions need the same person.' }, 'eng-manager': { letter: 'R', detail: 'Offers or asks for engineers.' }, 'pm-manager': 'R', 'tech-manager': 'R', programme: 'C', head: 'I' } },
   { label: 'A task added that the playbook does not have', cells: { pm: { letter: 'A', detail: 'The project task list is theirs. Anyone on the project can add a task; the project manager sees it.' }, delivery: { letter: 'R', detail: 'Adds it, or suggests it.' }, tech: { letter: 'R', detail: 'Adds it, or suggests it.' }, 'eng-manager': 'I', 'tech-manager': 'I' } },
-  { label: 'Escalating a late or blocked project', cells: { pm: { letter: 'R', detail: 'Raises it with the reason and a new date.' }, 'pm-manager': { letter: 'A', detail: 'Decides whether it goes on to the programme manager.' }, programme: { letter: 'C', detail: 'Moves other projects if the plan has to change.' }, 'eng-manager': 'C', 'tech-manager': 'C', head: 'I' } },
+  { label: 'Escalating a late project or one waiting on something', cells: { pm: { letter: 'R', detail: 'Raises it with the reason and a new date.' }, 'pm-manager': { letter: 'A', detail: 'Decides whether it goes on to the programme manager.' }, programme: { letter: 'C', detail: 'Moves other projects if the plan has to change.' }, 'eng-manager': 'C', 'tech-manager': 'C', head: 'I' } },
   { label: 'Escalating a fault the guide does not fix', cells: { tech: { letter: 'R', detail: 'Escalates with what they tried.' }, 'tech-manager': { letter: 'A', detail: 'Makes sure it lands with an engineer the same day.' }, delivery: { letter: 'R', detail: 'Picks it up and fixes it.' }, 'eng-manager': 'C', 'service-vendor': 'C', 'sm-av': 'I' } },
-  { group: 'Service and the standard', sub: 'rooms in use, and what the standard says' },
-  { label: 'Fixing a room that is down', cells: { tech: { letter: 'R', detail: 'First on site.' }, 'service-vendor': { letter: 'R', detail: 'When the fix is a covered repair or replacement.' }, 'sm-av': { letter: 'A', detail: 'Owns the AV service level.' }, delivery: 'C' } },
+  { group: 'Service and the standard', sub: 'spaces in use, and what the standard says' },
+  { label: 'Fixing a space that is down', cells: { tech: { letter: 'R', detail: 'First on site.' }, 'service-vendor': { letter: 'R', detail: 'When the fix is a covered repair or replacement.' }, 'sm-av': { letter: 'A', detail: 'Owns the AV service level.' }, delivery: 'C' } },
   { label: 'Something new in the standard', cells: { 'sm-av': { letter: 'A', detail: 'Decides after the Lab result.' }, innovation: { letter: 'R', detail: 'Tests it in the Lab.' }, delivery: 'C', head: 'I' } },
   { label: 'The year plan', cells: { head: { letter: 'A' }, programme: { letter: 'R' }, 'sm-av': 'C', 'sm-infra': 'C', 'delivery-manager': 'C', pm: 'I' } },
 ];
@@ -221,11 +221,11 @@ const ROWS = LIST.map((x) => ({ id: x.p.id, name: x.p.name, team: rank[x.p.id], 
 // ---------- How the team works ----------
 const who = (t) => PEOPLE.filter((p) => p.team === t);
 const FLOW_TEAMS = [
-  { id: 'av-it', icon: 'profile', name: 'AV service', owns: `${Object.keys(classes).length} device profiles · ${Object.keys(configurations).length} configurations`, does: 'Decides the standard: which devices, which firmware, how they are set up.', to: '/profiles/' },
-  { id: 'delivery', icon: 'project', name: 'Delivery', owns: `${Object.keys(projects).length} projects`, does: 'Builds and changes rooms to the standard, as projects.', to: '/projects/' },
+  { id: 'av-it', icon: 'profile', name: 'AV service', owns: `${Object.keys(classes).length} device types · ${Object.keys(configurations).length} setup guides`, does: 'Decides the standard: which devices, which firmware, how they are set up.', to: '/profiles/' },
+  { id: 'delivery', icon: 'project', name: 'Delivery', owns: `${Object.keys(projects).length} projects`, does: 'Builds and changes spaces to the standard, as projects.', to: '/projects/' },
   { id: 'it-infra', icon: 'rack', name: 'IT infrastructure', owns: `${commsRooms.length} comms rooms · ${Object.keys(racks).length} racks`, does: 'The network: switches, VLANs, comms rooms and the internet circuits.', to: '/rooms/?kind=comms' },
-  { id: 'service-desk', icon: 'alert', name: 'Service desk', owns: `${Object.values(incidents).filter((i) => i.state !== 'resolved').length} open incidents`, does: 'Takes the calls and tickets, and sends room problems on site.', to: '/incidents/' },
-  { id: 'onsite', icon: 'room', name: 'On site', owns: `${Object.keys(spaces).length} rooms at ${Object.keys(sites).length} sites`, does: 'Keeps rooms running day to day; first on the scene.', to: '/rooms/' },
+  { id: 'service-desk', icon: 'alert', name: 'Service desk', owns: `${Object.values(incidents).filter((i) => i.state !== 'resolved').length} open incidents`, does: 'Takes the calls and tickets, and sends space problems on site.', to: '/incidents/' },
+  { id: 'onsite', icon: 'room', name: 'On site', owns: `${Object.keys(spaces).length} spaces at ${Object.keys(sites).length} sites`, does: 'Keeps spaces running day to day; first on the scene.', to: '/rooms/' },
   { id: 'vendor', icon: 'kit', name: 'Vendors', owns: `${Object.keys(vendors).length} under contract`, does: 'Integrators install for projects; the service vendor repairs and replaces.', to: '/vendors/' },
 ].map((t) => ({ ...t, people: who(t.id) }));
 

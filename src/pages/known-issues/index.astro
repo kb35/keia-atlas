@@ -25,7 +25,7 @@ const NUMBERS = [
   { n: counts.decisions, label: 'To decide', to: '#needs-your-decision', tone: counts.decisions ? 'warn' : undefined, id: 'decide' },
   { n: counts.affecting, label: 'Affect us', to: '?affects=yes', tone: counts.affecting ? 'bad' : undefined },
   { n: counts.exposedUnits, label: 'Units exposed', fact: true },
-  { n: counts.openCases, label: 'Open maker cases', to: '#maker-cases' },
+  { n: counts.openCases, label: 'Open manufacturer cases', to: '#maker-cases' },
 ];
 
 // ---- The filter bar ----
@@ -33,11 +33,11 @@ const usedModels = [...new Set(issues.flatMap((it) => it.models))].sort((a, b) =
 const FACETS = [
   { key: 'site', label: 'Office', options: SITE_ORDER.filter((s) => issues.some((it) => exSites(it).includes(s))).map((s) => ({ value: s, label: sites[s].name, sub: sites[s].kind === 'remote' ? 'Home offices' : sites[s].city })) },
   { key: 'status', label: 'Status', options: Object.entries(KI_STATUS).map(([value, label]) => ({ value, label })) },
-  { key: 'maker', label: 'Maker', options: feeds.map((f) => ({ value: f.id, label: f.maker, sub: f.demo ? 'Demo feed' : undefined })) },
+  { key: 'maker', label: 'Manufacturer', options: feeds.map((f) => ({ value: f.id, label: f.maker, sub: f.demo ? 'Demo feed' : undefined })) },
   { key: 'model', label: 'Model', options: [...usedModels.map((m) => ({ value: m, label: modelName(m) })), { value: 'none', label: 'Not in our fleet' }] },
   { key: 'affects', label: 'Affects us', options: Object.entries(AFFECTS).map(([value, label]) => ({ value, label })) },
 ];
-const SORT = { options: [{ value: 'affects', label: 'Affects us first' }, { value: 'maker', label: 'By maker' }, { value: 'newest', label: 'Newest first' }] };
+const SORT = { options: [{ value: 'affects', label: 'Affects us first' }, { value: 'maker', label: 'By manufacturer' }, { value: 'newest', label: 'Newest first' }] };
 const VIEWS = [{ value: 'cards', label: 'Cards', show: '[data-grid]' }, { value: 'list', label: 'List', show: '[data-list]' }];
 const fattrs = (it) => ({
   'data-fi': '', 'data-id': it.id,
@@ -48,11 +48,11 @@ const fattrs = (it) => ({
 const exLine = (it) => it.affects === 'yes' ? `${it.ex.exposed.length} ${it.ex.exposed.length === 1 ? 'unit' : 'units'} in ${new Set(it.ex.exposed.map((u) => u.site)).size} ${new Set(it.ex.exposed.map((u) => u.site)).size === 1 ? 'office' : 'offices'}`
   : it.affects === 'maybe' ? `${it.ex.unknown.length} units, version not tracked`
   : !it.models.length ? 'Not in our fleet'
-  : it.needs?.never ? 'No room meets the condition'
-  : it.ex.safe.some((u) => u.why === 'need') && !it.ex.safe.some((u) => u.why === 'version') ? 'No room meets the condition'
+  : it.needs?.never ? 'No space meets the condition'
+  : it.ex.safe.some((u) => u.why === 'need') && !it.ex.safe.some((u) => u.why === 'version') ? 'No space meets the condition'
   : 'No unit on an affected version';
 
-// ---- Needs your decision: matches grouped by known issue, and repeats with no known issue ----
+// ---- Ready for you: matches grouped by known issue, and repeats with no known issue ----
 const byIssue = [];
 for (const m of matches) {
   let g = byIssue.find((x) => x.issue.id === m.issue.id);
@@ -61,19 +61,19 @@ for (const m of matches) {
 }
 const confTone = { strong: 'bad', possible: 'warn' };
 ---
-<Shell title="Known issues" section="known-issues" minStage={2} crumbs={[{ label: 'Work', to: '/work/' }, { label: 'Incidents', to: '/incidents/' }, { label: 'Known issues' }]}>
-  <PageBand overline="Maker feeds" title="Known issues" lede="What makers publish about their firmware, matched to our units and incidents." stage={2} numbers={NUMBERS} />
+<Shell title="Known errors" section="known-issues" minStage={2} crumbs={[{ label: 'Work', to: '/work/' }, { label: 'Incidents', to: '/incidents/' }, { label: 'Known errors' }]}>
+  <PageBand overline="Manufacturer feeds" title="Known errors" lede="What manufacturers publish about their firmware, matched to our units and incidents." sim numbers={NUMBERS} />
 
   <div class="content known-issues" data-ki-root>
-    <FilterBar facets={FACETS} placeholder="Find a known issue, reference or model" label="Find a known issue" noun={['known issue', 'known issues']} scope="[data-ki-scope]" views={VIEWS} viewKey="rs5-ki-view" sort={SORT} />
+    <FilterBar facets={FACETS} placeholder="Find a known error, reference or model" label="Find a known error" noun={['known error', 'known errors']} scope="[data-ki-scope]" views={VIEWS} viewKey="rs5-ki-view" sort={SORT} />
 
-    <Section title="Needs your decision" id="needs-your-decision" help="ki.decide" data-ki-decide>
+    <Section title="Ready for you" id="needs-your-decision" help="ki.decide" data-ki-decide>
       <span slot="aside" class="faint" data-ki-decide-left>{counts.decisions} to decide</span>
       <div class="g12 ki-decide">
         {byIssue.map((g) => (
           <article class="card ki-dcard s-6" data-ki-card data-help="ki.match-card">
             <header class="ki-dh">
-              <p class="overline">Looks like a known issue · {g.issue.maker}</p>
+              <p class="overline">Looks like a known error · {g.issue.maker}</p>
               <h3><a href={href(g.issue.path)}><span class="mono">{g.issue.ref ?? g.issue.id}</span> {g.issue.title}</a></h3>
               <p class="faint ki-dsub">{g.issue.fixed_in ? `Fixed in ${g.issue.fixed_in}` : g.issue.statusLabel} · <span data-ki-left>{g.rows.length} to decide</span> · <button type="button" class="ki-linkbtn" data-ki-history data-item={`ki:${g.issue.id}`} data-title={`${g.issue.ref ?? g.issue.id} ${g.issue.title}`} data-help="ki.history">History</button></p>
             </header>
@@ -103,7 +103,7 @@ const confTone = { strong: 'bad', possible: 'warn' };
           return (
             <article class="card ki-dcard ki-ccard s-6" data-ki-cluster data-item={`cluster:${c.key}`} data-case={`case:${d.id}`} data-state="open" data-help="ki.cluster-card">
               <header class="ki-dh">
-                <p class="overline">A repeat with no known issue · {d.feed?.maker ?? 'Maker not known'}</p>
+                <p class="overline">A repeat with no known error · {d.feed?.maker ?? 'Manufacturer not known'}</p>
                 <h3>{modelName(c.model)}: {c.symptom.replace(/_/g, ' ')}</h3>
                 <p class="faint ki-dsub">{c.why}, {when(c.first, { time: false })} to {when(c.last, { time: false })} · {c.sites.map(siteName).join(', ')}</p>
               </header>
@@ -114,7 +114,7 @@ const confTone = { strong: 'bad', possible: 'warn' };
               </ol>
               <p class="ki-mstate" data-ki-cstate></p>
               <footer class="ki-cbtn">
-                <a class="btn small primary" href={href(d.path)} data-ki-cl="raise" data-help="ki.raise">Raise with the maker</a>
+                <a class="btn small primary" href={href(d.path)} data-ki-cl="raise" data-help="ki.raise">Raise with the manufacturer</a>
                 <a class="btn small" href={href(d.path)} data-ki-opencase data-help="ki.open-case">Open the case</a>
                 <button type="button" class="btn small ghost" data-ki-cl="not-now" data-help="ki.not-now">Not now</button>
                 <button type="button" class="btn small ghost" data-ki-cl="back" data-help="ki.put-back">Put back</button>
@@ -124,11 +124,11 @@ const confTone = { strong: 'bad', possible: 'warn' };
           );
         })}
       </div>
-      {!byIssue.length && !clusters.length && <EmptyState text="Nothing to decide: no incident looks like a known issue, and nothing repeats across the fleet." filter={false} />}
+      {!byIssue.length && !clusters.length && <EmptyState text="Nothing to decide: no incident looks like a known error, and nothing repeats across the fleet." filter={false} />}
     </Section>
 
     <div data-ki-scope>
-      <Section title="Every known issue" id="every-known-issue" help="ki.all" aside={`${issues.length} from ${feeds.length} makers`}>
+      <Section title="Every known error" id="every-known-issue" help="ki.all" aside={`${issues.length} from ${feeds.length} manufacturers`}>
         <div class="ki-grid" data-grid>
           {list.map(({ it }) => (
             <a class="card ki-card" href={href(it.path)} {...fattrs(it)} data-affects={it.affects}>
@@ -142,7 +142,7 @@ const confTone = { strong: 'bad', possible: 'warn' };
         </div>
         <div class="tablewrap" data-list hidden>
           <table class="to-cards ki-table">
-            <thead><tr><th scope="col">Reference</th><th scope="col">Known issue</th><th scope="col">Maker</th><th scope="col">Status</th><th scope="col">Fixed in</th><th scope="col">For us</th></tr></thead>
+            <thead><tr><th scope="col">Reference</th><th scope="col">Known error</th><th scope="col">Manufacturer</th><th scope="col">Status</th><th scope="col">Fixed in</th><th scope="col">For us</th></tr></thead>
             <tbody>
               {list.map(({ it }) => (
                 <tr {...fattrs(it)}>
@@ -157,17 +157,17 @@ const confTone = { strong: 'bad', possible: 'warn' };
             </tbody>
           </table>
         </div>
-        <EmptyState text="No known issues match these filters." />
+        <EmptyState text="No known errors match these filters." />
       </Section>
     </div>
 
-    <Section title="Maker cases" id="maker-cases" help="ki.cases" aside={`${cases.length} on record`}>
+    <Section title="Manufacturer cases" id="maker-cases" help="ki.cases" aside={`${cases.length} on record`}>
       <div class="list">
         {cases.map((c) => (
           <a class="row plain" href={href(c.path)}>
             <span>
               <span class="name"><span class="mono">{c.id}</span> {c.title}</span>
-              <span class="sub">{c.feed.maker}{c.ref ? ` · case ${c.ref}` : ''} · raised {fmtDate(c.raised)} by {person(c.raised_by).name}{c.issue ? ` · known issue ${c.issue.ref ?? c.issue.id}` : ''}</span>
+              <span class="sub">{c.feed.maker}{c.ref ? ` · case ${c.ref}` : ''} · raised {fmtDate(c.raised)} by {person(c.raised_by).name}{c.issue ? ` · known error ${c.issue.ref ?? c.issue.id}` : ''}</span>
             </span>
             <span class="end"><span class={`pill ${c.status === 'closed' || c.status === 'published' ? 'manage' : 'deploy'}`}>{CASE_STATUS[c.status]}</span></span>
           </a>
@@ -175,7 +175,7 @@ const confTone = { strong: 'bad', possible: 'warn' };
       </div>
     </Section>
 
-    <Section title="Maker feeds" id="maker-feeds" help="ki.feeds" aside="Read with the firmware list">
+    <Section title="Manufacturer feeds" id="maker-feeds" help="ki.feeds" aside="Read with the firmware list">
       <div class="g12">
         {feeds.map((f) => (
           <div class="card side-card s-3 ki-feed" data-help="ki.feed">
@@ -184,9 +184,9 @@ const confTone = { strong: 'bad', possible: 'warn' };
             <dl class="kv">
               <div><dt>Last checked</dt><dd>{when(f.checked)}</dd></div>
               <div><dt>How often</dt><dd>{f.every}</dd></div>
-              <div><dt>Known issues</dt><dd>{f.issues.length}</dd></div>
+              <div><dt>Known errors</dt><dd>{f.issues.length}</dd></div>
             </dl>
-            <p class="faint ki-feednote">{f.demo ? 'Demo feed: made up for this demo.' : 'From the maker\'s public release notes.'} Checked times are simulated until stage 2.</p>
+            <p class="faint ki-feednote">{f.demo ? 'Demo feed: made up for this demo.' : 'From the manufacturer\'s public release notes.'} Checked times are simulated until a real feed replaces them.</p>
           </div>
         ))}
       </div>

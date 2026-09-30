@@ -3,7 +3,7 @@
 // archetype (page-anatomy.md, D). Each card has the service's light, its owner, its four figures and its three worst
 // items right now; every figure opens the service page with that filter. The figures are simulated live
 // (src/lib/livesim.mjs), the same as the service pages.
-//   band      services running well, units needing attention, open incidents
+//   band      services running well, units not working, open incidents
 //   main      one card per service
 //   below     what belongs to each service (kinds of kit, each opening the service filtered to it)
 import Shell from '../../layouts/Shell.astro';
@@ -18,12 +18,12 @@ const models = Object.fromEntries(SERVICE_ORDER.map((id) => [id, serviceModel(id
 const openIncidents = devicesModel().incs.length;
 const NUMBERS = [
   { id: 'svo-1', n: '–', label: 'Services running well', to: '#services' },
-  { id: 'svo-2', n: '–', label: 'Units needing attention', to: '#services' },
+  { id: 'svo-2', n: '–', label: 'Units not working', to: '#services' },
   { id: 'svo-3', n: openIncidents, label: 'Open incidents', to: '/incidents/?state=new,in-progress,on-hold' },
 ];
 // The four figures on each card: the same labels and drill-downs as the service page's band.
 const FIGURES = {
-  av: [['Rooms working now', '/rooms/overview/?status=use,free'], ['Units alerting', 'services/av/?status=alert,offline#units'], ['Firmware behind the standard', 'services/av/?fw=1#units', models.av.behind], ['Open incidents', 'services/av/#incidents', models.av.incidents.length]],
+  av: [['Spaces working now', '/rooms/overview/?status=use,free'], ['Units alerting', 'services/av/?status=alert,offline#units'], ['Firmware behind the standard', 'services/av/?fw=1#units', models.av.behind], ['Open incidents', 'services/av/#incidents', models.av.incidents.length]],
   network: [['Offices online', 'services/network/#health'], ['Home gateways online', 'services/network/?kind=home-gateway&status=online,alert#units'], ['Switches alerting', 'services/network/?kind=switch&status=alert,offline#units'], ['Circuits up', 'services/network/?kind=circuit&status=online,alert#units']],
   infrastructure: [['Comms rooms to standard', 'services/infrastructure/#commsrooms', models.infrastructure.statics.toStandard], ['UPS and power strip alerts', 'services/infrastructure/?kind=ups,pdu&status=alert,offline#units'], ['Rack space short', 'services/infrastructure/#commsrooms', models.infrastructure.statics.short], ['Links with a fault', 'services/infrastructure/?kind=link&status=alert,offline#units']],
 };
@@ -59,9 +59,9 @@ const ownerOf = (id) => PEOPLE.find((p) => p.id === SERVICES[id].owner);
               ))}
             </ul>
             <div class="sv-topbox">
-              <h3>Needs attention</h3>
+              <h3>Not working</h3>
               <ol class="sv-toplist" data-top aria-live="polite"></ol>
-              <p class="sv-topnone" data-top-none hidden>Nothing needs attention right now.</p>
+              <p class="sv-topnone" data-top-none hidden>No faults right now.</p>
             </div>
             <a class="sv-more" data-more href={href(svc.path)}>Open the {svc.name} service →</a>
           </article>
@@ -82,7 +82,7 @@ const ownerOf = (id) => PEOPLE.find((p) => p.id === SERVICES[id].owner);
           </div>
         ))}
       </div>
-      <p class="sv-note">The switch inside a room is AV; a switch in a comms room is the network. Printers belong to no service here. Access points are units in the open areas and corridors of each floor.</p>
+      <p class="sv-note">The switch inside a space is AV; a switch in a comms room is the network. Printers belong to no service here. Access points are units in the open areas and corridors of each floor.</p>
     </Section>
 
     <p class="sv-note sv-clock"><span class="lv-dot" aria-hidden="true"></span><span data-clock>Updating</span>. Simulated from each kind of kit and the open incidents, the same in every window. Real feeds replace this with the same shape.</p>

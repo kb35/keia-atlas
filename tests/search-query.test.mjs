@@ -73,8 +73,13 @@ const filter = (q, type) => parse(I, q).filters.find((f) => f.type === type);
 const urls = (q, kind) => { const r = search(I, q); return [...r.top, ...r.groups.flatMap((g) => g.items)].filter((x) => !kind || x.it.k === kind).map((x) => x.it.u); };
 const chips = (q) => parse(I, q).chips.map((c) => c.label).join(' · ');
 
-test('EMEA rooms with X52: rooms, region, has the model', () => {
-  assert.equal(chips('EMEA rooms with X52'), 'Rooms · Region: EMEA · Has: Poly Studio X52');
+test('EMEA spaces with X52: spaces, region, has the model', () => {
+  assert.equal(chips('EMEA spaces with X52'), 'Spaces · Region: EMEA · Has: Poly Studio X52');
+  assert.deepEqual(urls('EMEA spaces with X52'), ['rooms/dub-3-05/', 'rooms/lon-2-03/']);
+});
+
+test('the old word "rooms" still searches, and reads as spaces', () => {
+  assert.equal(chips('EMEA rooms with X52'), 'Spaces · Region: EMEA · Has: Poly Studio X52');
   assert.deepEqual(urls('EMEA rooms with X52'), ['rooms/dub-3-05/', 'rooms/lon-2-03/']);
 });
 

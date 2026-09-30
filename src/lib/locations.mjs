@@ -47,7 +47,7 @@ export function commsAt(siteId) {
     const unknown = size.rows.filter((r) => r.v.tone === 'faint' && r.id !== 'ups');
     const verdict = bad.length ? { tone: 'bad', text: `Short: ${bad.map((r) => r.name.toLowerCase()).join(', ')}` }
       : unknown.length === size.rows.length - 1 ? { tone: 'off', text: 'Not recorded' }
-      : { tone: 'ok', text: 'Enough for the rooms it serves' };
+      : { tone: 'ok', text: 'Enough for the spaces it serves' };
     return { space, facts, size, verdict, pill: standardPill(space), racks: racksIn(space.id), title: roomTitle(space), mdf: space.space_type === 'mdf' };
   });
 }
@@ -62,7 +62,7 @@ export function lightsFor(siteId) {
     return { id, label: LIGHT_LABEL[id], tone: TONE_OF[h[id].light], text: h[id].reason, to: `/services/${id}/?site=${siteId}${status ? `&status=${status}` : ''}` };
   });
 }
-export const LIGHT_WORD = { ok: 'Fine', warn: 'Needs a look', bad: 'Problem', off: 'Not recorded' };
+export const LIGHT_WORD = { ok: 'Fine', warn: 'To review', bad: 'Problem', off: 'Not recorded' };
 
 // The rooms at a site, by floor (floors in the site's order; rooms by number), without comms rooms.
 export function floorsOf(siteId) {
@@ -70,7 +70,7 @@ export function floorsOf(siteId) {
   const rooms = Object.values(spaces).filter((x) => x.site === siteId).sort(byNumber);
   const list = (s.floors ?? []).map((f) => ({ id: String(f.id), name: f.name.replace(/:.*$/, ''), rooms: rooms.filter((r) => String(r.floor) === String(f.id)) }));
   const loose = rooms.filter((r) => !list.some((f) => f.id === String(r.floor)));
-  if (loose.length) list.push({ id: 'other', name: 'Other rooms', rooms: loose });
+  if (loose.length) list.push({ id: 'other', name: 'Other spaces', rooms: loose });
   return list;
 }
 

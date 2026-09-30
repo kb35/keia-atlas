@@ -97,7 +97,7 @@ export const KIND = (s) => {
   if (['reception-concierge', 'cafeteria', 'pantry', 'pantry-expanded', 'copy-print-room'].includes(t)) return 'shared';
   return 'meeting';
 };
-export const KIND_LABEL = { meeting: 'Meeting rooms', small: 'Huddle rooms, focus rooms and offices', shared: 'Shared rooms', desks: 'Desks', kits: 'Home offices', comms: 'Comms rooms', stores: 'IT stores', open: 'Open areas and corridors' };
+export const KIND_LABEL = { meeting: 'Meeting rooms', small: 'Huddle rooms, focus rooms and offices', shared: 'Shared spaces', desks: 'Desks', kits: 'Home offices', comms: 'Comms rooms', stores: 'IT stores', open: 'Open areas and corridors' };
 
 // Per-site rollups.
 export const siteStats = {};
@@ -193,12 +193,12 @@ export const phasesOf = (project) => {
   const own = new Set([...(pb?.phases ?? []).map((ph) => ph.phase), ...(project?.history ?? []).map((h) => h.phase), project?.phase].filter(Boolean));
   return pb ? PHASES.filter((p) => own.has(p)) : PHASES;
 };
-export const TASK_STATUS = { todo: 'To do', doing: 'Doing', blocked: 'Blocked', done: 'Done' };
+export const TASK_STATUS = { todo: 'To do', doing: 'Doing', blocked: 'Waiting on', done: 'Done' };
 export const TEAM_LABEL = { 'av-it': 'AV and IT', 'it-network': 'IT network', facilities: 'Facilities', 'it-security': 'IT security', procurement: 'Procurement', vendor: 'Vendor' };
 export const NOTHING_NEW = { 'guide-was-right': 'Nothing new: the guide was right', 'not-device-related': 'Nothing new: not device related', 'one-off': 'Nothing new: a one-off' };
 
-// Keia's vocabulary says "space"; the console says "room" (decision 0019). Use when showing Keia text.
-export const roomWords = (t) => String(t).replace(/\bspace types?\b/gi, (m) => m.replace(/space/i, (x) => (x[0] === 'S' ? 'Room' : 'room'))).replace(/\bspaces?\b/gi, (m) => m.replace(/space/i, (x) => (x[0] === 'S' ? 'Room' : 'room')));
+// Keia and the console both say "space" now (the method glossary). This is kept as a pass-through for text read from data.
+export const roomWords = (t) => String(t);
 
 // Playbooks, Lab tests and incidents (demo data).
 export const playbooks = readFolder('playbooks');
@@ -237,7 +237,7 @@ export const ADV_ORDER = ['do-not-install', 'act', 'check', 'info'];
 export const ADV_LEVEL = { 'do-not-install': 'Do not install', act: 'Action needed', check: 'Check', info: 'Good to know' };
 export const FW_STATUS = { standard: 'Standard', lab: 'In the Lab', blocked: 'Do not install', superseded: 'Superseded', available: 'Available' };
 export const MODEL_STATUS = { standard: 'In the standard', legacy: 'Legacy', candidate: 'Candidate', 'under-review': 'Under review' };
-export const LAYER_LABEL = { profile: 'Profile default', model: 'Model', country: 'Country', 'naming-network': 'Naming and network', 'room-type': 'Room profile', exception: 'Exception' };
+export const LAYER_LABEL = { profile: 'Profile default', model: 'Model', country: 'Country', 'naming-network': 'Naming and network', 'room-type': 'Space type', exception: 'Exception' };
 export const src = (id) => (id ? sources[id] ?? null : null);
 
 // Comms rooms and racks. A room reaches the internet through its floor's IDF (or the MDF when the

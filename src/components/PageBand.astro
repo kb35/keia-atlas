@@ -3,12 +3,11 @@
    One short band, about 100 px tall at 1440 wide:
      left   overline row (the kind of thing, then any status, then a SimTag), the title, one line
      right  KeyNumbers (3 or 4 figures, each may link), then one primary action
-   Props:  overline  the kind of thing: "Room", "Unit", "Project PRJ-09", "Catalogue" (not an audience or a count)
+   Props:  overline  the kind of thing: "Space", "Unit", "Project PRJ-09", "Catalogue" (not an audience or a count)
            title     the page title (h1; it morphs into the next page's title)
            lede      one line; longer text is cut with an ellipsis, so keep it to one line
            sim       true when the figures are made up ("Simulated"); "live" when they are made up and change
                      as you watch ("Simulated live")
-           stage     the adoption stage this page arrives at ("Stage n")
            numbers   optional shortcut for the numbers slot: [{ n, label, to?, tone? }] (each may have an `id`, so a
                      script can change it: window.rsKeyNumber(id, value), see KeyNumbers)
            rec       the record this page is, for the shared element that flies in from the list or the
@@ -24,8 +23,8 @@ import KeyNumbers from './KeyNumbers.astro';
 import SimTag from './SimTag.astro';
 import { recHere } from '../lib/vt.mjs';
 interface Num { n: string | number; label: string; to?: string; tone?: 'bad' | 'warn' | 'good'; id?: string }
-interface Props { overline: string; title: string; lede?: string; sim?: boolean | 'live'; stage?: number; numbers?: Num[]; rec?: string }
-const { overline, title, lede, sim = false, stage, numbers, rec } = Astro.props;
+interface Props { overline: string; title: string; lede?: string; sim?: boolean | 'live'; numbers?: Num[]; rec?: string }
+const { overline, title, lede, sim = false, numbers, rec } = Astro.props;
 const hasLede = !!lede || Astro.slots.has('lede');
 const hasSide = Astro.slots.has('numbers') || Astro.slots.has('action') || (numbers?.length ?? 0) > 0;
 ---
@@ -34,7 +33,6 @@ const hasSide = Astro.slots.has('numbers') || Astro.slots.has('action') || (numb
     <p class="pb-over">
       <span class="overline">{overline}</span>
       <slot name="overline" />
-      {stage && <SimTag kind={`stage:${stage}`} />}
       {sim && <SimTag kind={sim === 'live' ? 'live' : 'simulated'} />}
     </p>
     <h1 id="pb-title" {...(rec ? recHere(rec) : {})}>{title}</h1>

@@ -73,7 +73,7 @@ export function compareHtml(rows, name) {
   void tot;
   return `<div class="plc-chart" role="list" aria-label="Spend by year, the plan and ${esc(name)}">${chart}</div>
 <ul class="plc-key" aria-label="Key"><li><i class="plc-base"></i>The plan as it stands</li><li><i class="plc-sc"></i>${esc(name)}</li></ul>
-<div class="tablewrap"><table class="plc-table to-cards"><thead><tr><th scope="col">Year</th><th scope="col" colspan="3">Spend: plan, scenario, change</th><th scope="col" colspan="3">Devices</th><th scope="col" colspan="3">Rooms</th><th scope="col" colspan="3">Technician hours</th><th scope="col" colspan="3">Engineer hours</th></tr></thead><tbody>${body}</tbody>
+<div class="tablewrap"><table class="plc-table to-cards"><thead><tr><th scope="col">Year</th><th scope="col" colspan="3">Spend: plan, scenario, change</th><th scope="col" colspan="3">Devices</th><th scope="col" colspan="3">Spaces</th><th scope="col" colspan="3">Technician hours</th><th scope="col" colspan="3">Engineer hours</th></tr></thead><tbody>${body}</tbody>
 <tfoot><tr><th scope="row">All years</th><td class="num">${esc(kmoney(sums.base))}</td><td class="num">${esc(kmoney(sums.sc))}</td><td class="num plc-d ${dCls(sums.sc - sums.base)}">${esc(signed(sums.sc - sums.base))}</td><td colspan="12"></td></tr></tfoot></table></div>`;
 }
 

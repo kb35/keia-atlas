@@ -49,9 +49,9 @@ const homeOffices = Object.values(spaces).filter((s) => /^r(em|am|ap)-/.test(s.i
 const netProjects = Object.values(projects).filter((p) => ['network-refresh', 'infra-refresh'].includes(p.kind) && p.phase !== 'closed');
 const HEALTH = {
   'sm-av': [
-    { n: inService, label: 'Rooms in service', to: '/rooms/?status=service' },
-    { n: roomsWithInc, label: 'Rooms with an open incident', to: '/rooms/?issues=1', tone: roomsWithInc ? 'warn' : undefined },
-    { n: installing.length, label: 'Rooms being installed', to: '/rooms/?status=installing' },
+    { n: inService, label: 'Spaces in service', to: '/rooms/?status=service' },
+    { n: roomsWithInc, label: 'Spaces with an open incident', to: '/rooms/?issues=1', tone: roomsWithInc ? 'warn' : undefined },
+    { n: installing.length, label: 'Spaces being installed', to: '/rooms/?status=installing' },
   ],
   'sm-infra': [
     { n: commsRooms.length, label: 'Comms rooms', to: '/rooms/?kind=comms' },
@@ -61,7 +61,7 @@ const HEALTH = {
 };
 const review = [
   { id: 'CHG-039', title: 'Video bar profile: add a symptom for the external camera switching back after a reboot', by: 'Aoife Byrne', to: 'sofia' },
-  { id: 'CHG-035', title: 'New device model: Logitech Rally Bar Mini', by: 'Niamh Walsh', to: 'sofia', note: 'You asked for changes' },
+  { id: 'CHG-035', title: 'New device model: Logitech Rally Bar Mini', by: 'Niamh Walsh', to: 'sofia', note: 'Sent back for edits' },
 ];
 // Projects, with their lights, next gate and blocked tasks. Rows carry the project manager, so a PM sees theirs.
 const projList = Object.values(projects).filter((p) => p.phase !== 'closed').map((p) => {
@@ -164,13 +164,13 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
         <header class="hp-h" data-help="home.inbox"><h2 id="h-inbox"><Icon name="inbox" />For your approval</h2><span class="aside faint" data-inbox-summary></span></header>
         <ol class="inbox" data-inbox></ol>
         <div class="hp-sub" data-help="home.review">
-          <h3>Changes waiting for your review</h3>
+          <h3>Proposals waiting for your review</h3>
           {review.map((c) => (
             <a class="mini-row" href={href(`/changes/#${c.id.toLowerCase()}`)} data-to={c.to}>
               <span class="mono faint">{c.id}</span><span>{c.title}<small>{c.by}{c.note ? ` · ${c.note}` : ''}</small></span><Icon name="arrow" size={16} />
             </a>
           ))}
-          <a class="hp-more" href={href('/changes/')}>Every change and who approved it <Icon name="arrow" size={14} /></a>
+          <a class="hp-more" href={href('/changes/')}>Every proposal and who approved it <Icon name="arrow" size={14} /></a>
         </div>
       </section>
       <section class="hp hp-health card s-5" aria-labelledby="h-health">
@@ -195,7 +195,7 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
               <span class="pm-lights" aria-label={`Schedule ${L.schedule.word}, cost ${L.cost.word}, scope ${L.scope.word}`}>{[L.schedule, L.cost, L.scope].map((l) => <i class="hl" data-state={l.state}></i>)}</span>
               <span class="pm-name"><b>{p.name}</b><small>{p.id} · {sites[p.site]?.name} · {PHASE_LABEL[p.phase]}{G ? ` · gate ${short(G.date)}` : ''}</small></span>
               <span class="pm-word">{worst === 'bad' ? [L.schedule, L.cost, L.scope].find((l) => l.state === 'bad').word : worst === 'warn' ? [L.schedule, L.cost, L.scope].find((l) => l.state === 'warn').word : 'On plan'}</span>
-              {blocked.length ? <span class="pill bad">{blocked.length} blocked</span> : <span class="pill plain">{open.length} open</span>}
+              {blocked.length ? <span class="pill bad">{blocked.length} waiting</span> : <span class="pill plain">{open.length} open</span>}
             </a>
           ))}
         </div>
@@ -225,16 +225,16 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
             <a class="mini-row" href={href(`/projects/${p.id.toLowerCase()}/`)}><span class="pill bad">Project</span><span>{p.name}<small>{[L.schedule, L.cost, L.scope].filter((l) => l.state === 'bad').map((l) => l.why).join(' ')}</small></span><Icon name="arrow" size={16} /></a>
           ))}
           {blockedTasks.slice(0, 5).map(({ t, p }) => (
-            <a class="mini-row" href={href(`/projects/${p.id.toLowerCase()}/tasks/${t.id.toLowerCase()}/`)}><span class="pill bad">Blocked</span><span>{t.title}<small>{p.name} · {person(t.owner).name} · {t.blocked_by}</small></span><Icon name="arrow" size={16} /></a>
+            <a class="mini-row" href={href(`/projects/${p.id.toLowerCase()}/tasks/${t.id.toLowerCase()}/`)}><span class="pill bad">Waiting on</span><span>{t.title}<small>{p.name} · {person(t.owner).name} · {t.blocked_by}</small></span><Icon name="arrow" size={16} /></a>
           ))}
         </div>
-        <a class="hp-more" data-vt-rec="dd-work-list" href={href(`/work/list/?kind=${TASK_KINDS}&status=blocked`)}>See all {blockedTasks.length} blocked in the Work list →</a>
+        <a class="hp-more" data-vt-rec="dd-work-list" href={href(`/work/list/?kind=${TASK_KINDS}&status=blocked`)}>See all {blockedTasks.length} waiting on something in the Work list →</a>
       </section>
       <section class="hp hp-regions card s-5" aria-labelledby="h-reg">
         <p class="hp-who" data-help="home.who">{WHO_SEES.regions}</p>
         <header class="hp-h" data-help="home.regions"><h2 id="h-reg"><Icon name="globe" />The regions</h2></header>
         <table class="reg-t">
-          <thead><tr><th>Region</th><th>Offices</th><th>Rooms</th><th>Incidents</th></tr></thead>
+          <thead><tr><th>Region</th><th>Offices</th><th>Spaces</th><th>Incidents</th></tr></thead>
           <tbody>
             {REGIONS.map((x) => (
               <tr><th scope="row">{x.label}</th><td><a href={href(`/locations/?region=${x.r}`)}>{x.sites}</a></td><td><a href={href(`/rooms/?region=${x.r}`)} data-vt-rec="dd-rooms">{x.rooms}</a></td><td><a href={href(`/incidents/?region=${x.r}&state=${OPEN_STATES}`)} data-vt-rec="dd-incidents">{x.inc}</a></td></tr>
@@ -262,7 +262,7 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
       <section class="hp hp-vendor card s-7" aria-labelledby="h-vend">
         <p class="hp-who" data-help="home.who">{WHO_SEES.vendor}</p>
         <header class="hp-h" data-help="home.vendor"><h2 id="h-vend"><Icon name="kit" />Your installation</h2></header>
-        <p>Your rooms, the tasks assigned to your company, and the records Aigna needs from you: serial numbers, MAC addresses and photos.</p>
+        <p>Your spaces, the tasks assigned to your company, and the records Aigna needs from you: serial numbers, MAC addresses and photos.</p>
         <a class="btn primary" href={href('/vendor/')}>Open your installation <Icon name="arrow" size={16} /></a>
       </section>
       <section class="hp hp-vnext card s-5" aria-labelledby="h-vnext">
@@ -314,7 +314,7 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
     <!-- 4. Service managers: firmware and advisories, full width. -->
     <section class="hp hp-firmware card" aria-labelledby="h-fw">
       <p class="hp-who" data-help="home.who">{WHO_SEES.firmware}</p>
-      <header class="hp-h" data-help="home.firmware"><h2 id="h-fw"><Icon name="chip" />Firmware and advisories</h2><a class="aside" href={href("/known-issues/")}>Known issues</a></header>
+      <header class="hp-h" data-help="home.firmware"><h2 id="h-fw"><Icon name="chip" />Firmware and advisories</h2><a class="aside" href={href("/known-issues/")}>Known errors</a></header>
       <div class="g12 fw-grid">
         <div class="s-5 fw-lines">
           <h3 class="overline">Firmware standard</h3>
@@ -334,10 +334,10 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
     <!-- Project managers: every blocked task on your projects, full width. -->
     <section class="hp hp-blocked card" aria-labelledby="h-blocked">
       <p class="hp-who" data-help="home.who">{WHO_SEES.blocked}</p>
-      <header class="hp-h" data-help="home.blocked"><h2 id="h-blocked"><Icon name="alert" />Blocked on your projects</h2></header>
+      <header class="hp-h" data-help="home.blocked"><h2 id="h-blocked"><Icon name="alert" />Waiting on, your projects</h2></header>
       <div class="mini-list">
         {blockedTasks.map(({ t, p }) => (
-          <a class="mini-row" href={href(`/projects/${p.id.toLowerCase()}/tasks/${t.id.toLowerCase()}/`)} data-pm={p.owner}><span class="pill bad">Blocked</span><span>{t.title}<small>{p.name} · {person(t.owner).name} · {t.blocked_by}</small></span><Icon name="arrow" size={16} /></a>
+          <a class="mini-row" href={href(`/projects/${p.id.toLowerCase()}/tasks/${t.id.toLowerCase()}/`)} data-pm={p.owner}><span class="pill bad">Waiting on</span><span>{t.title}<small>{p.name} · {person(t.owner).name} · {t.blocked_by}</small></span><Icon name="arrow" size={16} /></a>
         ))}
       </div>
     </section>
@@ -351,7 +351,7 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
     </aside>
 
     <details class="home-more card">
-      <summary data-help="home.across"><span><b>Across Aigna</b><small>{totals.offices} offices · {totals.spaces} rooms · {totals.units.toLocaleString('en-IE')} devices</small></span><Icon name="arrow" size={16} /></summary>
+      <summary data-help="home.across"><span><b>Across Aigna</b><small>{totals.offices} offices · {totals.spaces} spaces · {totals.units.toLocaleString('en-IE')} devices</small></span><Icon name="arrow" size={16} /></summary>
       <div class="site-tiles">
         {SITE_ORDER.map((sid) => {
           const s = sites[sid], st = siteStats[sid];
@@ -402,7 +402,7 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
       var root = document.querySelector('[data-inbox]'); if (!root) return;
       var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
       var base = (document.querySelector('link[rel=icon]').getAttribute('href') || '/').replace(/favicon\.svg$/, '');
-      var KIND = { urgent: 'Urgent issue', firmware: 'New firmware found', change: 'Suggested change' };
+      var KIND = { urgent: 'Urgent issue', firmware: 'New firmware found', change: 'Proposal' };
       var ORDER = { urgent: 0, firmware: 1, change: 2 };
       var ago = function (iso) { var m = Math.max(1, Math.round((Date.now() - new Date(iso)) / 6e4)); return m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : (Math.round(m / 1440) === 1 ? '1 day ago' : Math.round(m / 1440) + ' days ago'); };
       function render() {
@@ -417,7 +417,7 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
           var by = PEOPLE.find(function (p) { return p.id === x.by; }) || { name: x.by };
           var f = x.fields || {};
           var text = f.happened || f.why || f.notes || f.what || '';
-          var head = x.kind === 'firmware' ? (f.model || x.about.label) + ' on ' + (f.version || 'a new version') : x.kind === 'change' ? (f.what || 'Change to ' + x.about.label) : (x.about.label);
+          var head = x.kind === 'firmware' ? (f.model || x.about.label) + ' on ' + (f.version || 'a new version') : x.kind === 'change' ? (f.what || 'Edit to ' + x.about.label) : (x.about.label);
           return '<li class="ib ib-' + x.kind + (local.some(function (l) { return l.id === x.id; }) ? ' ib-new' : '') + '" data-help="home.inbox-item" style="--i:' + i + '">' +
             '<span class="ib-dot" aria-hidden="true"></span>' +
             '<div class="ib-body"><p class="ib-top"><span class="ib-kind">' + KIND[x.kind] + '</span><span class="faint">' + esc(by.name) + (all ? ' to ' + esc((PEOPLE.find(function (p) { return p.id === x.to; }) || { name: x.to }).name) : '') + ' · ' + ago(x.at) + '</span></p>' +
@@ -457,10 +457,10 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
       var roomOf = function (id) { return id && H.rooms[id] ? H.rooms[id] : null; };
       var siteName = function (id) { return id && H.sites[id] ? H.sites[id].name : ''; };
       var personOf = function (id) { return H.people[id] || { id: id, name: id, first: id, role: '', roleId: 'delivery', initials: '?' }; };
-      var STATUS = { todo: 'To do', doing: 'Doing', blocked: 'Blocked', done: 'Done', booked: 'Booked' };
+      var STATUS = { todo: 'To do', doing: 'Doing', blocked: 'Waiting on', done: 'Done', booked: 'Booked' };
       var KIND_WORD = { task: 'Task', incident: 'Incident', lab: 'Lab test', visit: 'Site visit', refresh: 'Work plan', plan: 'Planning', inbox: 'Approval' };
       var ACTION = { tech: function (p) { return ['Open ' + siteName(p.office), '/rooms/?site=' + p.office]; }, delivery: function (p) { var n = H.next[p.id]; return n ? ['Open the batch', n.href] : ['Open Work overview', '/work/']; },
-        network: function (p) { var n = H.next[p.id]; return n ? ['Open the batch', n.href] : ['Open Work overview', '/work/']; }, 'sm-av': function () { return ['Open Changes', '/changes/']; }, 'sm-infra': function () { return ['Open Changes', '/changes/']; },
+        network: function (p) { var n = H.next[p.id]; return n ? ['Open the batch', n.href] : ['Open Work overview', '/work/']; }, 'sm-av': function () { return ['Open Proposals', '/changes/']; }, 'sm-infra': function () { return ['Open Proposals', '/changes/']; },
         pm: function (p) { return ['Open your projects', '/projects/?owner=' + p.id]; }, programme: function () { return ['Open the year plan', '/work/schedule/?view=year']; }, head: function () { return ['Open Work overview', '/work/']; },
         desk: function () { return ['Open Incidents', '/incidents/?state=new']; }, vendor: function () { return ['Open your installation', '/vendor/']; }, 'service-vendor': function () { return ['Open your installation', '/vendor/']; }, innovation: function () { return ['Open the Lab', '/lab/']; } };
 
@@ -549,8 +549,8 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
         var r = roomOf(it.room); if (r) bits.push(r.name + (it.site && H.sites[it.site] && !H.sites[it.site].remote ? ', ' + siteName(it.site) : ''));
         else if (it.site) bits.push(siteName(it.site));
         if (it.project) bits.push(it.project + ' ' + (H.projectNames[it.project] || ''));
-        if (it.kind === 'refresh' && it.rooms) bits.push(it.rooms + (it.rooms === 1 ? ' room' : ' rooms'));
-        if (it.blocked) bits.push('Blocked: ' + it.blocked);
+        if (it.kind === 'refresh' && it.rooms) bits.push(it.rooms + (it.rooms === 1 ? ' space' : ' spaces'));
+        if (it.blocked) bits.push('Waiting on: ' + it.blocked);
         return bits.join(' · ');
       };
 
@@ -623,7 +623,7 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
           return '<li class="day-i" style="--i:' + i + '" data-help="home.day-item"><a href="' + esc(it.href) + '">' +
             '<span class="day-t">' + (x.from == null ? '<small>Later</small>' : '<b>' + clock(x.from) + '</b><small>' + span(x.hours) + '</small>') + '</span>' +
             '<span class="day-k k-' + esc(it.kind) + '" aria-hidden="true"></span>' +
-            '<span class="day-b"><b>' + esc(it.title) + '</b><small>' + esc(KIND_WORD[it.kind] || it.kind) + (r ? ' · ' + esc(r.name) : it.site ? ' · ' + esc(siteName(it.site)) : '') + (it.kind === 'incident' ? (it.prio ? ' · P' + it.prio : '') : it.status === 'blocked' ? ' · Blocked' : '') + '</small></span>' +
+            '<span class="day-b"><b>' + esc(it.title) + '</b><small>' + esc(KIND_WORD[it.kind] || it.kind) + (r ? ' · ' + esc(r.name) : it.site ? ' · ' + esc(siteName(it.site)) : '') + (it.kind === 'incident' ? (it.prio ? ' · P' + it.prio : '') : it.status === 'blocked' ? ' · Waiting on something' : '') + '</small></span>' +
             '<span class="day-arrow" aria-hidden="true">→</span></a></li>';
         }).join('');
         box.querySelector('[data-day-empty]').hidden = plan.length > 0;
@@ -657,7 +657,7 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
           var u = n.unit;
           return '<a class="next dev" href="' + esc(n.href) + '" data-help="home.device-card">' +
             (u && u.type ? '<span class="next-plan"><svg class="rplan" viewBox="0 0 120 80" aria-hidden="true"><use href="#rp-' + esc(u.type) + '"></use></svg></span>' : '<span class="next-plan next-none" aria-hidden="true"></span>') +
-            '<span class="next-b"><span class="next-k">' + esc(n.project) + ' ' + esc(n.projectName) + ' · ' + esc(n.siteName) + '</span><b>' + esc(u ? u.name : n.batch) + '</b><small>' + esc(u && u.model ? u.model + ' · ' : '') + esc(n.batch) + ': ' + n.done + ' of ' + n.total + ' set up' + (n.issues ? ' · ' + n.issues + ' need you' : n.ready ? ' · ' + n.ready + ' checked, to accept' : '') + '</small><span class="next-go">Open the batch →</span></span></a>';
+            '<span class="next-b"><span class="next-k">' + esc(n.project) + ' ' + esc(n.projectName) + ' · ' + esc(n.siteName) + '</span><b>' + esc(u ? u.name : n.batch) + '</b><small>' + esc(u && u.model ? u.model + ' · ' : '') + esc(n.batch) + ': ' + n.done + ' of ' + n.total + ' set up' + (n.issues ? ' · ' + n.issues + ' ready for you' : n.ready ? ' · ' + n.ready + ' checked, to accept' : '') + '</small><span class="next-go">Open the batch →</span></span></a>';
         };
         var eng = all ? 'aoife' : who;
         D.querySelector('[data-device]').innerHTML = dev(H.next[eng]);

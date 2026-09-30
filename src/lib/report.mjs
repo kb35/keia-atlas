@@ -77,7 +77,7 @@ export function projectReport(p) {
     facts: [
       ['Project', `${p.id} ${p.name}`], ['Office', sites[p.site]?.name ?? p.site], ['Kind of work', `${PROJECT_KIND[p.kind] ?? p.kind}${pb ? `, following the ${pb.name} playbook version ${pb.version}` : ''}`],
       ['Started', fmtDate(p.start)], ['Target', fmtDate(p.target)], ['Finished', finished ? fmtDate(finished) : 'Not yet'],
-      ['Project manager', person(p.owner).name], ['Rooms', rooms.map(spaceName).join(', ') || 'None'],
+      ['Project manager', person(p.owner).name], ['Spaces', rooms.map(spaceName).join(', ') || 'None'],
       ...(p.budget ? [['Cost', `${money(spent)} spent of ${money(p.budget.approved)} approved`]] : []),
     ],
     summary: p.summary,
@@ -112,7 +112,7 @@ export function taskReport(p, t) {
     title: `Work report: ${t.title}`, status: TASK_STATUS[t.status], complete: t.status === 'done',
     facts: [
       ['Task', `${t.id} ${t.title}`], ['Project', `${p.id} ${p.name}`], ['Office', sites[p.site]?.name ?? p.site], ['Kind of work', `${PHASE_LABEL[t.phase]} phase, ${D.kindLabel.toLowerCase()} work`],
-      ['Room', rooms.length ? spaceName(rooms[0]) : 'Whole project'], ['Done by', `${who.name}${who.vendorName ? ` (${who.vendorName})` : ''}, ${pr ? PROJECT_ROLE[pr.as] : ROLES[who.roleId]?.name}`],
+      ['Space', rooms.length ? spaceName(rooms[0]) : 'Whole project'], ['Done by', `${who.name}${who.vendorName ? ` (${who.vendorName})` : ''}, ${pr ? PROJECT_ROLE[pr.as] : ROLES[who.roleId]?.name}`],
       ['Due', t.due ? fmtDate(t.due) : 'No date'], ['Estimate', t.hours ? `${t.hours} h` : 'None'],
       ['Closed with the phase', h?.ended ? `${PHASE_LABEL[t.phase]} phase ended ${fmtDate(h.ended)}` : 'Phase still open'],
     ],
@@ -138,7 +138,7 @@ export function reportMarkdown(r) {
   out.push('## Who', '', ...r.team.map((x) => `- **${x.name}**, ${x.role}${x.hours ? ` (${x.hours})` : ''}${x.detail ? `: ${x.detail}` : ''}`), '');
   if (r.tasks.length) out.push('## Tasks', '', row(['Task', 'Title', 'Owner', 'Due', 'Status', 'How it closed']), row(['---', '---', '---', '---', '---', '---']), ...r.tasks.map((t) => row([t.id, t.title, t.owner, t.due, t.status, t.how])), '');
   out.push('## Devices installed or changed', '');
-  out.push(...(r.devices.length ? [row(['Room', 'Position', 'Hostname', 'Model', 'Serial', 'Asset tag', 'Note']), row(['---', '---', '---', '---', '---', '---', '---']), ...r.devices.map((d) => row([d.room, d.position, d.hostname, d.model, d.serial, d.tag, d.replaced]))] : ['No devices were installed or changed by this work.']), '');
+  out.push(...(r.devices.length ? [row(['Space', 'Position', 'Hostname', 'Model', 'Serial', 'Asset tag', 'Note']), row(['---', '---', '---', '---', '---', '---', '---']), ...r.devices.map((d) => row([d.room, d.position, d.hostname, d.model, d.serial, d.tag, d.replaced]))] : ['No devices were installed or changed by this work.']), '');
   out.push('## Evidence', '', ...(r.evidence.length ? r.evidence.map((e) => `- ${e}`) : ['None recorded.']), '');
   out.push('## Deviations and added tasks', '', ...(r.deviations.length ? r.deviations.map((e) => `- ${e}`) : ['No deviations recorded.']), '{{ADDED}}', '');
   out.push('## Sign-off', '', ...r.signoff.gates.map((g) => `- ${g.phase}: signed off by ${g.by}, ${g.date}`), `- ${r.signoff.closed}`, '', ...r.signoff.lines.map((l) => `- ${l.role}: ${l.name}    Signature: ____________    Date: __________`), '');

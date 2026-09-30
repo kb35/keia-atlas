@@ -14,7 +14,7 @@ Every page has the same anatomy: the same slots, in the same place, in the same 
 
 Every page is one of four archetypes:
 
-**A. List** (Rooms, Units, Models, Projects, Playbooks, People...)
+**A. List** (Spaces, Units, Models, Projects, Playbooks, People...)
 
 ```
 PATH                                  [Search] [Report]
@@ -26,10 +26,10 @@ Title / one line                 sites  ...   ...
 └─────┘└─────┘└─────┘└─────┘   groups continue below
 ```
 
-**B. Record** (a room, a unit, a model, a project, a task, an incident, a person)
+**B. Record** (a space, a unit, a model, a project, a task, an incident, a person)
 
 ```
-PATH: Rooms / New York office / 20.10 Whooper Swan
+PATH: Spaces / New York office / 20.10 Whooper Swan
 Overline · status · Sim        13 units  ✓ matches  8 seats  [Action]
 Title / one line
 ┌ picture (7 cols) ──────────┐┌ SidePanel: key or facts (5 cols, sticky) ┐
@@ -94,7 +94,7 @@ Under 768 px the sidebar is a bottom tab bar with More, the band stacks (key num
 
 ### L6. One grid, and a path you can climb
 
-Cards on a page sit on one 12-column grid (`.g12`, spans `.s-3` to `.s-8`) with equal gutters; cards in a row stretch to the same height, so their edges line up. A long list shows its first few rows and a "Show all" (`Section` with `showAll`). Every deep page (a unit, a room, a model, a device profile's model) puts its path in the top bar, for example Units / Dublin office / 3.02 Pantry / Pantry signage player, and each step but the last is a link.
+Cards on a page sit on one 12-column grid (`.g12`, spans `.s-3` to `.s-8`) with equal gutters; cards in a row stretch to the same height, so their edges line up. A long list shows its first few rows and a "Show all" (`Section` with `showAll`). Every deep page (a unit, a space, a model, a device type's model) puts its path in the top bar, for example Units / Dublin office / 3.02 Pantry / Pantry signage player, and each step but the last is a link.
 
 - **Why:** stacked boxes of different sizes push the answer down, and people need to get back up a level in one click.
 - **Do:** pass `crumbs` to `Shell`; a page filled in the browser rewrites `.mast .crumbs` once it knows the unit.
@@ -123,7 +123,7 @@ One scrollbar: the page's. No box with a fixed or window-based height that scrol
 
 ### L9. The band: one line, key numbers, one action
 
-`PageBand` takes the overline (the kind of thing: "Room", "Unit", "Project PRJ-09", "Catalogue"), the title, one line (cut with an ellipsis), and `sim` or `stage` for the `SimTag`. `KeyNumbers` holds 3 or 4 figures, each a link where it can be (a page, `?status=installing` to filter this list, `#incidents` to open a tab or section), with a tone only when the label says the same thing in words. The count of a filtered list is not a key number: it is the filter bar's "N of M". One primary action, at the right end of the band.
+`PageBand` takes the overline (the kind of thing: "Space", "Unit", "Project PRJ-09", "Catalogue"), the title, one line (cut with an ellipsis), and `sim` or `stage` for the `SimTag`. `KeyNumbers` holds 3 or 4 figures, each a link where it can be (a page, `?status=installing` to filter this list, `#incidents` to open a tab or section), with a tone only when the label says the same thing in words. The count of a filtered list is not a key number: it is the filter bar's "N of M". One primary action, at the right end of the band.
 
 - **Why:** one band everywhere replaced twelve page-made variants, and the band stays put between pages (M5).
 - **Do:** make each key number answer "how many need me?" and link to them.
@@ -150,7 +150,7 @@ From 1900 px the content stops at `--page-max` (1760 px) and centres. The path s
 **The shared parts:**
 
 - `PageBand`: key numbers and the action sit right of the title from 900 px of `main`; under that they go below the title, the action at the right end of their row; under 600 px the numbers are two by two and the action takes the full width.
-- `FilterBar` lays itself out by the room it has. *Line*: everything on one line. *Stack*: the find box with the view switch, Sort and count, then the facets as one group on the next line; or the find box alone, then the facets beside the view switch, Sort and count, whichever is shorter. *Sheet*: under 600 px of content, or when stacking would take more than three lines, the facets fold into one Filters button (showing how many choices are on) that opens a sheet from the bottom. Sort and the count never part. A closed facet list takes no room. The bar sticks under the top bar only when it is one line, or from 1024 px.
+- `FilterBar` lays itself out by the space it has. *Line*: everything on one line. *Stack*: the find box with the view switch, Sort and count, then the facets as one group on the next line; or the find box alone, then the facets beside the view switch, Sort and count, whichever is shorter. *Sheet*: under 600 px of content, or when stacking would take more than three lines, the facets fold into one Filters button (showing how many choices are on) that opens a sheet from the bottom. Sort and the count never part. A closed facet list takes no space. The bar sticks under the top bar only when it is one line, or from 1024 px.
 - `DetailTabs` wrap into rows of pills when they do not fit on one line.
 - `SidePanel` moves under the picture under 840 px of content.
 - A table marked `class="to-cards"` becomes one card per row under 700 px of content, each cell with its column's name (filled from the heading). A matrix (Who does what, RACI) becomes one card per row listing only its non-empty cells. A board goes 4, 2, then 1 column. The Schedule's week goes from people by days, to each person above their days, to days stacked; the year plan narrows its name column, then puts each name above its bar. A phase rail turns to run down the page.

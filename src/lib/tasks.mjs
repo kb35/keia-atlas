@@ -11,13 +11,13 @@ export const TASK_KIND = {
 
 const STEPS = {
   survey: [
-    'Open the room profile drawing and walk the room with it.',
-    'Check every outlet is where the room profile expects it: power and data behind the display, under the table, at the door.',
+    'Open the space type drawing and walk the space with it.',
+    'Check every outlet is where the space type expects it: power and data behind the display, under the table, at the door.',
     'Photograph the display wall, the table floor box and the ceiling.',
-    'Note anything that differs from the room profile; it goes in the design.',
+    'Note anything that differs from the space type; it goes in the design.',
   ],
   design: [
-    'Choose the build option for each room from its room profile.',
+    'Choose the build option for each space from its space type.',
     'Write the swap sheet: position, old model, new model, hostname kept.',
     'Check mounts, cable lengths and power suit the new model (its ports are on the model page).',
     'List each networked device with its port and VLAN for the network team.',
@@ -35,8 +35,8 @@ const STEPS = {
     'Check each reservation resolves before install day.',
   ],
   facilities: [
-    'Confirm power and data outlets with facilities against the room profile\'s outlet list.',
-    'Power in AV rooms must be always on: no light switch can turn it off.',
+    'Confirm power and data outlets with facilities against the space type\'s outlet list.',
+    'Power in AV spaces must be always on: no light switch can turn it off.',
     'The table floor box sits under a table leg, so nobody trips on it.',
   ],
   records: [
@@ -45,46 +45,46 @@ const STEPS = {
     'The delivery engineer checks the records before they count.',
   ],
   install: [
-    'Book the room out for the time the install needs.',
+    'Book the space out for the time the install needs.',
     'Check the firmware on the unit against the standard. Newer than the standard? Don\'t update or roll back: use Report, New firmware found.',
-    'Mount each device where the room profile puts it, and connect it as the wiring shows.',
+    'Mount each device where the space type puts it, and connect it as the wiring shows.',
     'Power on and check each device takes its reserved address.',
     'Keep the position and hostname; retire any old unit in the asset register the same day.',
   ],
   // Deploy holds four steps per device (decision 0025). Provision is the system records, made
   // before or as the device arrives; configure is setting the device itself up.
   provision: [
-    'Create or update the asset record: serial, asset tag, model, room and position.',
+    'Create or update the asset record: serial, asset tag, model, space and position.',
     'Reserve the address and check forward and reverse DNS resolve to the hostname.',
     'Enrol the device in device management, and add it to monitoring.',
-    'Add the room to booking, where the room has a calendar.',
+    'Add the space to booking, where the space has a calendar.',
     'Assign the licence, and check the firmware against the standard before it goes on the wall.',
   ],
   configure: [
-    'Open the configuration for each device and work through its setup order: a step unlocks when the ones before it are done.',
+    'Open the setup guide for each device and work through its setup order: a step unlocks when the ones before it are done.',
     'Settings marked Set must be changed; settings marked Verify only need checking.',
     'Enrol the device in its meeting platform with the hostname as its name.',
-    'Pair the touch controller and the booking panel to their room.',
+    'Pair the touch controller and the booking panel to their space.',
     'Check the time zone and time servers, so the calendar is right.',
   ],
   commission: [
-    'Run the room\'s verification: every device recorded, on its address, in device management and on standard firmware.',
-    'Make a test call from another site, not the room next door.',
+    'Run the space\'s verification: every device recorded, on its address, in device management and on standard firmware.',
+    'Make a test call from another site, not the space next door.',
     'Check camera framing and microphone levels from the far end.',
     'List any snags; each gets an owner and a date.',
     'Close with what fixed anything unexpected, or "Nothing new" and why.',
   ],
   handover: [
-    'Write the handover note for the service desk: rooms, what changed, known snags.',
-    'Check the records match what is in the rooms.',
+    'Write the handover note for the service desk: spaces, what changed, known snags.',
+    'Check the records match what is in the spaces.',
     'Redeploy or dispose of old units, and record which.',
   ],
   review: [
     'Collect what was learned on each task.',
-    'Propose changes to the playbook, profiles or configurations; the owner approves them.',
+    'Propose changes to the playbook, profiles or setup guides; the owner approves them.',
   ],
   budget: [
-    'Set the scope: which rooms and which units.',
+    'Set the scope: which spaces and which units.',
     'Estimate the cost and add a budget line for the planning review.',
   ],
 };
@@ -161,10 +161,10 @@ function provisionRows(room, p, cfg, fw) {
 // Install: the physical work, in the order it happens.
 function installRows(p, fw) {
   const where = LOC_LABEL[p.equipment?.location ?? 'tbd'];
-  const rows = [{ id: 'book', t: 'Room booked out for the install' }];
+  const rows = [{ id: 'book', t: 'Space booked out for the install' }];
   if (fw) rows.push({ id: 'fw', t: `Firmware checked against the standard (${fw})`, why: 'Newer than the standard? Do not update or roll back: use Report, New firmware found.' });
   rows.push({ id: 'label', t: 'Label photographed before it is mounted', why: 'Some labels cannot be read once the unit is on the wall.' });
-  rows.push({ id: 'mount', t: where && p.equipment?.location && p.equipment.location !== 'tbd' ? `Mounted: ${where.toLowerCase()}` : 'Mounted where the room profile puts it' });
+  rows.push({ id: 'mount', t: where && p.equipment?.location && p.equipment.location !== 'tbd' ? `Mounted: ${where.toLowerCase()}` : 'Mounted where the space type puts it' });
   rows.push({ id: 'wire', t: 'Connected as the wiring shows' });
   rows.push({ id: 'power', t: p.hostname ? 'Powered on and took its reserved address' : 'Powered on and working' });
   if (p.legacy) rows.push({ id: 'retire', t: `Old unit ${p.legacy.serial} retired in the asset register`, why: 'The same day, so the register never shows two units in one position.' });
@@ -188,8 +188,8 @@ function configureList(cfg) {
 // Commission: the room verification for this kind of device, then its healthy checks.
 function commissionRows(cls) {
   const plat = classes[cls]?.platforms ?? {};
-  const V = 'Room verification';
-  const rows = [{ id: 'v-asset', t: 'Recorded in the asset register, in this room', grp: V }];
+  const V = 'Space verification';
+  const rows = [{ id: 'v-asset', t: 'Recorded in the asset register, in this space', grp: V }];
   if (plat.dhcp_dns) rows.push({ id: 'v-addr', t: 'On its reserved address; DNS resolves both ways', grp: V });
   if (plat.device_management) rows.push({ id: 'v-dm', t: 'Checking in to device management', grp: V });
   rows.push({ id: 'v-fw', t: 'On the standard firmware', grp: V });
@@ -242,7 +242,7 @@ export function integrateBoard(project) {
         if (tot > 0 && frac[step] > 0 && frac[step] < 1) k = Math.min(tot - 1, Math.max(1, k));
         base[step] = k;
         const t = task[step];
-        if (t?.status === 'blocked') blocked[step] = t.blocked_by ?? 'Blocked';
+        if (t?.status === 'blocked') blocked[step] = t.blocked_by ?? 'Waiting on something';
         owner[step] = t?.owner ?? lead;
         if (t) tasks[step] = { id: t.id, title: t.title, href: href(`/projects/${project.id.toLowerCase()}/tasks/${t.id.toLowerCase()}/`) };
       }

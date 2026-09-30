@@ -28,7 +28,7 @@ const confTone = { strong: 'bad', possible: 'warn' };
 const ref = it.ref ?? it.id;
 
 // The fleet picture: every unit of the models the maker names, by office, lit by what it means for this issue.
-const WHY = { version: 'On a version without it', need: "Its room doesn't meet the maker's condition", never: "Its room doesn't meet the maker's condition" };
+const WHY = { version: 'On a version without it', need: "Its space doesn't meet the manufacturer's condition", never: "Its space doesn't meet the manufacturer's condition" };
 const allUnits = [...it.ex.exposed.map((u) => ({ ...u, st: 'exposed' })), ...it.ex.unknown.map((u) => ({ ...u, st: 'unknown' })), ...it.ex.safe.map((u) => ({ ...u, st: 'safe' }))];
 const rowsBySite = SITE_ORDER.map((s) => ({ site: s, units: allUnits.filter((u) => u.site === s) })).filter((r) => r.units.length);
 const ST_ORDER = { exposed: 0, unknown: 1, safe: 2 };
@@ -36,12 +36,12 @@ for (const r of rowsBySite) r.units.sort((a, b) => ST_ORDER[a.st] - ST_ORDER[b.s
 const picHead = it.affects === 'yes' ? `${it.ex.exposed.length} ${it.ex.exposed.length === 1 ? 'unit runs' : 'units run'} an affected version`
   : it.affects === 'maybe' ? `${it.ex.unknown.length} units may run an affected version`
   : !it.models.length ? 'Not in our fleet' : 'No unit is exposed';
-const picLine = it.affects === 'maybe' ? "Keia Atlas doesn't track this maker's firmware per unit yet (stage 2 reads it from device management), so every unit of the model counts until it does."
-  : !it.models.length ? `The maker names ${it.maker_models.join(', ')}, which Aigna doesn't have.`
+const picLine = it.affects === 'maybe' ? "Keia Atlas doesn't track this manufacturer's firmware per unit yet (a real feed from device management will read it), so every unit of the model counts until it does."
+  : !it.models.length ? `The manufacturer names ${it.maker_models.join(', ')}, which Aigna doesn't have.`
   : it.needs?.never ? it.needs.never
-  : it.affects === 'no' && it.ex.safe.every((u) => u.why === 'need') ? `The maker's condition: ${it.needs.text.toLowerCase()}. No room has it.`
-  : it.affects === 'no' ? `Every unit runs a version the maker doesn't list (${it.affected.join(', ')}).`
-  : `Versions from device management, simulated until stage 2. ${it.needs ? `Counted only where ${it.needs.text.toLowerCase()}.` : ''}`;
+  : it.affects === 'no' && it.ex.safe.every((u) => u.why === 'need') ? `The manufacturer's condition: ${it.needs.text.toLowerCase()}. No space has it.`
+  : it.affects === 'no' ? `Every unit runs a version the manufacturer doesn't list (${it.affected.join(', ')}).`
+  : `Versions from device management, simulated until a real feed replaces them. ${it.needs ? `Counted only where ${it.needs.text.toLowerCase()}.` : ''}`;
 
 const NUMBERS = [
   { n: it.affects === 'maybe' ? it.ex.unknown.length : it.ex.exposed.length, label: it.affects === 'maybe' ? 'Units, version unknown' : 'Units exposed', to: shown.length ? '#affected-units' : undefined, tone: it.affects === 'yes' ? 'bad' : it.affects === 'maybe' ? 'warn' : undefined },
@@ -49,10 +49,10 @@ const NUMBERS = [
   { n: 0, label: 'Incidents linked', to: '#incidents', id: 'linked' },
   { n: it.fixed_in ? it.fixed_in.split(/[.-]/).slice(0, 3).join('.') : it.status === 'wont-fix' ? 'None' : 'Not yet', label: 'Fixed in', to: '#the-fix' },
 ];
-const tellText = `Known issue ${ref} (${it.maker}): ${it.symptom}${it.workaround ? ` Workaround: ${it.workaround.text}` : ''}`;
+const tellText = `Known error ${ref} (${it.maker}): ${it.symptom}${it.workaround ? ` Workaround: ${it.workaround.text}` : ''}`;
 ---
-<Shell title={`${ref}: ${it.title}`} section="known-issues" minStage={2} crumbs={[{ label: 'Work', to: '/work/' }, { label: 'Known issues', to: '/known-issues/' }, { label: it.maker, to: `/known-issues/?maker=${it.feed.id}` }, { label: ref }]} about={{ kind: 'known-issue', label: `${ref}, ${it.title}`, to: it.path }}>
-  <PageBand overline="Known issue" title={it.title} lede={it.symptom} stage={2} numbers={NUMBERS} rec={it.id}>
+<Shell title={`${ref}: ${it.title}`} section="known-issues" minStage={2} crumbs={[{ label: 'Work', to: '/work/' }, { label: 'Known errors', to: '/known-issues/' }, { label: it.maker, to: `/known-issues/?maker=${it.feed.id}` }, { label: ref }]} about={{ kind: 'known-issue', label: `${ref}, ${it.title}`, to: it.path }}>
+  <PageBand overline="Known error" title={it.title} lede={it.symptom} sim numbers={NUMBERS} rec={it.id}>
     <Fragment slot="overline">
       <span class="code" data-help="ki.ref">{ref}</span>
       <span>{it.maker}</span>
@@ -75,7 +75,7 @@ const tellText = `Known issue ${ref} (${it.maker}): ${it.symptom}${it.workaround
         <p class="faint ki-pl">{picLine}</p>
         <p class="ki-state" data-ki-toldstate hidden></p>
         <div class="ki-tell card" data-ki-tell-form hidden>
-          <label for="ki-tell-t"><b>A note on {tellRooms.length} {tellRooms.length === 1 ? 'room' : 'rooms'}</b> <span class="faint">Everyone who opens those rooms sees it, with your name.</span></label>
+          <label for="ki-tell-t"><b>A note on {tellRooms.length} {tellRooms.length === 1 ? 'space' : 'spaces'}</b> <span class="faint">Everyone who opens those spaces sees it, with your name.</span></label>
           <textarea id="ki-tell-t" rows="4">{tellText}</textarea>
           <span class="ki-tellb">
             <button type="button" class="btn small primary" data-ki-tell-send data-rooms={tellRooms.join('|')}>Leave the note</button>
@@ -103,7 +103,7 @@ const tellText = `Known issue ${ref} (${it.maker}): ${it.symptom}${it.workaround
         )}
       </section>
 
-      <SidePanel class="s-5" title="What the maker says" meta={`Checked ${when(it.feed.checked)}`} help="ki.maker-says">
+      <SidePanel class="s-5" title="What the manufacturer says" meta={`Checked ${when(it.feed.checked)}`} help="ki.maker-says">
         <dl class="kv">
           <div><dt>Reference</dt><dd class="mono">{it.ref ?? 'None published'}</dd></div>
           <div><dt>Models</dt><dd>{it.modelNames.join(', ')}</dd></div>
@@ -115,7 +115,7 @@ const tellText = `Known issue ${ref} (${it.maker}): ${it.symptom}${it.workaround
         {it.affected_note && <p class="faint ki-note">{it.affected_note}</p>}
         <div class="ki-wa" data-help="ki.workaround">
           <p class="overline">Workaround</p>
-          {it.workaround ? <><p>{it.workaround.text}</p><small class="faint">{it.workaround.from === 'maker' ? 'Published by the maker.' : "Aigna's own. The maker didn't publish one."}</small></> : <p class="faint">None published.</p>}
+          {it.workaround ? <><p>{it.workaround.text}</p><small class="faint">{it.workaround.from === 'maker' ? 'Published by the manufacturer.' : "Aigna's own. The manufacturer didn't publish one."}</small></> : <p class="faint">None published.</p>}
         </div>
         <p class="ki-src">
           {it.sourceRec?.url ? <a href={it.sourceRec.url} rel="noopener">{it.sourceRec.title}</a> : <span>{it.sourceRec?.title}</span>}
@@ -168,7 +168,7 @@ const tellText = `Known issue ${ref} (${it.maker}): ${it.symptom}${it.workaround
       </section>
 
       <section class="card side-card s-4" aria-labelledby="ki-mk-h" data-help="ki.maker">
-        <h3 id="ki-mk-h">With the maker</h3>
+        <h3 id="ki-mk-h">With the manufacturer</h3>
         {mcase ? (
           <>
             <p class="ki-t"><a href={href(mcase.path)}><b class="mono">{mcase.id}</b> {mcase.title}</a></p>
@@ -178,7 +178,7 @@ const tellText = `Known issue ${ref} (${it.maker}): ${it.symptom}${it.workaround
         ) : draft ? (
           <>
             <p class="ki-t">No case with {it.maker} about this yet. Keia Atlas has one ready with the units, versions and incidents.</p>
-            <a class="btn small" href={href(draft.path)} data-help="ki.raise">Raise with the maker</a>
+            <a class="btn small" href={href(draft.path)} data-help="ki.raise">Raise with the manufacturer</a>
           </>
         ) : <p class="muted ki-t">Nothing to raise: it doesn't affect us.</p>}
         <button type="button" class="btn small ghost ki-hist" data-ki-history data-item={`ki:${it.id}`} data-title={`${ref} ${it.title}`} data-help="ki.history">History</button>
@@ -194,7 +194,7 @@ const tellText = `Known issue ${ref} (${it.maker}): ${it.symptom}${it.workaround
                 <a class="name" href={href(`/device/?tag=${u.tag}`)}>{u.name}</a>
                 <span class="sub">{modelName(u.model)} · <a href={href(`/rooms/${u.room}/`)}>{u.roomTitle}</a>, {siteName(u.site)} · <span class="mono">{u.tag}</span></span>
               </span>
-              <span class="end"><span class="ki-noted" title="A note about this known issue is on the room">Note left</span><span class="mono faint">{u.firmware ?? 'Version not known'}</span></span>
+              <span class="end"><span class="ki-noted" title="A note about this known error is on the space">Note left</span><span class="mono faint">{u.firmware ?? 'Version not known'}</span></span>
             </div>
           ))}
         </div>

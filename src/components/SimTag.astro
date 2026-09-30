@@ -1,20 +1,17 @@
 ---
-/* SimTag: the one tag that says a page is not live (rule P5). Three wordings exist:
-   "Simulated" (made-up figures or people), "Simulated live" (made-up figures that change as you watch,
-   kind="live") and "Stage n" (arrives at a later adoption stage).
-   Used by PageBand's overline row only; pages pass `sim` (true or "live") or `stage` to PageBand instead. */
+/* SimTag: the one tag that says a page is not live (rule P5). Two wordings exist:
+   "Simulated" (made-up figures or people) and "Simulated live" (made-up figures that change as you watch,
+   kind="live"). Used by PageBand's overline row only; pages pass `sim` (true or "live") to PageBand instead. */
 interface Props { kind: string }
 const { kind } = Astro.props;
-const stage = /^stage:(\d)$/.exec(kind ?? '')?.[1];
-if (!stage && kind !== 'simulated' && kind !== 'live') throw new Error(`SimTag: kind must be "simulated", "live" or "stage:<n>", not "${kind}"`);
+if (kind !== 'simulated' && kind !== 'live') throw new Error(`SimTag: kind must be "simulated" or "live", not "${kind}"`);
 const live = kind === 'live';
-const text = stage ? `Stage ${stage}` : live ? 'Simulated live' : 'Simulated';
-const tip = stage ? `Arrives at adoption stage ${stage}. Switch stages in Settings.` : live ? 'Made-up figures that change as you watch, until the real feeds plug in.' : 'Made-up figures for the demo. Nothing here is live.';
+const text = live ? 'Simulated live' : 'Simulated';
+const tip = live ? 'Made-up figures that change as you watch. Real feeds replace this with the same shape. Live between windows on this computer (demo).' : 'Made-up figures for the demo. Nothing here is live. Real feeds replace this with the same shape.';
 ---
-<span class:list={['sim-t', stage ? 'is-stage' : 'is-sim']} title={tip} data-help={stage ? 'simtag:stage' : 'simtag:simulated'}>{text}</span>
+<span class="sim-t is-sim" title={tip} data-help="simtag:simulated">{text}</span>
 
 <style is:global>
   .sim-t { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: var(--pill-radius); font: 700 10.5px/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
   .sim-t.is-sim { border: 1px dashed var(--amber-ink); color: var(--amber-ink); background: transparent; }
-  .sim-t.is-stage { border: 1px solid transparent; background: var(--violet-soft); color: var(--violet-ink); }
 </style>
