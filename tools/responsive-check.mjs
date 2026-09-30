@@ -73,6 +73,8 @@ const PAGES = [
   // Other places (owned by other helpers; checked with --all)
   ['locations', '/locations/'], ['offices', '/locations/offices/'], ['region', '/locations/emea/'], ['office', '/locations/dub/'], ['office-plain', '/locations/lon/'], ['home-offices', '/locations/emea/home-offices/'],
   ['services', '/services/'], ['service-av', '/services/av/'], ['service-network', '/services/network/'], ['service-infrastructure', '/services/infrastructure/'],
+  ['service-security', '/services/security/'], ['service-print', '/services/print/'], ['service-collaboration', '/services/collaboration/'], ['service-wifi', '/services/wifi/'],
+  ['service-events', '/services/events/'], ['event', '/services/events/evt-03/'], ['event-past', '/services/events/evt-01/'],
   ['spares', '/spares/'], ['store', '/spares/dub/'],
   ['assets', '/assets/', 'other'],
   ['rooms', '/rooms/', 'other'],

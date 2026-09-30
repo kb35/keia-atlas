@@ -1,0 +1,229 @@
+---
+// /services/events/: the Events and experience centres service (src/lib/catalogue.mjs, src/lib/events.mjs). Overview
+// archetype: today's briefing first, then what is coming and how ready it is, the briefing centre's floor, the demo
+// and loaner kit, and the history with each event's report. Then the service's targets, its standard and who runs it.
+// The readiness states are as they stand at the demo's moment (09:20 on the demo's today, src/lib/events-view.mjs).
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import Section from '../../../components/Section.astro';
+import HealthGlyph from '../../../components/HealthGlyph.astro';
+import EmptyState from '../../../components/EmptyState.astro';
+import FeatureGate from '../../../components/FeatureGate.astro';
+import ServiceMap from '../../../components/ServiceMap.astro';
+import SmallMultiples from '../../../components/SmallMultiples.astro';
+import { href, sites } from '../../../lib/data.mjs';
+import { building } from '../../../lib/floors.mjs';
+import { catalogueModel } from '../../../lib/catalogue-view.mjs';
+import { events, upcoming, history, kit, eventFigures, eventsSummary, STATE_WORDS, spaceTitle } from '../../../lib/events-view.mjs';
+import { STATE_GLYPH } from '../../../lib/events.mjs';
+import { WORD as WORDS } from '../../../lib/health.mjs';
+import { ROLES, PEOPLE } from '../../../lib/demo.mjs';
+
+const m = catalogueModel('events', { events: eventFigures });
+const svc = m.svc;
+const owner = m.owner;
+const today = events.find((e) => e.today) ?? null;
+const next = upcoming[0] ?? null;
+// The answer: today's event first, else the next one, else the last report.
+const ANSWER = today ? `Today's ${today.kindShort.toLowerCase()} is ${today.line.replace(/^(At risk|Not ready|Ready):/, (x) => `${x.slice(0, -1).toLowerCase()}:`)}`
+  : next ? `Next: ${next.title} on ${next.day}, ${next.readinessWord.toLowerCase()}` : 'No events coming up';
+const toCharge = eventsSummary.kitToCharge;
+const NUMBERS = [
+  { n: eventsSummary.upcoming, label: 'Events coming up', to: '#upcoming' },
+  { n: eventsSummary.atRisk, label: 'Not ready yet', to: '#upcoming', tone: eventsSummary.atRisk ? 'warn' : undefined },
+  { n: toCharge, label: 'Demo kit to charge', to: '#kit', tone: toCharge ? 'warn' : undefined },
+  { n: `${Math.round(eventFigures.lost)} min`, label: 'Time lost per event', fact: true },
+];
+// The briefing centre's floor: a room is To review when a check on it is left for today's or the next event, and the
+// kit store is To review when a unit in it is not charged or not tested.
+const focus = today ?? next;
+const health = {};
+if (focus) for (const c of focus.checks.filter((x) => !x.done && x.group === 'rooms')) health[c.id.slice(5)] = { h: 'review', why: c.missing };
+const kitHome = kit[0]?.keptIn;
+const kitIssues = kit.filter((k) => k.health !== 'fine');
+if (kitHome && kitIssues.length) health[kitHome] = { h: 'review', why: kitIssues.map((k) => (!k.charged ? `unit ${k.n} at ${k.charge_pct}%` : `unit ${k.n} not tested for ${k.testedDays} days`)).join(', ') };
+const centreSite = kit[0]?.site ?? 'dub';
+const centreFloor = building(centreSite)?.floors.find((f) => Object.keys(building(centreSite).rooms).some((r) => building(centreSite).rooms[r].floor === f.id && /^(executive-boardroom|briefing-auditorium|demo-zone)$/.test(building(centreSite).rooms[r].space_type)))?.id ?? null;
+const FIRST = Object.fromEntries(PEOPLE.map((p) => [p.id, p.name.split(' ')[0]]));
+const pct = (e) => Math.round(((e.checks.length - e.left) / Math.max(1, e.checks.length)) * 100);
+const CHAIN = {
+  before: svc.map.before,
+  groups: [
+    { label: 'Rooms and their kit', state: m.roll.offline ? 'fault' : m.roll.alert ? 'review' : 'fine', sub: `${m.roll.working} of ${m.roll.all} working`, to: '#units' },
+    { label: 'Demo kit', state: kitIssues.length ? 'review' : 'fine', sub: `${kit.length} units${kitIssues.length ? `, ${kitIssues.length} to see to` : ''}`, to: '#kit' },
+    { label: 'Readiness checks', state: eventsSummary.atRisk ? 'review' : 'fine', sub: `${eventsSummary.upcoming - eventsSummary.atRisk} of ${eventsSummary.upcoming} events ready`, to: '#upcoming' },
+  ],
+  after: svc.map.after,
+};
+const KIT_ST = { out: 'progress', booked: 'planned', in: 'fine' };
+---
+<Shell title="Events and experience centres" section="services-events" crumbs={[{ label: 'Services', to: '/services/' }, { label: 'Events' }]} about={{ kind: 'page', label: 'Events and experience centres' }}>
+  <FeatureGate id="events">
+    <PageBand overline="Service" title="Events and experience centres" rec="svc-events" answer={ANSWER} lede={svc.lede} sim numbers={NUMBERS} heartbeat={false}>
+      <a slot="overline" class="pill plain sv-owner" href={href(`/team/?p=${owner.id}`)} data-help="services.owner">Owner: {owner.name}</a>
+      <span slot="overline"><HealthGlyph state={m.within ? 'fine' : 'review'} size={12} word={m.within ? 'Fine · within target' : 'To review · below target'} quiet={m.within} /></span>
+    </PageBand>
+
+    <div class="content evs">
+      <Section title="Coming up" id="upcoming" aside={`${upcoming.length} ${upcoming.length === 1 ? 'event' : 'events'} · readiness as of 09:20 today`} help="events.upcoming">
+        {upcoming.length ? (
+          <ul class="ev-cards">
+            {upcoming.map((e) => (
+              <li>
+                <a class="card ev-card" href={href(e.to)} data-lift data-state={e.readiness} data-vt-rec={`evt-${e.id}`} data-help="events.card" data-help-name={e.title}>
+                  <span class="ev-when"><b>{e.today ? 'Today' : e.day}</b> {e.start} to {e.end}{e.today && <span class="pill plain">Today</span>}</span>
+                  <b class="ev-t">{e.title}</b>
+                  <span class="ev-sub">{e.kindWord} · {e.client.guests} guests · {e.roomsNamed.map((r) => r.name.replace(/^\d+\.\d+ /, '')).join(', ')}</span>
+                  <span class="ev-ready"><HealthGlyph state={STATE_GLYPH[e.readiness]} size={16} word={`${WORDS[STATE_GLYPH[e.readiness]]} · ${e.readinessWord.toLowerCase()}`} quiet={e.readiness === 'ready'} /><span class="ev-left">{e.checks.length - e.left} of {e.checks.length} checks done</span></span>
+                  <span class="ev-bar" aria-hidden="true" data-chart-bar="each"><i style={`width:${pct(e)}%`}></i></span>
+                  {e.left > 0 && <span class="ev-miss">{e.line.replace(/^[^:]+: /, 'Left: ')}</span>}
+                  <span class="ev-tech">Technician: {e.tech.name}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : <EmptyState text="No events coming up." filter={false} />}
+      </Section>
+
+      {centreFloor && (
+        <Section title="The briefing centre" id="centre" aside={`${sites[centreSite].name}, ${building(centreSite).floors.find((f) => f.id === centreFloor).name.toLowerCase()}`} help="events.centre">
+          <div class="g12 ev-centre">
+            <div class="s-7">
+              <SmallMultiples cards={[{ key: `${centreSite}-${centreFloor}`, site: centreSite, floor: centreFloor, title: 'Briefing centre', to: `/locations/${centreSite}/?floor=${centreFloor}` }]} health={health} people={FIRST} min={320} label="The briefing centre's floor" />
+            </div>
+            <div class="card side-card s-5">
+              <h3>Its rooms</h3>
+              <ul class="ev-rooms">
+                {[...new Set(events.flatMap((e) => e.rooms))].concat(kitHome ? [kitHome] : []).filter((v, i, a) => a.indexOf(v) === i).map((r) => (
+                  <li><a href={href(`/rooms/${r}/`)}>{spaceTitle(r)}</a><small>{health[r] ? health[r].why : r === kitHome ? 'Demo kit kept and charged here' : `${events.filter((e) => e.rooms.includes(r) && !e.past).length} upcoming ${events.filter((e) => e.rooms.includes(r) && !e.past).length === 1 ? 'event' : 'events'}`}</small></li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </Section>
+      )}
+
+      <Section title="Demo and loaner kit" id="kit" aside={`Kept in ${kit[0]?.keptInName ?? 'the control room'} · booked to events, checked out and in`} help="events.kit">
+        <div class="tablewrap"><table class="to-cards sv-tbl">
+          <thead><tr><th>Unit</th><th>Now</th><th>Charge</th><th>Last tested</th><th>Next booking</th></tr></thead>
+          <tbody>
+            {kit.map((k) => (
+              <tr>
+                <td data-label=""><b>Unit {k.n}: {k.name}</b><small class="faint"> · {k.use === 'demo' ? 'Demo' : 'Loaner'}{k.modelName ? ` · ${k.modelName}` : ''}</small></td>
+                <td data-label="Now"><HealthGlyph state={KIT_ST[k.st]} size={16} word={k.st === 'out' ? `In progress · checked out ${k.booking.out.slice(11, 16)}` : k.st === 'booked' ? `Planned · booked to ${k.booking.event}` : 'Fine · in the store'} quiet={k.st === 'in'} /></td>
+                <td data-label="Charge" class:list={['num', { 't-warn': !k.charged }]}>{k.battery ? `${k.charge_pct}%${k.charged ? '' : ', to charge'}` : <span class="faint">No battery</span>}</td>
+                <td data-label="Last tested" class:list={{ 't-warn': !k.tested14 }}>{k.testedDays === 0 ? 'Today' : `${k.testedDays} ${k.testedDays === 1 ? 'day' : 'days'} ago`}</td>
+                <td data-label="Next booking">{k.nextEvent ? <a href={href(k.nextEvent.to)}>{k.nextEvent.id}, {k.nextEvent.today ? 'today' : k.nextEvent.day}</a> : <span class="faint">None</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table></div>
+        <p class="sv-note">A unit is ready at {80}% charge and tested within 14 days of its event; checking it out to an event counts as its checks. The same unit cannot be booked to two events on one day. Charge and test dates are simulated.</p>
+      </Section>
+
+      <Section title="History" id="history" aside={`${history.length} ${history.length === 1 ? 'event' : 'events'} · each report taken from the record`} rows={8} help="events.history">
+        <ul class="card ev-hist" data-items>
+          {history.map((e) => (
+            <li>
+              <HealthGlyph state={e.report.faults.length ? 'review' : 'fine'} size={16} word={e.report.faults.length ? `To review · ${e.report.lost} min lost` : 'Fine · ran as planned'} quiet={!e.report.faults.length} />
+              <span><a href={href(e.to)}><b>{e.title}</b></a><small>{e.day} · {e.report.ran} of {e.report.planned} items ran · {e.report.faults.length ? `${e.report.faults.length} ${e.report.faults.length === 1 ? 'fault' : 'faults'}` : 'no faults'}{e.report.lessons.length ? ` · ${e.report.lessons.length} ${e.report.lessons.length === 1 ? 'lesson' : 'lessons'}` : ''}</small></span>
+            </li>
+          ))}
+        </ul>
+      </Section>
+
+      <ServiceMap chain={CHAIN} systems={svc.systems} synced="simulated" />
+
+      <Section title="Targets" id="targets" aside={`${m.targets.filter((t) => t.kept).length} of ${m.targets.length} kept · from the events' records and the units`} help="services.cat-targets">
+        <div class="tablewrap"><table class="to-cards sv-tbl">
+          <thead><tr><th>Target</th><th>Promise</th><th>This month</th><th>Kept</th></tr></thead>
+          <tbody>
+            {m.targets.map((t) => (
+              <tr><td data-label=""><b>{t.what}</b></td><td data-label="Promise">{t.promise}</td><td data-label="This month" class="num">{t.words}</td><td data-label="Kept"><HealthGlyph state={t.kept ? 'fine' : 'review'} size={16} word={t.kept ? 'Fine · kept' : 'To review · below target'} quiet={t.kept} /></td></tr>
+            ))}
+          </tbody>
+        </table></div>
+      </Section>
+
+      <Section title="The standard" id="standard" aside="A house choice" help="services.cat-standard">
+        <div class="card pad ev-std">
+          <p class="ev-std-h"><b>{m.standard.name}</b><span class="pill plain">House choice</span></p>
+          <p class="ev-std-s">{m.standard.summary}</p>
+          <ul>{m.standard.sample.map(([rule, why]) => <li><span>{rule}</span><small>{why}</small></li>)}</ul>
+          <p class="sv-note">Each room's own kit follows its space type: the executive boardroom, demo zone, briefing auditorium, welcome lounge and control room each have one, with display, audio, camera, lighting and recording where the room needs them.</p>
+        </div>
+      </Section>
+
+      <Section title="Every unit in the briefing centre" id="units" aside={`${m.roll.working} of ${m.roll.all} working`} rows={8} help="services.cat-units">
+        <div class="tablewrap"><table class="to-cards sv-tbl">
+          <thead><tr><th>Unit</th><th>Space</th><th>State</th></tr></thead>
+          <tbody data-items>
+            {m.units.map((u) => (
+              <tr>
+                <td data-label=""><a href={href(u.to)}><b>{u.role}</b></a>{u.modelName && <small class="faint"> · {u.modelName}</small>}</td>
+                <td data-label="Space"><a href={href(`/rooms/${u.space}/`)}>{u.spaceName}</a></td>
+                <td data-label="State"><HealthGlyph state={u.st === 'online' ? 'fine' : u.st === 'alert' ? 'review' : 'fault'} size={16} word={u.st === 'online' ? 'Fine' : u.st === 'alert' ? 'To review' : 'Fault'} quiet={u.st === 'online'} />{u.st !== 'online' && <small class="faint"> {u.why}</small>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table></div>
+      </Section>
+
+      <Section title="Who runs this service" id="owners" help="services.owners">
+        <article class="card side-card sv-own">
+          <h3>Service owner</h3>
+          <p class="sv-role"><b>{ROLES[owner.roleId].name}</b></p>
+          <p class="sv-people"><a href={href(`/team/?p=${owner.id}`)}>{owner.name}</a>, with the on-site technician for each event</p>
+          <p class="sv-note">Every client, host and agenda on these pages is made up for the demo.</p>
+        </article>
+      </Section>
+    </div>
+  </FeatureGate>
+</Shell>
+
+<style>
+  .sv-owner { text-decoration: none; }
+  .evs { display: grid; gap: 24px; }
+  .ev-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 12px; }
+  .ev-cards > li { display: grid; min-width: 0; }
+  .ev-card { display: grid; gap: 6px; align-content: start; padding: 16px 18px; color: inherit; text-decoration: none; min-width: 0; }
+  .ev-card[data-state=at-risk] { border-color: color-mix(in srgb, var(--h-review) 50%, var(--line)); }
+  .ev-card:hover .ev-t { text-decoration: underline; text-underline-offset: 3px; }
+  .ev-when { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: var(--fs-code); color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .ev-when b { color: var(--text); }
+  .ev-t { font-size: var(--fs-h3); line-height: 1.25; }
+  .ev-sub, .ev-tech { font-size: var(--fs-code); color: var(--text-3); }
+  .ev-ready { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 10px; margin-top: 4px; font-size: var(--fs-code); }
+  .ev-left { color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .ev-bar { display: block; height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+  .ev-bar i { display: block; height: 100%; background: color-mix(in srgb, var(--h-fine) 65%, var(--surface)); border-radius: 3px; }
+  .ev-card[data-state=at-risk] .ev-bar i, .ev-card[data-state=not-ready] .ev-bar i { background: var(--amber); }
+  .ev-miss { font-size: var(--fs-code); color: var(--h-review-ink); font-weight: 600; }
+  .ev-rooms { list-style: none; margin: 0; padding: 0; display: grid; }
+  .ev-rooms li { display: grid; gap: 1px; padding: 8px 0; border-top: var(--border-rule); }
+  .ev-rooms li:first-child { border-top: 0; padding-top: 0; }
+  .ev-rooms a { color: inherit; font-weight: var(--fw-name); text-decoration: none; }
+  .ev-rooms a:hover { text-decoration: underline; text-underline-offset: 2px; }
+  .ev-rooms small { font-size: var(--fs-code); color: var(--text-3); }
+  .ev-hist { list-style: none; margin: 0; padding: 4px 16px; display: grid; }
+  .ev-hist li { display: grid; grid-template-columns: 11em minmax(0, 1fr); gap: 4px 12px; align-items: start; padding: 10px 0; border-top: var(--border-rule); }
+  .ev-hist li:first-child { border-top: 0; }
+  .ev-hist span { display: grid; gap: 2px; min-width: 0; }
+  .ev-hist a { color: inherit; text-decoration: none; }
+  .ev-hist a:hover { text-decoration: underline; text-underline-offset: 2px; }
+  .ev-hist small { font-size: var(--fs-code); color: var(--text-2); }
+  .ev-std { display: grid; gap: 10px; }
+  .ev-std-h { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0; font-size: var(--fs-h3); }
+  .ev-std-s { margin: 0; font-size: var(--fs-body); line-height: 1.5; color: var(--text-2); max-width: 78ch; }
+  .ev-std ul { list-style: none; margin: 0; padding: 0; display: grid; }
+  .ev-std li { display: grid; gap: 2px; padding: 9px 0; border-top: var(--border-rule); }
+  .ev-std li span { font-size: var(--fs-body); line-height: 1.45; }
+  .ev-std li small { font-size: var(--fs-code); color: var(--text-3); }
+  .sv-tbl :global(td.t-warn), .sv-tbl :global(.t-warn) { color: var(--amber-ink); font-weight: 600; }
+  .sv-note { margin: 10px 2px 0; font-size: var(--fs-code); line-height: 1.5; color: var(--text-3); max-width: 78ch; }
+  .sv-own { max-width: 640px; }
+  .sv-own .sv-role { margin: 0; font-size: var(--fs-h3); }
+  .sv-own .sv-people { margin: 0; font-size: var(--fs-body); }
+  .sv-own .sv-people a { color: var(--accent-ink); }
+  @container content (max-width: 640px) { .ev-hist li { grid-template-columns: minmax(0, 1fr); } }
+</style>

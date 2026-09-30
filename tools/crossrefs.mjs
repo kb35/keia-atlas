@@ -19,6 +19,7 @@ import { crossCheckConnected } from './crossrefs-connected.mjs';
 import { crossCheckOperations } from './crossrefs-operations.mjs';
 import { crossCheckSwitchPorts } from './crossrefs-switchports.mjs';
 import { crossCheckCapabilities } from './crossrefs-capabilities.mjs';
+import { crossCheckEvents } from './crossrefs-events.mjs';
 import path from 'node:path';
 
 
@@ -653,6 +654,8 @@ export function crossCheck(records, root) {
   problems.push(...crossCheckSwitchPorts(records));
   // The capabilities' records: licences, checks, alert rules, certificates and the rest (src/lib/modules.mjs).
   problems.push(...crossCheckCapabilities(records));
+  // Events and demo kit in the experience centres (tools/crossrefs-events.mjs).
+  problems.push(...crossCheckEvents(records));
 
   return problems;
 }

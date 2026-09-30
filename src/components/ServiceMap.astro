@@ -8,12 +8,17 @@
    state in place (--dur-state), once.
    Props:  svc    av, network or infrastructure
            kinds  the kinds the page has ([{ k, label, n }])
-           systems the connectors the service reads from (names) */
+           systems the connectors the service reads from (names)
+           chain   instead of svc and kinds, a still chain drawn as given (the catalogue's services, src/lib/catalogue.mjs):
+                   { before?: { label, to, sub }, groups: [{ label, sub, state, to }], after: { label, sub } }. Its
+                   nodes are not recounted in the browser; each glyph shows the state it was given.
+           synced  the words on each connector's source mark (default "checked every 5 s") */
 import HealthGlyph from './HealthGlyph.astro';
 import SourceMark from './SourceMark.astro';
 import { href } from '../lib/data.mjs';
-interface Props { svc: string; kinds: { k: string; label: string; n: number }[]; systems: string[] }
-const { svc, kinds, systems } = Astro.props;
+interface Chain { before?: { label: string; to: string; sub: string }; groups: { label: string; sub: string; state: string; to?: string }[]; after: { label: string; sub: string } }
+interface Props { svc?: string; kinds?: { k: string; label: string; n: number }[]; systems: string[]; chain?: Chain; synced?: string }
+const { svc = '', kinds = [], systems, chain, synced = 'checked every 5 s' } = Astro.props;
 // The chain per service: what it needs first, then its kit in the order signals pass through it, then what it gives.
 const CHAIN: Record<string, { before?: { label: string; to: string; sub: string }; groups: { label: string; kinds: string[] }[]; after: { label: string; sub: string } }> = {
   av: {
@@ -46,23 +51,28 @@ const CHAIN: Record<string, { before?: { label: string; to: string; sub: string 
     after: { label: 'Comms rooms', sub: 'The network runs in them' },
   },
 };
-const C = CHAIN[svc] ?? { groups: [], after: { label: '', sub: '' } };
+const C = chain ?? CHAIN[svc] ?? { groups: [], after: { label: '', sub: '' } };
 const have = new Set(kinds.map((x) => x.k));
 const used = new Set(C.groups.flatMap((g) => g.kinds));
-const groups = [
+const groups = chain ? [] : [
   ...C.groups.filter((g) => g.kinds.some((k) => have.has(k))),
   ...(kinds.some((x) => !used.has(x.k)) ? [{ label: 'Other kit', kinds: kinds.filter((x) => !used.has(x.k)).map((x) => x.k) }] : []),
 ].map((g) => ({ ...g, n: kinds.filter((x) => g.kinds.includes(x.k)).reduce((a, x) => a + x.n, 0) }));
-const connectors = [...systems, 'ServiceNow'];
+const connectors = chain ? systems : [...systems, 'ServiceNow'];
 ---
-<section class="card smap svc-accent" id="map" aria-labelledby="smap-h" data-smap data-help="services.map">
-  <header class="smap-top"><h2 id="smap-h">Service map</h2><span class="faint">Lit by health, following the filters</span></header>
+<section class="card smap svc-accent" id="map" aria-labelledby="smap-h" data-smap={chain ? undefined : ''} data-help="services.map">
+  <header class="smap-top"><h2 id="smap-h">Service map</h2><span class="faint">{chain ? 'Each part lit by the worst state of its kit' : 'Lit by health, following the filters'}</span></header>
   <ol class="smap-chain" aria-label="What the service runs on, in order">
     {C.before && (
       <li class="smap-n smap-dep">
         <a href={href(C.before.to)}><HealthGlyph state="fine" size={16} quiet title="Its own service page says how it is" /><span><b>{C.before.label}</b><small>{C.before.sub} · its own service</small></span></a>
       </li>
     )}
+    {chain && chain.groups.map((g) => (
+      <li class="smap-n" data-state={g.state}>
+        <a href={g.to ?? '#units'}><HealthGlyph state={g.state} size={16} quiet={g.state === 'fine'} /><span><b>{g.label}</b><small>{g.sub}</small></span></a>
+      </li>
+    ))}
     {groups.map((g) => (
       <li class="smap-n" data-smap-kinds={g.kinds.join(' ')}>
         <a href={`?kind=${g.kinds.filter((k) => have.has(k)).join(',')}#units`}><HealthGlyph state="fine" size={16} quiet /><span><b>{g.label}</b><small data-smap-c>{g.n.toLocaleString('en-IE')} working</small></span></a>
@@ -73,7 +83,7 @@ const connectors = [...systems, 'ServiceNow'];
   <div class="smap-conn">
     <span class="smap-cl">Connectors</span>
     <ul aria-label="Where the figures come from">
-      {connectors.map((s) => <li><HealthGlyph state="fine" size={12} quiet title="Reporting" /><SourceMark from={s} synced="checked every 5 s" /></li>)}
+      {connectors.map((s) => <li><HealthGlyph state="fine" size={12} quiet title="Reporting" /><SourceMark from={s} synced={synced} /></li>)}
     </ul>
   </div>
 </section>

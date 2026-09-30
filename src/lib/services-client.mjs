@@ -356,8 +356,10 @@ export function initOverview(root) {
     const past = ids.filter((id) => lights[id] === 'bad').length, review = ids.filter((id) => lights[id] === 'warn').length;
     const svc = (n) => `${n} ${n === 1 ? 'service' : 'services'}`;
     const parts = [past && `${svc(past)} past target`, review && `${svc(review)} to review`, fine && `${fine} within target`].filter(Boolean);
-    if (W_.rsAnswer) W_.rsAnswer(fine === ids.length ? `All ${ids.length} services within target` : parts.join(' · '));
-    if (W_.rsKeyNumber) {
+    // On the catalogue index the band answers for every service, from their targets (the page's own script); the live
+    // cards only light themselves.
+    if (W_.rsAnswer && !D.keepBand) W_.rsAnswer(fine === ids.length ? `All ${ids.length} services within target` : parts.join(' · '));
+    if (W_.rsKeyNumber && !D.keepBand) {
       const put = (key, v, tone) => { W_.rsKeyNumber(key, v, { tone }); if (!firstNumbers && last[key] !== String(v) && W_.rsMarkChanged) W_.rsMarkChanged(document.querySelector(`.kn-i[data-kn="${key}"]`)); last[key] = String(v); };
       put('svo-1', fine, fine < ids.length ? 'warn' : 'good');
       put('svo-2', alerting, alerting ? 'warn' : '');

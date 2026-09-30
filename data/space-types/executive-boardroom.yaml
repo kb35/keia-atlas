@@ -1,0 +1,326 @@
+# Space type: Executive boardroom
+# Keia Atlas house standard, not from a published guideline (see docs/decisions/0009-house-standard.md). No public
+# guidance covers an executive briefing centre's rooms, so every size, count and choice here is a house choice.
+# Keia part (profile to verification_model): which classes of device belong here.
+# Keia Atlas part: build options, the models each option names, and the outlets.
+
+schema: composite-profile
+
+profile:
+  name: Executive boardroom
+  space_type: executive-boardroom
+  version: "1.0"
+  last_updated: "2026-09-30"
+  owner: Keia Atlas maintainers
+  capacity: "12-18 people"
+  purpose: >-
+    The boardroom of an executive briefing centre: customer and leadership meetings at one long
+    table, with far-end video on two displays, ceiling microphones and speakers, and lighting
+    scenes for meeting, presenting and video.
+
+sources:
+  - file: docs/decisions/0009-house-standard.md
+    provides: 'Keia Atlas house standard: why this space type and its kit'
+  - file: data/device-classes/display.yaml
+    provides: Healthy state for the display class
+  - file: data/device-classes/codec.yaml
+    provides: Healthy state for the video codec class
+  - file: data/device-classes/camera.yaml
+    provides: Healthy state for the camera class
+  - file: data/device-classes/touch-controller.yaml
+    provides: Healthy state for the touch controller class
+  - file: data/device-classes/microphone.yaml
+    provides: Healthy state for the microphone class
+  - file: data/device-classes/amplifier.yaml
+    provides: Healthy state for the amplifier class
+  - file: data/device-classes/loudspeaker.yaml
+    provides: Healthy state for the loudspeaker class
+  - file: data/device-classes/av-extender.yaml
+    provides: Healthy state for the AV extender class
+  - file: data/device-classes/network-switch.yaml
+    provides: Healthy state for the in-room network switch class
+  - file: data/device-classes/scheduler-panel.yaml
+    provides: Healthy state for the scheduler panel class
+
+equipment_categories:
+  - category: display
+    description: Two displays for the far end and shared content
+    object_profile: data/device-classes/display.yaml
+    quantity: "2"
+  - category: video_conferencing_codec
+    description: Meeting computer driving the camera, microphones and speakers
+    object_profile: data/device-classes/codec.yaml
+    quantity: "1"
+  - category: camera
+    description: PTZ camera facing the table
+    object_profile: data/device-classes/camera.yaml
+    quantity: "1"
+  - category: meeting_control
+    description: Touchscreen on the table that controls meetings
+    object_profile: data/device-classes/touch-controller.yaml
+    quantity: "1"
+  - category: microphones
+    description: Ceiling microphones over the table
+    object_profile: data/device-classes/microphone.yaml
+    quantity: "2"
+  - category: audio_amplification
+    description: Amplifier and audio processing for the ceiling speakers
+    object_profile: data/device-classes/amplifier.yaml
+    quantity: "1"
+  - category: loudspeakers
+    description: Ceiling speakers
+    object_profile: data/device-classes/loudspeaker.yaml
+    quantity: "4"
+  - category: signal_extension
+    description: HDBaseT transmitter and receiver for the laptop connection at the table
+    object_profile: data/device-classes/av-extender.yaml
+    quantity: "2"
+  - category: network
+    description: In-room network switch for the AV devices
+    object_profile: data/device-classes/network-switch.yaml
+    quantity: "1"
+  - category: scheduling_panel
+    description: Booking panel at the door
+    object_profile: data/device-classes/scheduler-panel.yaml
+    quantity: "1"
+
+verification_model:
+  platforms_to_check:
+    - platform: keia_atlas
+      check: every required device in the chosen option is recorded in the space and wired
+        as the option says
+    - platform: inventory
+      check: every device has an active record in this space
+    - platform: dhcp_dns
+      check: every networked device has an address reservation and DNS records
+    - platform: device_management
+      check: meeting devices are online, paired and on standard firmware
+    - platform: room_booking
+      check: the room resource exists with the right capacity and is linked to its devices
+
+keia_atlas:
+  standard: house
+  category: connect
+  bookable: true
+  capacity:
+    min: 12
+    max: 18
+  area:
+    sq_ft:
+      min: 592
+      max: 807
+    m2:
+      min: 55
+      max: 75
+  geometry:
+    # The room shell for a floor-level 3D model; basis says where each value comes from.
+    width_m: 6.4
+    depth_m: 10
+    ceiling_m: 2.6
+    display_wall: back
+    door: { wall: left, from_m: 8.9, to_m: 9.8 }
+    data_entry: { via: ceiling, wall: left, at: above the door }
+    containment: [display-track, wall-riser, ceiling-drop, ceiling-basket, table-tray, table-leg, floor-cover, floor-box, floor-duct, floor-void, in-wall]
+    basis:
+      size: chosen
+      ceiling: house-default
+      door: house-default
+      data_entry: house-default
+      containment: house-default
+    notes:
+      - 6.4 × 10 m (64 m²), the depth of a facade row; the displays are on a short wall (house choice).
+  options:
+    - id: dual-display
+      name: Dual display, codec
+      standard: house
+      since: "2026-06-15"
+      summary: "Two 85 in displays with a Poly G62 codec and PTZ camera, two ceiling microphones and four ceiling speakers on an amplifier, the laptop connection at the table over HDBaseT, and a booking panel at the door. Lighting scenes come from the building's lighting control; meetings are recorded only in the meeting service, when everyone agrees."
+      equipment:
+        - key: display
+          class: display
+          model: samsung-qm85c
+          quantity: 2
+          requirement: required
+          location: display-wall
+          sizes_in: [85]
+        - key: codec
+          class: codec
+          model: poly-g62
+          quantity: 1
+          requirement: required
+          location: display-wall
+        - key: ptz-camera
+          class: camera
+          model: poly-e60
+          role: PTZ camera facing the table
+          quantity: 1
+          requirement: required
+          location: display-wall
+        - key: touch-controller
+          class: touch-controller
+          model: poly-tc10
+          quantity: 1
+          requirement: required
+          location: table-top
+        - key: ceiling-microphone
+          class: microphone
+          model: poly-ip-ceiling-microphone
+          quantity: 2
+          requirement: required
+          location: ceiling
+          notes: One over each half of the table
+        - key: amplifier
+          class: amplifier
+          model: kramer-pa-240z
+          quantity: 1
+          requirement: required
+          location: data-closet
+          notes: Amplifier with audio processing, in the floor's comms room
+        - key: loudspeaker
+          class: loudspeaker
+          model: kramer-galil-6
+          quantity: 4
+          requirement: required
+          location: ceiling
+        - key: network-switch
+          class: network-switch
+          model: netgear-m4250-gsm4210pd
+          quantity: 1
+          requirement: required
+          location: data-closet
+        - key: hdbaset-tx
+          class: av-extender
+          model: kramer-ext3-c-xr-t
+          role: 'HDBaseT transmitter: the laptop connection at the table'
+          quantity: 1
+          requirement: required
+          location: below-table
+        - key: hdbaset-rx
+          class: av-extender
+          model: kramer-ext3-poe-xr-r
+          role: HDBaseT receiver at the display wall
+          quantity: 1
+          requirement: required
+          location: behind-display
+        - key: scheduler-panel
+          class: scheduler-panel
+          model: logitech-tap-scheduler
+          quantity: 1
+          requirement: required
+          location: room-entrance
+      infrastructure:
+        - service: power
+          provided_by: it
+          quantity: 6
+          location: behind-display
+          serves: [display 1, HDBaseT receiver, spare, display 2, spare, spare]
+        - service: power
+          provided_by: it
+          quantity: 2
+          location: below-table
+          serves: [HDBaseT transmitter, spare]
+        - service: power
+          provided_by: facilities
+          quantity: 4
+          location: floor-box
+          notes: For people at the table. A house recommendation; facilities decide.
+        - service: data
+          provided_by: it
+          quantity: 6
+          location: behind-display
+          serves: [display 1, PTZ camera, in-room switch uplink, display 2, spare, spare]
+        - service: data
+          provided_by: it
+          quantity: 3
+          location: below-table
+          serves: [touch controller, spare, spare]
+        - service: direct-run
+          provided_by: it
+          quantity: 2
+          location: below-table
+          serves: [HDBaseT link to the display wall, spare]
+          notes: Cable runs straight from the table floor box to the display wall.
+        - service: data
+          provided_by: it
+          quantity: 1
+          location: room-entrance
+          serves: [scheduler panel]
+      wiring:
+        - from: codec.hdmi-out-1
+          to: display#1.hdmi-in-1
+          cable: hdmi
+        - from: codec.hdmi-out-2
+          to: display#2.hdmi-in-1
+          cable: hdmi
+        - from: display#1.lan-1
+          to: outlet:data/behind-display#1
+          cable: cat6
+        - from: ptz-camera.lan-1
+          to: outlet:data/behind-display#2
+          cable: cat6
+        - from: display#2.lan-1
+          to: outlet:data/behind-display#4
+          cable: cat6
+        - from: codec.lan-1
+          to: network-switch.lan-1
+          cable: cat6
+          notes: The switch powers the codec (PoE+)
+        - from: codec.lan-2
+          to: network-switch.lan-2
+          cable: cat6
+          notes: Link-local network for Poly IP peripherals
+        - from: ceiling-microphone#1.lan-1
+          to: network-switch.lan-3
+          cable: cat6
+        - from: ceiling-microphone#2.lan-1
+          to: network-switch.lan-4
+          cable: cat6
+        - from: amplifier.lan-1
+          to: network-switch.lan-5
+          cable: cat6
+        - from: network-switch.lan-9
+          to: outlet:data/behind-display#3
+          cable: cat6
+          notes: Uplink
+        - from: touch-controller.lan-1
+          to: outlet:data/below-table#1
+          cable: cat6
+        - from: hdbaset-tx.hdbaset-1
+          to: hdbaset-rx.hdbaset-1
+          cable: cat6a
+          notes: In direct cable run 1, floor box to display wall
+        - from: hdbaset-tx.usb-c-1
+          to: laptop
+          cable: usb-c
+          notes: The table cable people plug their laptop into
+        - from: hdbaset-rx.hdmi-out-1
+          to: codec.hdmi-in-1
+          cable: hdmi
+        - from: codec.audio-out-1
+          to: amplifier.audio-in-1
+          cable: audio
+        - from: amplifier.speaker-out-1
+          to: loudspeaker#1.speaker-in-1
+          cable: speaker
+          notes: The four speakers are chained from the amplifier
+        - from: scheduler-panel.lan-1
+          to: outlet:data/room-entrance#1
+          cable: cat6
+        - from: display#1.power-in
+          to: outlet:power/behind-display#1
+          cable: power
+        - from: hdbaset-rx.power-in
+          to: outlet:power/behind-display#2
+          cable: power
+        - from: display#2.power-in
+          to: outlet:power/behind-display#4
+          cable: power
+        - from: hdbaset-tx.power-in
+          to: outlet:power/below-table#1
+          cable: power
+          notes: 'Optional: the transmitter can also run on power from the receiver'
+  notes:
+    - 'Keia Atlas house standard: no public guidance covers an executive briefing centre, so the size, seats and kit are house choices.'
+    - 'Lighting control: scenes for meeting, presenting and video come from the building''s lighting control on a keypad by the door. No device class covers lighting control, so it is not listed as kit (a gap to fill).'
+    - 'Recording: there is no recording kit in the room. A meeting is recorded only in the meeting service, when everyone in it agrees (house choice).'
+    - 'Sensing kit (codec, camera, microphones) needs a privacy record for its site before it is installed.'

@@ -1,0 +1,43 @@
+---
+/* HomeEvents: the client briefings the viewer is the technician for in the next two weeks, on Home (the Events and
+   experience centres capability, src/lib/modules.mjs; src/lib/events.mjs). "Briefing at 10:00: 1 check left", with
+   what is left named, each a link to its event. It is one of Home's sections (data-sec="events", placed by the role's
+   layout in src/lib/homecore.mjs), belongs to its capability (data-feature) and has no empty state: with nothing
+   coming up for the viewer, it is not there. The service owner sees every event.
+   Motion: none of its own. View as and a capability switched on or off change it inside rsChange (M12, row 26). */
+import { href } from '../lib/data.mjs';
+import { homeEvents } from '../lib/events-view.mjs';
+import { CATALOGUE } from '../lib/catalogue.mjs';
+const ROWS = homeEvents(14);
+const OWNER = CATALOGUE.events.owner;
+---
+<section class="ck card hk hev" data-sec="events" id="events" data-feature="events" aria-labelledby="h-events" data-home-events data-rows={JSON.stringify(ROWS)} data-owner={OWNER} hidden>
+  <header class="ck-h"><h2 id="h-events" data-help="home.events">Client briefings</h2><span class="ck-n faint" data-hk-say></span><a class="aside" href={href('/services/events/')}>Events <span aria-hidden="true">→</span></a></header>
+  <ol class="hk-list" data-hk-list></ol>
+</section>
+
+<script is:inline data-astro-rerun>
+  (function () {
+    var sec = document.querySelector('[data-home-events]'); if (!sec) return;
+    var R = JSON.parse(sec.dataset.rows || '[]');
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+    function draw() {
+      var who = window.rsWhoId ? window.rsWhoId() : 'anna';
+      var mine = R.filter(function (r) { return who === 'everyone' || who === sec.dataset.owner || r.who.indexOf(who) >= 0; });
+      sec.classList.toggle('hk-none', mine.length === 0);
+      var risk = mine.filter(function (r) { return r.state !== 'ready'; }).length;
+      sec.querySelector('[data-hk-say]').textContent = mine.length ? mine.length + (mine.length === 1 ? ' event' : ' events') + ' in the next two weeks' + (risk ? ' · ' + risk + ' not ready yet' : '') : '';
+      sec.querySelector('[data-hk-list]').innerHTML = mine.slice(0, 4).map(function (r) {
+        var left = r.missing.length ? '<small class="hev-left">Left: ' + esc(r.missing.slice(0, 2).join(', ')) + (r.missing.length > 2 ? ' and ' + (r.missing.length - 2) + ' more' : '') + '</small>' : '';
+        return '<li class="hk-row' + (r.today && r.state !== 'ready' ? ' is-risk' : '') + '"><a href="' + r.to + '"><b>' + esc(r.line) + '</b><small>' + esc(r.title) + ' · ' + esc(r.where) + '</small>' + left + '</a><span class="hk-when">' + esc(r.stateWord) + '</span></li>';
+      }).join('');
+    }
+    draw();
+    if (!sec.__hk) { sec.__hk = true; document.addEventListener('rs:demo-change', function () { if (sec.isConnected) draw(); }); }
+  })();
+</script>
+
+<style is:global>
+  .home .hev .hev-left { color: var(--h-review-ink); font-weight: 600; }
+  .home .hev .hk-row.is-risk .hk-when { color: var(--h-review-ink); font-weight: 600; }
+</style>

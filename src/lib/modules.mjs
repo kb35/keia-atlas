@@ -78,6 +78,17 @@ export const CAPABILITIES = [
   { id: 'cable-tests', module: 'locations', label: 'Cable test results', what: 'Certification results for every cable run and outlet', state: 'on', source: 'the cable tester', helper: true },
   { id: 'certified-platforms', module: 'locations', label: 'Certified platforms', what: 'Which meeting platforms each space\'s kit is certified for', state: 'on', source: 'the manufacturers', helper: true },
   { id: 'meeting-quality', module: 'locations', label: 'Meeting quality', what: 'A call-quality score per space, its trend and the worst rooms', state: 'connected', source: 'the meeting platform' },
+  // Services: the service catalogue beyond AV, Network and IT infrastructure (src/lib/catalogue.mjs). Each service is a
+  // capability, so a team shows only the services it runs. Security is Connected: the security team usually owns it.
+  { id: 'collaboration', module: 'services', label: 'Collaboration platforms', what: 'Teams Rooms, Zoom Rooms and Google Meet hardware, with their licences', state: 'on', source: 'the platforms\' admin consoles' },
+  { id: 'wifi', module: 'services', label: 'Wi-Fi', what: 'Access points and the three house networks in every office', state: 'on', source: 'UniFi Site Manager' },
+  { id: 'security', module: 'services', label: 'Security', what: 'Door access, cameras and visitor sign-in at each reception', state: 'connected', source: 'the security platform' },
+  { id: 'print', module: 'services', label: 'Print', what: 'Printers and multifunction devices in the copy and print rooms', state: 'on', source: 'print management' },
+  { id: 'signage', module: 'services', label: 'Digital signage and displays', what: 'Screens in receptions, pantries and cafeterias, and their players', state: 'on', source: 'the signage platforms' },
+  { id: 'room-booking', module: 'services', label: 'Room booking and scheduling', what: 'Booking panels and each room\'s link to its calendar', state: 'on', source: 'the booking system' },
+  { id: 'building-sensors', module: 'services', label: 'Building and sensors', what: 'Environment sensors and room counts, never per person', state: 'on', source: 'the building management system' },
+  { id: 'home-kit', module: 'services', label: 'Home office kit', what: 'Home gateways, screens and docks at home desks', state: 'on', source: 'the asset register' },
+  { id: 'events', module: 'services', label: 'Events and experience centres', what: 'Client briefings: readiness, demo kit, a technician on site, a report', state: 'on', source: 'the events calendar', requires: ['locations'] },
   // Assets
   { id: 'licences', module: 'assets', label: 'Licences', what: 'Room and platform licences, seats, renewals and cost', state: 'on', source: 'the licence portals' },
   { id: 'warranty', module: 'assets', label: 'Warranty and cover', what: 'Warranty, support cover and purchase per unit', state: 'on', source: 'the asset register', helper: true },

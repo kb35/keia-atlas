@@ -23,7 +23,7 @@ test('every office with rooms has a floor plan for each of its floors', () => {
 });
 
 test('every room in every office is placed on its floor, without overlaps, and marked fictional', () => {
-  assert.equal(Object.values(M.rooms).length, 35);
+  assert.equal(Object.values(M.rooms).length, 41);
   for (const [s, B] of Object.entries(ALL)) {
     const rooms = Object.values(B.rooms);
     assert.deepEqual(rooms.filter((r) => !r.rect).map((r) => r.id), [], s);
@@ -46,7 +46,7 @@ test('every data outlet and access point has exactly one run, and no panel port 
     // A spare run is only ever an outlet with nothing plugged in.
     for (const r of runs.filter((x) => x.spare)) assert.ok(!r.to.access_point && !B.rooms[r.to.space].outlets.find((o) => o.id === r.to.outlet).dev, r.id);
   }
-  assert.equal(M.aps.length, 16);
+  assert.equal(M.aps.length, 21);
   assert.equal(M.circuits.length, 2);
   assert.equal(ALL.nyc.circuits.length, 2);
   assert.equal(ALL.cph.circuits.length, 1);
@@ -74,8 +74,8 @@ test('there are enough access points for the Wi-Fi standard, and each is a unit 
     }
     for (const a of B.aps) assert.ok(a.serial && a.asset_tag && ['unifi-u7-pro', 'unifi-u7-pro-max'].includes(a.model), `${a.id}`);
   }
-  // Dublin's access points kept their serials when they moved.
-  assert.deepEqual(M.aps.map((a) => a.serial), Array.from({ length: 16 }, (_, i) => `DEMO-DUB-${String(3101 + i).padStart(6, '0')}`));
+  // Dublin's access points kept their serials when they moved; the fifth floor's (the briefing centre) are new.
+  assert.deepEqual(M.aps.map((a) => a.serial), [...Array.from({ length: 16 }, (_, i) => `DEMO-DUB-${String(3101 + i).padStart(6, '0')}`), ...Array.from({ length: 5 }, (_, i) => `DEMO-DUB-${String(4004 + i).padStart(6, '0')}`)]);
 });
 
 test('a meeting room display traces hop by hop to the internet', () => {
