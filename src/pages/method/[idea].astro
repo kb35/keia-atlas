@@ -1,17 +1,19 @@
 ---
-// One page per idea (Level 2), always in the same order: name, line, paragraph, worked example, how to do it, why
-// it works (with its limits beside it), how to measure it, what it maps to; one picture to explore; then the thing
-// to try in the demo. Every word of method text comes from docs/keia-method.md (src/lib/method.mjs).
+// One page per idea (Level 2), always in the same order, the card's order: the idea's card from Level 1 first
+// (IdeaCard); then the same four lines in full: what it replaces, what you do (with the moves and anything else the
+// section says), how you'll know it's working, and what Keia Atlas adds, beside the picture to explore; then why it
+// works and its limits; then what it maps to. The method (the first three) comes before the product (the fourth).
+// Every word of method text comes from docs/keia-method.md (src/lib/method.mjs).
 import MethodPage from '../../components/method/MethodPage.astro';
-import SidePanel from '../../components/SidePanel.astro';
 import Section from '../../components/Section.astro';
+import IdeaCard from '../../components/method/IdeaCard.astro';
 import ZoomStrip from '../../components/method/ZoomStrip.astro';
 import CaptureDemo from '../../components/method/CaptureDemo.astro';
 import DrillFrames from '../../components/method/DrillFrames.astro';
 import WithDemo from '../../components/method/WithDemo.astro';
 import FadeChecklist from '../../components/method/FadeChecklist.astro';
-import IdeaArt from '../../components/method/IdeaArt.astro';
-import { IDEAS, part, moves, md, WORDS, WORDS_FOR, MAPS } from '../../lib/method.mjs';
+import { IDEAS, LEVEL1, part, moves, md, WORDS, WORDS_FOR, MAPS } from '../../lib/method.mjs';
+import { href } from '../../lib/data.mjs';
 import { pageBySlug } from './_pages.mjs';
 
 export function getStaticPaths() {
@@ -19,17 +21,19 @@ export function getStaticPaths() {
 }
 const idea = IDEAS.find((i) => i.slug === Astro.params.idea);
 const page = pageBySlug(idea.slug);
-const doIt = part(idea, /^What you do/);
-const see = part(idea, /^What you'll see/);
-const mv = part(idea, /^The moves/);
+const instead = part(idea, /^Instead of$/);
+const you = part(idea, /^You$/);
+const mv = part(idea, /^The moves$/);
 const moveList = moves(mv?.text);
-const why = part(idea, /^Why it works/);
-const limits = part(idea, /^Limits/);
-const measure = part(idea, /^Measure/);
-// Anything else the section says ("Urgency when it is real", "Cover", "Progress, never points"...) belongs with how to do it.
-const known = /^(What you do|What you'll see|The moves|Why it works|Limits|Measure)$/;
+const working = part(idea, /^You'll know it's working when$/);
+const atlas = part(idea, /^In Keia Atlas$/);
+const why = part(idea, /^Why it works$/);
+const limits = part(idea, /^Limits$/);
+// Anything else the section says ("Urgency when it is real", "Cover", "Progress, never points"...) belongs with what you do.
+const known = /^(Instead of|You|The moves|You'll know it's working when|In Keia Atlas|Why it works|Limits)$/;
 const more = idea.parts.filter((p) => !known.test(p.label));
 const maps = WORDS_FOR(MAPS[idea.slug]);
+const step = LEVEL1.story.steps[idea.n - 1];
 const PICTURE = {
   'start-from-the-building': { title: 'The zoom: region to port', Comp: ZoomStrip },
   'capture-dont-ask': { title: 'Where each field came from', Comp: CaptureDemo },
@@ -39,38 +43,38 @@ const PICTURE = {
 }[idea.slug];
 const Pic = PICTURE.Comp;
 ---
-<MethodPage slug={idea.slug} title={idea.name} lede={idea.line.split(/(?<=\.)\s/)[0]} level={2} num={`${idea.num} · idea ${idea.n} of 5`} try={page.try}>
-  <div class="g12 top">
-    <div class="s-7 mp-left">
-    <section class="card pad mp-pic" aria-labelledby="pic-h">
-      <h2 id="pic-h">{PICTURE.title}</h2>
-      <Pic />
-    </section>
-    <Section title="How to do it">
-      <dl class="mp-parts">
-        {moveList ? moveList.map((x) => <div><dt>{x.move}</dt><dd set:html={md(x.meaning)} /></div>) : <div><dt>The moves</dt><dd set:html={md(mv.text)} /></div>}
-        {more.map((p) => <div><dt>{p.label}</dt><dd set:html={md(p.text)} /></div>)}
-      </dl>
-    </Section>
-    </div>
-    <SidePanel class="s-5" title="In one paragraph" meta={`Method ${idea.num}`} help="method.paragraph">
-      <div class="mp-side">
-        <IdeaArt idea={idea.slug} class="mp-art" />
-        <p set:html={md(doIt.text)} />
-        <h3>Worked example</h3>
-        <p class="mp-example" set:html={md(idea.example)} />
-        {see && <p set:html={md(see.text)} />}
+<MethodPage slug={idea.slug} title={idea.name} lede={idea.summary} level={2} num={`${idea.num} · idea ${idea.n} of 5`} try={page.try}>
+  <IdeaCard idea={idea} art />
+  {step && (
+    <p class="ip-story">In the morning story, this is {step.time}: <span set:html={md(step.text)} /> <a href={href(`/method/#st-${step.time.replace(':', '')}`)}>Read the story</a></p>
+  )}
+  <Section title="In full, with no software">
+    <dl class="mp-parts ip-parts">
+      <div><dt>Instead of</dt><dd set:html={md(instead.text)} /></div>
+      <div><dt>You</dt><dd set:html={md(you.text)} /></div>
+      <div><dt>The moves</dt><dd>{moveList
+        ? <ul class="ip-moves">{moveList.map((x) => <li><b>{x.move}</b> <span set:html={md(x.meaning)} /></li>)}</ul>
+        : <span set:html={md(mv.text)} />}</dd></div>
+      {more.map((p) => <div><dt>{p.label}</dt><dd set:html={md(p.text)} /></div>)}
+      <div><dt>You'll know it's working when</dt><dd set:html={md(working.text)} /></div>
+    </dl>
+  </Section>
+  <Section title="In Keia Atlas">
+    <div class="g12 top">
+      <section class="card pad s-7 mp-pic" aria-labelledby="pic-h">
+        <h2 id="pic-h">{PICTURE.title}</h2>
+        <Pic />
+      </section>
+      <div class="card pad s-5 mp-side ip-atlas">
+        <p set:html={md(atlas.text)} />
       </div>
-    </SidePanel>
-  </div>
+    </div>
+  </Section>
   <Section title="Why it works, and its limits">
     <dl class="mp-parts">
       <div><dt>Why it works</dt><dd set:html={md(why.text)} /></div>
       <div><dt>Limits</dt><dd set:html={md(limits.text)} /></div>
     </dl>
-  </Section>
-  <Section title="How to measure it">
-    <div class="mp-prose"><p set:html={md(measure.text)} /></div>
   </Section>
   <Section title="What it maps to">
     <div class="tablewrap card">
@@ -81,3 +85,11 @@ const Pic = PICTURE.Comp;
     </div>
   </Section>
 </MethodPage>
+
+<style>
+  .ip-story { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--text-2); max-width: 100ch; }
+  .ip-story a { white-space: nowrap; }
+  .ip-moves { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+  .ip-moves b { font-weight: 600; }
+  .ip-atlas p { font-size: 14.5px !important; }
+</style>
