@@ -23,7 +23,7 @@ export const GLOSSARY = [
   { id: 'lab', term: 'The Lab', def: 'Where new devices and firmware are tested before anyone installs them in a space.', to: '/lab/' },
   { id: 'advisory', term: 'Advisory', def: 'A warning attached to a model or a firmware version, such as "do not install version 5".' },
   { id: 'known-issue', term: 'Known error', def: 'A fault a manufacturer has published about its own firmware, with the versions it affects, any fix and any workaround. Keia Atlas reads them with the firmware list and shows which units run an affected version.', to: '/known-issues/' },
-  { id: 'maker-case', term: 'Manufacturer case', def: 'Something Aigna raised with a manufacturer through its support route, such as a fault that keeps coming back across the fleet. Keia Atlas prepares the evidence; a person sends it and records what the manufacturer says.', to: '/known-issues/#maker-cases' },
+  { id: 'maker-case', term: 'Manufacturer case', def: 'Something Aigna raised with a manufacturer through its support route, such as a fault that keeps coming back across the fleet. Keia Atlas prepares the evidence; a person sends it and records what the manufacturer says.', to: '/known-issues/#manufacturer-cases' },
   { id: 'change', term: 'Proposal', def: 'A proposed edit to Keia Atlas\'s knowledge, such as a standard, a setup guide or a playbook. Nothing changes until the owner approves it; then it shows everywhere.', to: '/changes/' },
   { id: 'approve', term: 'Approve', def: 'The owner of that piece of knowledge accepts a proposal. Keia Atlas keeps who approved what, and why.' },
   { id: 'service-manager', term: 'Service manager', def: 'Owns part of the standard, such as AV devices or the network, and approves changes to it.' },

@@ -30,4 +30,4 @@ export function supportStatus(ss, today) {
   return { state: 'ok', tone: 'ok', chip: null, text: `Until ${when}` };
 }
 
-export const PASSWORD_LABEL = { true: 'Yes', false: 'No: still the maker\'s default', undefined: 'Not recorded' };
+export const PASSWORD_LABEL = { true: 'Yes', false: 'No: still the manufacturer\'s default', undefined: 'Not recorded' };

@@ -226,7 +226,7 @@ The record follows a small canonical model (space, unit, model, service, person,
 
 Not yet part of the method. Each is written up and tried before it is added.
 
-1. **Measure and improve.** Every correction, captured fix and lesson is classified and routed to the profile, playbook or rule it improves; a monthly note per service on what changed because of what was learnt.
+1. **Measure and improve.** Every correction, captured fix and lesson is classified and routed to the device type, playbook or rule it improves; a monthly note per service on what changed because of what was learnt.
 2. **A friction budget.** One number per service, in the spirit of an error budget, that decides when to stop new work and fix.
 3. **Keeping knowledge true.** Owner, review date and expiry on every knowledge item; "still true?" at review; a known error asks "still happening?".
 4. **Welcome back.** A designed first screen after leave: what changed, what is yours, what was handled, with a lighter first day.

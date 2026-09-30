@@ -128,7 +128,7 @@ const rectOf = (pts) => [Math.min(...pts.map((p) => p[0])), Math.min(...pts.map(
 // What differs from the profile, in words, for the page and the 3D view's tooltip.
 export function variationsOf(space, type, geo) {
   const g = space.geometry ?? {}, prof = type?.keia_atlas?.geometry, out = [];
-  if (g.size_m && prof && (space.count ?? 1) === 1) out.push({ kind: 'size', text: `${g.size_m.width} × ${g.size_m.depth} m (profile ${prof.width_m} × ${prof.depth_m} m)` });
+  if (g.size_m && prof && (space.count ?? 1) === 1) out.push({ kind: 'size', text: `${g.size_m.width} × ${g.size_m.depth} m (space type ${prof.width_m} × ${prof.depth_m} m)` });
   if (g.mirror) out.push({ kind: 'mirror', text: 'Built the other way round' });
   if (g.door) out.push({ kind: 'door', text: `Door on the ${g.door.wall} wall, ${g.door.from_m} to ${g.door.to_m} m` });
   if (g.ceiling_m) out.push({ kind: 'ceiling', text: `Ceiling ${g.ceiling_m} m` });
