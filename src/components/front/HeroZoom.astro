@@ -88,16 +88,32 @@ const typeWord = (t) => spaceTypes[t]?.profile?.name ?? '';
 const peekOf = (r) => { const n = (r.positions ?? []).reduce((k, p) => k + (p.units?.length ?? 0), 0); return r.id === ROOM ? `Fault · video bar offline since ${STORY.since} · With ${STORY.who}` : `Fine · ${n === 1 ? '1 device' : `${n} devices`}`; };
 const floorIndex = Object.fromEntries(M.floors.map((f, i) => [f.id, i]));
 
-// The room drawings' materials, grouped for the scene (the index is hero3d's FURN list); what a far room keeps.
-const FURN_MAT = { table: 0, wood: 0, counter: 0, chair: 2, 'chair-back': 2, sofa: 4, 'sofa-back': 4, dev: 5, bezel: 5, router: 5, laptop: 5, 'led-wall': 5, deskmod: 5, board: 7, stone: 7, appliance: 7, printer: 7, 'printer-top': 7, leg: 8, 'chair-base': 8, leaf: 9, pot: 10 };
-const FAR_SKIP = new Set(['leg', 'chair-base', 'deskmod', 'router', 'laptop']);
+// The room drawings' materials, grouped for the scene (the index is hero3d's FURN list). Calm (Keith, 30 Sept): every
+// chair in one tone, no legs, bases or small kit in any room, and each table one clean shape (its parts joined).
+const FURN_MAT = { table: 0, wood: 0, counter: 0, chair: 2, 'chair-back': 2, sofa: 4, 'sofa-back': 4, dev: 5, bezel: 5, 'led-wall': 5, board: 7, stone: 7, appliance: 7, printer: 7, 'printer-top': 7, leaf: 9, pot: 10 };
 const NO_DRAWING = new Set(['mdf', 'idf', 'it-store', 'open-area']);
-// A box in a room's own frame (the profile's), stretched, mirrored and turned onto the plan, with the floor's level.
-const toPlan = (geo, level, x0, y0, z0, x1, y1, z1) => {
-  const pts = [[x0, y0], [x1, y0], [x0, y1], [x1, y1]].map(([x, y]) => geo.toFloor(geo.fromProfile([x, y, 0])));
-  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
-  return [r2(Math.min(...xs)), r2(Math.min(...ys)), r2(level + z0), r2(Math.max(...xs)), r2(Math.max(...ys)), r2(level + z1)];
-};
+// A part as the scene draws it: [floor index, material, 1 if in the story's room, z0, z1, x, y, x, y, ...], its outline
+// in the room's own frame (the profile's) stretched, mirrored and turned onto the plan, with the floor's level.
+// Millimetres, not centimetres: a screen stands 8 mm proud of its bezel, and rounding it to the centimetre would lay
+// the two faces in one plane (they would fight for the same pixels).
+const r3 = (v) => Math.round(v * 1000) / 1000;
+const part = (geo, fi, mi, story, level, pts, z0, z1) => [fi, mi, story ? 1 : 0, r3(level + z0), r3(level + z1), ...pts.flatMap(([x, y]) => geo.toFloor(geo.fromProfile([x, y, 0])).slice(0, 2).map(r3))];
+// A table drawn in pieces (the hybrid room's C-shaped table is ten) as one outline: the pieces' shared edges cancel
+// and what is left is chained into one loop. Null when the pieces do not make one simple outline.
+const areaOf = (P) => P.reduce((a, [x1, y1], i) => { const [x2, y2] = P[(i + 1) % P.length]; return a + x1 * y2 - x2 * y1; }, 0) / 2;
+function joined(polys) {
+  const key = ([x, y]: number[]) => `${Math.round(x * 1000)},${Math.round(y * 1000)}`;
+  const edges = new Map();
+  for (let P of polys) {
+    if (areaOf(P) < 0) P = [...P].reverse();
+    P.forEach((a, i) => { const b = P[(i + 1) % P.length], k = `${key(a)}|${key(b)}`, back = `${key(b)}|${key(a)}`; if (edges.has(back)) edges.delete(back); else edges.set(k, [a, b]); });
+  }
+  const from = new Map(); for (const e of edges.values()) from.set(key(e[0]), e);
+  if (from.size !== edges.size || !edges.size) return null;
+  const first = edges.values().next().value, out = [first[0]];
+  for (let at = first[1], n = 0; key(at) !== key(first[0]); n++) { if (n > edges.size) return null; out.push(at); const e = from.get(key(at)); if (!e) return null; at = e[1]; }
+  return out.length === edges.size ? out : null;
+}
 const furn = [];
 const storyDev = {};
 let booking = null;
@@ -106,18 +122,20 @@ for (const r of Object.values(M.rooms)) {
   const sp = spaces[r.id]; if (!sp?.option) continue;
   const fl = M.floors.find((f) => f.id === r.floor), fi = floorIndex[r.floor], isStory = r.id === ROOM;
   const drawn = isStory ? RM : buildRoom(sp.space_type, sp.option, roomItems(sp.option, { fitted: sp.fitted, space: sp }), { plugs: sites[SITE].mains?.plugs ?? null, country: sp.country ?? sites[SITE].country ?? null, fitted: sp.fitted, models });
-  let seat = 0, mustard = false;
+  const tables = new Map();
   for (const s of drawn.b.S) {
     if (s.ghost || s.outside || s.hid || s.mat === 'plate' || s.mat === 'floorbox') continue;
-    if (!isStory && FAR_SKIP.has(s.mat)) continue;
-    let mi = FURN_MAT[s.mat]; if (mi == null) continue;
-    if (s.mat === 'chair') { seat++; mustard = seat % 3 === 1; }
-    if ((s.mat === 'chair' || s.mat === 'chair-back') && mustard) mi = 3;
+    const mi = FURN_MAT[s.mat]; if (mi == null) continue;
     const { x0, x1, y0, y1 } = s.bb;
-    if (!isStory && (x1 - x0) * (y1 - y0) < 0.02) continue;
-    furn.push([fi, mi, ...toPlan(r.geo, fl.level_m, x0, y0, s.z0, x1, y1, s.z1)]);
+    if ((x1 - x0) * (y1 - y0) < 0.02) continue;
+    if (s.mat === 'table') { const k = `${s.z0}:${s.z1}`; if (!tables.has(k)) tables.set(k, []); tables.get(k).push(s); continue; }
+    furn.push(part(r.geo, fi, mi, isStory, fl.level_m, s.pts, s.z0, s.z1));
     // A display's lit screen, on the face towards the room.
-    if (s.mat === 'bezel') furn.push([fi, 6, ...toPlan(r.geo, fl.level_m, x0 + 0.02, y1, s.z0 + 0.02, x1 - 0.02, y1 + 0.004, s.z1 - 0.02)]);
+    if (s.mat === 'bezel') furn.push(part(r.geo, fi, 6, isStory, fl.level_m, [[x0 + 0.02, y1], [x1 - 0.02, y1], [x1 - 0.02, y1 + 0.008], [x0 + 0.02, y1 + 0.008]], s.z0 + 0.02, s.z1 - 0.02));
+  }
+  for (const list of tables.values()) {
+    const one = list.length > 1 ? joined(list.map((s) => s.pts)) : list[0].pts;
+    for (const pts of one ? [one] : list.map((s) => s.pts)) furn.push(part(r.geo, fi, 0, isStory, fl.level_m, pts, list[0].z0, list[0].z1));
   }
   if (isStory) {
     // Where each named device sits, for its ring and its label: a little in front of a wall device, above a table one.
@@ -165,7 +183,6 @@ const ring = (state, [cx, cy], r, sw) => ringParts(state, cx, cy, r, sw);
 const rb = Math.max(3.4, 0.42 * fb.k), rf = Math.max(5, 0.5 * ff.k);
 const P = (t, pts) => t.pts(pts);
 const CORE_WORD = { stair: 'Stairs', lift: 'Lifts', toilets: 'Toilets' };
-const KEY = [['meeting', 'Meeting rooms'], ['small', 'Small rooms'], ['shared', 'Shared and back of house'], ['desks', 'Desks']];
 ---
 <style is:global set:html={interiorCss()} />
 <div class="hz" data-hz>
@@ -239,7 +256,6 @@ const KEY = [['meeting', 'Meeting rooms'], ['small', 'Small rooms'], ['shared', 
     <div class="hz-labels" data-hz-labels aria-hidden="true"></div>
     <div class="hz-tag hz-hover" data-hz-hover hidden><b data-hz-hover-name></b><span data-hz-hover-state></span></div>
     <ul class="hz-key" data-hz-key aria-label="Key">
-      {KEY.map(([k, w]) => <li><i class={`hz-key-${k}`}></i>{w}</li>)}
       <li><i class="hz-key-ring"></i>Fine</li>
       <li><i class="hz-key-ring is-fault"></i>Fault</li>
     </ul>
@@ -492,12 +508,12 @@ const KEY = [['meeting', 'Meeting rooms'], ['small', 'Small rooms'], ['shared', 
     display: grid; gap: 14px; min-width: 0;
   }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .hz {
-    --hz-light: color-mix(in srgb, var(--surface) 70%, var(--in-slab)); --hz-glow: color-mix(in srgb, var(--in-lamp) 14%, transparent);
+    --hz-light: color-mix(in srgb, var(--surface) 70%, var(--in-slab)); --hz-glow: color-mix(in srgb, var(--in-lamp) 6%, transparent);
     --hz-top: #4A453E; --hz-east: #221F1B; --hz-north: #2E2A25; --hz-edge: rgba(255, 235, 210, .09); --hz-ground: rgba(0, 0, 0, .7);
     --hz-k-meeting: #434850; --hz-k-small: #48434F; --hz-k-shared: #4F4739;
   } }
   :root[data-theme="dark"] .hz {
-    --hz-light: color-mix(in srgb, var(--surface) 70%, var(--in-slab)); --hz-glow: color-mix(in srgb, var(--in-lamp) 14%, transparent);
+    --hz-light: color-mix(in srgb, var(--surface) 70%, var(--in-slab)); --hz-glow: color-mix(in srgb, var(--in-lamp) 6%, transparent);
     --hz-top: #4A453E; --hz-east: #221F1B; --hz-north: #2E2A25; --hz-edge: rgba(255, 235, 210, .09); --hz-ground: rgba(0, 0, 0, .7);
     --hz-k-meeting: #434850; --hz-k-small: #48434F; --hz-k-shared: #4F4739;
   }
@@ -563,42 +579,39 @@ const KEY = [['meeting', 'Meeting rooms'], ['small', 'Small rooms'], ['shared', 
   /* Words over the 3D scene (src/lib/hero-labels.mjs): positioned by transform, faded by opacity, nothing else. */
   .hz-labels { position: absolute; inset: 0; pointer-events: none; z-index: 2; transition: opacity var(--dur-morph) var(--ease-settle); }
   .hz-labels.is-under { opacity: 0; }
-  .hz-labels :global(.hz-lab) { position: absolute; left: 0; top: 0; display: grid; gap: 0; white-space: nowrap; text-align: center; font-size: 12px; line-height: 1.3; color: var(--text); opacity: 0; transition: opacity var(--dur-morph) var(--ease-settle); will-change: transform, opacity; }
-  .hz-labels :global(.hz-lab b) { font-weight: 600; }
-  .hz-labels :global(.hz-lab span) { color: var(--text-2); font-size: 11px; }
+  /* One line each, small and quiet: the name, and a state word only on the fault. Placed on whole pixels, faded in and out. */
+  .hz-labels :global(.hz-lab) { position: absolute; left: 0; top: 0; display: flex; align-items: baseline; gap: 5px; white-space: nowrap; text-align: center; font-size: 12px; line-height: 1.25; color: var(--text); opacity: 0; transition: opacity var(--dur-morph) var(--ease-settle); will-change: transform, opacity; }
+  .hz-labels :global(.hz-lab b) { font-weight: 550; }
+  .hz-labels :global(.hz-lab span) { color: var(--text-2); font-size: 11.5px; }
   .hz-labels :global(.hz-lab-site) { gap: 2px; }
   .hz-labels :global(.hz-lab-site b) { font-size: 19px; letter-spacing: -.012em; }
   .hz-labels :global(.hz-lab-site span) { font-size: 13px; }
   .hz-labels :global(.hz-lab-floor) { font-size: 12px; font-weight: 550; color: var(--text-2); }
   .hz-labels :global(.hz-lab-floor b) { font-weight: 550; }
-  .hz-labels :global(.hz-lab-room), .hz-labels :global(.hz-lab-dev) { padding: 4px 8px 5px; border-radius: 8px; background: color-mix(in srgb, var(--surface) 84%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent); }
-  .hz-labels :global(.hz-lab-room.is-fault), .hz-labels :global(.hz-lab-dev.is-fault) { background: var(--surface); box-shadow: var(--shadow-md); padding: 7px 11px; }
-  .hz-labels :global(.hz-lab-room.is-fault b), .hz-labels :global(.hz-lab-dev.is-fault b) { font-size: 13px; }
-  .hz-labels :global(.hz-lab-room.is-fault span), .hz-labels :global(.hz-lab-dev.is-fault span) { color: var(--h-fault-ink, var(--text-2)); }
-  .hz-labels :global(.hz-lab[data-ring] b::before) { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; border: 2px solid var(--h-fine, var(--green)); margin-right: 6px; vertical-align: 0; }
-  .hz-labels :global(.hz-lab[data-ring="fault"] b::before) { border-color: var(--h-fault, var(--red)); width: 8px; height: 8px; }
+  .hz-labels :global(.hz-lab-room), .hz-labels :global(.hz-lab-dev) { padding: 3px 8px 4px; border-radius: 999px; background: color-mix(in srgb, var(--surface) 68%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 45%, transparent); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+  .hz-labels :global(.hz-lab-room.is-fault), .hz-labels :global(.hz-lab-dev.is-fault) { background: color-mix(in srgb, var(--surface) 86%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 55%, transparent), 0 2px 8px rgba(0, 0, 0, .08); padding: 4px 10px 5px; }
+  .hz-labels :global(.hz-lab-room.is-fault b), .hz-labels :global(.hz-lab-dev.is-fault b) { font-size: 12.5px; font-weight: 600; }
+  .hz-labels :global(.hz-lab-room.is-fault span), .hz-labels :global(.hz-lab-dev.is-fault span) { color: var(--h-fault-ink, var(--text-2)); font-weight: 550; }
+  .hz-labels :global(.hz-lab[data-ring] b::before) { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; border: 1.5px solid var(--h-fine, var(--green)); margin-right: 5px; vertical-align: 0; }
+  .hz-labels :global(.hz-lab[data-ring="fault"] b::before) { border-color: var(--h-fault, var(--red)); width: 7px; height: 7px; border-width: 2px; }
+  .hz-labels :global(.hz-lab[data-ring="fault"] span::before) { content: "·"; margin-right: 5px; color: var(--text-3); }
   .hz-labels :global(.hz-lab-room.is-small span) { display: none; }
-  .hz-labels :global(.hz-lab-core) { font-size: 10.5px; font-weight: 550; letter-spacing: .03em; color: var(--text-3); }
+  .hz-labels :global(.hz-lab-core) { font-size: 10px; font-weight: 550; letter-spacing: .04em; text-transform: uppercase; color: var(--text-3); opacity: 0; }
+  .hz-labels :global(.hz-lab-core.is-on) { opacity: .7 !important; }
   .hz-labels :global(.hz-lab-core b) { font-weight: 550; }
-  .hz-labels :global(.hz-lab-area) { font-size: 10.5px; color: var(--text-3); }
-  .hz-labels :global(.hz-lab-area b) { font-weight: 500; font-style: italic; }
   .hz-labels :global(.hz-lab-booking) { padding: 3px 9px; border-radius: 999px; background: color-mix(in srgb, var(--surface) 84%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent); }
   .hz-labels :global(.hz-lab-booking b) { font-weight: 550; color: var(--text-2); }
-  .hz-labels :global(.hz-lab-person) { grid-auto-flow: column; align-items: center; gap: 6px; transform-origin: 50% 100%; }
+  .hz-labels :global(.hz-lab-person) { align-items: center; gap: 5px; transform-origin: 50% 100%; }
   .hz-labels :global(.hz-lab-person b) { font-weight: 550; font-size: 11.5px; }
-  .hz-labels :global(.hz-lab-person span) { font-size: 10.5px; }
-  .hz-labels :global(.hz-lab-person.is-story) { padding: 3px 9px 3px 3px; border-radius: 999px; background: color-mix(in srgb, var(--surface) 88%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent); text-align: left; }
-  .hz-labels :global(.hz-lab-person.is-story > b) { grid-row: 1; }
-  .hz-labels :global(.hz-lab-person.is-story > span) { grid-row: 2; grid-column: 2; }
-  .hz-labels :global(.hz-lab-person.is-story > i) { grid-row: 1 / 3; }
-  .hz-labels :global(.hz-lab-av) { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--surface-3); color: var(--text); font: 600 9.5px/1 var(--font-sans); font-style: normal; letter-spacing: .02em; box-shadow: 0 0 0 2px var(--surface), 0 2px 6px rgba(0, 0, 0, .18); }
+  .hz-labels :global(.hz-lab-person span) { font-size: 11px; }
+  .hz-labels :global(.hz-lab-person.is-story) { padding: 2px 9px 2px 2px; border-radius: 999px; background: color-mix(in srgb, var(--surface) 68%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 45%, transparent); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); text-align: left; }
+  .hz-labels :global(.hz-lab-av) { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--surface-3); color: var(--text); font: 600 8.5px/1 var(--font-sans); font-style: normal; letter-spacing: .02em; box-shadow: none; }
   /* The key: what the tones mean, shown at the floor level. */
-  .hz-key { position: absolute; left: 14px; bottom: 12px; margin: 0; padding: 8px 10px; list-style: none; display: grid; gap: 4px; border-radius: 10px; background: color-mix(in srgb, var(--surface) 84%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent); font-size: 11px; color: var(--text-2); pointer-events: none; opacity: 0; transition: opacity var(--dur-morph) var(--ease-settle); z-index: 2; }
+  .hz-key { position: absolute; left: 14px; bottom: 12px; margin: 0; padding: 4px 10px; list-style: none; display: flex; gap: 12px; border-radius: 999px; background: color-mix(in srgb, var(--surface) 68%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 45%, transparent); font-size: 11px; color: var(--text-2); pointer-events: none; opacity: 0; transition: opacity var(--dur-morph) var(--ease-settle); z-index: 2; }
   .hz-key.is-on { opacity: 1; }
   .hz-key li { display: flex; align-items: center; gap: 7px; }
-  .hz-key i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12); }
-  .hz-key-meeting { background: var(--in-room-floor); box-shadow: inset 0 0 0 1px var(--in-frame) !important; } .hz-key-small { background: var(--in-room-floor); } .hz-key-shared { background: var(--in-corr); } .hz-key-desks { background: var(--in-oak); }
-  .hz-key-ring { border-radius: 50% !important; box-shadow: none !important; border: 2px solid var(--h-fine, var(--green)); width: 9px !important; height: 9px !important; }
+  .hz-key i { display: inline-block; }
+  .hz-key-ring { border-radius: 50%; border: 1.5px solid var(--h-fine, var(--green)); width: 8px; height: 8px; }
   .hz-key-ring.is-fault { border-color: var(--h-fault, var(--red)); border-style: dashed; }
   .hz-3d:not(.is-on) ~ .hz-key { display: none; }
   .hz { gap: 10px; }
