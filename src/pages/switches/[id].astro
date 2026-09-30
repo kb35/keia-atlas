@@ -1,0 +1,290 @@
+---
+// One switch (a comms room switch or an in-room AV switch), in the record shape every object has (UI-V2 §2):
+//   band     the kind, where it is, the platform it is read from, the answer (how many ports are in use and whether
+//            any is off the VLAN plan) and four figures
+//   picture  the front of the switch: every port, coloured by its VLAN with its number printed, parked ports
+//            dashed and disabled ones plain; each port opens what is plugged into it. The key sits under it.
+//   record   the ports to review, every port in use (far end, mode, VLAN, the plan check, Change VLAN), the
+//            Change VLAN form, If this were off, and the switch as recorded
+// The switch-port data is recorded for the demo (data/switch-ports); a VLAN change is recorded as simulated and
+// would be applied by the platform's connector and read back. Nothing is sent to a switch.
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import Section from '../../components/Section.astro';
+import SidePanel from '../../components/SidePanel.astro';
+import HealthGlyph from '../../components/HealthGlyph.astro';
+import BlastRadius from '../../components/BlastRadius.astro';
+import LiveBar from '../../components/LiveBar.astro';
+import SourceMark from '../../components/SourceMark.astro';
+import Restricted from '../../components/Restricted.astro';
+import { allSwitches, siteNet, switchPath } from '../../lib/switchports.mjs';
+import { explorerFor, BLAST_NOW } from '../../lib/blast-view.mjs';
+import { href, sites, spaces, plural } from '../../lib/data.mjs';
+import { readSwitchPorts, rangeText } from '../../lib/switchcore.mjs';
+import { stringify } from 'yaml';
+import '../../styles/vlan.css';
+
+export function getStaticPaths() { return allSwitches().map((s) => ({ params: { id: s.id } })); }
+const s = allSwitches().find((x) => x.id === Astro.params.id);
+const N = siteNet(s.site);
+const site = sites[s.site];
+const room = spaces[s.space];
+const roomLabel = room ? `${room.number ? `${room.number} ` : ''}${room.name}` : s.space;
+const to = (t) => (t ? href(`/${t.path}`) + (t.q ?? '') + (t.hash ?? '') : null);
+const nameOf = (v) => N.plan.find((p) => p.vlan === v)?.name ?? null;
+const vlVar = (v) => (v == null ? 'var(--vl-off)' : [10, 20, 30, 31, 40, 50, 60, 70, 90].includes(v) ? `var(--vl-${v})` : 'var(--text)');
+
+// The figures and the answer.
+const used = s.ports.filter((p) => p.state === 'active');
+const parked = s.ports.filter((p) => p.state === 'parked');
+const off = s.ports.filter((p) => p.state === 'disabled');
+const review = s.ports.filter((p) => p.check.ok === false);
+const NUMBERS = [
+  { n: used.length, label: 'In use', to: '#ports' },
+  { n: parked.length, label: 'Parked', to: '#ports' },
+  { n: off.length, label: 'Disabled', to: '#front' },
+  { n: review.length, label: 'To review', to: review.length ? '#to-review' : '#ports', tone: review.length ? 'warn' : undefined },
+];
+const r0 = review[0];
+const ANSWER = review.length
+  ? `${r0.far?.title?.split(' · ')[0] ?? `Port ${r0.port}`}, ${r0.word}: ${r0.check.why.replace(/\.$/, '').replace(/^P/, 'p')}${review.length > 1 ? ` · ${review.length - 1} more to review` : ''}`
+  : `${plural(used.length, 'port')} in use, each on the VLAN the plan gives it`;
+const AUTH = { dot1x: '802.1X', mab: 'MAC check (MAB)' };
+const AUTH_SHORT = { dot1x: 'X', mab: 'M' };
+const where = s.where === 'rack' ? `${roomLabel}, ${s.rackName}, U${s.u}` : roomLabel;
+
+// The front: the main block of ports in two rows (odd on top), then any more ports (uplinks) in a row of their own.
+const main = s.where === 'rack' ? (s.count >= 48 ? 48 : 24) : s.ports.length;
+const front = s.ports.slice(0, main).map((p, i) => ({ p, c24: Math.floor(i / 2) + 1, r24: (i % 2) + 1, c12: (Math.floor(i / 2) % 12) + 1, r12: (i % 2) + 1 + 2 * Math.floor(Math.floor(i / 2) / 12) }));
+const extra = s.ports.slice(main);
+const oneRow = s.where === 'room';
+const cellLabel = (p) => `${p.word[0].toUpperCase()}${p.word.slice(1)}: ${p.state === 'active' ? `${p.far?.title ?? 'nothing recorded'} · ${p.vlanWords}${p.auth ? ` · ${AUTH[p.auth]}` : ''}` : p.state === 'parked' ? `parked, ${p.far?.sub ?? ''}` : 'disabled'}${p.check.ok === false ? ` · to review: ${p.check.why}` : ''}`;
+const vShort = (p) => (p.state === 'active' ? String(p.native) : p.state === 'parked' ? 'P' : '–');
+const onSwitch = [...new Set(used.map((p) => p.native))].sort((a, b) => a - b);
+
+// For the form: the VLANs a port may go on (the plan, never VLAN 1), and each port's facts and what a change touches.
+const planVlans = N.plan.map((p) => ({ v: p.vlan, name: p.name, routed: p.routed }));
+const PORTS = s.ports.filter((p) => p.state !== 'disabled' || p.f).map((p) => ({
+  p: p.port, slug: p.slug, word: p.word, state: p.state, mode: p.mode, native: p.native, tagged: p.tagged,
+  far: p.far?.title ?? '', place: p.far?.place ?? '', unit: p.far?.unit?.name ?? null, ok: p.check.ok, why: p.check.why, rule: p.check.rule,
+  plan: p.check.want ?? null, what: p.check.what ?? null, inRoom: s.where === 'room', drift: p.drift, seen: p.seen?.native ?? null,
+  impact: p.impact,
+}));
+const DATA = JSON.stringify({ sw: s.id, label: s.label, platform: s.platformName, platformShort: s.platformShort, site: s.site, ports: PORTS, plan: planVlans, blast: s.where === 'rack' });
+
+// If this were off: a comms room switch's own explorer (port by port); an in-room switch takes its space off.
+const ex = s.where === 'rack' ? explorerFor(s.site, { kind: 'item', rack: s.rack, u: s.u, key: `${s.rack}-u${s.u}` }) : explorerFor(s.site, { kind: 'touch', key: `sw-${s.id}`, spaces: [s.space], title: `${s.id}, the in-room switch` });
+
+// The switch as recorded, in NetBox's names.
+const recorded = readSwitchPorts()[s.site].switches.find((x) => x.id === s.id);
+const RAW = stringify(recorded, { lineWidth: 0, flowCollectionPadding: true, collectionStyle: 'block' });
+const crumbs = [{ label: 'Locations', to: '/locations/' }, { label: site.name, to: `/locations/${s.site}/` }, { label: roomLabel, to: `/rooms/${s.space}/` }, { label: s.id }];
+const unitTo = s.tag ? `/device/?tag=${s.tag}` : null;
+---
+<Shell about={{ kind: 'switch', label: `${s.id}, ${site.name}`, to: `/${switchPath(s.id)}` }} title={`${s.id} · ${s.label}`} section="devices" crumbs={crumbs}>
+  <PageBand overline={s.where === 'rack' ? 'Switch' : 'In-room switch'} title={s.id} answer={ANSWER} numbers={NUMBERS} sim>
+    <Fragment slot="overline">
+      <span class="code">{site.code}</span>
+      <span>{where}</span>
+      <SourceMark from={s.platformName} at={s.read} synced={`read ${s.read.slice(11, 16)}`} />
+    </Fragment>
+  </PageBand>
+
+  <div class="content swp-page" data-swp={DATA}>
+    <LiveBar page={`switch:${s.id}`} />
+    <div class="g12 top">
+      <section class="card pad s-12 swp-front" id="front" aria-labelledby="swp-front-h">
+        <header class="swp-h">
+          <h2 id="swp-front-h" data-help="switch.grid">The ports</h2>
+          <span class="faint">{s.product ?? 'Model not recorded'} · {plural(s.count, 'port')}</span>
+        </header>
+        <div class="swp-face">
+          <div class:list={['swp-grid', { 'one-row': oneRow }]} style={oneRow ? `--cols:${main};--cols-sm:${Math.min(main, 6)}` : `--cols:${main / 2};--cols-sm:${Math.min(12, main / 2)}`} role="list" aria-label={`The ports of ${s.id}`}>
+            {front.map(({ p, c24, r24, c12, r12 }) => {
+              const link = p.far?.to ? to(p.far.to) : null;
+              const Tag = link ? 'a' : 'span';
+              return (
+                <Tag role="listitem" class:list={['swp-port', { 'vl-hatch': p.native === 90 && p.state === 'active' }]} href={link} data-state={p.state} data-port={p.slug} data-vl={p.native ?? ''}
+                  style={`--vl:${p.state === 'active' ? vlVar(p.native) : 'transparent'};--c24:${oneRow ? c24 * 2 - 1 + r24 - 1 : c24};--r24:${oneRow ? 1 : r24};--c12:${oneRow ? 'auto' : c12};--r12:${oneRow ? 'auto' : r12}`}
+                  aria-label={cellLabel(p)} title={cellLabel(p)}>
+                  <span class="swp-n">{p.word.replace(/^port /, '').toUpperCase()}</span>
+                  <span class="swp-v">{vShort(p)}{p.auth && <span class="swp-a" aria-hidden="true">{AUTH_SHORT[p.auth]}</span>}</span>
+                  {p.check.ok === false && <span class="swp-g"><HealthGlyph state="review" size={12} title={p.check.why} /></span>}
+                </Tag>
+              );
+            })}
+          </div>
+          {extra.length > 0 && (
+            <>
+              <p class="swp-sub">Ports {extra[0].port} to {extra[extra.length - 1].port}{s.uplinks.length ? ' · uplinks' : ''}</p>
+              <div class="swp-grid one-row" style={`--cols:${oneRow ? main : main / 2};--cols-sm:${oneRow ? Math.min(main, 6) : Math.min(12, main / 2)}`} role="list" aria-label="More ports">
+                {extra.map((p, i) => {
+                  const link = p.far?.to ? to(p.far.to) : null;
+                  const Tag = link ? 'a' : 'span';
+                  return (
+                    <Tag role="listitem" class="swp-port" href={link} data-state={p.state} data-port={p.slug} data-vl={p.native ?? ''} style={`--vl:${p.state === 'active' ? vlVar(p.native) : 'transparent'};--c24:${i + 1};--r24:1;--c12:auto;--r12:auto`} aria-label={cellLabel(p)} title={cellLabel(p)}>
+                      <span class="swp-n">{p.port}</span>
+                      <span class="swp-v">{p.state === 'active' && p.mode === 'trunk' ? 'T' : vShort(p)}</span>
+                      {p.check.ok === false && <span class="swp-g"><HealthGlyph state="review" size={12} title={p.check.why} /></span>}
+                    </Tag>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+        <ul class="swp-key" data-help="switch.key" aria-label="Key">
+          {onSwitch.map((v) => <li><span class:list={['vl-sw', { 'vl-hatch': v === 90 }]} style={`--vl:${vlVar(v)}`}></span><b class="vl-n">{v}</b> {nameOf(v) ?? 'Not in the plan'}</li>)}
+          {extra.some((p) => p.mode === 'trunk') && <li><b class="vl-n">T</b> Trunk: several VLANs, tagged</li>}
+          {used.some((p) => p.auth) && <li><b class="vl-n swp-a">X</b> 802.1X · <b class="vl-n swp-a">M</b> MAC check (MAB)</li>}
+          <li><span class="vl-sw parked"></span><b class="vl-n">P</b> Parked: patched, nothing plugged in</li>
+          <li><span class="vl-sw disabled"></span><b class="vl-n">–</b> Disabled: nothing patched</li>
+          {review.length > 0 && <li><HealthGlyph state="review" size={12} /> To review: the switch differs from the plan</li>}
+        </ul>
+        <p class="faint swp-foot"><Restricted view="rack" /> Recorded for the demo, as {s.platformName} would report it. Select a port to open what is plugged into it.</p>
+      </section>
+
+      <SidePanel class="s-12 swp-side" title="This switch" help="switch.facts" sticky={false}>
+        <dl class="swp-facts">
+          <div><dt>Where</dt><dd><a href={href(`/rooms/${s.space}/`)}>{roomLabel}</a>{s.where === 'rack' ? `, ${s.rackName}, U${s.u}` : ''}</dd></div>
+          <div><dt>What</dt><dd>{s.label}{s.product ? ` · ${s.product}` : ''}</dd></div>
+          <div><dt>Run from</dt><dd>{s.platformName} <span class="faint">(its connector would read and set it)</span></dd></div>
+          {s.group && <div><dt>Acts as one with</dt><dd>{s.group.members.filter((m) => m !== s.id).map((m, i) => <>{i ? ', ' : ''}<a href={href(`/${switchPath(m)}`)}>{m}</a></>)} <span class="faint">({s.group.kindWord}): a change to one is a change to both</span></dd></div>}
+          <div><dt>Unit record</dt><dd>{unitTo ? <a href={href(unitTo)}>{s.tag}</a> : <span class="faint">None yet: the comms room's space type names one access switch</span>}</dd></div>
+          <div><dt>PoE</dt><dd>{s.poe ? <><span class="swp-poe" role="img" aria-label={`${Math.round(s.poe.share * 100)} percent of the budget in use`}><i style={`width:${Math.min(100, Math.round(s.poe.share * 100))}%`}></i></span><span class="num">{s.poe.used} W</span> of {s.poe.words}{s.poe.unknown ? <span class="faint"> · {plural(s.poe.unknown, 'unit')} with no figure, not counted</span> : ''}</> : <span class="faint">No PoE budget recorded for this model</span>}</dd></div>
+          <div><dt>VLANs here</dt><dd class="swp-vls">{onSwitch.map((v) => <span class="vl"><span class:list={['vl-sw', { 'vl-hatch': v === 90 }]} style={`--vl:${vlVar(v)}`}></span><span class="vl-n">{v}</span></span>)}</dd></div>
+          <div><dt>Office VLANs</dt><dd><a href={href(`/rooms/${N.switches.find((x) => x.where === 'rack')?.space ?? s.space}/#vlans`)}>Prefixes and members at {site.name}</a></dd></div>
+        </dl>
+      </SidePanel>
+    </div>
+
+    {review.length > 0 && (
+      <Section title="To review" id="to-review" help="switch.review" aside={plural(review.length, 'port')}>
+        <ul class="card swp-rev">
+          {review.map((p) => (
+            <li>
+              <HealthGlyph state="review" size={16} word="To review" />
+              <div><b><a href={`#${p.slug}`}>{p.word[0].toUpperCase() + p.word.slice(1)}</a> · {p.far?.title}</b>{p.far?.place && <span class="faint"> · {p.far.place}</span>}<p>{p.check.why}</p></div>
+              <button type="button" class="btn small" data-vlan-open={p.slug} data-help="vlan.change">Change VLAN</button>
+            </li>
+          ))}
+        </ul>
+      </Section>
+    )}
+
+    <section class="card pad swp-form" id="change-vlan" data-vlan-form hidden aria-labelledby="vf-h" data-help="vlan.form" tabindex="-1">
+      <header class="swp-h"><h2 id="vf-h">Change VLAN · <span data-vf-port></span></h2><span class="sim-t is-sim">Simulated</span></header>
+      <p class="vf-now" data-vf-now></p>
+      <form data-vf novalidate>
+        <div class="vf-row">
+          <label class="vf-f"><span>New VLAN</span>
+            <select data-vf-vlan required>{planVlans.map((v) => <option value={v.v}>{v.v} {v.name}</option>)}</select>
+          </label>
+          <label class="vf-f vf-why"><span>Reason</span>
+            <input type="text" data-vf-why required maxlength="160" placeholder="Why, in a line" autocomplete="off" />
+          </label>
+        </div>
+        <p class="vf-plan" data-vf-plan></p>
+        <div class="vf-blast">
+          <h3>What it touches</h3>
+          <p data-vf-touch></p>
+          <p class="faint" data-vf-meet></p>
+          <p data-vf-group hidden></p>
+          {s.where === 'rack' && <button type="button" class="btn small ghost" data-vf-see data-help="vlan.plan-link">See it on the plan</button>}
+        </div>
+        <p class="vf-ap"><b data-vf-ap></b> <span class="faint" data-vf-ap-why></span></p>
+        <p class="vf-err" data-vf-err hidden role="alert"></p>
+        <div class="vf-do">
+          <button type="submit" class="btn primary" data-vf-go>Record the change</button>
+          <button type="button" class="btn ghost" data-vf-cancel>Cancel</button>
+        </div>
+        <p class="faint vf-foot">In the demo the change is recorded, not made: in a live setup {s.platformName} would set the port, then read it back to confirm. Nothing is sent to a switch.</p>
+      </form>
+      <div class="vf-done" data-vf-done hidden aria-live="polite"></div>
+    </section>
+
+    <Section title="Every port in use" id="ports" help="switch.ports" aside={`${plural(used.length, 'in use')}, ${parked.length} parked${off.length ? `, ${off.length} disabled` : ''}`}>
+      <div class="tablewrap card">
+        <table class="stack-sm swp-t">
+          <thead><tr><th scope="col">Port</th><th scope="col">On it</th><th scope="col">Mode</th><th scope="col">VLAN</th><th scope="col">Plan</th><th scope="col"><span class="sr-only">Change</span></th></tr></thead>
+          <tbody>
+            {s.ports.filter((p) => p.state !== 'disabled').map((p) => (
+              <tr id={p.slug} data-row={p.slug}>
+                <th scope="row" class="mono">{p.word[0].toUpperCase() + p.word.slice(1)}</th>
+                <td>{p.far?.to ? <a href={to(p.far.to)}>{p.far.title}</a> : p.far?.title}{(p.far?.place || p.far?.sub) && <small class="swp-sub2">{[p.far.place, p.far.sub].filter(Boolean).join(' · ')}</small>}</td>
+                <td data-label="Mode">{p.state === 'parked' ? 'Shut' : p.mode === 'trunk' ? `Trunk, tagged ${p.tagged.join(', ')}` : 'Access'}{p.auth && <small class="swp-sub2">{AUTH[p.auth]}</small>}</td>
+                <td data-label="VLAN" data-cell-vlan><span class="vl"><span class:list={['vl-sw', { 'vl-hatch': p.native === 90 }]} style={`--vl:${p.state === 'active' ? vlVar(p.native) : 'transparent'}`}></span><span>{p.state === 'active' ? `Planned ${p.vlanWords.replace(/^VLAN/, 'VLAN')}` : p.vlanWords}</span></span>{p.seenWords && <small class="swp-sub2">Switch reports: {p.seenWords.replace(/^seen /, '')}</small>}</td>
+                <td data-label="Plan" data-cell-check>{p.check.ok === false ? <HealthGlyph state="review" size={16} word="To review" title={p.check.why} /> : p.check.ok === true ? <span class="faint">{p.state === 'parked' ? 'Parked' : 'As planned'}</span> : <span class="faint">Not in the plan</span>}{p.check.ok === false && <small class="swp-sub2">{p.check.why}</small>}</td>
+                <td><button type="button" class="btn small" data-vlan-open={p.slug} data-help="vlan.change">Change VLAN</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {off.length > 0 && <p class="faint swp-off">Disabled, nothing patched: {s.where === 'rack' ? rangeText(off.map((p) => p.port)).replace(/,/g, ', ').replace(/-/g, ' to ') : off.map((p) => p.word).join(', ')}.</p>}
+    </Section>
+
+    {ex && <BlastRadius targets={[ex]} now={BLAST_NOW} title="If this were off" lede={s.where === 'rack' ? 'What this switch would cut off, worked out from the recorded patching. Press a port to narrow it.' : 'The space this switch serves.'} />}
+
+    <Section title="As recorded" id="raw" help="switch.raw" aside="NetBox's names">
+      <details class="card pad swp-raw"><summary>The switch's record, with every interface's cable trace</summary><pre class="mono">{RAW}</pre></details>
+    </Section>
+  </div>
+</Shell>
+
+<script>
+  import { mountVlanForm } from '../../lib/vlan-client.mjs';
+  mountVlanForm();
+  document.addEventListener('astro:page-load', mountVlanForm);
+</script>
+
+<style is:global>
+  .swp-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .swp-h h2 { margin: 0; }
+  .swp-face { display: grid; gap: 10px; }
+  .swp-sub { margin: 4px 0 0; font-size: var(--fs-code); color: var(--text-3); }
+  .swp-front .swp-key { margin-top: 14px; }
+  .swp-foot { margin: 10px 0 0; font-size: var(--fs-code); }
+  .swp-facts { margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); column-gap: 28px; }
+  .swp-facts > div { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); font-size: var(--fs-support); }
+  .swp-facts > div:first-child { border-top: 0; }
+  @container content (min-width: 700px) { .swp-facts > div:nth-child(-n+2) { border-top: 0; } }
+  .swp-facts dt { color: var(--text-3); }
+  .swp-facts dd { margin: 0; overflow-wrap: anywhere; }
+  .swp-vls { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+  .swp-rev { list-style: none; margin: 0; padding: 0; }
+  .swp-rev li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 12px 16px; border-top: 1px solid var(--line); }
+  .swp-rev li:first-child { border-top: 0; }
+  .swp-rev p { margin: 2px 0 0; font-size: var(--fs-support); color: var(--text-2); }
+  .swp-t { width: 100%; border-collapse: collapse; }
+  .swp-t th, .swp-t td { text-align: left; vertical-align: top; padding: 10px 12px; border-top: 1px solid var(--line); font-size: var(--fs-support); }
+  .swp-t thead th { border-top: 0; font: 500 var(--fs-overline)/1.2 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+  .swp-t tbody th { font: 500 var(--fs-code)/1.4 var(--font-mono); text-transform: none; letter-spacing: 0; color: var(--text); white-space: nowrap; }
+  .swp-t tr.is-on { background: var(--accent-soft); }
+  .swp-t tr:target { background: var(--accent-soft); }
+  .swp-sub2 { display: block; margin-top: 2px; color: var(--text-3); font-size: var(--fs-code); }
+  .swp-off { margin: 10px 0 0; font-size: var(--fs-code); }
+  .swp-poe { display: block; width: 100%; height: 6px; margin: 4px 0 6px; border-radius: 3px; background: var(--surface-3); overflow: hidden; }
+  .swp-poe i { display: block; height: 100%; background: var(--text-2); }
+  .swp-raw summary { cursor: pointer; font-size: var(--fs-support); }
+  .swp-raw pre { margin: 12px 0 0; font-size: var(--fs-code); white-space: pre-wrap; overflow-wrap: anywhere; }
+  /* The form */
+  .swp-form[hidden] { display: none; }
+  .swp-form { border: 1px solid var(--line-strong); }
+  .swp-form .vf-now { margin: 0 0 12px; font-size: var(--fs-body); }
+  .vf-row { display: grid; grid-template-columns: minmax(180px, 260px) minmax(0, 1fr); gap: 12px; }
+  @container content (max-width: 559px) { .vf-row { grid-template-columns: minmax(0, 1fr); } }
+  .vf-f { display: grid; gap: 4px; font-size: var(--fs-code); color: var(--text-2); }
+  .vf-f select, .vf-f input { font: 400 var(--fs-body)/1.3 var(--font-sans); min-height: 44px; padding: 8px 10px; border-radius: var(--radius); border: 1.5px solid var(--line-strong); background: var(--surface); color: var(--text); width: 100%; }
+  .vf-plan { margin: 10px 0 0; font-size: var(--fs-support); color: var(--text-2); }
+  .vf-blast { margin: 14px 0 0; padding: 12px 14px; border-radius: var(--radius); background: var(--surface-2); }
+  .vf-blast h3 { margin: 0 0 4px; font-size: var(--fs-support); }
+  .vf-blast p { margin: 2px 0; font-size: var(--fs-support); }
+  .vf-blast .btn { margin-top: 8px; }
+  .vf-ap { margin: 12px 0 0; font-size: var(--fs-support); }
+  .vf-err { margin: 8px 0 0; color: var(--h-review-ink); font-size: var(--fs-support); }
+  .vf-do { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .vf-foot { margin: 10px 0 0; font-size: var(--fs-code); }
+  .vf-done { font-size: var(--fs-support); }
+  .vf-done p { margin: 4px 0; }
+</style>

@@ -92,7 +92,8 @@ const CLASS_WORDS = {
   'network-switch': ['switch', 'network switch', 'poe switch', 'room switch'],
   'signage-player': ['signage', 'digital signage', 'media player'],
   printer: ['mfp', 'copier'],
-  'security-device': ['security', 'access control', 'badge reader'],
+  'security-device': ['security', 'access control', 'badge reader', 'door controller', 'cctv'],
+  'building-sensor': ['sensor', 'building sensor', 'bms', 'environment sensor'],
   'scheduler-panel': ['scheduler', 'booking panel', 'room booking panel', 'door panel'],
   'desk-video-device': ['desk video', 'personal video'],
 };

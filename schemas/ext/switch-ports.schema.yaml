@@ -1,68 +1,117 @@
-# Switch ports at a site: the site's VLAN table (subnet and gateway per VLAN), and how every port on every switch is
-# set, as the switch platform (UniFi, Meraki or Netgear) reports it: state, mode, native VLAN, tagged VLANs, and what
-# is on its far end. One file per site (data/switch-ports/<site>.yaml). Made up for the demo.
+# Switch ports at a site: the site's VLANs with their prefixes, the groups of network kit that act as one, and every
+# interface on every switch as the switch platform (UniFi, Meraki or Netgear) reports it: enabled, mode, untagged and
+# tagged VLANs, and what it is connected to. One file per site (data/switch-ports/<site>.yaml). Made up for the demo.
 #
-# The far end names each link of the chain (run, patch cord, unit and its port), so the file reads on its own; the
-# validator (tools/crossrefs-switchports.mjs) checks every name against the room wiring, the runs and the patch cords,
-# so the chain is recorded once and can never disagree with them. Whether a port follows the VLAN plan is not a
-# validation error: it is a finding the pages show ("To review"), because a real switch can be set wrong.
+# Shaped so NetBox can fill it later without a remodel (docs/connectors/netbox-ports.md has the mapping):
+#   vlan_group + vlans      NetBox VLAN group (scoped to the site) and its VLANs; prefix and gateway are IPAM
+#                           prefixes (with the VLAN's role) and the gateway's IP address
+#   groups                  NetBox virtual chassis (a stack, a StackWise Virtual pair); an HA gateway pair and a
+#                           cluster are the same idea with another kind
+#   switches                NetBox devices (role switch) with their interfaces: name, enabled, mode (access or
+#                           tagged), untagged_vlan, tagged_vlans
+#   connected               the interface's cable trace, as NetBox computes it (connected endpoints): the cables on
+#                           the way, in order (patch cord, permanent link), and the device and interface at the end.
+#                           The validator (tools/crossrefs-switchports.mjs) recomputes it from data/cables, data/runs
+#                           and the room wiring, so it is a checked copy, never a second truth.
+#   seen                    what the switch platform reports, where it differs from the record: the record is the
+#                           plan (decided), seen is observed. A difference is a drift finding on the pages ("planned
+#                           VLAN 30, seen VLAN 20"), never an overwrite.
+#   auth                    how the port admits a device (the standard's 802-1x rule): dot1x for staff desks, mab (the
+#                           MAC address checked against the device's record) for room devices; none on trunks
+#   addresses               IPAM IP addresses: each networked unit's address in its VLAN's prefix, its MAC (a field on
+#                           the interface in NetBox 4.2), its DNS name and how it gets it (a DHCP reservation, or static)
+#   source                  the connector model's source mark (docs/connectors/model.md), for a value NetBox or a
+#                           switch platform filled
+# Whether a port follows the VLAN plan is not checked here: it is a finding the pages show (To review), because a real
+# switch can be set wrong.
 $schema: https://json-schema.org/draft/2020-12/schema
 $id: https://kb35.github.io/keia-atlas/schemas/ext/switch-ports
 title: Switch ports at a site
 type: object
 additionalProperties: false
-required: [site, read_at, vlans, switches, demo]
+required: [site, vlan_group, read_at, vlans, switches, demo]
 $defs:
-  vlan: { type: integer, minimum: 1, maximum: 4094 }
-  portId:
-    description: A port number on a rack switch (1, 49), or a port id from the model on an in-room switch (lan-9).
+  vid: { type: integer, minimum: 1, maximum: 4094 }
+  ifname:
+    description: An interface name. A port number on a comms room switch (1, 49), or the port id from the model on an in-room switch (lan-9).
     oneOf:
       - { type: integer, minimum: 1 }
       - { type: string, pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
-  far:
+  mark: { $ref: "../connectors/common#/$defs/mark" }
+  connected:
     description: >
-      What the port reaches. A room outlet or access point: run (its permanent link), patch (the patch cord from the
-      panel port to this switch port), and the unit and unit_port plugged in (none when the outlet is empty). A room
-      device on an in-room switch: unit and unit_port. Another switch: switch (its id here) and port, with the patch
-      cords and any riser run between. A firewall or controller: rack and u.
+      The interface's cable trace. cables: every cable on the way, from this interface out (the patch cord, then the
+      permanent link to the outlet, or the riser fibre). device and interface: what is at the far end, by asset tag
+      (a unit) or switch id; none when an outlet has nothing plugged in. rack and u: a rack item with neither (a
+      wireless controller).
     type: object
     additionalProperties: false
     properties:
-      run: { type: string }
-      patch: { type: string }
-      patches: { type: array, items: { type: string } }
-      unit: { description: "The asset tag of the unit on the far end.", type: string, pattern: "^AG-[0-9]{6}$" }
-      unit_port: { description: "The unit's own port, as the model or the space type names it (lan-1).", type: string }
-      switch: { description: "Another switch's id in data/switch-ports.", type: string }
-      port: { $ref: "#/$defs/portId" }
+      cables: { type: array, items: { type: string } }
+      device: { type: string, pattern: "^(AG-[0-9]{6}|[a-z]{3}-[0-9]{2,4}-[a-z]{2,4}[0-9]{2})$" }
+      interface: { $ref: "#/$defs/ifname" }
       rack: { type: string }
       u: { type: integer, minimum: 1 }
 properties:
   site: { description: "The site id, the same as the file name.", type: string, pattern: "^[a-z0-9]+$" }
+  vlan_group: { description: "The site's VLAN group (NetBox: a VLAN group scoped to the site).", type: string, pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
   read_at: { description: "When the switch platform was last read (simulated in the demo).", type: string, format: date-time }
+  source: { $ref: "#/$defs/mark" }
   note: { type: string }
   demo: { const: true }
   vlans:
-    description: The site's VLAN table. Every VLAN in the network standard's plan, with its subnet and gateway (made-up private addresses).
+    description: The site's VLANs. Every VLAN in the network standard's plan, with its prefix and gateway (made-up private addresses).
     type: array
     minItems: 1
     items:
       type: object
       additionalProperties: false
-      required: [vlan, subnet]
+      required: [vid, role, prefix]
       properties:
-        vlan: { $ref: "#/$defs/vlan" }
-        subnet: { type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}/[0-9]{1,2}$" }
-        gateway: { description: "None for a VLAN that is not routed (AV, kept in each room).", type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$" }
-        dhcp: { description: "Where addresses come from.", type: string }
+        vid: { $ref: "#/$defs/vid" }
+        role: { description: "The VLAN's purpose from the plan, as a slug (NetBox: the VLAN's and the prefix's role).", type: string, pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
+        prefix: { type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}/[0-9]{1,2}$" }
+        gateway: { description: "The gateway's address. None for a VLAN that is not routed (AV, kept in each room).", type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$" }
+        reserved: { description: "The range DHCP reservations for devices come from (first-last).", type: string, pattern: "^[0-9.]+-[0-9.]+$" }
+        pool: { description: "The range DHCP hands out to anything else (first-last).", type: string, pattern: "^[0-9.]+-[0-9.]+$" }
         note: { type: string }
+        source: { $ref: "#/$defs/mark" }
+  groups:
+    description: Network kit that acts as one. A change to one member is worked out as a change to the group.
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, kind, name, members]
+      properties:
+        id: { type: string, pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
+        kind: { description: "stack and virtual-chassis are NetBox virtual chassis; ha-pair is a gateway pair; cluster comes later.", enum: [stack, virtual-chassis, ha-pair, cluster] }
+        name: { type: string, minLength: 1 }
+        members: { description: "Switch ids here, or asset tags of units (a gateway).", type: array, minItems: 2, uniqueItems: true, items: { type: string } }
+        source: { $ref: "#/$defs/mark" }
+  addresses:
+    description: IP addresses (IPAM) for the networked units at the site, each in its VLAN's prefix.
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [address, device, assignment]
+      properties:
+        address: { description: "The address with its prefix length (10.20.30.41/24).", type: string, pattern: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}/[0-9]{1,2}$" }
+        device: { description: "The unit's asset tag, or a switch id.", type: string, pattern: "^(AG-[0-9]{6}|[a-z]{3}-[0-9]{2,4}-[a-z]{2,4}[0-9]{2})$" }
+        interface: { $ref: "#/$defs/ifname" }
+        mac: { description: "The interface's MAC address. Made up in the demo, as locally administered addresses (02:...).", type: string, pattern: "^[0-9A-F]{2}(:[0-9A-F]{2}){5}$" }
+        dns_name: { type: string }
+        assignment: { enum: [dhcp-reservation, static] }
+        source: { $ref: "#/$defs/mark" }
   switches:
     type: array
     minItems: 1
     items:
       type: object
       additionalProperties: false
-      required: [id, platform, ports]
+      required: [id, platform, interfaces]
+      description: A comms room switch gives rack and u; an in-room switch gives space and position; never both.
       properties:
         id: { description: "The switch's hostname: its unit's hostname where it has one.", type: string, pattern: "^[a-z]{3}-[0-9]{2,4}-[a-z]{2,4}[0-9]{2}$" }
         rack: { description: "A comms room switch's rack and unit (data/racks).", type: string }
@@ -70,33 +119,46 @@ properties:
         space: { description: "An in-room switch's space and position (data/installs).", type: string }
         position: { type: string }
         platform: { description: "The switch platform its connector would read and set it through.", enum: [unifi, meraki, netgear] }
-        ports:
-          description: Every port that is patched or cabled, active or parked.
+        source: { $ref: "#/$defs/mark" }
+        interfaces:
+          description: "Every interface with a cable on it. Enabled, or not: a disabled interface with a cable is parked (patched to an outlet with nothing plugged in, shut, on no VLAN)."
           type: array
           items:
             type: object
             additionalProperties: false
-            required: [port, state]
+            required: [name, enabled]
             properties:
-              port: { $ref: "#/$defs/portId" }
-              state: { description: "Active; or parked: patched to an outlet with nothing plugged in, shut and on no VLAN.", enum: [active, parked] }
-              mode: { enum: [access, trunk] }
-              native: { description: "The untagged VLAN (for an access port, its one VLAN).", $ref: "#/$defs/vlan" }
-              tagged: { description: "The tagged VLANs on a trunk.", type: array, items: { $ref: "#/$defs/vlan" }, uniqueItems: true }
-              far: { $ref: "#/$defs/far" }
+              name: { $ref: "#/$defs/ifname" }
+              enabled: { type: boolean }
+              mode: { description: "access (one VLAN, untagged) or tagged (a trunk: untagged_vlan plus tagged_vlans).", enum: [access, tagged] }
+              untagged_vlan: { description: "The untagged (native) VLAN; for an access interface, its one VLAN.", $ref: "#/$defs/vid" }
+              tagged_vlans: { description: "The tagged VLANs on a trunk.", type: array, items: { $ref: "#/$defs/vid" }, uniqueItems: true }
+              connected: { $ref: "#/$defs/connected" }
+              auth: { description: "How the port admits a device: 802.1X (dot1x) or the MAC address against the record (mab). None when left out.", enum: [dot1x, mab] }
+              seen:
+                description: What the switch platform reports, where it differs from the record (a drift finding).
+                type: object
+                additionalProperties: false
+                required: [at]
+                properties:
+                  enabled: { type: boolean }
+                  untagged_vlan: { $ref: "#/$defs/vid" }
+                  tagged_vlans: { type: array, items: { $ref: "#/$defs/vid" }, uniqueItems: true }
+                  at: { type: string, format: date-time }
+                  source: { $ref: "#/$defs/mark" }
+              source: { $ref: "#/$defs/mark" }
             allOf:
-              - if: { properties: { state: { const: active } } }
-                then: { properties: { mode: true, native: true }, required: [mode, native] }
+              - if: { properties: { enabled: { const: true } } }
+                then: { properties: { mode: true, untagged_vlan: true }, required: [mode, untagged_vlan] }
               - if: { properties: { mode: { const: access } }, required: [mode] }
-                then: { not: { properties: { tagged: true }, required: [tagged] } }
-              - if: { properties: { mode: { const: trunk } }, required: [mode] }
-                then: { properties: { tagged: { type: array, minItems: 1 } }, required: [tagged] }
+                then: { not: { properties: { tagged_vlans: true }, required: [tagged_vlans] } }
+              - if: { properties: { mode: { const: tagged } }, required: [mode] }
+                then: { properties: { tagged_vlans: { type: array, minItems: 1 } }, required: [tagged_vlans] }
         disabled:
-          description: 'The ports with nothing patched, shut: numbers and ranges on a rack switch ("41-48,51-52"), port ids on an in-room switch.'
+          description: 'Interfaces with no cable, shut: numbers and ranges on a comms room switch ("41-48,51-52"), port ids on an in-room switch.'
           oneOf:
             - { type: string, pattern: "^[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*$" }
-            - { type: array, items: { $ref: "#/$defs/portId" } }
-      description: A comms room switch gives rack and u; an in-room switch gives space and position; never both.
+            - { type: array, items: { $ref: "#/$defs/ifname" } }
       oneOf:
         - { properties: { rack: true, u: true }, required: [rack, u] }
         - { properties: { space: true, position: true }, required: [space, position] }

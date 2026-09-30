@@ -31,10 +31,13 @@ test('Support: the worst open job, fault before review before booked work', () =
   assert.equal(supportLens({ jobs: [{ kind: 'incident', prio: 4, state: 'new', title: 'x' }] }).h, 'review');
 });
 
-test('Network: a port fault, then a thin cable margin, then fine; nothing recorded is Off', () => {
+test('Network: a port fault, then a port off the VLAN plan or a thin cable margin, then fine; nothing recorded is Off', () => {
   assert.equal(networkLens({}).h, 'off');
   assert.equal(networkLens({ ports: 3, portFault: 'Switch port: PoE 0 W' }).h, 'fault');
   assert.equal(networkLens({ ports: 3, minMargin: MARGIN_DB - 0.01 }).h, 'review');
+  const off = networkLens({ ports: 3, vlanOff: 'dub-321-as02 port 24: Planned VLAN 31 Displays and signage, seen VLAN 20 Corporate on the switch.', minMargin: 6 });
+  assert.equal(off.h, 'review'); assert.equal(off.label, 'VLAN'); assert.match(off.line, /seen VLAN 20/);
+  assert.equal(networkLens({ ports: 3, portFault: 'Switch port: PoE 0 W', vlanOff: 'x' }).h, 'fault', 'a fault comes before a VLAN off the plan');
   const f = networkLens({ ports: 3, minMargin: 6, vlans: [30, 31], sw: 'Access switch 1' });
   assert.equal(f.h, 'fine'); assert.equal(f.on, 'VLAN 30 and 31 · Access switch 1');
 });

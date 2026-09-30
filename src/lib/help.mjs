@@ -506,7 +506,6 @@ const UNIT = {
   'unit.config': e('Setup guide', 'The settings that are unique to this unit, such as its name and calendar, filled in from its record.', 'Select Every setting to see the whole setup guide.', 'l:configurations'),
   'unit.history': e('Work and incidents', 'Everything that has happened to this unit and its space, newest first: incidents, tasks, Lab tests of the model, and when it went in or came out.', 'Select a line to open it.'),
   'unit.usage': e('Usage', 'How much this unit is used. The figures are simulated.', 'Select the button to compare it across the fleet.'),
-  'unit.connections': e('Connections', 'Each port on this unit, where its cable goes and which cable it is.', 'Use it when you trace a fault or replace the unit.'),
   'unit.port': e('A port', 'One port on this unit. Choosing it marks its row and adds it to the path: the last level of the zoom.', 'Select it to zoom in to the port. Press [ to zoom back out to the unit.'),
   'unit.network': e('Network', 'The path from this unit to the internet: the floor switch, the core and the firewall.', 'Select a comms room to open it.', 'g:mdf'),
   // Classification, security support and privacy records (docs/rules/data.md F10 and F11).
@@ -885,7 +884,24 @@ const GUIDE = {
   'guide.privacy': e('Cameras and microphones', 'What the cameras and microphones in this space do and do not do, from Aigna\'s privacy records.', 'Nothing to do. Ask the office team for the full record.'),
 };
 
+// ---- Switch ports and VLANs: the switch page, a unit's ports, Change VLAN, an office's VLANs -------------------------
+const PORTS = {
+  'switch.grid': e('The ports', 'Every port on this switch, laid out as on its front. The colour and the number in each port are its VLAN; P is parked, a dash is disabled.', 'Select a port to open what is plugged into it.'),
+  'switch.key': e('Key', 'What each colour means: the VLANs on this switch, by number and name. Colour never stands alone: the number is in every port.', 'Nothing to do.'),
+  'switch.facts': e('This switch', 'What it is, where it is, the platform it is run from and the group it belongs to.', 'Select the comms room or the unit to open it.'),
+  'switch.ports': e('Every port', 'Each port in use or parked: what is on the far end, its mode and its VLAN, and whether that follows the VLAN plan.', 'Select what is on a port to open it, or Change VLAN to set a new one.'),
+  'switch.review': e('To review', 'Ports whose VLAN does not follow the network standard\'s VLAN plan, with the reason in words.', 'Change the VLAN, or record why it is right.'),
+  'switch.raw': e('As recorded', 'This switch as it is recorded, in NetBox\'s names: each interface, its VLANs and its cable trace.', 'Nothing to do. It is what a connector would read and write.'),
+  'vlan.change': e('Change VLAN', 'Opens a small form to put this port on another VLAN from the plan, with the reason.', 'Select it, pick the VLAN and say why.'),
+  'vlan.form': e('Change VLAN', 'Pick the new VLAN and say why. The form shows what the change touches and the approval it needs. In the demo the change is recorded as simulated: nothing is sent to a switch.', 'Select Record the change, or Cancel.'),
+  'vlan.plan-link': e('See it on the plan', 'Shows what this port reaches on the floor plans, in If this were off below.', 'Select it.'),
+  'vlan.summary': e('VLANs', 'The office\'s VLANs from the network standard\'s plan: each one\'s prefix and gateway, how many ports sit on it, and the ports that do not follow the plan.', 'Select a switch or a port to open it.'),
+  'unit.trace': e('Trace', 'The path from this port to its switch, hop by hop: outlet, permanent link, patch panel port, patch cord, switch port and VLAN. Each hop opens its record.', 'Open it to see the path.'),
+  'unit.ports': e('Ports', 'Each port on this unit: where its cable goes, all the way to the switch port, and the VLAN it lands on.', 'Open Trace for the path, or Change VLAN to set a new one.'),
+};
+
 export const HELP = {
+  ...PORTS,
   ...METHOD_PAGES, ...GUIDE,
   ...SHELL, ...PLACES, ...PAGES, ...PARTS, ...FILTER, ...HOME, ...OVERVIEW, ...SCHEDULE, ...INTEGRATE, ...INCIDENT,
   ...SUPPORT_V5,

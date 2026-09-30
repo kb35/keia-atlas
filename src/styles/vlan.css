@@ -1,0 +1,77 @@
+/* VLAN colours and the switch port grid (the switch page, a unit's ports, an office's VLANs).
+   One calm categorical colour per VLAN, from the categorical hues in craft.css (chosen away from the health palette:
+   no green, amber, vermillion or plain blue), so a VLAN never reads as health. Colour never stands alone: every port
+   and every key line prints the VLAN's number. Guest is a hatch, parked a dashed outline, disabled plain. */
+:root {
+  --vl-10: #4E6A85;        /* Management: steel */
+  --vl-20: #4F5BC4;        /* Corporate: indigo */
+  --vl-30: #A4457E;        /* Room systems: raspberry (the AV service's colour) */
+  --vl-31: #7A4FB8;        /* Displays and signage: violet */
+  --vl-40: #8B5A3C;        /* AV, in the room: walnut */
+  --vl-50: #8A6D2B;        /* Building: bronze */
+  --vl-60: #1F7FA6;        /* Security: cerulean */
+  --vl-70: #975468;        /* Printers: rose */
+  --vl-90: var(--text-3);  /* Guest: grey, hatched */
+  --vl-off: var(--line-strong);
+}
+/* The same hues, lighter, on the dark page (the categorical dark set in craft.css). Written out here: viz.css
+   redefines --cat-* for charts, so the VLANs keep their own tokens. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --vl-10: #A5BCD3; --vl-20: #9EA7F2; --vl-30: #E58FC2; --vl-31: #C3A2F0; --vl-40: #D9A882; --vl-50: #D6BD7A; --vl-60: #6CC3E8; --vl-70: #E3A3B3; }
+}
+:root[data-theme="dark"] { --vl-10: #A5BCD3; --vl-20: #9EA7F2; --vl-30: #E58FC2; --vl-31: #C3A2F0; --vl-40: #D9A882; --vl-50: #D6BD7A; --vl-60: #6CC3E8; --vl-70: #E3A3B3; }
+
+/* A VLAN chip: the swatch and the number, then the name. */
+.vl { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-size: var(--fs-support); }
+.vl-sw { flex: none; width: 10px; height: 10px; border-radius: 2px; background: var(--vl, var(--vl-off)); }
+.vl-sw.vl-hatch, .swp-port.vl-hatch::before { background: repeating-linear-gradient(135deg, var(--vl-90) 0 2px, transparent 2px 4px); }
+.vl-n { font: 500 var(--fs-code)/1 var(--font-mono); }
+.vl-name { color: var(--text-2); }
+
+/* The port grid: the front of the switch. 24 columns in two rows (odd ports on top, as printed on the switch);
+   under 640 px of content, 12 columns in four rows. Each port: its VLAN's colour as a band on top, its number and
+   its VLAN's number. */
+.swp-face { container-type: inline-size; }
+.swp-grid { display: grid; grid-template-columns: repeat(var(--cols, 24), minmax(0, 1fr)); gap: 5px; }
+.swp-grid > .swp-port { grid-column: var(--c24); grid-row: var(--r24); }
+@container (max-width: 639px) {
+  .swp-grid { grid-template-columns: repeat(var(--cols-sm, 12), minmax(0, 1fr)); }
+  .swp-grid > .swp-port { grid-column: var(--c12); grid-row: var(--r12); }
+}
+@container (max-width: 359px) {
+  .swp-grid.one-row { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .swp-grid.one-row > .swp-port { grid-column: auto; grid-row: auto; }
+}
+.swp-port { position: relative; display: grid; align-content: space-between; min-height: 48px; padding: 9px 4px 4px; border-radius: 5px; background: var(--surface); border: 1px solid var(--line-strong); color: var(--text); text-decoration: none; overflow: hidden; }
+.swp-port::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 5px; background: var(--vl, var(--vl-off)); }
+.swp-port .swp-n { font: 500 var(--fs-mark)/1 var(--font-mono); color: var(--text-3); }
+.swp-port .swp-v { font: 600 var(--fs-code)/1 var(--font-mono); color: var(--text); }
+.swp-port[data-state="parked"] { border-style: dashed; background: transparent; }
+.swp-port[data-state="parked"]::before { background: none; }
+.swp-port[data-state="disabled"] { background: var(--surface-2); border-color: var(--line); }
+.swp-port[data-state="disabled"]::before { background: none; }
+.swp-port[data-state="disabled"] .swp-v, .swp-port[data-state="parked"] .swp-v { color: var(--text-3); font-weight: 500; }
+.swp-port .swp-g { position: absolute; right: 3px; top: 8px; line-height: 0; }
+.swp-a { margin-left: 3px; font: 500 9px/1 var(--font-mono); color: var(--text-3); vertical-align: 1px; }
+.swp-key .swp-a { margin: 0; font-size: var(--fs-code); }
+a.swp-port:hover { border-color: var(--text-2); }
+a.swp-port:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.swp-port.is-on { box-shadow: 0 0 0 2px var(--accent); }
+.swp-port.is-sim .swp-v::after { content: "*"; color: var(--text-3); }
+@media (hover: none) and (pointer: coarse) { .swp-port { min-height: 44px; } }
+
+/* The key under the grid: always open, a line per VLAN on this switch, then parked, disabled and to review. */
+.swp-key { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: var(--fs-support); color: var(--text-2); }
+.swp-key li { display: inline-flex; align-items: center; gap: 6px; }
+.swp-key .vl-sw.parked { background: none; border: 1.5px dashed var(--line-strong); }
+.swp-key .vl-sw.disabled { background: var(--surface-2); border: 1px solid var(--line); }
+.swp-key b { font-weight: 550; color: var(--text); }
+
+/* A trace: the path from a port to its switch, as a short horizontal chain. It wraps; it never scrolls. */
+.tr-chain { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; align-items: stretch; gap: 6px 0; }
+.tr-chain li { display: flex; align-items: center; }
+.tr-chain li + li::before { content: ""; width: 18px; height: 2px; margin: 0 4px; background: var(--line-strong); flex: none; }
+.tr-hop { display: grid; gap: 2px; padding: 6px 10px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); color: var(--text); text-decoration: none; font-size: var(--fs-code); line-height: 1.25; min-height: 40px; align-content: center; }
+.tr-hop small { color: var(--text-3); font-size: var(--fs-mark); }
+a.tr-hop:hover { border-color: var(--text-2); }
+.tr-hop.tr-vlan { border-top: 4px solid var(--vl, var(--vl-off)); }
