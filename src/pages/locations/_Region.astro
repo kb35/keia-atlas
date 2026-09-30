@@ -1,12 +1,20 @@
 ---
-// A region. Overview archetype (page-anatomy.md, D): offices open, rooms in use, problems
-// and open incidents in the band (live where they are live); a tile per office and one for the home offices;
-// then what needs attention, the work, the people who look after the region, and its vendors. Every count opens
-// the list it counts, filtered to the region (P10).
+// A region, on the one shape (UI-V2 §2; BUILD-PLAN V6 H2). Band: offices open, spaces in use, problems now and open
+// incidents (live where they are live). Picture: the region's offices as small multiples (UI-V2 §8.7), the same tiny
+// plan at one scale, each office's floor with the space that most needs a look, rings in place and a peek on each;
+// beside it, sticky, what to review: every space not fine, fault first, with who has it. Then each office as a card
+// (local time, service lights, counts), the home offices, the open incidents, the work, the people and the vendors.
+// Every count opens the list it counts, filtered to the region (P10).
 import Shell from '../../layouts/Shell.astro';
 import PageBand from '../../components/PageBand.astro';
 import Section from '../../components/Section.astro';
+import SidePanel from '../../components/SidePanel.astro';
+import SmallMultiples from '../../components/SmallMultiples.astro';
+import HealthGlyph from '../../components/HealthGlyph.astro';
 import OfficeCard from './_OfficeCard.astro';
+import { building } from '../../lib/floors.mjs';
+import { SPACE_HEALTH, SITE_HEALTH } from '../../lib/home.mjs';
+import { spaces } from '../../lib/data.mjs';
 import { href, plural, PHASES, PHASE_LABEL, PROJECT_KIND, VENDOR_KIND, REGION_LABEL, projects, vendors } from '../../lib/data.mjs';
 import { PEOPLE } from '../../lib/demo.mjs';
 import { officesIn, office, homeOffices, incidentsAt, liveModelFor, REGION_SHORT, HOME_SITE, OPEN_Q, INC_WORD } from '../../lib/locations.mjs';
@@ -31,6 +39,23 @@ const NUMBERS = [
   { n: inc.length, label: 'Open incidents', to: `/incidents/?region=${region}&${OPEN_Q}`, tone: inc.length ? 'bad' as const : undefined },
 ];
 const json = JSON.stringify({ ...liveModelFor(sitesHere), base: href('/') }).replace(/</g, '\\u003c');
+// The small multiples: one card per office, the floor with the space that most needs a look (the same choice as the
+// estate on Home), all at the scale of the largest floor in the set.
+const FIRST = Object.fromEntries(PEOPLE.map((p) => [p.id, p.name.split(' ')[0]]));
+const health = Object.fromEntries(Object.entries(SPACE_HEALTH).map(([id, h]) => [id, { h: h.h, why: h.why, who: h.who }]));
+const rank = (id) => (health[id]?.h === 'fault' ? 0 : health[id]?.h === 'review' ? 1 : 2);
+const smCards = OFFICES.map((o) => {
+  const fl = building(o.id)?.floors ?? [];
+  const worst = fl.map((f) => ({ f, r: Math.min(2, ...Object.keys(health).filter((id) => id.startsWith(`${o.id}-${f.id}-`)).map(rank)) })).sort((a, b) => a.r - b.r)[0];
+  const sh = SITE_HEALTH[o.id], f = worst?.f ?? fl[0];
+  if (!f) return null;
+  return { key: o.id, site: o.id, floor: f.id, title: o.s.name.replace(/ office$/, ''), to: `/locations/${o.id}/?floor=${f.id}`,
+    figure: sh.fault.length ? `${sh.fault.length} not working` : sh.review.length ? `${sh.review.length} to review` : `${sh.n} ready`,
+    sub: fl.length > 1 ? `${f.name} of ${fl.length} floors` : f.name };
+}).filter(Boolean);
+// To review: every space in the region that is not fine, fault first, with who has it.
+const notFine = Object.entries(SPACE_HEALTH).filter(([id]) => sitesHere.includes(spaces[id]?.site))
+  .map(([id, h]) => ({ id, ...h, s: spaces[id] })).sort((a, b) => rank(a.id) - rank(b.id) || (a.prio ?? 9) - (b.prio ?? 9));
 // The answer: spaces not working first (from open incidents until the live feed takes over, locations-client.mjs).
 const incSpaces = new Set(inc.map((v) => v.space.id)).size;
 const ANSWER = incSpaces ? `${plural(incSpaces, 'space')} not working now · ${plural(OFFICES.length, 'office')}` : `All spaces working across ${plural(OFFICES.length, 'office')}`;
@@ -39,6 +64,27 @@ const ANSWER = incSpaces ? `${plural(incSpaces, 'space')} not working now · ${p
   <PageBand overline="Region" title={REGION_LABEL[region]} answer={ANSWER} lede={`${plural(OFFICES.length, 'office')} and ${plural(homes.rooms.length, 'home office')}.`} sim="live" numbers={NUMBERS} rec={`rg-${region}`} />
 
   <div class="content rgn" data-loc="region" data-loc-answer data-cockpit>
+    <div class="g12 top">
+      <section class="card s-7 stick rg-pic" aria-labelledby="rg-sm-h" data-help="loc.region-sm">
+        <header class="rg-pic-h"><h2 id="rg-sm-h">Offices at one scale</h2><span class="faint">each office's floor that most needs a look · simulated</span></header>
+        <SmallMultiples cards={smCards} health={health} people={FIRST} min={280} label={`The offices in ${REGION_SHORT[region]}, one card each`} />
+      </section>
+      <SidePanel class="s-5" title="To review" meta={notFine.length ? `${plural(notFine.length, 'space')} not fine` : 'nothing'} id="review" help="loc.region-review">
+        {notFine.length ? (
+          <ul class="rg-rv">
+            {notFine.map((x) => (
+              <li><a href={href(`/rooms/${x.id}/`)}>
+                <HealthGlyph state={x.h} size={16} word />
+                <span class="rg-rv-b"><b>{x.s.number ? `${x.s.number} ${x.s.name}` : x.s.name}</b><small>{x.why}{x.who ? ` · With ${FIRST[x.who] ?? x.who}` : ''} · {OFFICES.find((o) => o.id === x.s.site)?.s.name ?? 'Home offices'}</small></span>
+              </a></li>
+            ))}
+          </ul>
+        ) : <p class="faint">Every space in the region is working.</p>}
+        <a class="rg-rv-all" href={href(`/incidents/?region=${region}&${OPEN_Q}`)}>All open incidents in {REGION_SHORT[region]} →</a>
+      </SidePanel>
+    </div>
+
+    <h2 class="rg-h">Each office</h2>
     <div class="rg-grid" id="offices">
       {OFFICES.map((o) => <OfficeCard o={o} />)}
       <a class="card rg-home" href={href(`/locations/${region}/home-offices/`)} data-vt-rec={`ho-${region}`} data-help="loc.homes">
@@ -100,6 +146,18 @@ const ANSWER = incSpaces ? `${plural(incSpaces, 'space')} not working now · ${p
 
 <style>
   .rgn { display: grid; gap: var(--gutter); }
+  .rg-pic { display: grid; gap: 12px; align-content: start; padding: 20px 22px; }
+  .rg-pic-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+  .rg-pic-h h2 { margin: 0; font-size: var(--fs-body); }
+  .rg-pic-h .faint { font-size: var(--fs-code); }
+  .rg-h { margin: 8px 0 -4px; font-size: var(--h2-size); }
+  .rg-rv { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 4px; }
+  .rg-rv a { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; align-items: start; padding: 8px; border-radius: 8px; color: var(--ink); text-decoration: none; transition: background var(--dur-hover) var(--ease-settle); }
+  .rg-rv a:hover { background: var(--surface-2); }
+  .rg-rv-b { display: grid; gap: 2px; min-width: 0; }
+  .rg-rv-b b { font-size: var(--fs-body); font-weight: var(--fw-name); }
+  .rg-rv-b small { color: var(--text-2); font-size: var(--fs-code); }
+  .rg-rv-all { font-size: var(--fs-support); font-weight: 600; }
   .rg-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gutter); }
   @container content (max-width: 1099px) { .rg-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @container content (max-width: 599px) { .rg-grid { grid-template-columns: minmax(0, 1fr); } }
@@ -127,5 +185,5 @@ const ANSWER = incSpaces ? `${plural(incSpaces, 'space')} not working now · ${p
   .rp b { font-size: var(--fs-support); font-weight: var(--fw-name); }
   .rp small { color: var(--text-2); font-size: var(--fs-mark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   p.faint { margin: 0; font-size: var(--fs-support); }
-  @media (prefers-reduced-motion: reduce) { .rg-home, .rp a { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .rg-home, .rp a, .rg-rv a { transition: none; } }
 </style>
