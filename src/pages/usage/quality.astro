@@ -1,0 +1,90 @@
+---
+// Meeting quality (the Meeting quality capability, src/lib/modules.mjs; src/lib/quality.mjs): how each space's calls
+// go, as the meeting platform reports them. The answer first (which spaces have poor calls, the worst of them), then
+// the worst rooms as cards with their eight-week trend, then every space with a video system, worst first. Connected
+// by default (from the meeting platform); simulated in the demo (data/meeting-quality/). Sparklines are drawn still (M9).
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import HealthGlyph from '../../components/HealthGlyph.astro';
+import Section from '../../components/Section.astro';
+import FeatureGate from '../../components/FeatureGate.astro';
+import FeatureSource from '../../components/FeatureSource.astro';
+import { href, sites, SITE_ORDER, plural } from '../../lib/data.mjs';
+import { quality, qualityTotals as T, spaceTitle } from '../../lib/capabilities-view.mjs';
+import { qualityAnswer, qualityLine, PLATFORM_LABEL, CAUSE_WORD, POOR_BELOW } from '../../lib/quality.mjs';
+import { sparkSvg } from '../../lib/spark.mjs';
+import '../../styles/capabilities.css';
+
+const worst = quality.filter((r) => r.state !== 'fine').slice(0, 6);
+const WORD = { fault: 'Poor', review: 'To watch', fine: 'Good' };
+const spark = (r) => sparkSvg([...r.weeks, r.score], { w: 96, h: 22, state: r.state, fmt: (x) => String(x), span: '9 weeks' });
+const usedSites = SITE_ORDER.filter((s) => quality.some((r) => r.site === s));
+const FACETS = [
+  { key: 'site', label: 'Office', options: usedSites.map((s) => ({ value: s, label: sites[s].name, sub: sites[s].city })) },
+  { key: 'status', label: 'Quality', options: Object.entries(WORD).map(([value, label]) => ({ value, label })) },
+  { key: 'cause', label: 'Cause', options: ['network', 'audio', 'video', 'device'].filter((c) => quality.some((r) => r.cause === c)).map((c) => ({ value: c, label: CAUSE_WORD[c][0].toUpperCase() + CAUSE_WORD[c].slice(1) })) },
+];
+const NUMBERS = [
+  { n: T.poorSpaces, label: `Spaces under ${POOR_BELOW}`, to: '?status=fault', tone: T.poorSpaces ? 'bad' : undefined },
+  { n: T.falling, label: 'Getting worse', fact: true, tone: T.falling ? 'warn' : undefined },
+  { n: T.poor, label: 'Poor calls, 7 days', fact: true },
+  { n: T.score ?? '', label: 'Out of 100, all calls', fact: true },
+];
+---
+<Shell title="Meeting quality" section="quality" crumbs={[{ label: 'Locations', to: '/locations/' }, { label: 'Meeting quality' }]}>
+  <FeatureGate id="meeting-quality">
+    <PageBand overline="Meeting quality" title="Meeting quality" answer={qualityAnswer(T, spaceTitle)} lede="How each space's calls went in the last seven days, as the meeting platform scores them, with the trend." sim heartbeat={false} numbers={NUMBERS}>
+      <FeatureSource slot="overline" id="meeting-quality" />
+    </PageBand>
+    <div class="content mq">
+      <FilterBar facets={FACETS} placeholder="Find a space or office" label="Find a space" noun={['space', 'spaces']} scope=".content.mq" />
+      {worst.length > 0 && (
+        <Section title="The worst rooms" id="worst" help="quality.worst">
+          <div class="cap-grid">
+            {worst.map((r) => (
+              <a class="card pad cap-card mq-card" href={href(`/rooms/${r.space}/`)} data-vt-rec={r.space}>
+                <span class="mq-top"><HealthGlyph state={r.state} size={16} word={WORD[r.state]} /><span class="faint">{sites[r.site].name}</span></span>
+                <b class="mq-n">{spaceTitle(r.space)}</b>
+                <span class="mq-score"><b class="num">{r.score}</b><span class="faint"> out of 100</span><i set:html={spark(r)} /></span>
+                <small>{qualityLine(r).split(' · ')[1]}{r.trend !== 'steady' ? ` · ${r.trend}` : ''}</small>
+              </a>
+            ))}
+          </div>
+        </Section>
+      )}
+      <Section title="Every space" id="all" rows={8} help="quality.all">
+        <div class="card cap-t">
+          <table class="to-cards cap-tbl">
+            <thead><tr><th>Space</th><th>Score</th><th>Nine weeks</th><th>Poor calls</th></tr></thead>
+            <tbody data-items>
+              {quality.map((r) => (
+                <tr class:list={[{ 'is-alert': r.state === 'fault', 'is-warn': r.state === 'review' }]} data-fi data-help="quality.row" data-find={`${spaceTitle(r.space)} ${sites[r.site].name} ${PLATFORM_LABEL[r.platform]}`} data-f-site={r.site} data-f-status={r.state} data-f-cause={r.cause}>
+                  <td data-label=""><a href={href(`/rooms/${r.space}/`)}><b>{spaceTitle(r.space)}</b></a><small>{sites[r.site].name} · {PLATFORM_LABEL[r.platform]}</small></td>
+                  <td data-label="Score" class="num"><HealthGlyph state={r.state} size={12} title={WORD[r.state]} /> {r.score}<small>{r.trend === 'steady' ? 'Steady' : r.trend === 'falling' ? 'Getting worse' : 'Getting better'}</small></td>
+                  <td data-label="Nine weeks"><i class="mq-spark" set:html={spark(r)} /></td>
+                  <td data-label="Poor calls" class="num">{r.poor_7d} of {r.calls_7d}{r.poor_7d > 0 && <small>Mostly {CAUSE_WORD[r.cause]}</small>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <EmptyState text="No spaces match these filters." />
+      </Section>
+      <p class="cap-note">Read each morning from the meeting platform (the Google Meet quality tool; Webex Control Hub for the Webex desks): the share of call minutes rated good in the last seven days, calls held, poor calls and their commonest cause, per space, never per person. The spaces with call incidents score low for the same reason. Simulated for the demo.</p>
+    </div>
+  </FeatureGate>
+</Shell>
+
+<style>
+  .mq-card { color: inherit; text-decoration: none; gap: 6px; }
+  .mq-card:hover .mq-n { text-decoration: underline; text-underline-offset: 2px; }
+  .mq-top { display: flex; justify-content: space-between; gap: 8px; font-size: var(--fs-code); }
+  .mq-n { font-size: var(--fs-h3); }
+  .mq-score { display: flex; align-items: baseline; gap: 4px; }
+  .mq-score > b { font: 600 28px/1 var(--font-display, var(--font-sans)); }
+  .mq-score i { margin-left: auto; align-self: center; }
+  .mq-card small { font-size: var(--fs-code); color: var(--text-3); }
+  .mq-spark { display: inline-block; }
+</style>

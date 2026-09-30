@@ -15,6 +15,7 @@ import { sentence, quietWords, simulatedAlerts, alertCounts, ruleAnswer } from '
 import { warnLevel, credentialRows, credentialSummary, credentialAnswer } from '../src/lib/credentials.mjs';
 import { exposure, fixState, flawRows, flawSummary, flawAnswer } from '../src/lib/flaws.mjs';
 import { backupRows, backupSummary, backupAnswer, backupWhen } from '../src/lib/backups.mjs';
+import { qualityRows, qualitySummary, qualityAnswer, qualityLine, trendOf } from '../src/lib/quality.mjs';
 import { nthWeekday, planDates, rounds, checksForSpace, checksSummary, checksAnswer, checkItem, addMonths } from '../src/lib/checks.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -38,7 +39,7 @@ for (const f of readdirSync(join(ROOT, 'data/installs'))) for (const n of readdi
   for (const u of inst.older_kit ?? []) add(u, u.model);
 }
 
-const FOLDERS = ['licences', 'checks', 'out-of-service', 'alert-rules', 'credentials', 'security-flaws', 'config-backups'];
+const FOLDERS = ['licences', 'checks', 'out-of-service', 'alert-rules', 'credentials', 'security-flaws', 'config-backups', 'meeting-quality'];
 let result;
 test('each capability\'s data validates: schema, secrets and cross-references', async () => {
   result = await validate(ROOT);
@@ -210,6 +211,18 @@ test('config backups: failed or late first, then drift; the answer counts both; 
   const late = backupRows([{ site: 'x', source: 'oxidized', read_at: '2026-09-28T06:00', devices: [{ unit: 'AG-1', last_backup: '2026-09-25T02:00', status: 'ok', lines_changed: 0 }] }])[0];
   assert.equal(late.state, 'fault', 'a backup older than 48 hours is late');
   assert.equal(backupWhen(late), '3 days ago');
+});
+
+// ---- Meeting quality -----------------------------------------------------------------------------------------------
+test('meeting quality: worst first, the trend against the weeks before, and the answer names the worst room', () => {
+  const rows = qualityRows(read('meeting-quality'));
+  assert.deepEqual(rows.map((r) => r.score), [...rows.map((r) => r.score)].sort((a, b) => a - b));
+  for (const id of ['nyc-20-05', 'cph-4-07', 'tyo-15-03']) assert.equal(rows.find((r) => r.space === id)?.state, 'fault', `${id}: the call incident shows in its score`);
+  assert.equal(trendOf(60, [80, 80, 80, 80, 80, 80, 80, 80]), 'falling');
+  assert.equal(trendOf(80, [80, 81, 79, 80, 80, 80, 80, 80]), 'steady');
+  const s = qualitySummary(rows);
+  assert.match(qualityAnswer(s, (id) => id), /^\d+ spaces? ha(s|ve) poor calls · worst: [a-z0-9-]+, \d+$/);
+  assert.equal(qualityLine({ score: 64, trend: 'falling', poor_7d: 6, calls_7d: 17, cause: 'audio' }), '64 out of 100, falling · 6 of 17 calls poor, mostly the audio');
 });
 
 test('out of service: the space offered instead is the same kind in the same office, same floor first, never one that is out', () => {

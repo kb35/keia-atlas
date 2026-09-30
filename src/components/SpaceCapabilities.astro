@@ -8,7 +8,10 @@ import Section from './Section.astro';
 import FeatureSource from './FeatureSource.astro';
 import { href, fmtDate, plural } from '../lib/data.mjs';
 import { featureAnyCss } from '../lib/modules.mjs';
-import { licences, checkRounds, checkPlans } from '../lib/capabilities-view.mjs';
+import { licences, checkRounds, checkPlans, qualityOf } from '../lib/capabilities-view.mjs';
+import { qualityLine, PLATFORM_LABEL, CAUSE_WORD } from '../lib/quality.mjs';
+import { sparkSvg } from '../lib/spark.mjs';
+import HealthGlyph from './HealthGlyph.astro';
 import { checksForSpace, dayWords } from '../lib/checks.mjs';
 import { PEOPLE } from '../lib/demo.mjs';
 import { rowsForSpace, inDays } from '../lib/licences.mjs';
@@ -21,7 +24,8 @@ const chk = checksForSpace(checkRounds, space);
 const planName = (id) => checkPlans.find((p) => p.id === id)?.name ?? id;
 const first = (id) => PEOPLE.find((p) => p.id === id)?.name.split(' ')[0];
 // In the registry's order, so the section's data-feat-any matches its rule.
-const cards = [lic.length ? 'licences' : null, chk.next || chk.last ? 'maintenance' : null].filter(Boolean);
+const mq = qualityOf(space);
+const cards = [lic.length ? 'licences' : null, chk.next || chk.last ? 'maintenance' : null, mq ? 'meeting-quality' : null].filter(Boolean);
 ---
 {cards.length > 0 && (
   <Section title="Upkeep" id="upkeep" help="room.upkeep" data-feat-any={cards.join(' ')}>
@@ -51,6 +55,17 @@ const cards = [lic.length ? 'licences' : null, chk.next || chk.last ? 'maintenan
             {chk.last && <li><b>Last checked</b><span>{fmtDate(chk.last.date)}{chk.last.name ? `, ${chk.last.name.toLowerCase()}` : ''}</span></li>}
             {chk.plans.filter((p) => p !== chk.next?.plan).map((p) => <li><b>{planName(p)}</b><small>Also covers this space</small></li>)}
           </ul>
+        </section>
+      )}
+      {mq && (
+        <section class="card pad cap-card" data-feature="meeting-quality" data-help="room.quality" aria-labelledby="up-mq">
+          <h3 id="up-mq">Meeting quality <FeatureSource id="meeting-quality" /></h3>
+          <p class:list={['cap-a', { 'cap-w t-bad': mq.state === 'fault', 'cap-w t-warn': mq.state === 'review' }]}>{mq.score} out of 100 in the last 7 days{mq.trend !== 'steady' ? `, ${mq.trend === 'falling' ? 'getting worse' : 'getting better'}` : ''}</p>
+          <ul class="cap-list">
+            <li><span class="up-mq-s"><HealthGlyph state={mq.state} size={12} title={`${mq.score} out of 100`} /> Nine weeks <i set:html={sparkSvg([...mq.weeks, mq.score], { w: 96, h: 20, state: mq.state, span: '9 weeks' })} /></span></li>
+            <li><b>{mq.poor_7d ? `${mq.poor_7d} of ${mq.calls_7d} calls poor` : `${mq.calls_7d} calls, none poor`}</b>{mq.poor_7d > 0 && <span>Mostly {CAUSE_WORD[mq.cause]}</span>}<small>From {PLATFORM_LABEL[mq.platform]}</small></li>
+          </ul>
+          <a class="sec-to" href={href(`/usage/quality/`)}>Every space's calls <span aria-hidden="true">→</span></a>
         </section>
       )}
     </div>

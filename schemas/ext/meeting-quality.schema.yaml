@@ -1,0 +1,28 @@
+# Meeting quality: one office's spaces with a video system, as the meeting platform reports their calls (the Meeting
+# quality capability, src/lib/modules.mjs). A score out of 100 for the last seven days, the eight weeks before, calls,
+# poor calls and their most common cause. Read by a connector; never people's names or call content.
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/meeting-quality
+title: Meeting quality for an office
+type: object
+additionalProperties: false
+required: [site, read_at, spaces, simulated]
+properties:
+  site: { type: string }
+  read_at: { type: string, pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$" }
+  spaces:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [space, platform, score, weeks, calls_7d, poor_7d, cause]
+      properties:
+        space: { type: string }
+        platform: { description: The meeting platform it was read from., enum: [google-meet, webex, teams, zoom] }
+        score: { description: "The share of call minutes rated good in the last seven days, out of 100.", type: integer, minimum: 0, maximum: 100 }
+        weeks: { description: "The eight weeks before, oldest first.", type: array, minItems: 8, maxItems: 8, items: { type: integer, minimum: 0, maximum: 100 } }
+        calls_7d: { type: integer, minimum: 0 }
+        poor_7d: { type: integer, minimum: 0 }
+        cause: { description: The most common cause of a poor call., enum: [network, audio, video, device, none] }
+  simulated: { description: Made up for the demo., const: true }

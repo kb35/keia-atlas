@@ -11,6 +11,7 @@ import { credentialRows, credentialSummary, expiryWords, LEVEL_WORD } from './cr
 import { flawRows, flawSummary, flawsForUnit, SEVERITY_WORD, SEVERITY_TONE, FIX_WORD } from './flaws.mjs';
 import { fleet as kiFleet } from './knownissues-view.mjs';
 import { backupRows, backupSummary, backupWhen, SOURCE_LABEL as BACKUP_SOURCE } from './backups.mjs';
+import { qualityRows, qualitySummary } from './quality.mjs';
 import { firmwareLines } from './data.mjs';
 import { alternativesFor } from './outofservice.mjs';
 import { PEOPLE } from './demo.mjs';
@@ -127,6 +128,11 @@ export const flawTotals = flawSummary(flaws);
 // ---- Config backups --------------------------------------------------------------------------------------------------
 export const backups = backupRows(readRecords('config-backups'));
 export const backupTotals = backupSummary(backups);
+
+// ---- Meeting quality -------------------------------------------------------------------------------------------------
+export const quality = qualityRows(readRecords('meeting-quality'));
+export const qualityTotals = qualitySummary(quality);
+export const qualityOf = (spaceId) => quality.find((r) => r.space === spaceId) ?? null;
 
 // ---- The unit page's cards (/device/caps.json, UnitCapabilities.astro) --------------------------------------------
 // Each card already worded: { feature, help, title, answer, tone?, items: [{ b, text?, w?, tone?, small?, to? }], more? }.

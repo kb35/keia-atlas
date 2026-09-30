@@ -143,5 +143,21 @@ export function crossCheckCapabilities(records) {
     });
   }
 
+  // Meeting quality: a real office, named in the file; each space in it, once; no more poor calls than calls; a cause
+  // only when there were poor calls.
+  for (const rec of inFolder('meeting-quality')) {
+    const d = rec.data, seen = new Set();
+    site(rec, ['site'], d.site);
+    if (d.site !== rec.id) report(rec, ['site'], `the file is named "${rec.id}" but holds office "${d.site}"`);
+    d.spaces.forEach((x, i) => {
+      space(rec, ['spaces', i, 'space'], x.space);
+      if (spaces.get(x.space) && spaces.get(x.space).site !== d.site) report(rec, ['spaces', i, 'space'], `space "${x.space}" is not in this office`);
+      if (seen.has(x.space)) report(rec, ['spaces', i, 'space'], `space "${x.space}" is listed twice`);
+      seen.add(x.space);
+      if (x.poor_7d > x.calls_7d) report(rec, ['spaces', i, 'poor_7d'], 'more poor calls than calls');
+      if ((x.poor_7d === 0) !== (x.cause === 'none')) report(rec, ['spaces', i, 'cause'], x.poor_7d ? 'poor calls need a cause' : 'no poor calls, so the cause is none');
+    });
+  }
+
   return problems;
 }
