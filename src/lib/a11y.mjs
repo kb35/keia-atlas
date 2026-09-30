@@ -46,11 +46,16 @@ export function a11yAttrs(p) {
   };
 }
 
-/** True when motion should be reduced: the person chose Reduced or Off here, or their device asks for it. */
+/** True when motion should be reduced. The one question every script asks (M7), in this order: the person's own
+    setting here (Reduced or Off); then html[data-motion] ("off" or "reduced" reduce, "full" or "on" keep motion,
+    as a tool or a page may set it); then the older html[data-reduced]; then the device's prefers-reduced-motion.
+    In the browser it is window.rsReducedNow() (window.rsReduced is the same function). */
 export function reducedMotion() {
+  if (typeof window !== 'undefined' && typeof window.rsReducedNow === 'function') return window.rsReducedNow();
   if (typeof document === 'undefined') return false;
   const m = document.documentElement.getAttribute('data-motion');
   if (m === 'reduced' || m === 'off') return true;
+  if (m === 'full' || m === 'on') return false;
   return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
@@ -59,7 +64,8 @@ export const motionOff = () => typeof document !== 'undefined' && document.docum
 
 // The boot script, inlined in each layout's <head> before any stylesheet or content, so the first paint already
 // has the settings. It also:
-//   - defines window.rsA11y(), rsSetA11y(patch), rsApplyA11y() and rsReduced() for Settings and page scripts;
+//   - defines window.rsA11y(), rsSetA11y(patch), rsApplyA11y() for Settings, and window.rsReducedNow() (alias
+//     rsReduced), the one reduced-motion question every script asks;
 //   - with Motion Off, makes every scripted animation (Element.animate) finish at once at its end state, so a
 //     script that forgot to check never moves anything, and its onfinish still runs;
 //   - puts the attributes back after the client router swaps in the next page's <html>.
@@ -68,9 +74,17 @@ export const A11Y_BOOT = `(function () {
   var readA11y = ${readA11y.toString()};
   var a11yAttrs = ${a11yAttrs.toString()};
   W.rsA11y = function () { var v = null; try { v = localStorage.getItem(KEY); } catch (_) {} return readA11y(v || W.__rsA11yMem || null); };
+  // Only a data-motion this script set is ever taken away, so one set by a tool or a page (data-motion="full") stays.
   W.rsApplyA11y = function () {
-    var a = a11yAttrs(W.rsA11y());
-    Object.keys(a).forEach(function (k) { if (a[k] == null) R.removeAttribute(k); else if (R.getAttribute(k) !== a[k]) R.setAttribute(k, a[k]); });
+    var p = W.rsA11y(), a = a11yAttrs(p); W.__rsA11yNow = p;
+    Object.keys(a).forEach(function (k) {
+      if (k === 'data-motion') {
+        if (a[k] == null) { if (R.hasAttribute('data-rs-motion')) { R.removeAttribute(k); R.removeAttribute('data-rs-motion'); } }
+        else { R.setAttribute(k, a[k]); R.setAttribute('data-rs-motion', ''); }
+        return;
+      }
+      if (a[k] == null) R.removeAttribute(k); else if (R.getAttribute(k) !== a[k]) R.setAttribute(k, a[k]);
+    });
   };
   W.rsSetA11y = function (patch) {
     var p = W.rsA11y(); Object.keys(patch || {}).forEach(function (k) { p[k] = patch[k]; });
@@ -80,10 +94,17 @@ export const A11Y_BOOT = `(function () {
     D.dispatchEvent(new CustomEvent('rs:a11y', { detail: p }));
     return p;
   };
-  W.rsReduced = function () {
-    var m = R.getAttribute('data-motion');
-    return m === 'reduced' || m === 'off' || (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  W.rsReducedNow = function () {
+    var p = W.__rsA11yNow || W.rsA11y();
+    if (p.motion === 'reduced' || p.motion === 'off') return true;
+    var m = R.getAttribute('data-motion'), o = R.getAttribute('data-reduced');
+    if (m === 'off' || m === 'reduced') return true;
+    if (m === 'full' || m === 'on') return false;
+    if (o === 'true') return true;
+    if (o === 'false') return false;
+    return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   };
+  W.rsReduced = W.rsReducedNow;
   W.rsApplyA11y();
   if (!W.__rsA11yHook) {
     W.__rsA11yHook = true;

@@ -48,7 +48,7 @@ const world = (x, y, z) => new Vector3(x, z, -y);
 export function createScene(host, D, hooks) {
   // The motion tokens, read once and again when the look changes (not on every frame).
   const readMotion = () => {
-    const base = window.rsMotion ? window.rsMotion() : { reduced: (window.rsReduced ? window.rsReduced() : matchMedia('(prefers-reduced-motion: reduce)').matches), morph: 520, state: 300, ease: '' };
+    const base = window.rsMotion ? window.rsMotion() : { reduced: (window.rsReducedNow ? window.rsReducedNow() : matchMedia('(prefers-reduced-motion: reduce)').matches), morph: 520, state: 300, ease: '' };
     const v = getComputedStyle(document.documentElement).getPropertyValue('--dur-pulse').trim(), n = parseFloat(v);
     return { ...base, pulse: isNaN(n) ? 2400 : /ms$/.test(v) ? n : /s$/.test(v) ? n * 1000 : n };
   };

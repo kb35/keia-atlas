@@ -139,7 +139,13 @@ export function loop(stage, { play, reset, finish, hold = 3200, jitter = 900, cl
     show(false);
   }
   // Keep things still: the finished frame, paused, until the visitor presses Play.
-  if (stillWanted()) { if (finish) { finish(); atEnd = true; } api.hold(); }
+  if (stillWanted()) {
+    // The finished frame lands at once: any move it starts (a chip sliding to its last state) jumps to its end.
+    const land = () => stage.getAnimations?.({ subtree: true }).forEach((a) => { try { a.finish(); } catch (_) { /* an endless one is cancelled below */ a.cancel(); } });
+    // After the page's own first paint of the stage (a chip drawn from its data at load), so the finished frame wins.
+    if (finish) { atEnd = true; setTimeout(() => { stage.classList.add('fd-resetting'); finish(); land(); requestAnimationFrame(() => { land(); stage.classList.remove('fd-resetting'); }); }, 0); }
+    api.hold();
+  }
   if (io) io.observe(stage); else { visible = true; sync(); }
   return api;
 }

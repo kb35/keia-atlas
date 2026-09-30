@@ -10,7 +10,7 @@ import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load, search } from '../src/lib/search-query.mjs';
-import { VERBS, verbRows, matchVerbs, paletteMode } from '../src/lib/verbs.mjs';
+import { VERBS, verbRows, matchVerbs, matchPeople, paletteMode } from '../src/lib/verbs.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const BUDGET_MS = 50;
@@ -53,7 +53,9 @@ test(`the first row of results comes back in under ${BUDGET_MS} ms, from the in-
     }
     const first = R.top[0] ?? R.groups[0]?.items[0];
     if (ms >= BUDGET_MS) slow.push(`${q}: ${ms.toFixed(1)} ms`);
-    if (q !== 'who is on site in APAC') assert.ok(first, `"${q}" finds something`);
+    // The made-up index (no dist/ yet, as in CI before the build) has no displays with ages, so only the real one must answer it.
+    const needs = q !== 'who is on site in APAC' && (existsSync(built) || q !== 'displays older than 7 years');
+    if (needs) assert.ok(first, `"${q}" finds something`);
   }
   assert.deepEqual(slow, [], `over ${BUDGET_MS} ms`);
 });
@@ -78,6 +80,34 @@ test('a verb is listed under its button\'s own name, once, and found by the word
   assert.equal(matchVerbs(rows, 'open')[0].label, 'Open in 3D');
   assert.equal(matchVerbs(rows, '').length, rows.length, 'nothing typed after > lists them all');
   assert.deepEqual(matchVerbs(rows, 'zzz'), []);
+});
+
+test('Do mode finds people to view as by first name, surname, role or place, and "view as" on its own lists all', async () => {
+  const { PEOPLE } = await import('../src/lib/demo.mjs');
+  const people = [{ id: 'everyone', name: 'Everyone (overview)', role: 'Every role at once', where: 'Every role at once' },
+    ...PEOPLE.map((p) => ({ id: p.id, name: p.name, role: p.role, where: p.where }))];
+  const ids = (q) => matchPeople(people, q).map((p) => p.id);
+  assert.equal(ids('liam')[0], 'liam', '">liam" finds Liam first');
+  assert.equal(ids('view as liam')[0], 'liam');
+  assert.equal(ids('View as Anna')[0], 'anna', 'case does not matter');
+  assert.equal(ids('byrne')[0], 'anna', 'a surname works');
+  assert.equal(ids('tomas')[0], 'tomas', 'accents do not matter');
+  assert.ok(ids('technician dublin').includes('liam') && ids('technician dublin').length === 1, 'a role and a place together narrow to one');
+  assert.equal(ids('view as').length, people.length, '"view as" on its own lists everyone');
+  assert.deepEqual(ids(''), [], 'nothing typed lists no one, so the page\'s verbs come first');
+  assert.deepEqual(ids('take'), [], 'a verb is not a person');
+  assert.equal(ids('everyone')[0], 'everyone');
+});
+
+test('View as is one picker: every way in opens it, and it keeps the Shell\'s storage', () => {
+  const va = readFileSync(join(ROOT, 'src/components/ViewAs.astro'), 'utf8');
+  const shell = readFileSync(join(ROOT, 'src/layouts/Shell.astro'), 'utf8');
+  assert.ok(/<ViewAs \/>/.test(shell), 'the Shell draws it on every page');
+  assert.ok(/data-acct-menu/.test(shell) && /data-open-viewas/.test(shell), 'the name in the sidebar and the ribbon open it');
+  assert.ok(/data-open-viewas/.test(readFileSync(join(ROOT, 'src/components/Settings.astro'), 'utf8')), 'Settings opens it (the way in on a phone)');
+  assert.ok(/W\.rsPickWho\(id\)/.test(va), 'choosing goes through rsPickWho, so Home changes in place and the per-window storage is kept');
+  assert.ok(!/sessionStorage\.setItem\('rs5-who'/.test(va), 'it never writes the person itself');
+  assert.ok(!/class="vp-people"[^>]*style=/.test(va), 'no fixed heights on the people panels');
 });
 
 test('every data-verb on a page names a verb the palette knows, and the palette defines no verb of its own', () => {

@@ -28,7 +28,7 @@ Report offers Propose an edit, New firmware found or Urgent issue, filled in wit
 
 ### P4. View as
 
-Anyone can see Keia Atlas as any role from the menu under their name. Role changes what comes first, never what exists; vendors alone see less.
+Anyone can see Keia Atlas as any role: from their name in the sidebar, the ribbon's Change, Settings (on a phone too) or the palette ("> Liam"). View as shows roles first, grouped by team; a role with one person switches at once, a role with several opens to show them (`src/components/ViewAs.astro`). Role changes what comes first, never what exists; vendors alone see less.
 
 - **Why:** people learn each other's jobs.
 - **Do:** order a role's first screen (Home) and its place tabs by role; the sidebar keeps one order for everyone (L3).

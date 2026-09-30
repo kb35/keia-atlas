@@ -40,6 +40,7 @@ function blocks(lines) {
       return { kind: 'table', head: rows[0], rows: rows.slice(1) };
     }
     if (b.every((l) => /^\d+\.\s/.test(l.trim()))) return { kind: 'list', items: b.map((l) => l.trim().replace(/^\d+\.\s+/, '')) };
+    if (b.every((l) => /^-\s/.test(l.trim()))) return { kind: 'list', bullets: true, items: b.map((l) => l.trim().replace(/^-\s+/, '')) };
     return { kind: 'para', text: b.map((l) => l.trim()).join(' ') };
   });
 }
@@ -87,11 +88,13 @@ export const LEVEL1 = {
   origin: byLabel(l1, /comes from/i) ?? null,
 };
 
-// Level 2 and 3 sections: "### n.n Title".
+// Level 2 and 3 sections, and the sections of any later part: "### n.n Title". A section ends at the next section,
+// the next part ("## ..."), or the licence rule.
 export const SECTIONS = {};
 const secStarts = lines.map((l, i) => (/^### \d+\.\d+ /.test(l) ? i : -1)).filter((i) => i >= 0);
+const partStarts = lines.map((l, i) => (/^## /.test(l) ? i : -1)).filter((i) => i >= 0);
 secStarts.forEach((start, k) => {
-  const end = Math.min(k + 1 < secStarts.length ? secStarts[k + 1] : lines.length, ...[L3, lastRule ?? lines.length].filter((x) => x > start));
+  const end = Math.min(k + 1 < secStarts.length ? secStarts[k + 1] : lines.length, ...[...partStarts, lastRule ?? lines.length].filter((x) => x > start));
   const m = lines[start].match(/^### (\d+\.\d+) (.+)$/);
   const bs = blocks(lines.slice(start + 1, end));
   const paras = bs.filter((b) => b.kind === 'para').map((b) => b.text);
@@ -154,3 +157,39 @@ export function STANDARDS_FOR(prefixes) {
     return row;
   });
 }
+
+// ---------- A later part: How it fits ----------
+// "## How it fits" after Level 3: an intro, the overview table (framework, what it is for, how Keia relates, its
+// section), labelled notes (Trademarks), then one "### 4.n" section per framework. A framework section is read as
+// groups: each "**Label.** text" starts a group, and the tables, lists and plain paragraphs after it belong to it.
+//   FITS  { title, intro: [para], notes: [{ label, text }], head, rows, frameworks: [{ num, title, what, groups }] }
+const fitsAt = lines.findIndex((l) => /^## How it fits\s*$/.test(l));
+function groupsOf(bs) {
+  const out = [];
+  for (const b of bs) {
+    const l = b.kind === 'para' && labelled(b.text);
+    if (l) out.push({ label: l.label, text: l.text, blocks: [] });
+    else if (out.length) out[out.length - 1].blocks.push(b);
+    else out.push({ label: '', text: '', blocks: [b] });
+  }
+  return out;
+}
+export const FITS = (() => {
+  if (fitsAt < 0) return null;
+  const firstSec = secStarts.find((i) => i > fitsAt) ?? lastRule ?? lines.length;
+  const bs = blocks(lines.slice(fitsAt + 1, firstSec));
+  const table = bs.find((b) => b.kind === 'table');
+  const paras = bs.filter((b) => b.kind === 'para');
+  const frameworks = secStarts.filter((i) => i > fitsAt).map((i) => SECTIONS[lines[i].match(/^### (\d+\.\d+) /)[1]]).map((s) => {
+    const groups = groupsOf(s.blocks);
+    const what = groups.find((g) => /^What (it is|they are)$/.test(g.label));
+    return { num: s.num, title: s.title, what: what?.text ?? '', groups };
+  });
+  return {
+    title: 'How it fits',
+    intro: paras.filter((p) => !labelled(p.text)).map((p) => p.text),
+    notes: paras.map((p) => labelled(p.text)).filter(Boolean),
+    head: table?.head ?? [], rows: table?.rows ?? [],
+    frameworks,
+  };
+})();

@@ -86,12 +86,12 @@ Switching a tab, filter, view or step never moves the page under the pointer. Wr
 
 ### M7. Reduced motion is a second design, not the animations off
 
-With reduced motion on, every meaning survives: travel and zoom become a cross-fade, a state change is instant, the heartbeat still updates its words, and a reduced page reaches its final state sooner than the full one. CSS is covered by `base.css`, `motion.css` and `craft.css`; scripts check `window.rsMotion().reduced` themselves. Each row of the table in M13 names its reduced equivalent.
+With reduced motion on, every meaning survives: travel and zoom become a cross-fade, a state change is instant, the heartbeat still updates its words, and a reduced page reaches its final state sooner than the full one. CSS is covered by `base.css`, `motion.css`, `craft.css` and `motion-library.css`; scripts check `window.rsMotion().reduced` (or `km.reduced()`) themselves. Each row of the table in M13 names its reduced equivalent.
+
+Reduced motion is on when the person says so, else when the site's switch does, else when the system does. The person's choice is Settings › Accessibility › Motion (`src/lib/a11y.mjs`, [accessibility](../accessibility.md)): Follow my device, Reduced (this second design) or Off (nothing moves at all). It is kept in this browser (`rs7-a11y`) and written to `html[data-motion]` before first paint. `html[data-motion="off"]` or `"reduced"` (from Settings, a tool or a page) reduces motion, `html[data-motion="full"]` keeps it on even when the system asks for less, and otherwise `prefers-reduced-motion` decides. One function answers for every script, `window.rsReducedNow()` (alias `rsReduced`), defined by the accessibility boot script in the `<head>` of the Shell, the front door and the room guide, before any other script; `rsMotion().reduced`, `km.reduced()` and `motion()` all ask it, and no script reads `matchMedia` for motion itself. In CSS, a rule is written once, in `@media (prefers-reduced-motion: reduce)`: the build copies every such block to `[data-motion="reduced"]` and `[data-motion="off"]` (`tools/postcss-a11y.mjs`). Off goes further (`src/styles/a11y.css`): every transition and animation lasts no time, the duration tokens are zero, and `Element.animate()` finishes at once at its end state. Keep things still (the same Settings section, or the front door's Pause animations) starts the front door's loops paused (row 50) and lands the site-wide grammar's moves (M19) at once.
 
 - **Why:** [WCAG 2.2, 2.3.3](https://www.w3.org/WAI/WCAG22/Understanding/animation-from-interactions.html): motion makes some people ill.
-Reduced motion also comes from the person's own choice in Settings › Accessibility › Motion (`src/lib/a11y.mjs`, [accessibility](../accessibility.md)): Follow my device, Reduced (the same second design) or Off (nothing moves at all; `src/styles/a11y.css` stops every transition and animation, the duration tokens go to zero, and `Element.animate()` finishes at once at its end state). The build copies every `@media (prefers-reduced-motion: reduce)` block to `[data-motion="reduced"]` and `[data-motion="off"]` (`tools/postcss-a11y.mjs`), so a rule is written once. Scripts ask `window.rsMotion().reduced`, `motion().reduced` (`motion-read.mjs`) or `window.rsReduced()`, never `matchMedia` directly.
-
-- **Do:** guard every `el.animate()` and `startViewTransition()`: `if (M.reduced) { apply(); return; }`. `node tools/motion-check.mjs --base <dev server>` walks the zoom, the palette, Settings › Modules and a port with reduced motion on and fails on any scripted animation.
+- **Do:** guard every `el.animate()` and `startViewTransition()`: `if (M.reduced) { apply(); return; }`. `node tools/motion-check.mjs --base <dev server>` walks the zoom, the palette, Settings › Modules, a port, a disclosure, a filter, sections and charts scrolling in, a project's phases and a card's hover, once with the system set to reduced motion and once with `data-motion="off"` on a full-motion system, and fails on any scripted animation.
 - **Don't:** assume the CSS rule stops script animation. It doesn't.
 
 ### M8. Lights come on in turn
@@ -104,7 +104,7 @@ Health glyphs (`HealthGlyph.astro`, `.hg`; UI-V2 section 6) arrive quiet, then c
 
 ### M9. When not to animate
 
-Not text being read. Not numbers: a figure changes in place, never counts up, and a bar is drawn at its value. Not charts, sparklines or small multiples: they are drawn still and updated by redraw. Not things the person did not cause, with three exceptions that happen once: glyphs coming on at load, a new signal, a live change by a colleague. Not decoration on a loop. Stagger at most 12 list items, then show the rest together.
+Not text being read. Not numbers counting: a figure never counts up through the values in between; when it changes, the new value ticks into place once (`km-tick`, M19), exact on every frame. Not charts on a loop: a chart draws in once, the first time it is seen (`km-draw-in`, M19), and after that it is redrawn still; small multiples and floor plans are drawn still. Not things the person did not cause, with three exceptions that happen once: glyphs coming on at load, a new signal, a live change by a colleague. Not decoration on a loop. Stagger at most 12 list items, then show the rest together.
 
 - **Why:** motion that explains nothing hides motion that does; and data is read from still pictures.
 - **Do:** ask "what changed?" If nothing did, nothing moves.
@@ -120,7 +120,7 @@ When someone else changes something you are looking at, it stays where it is. Th
 
 ### M11. Opening things: one move, from where it came
 
-Everything that opens makes one move from its origin. Peek cards grow from the hovered item (`--dur-pop`, after `--peek-rest` of rest) and, when you move to the next item, slide there instead of closing and opening. Settings and the View as menu grow from the button that opened them and shrink back to it (`window.rsPopIn`, `rsPopOut`). Search grows from the search button. Filter and Sort menus drop from their pill. A side panel's content cross-fades in place; the panel never slides. Toasts rise from the bottom (`window.rsToast`). Every exit uses `--dur-exit` on `--ease-exit` and takes no clicks.
+Everything that opens makes one move from its origin. Peek cards grow from the hovered item (`--dur-pop`, after `--peek-rest` of rest) and, when you move to the next item, slide there instead of closing and opening. Settings and View as grow from the button that opened them and shrink back to it (`window.rsPopIn`, `rsPopOut`). Search grows from the search button. Filter and Sort menus drop from their pill. A side panel's content cross-fades in place; the panel never slides. Toasts rise from the bottom (`window.rsToast`). A `<dialog>` leaves the way it came, from its backdrop, its Cancel and Escape alike (`km.closeDialog(dlg, { to })`). Every exit uses `--dur-exit` on `--ease-exit` and takes no clicks.
 
 - **Why:** the move says where the thing came from, so people know how to put it back.
 - **Do:** start the move at the control that opened it.
@@ -158,10 +158,10 @@ Each interaction on a page is one of these rows (MOTION-V2 section 4), with its 
 
 | # | Interaction | Full motion | Reduced motion |
 |---|---|---|---|
-| 1 | Hover a row, card, glyph or link | Background eases to `--surface-2` in `--dur-hover`; a peek grows from the item in `--dur-pop` after `--peek-rest`; moving to the next item slides the peek there | Background changes at once; the peek appears at once |
+| 1 | Hover a row, card, glyph or link | Background eases to `--surface-2` in `--dur-hover`; a card that opens something also lifts 2 px and gains the next shadow (`km-lift`); a peek grows from the item in `--dur-pop` after `--peek-rest`; moving to the next item slides the peek there | Background changes at once; no lift; the peek appears at once |
 | 2 | Press a button, chip, card or row | Buttons, chips and cards scale to `--press-scale` in `--dur-press`, back on release; a primary button also darkens; a full-width row darkens instead of scaling | No scale; darkens at once |
 | 3 | Focus (keyboard) | Focus ring appears at once, never obscured by a sticky bar | Same |
-| 4 | Open or close a section, "Show all", a DetailTab | `rsHold`: the box keeps its height, then eases to the new height in `--dur-morph`; new rows enter `--stagger` apart up to 12; a tab comes from the side you moved towards | Height and rows change at once |
+| 4 | Open or close a section, "Show all", a DetailTab, a `<details>` | `rsHold`: the box keeps its height, then eases to the new height in `--dur-morph`; new rows enter `--stagger` apart up to 12; a tab comes from the side you moved towards; a `<details>` grows from its summary (`km-disclose`) | Height and rows change at once |
 | 5 | Card to page | Transform: the card's picture tweens to the page's picture over `--dur-page` while `main` leaves upward and the next rises in; the band stays | Cross-fade of `main` |
 | 6 | Zoom in one level | Transform over `--dur-zoom` on `--spring-settle`: the clicked shape grows into the destination picture; the parent scales to 1.06 and fades beneath it | Cross-fade |
 | 7 | Zoom out one level | The reverse | Reverse cross-fade |
@@ -196,7 +196,19 @@ Each interaction on a page is one of these rows (MOTION-V2 section 4), with its 
 | 36 | The suggestion after your call (P1, P2) | The folded suggestion opens once the call is saved: its box holds (`rsHold`) and eases to the new height; the suggestion rises 6 px and fades in over `--dur-enter` | Appears at once |
 | 37 | A timeline row arrives (a step of a run, a hand-off, a colleague's change) | Enters at its place in time, scaling from .97 over `--dur-enter` inside a held box; someone else's carries the M10 mark | Appears at once; the mark still shows |
 | 38 | A run joins a rule's strip | The new square grows from its centre once at the right end (`--dur-enter`); the words under the strip change in place | Appears at once |
-| 39 | Front door: a lifecycle stage left alone (Plan, Deliver, Maintain, Fix, Improve, the five proofs) | The one place on the site that loops (`src/lib/front-loop.mjs`, Keith's rule for the landing page, 30 Sept 2026): the stage plays its sequence on the tokens, eases into its final frame, holds it 3 to 4 s, cross-fades back to its first frame (`--dur-exit` out, `--dur-state` in; nothing plays backwards) and plays again. It pauses off screen and in a hidden tab, each stage adds its own random beat so no two loop in step, and a click, hover or focus yields to the visitor for 8 s. No "Play again" buttons anywhere. Every loop has one small pause and play button in its corner, and the footer has Pause animations (WCAG 2.2.2): pausing freezes the picture, its timers and its moves where they are, and play carries on from there. Keep things still (Settings › Accessibility, or the footer): each stage shows its finished frame, paused, and Play starts it from the top | The finished frame, still, no loop and no button; the hero is the drawn floor with its words |
+| 39 | Front door: a lifecycle stage left alone (Plan, Deliver, Maintain, Fix, Improve, the five proofs) | The one place on the site that loops (`src/lib/front-loop.mjs`, Keith's rule for the landing page, 30 Sept 2026): the stage plays its sequence on the tokens, eases into its final frame, holds it 3 to 4 s, cross-fades back to its first frame (`--dur-exit` out, `--dur-state` in; nothing plays backwards) and plays again. It pauses off screen and in a hidden tab, each stage adds its own random beat so no two loop in step, and a click, hover or focus yields to the visitor for 8 s. No "Play again" buttons anywhere; each loop can be paused (row 50) | The finished frame, still, no loop and no pause button; the hero is the drawn floor with its words |
+| 40 | View as: open a role, find, choose | The picker grows from the control that opened it (`rsPopIn`) and shrinks back to it. A role with several people opens a panel on the row under its tile: the panel grows out of the tile (from the tile's width to the row's, and downwards) on `--spring-settle`, the rows below slide down on the same spring, the card's height eases with them, and the people enter `--stagger` apart over `--dur-enter`; the tiles never change order. Closing folds the panel back into its tile over `--dur-exit`. A second press starts from where things are. Finding dims what does not match and moves nothing. Choosing closes the picker, then `rsPickWho` (row 26) | Opens, closes and dims at once |
+| 41 | Method pages: a block below the fold comes into view | It settles in once: opacity and 8 px up over `--dur-enter` on `--ease-settle`. Blocks already on screen arrive with the page and do not move again; scrolling back never replays it (`MethodPage.astro`) | Present at once |
+| 42 | Method pages: an idea's picture (`IdeaArt`) comes into view | It plays its point once, from the library's moves: the building's frame closes on the room (km-zoom's move) and its ring comes on (`km-on`); the fields draw in (`km-draw`), the question last; the answer line, then its figure, then the list; the chip hands over (km-chip's move); the lines no longer needed fade. Several arriving together play `--dur-state` apart. The markup is the end frame | The end frame, never played |
+| 43 | Method, How it fits: point at or focus an idea on a mapping | The idea's chip and its row ease to the accent wash and the other rows quieten (`--dur-state`); nothing moves, and the rows never animate in (M16) | Changes at once |
+| 44 | Method pages: arriving from another method page | The navigation's marker slides from the page you came from to this one once the navigation is in view (`rsZoom`, the zero-bounce spring) | The marker is simply at this page |
+| 45 | Method pages: "Try it in the demo" | The zoom-in page move (row 6), growing from the link: the method page scales to `--zoom-scale` and fades as the demo arrives | Cross-fade |
+
+| 46 | A section scrolls into view for the first time | It settles in once: rises 12 px into its place while it fades in (`km-settle`, `--dur-enter`). What was in view when the page arrived came with the page move and never settles again | Present at once |
+| 47 | A `<details>` opens or closes | Its box grows from the summary's height to its own (`--dur-morph`) while its content rises 4 px and fades in (`--dur-state`); closing fades the content and folds the box back into the summary (`--dur-exit`); a floating menu grows from its summary instead (`--pop-scale`, `--dur-pop`). A second press starts from where the box is (`km-disclose`) | Opens and closes at once |
+| 48 | A figure changes (a filter's count, a band's number, a Home figure) | The new value ticks into place: it rises in when it went up and drops in when it went down, once, over `--dur-state`; it never counts through the values in between (`km-tick`) | The new value is there |
+| 49 | A chart is first seen (a sparkline, a bar, a stacked bar, a column chart) | Lines draw along their length and bars grow from their baseline, a stacked bar's segments together from its left edge so they stay joined, up to 12 bars `--stagger` apart, over `--dur-morph`, once (`km-draw-in`). Later changes redraw it still | Drawn at once |
+| 50 | Pause and play a moving picture (WCAG 2.2.2): the pause button in a loop's corner, or Pause animations in the front door's footer | The loop, its timers and every move inside it (CSS and scripted, and the 3D camera) freeze where they are; play carries on from that point. The button changes from pause to play and back in place. Pause animations pauses every loop and is kept as Keep things still (Settings › Accessibility): the next visit shows each stage's finished frame, paused, and Play starts it from its first frame (`src/lib/front-loop.mjs`) | Nothing plays, so there is no button |
 
 A list that appears with the page (a card grid, a list of rows) makes one quiet stagger, once: the first 12 items rise into place `--stagger` apart, the rest together; filtering, sorting and live changes never replay it.
 
@@ -206,12 +218,12 @@ A list that appears with the page (a card grid, a list of rows) makes one quiet 
 
 ### M14. What never moves
 
-- Text being read, and numbers changing.
+- Text being read. A figure never counts through the numbers in between (its new value ticks into place once, M19).
 - The band, the top bar, the sidebar, the place tabs and the filter bar between pages.
 - The page under the pointer (M6).
 - A fine glyph. Nothing that is fine pulses, breathes or glows.
 - The floor plan: it never pans or zooms on its own.
-- Sparklines, small multiples and charts: drawn still, updated by redraw.
+- Sparklines and charts after their one draw-in (M19), and small multiples: updated by a still redraw.
 - Focus rings and error text.
 - An empty Restricted slot for a partner: drawn at once with its reason.
 
@@ -240,21 +252,21 @@ A list that appears with the page (a card grid, a list of rows) makes one quiet 
 2. **Hierarchy.** Navigation (zoom, page to page, card to page) is the largest move; then state change (a ring, the With chip, a section opening or closing); then feedback (hover, press, copy, a toggle); then text updates (the heartbeat's words), which do not move at all.
 3. **Budget per screen.** Outside the person's own action, at most one thing moves at a time. A new fault moves at most three things, once (M13, row 15). A list reveal is one quiet stagger, once per page load, never on a re-render.
 4. **Small by default.** Hover and press are the lightest moves (`--dur-hover` and `--dur-press`, no layout shift). Nothing larger than the element itself moves unless it is navigation.
-5. **Still places.** Data, tables, charts, numbers and reading text never animate.
+5. **Still places.** Reading text and table rows never animate, and data never moves on its own. A chart draws in once when first seen, and a figure ticks once when it changes (M19); both are the whole of the move.
 
 - **Why:** motion that is everywhere stops meaning anything, and a busy screen is tiring to work in all day.
 - **Do:** count what moves on a screen when nothing was pressed: it should be none, or one.
-- **Don't:** add a move to a page that already has one playing, or animate a figure, a table row or a chart.
+- **Don't:** add a move to a page that already has one playing, count a figure up, loop a chart, or animate a table row.
 
 ### M17. The motion library is the one source
 
-The twelve micro-motions of the Keia motion library live in `src/styles/motion-library.css` and `src/lib/motion-library.js` (`window.km`), loaded on every page by `src/components/Motion.astro`. Their durations and curves are the tokens in `motion.css`, so each look keeps its tempo; their spring is V2's (`src/lib/spring.mjs`, `--ease-spring`); `--km-t` is 0 under reduced motion, so every one of them lands on its end state.
+The seventeen micro-motions of the Keia motion library live in `src/styles/motion-library.css` and `src/lib/motion-library.js` (`window.km`), loaded on every page by `src/components/Motion.astro`. Their durations and curves are the tokens in `motion.css`, so each look keeps its tempo; their spring is V2's (`src/lib/spring.mjs`, `--ease-spring`); `--km-t` is 0 under reduced motion, so every one of them lands on its end state.
 
 | # | Motion | In the site |
 |---|---|---|
 | 1 | `km-logo` | The mark's one-time draw (front door; the mark is not final) |
 | 2 | `km-draw` | Any stroke that draws on (`pathLength="1"`); the Drawing set's section rules |
-| 3 | `km-ring` | Every health glyph: `HealthGlyph.astro`, and `glyph()` and `setGlyph()` in `src/lib/health.mjs`. A state change eases the ring's dash pattern in place; M8's "coming on" is the ring closing |
+| 3 | `km-ring` | Every health glyph: `HealthGlyph.astro`, and `glyph()` and `setGlyph()` in `src/lib/health.mjs`. A state change eases the ring's dash pattern in place; M8's "coming on" is the ring closing. A line redrawn with new markup keeps the move with `km.ringSwap(box, render)`: each glyph starts from its old state and eases to the new one |
 | 4 | `km-chip` | `km.chip()`, for `WithChip` (the Home round) |
 | 5 | `km-peek` | `Peek.astro` makes this move site-wide; `km.peek()` for a peek inside a frame |
 | 6 | `km-heartbeat` | `Heartbeat.astro` keeps the same rule (words only; stale once) |
@@ -264,6 +276,11 @@ The twelve micro-motions of the Keia motion library live in `src/styles/motion-l
 | 10 | `km-toast` | `window.rsToast()` (Report, the Schedule) is `km.toast()` in a host at the foot of the window |
 | 11 | `km-empty` | `EmptyState.astro`: a thin planned ring that comes on once each time the empty state appears |
 | 12 | `km-skeleton` | `window.rsFill(box, fill)`: the wash only after `--skeleton-skip`, gone when the content arrives |
+| 13 | `km-settle` | `km.settle(scope)`: every `section.sec` (or `[data-settle]`) below the fold settles in once as it first scrolls into view. Wired on every page by `src/lib/motion-wire.js`; an automated browser (a full-page screenshot) sees everything in place |
+| 14 | `km-disclose` | `km.disclose(details, open)`: every `<details>` in `main` grows from its summary and folds back into it; wired site-wide by `motion-wire.js`. Opt out with `data-no-disclose` |
+| 15 | `km-tick` | `km.tick(el, oldText)`, and `km.watchFigures(scope)`: every `.num`, `[data-tick]`, the filter bar's count, `[data-n]` and `[data-qn]` that changes while in view ticks to its new value. Opt out with `data-no-tick` |
+| 16 | `km-draw-in` | `km.drawIn(el)` and `km.watchCharts(scope)`: every sparkline (`svg.spk`), `[data-chart]` and bar track in `km.BARS` draws in once when first a third in view. Opt out with `data-no-draw`; small multiples are left still |
+| 17 | `km-lift` | CSS: `a.card`, `a.site-card`, `.card.oc` and `[data-lift]` lift 2 px on hover (`translate`, so a press's scale composes) |
 
 - **Why:** one library, one set of tokens, one spring: the site moves as one thing.
 - **Do:** reach for a `km-` motion before writing a new one.
@@ -282,4 +299,27 @@ What moves where, page type by page type, so it can be audited. Everything not l
 | Services | As every page | Filter the units (row 22) | A service's light changing once (row 15) |
 | The room guide (`/guide/<space>/`) | Glyphs come on in turn (M8); the symptom list makes one quiet stagger | Tap 1: the two buttons become the symptom list in place, the box easing to its new height (`--dur-morph`) and the list fading in (`--dur-state`); tap 2: the list becomes the status the same way; the With chip slides Ready for Liam to With Liam (`km-chip`, row 17) | The report's status changing (taken, fixed): the glyph eases in place and the two lines cross-fade once (row 15). Reduced motion: every one changes at once |
 | Settings | Grows from its button (M11) | Look, light and dark (row 24); density (row 25); a module (row 26); markers slide (M12) | None |
-| Home, the front door, the method pages | Owned by their rounds, within this budget (M16) | | |
+| Home, the front door | Owned by their rounds, within this budget (M16) | | |
+| The method pages | As every page; blocks below the fold settle in once, and each idea's picture plays once, as they come into view (rows 41, 42); the navigation's marker slides from the last method page (row 44) | A mapping lights an idea's row (row 43); Try it zooms into the demo (row 45); each explorable makes its own one motion | None |
+
+### M19. One grammar for every page
+
+Every page gets the same moves for the same kinds of change, from the library, without writing any motion of its own. Most of it is wired once for the whole site (`src/components/Motion.astro` loads `src/lib/motion-wire.js`; the room guide's layout does the same), so a new page that uses the shared parts moves like every other page. The audit of every page family against this grammar is `docs/rules/motion-audit.md`.
+
+| Change | The move | Where it comes from |
+|---|---|---|
+| A page arrives | `main` leaves upward and the next rises in; the frame, band and filter bar stay (M5) | The Shell's view transitions (`motion.css`) |
+| A section is first seen | It settles in once (row 46) | `km-settle`, wired site-wide |
+| A list appears with the page | One quiet stagger, once (M13) | `Motion.astro` |
+| Filter, sort, view switch | Staying items slide to their new place (FLIP); leaving ones fade early and shrink, so a leaving row never sits over one sliding into its place; new ones grow; the box eases to its height (M12) | `FilterBar` (`rsEnterEls`, `rsExitEls`, `rsHold`) |
+| Something expands | It grows from its source: a `<details>` from its summary (row 47), "Show all" in a held box (row 4), a menu or card from its control (`rsPopIn`), a tab or phase from the side you moved towards (`DetailTabs`, `rsSwapBegin` with `dir`) | `km-disclose`, `Section`, the Shell |
+| A number changes | It ticks to the new value (row 48) | `km-tick`, wired site-wide |
+| A status changes | The ring eases in place (`km-ring`, `setGlyph()`); an owner's chip slides (`km-chip`) | `HealthGlyph`, `src/lib/health.mjs`, `WithChip` |
+| A chart is first seen | It draws in once (row 49) | `km-draw-in`, wired site-wide |
+| Hover | Rows darken; cards that open something lift 2 px (row 1) | `craft.css`, `km-lift` |
+
+Under reduced motion (Follow my device, Reduced or Off, M7) and under Keep things still (Settings › Accessibility), settle, disclose, tick, draw-in and lift land on their end state at once (`km.still()` in `src/lib/motion-library.js`).
+
+- **Why:** motion is how Keia Atlas shows a change instead of claiming it; one grammar on every page is what makes it read as one product.
+- **Do:** use the shared parts (`Section`, `FilterBar`, `DetailTabs`, `<details>`, `.num`, a bar as a track of `<i>` sized to its value, `sparkSvg`) and the moves come with them. A new chart that is none of these takes `data-chart`; a new bar track takes `data-chart-bar`.
+- **Don't:** write a page's own version of any of these moves, or turn one off without a reason written beside the opt-out.

@@ -3,6 +3,7 @@
 import Icon from '../components/Icon.astro';
 import { href } from '../lib/data.mjs';
 import Settings from '../components/Settings.astro';
+import ViewAs from '../components/ViewAs.astro';
 import Report from '../components/Report.astro';
 import Peek from '../components/Peek.astro';
 import Motion from '../components/Motion.astro';
@@ -21,7 +22,7 @@ import '../styles/craft.css';
 import '../styles/a11y.css';
 import { A11Y_BOOT } from '../lib/a11y.mjs';
 
-import { PEOPLE, TEAMS } from '../lib/demo.mjs';
+import { PEOPLE } from '../lib/demo.mjs';
 import { LINE } from '../lib/brand.mjs';
 import { MODULES, MODULE_DEFAULTS } from '../lib/modules.mjs';
 import { zoomTrail } from '../lib/zoom.mjs';
@@ -147,7 +148,8 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>{pageTitle}</title>
   <meta name="description" content={`Keia Atlas: ${LINE} A demo of a made-up company, built on public device data.`} />
-  <!-- Settings › Accessibility (src/lib/a11y.mjs): motion, text size, outlines, links, status words, keep still. Before anything paints. -->
+  <!-- Settings › Accessibility (src/lib/a11y.mjs): motion, text size, outlines, links, status words, keep still. Before
+       anything paints. It also defines window.rsReducedNow(), the one reduced-motion question every script asks (M7). -->
   <script is:inline data-astro-rerun set:html={A11Y_BOOT}></script>
   <script is:inline data-astro-rerun define:vars={{ VENDOR_IDS, WHO_ROLE, PEOPLE_LITE, MODULE_DEFAULTS, MOVED_HREF }}>window.RS_VENDORS = VENDOR_IDS; window.RS_WHO_ROLE = WHO_ROLE; window.RS_PEOPLE = PEOPLE_LITE; window.RS_MODULES = MODULE_DEFAULTS; window.RS_MOVED = MOVED_HREF;</script>
   <script is:inline data-astro-rerun>
@@ -345,7 +347,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
           var load = e.loader, src = e.sourceElement && e.sourceElement.closest ? e.sourceElement : null;
           e.loader = async function () {
             await load();
-            var nd = e.newDocument; if (!nd || (window.rsReduced ? window.rsReduced() : matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+            var nd = e.newDocument; if (!nd || (window.rsReducedNow && window.rsReducedNow())) return;
             var safe = function (id) { return 'rec-' + String(id).replace(/[^a-zA-Z0-9_-]/g, '-'); };
             var esc = function (s) { return window.CSS && CSS.escape ? CSS.escape(s) : s; };
             var named = function (el, id) { el.style.viewTransitionName = safe(id); el.style.viewTransitionClass = 'rec'; };
@@ -425,7 +427,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
       </nav>
       <div class="foot">
         <div class="account">
-          <button class="acct-btn" type="button" data-help="shell.account" aria-haspopup="menu" aria-expanded="false" data-acct-menu data-verb="view-as" data-verb-name="View as">
+          <button class="acct-btn" type="button" data-help="shell.account" aria-haspopup="dialog" aria-expanded="false" aria-controls="view-as" data-acct-menu data-verb="view-as" data-verb-name="View as">
             <span class="avatar" aria-hidden="true" data-who-initials>AB</span>
             <span class="acct-who"><b data-who-role>AV and IT delivery engineer</b><small data-who-where>EMEA</small></span>
           </button>
@@ -435,41 +437,6 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
             </button>
             <button class="icon-btn" type="button" data-help="shell.settings" data-open-settings data-verb="settings" data-verb-name="Settings" aria-label="Settings" title="Settings"><Icon name="gear" /></button>
           </span>
-          <div class="acct-menu" data-help="shell.viewas" role="menu" aria-label="View as someone else" hidden>
-            <div class="am-top">
-              <p class="am-h">View as <span class="faint">· demo</span></p>
-              <label class="am-q" data-help="shell.viewas-find"><Icon name="search" size={14} /><input type="search" placeholder="Role, place or team" data-who-q aria-label="Find a person" /></label>
-            </div>
-            <div class="am-people" data-who-list>
-              <div class="am-grp" data-grp>
-                <p class="am-g">Overview</p>
-                <button type="button" role="menuitemradio" aria-checked="false" data-help="shell.viewas-everyone" data-pick-who="everyone" data-text="everyone overview all roles master demo">
-                  <span class="avatar sm" aria-hidden="true">All</span>
-                  <span class="am-p"><b>{EVERYONE.role}</b><small>Every role's first screen, all at once</small></span>
-                </button>
-              </div>
-              {['delivery', 'onsite', 'av-it', 'it-infra', 'service-desk', 'leadership', 'vendor'].map((tm) => {
-                const ps = PEOPLE.filter((p) => p.team === tm);
-                return ps.length > 0 && (
-                  <div class="am-grp" data-grp>
-                    <p class="am-g">{TEAMS[tm]}</p>
-                    {ps.map((p) => (
-                      <button type="button" role="menuitemradio" aria-checked="false" data-help="shell.viewas-person" data-pick-who={p.id} data-text={`${p.role} ${p.where} ${TEAMS[tm]} ${p.scope ?? ''} ${p.name}`.toLowerCase()}>
-                        <span class="avatar sm" aria-hidden="true" title={p.name}>{p.initials}</span>
-                        <span class="am-p"><b>{p.role}</b><small>{p.where}</small></span>
-                      </button>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-            <div class="am-links">
-              <button type="button" role="menuitem" data-open-settings><Icon name="gear" size={16} />Settings</button>
-              <a role="menuitem" href={href('/welcome/')}><Icon name="globe" size={16} />Welcome page</a>
-              <a role="menuitem" href={href('/about/')}><Icon name="about" size={16} />About</a>
-              <a role="menuitem" href={href('/about/#decisions')}><Icon name="decisions" size={16} />Decisions</a>
-            </div>
-          </div>
         </div>
       </div>
     </aside>
@@ -478,6 +445,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
       <div class="viewas" data-viewas data-help="shell.ribbon" hidden role="status">
         <span class="va-eye" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg></span>
         <span class="va-t">Viewing as <b data-va-name></b><span class="va-role">, <span data-va-role></span>, <span data-va-where></span></span></span>
+        <button type="button" class="va-change" data-open-viewas data-help="shell.viewas-change">Change</button>
         <button type="button" class="va-back" data-back-to-you data-help="shell.back-to-you">Back to you</button>
       </div>
       <section class="vendor-gate">
@@ -542,6 +510,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
       <div class="page-body"><slot /></div>
     </main>
   </div>
+  <ViewAs />
   <Settings />
   <Report about={aboutThis} />
   <Peek />
@@ -622,60 +591,6 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
       document.querySelectorAll('[data-set-module]').forEach(function (b) {
         b.addEventListener('click', function () { window.rsSetModule(b.dataset.setModule, 'on'); });
       });
-      /* Account menu: about the project, decision records and settings live here. */
-      var btn = document.querySelector('[data-acct-menu]'), menu = document.querySelector('.acct-menu');
-      if (btn && menu) {
-        // It grows from the account button and shrinks back to it (M11, M12).
-        var close = function () {
-          if (menu.hidden || menu.__closing) return;
-          menu.__closing = true; btn.setAttribute('aria-expanded', 'false');
-          window.rsPopOut(menu, btn, function () { menu.hidden = true; menu.__closing = false; });
-        };
-        var markWho = function () {
-          var cur = window.rsWhoId();
-          menu.querySelectorAll('[data-pick-who]').forEach(function (b) { b.setAttribute('aria-checked', String(b.dataset.pickWho === cur)); });
-        };
-        btn.addEventListener('click', function (e) {
-          e.stopPropagation();
-          if (!menu.hidden && !menu.__closing) { close(); return; }
-          menu.__closing = false; menu.getAnimations().forEach(function (an) { an.cancel(); });
-          menu.hidden = false; btn.setAttribute('aria-expanded', 'true');
-          markWho(); var on = menu.querySelector('[aria-checked=true]'); if (on) on.scrollIntoView({ block: 'nearest' });
-          window.rsPopIn(menu, btn);
-          var q = menu.querySelector('[data-who-q]'); if (q && matchMedia('(hover: hover)').matches) q.focus({ preventScroll: true });
-        });
-        menu.addEventListener('click', function (e) {
-          var pick = e.target.closest('[data-pick-who]');
-          if (pick) {
-            // The menu closes first, then the page changes to the new person in one move (rsPickWho).
-            var id = pick.dataset.pickWho, m = window.rsMotion ? window.rsMotion() : { reduced: true, exit: 0 };
-            close(); markWho();
-            if (m.reduced) window.rsPickWho(id); else setTimeout(function () { window.rsPickWho(id); }, m.exit);
-            return;
-          }
-          if (e.target.closest('[role=menuitem]')) close();
-        });
-        var wq = menu.querySelector('[data-who-q]');
-        if (wq) wq.addEventListener('input', function () {
-          var q = wq.value.trim().toLowerCase();
-          menu.querySelectorAll('[data-grp]').forEach(function (g) {
-            var any = false;
-            g.querySelectorAll('[data-pick-who]').forEach(function (b) { var ok = !q || b.dataset.text.indexOf(q) >= 0; b.hidden = !ok; any = any || ok; });
-            g.hidden = !any;
-          });
-        });
-        if (!window.__rsMenuHook) {   // once per visit, not once per page
-          window.__rsMenuHook = true;
-          document.addEventListener('click', function (e) {
-            var m = document.querySelector('.acct-menu'), b = document.querySelector('[data-acct-menu]');
-            if (m && !m.hidden && !m.__closing && !e.target.closest('.acct-menu')) {
-              m.__closing = true; if (b) b.setAttribute('aria-expanded', 'false');
-              window.rsPopOut(m, b, function () { m.hidden = true; m.__closing = false; });
-            }
-          });
-        }
-        menu.addEventListener('keydown', function (e) { if (e.key === 'Escape') { close(); btn.focus(); } });
-      }
       /* "Back to you" on the View as ribbon: back to the person this window opened as. */
       var back = document.querySelector('[data-back-to-you]');
       if (back) back.addEventListener('click', function () { window.rsPickWho(window.rsMeId()); });
@@ -696,7 +611,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         return isNaN(n) ? d : /ms$/.test(v) ? n : /s$/.test(v) ? n * 1000 : n;
       };
       return {
-        reduced: (window.rsReduced ? window.rsReduced() : matchMedia('(prefers-reduced-motion: reduce)').matches),
+        reduced: window.rsReducedNow(),
         ease: cs.getPropertyValue('--ease-settle').trim() || 'cubic-bezier(.22,1,.36,1)',
         morph: ms('--dur-morph', 520), enter: ms('--dur-enter', 440), exit: ms('--dur-exit', 240), page: ms('--dur-page', 420),
         state: ms('--dur-state', 300), hover: ms('--dur-hover', 140), pop: ms('--dur-pop', 200), flash: ms('--dur-flash', 800),
@@ -932,9 +847,12 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         pins.forEach(function (p) { p.r = p.el.getBoundingClientRect(); });
         pins.forEach(function (p) { p.el.style.left = (p.b.left - p.r.left) + 'px'; p.el.style.top = (p.b.top - p.r.top) + 'px'; });
         var undos = pins.map(function (p) {
-          var o = originOf(p.b), k = bigBox(p.b) ? [{ opacity: 1 }, { opacity: 0 }] : [{ opacity: 1, transform: 'none', transformOrigin: o }, { opacity: 0, transform: 'scale(0)', transformOrigin: o }];
-          var an = p.el.animate(k, { duration: m.exit, easing: m.exitEase || m.ease, fill: 'forwards' }), gone = false;
-          var undo = function () { if (gone) return; gone = true; an.cancel(); if (p.saved == null) p.el.removeAttribute('style'); else p.el.setAttribute('style', p.saved); };
+          // The words fade early (in the first 60% of the exit, on the settle curve) while the box shrinks on the exit
+          // curve, so a leaving row never sits at full strength over a row sliding into its place.
+          var o = originOf(p.b), big = bigBox(p.b);
+          var fade = p.el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: Math.round(m.exit * 0.6), easing: m.ease, fill: 'forwards' });
+          var an = big ? fade : p.el.animate([{ transform: 'none', transformOrigin: o }, { transform: 'scale(0)', transformOrigin: o }], { duration: m.exit, easing: m.exitEase || m.ease, fill: 'forwards' }), gone = false;
+          var undo = function () { if (gone) return; gone = true; fade.cancel(); an.cancel(); if (p.saved == null) p.el.removeAttribute('style'); else p.el.setAttribute('style', p.saved); };
           an.onfinish = undo;
           return undo;
         });
@@ -1112,7 +1030,9 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
   .viewas[hidden] { display: none; }
   .va-eye { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--on-accent); flex: none; }
   .va-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .va-back { margin-left: auto; flex: none; font: 600 12.5px/1 var(--font-sans); padding: 6px 10px; border-radius: var(--pill-radius); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); background: var(--surface); color: var(--accent-ink); cursor: pointer; transition: background var(--dur-hover), border-color var(--dur-hover); }
+  .va-change { margin-left: auto; flex: none; font: 600 12.5px/1 var(--font-sans); padding: 6px 10px; border-radius: var(--pill-radius); border: 0; background: none; color: var(--accent-ink); cursor: pointer; transition: background var(--dur-hover); }
+  .va-change:hover { background: color-mix(in srgb, var(--accent-soft) 70%, var(--surface)); }
+  .va-back { flex: none; font: 600 12.5px/1 var(--font-sans); padding: 6px 10px; border-radius: var(--pill-radius); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); background: var(--surface); color: var(--accent-ink); cursor: pointer; transition: background var(--dur-hover), border-color var(--dur-hover); }
   .va-back:hover { background: var(--accent-soft); border-color: var(--accent); }
   @media (max-width: 600px) { .va-role { display: none; } }
   ::view-transition-group(ribbon) { z-index: 3; }

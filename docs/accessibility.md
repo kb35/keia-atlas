@@ -22,7 +22,7 @@ Open **Settings** (the gear at the bottom of the sidebar, or at the top right on
 | Stronger outlines and focus rings | Lines drawn in a text colour, and a thicker focus ring with a halo, on any look. |
 | Underline links | Every text link is underlined, not only told by its colour. |
 | Status shown with words | The word (Fine, Fault, To review, Not reporting, In progress, Planned, Off) beside every status mark. |
-| Keep things still | The moving pictures on the front page start paused, on their finished frame. |
+| Keep things still | The moving pictures on the front page start paused, on their finished frame, and nothing on a page slides, grows or draws in by itself. |
 
 Your browser's own zoom also works: the pages we checked reflow down to 320 px wide (400% zoom on a laptop) without scrolling sideways.
 

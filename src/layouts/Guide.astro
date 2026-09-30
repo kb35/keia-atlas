@@ -37,6 +37,7 @@ const { title, office, home } = Astro.props;
       if (t === 'light' || t === 'dark') r.setAttribute('data-theme', t); else r.removeAttribute('data-theme');
       try { hp = sessionStorage.getItem('rs5-help') === 'on' ? 'on' : 'off'; } catch (_) {}
       r.setAttribute('data-help', hp);
+      /* Reduced motion (M7): window.rsReducedNow() comes from the accessibility boot script above (src/lib/a11y.mjs). */
     })();
   </script>
   <ClientRouter />
@@ -64,7 +65,9 @@ const { title, office, home } = Astro.props;
   <slot name="end" />
   <script>
     import km from '../lib/motion-library.js';
+    import { wirePage } from '../lib/motion-wire.js';
     (window as any).km = km;
+    wirePage(km);
   </script>
   <script is:inline data-astro-rerun>
     /* Health glyphs (M8, as in the Shell): quiet first, then each comes on in turn, once, as it scrolls into view. */
@@ -72,7 +75,7 @@ const { title, office, home } = Astro.props;
       var lights = document.querySelectorAll('.hg:not(.lit)'), n = 0;
       var gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--stagger')) || 24;
       var light = function (el) { setTimeout(function () { el.classList.add('lit'); }, 200 + (n++ % 40) * gap); };
-      if ((window.rsReduced ? window.rsReduced() : matchMedia('(prefers-reduced-motion: reduce)').matches)) { lights.forEach(function (el) { el.classList.add('lit'); }); return; }
+      if ((window.rsReducedNow ? window.rsReducedNow() : matchMedia('(prefers-reduced-motion: reduce)').matches)) { lights.forEach(function (el) { el.classList.add('lit'); }); return; }
       if (!('IntersectionObserver' in window)) { lights.forEach(light); return; }
       var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { io.unobserve(e.target); light(e.target); } }); }, { threshold: 0.5 });
       lights.forEach(function (el) { io.observe(el); });

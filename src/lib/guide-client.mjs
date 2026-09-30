@@ -14,7 +14,7 @@ import { setGlyph } from './health.mjs';
 
 const D = document;
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-const reduced = () => (window.rsReduced ? window.rsReduced() : matchMedia('(prefers-reduced-motion: reduce)').matches);
+const reduced = () => (window.rsReducedNow ? window.rsReducedNow() : matchMedia('(prefers-reduced-motion: reduce)').matches);
 const hm = (stamp) => stamp.slice(11, 16);
 const todayOf = (stamp) => stamp.slice(0, 10);
 let stops = [];

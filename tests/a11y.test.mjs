@@ -17,7 +17,7 @@ const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 // A small stand-in for the browser: <html> with attributes, localStorage, and Element.prototype.animate.
 function fakePage(saved, { reduce = false } = {}) {
   const attrs = new Map();
-  const html = { getAttribute: (k) => (attrs.has(k) ? attrs.get(k) : null), setAttribute: (k, v) => attrs.set(k, String(v)), removeAttribute: (k) => attrs.delete(k) };
+  const html = { hasAttribute: (k) => attrs.has(k), getAttribute: (k) => (attrs.has(k) ? attrs.get(k) : null), setAttribute: (k, v) => attrs.set(k, String(v)), removeAttribute: (k) => attrs.delete(k) };
   const store = new Map(saved == null ? [] : [[A11Y_KEY, typeof saved === 'string' ? saved : JSON.stringify(saved)]]);
   const calls = [];
   class Element {}
@@ -49,7 +49,7 @@ test('a saved record always reads as a complete, valid set of settings', () => {
 
 test('the boot script puts the saved settings on <html> as it runs, before anything paints', () => {
   const { attrs } = fakePage({ motion: 'off', text: 'larger', outlines: true, links: true, words: true, still: true });
-  assert.deepEqual(Object.fromEntries(attrs), { 'data-motion': 'off', 'data-text': 'larger', 'data-outlines': 'strong', 'data-links': 'underline', 'data-status-words': 'on', 'data-still': 'on' });
+  assert.deepEqual(Object.fromEntries(attrs), { 'data-motion': 'off', 'data-rs-motion': '', 'data-text': 'larger', 'data-outlines': 'strong', 'data-links': 'underline', 'data-status-words': 'on', 'data-still': 'on' });
   const none = fakePage(null);
   assert.equal(none.attrs.size, 0, 'the defaults add nothing');
 });
@@ -73,6 +73,35 @@ test('a change applies at once, is saved, can be undone, and survives a page cha
   assert.equal(attrs.has('data-status-words'), false);
   assert.equal(window.rsReduced(), false);
   assert.equal(fakePage(null, { reduce: true }).window.rsReduced(), true, 'Follow my device follows the device');
+});
+
+test('one reduced-motion question: the setting first, then html[data-motion], then data-reduced, then the device', () => {
+  const page = fakePage({ motion: 'reduced' });
+  assert.equal(page.window.rsReduced, page.window.rsReducedNow, 'rsReduced is the same function');
+  page.attrs.set('data-motion', 'full');
+  assert.equal(page.window.rsReducedNow(), true, 'the person\'s setting wins over a page\'s switch');
+  const tool = fakePage(null, { reduce: true });
+  assert.equal(tool.window.rsReducedNow(), true, 'the device, when nothing else says');
+  tool.attrs.set('data-motion', 'full');
+  assert.equal(tool.window.rsReducedNow(), false, 'data-motion="full" keeps motion on');
+  tool.window.rsApplyA11y();
+  assert.equal(tool.attrs.get('data-motion'), 'full', 'the setting never removes a data-motion it did not set');
+  tool.attrs.delete('data-motion'); tool.attrs.set('data-reduced', 'false');
+  assert.equal(tool.window.rsReducedNow(), false, 'then the older data-reduced');
+  // No script asks the media query for motion on its own; the library asks the one function too.
+  const km = read('src/lib/motion-library.js');
+  assert.match(km, /if \(typeof window\.rsReducedNow === 'function'\) return window\.rsReducedNow\(\);/);
+  for (const f of ['src/layouts/Shell.astro', 'src/layouts/Guide.astro']) assert.ok(!/window\.rsReducedNow = window\.rsReducedNow \|\| function/.test(read(f)), `${f}: no second definition`);
+});
+
+test('the site-wide grammar (settle, disclose, tick, draw-in, lift) lands at once under Keep things still', () => {
+  const km = read('src/lib/motion-library.js');
+  assert.match(km, /still\(\) \{ return km\.reduced\(\) \|\| root\.getAttribute\('data-still'\) === 'on'; \}/);
+  for (const [name, re] of [['settle', /settle\(scope[^)]*\) \{[\s\S]{0,200}?km\.still\(\)/], ['disclose', /disclose\(d[^)]*\) \{[\s\S]{0,200}?km\.still\(\)/], ['tick', /tick\(el[^)]*\) \{\s*if \(!el \|\| km\.still\(\)/], ['drawIn', /drawIn\(el[^)]*\) \{\s*if \(!el \|\| km\.still\(\)/], ['watchCharts', /watchCharts\(scope[^)]*\) \{\s*if \(!scope \|\| km\.still\(\)/]]) assert.match(km, re, name);
+  const css = read('src/styles/motion-library.css');
+  assert.match(css, /:root\[data-still="on"\] :is\(a\.card, a\.site-card, \.card\.oc, \[data-lift\]\):hover \{ translate: none; \}/, 'lift');
+  assert.match(css, /:root\[data-still="on"\] \.km-settle-wait \{ opacity: 1; translate: none; \}/, 'nothing waits to settle');
+  assert.ok(!/:root\[data-motion="reduced"\] \*[^{]*\{ animation: none !important; transition: none !important; \}/.test(css), 'Reduced keeps its short fades');
 });
 
 test('every layout inlines the boot script in <head>, ahead of its stylesheets and the client router', () => {

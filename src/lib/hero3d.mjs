@@ -64,7 +64,7 @@ const ms = (cs, name, d) => { const v = cs.getPropertyValue(name).trim(), n = pa
 
 export function mountHero(host, D, hooks = {}, opts = {}) {
   const cs = getComputedStyle(host);
-  const reduced = (window.rsReduced ? window.rsReduced() : matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const reduced = (window.rsReducedNow ? window.rsReducedNow() : matchMedia('(prefers-reduced-motion: reduce)').matches);
   const DUR = { theme: ms(cs, '--dur-theme', 360), move: ms(cs, '--dur-hero-move', 1800), hold: ms(cs, '--dur-hero-hold', 700), state: ms(cs, '--dur-state', 300), stagger: ms(cs, '--stagger', 24), lift: ms(cs, '--dur-hero-lift', 1400) };
   let T = readTokens(host);
 
