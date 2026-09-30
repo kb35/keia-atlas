@@ -45,7 +45,7 @@ const SERVICE = { power: 'Power', data: 'Data', 'direct-run': 'Direct run' };
 // outlets are not drawn as long lines: each device lists the outlets it plugs into underneath its
 // name, so every drawn line is a signal between two devices.
 const RANK = {
-  laptop: 0, camera: 1, microphone: 1, 'touch-controller': 1, 'signage-player': 1, 'scheduler-panel': 1, printer: 1, 'security-device': 1,
+  laptop: 0, camera: 1, microphone: 1, 'touch-controller': 1, 'signage-player': 1, 'scheduler-panel': 1, printer: 1, 'security-device': 1, 'building-sensor': 1,
   'av-extender': 2, adapter: 2, dock: 2, 'av-switcher': 3, 'desk-video-device': 4, codec: 4, 'video-bar': 4,
   amplifier: 5, display: 6, monitor: 6, loudspeaker: 6, 'network-switch': 7, 'network-gateway': 8, router: 9,
 };

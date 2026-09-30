@@ -1,0 +1,82 @@
+# Device class: Building sensor
+# A Keia object profile: what a healthy device of this class looks like on every
+# platform that knows about it. Specific models are in data/device-models/ (step 3).
+# Added 30 Sept 2026 so the network standard's Building VLAN (50) has members; no model is named yet.
+
+schema: object-profile
+
+profile:
+  name: Building sensor
+  object_role: 'A wired sensor or meter for the building management system: temperature, humidity and CO2, or energy.
+    It counts nothing about people.'
+  naming_prefixes:
+    - bms
+  version: "1.0"
+  last_updated: "2026-09-30"
+  owner: Keia Atlas maintainers
+
+sources:
+  - file: data/standards/network.yaml
+    provides: The Building VLAN (50) it goes on
+
+platforms:
+  keia_atlas:
+    helpful_fields:
+      - space
+      - model
+      - serial
+      - lifecycle_state
+    healthy_indicators:
+      - recorded in the space its space type expects
+      - every port wired as the space type says
+  inventory:
+    helpful_fields:
+      - asset_tag
+      - serial
+      - model
+      - space
+      - status
+      - hostname
+    healthy_indicators:
+      - status is active
+      - space matches where the device is installed
+  dhcp_dns:
+    helpful_fields:
+      - hostname
+      - mac_address
+      - ip_address
+    healthy_indicators:
+      - address reservation matches the MAC address
+      - forward and reverse DNS records resolve
+  monitoring:
+    helpful_fields:
+      - monitor_name
+    healthy_indicators:
+      - reporting
+      - no open critical alerts
+
+consistency:
+  - check: serial match
+    compare:
+      - keia_atlas.serial
+      - inventory.serial
+  - check: space match
+    compare:
+      - keia_atlas.space
+      - inventory.space
+  - check: hostname match
+    compare:
+      - inventory.hostname
+      - dhcp_dns.hostname
+
+discrimination:
+  device_offline:
+    likely_causes:
+      - PoE port off
+      - network cable unplugged
+      - switch port on the wrong VLAN
+    first_check: monitoring
+
+not_applicable:
+  - device_management
+  - room_booking
