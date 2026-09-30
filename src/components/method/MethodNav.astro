@@ -1,6 +1,7 @@
 ---
 // Where this page sits in the method: the four levels, every page in reading order with this one marked, and the
 // previous and next page. A person who arrives at Level 3 by accident can always step back up (FRONT-DOOR 4).
+// The marker behind this page's link slides from the page you came from (MethodPage's script, rsZoom).
 import { href } from '../../lib/data.mjs';
 import { PAGES, LEVELS } from '../../pages/method/_pages.mjs';
 interface Props { current: string }
@@ -10,7 +11,7 @@ const i = order.findIndex((p) => p.slug === current);
 const prev = i > 0 ? order[i - 1] : null, next = i >= 0 && i < order.length - 1 ? order[i + 1] : null;
 const level = order[i]?.level ?? 1;
 ---
-<nav class="card pad mn" aria-label="The Keia Method: every page" data-help="method.nav">
+<nav class="card pad mn" aria-label="The Keia Method: every page" data-help="method.nav" data-mn-here={current}>
   <ol class="mn-levels" aria-label="Levels">
     {LEVELS.map((l) => (
       <li class:list={{ 'is-here': l.n === level }} aria-current={l.n === level ? 'step' : undefined}>
@@ -18,18 +19,21 @@ const level = order[i]?.level ?? 1;
       </li>
     ))}
   </ol>
-  <div class="mn-pages">
+  <div class="mn-pages" data-mn-pages>
+    <span class="mn-mark" aria-hidden="true"></span>
     <div>
       <p class="mn-h">Level 1</p>
-      <ul><li><a href={href('/method/')} aria-current={current === 'level1' ? 'page' : undefined}>One screen: the whole method</a></li></ul>
+      <ul><li><a href={href('/method/')} data-mn="level1" aria-current={current === 'level1' ? 'page' : undefined}>One screen: the whole method</a></li></ul>
     </div>
     <div>
       <p class="mn-h">Level 2: the practices</p>
-      <ul>{PAGES.filter((p) => p.level === 2).map((p) => <li><a href={href(p.to)} aria-current={p.slug === current ? 'page' : undefined}><span class="mn-num">{p.num}</span> {p.title}</a></li>)}</ul>
+      <ul>{PAGES.filter((p) => p.level === 2).map((p) => <li><a href={href(p.to)} data-mn={p.slug} aria-current={p.slug === current ? 'page' : undefined}><span class="mn-num">{p.num}</span> {p.title}</a></li>)}</ul>
     </div>
     <div>
       <p class="mn-h">Level 3: the reference</p>
-      <ul>{PAGES.filter((p) => p.level === 3).map((p) => <li><a href={href(p.to)} aria-current={p.slug === current ? 'page' : undefined}><span class="mn-num">{p.num}</span> {p.title}</a></li>)}</ul>
+      <ul>{PAGES.filter((p) => p.level === 3 && !p.part).map((p) => <li><a href={href(p.to)} data-mn={p.slug} aria-current={p.slug === current ? 'page' : undefined}><span class="mn-num">{p.num}</span> {p.title}</a></li>)}</ul>
+      <p class="mn-h mn-h2">How it fits</p>
+      <ul>{PAGES.filter((p) => p.part).map((p) => <li><a href={href(p.to)} data-mn={p.slug} aria-current={p.slug === current ? 'page' : undefined}>{p.num && <span class="mn-num">{p.num}</span>} {p.short ?? p.title}</a></li>)}</ul>
     </div>
   </div>
   <div class="mn-step">
@@ -45,12 +49,17 @@ const level = order[i]?.level ?? 1;
   .mn-levels li.is-here { border-color: var(--accent); color: var(--text); }
   .mn-n { font: 500 10.5px/1.3 var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); }
   .mn-levels small { font-size: 12px; color: var(--text-3); }
-  .mn-pages { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 16px; }
+  .mn-pages { position: relative; display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 16px; }
+  .mn-pages > div { position: relative; }   /* the links sit above the marker */
+  .mn-h2 { margin-top: 14px; }
+  /* The marker behind this page's link: placed by MethodPage's script, still until you arrive from another page. */
+  .mn-mark { position: absolute; left: 0; top: 0; width: 0; height: 0; border-radius: 8px; background: color-mix(in srgb, var(--accent) 9%, transparent); opacity: 0; pointer-events: none; }
+  .mn-mark.on { opacity: 1; }
   .mn-h { margin: 0 0 6px; font: 500 10.5px/1.3 var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); }
   .mn-pages ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
   .mn-pages a { display: inline-flex; gap: 6px; align-items: baseline; min-height: 32px; padding: 4px 0; font-size: 13.5px; text-decoration: none; color: var(--text); }
   .mn-pages a:hover { text-decoration: underline; color: var(--text); }
-  .mn-pages a[aria-current="page"] { color: var(--accent); font-weight: 550; }
+  .mn-pages a[aria-current="page"] { color: var(--accent); font-weight: 550; position: relative; }
   .mn-num { font: 500 11.5px/1 var(--font-mono); color: var(--text-3); }
   .mn-step { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 12px; }
   .mn-step a { font-size: 14px; min-height: 44px; display: inline-flex; align-items: center; }

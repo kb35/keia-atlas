@@ -258,7 +258,12 @@ const TABS = [
       var show = function (b, animate) {
         var cur = document.querySelector('[data-phx-panel]:not([hidden])'), next = document.querySelector('[data-phx-panel="' + b.dataset.phx + '"]');
         var swap = function () { bs.forEach(function (x) { x.setAttribute('aria-selected', String(x === b)); }); document.querySelectorAll('[data-phx-panel]').forEach(function (pn) { pn.hidden = pn !== next; }); };
-        if (animate && window.rsMorphPanels && cur !== next) window.rsMorphPanels(cur, next, swap); else swap();
+        // The next phase comes in from the side you stepped towards while the box eases to its height (M12, rsSwapBegin).
+        if (animate && window.rsSwapBegin && cur && cur !== next) {
+          var order = Array.prototype.map.call(document.querySelectorAll('[data-phx-panel]'), function (pn) { return pn.dataset.phxPanel; });
+          var dir = order.indexOf(b.dataset.phx) > order.indexOf(cur.dataset.phxPanel) ? 1 : -1;
+          var sw = window.rsSwapBegin(cur, { dir: dir }); swap(); sw.end(next);
+        } else swap();
       };
       bs.forEach(function (b) { b.addEventListener('click', function () { show(b, true); }); });
       var h0 = ((window.__rsNavTo && window.__rsNavTo.hash) || location.hash || '').replace('#', '');

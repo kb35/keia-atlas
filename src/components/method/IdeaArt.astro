@@ -3,6 +3,14 @@
 // with its fields already filled; a band figure opening to a list; a "With Anna" chip; a checklist with two lines
 // faded. Line art on the art tokens, so every look and both modes draw it. Decorative: the idea's name and line sit
 // beside it, so it is hidden from screen readers.
+//
+// Motion (docs/rules/motion.md, M13 row 42): the markup is the end frame. When the picture first comes into view,
+// MethodPage's script adds .km-play once and the picture plays its point, with the motion library's moves on the
+// tokens: the building's frame closes on the room with the fault (km-zoom's move) and the room's ring comes on;
+// the fields fill themselves in (km-draw), the question last; the answer line arrives first, then its figure, then
+// the list; the chip hands over from Liam to Anna (km-chip's move); the lines she no longer needs fade. Several
+// pictures arriving together play one after another (--ia-n, --dur-state apart). Reduced motion: never played,
+// so the end frame is all there is.
 interface Props { idea: string; class?: string }
 const { idea, class: cls } = Astro.props;
 ---
@@ -14,8 +22,9 @@ const { idea, class: cls } = Astro.props;
       <line class="ia-soft" x1="36" y1="62" x2="124" y2="62" />
       <line class="ia-soft" x1="80" y1="10" x2="80" y2="90" />
       {[[58, 23], [102, 23], [58, 49], [102, 49], [58, 76], [102, 76]].map(([x, y], i) => (
-        <circle class:list={['ia-ring', { 'ia-hot': i === 3 }]} cx={x} cy={y} r="5" />
+        <circle class:list={['ia-ring', { 'ia-hot km-on': i === 3 }]} cx={x} cy={y} r="5" />
       ))}
+      <rect class="ia-focus" x="81" y="37" width="42" height="24" rx="2" />
     </g>
   )}
   {idea === 'capture-dont-ask' && (
@@ -25,18 +34,18 @@ const { idea, class: cls } = Astro.props;
       <line class="ia-soft" x1="28" y1="42" x2="44" y2="42" /><line class="ia-soft" x1="16" y1="54" x2="44" y2="54" />
       <path class="ia-soft" d="M56 48h14" /><path class="ia-soft" d="M66 44l4 4-4 4" />
       <rect class="ia-line" x="76" y="10" width="76" height="76" rx="4" />
-      {[22, 36, 50, 64].map((y) => (<><circle class="ia-dot" cx="86" cy={y} r="2.2" /><line class="ia-fill" x1="94" y1={y} x2="140" y2={y} /></>))}
-      <line class="ia-ask" x1="86" y1="77" x2="120" y2="77" />
+      {[22, 36, 50, 64].map((y, i) => (<><circle class="ia-dot" cx="86" cy={y} r="2.2" /><line class="ia-fill km-draw" pathLength="1" style={`--ia-k: ${i}`} x1="94" y1={y} x2="140" y2={y} /></>))}
+      <line class="ia-ask km-draw" pathLength="1" style="--ia-k: 4" x1="86" y1="77" x2="120" y2="77" />
     </g>
   )}
   {idea === 'answer-first' && (
     <g>
       <rect class="ia-line" x="10" y="8" width="140" height="24" rx="4" />
-      <line class="ia-fill" x1="18" y1="20" x2="70" y2="20" />
-      <text class="ia-num" x="118" y="25">7</text>
+      <line class="ia-fill ia-answer km-draw" pathLength="1" x1="18" y1="20" x2="70" y2="20" />
+      <text class="ia-num ia-then km-on" x="118" y="25">7</text>
       <path class="ia-soft" d="M122 32v10" />
       <rect class="ia-line" x="30" y="42" width="120" height="46" rx="4" />
-      {[52, 62, 72, 82].map((y, i) => <line class:list={[i === 0 ? 'ia-fill' : 'ia-soft']} x1="40" y1={y} x2={i === 0 ? 120 : 136} y2={y} />)}
+      {[52, 62, 72, 82].map((y, i) => <line class:list={[i === 0 ? 'ia-fill ia-last km-draw' : 'ia-soft']} pathLength={i === 0 ? '1' : undefined} x1="40" y1={y} x2={i === 0 ? 120 : 136} y2={y} />)}
     </g>
   )}
   {idea === 'own-it-hand-it-on' && (
@@ -45,7 +54,8 @@ const { idea, class: cls } = Astro.props;
       <line class="ia-soft" x1="20" y1="66" x2="120" y2="66" /><line class="ia-soft" x1="20" y1="76" x2="96" y2="76" />
       <rect class="ia-chip" x="22" y="16" width="116" height="26" rx="13" />
       <circle class="ia-avatar" cx="36" cy="29" r="8" />
-      <text class="ia-chip-t" x="50" y="33">With Anna</text>
+      <text class="ia-chip-t ia-was" x="50" y="33" aria-hidden="true">With Liam</text>
+      <text class="ia-chip-t ia-now" x="50" y="33">With Anna</text>
       <path class="ia-soft" d="M80 42v12" />
     </g>
   )}
@@ -53,7 +63,7 @@ const { idea, class: cls } = Astro.props;
     <g>
       <rect class="ia-line" x="34" y="8" width="92" height="80" rx="4" />
       {[22, 38, 54, 70].map((y, i) => (
-        <g class:list={[{ 'ia-faded': i === 1 || i === 2 }]}>
+        <g class:list={[{ 'ia-faded': i === 1 || i === 2 }]} style={`--ia-k: ${i}`}>
           <rect class="ia-box" x="44" y={y - 5} width="10" height="10" rx="2" />
           <path class="ia-tick" d={`M46 ${y}l2.5 2.5 4-5`} />
           <line class="ia-fill" x1="62" y1={y} x2="114" y2={y} />
@@ -79,4 +89,25 @@ const { idea, class: cls } = Astro.props;
   .ia-box { fill: none; stroke: currentColor; stroke-width: 1.5; }
   .ia-tick { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .ia-faded { opacity: .28; }
+  .ia-focus { fill: none; stroke: var(--accent); stroke-width: 1.5; vector-effect: non-scaling-stroke; transform-box: fill-box; transform-origin: center; }
+  .ia-was { opacity: 0; }
+  .ia-now { transform-box: fill-box; }
+
+  /* Playing once (.km-play, added by MethodPage when the picture comes into view). --ia-at is where this picture's
+     turn starts; every delay and duration is a token times --km-t, so reduced motion lands on the end frame. */
+  .idea-art { --ia-at: calc(var(--ia-n, 0) * var(--dur-state)); }
+  .km-play .ia-focus { animation: ia-close var(--km-zoom) var(--ease-spring, var(--ease-settle)) both; animation-delay: calc(var(--ia-at) * var(--km-t)); }
+  .km-play .ia-hot { --km-delay: calc(var(--ia-at) + var(--dur-zoom)); }
+  .km-play .ia-fill.km-draw, .km-play .ia-ask.km-draw { --km-delay: calc(var(--ia-at) + var(--ia-k, 0) * var(--dur-exit)); }
+  .km-play .ia-answer { --km-delay: var(--ia-at); }
+  .km-play .ia-then { --km-delay: calc(var(--ia-at) + var(--dur-state)); }
+  .km-play .ia-last { --km-delay: calc(var(--ia-at) + var(--dur-state) + var(--dur-pop)); }
+  .km-play .ia-was { animation: ia-hand-out var(--km-chip) var(--ease-exit) both; animation-delay: calc((var(--ia-at) + var(--dur-enter)) * var(--km-t)); }
+  .km-play .ia-now { animation: km-step-in var(--km-chip) var(--ease-spring, var(--ease-settle)) both; animation-delay: calc((var(--ia-at) + var(--dur-enter)) * var(--km-t)); }
+  .km-play .ia-faded { animation: ia-fade var(--km-state) var(--ease-settle) both; animation-delay: calc((var(--ia-at) + var(--dur-enter) + var(--ia-k, 0) * var(--dur-pop)) * var(--km-t)); }
+  /* The frame starts as the whole building and closes on the room: km-zoom's move, drawn as a frame. */
+  @keyframes ia-close { from { opacity: 0; transform: translate(-22px, 1px) scale(2.095, 3.333); } 20% { opacity: 1; } }
+  /* The chip's old words leave to the left as the new ones arrive from the right: km-chip's move, in a drawing. */
+  @keyframes ia-hand-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateX(-14px); } }
+  @keyframes ia-fade { from { opacity: 1; } }
 </style>

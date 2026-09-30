@@ -147,6 +147,18 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
   <title>{pageTitle}</title>
   <meta name="description" content={`Keia Atlas: ${LINE} A demo of a made-up company, built on public device data.`} />
   <script is:inline data-astro-rerun define:vars={{ VENDOR_IDS, WHO_ROLE, PEOPLE_LITE, MODULE_DEFAULTS, MOVED_HREF }}>window.RS_VENDORS = VENDOR_IDS; window.RS_WHO_ROLE = WHO_ROLE; window.RS_PEOPLE = PEOPLE_LITE; window.RS_MODULES = MODULE_DEFAULTS; window.RS_MOVED = MOVED_HREF;</script>
+  <script is:inline>
+    /* Reduced motion (M7): the site's own switch on <html> (data-motion="off" or "reduced"; data-motion="full"
+       keeps motion on), the older data-reduced, else the system's prefers-reduced-motion. Every script asks this. */
+    window.rsReducedNow = window.rsReducedNow || function () {
+      var r = document.documentElement, m = r.getAttribute('data-motion'), o = r.getAttribute('data-reduced');
+      if (m === 'off' || m === 'reduced') return true;
+      if (m === 'full' || m === 'on') return false;
+      if (o === 'true') return true;
+      if (o === 'false') return false;
+      return matchMedia('(prefers-reduced-motion: reduce)').matches;
+    };
+  </script>
   <script is:inline data-astro-rerun>
     /* Small shared helpers for pages that keep demo records in this browser: read and write a JSON list
        (falling back to memory when storage is blocked), and who the viewer is right now. */
@@ -342,7 +354,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
           var load = e.loader, src = e.sourceElement && e.sourceElement.closest ? e.sourceElement : null;
           e.loader = async function () {
             await load();
-            var nd = e.newDocument; if (!nd || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+            var nd = e.newDocument; if (!nd || (window.rsReducedNow && window.rsReducedNow())) return;
             var safe = function (id) { return 'rec-' + String(id).replace(/[^a-zA-Z0-9_-]/g, '-'); };
             var esc = function (s) { return window.CSS && CSS.escape ? CSS.escape(s) : s; };
             var named = function (el, id) { el.style.viewTransitionName = safe(id); el.style.viewTransitionClass = 'rec'; };
@@ -606,7 +618,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         return isNaN(n) ? d : /ms$/.test(v) ? n : /s$/.test(v) ? n * 1000 : n;
       };
       return {
-        reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
+        reduced: window.rsReducedNow(),
         ease: cs.getPropertyValue('--ease-settle').trim() || 'cubic-bezier(.22,1,.36,1)',
         morph: ms('--dur-morph', 520), enter: ms('--dur-enter', 440), exit: ms('--dur-exit', 240), page: ms('--dur-page', 420),
         state: ms('--dur-state', 300), hover: ms('--dur-hover', 140), pop: ms('--dur-pop', 200), flash: ms('--dur-flash', 800),
@@ -842,9 +854,12 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         pins.forEach(function (p) { p.r = p.el.getBoundingClientRect(); });
         pins.forEach(function (p) { p.el.style.left = (p.b.left - p.r.left) + 'px'; p.el.style.top = (p.b.top - p.r.top) + 'px'; });
         var undos = pins.map(function (p) {
-          var o = originOf(p.b), k = bigBox(p.b) ? [{ opacity: 1 }, { opacity: 0 }] : [{ opacity: 1, transform: 'none', transformOrigin: o }, { opacity: 0, transform: 'scale(0)', transformOrigin: o }];
-          var an = p.el.animate(k, { duration: m.exit, easing: m.exitEase || m.ease, fill: 'forwards' }), gone = false;
-          var undo = function () { if (gone) return; gone = true; an.cancel(); if (p.saved == null) p.el.removeAttribute('style'); else p.el.setAttribute('style', p.saved); };
+          // The words fade early (in the first 60% of the exit, on the settle curve) while the box shrinks on the exit
+          // curve, so a leaving row never sits at full strength over a row sliding into its place.
+          var o = originOf(p.b), big = bigBox(p.b);
+          var fade = p.el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: Math.round(m.exit * 0.6), easing: m.ease, fill: 'forwards' });
+          var an = big ? fade : p.el.animate([{ transform: 'none', transformOrigin: o }, { transform: 'scale(0)', transformOrigin: o }], { duration: m.exit, easing: m.exitEase || m.ease, fill: 'forwards' }), gone = false;
+          var undo = function () { if (gone) return; gone = true; fade.cancel(); an.cancel(); if (p.saved == null) p.el.removeAttribute('style'); else p.el.setAttribute('style', p.saved); };
           an.onfinish = undo;
           return undo;
         });
