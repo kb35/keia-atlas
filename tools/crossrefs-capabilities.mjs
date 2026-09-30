@@ -60,5 +60,22 @@ export function crossCheckCapabilities(records) {
     });
   }
 
+  // Out of service: the file is named after a real space; the space offered instead is another of the same office;
+  // it comes back after it went out; the incident exists.
+  const incidents = new Set(inFolder('incidents').map((r) => r.data.number));
+  for (const rec of inFolder('out-of-service')) {
+    const d = rec.data;
+    space(rec, ['space'], d.space);
+    if (d.space !== rec.id) report(rec, ['space'], `the file is named "${rec.id}" but holds space "${d.space}"`);
+    if (d.alternative) {
+      space(rec, ['alternative'], d.alternative);
+      if (d.alternative === d.space) report(rec, ['alternative'], 'the space offered instead is the same space');
+      else if (spaces.get(d.alternative) && spaces.get(d.space) && spaces.get(d.alternative).site !== spaces.get(d.space).site) report(rec, ['alternative'], 'the space offered instead is in another office');
+    }
+    if (d.until <= d.since) report(rec, ['until'], 'the expected return is not after it went out of service');
+    if (d.incident && !incidents.has(d.incident)) report(rec, ['incident'], `incident "${d.incident}" does not exist`);
+    role(rec, ['by_role'], d.by_role);
+  }
+
   return problems;
 }

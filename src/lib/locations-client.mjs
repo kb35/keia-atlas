@@ -14,6 +14,8 @@
 import { prepare, snapshot, tickOf, hhmm, openAt, nextSwitch, local, OFFICE_HOURS } from './livesim.mjs';
 import { every, esc } from './liveview.mjs';
 import { glyph } from './health.mjs';
+// Spaces out of service show as Off on the plan (the Out of service capability, src/lib/outofservice.mjs).
+import { outNow, readChanges, whenWords, EVENT as OOS_EVENT, KEY as OOS_KEY } from './outofservice.mjs';
 
 const DAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const STW = { use: 'In use', free: 'Free', problem: 'Problem', closed: 'Closed' };
@@ -36,6 +38,10 @@ export function startLocations(root) {
   const B = model?.base ?? '/';
   let first = true;
   const last = {};
+  // Out of service: the seed records on the page ([data-oos-seed]) with this browser's changes on top, while the
+  // capability is on. Such a space reads Off (st "off") whatever the simulation says.
+  const oosSeed = (() => { try { return JSON.parse(document.querySelector('[data-oos-seed]')?.textContent || '[]'); } catch (_) { return []; } })();
+  const oosNow = () => (W.rsFeatureOn && !W.rsFeatureOn('out-of-service') ? {} : outNow(oosSeed, readChanges()));
 
   function clocks(t) {
     let moved = false;
@@ -71,15 +77,16 @@ export function startLocations(root) {
     if (!model) return;
     // While Replay shows a past moment (src/lib/replay-client.mjs), the plan and the answer keep that moment.
     if (root.dataset.replay) return;
-    const snap = snapshot(model, t);
-    root.__rooms = new Map(model.rooms.map((r, i) => [r.id, { st: snap.rooms[i].st, why: whyWords(snap.rooms[i]) }]));
+    const snap = snapshot(model, t), out = oosNow();
+    const stOf = (id, i) => (out[id] ? 'off' : snap.rooms[i].st);
+    root.__rooms = new Map(model.rooms.map((r, i) => [r.id, out[r.id] ? { st: 'off', why: `Out of service until ${whenWords(out[r.id].until)}` } : { st: snap.rooms[i].st, why: whyWords(snap.rooms[i]) }]));
     const byId = new Map(model.rooms.map((r, i) => [r.id, i]));
     root.querySelectorAll('[data-loc-room], [data-sel^="room:"]').forEach((el) => {
       const i = byId.get(el.dataset.locRoom ?? el.dataset.sel.slice(5)); if (i == null) return;
-      const s = snap.rooms[i];
-      if (el.dataset.st !== s.st) {
+      const st = stOf(el.dataset.locRoom ?? el.dataset.sel.slice(5), i);
+      if (el.dataset.st !== st) {
         const was = el.dataset.st;
-        el.dataset.st = s.st;
+        el.dataset.st = st;
         if (was && W.rsMarkChanged && !el.closest('svg')) W.rsMarkChanged(el);
       }
     });
@@ -107,5 +114,11 @@ export function startLocations(root) {
   // On the office, the floor map's spaces are chosen and opened by the lens script (src/lib/lens-client.mjs).
   root.__locTick = () => tick(tickOf(Date.now()));
   const stop = every(tick);
-  return () => { stop(); };
+  // A space taken out or brought back (here, in another window, or its capability switched) shows at once.
+  const again = () => { if (root.isConnected) root.__locTick(); };
+  const onStore = (e) => { if (e.key === OOS_KEY) again(); };
+  document.addEventListener(OOS_EVENT, again);
+  document.addEventListener('rs:demo-change', again);
+  window.addEventListener('storage', onStore);
+  return () => { stop(); document.removeEventListener(OOS_EVENT, again); document.removeEventListener('rs:demo-change', again); window.removeEventListener('storage', onStore); };
 }

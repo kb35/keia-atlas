@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
 import { validate } from '../tools/validate.mjs';
 import { seatHolders, licenceRows, licenceSummary, licenceAnswer, inDays } from '../src/lib/licences.mjs';
+import { outNow, lostBookings, noticeLines, whenWords, alternativesFor } from '../src/lib/outofservice.mjs';
 import { nthWeekday, planDates, rounds, checksForSpace, checksSummary, checksAnswer, checkItem, addMonths } from '../src/lib/checks.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -33,7 +34,7 @@ for (const f of readdirSync(join(ROOT, 'data/installs'))) for (const n of readdi
   for (const u of inst.older_kit ?? []) add(u, u.model);
 }
 
-const FOLDERS = ['licences', 'checks'];
+const FOLDERS = ['licences', 'checks', 'out-of-service'];
 let result;
 test('each capability\'s data validates: schema, secrets and cross-references', async () => {
   result = await validate(ROOT);
@@ -97,4 +98,37 @@ test('room checks: rounds per office, each with its technician; a hearing loop i
   assert.match(checksAnswer(s), s.overdue ? /overdue/ : /check|round/);
   const item = checkItem(dub[0]);
   assert.equal(item.kind, 'check'); assert.equal(item.feature, 'maintenance', 'a work item carries its capability, so it leaves the Schedule when the capability is off');
+});
+
+// ---- Out of service ------------------------------------------------------------------------------------------------
+test('out of service: the seed with this browser\'s changes on top; bringing it back is one change', () => {
+  const seed = read('out-of-service');
+  assert.deepEqual(Object.keys(outNow(seed, {})), ['dub-4-01']);
+  assert.deepEqual(Object.keys(outNow(seed, { 'dub-4-01': { out: false, at: '2026-09-28T10:00' } })), [], 'brought back');
+  const took = outNow(seed, { 'lon-2-01': { out: true, reason: 'The display is cracked.', since: '2026-09-28T10:00', until: '2026-09-29T17:00', by: 'tech' } });
+  assert.deepEqual(Object.keys(took).sort(), ['dub-4-01', 'lon-2-01']);
+  assert.equal(took['lon-2-01'].notice.booking_system, true);
+});
+
+test('out of service: the notices (simulated) name the bookings moved and the people told; same every time', () => {
+  const a = lostBookings('dub-4-01', '2026-09-28T09:00', '2026-10-01T17:00', { seats: 12 });
+  assert.deepEqual(a, lostBookings('dub-4-01', '2026-09-28T09:00', '2026-10-01T17:00', { seats: 12 }), 'seeded');
+  assert.ok(a.length > 0 && a.every((b) => b.people >= 2 && b.people <= 12));
+  assert.ok(a.every((b) => { const d = new Date(b.start * 60000); return d.getUTCHours() >= 8 && d.getUTCHours() < 18 && ![0, 6].includes(d.getUTCDay()); }), 'working hours only');
+  const lines = noticeLines({ until: '2026-10-01T17:00', notice: { booking_system: true, people_booked: true, room_guide: true } }, { spaceName: '4.01 Kingfisher', altName: '3.05 Gannet', bookings: a });
+  assert.match(lines[0], /^The booking system blocks 4\.01 Kingfisher until Thu, 1 Oct, 17:00 and moves \d+ bookings? to 3\.05 Gannet$/);
+  assert.match(lines[1], /^\d+ people booked in are told by email/);
+  assert.equal(whenWords('2026-10-01T17:00'), 'Thu, 1 Oct, 17:00');
+});
+
+test('out of service: the space offered instead is the same kind in the same office, same floor first, never one that is out', () => {
+  const me = { id: 'a', site: 'dub', floor: '4', kind: 'meeting', type: 'conference-room-medium', seats: 12 };
+  const c = [
+    { id: 'b', site: 'dub', floor: '3', kind: 'meeting', type: 'conference-room-medium', seats: 12 },
+    { id: 'c', site: 'dub', floor: '4', kind: 'meeting', type: 'conference-room-small', seats: 6 },
+    { id: 'd', site: 'lon', floor: '4', kind: 'meeting', type: 'conference-room-medium', seats: 12 },
+    { id: 'e', site: 'dub', floor: '4', kind: 'small', type: 'huddle-room', seats: 4 },
+  ];
+  assert.deepEqual(alternativesFor(me, c).map((x) => x.id), ['c', 'b']);
+  assert.deepEqual(alternativesFor(me, c, { c: {} }).map((x) => x.id), ['b']);
 });

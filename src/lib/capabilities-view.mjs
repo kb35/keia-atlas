@@ -5,7 +5,8 @@
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { parse } from 'yaml';
-import { spaces, sites, models, DEMO_TODAY, href } from './data.mjs';
+import { spaces, sites, models, DEMO_TODAY, href, KIND } from './data.mjs';
+import { alternativesFor } from './outofservice.mjs';
 import { PEOPLE } from './demo.mjs';
 import { licenceRows, licenceSummary, inDays } from './licences.mjs';
 import { rounds, checksSummary, checkItem, addDays } from './checks.mjs';
@@ -64,6 +65,17 @@ export const checkRounds = rounds(checkPlans, {
 });
 export const checkTotals = checksSummary(checkRounds, DEMO_TODAY);
 export const checkWork = checkRounds.map((r) => checkItem(r, { link: href, siteName: (s) => sites[s]?.name ?? s, spaceTitle }));
+
+// ---- Out of service --------------------------------------------------------------------------------------------------
+// The records the demo starts with, and for any space the working spaces of the same kind in its office to offer.
+export const oosSeed = readRecords('out-of-service');
+const candidate = (s) => ({ id: s.id, site: s.site, floor: s.floor ?? null, type: s.space_type, kind: KIND(s), seats: s.type.keia_atlas.capacity?.max ?? null, name: spaceTitle(s.id) });
+export const oosCandidates = (spaceId) => {
+  const s = spaces[spaceId];
+  if (!s) return [];
+  return alternativesFor(candidate(s), Object.values(spaces).filter((x) => x.site === s.site).map(candidate)).slice(0, 6);
+};
+export const oosOf = (spaceId) => oosSeed.find((r) => r.space === spaceId) ?? null;
 
 // ---- The unit page's cards (/device/caps.json, UnitCapabilities.astro) --------------------------------------------
 // Each card already worded: { feature, help, title, answer, tone?, items: [{ b, text?, w?, tone?, small?, to? }], more? }.

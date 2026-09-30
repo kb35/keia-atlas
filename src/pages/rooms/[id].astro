@@ -32,6 +32,8 @@ import BlastRadius from '../../components/BlastRadius.astro';
 import { explorersForRoom, BLAST_NOW } from '../../lib/blast-view.mjs';
 // Capabilities (src/lib/modules.mjs): licences, room checks and call quality for this space, each while it is on.
 import SpaceCapabilities from '../../components/SpaceCapabilities.astro';
+import SpaceOutOfService from '../../components/SpaceOutOfService.astro';
+import { DEMO_TODAY } from '../../lib/data.mjs';
 
 
 export function getStaticPaths() {
@@ -145,10 +147,12 @@ const deskWord =kind === 'kits' ? 'kit' : 'desk';
       <span class={`pill ${status[0]}`} data-help="room.status">{status[1]}</span>
       {std && <span class={`pill ${std.tone}`} data-help="room.standard">{std.text}</span>}
     </Fragment>
+    {GUIDE_KINDS.includes(kind) && <SpaceOutOfService slot="action" space={x.id} part="action" />}
     <Fragment slot="lede">{isComms ? <>{cf.servesLine} · Built to <a href={href(profileTo)}>{x.type.profile.name}</a>.</> : <>Built to <a href={href(profileTo)}>{x.type.profile.name}</a> · {x.option.name}{x.count ? `, ${plural(x.count, deskWord)}` : ''}.</>}</Fragment>
   </PageBand>
   {x.town && <p class="faint home-where">A home office in {x.town}, {countryName(x.country)}, near <a href={href(`/rooms/?site=${x.near}`)}>{nearSite?.name}</a>{owner ? <>. {owner.name} ({owner.role}) works from here and goes in to the office on {owner.office_days.map((d) => ({ mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday' })[d]).join(', ').replace(/, ([^,]*)$/, ' and $1')}</> : ''}.</p>}
   <div class="content">
+    {GUIDE_KINDS.includes(kind) && <SpaceOutOfService space={x.id} part="panel" name={title} seats={x.type.keia_atlas.capacity?.max ?? null} today={DEMO_TODAY} />}
     <section class="card pad rn" data-room-notes data-room={x.id} data-titles={kiTitles} data-ki-base={href('/known-issues/')} data-help="room.team-notes" aria-label="Notes from the team" hidden>
       <h2 class="rn-h">Notes from the team</h2>
       <ul class="rn-list" data-rn-list></ul>

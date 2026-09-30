@@ -1,0 +1,154 @@
+---
+/* SpaceOutOfService: take a space out of service, and bring it back in one action (the Out of service capability,
+   src/lib/modules.mjs; src/lib/outofservice.mjs). Two parts on the space page:
+     part="action"  the band's button, "Take out of service", while the space is in service
+     part="panel"   under the band: the short form (why, back when, the space to offer instead) that grows from the
+                    button, and while the space is out, the card that says so: until when and why, the space offered
+                    instead, who was told (the booking system and the people booked in, simulated) and Bring back
+   While it is out, the band's answer says so first. The state is the seed record (data/out-of-service/) with this
+   browser's changes on top (rs7-oos); other windows follow through the 'storage' event. Everything is marked
+   data-feature, so with the capability off none of it shows and the answer is the page's own.
+   Motion: the form and the card grow and shrink in a held box (rsHold, M6); the answer changes in place.
+   Props: space, part, and for the panel: name (the space's title), seats, today (the demo's date) */
+import { href } from '../lib/data.mjs';
+import { oosOf, oosCandidates } from '../lib/capabilities-view.mjs';
+import HealthGlyph from './HealthGlyph.astro';
+import FeatureSource from './FeatureSource.astro';
+import '../styles/capabilities.css';
+interface Props { space: string; part: 'action' | 'panel'; name?: string; seats?: number | null; today?: string }
+const { space, part, name = space, seats = null, today = '2026-09-28' } = Astro.props;
+const seed = oosOf(space);
+const alts = oosCandidates(space).map((c) => ({ id: c.id, name: c.name }));
+---
+{part === 'action' ? (
+  <button type="button" class="btn" data-feature="out-of-service" data-oos-take={space} data-help="room.oos-take" data-verb="out-of-service" data-verb-name="Take out of service">Take out of service</button>
+) : (
+  <div class="oos-host" data-feature="out-of-service" data-oos={space} data-name={name} data-seats={seats ?? ''} data-today={today} data-base={href('/')}
+    data-seed={seed ? JSON.stringify(seed) : ''} data-alts={JSON.stringify(alts)}>
+    <section class="card pad oos-card" data-oos-out aria-labelledby={`oos-h-${space}`} data-help="room.oos" hidden>
+      <div class="oos-top">
+        <HealthGlyph state="off" size={24} title="Out of service" />
+        <div class="oos-t">
+          <h2 id={`oos-h-${space}`} data-oos-title>Out of service</h2>
+          <p class="oos-why" data-oos-why></p>
+          <p class="oos-meta" data-oos-meta></p>
+        </div>
+        <button type="button" class="btn primary oos-back" data-oos-back data-help="room.oos-back">Bring back into service</button>
+      </div>
+      <div class="oos-told">
+        <h3>Who was told <span class="sim-t is-sim" title="Made-up notices for the demo: there is no booking feed.">Simulated</span> <FeatureSource id="out-of-service" /></h3>
+        <ul class="cap-list" data-oos-told></ul>
+      </div>
+    </section>
+    <form class="card pad oos-form" data-oos-form hidden aria-label={`Take ${name} out of service`}>
+      <h2>Take {name} out of service</h2>
+      <label class="oos-f"><span>Why</span><textarea name="reason" rows="2" required placeholder="What people booked into it should know, in a sentence"></textarea></label>
+      <div class="oos-row">
+        <label class="oos-f"><span>Back by</span><input type="datetime-local" name="until" required /></label>
+        {alts.length > 0 && (
+          <label class="oos-f"><span>Offer instead</span><select name="alternative">{alts.map((a) => <option value={a.id}>{a.name}</option>)}<option value="">Nothing: cancel the bookings</option></select></label>
+        )}
+      </div>
+      <p class="oos-note">The booking system blocks the space and moves or cancels its bookings, and the people booked in are told. Simulated in this demo.</p>
+      <div class="oos-act"><button type="submit" class="btn primary">Take out of service</button><button type="button" class="btn ghost" data-oos-cancel>Cancel</button></div>
+    </form>
+  </div>
+)}
+
+{part === 'panel' && (
+  <script>
+    import { outNow, readChanges, writeChange, lostBookings, noticeLines, whenWords, EVENT, KEY } from '../lib/outofservice.mjs';
+    const W = window as any;
+    const ROLE: Record<string, string> = { tech: 'the on-site technician', desk: 'the service desk', 'sm-av': 'the AV service manager' };
+    function boot() {
+      document.querySelectorAll<HTMLElement>('[data-oos]').forEach((host) => {
+        if ((host as any).__oos) return; (host as any).__oos = true;
+        const space = host.dataset.oos!, name = host.dataset.name!, seats = +(host.dataset.seats || 8) || 8;
+        const seed = host.dataset.seed ? [JSON.parse(host.dataset.seed)] : [];
+        const alts: { id: string; name: string }[] = JSON.parse(host.dataset.alts || '[]');
+        const altName = (id: string | null) => alts.find((a) => a.id === id)?.name ?? null;
+        const card = host.querySelector<HTMLElement>('[data-oos-out]')!, form = host.querySelector<HTMLFormElement>('[data-oos-form]')!;
+        const take = document.querySelector<HTMLButtonElement>(`[data-oos-take="${CSS.escape(space)}"]`);
+        const answer = document.querySelector<HTMLElement>('[data-pb-answer]');
+        const own = answer?.textContent ?? '';
+        const pill = document.querySelector<HTMLElement>('.pb-over [data-help="room.status"]');
+        const pillText = pill?.textContent ?? '', pillCls = pill?.className ?? '';
+        const box = host.closest('.content') as HTMLElement | null;
+        const hold = (fn: () => void) => (W.rsHold && box ? W.rsHold(box, fn) : fn());
+        const on = () => !W.rsFeatureOn || W.rsFeatureOn('out-of-service');
+        const now = () => `${host.dataset.today}T${new Date().toTimeString().slice(0, 5)}`;
+        function paint() {
+          const rec = outNow(seed, readChanges())[space];
+          card.hidden = !rec;
+          if (take) take.hidden = !!rec || !form.hidden;
+          if (rec) {
+            host.querySelector('[data-oos-title]')!.textContent = `Out of service until ${whenWords(rec.until)}`;
+            host.querySelector('[data-oos-why]')!.textContent = rec.reason;
+            const alt = altName(rec.alternative);
+            host.querySelector('[data-oos-meta]')!.innerHTML = `Since ${whenWords(rec.since)}, taken out by ${ROLE[rec.by_role] ?? 'the team'}${alt ? ` · offered instead: <a href="${host.dataset.base}rooms/${rec.alternative}/">${alt}</a>` : ''}`;
+            const from = rec.since > now() ? rec.since : now();
+            const lines = noticeLines(rec, { spaceName: name, altName: alt, bookings: lostBookings(space, from, rec.until, { seats }) });
+            host.querySelector('[data-oos-told]')!.innerHTML = lines.map((l) => `<li>${l}</li>`).join('');
+          }
+          // The overline's status pill says so too (it says In service for the kit otherwise).
+          if (pill) { const o = !!rec && on(); pill.textContent = o ? 'Out of service' : pillText; pill.className = o ? 'pill bad' : pillCls; }
+          if (answer && W.rsAnswer) {
+            const want = rec && on() ? `Out of service until ${whenWords(rec.until)} · ${rec.reason.split('. ')[0].replace(/\.$/, '')}` : own;
+            if (answer.textContent !== want) W.rsAnswer(want.length > 108 ? `Out of service until ${whenWords(rec!.until)}` : want);
+          }
+        }
+        const until0 = () => { const d = new Date(`${host.dataset.today}T17:00:00Z`); d.setUTCDate(d.getUTCDate() + (d.getUTCDay() === 5 ? 3 : 1)); return d.toISOString().slice(0, 16); };
+        take?.addEventListener('click', () => {
+          hold(() => { form.hidden = false; take.hidden = true; });
+          (form.elements.namedItem('until') as HTMLInputElement).value ||= until0();
+          if (!W.rsMotion?.().reduced && form.animate) form.animate([{ opacity: 0, transform: `scale(${getComputedStyle(document.documentElement).getPropertyValue('--pop-scale') || 0.94})` }, { opacity: 1, transform: 'none' }], { duration: W.rsMotion().pop, easing: W.rsMotion().ease });
+          (form.elements.namedItem('reason') as HTMLTextAreaElement).focus({ preventScroll: true });
+        });
+        host.querySelector('[data-oos-cancel]')!.addEventListener('click', () => { hold(() => { form.hidden = true; }); paint(); take?.focus({ preventScroll: true }); });
+        form.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const f = new FormData(form);
+          const reason = String(f.get('reason') || '').trim(), until = String(f.get('until') || '');
+          if (!reason || !until) return;
+          hold(() => {
+            form.hidden = true;
+            writeChange(space, { out: true, reason: /[.!?]$/.test(reason) ? reason : `${reason}.`, since: now(), until, by: W.rsWho?.().roleId ?? 'tech', alternative: String(f.get('alternative') || '') || null });
+            form.reset(); paint();
+          });
+          W.rsToast?.(`${name} is out of service. The booking system and the people booked in are told (simulated).`);
+        });
+        host.querySelector('[data-oos-back]')!.addEventListener('click', () => {
+          hold(() => { writeChange(space, { out: false, at: now() }); paint(); });
+          W.rsToast?.(`${name} is back in service. The booking system takes bookings again (simulated).`);
+          take?.focus({ preventScroll: true });
+        });
+        const again = () => { if (host.isConnected) paint(); };
+        document.addEventListener(EVENT, again);
+        document.addEventListener('rs:demo-change', again);
+        window.addEventListener('storage', (e) => { if (e.key === KEY) hold(again); });
+        paint();
+      });
+    }
+    document.addEventListener('astro:page-load', boot);
+    boot();
+  </script>
+)}
+
+<style is:global>
+  .oos-host { display: grid; gap: var(--gutter); }
+  .oos-host:not(:has(> :not([hidden]))) { display: none; }
+  .oos-card { border-color: color-mix(in srgb, var(--h-off, var(--line-strong)) 60%, var(--line)); display: grid; gap: 14px; }
+  .oos-top { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px 14px; align-items: start; }
+  .oos-t h2 { margin: 0; font-size: var(--fs-h3); }
+  .oos-why { margin: 4px 0 0; font-size: var(--fs-body); max-width: 70ch; }
+  .oos-meta { margin: 4px 0 0; font-size: var(--fs-code); color: var(--text-3); }
+  .oos-told h3 { margin: 0 0 8px; font-size: var(--fs-body); display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+  .oos-form { display: grid; gap: 12px; }
+  .oos-form h2 { margin: 0; font-size: var(--fs-h3); }
+  .oos-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 12px; }
+  .oos-f { display: grid; gap: 4px; font-size: var(--fs-code); font-weight: 600; color: var(--text-2); }
+  .oos-f textarea, .oos-f input, .oos-f select { font: 400 var(--fs-body)/1.4 var(--font-sans); color: var(--text); background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 8px 10px; min-width: 0; }
+  .oos-note { margin: 0; font-size: var(--fs-code); color: var(--text-3); }
+  .oos-act { display: flex; flex-wrap: wrap; gap: 8px; }
+  @container content (max-width: 599px) { .oos-top { grid-template-columns: auto minmax(0, 1fr); } .oos-back { grid-column: 1 / -1; justify-self: start; } }
+</style>

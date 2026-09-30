@@ -1,0 +1,60 @@
+---
+/* GuideOutOfService: the room guide says a space is out of service, first, in the employee's words: until when, why,
+   and the space to use instead (the Out of service capability, src/lib/modules.mjs; src/lib/outofservice.mjs). The
+   state is the seed record with this browser's changes on top, as on the space page; other windows follow. While the
+   space is out, the guide's own answer line gives way to it. Marked data-feature, so with the capability off the
+   guide is as it was. Motion: it appears in place, once; the answer line changes its words (M9). */
+import { href } from '../lib/data.mjs';
+import { oosOf, oosCandidates } from '../lib/capabilities-view.mjs';
+import HealthGlyph from './HealthGlyph.astro';
+interface Props { space: string }
+const { space } = Astro.props;
+const seed = oosOf(space);
+const alts = oosCandidates(space).map((c) => ({ id: c.id, name: c.name }));
+---
+<section class="g-oos" data-feature="out-of-service" data-guide-oos={space} data-seed={seed ? JSON.stringify(seed) : ''} data-alts={JSON.stringify(alts)} data-base={href('/guide/')} aria-labelledby="g-oos-h" data-help="guide.oos" hidden>
+  <HealthGlyph state="off" size={24} title="Out of service" />
+  <div>
+    <h2 id="g-oos-h" data-g-oos-title>This space is out of service</h2>
+    <p data-g-oos-why></p>
+    <p data-g-oos-alt></p>
+  </div>
+</section>
+
+<script>
+  import { outNow, readChanges, whenWords, EVENT, KEY } from '../lib/outofservice.mjs';
+  const W = window as any;
+  function boot() {
+    const box = document.querySelector<HTMLElement>('[data-guide-oos]'); if (!box || (box as any).__g) return; (box as any).__g = true;
+    const space = box.dataset.guideOos!, seed = box.dataset.seed ? [JSON.parse(box.dataset.seed)] : [];
+    const alts: { id: string; name: string }[] = JSON.parse(box.dataset.alts || '[]');
+    const ans = document.querySelector<HTMLElement>('[data-answer-text]'), own = ans?.textContent ?? '';
+    const answerLine = document.querySelector<HTMLElement>('[data-guide-answer]');
+    function paint() {
+      const rec = outNow(seed, readChanges())[space];
+      const on = !W.rsFeatureOn || W.rsFeatureOn('out-of-service');
+      box.hidden = !rec;
+      if (rec) {
+        box.querySelector('[data-g-oos-title]')!.textContent = `Out of service until ${whenWords(rec.until)}`;
+        box.querySelector('[data-g-oos-why]')!.textContent = rec.reason;
+        const alt = alts.find((a) => a.id === rec.alternative);
+        box.querySelector('[data-g-oos-alt]')!.innerHTML = alt ? `Your booking moves to <a href="${box.dataset.base}${alt.id}/">${alt.name}</a>. If you booked this room, you have an email about it.` : 'Bookings for this room are cancelled, and the people booked in have an email about it.';
+      }
+      if (answerLine) answerLine.hidden = !!rec && on;
+      if (ans && ans.textContent !== own) ans.textContent = own;
+    }
+    document.addEventListener(EVENT, paint);
+    document.addEventListener('rs:demo-change', paint);
+    window.addEventListener('storage', (e) => { if (e.key === KEY) paint(); });
+    paint();
+  }
+  document.addEventListener('astro:page-load', boot);
+  boot();
+</script>
+
+<style is:global>
+  .g-oos { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; padding: 14px 16px; border-radius: var(--radius-lg, 14px); border: 1px solid var(--line-strong); background: var(--surface); }
+  .g-oos[hidden] { display: none; }
+  .g-oos h2 { margin: 0 0 4px; font-size: 18px; }
+  .g-oos p { margin: 4px 0 0; font-size: 15px; line-height: 1.45; }
+</style>

@@ -151,5 +151,7 @@ export function knowledgeLens({ guides = [], errors = [], fixes = [], today } = 
 export function healthLens(st, why = '') {
   if (st === 'problem') return { h: 'fault', word: 'Not working now', label: '', line: why || 'Not working now.' };
   if (st === 'closed') return { h: 'off', word: 'Closed', label: '', line: 'Outside the office\'s hours.' };
+  // Out of service (the Out of service capability, src/lib/outofservice.mjs): Off, with until when.
+  if (st === 'off') return { h: 'off', word: 'Out of service', label: '', line: why || 'Out of service.' };
   return { h: 'fine', word: st === 'use' ? 'In use' : 'Free', label: '', line: st === 'use' ? 'In use now; working.' : 'Free now; working.' };
 }
