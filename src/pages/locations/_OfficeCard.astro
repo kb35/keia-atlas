@@ -4,30 +4,38 @@
 // counts that each open their list (rule P10). The name opens the office page; the plan flies into its map.
 import { href } from '../../lib/data.mjs';
 import HealthGlyph from '../../components/HealthGlyph.astro';
-import { planThumb, LIGHT_WORD, ROLE_WORD, OPEN_Q } from '../../lib/locations.mjs';
+import FloorMap from '../../components/FloorMap.astro';
+import { hasFloors, LIGHT_WORD, ROLE_WORD, OPEN_Q } from '../../lib/locations.mjs';
+import { building } from '../../lib/floors.mjs';
+import { planOf } from '../../lib/floorplan.mjs';
 
 interface Props { o: any; filter?: boolean }
 const { o, filter = false } = Astro.props;
 const s = o.s;
-const th = planThumb(o.id);
+const M = hasFloors(o.id) ? building(o.id) : null;
+const P = M ? planOf(M, M.floors[0].id) : null;
+const more = M ? M.floors.length - 1 : 0;
+// Every card's picture is 16:7; the floor sits centred in it at its own scale.
+const frame = P ? { VW: Math.max(P.VW, (P.VH * 16) / 7), VH: Math.max(P.VH, (P.VW * 7) / 16) } : undefined;
 const floors = s.floors ?? [];
 const nInc = o.inc.length, nPeople = o.people.length;
 const fi = filter ? { 'data-fi': '', 'data-find': `${s.name} ${s.city} ${s.code} ${o.id}`.toLowerCase(), 'data-f-region': s.region, 'data-f-status': '', 'data-vk': o.id, 'data-inc': nInc, 'data-name': s.name } : {};
 ---
 <article class="card oc" data-loc-tz={s.time_zone} {...fi}>
-  <a class="oc-pic" href={href(`/locations/${o.id}/`)} data-vt-rec={`loc-${o.id}`} tabindex="-1" aria-hidden="true">
-    {th ? (
-      <svg viewBox={`-1 -1 ${th.W + 2} ${th.H + 2}`} class="oc-plan">
-        <polygon class="oc-out" points={th.outline} />
-        {th.rooms.map((r) => <rect class:list={['oc-rm', { 'oc-comms': r.comms }]} x={r.x} y={r.y} width={r.w} height={r.h} data-loc-room={r.id} />)}
-      </svg>
-    ) : (
+  {P ? (
+    <div class="oc-pic">
+      {/* The office's first floor: the same floor map as everywhere (FloorMap's thumbnail), live. */}
+      <FloorMap site={o.id} floor={P.F.id} detail="thumb" frame={frame} live to={`/locations/${o.id}/?floor=${P.F.id}`} zoom title={`${s.name}, ${P.F.name}`} />
+      <span class="oc-cap">{`${P.F.name}${more ? ` and ${more} more` : ''}`}</span>
+    </div>
+  ) : (
+    <a class="oc-pic" href={href(`/locations/${o.id}/`)} data-vt-rec={`loc-${o.id}`} tabindex="-1" aria-hidden="true">
       <svg viewBox="0 0 120 64" class="oc-stack">
         {floors.map((_, i) => <path class="oc-slab" d={`M${30 + 0} ${48 - i * 11} l30 -8 l30 8 l-30 8 z`} style={`--i:${i}`} />)}
       </svg>
-    )}
-    <span class="oc-cap">{th ? `${th.floor}${th.more ? ` and ${th.more} more` : ''}` : `${floors.length} ${floors.length === 1 ? 'floor' : 'floors'} · plan not modelled yet`}</span>
-  </a>
+      <span class="oc-cap">{`${floors.length} ${floors.length === 1 ? 'floor' : 'floors'} · plan not modelled yet`}</span>
+    </a>
+  )}
   <div class="oc-body">
     <header class="oc-h">
       <span class="code">{s.code}</span>
@@ -51,15 +59,8 @@ const fi = filter ? { 'data-fi': '', 'data-find': `${s.name} ${s.city} ${s.code}
 <style>
   .oc { display: grid; grid-template-rows: auto 1fr; overflow: hidden; padding: 0; transition: box-shadow var(--dur-hover) var(--ease-settle), translate var(--dur-hover) var(--ease-settle), transform var(--dur-press) var(--ease-settle); }
   .oc:hover { box-shadow: var(--shadow-md); }   /* and it lifts 2 px (km-lift, motion-library.css) */
-  .oc-pic { display: grid; gap: 4px; padding: 14px 16px 8px; background: var(--surface-2); border-bottom: 1px solid var(--line); text-decoration: none; color: var(--text-2); }
-  .oc-pic svg { width: 100%; height: auto; display: block; aspect-ratio: 16 / 7; }
-  .oc-out { fill: var(--bg); stroke: var(--line-strong); stroke-width: 0.25; }
-  .oc-rm { fill: color-mix(in srgb, var(--ink) 6%, var(--bg)); stroke: var(--line-strong); stroke-width: 0.12; transition: fill var(--dur-state) var(--ease-settle); }
-  .oc-rm.oc-comms { fill: var(--surface-3); }
-  /* The dark cockpit: in use and free stay neutral; only a space that is not working takes a colour. */
-  .oc-rm[data-st=use] { fill: var(--surface-3); }
-  .oc-rm[data-st=free] { fill: var(--bg); }
-  .oc-rm[data-st=problem] { fill: var(--h-fault-soft); stroke: var(--h-fault); stroke-width: 0.3; }
+  .oc-pic { display: grid; gap: 6px; padding: 14px 16px 8px; background: var(--surface); border-bottom: 1px solid var(--line); text-decoration: none; color: var(--text-2); }
+  .oc-pic .oc-stack { width: 100%; height: auto; display: block; aspect-ratio: 16 / 7; }
   .oc-slab { fill: var(--bg); stroke: var(--line-strong); stroke-width: 0.8; }
   .oc-cap { font-size: var(--fs-mark); }
   .oc-body { display: grid; gap: 8px; padding: 12px 16px 14px; align-content: start; }

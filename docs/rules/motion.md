@@ -104,7 +104,7 @@ Health glyphs (`HealthGlyph.astro`, `.hg`; UI-V2 section 6) arrive quiet, then c
 
 ### M9. When not to animate
 
-Not text being read. Not numbers counting: a figure never counts up through the values in between; when it changes, the new value ticks into place once (`km-tick`, M19), exact on every frame. Not charts on a loop: a chart draws in once, the first time it is seen (`km-draw-in`, M19), and after that it is redrawn still; small multiples and floor plans are drawn still. Not things the person did not cause, with three exceptions that happen once: glyphs coming on at load, a new signal, a live change by a colleague. Not decoration on a loop. Stagger at most 12 list items, then show the rest together.
+Not text being read. Not numbers counting: a figure never counts up through the values in between; when it changes, the new value ticks into place once (`km-tick`, M19), exact on every frame. Not charts on a loop: a chart draws in once, the first time it is seen (`km-draw-in`, M19), and after that it is redrawn still; small multiples and floor plans are drawn still (a floor thumbnail draws in once and eases a changed space in place, row 50). Not things the person did not cause, with three exceptions that happen once: glyphs coming on at load, a new signal, a live change by a colleague. Not decoration on a loop. Stagger at most 12 list items, then show the rest together.
 
 - **Why:** motion that explains nothing hides motion that does; and data is read from still pictures.
 - **Do:** ask "what changed?" If nothing did, nothing moves.
@@ -208,6 +208,7 @@ Each interaction on a page is one of these rows (MOTION-V2 section 4), with its 
 | 47 | A `<details>` opens or closes | Its box grows from the summary's height to its own (`--dur-morph`) while its content rises 4 px and fades in (`--dur-state`); closing fades the content and folds the box back into the summary (`--dur-exit`); a floating menu grows from its summary instead (`--pop-scale`, `--dur-pop`). A second press starts from where the box is (`km-disclose`) | Opens and closes at once |
 | 48 | A figure changes (a filter's count, a band's number, a Home figure) | The new value ticks into place: it rises in when it went up and drops in when it went down, once, over `--dur-state`; it never counts through the values in between (`km-tick`) | The new value is there |
 | 49 | A chart is first seen (a sparkline, a bar, a stacked bar, a column chart) | Lines draw along their length and bars grow from their baseline, a stacked bar's segments together from its left edge so they stay joined, up to 12 bars `--stagger` apart, over `--dur-morph`, once (`km-draw-in`). Later changes redraw it still | Drawn at once |
+| 50 | A floor's thumbnail (FloorMap `detail="thumb"`: Home, region, leadership, vendor, office cards) | Draws in once when it first shows: the slab's edge draws on (`km-draw`, `--dur-enter`), then the spaces fade up (`--dur-state`, a `--dur-pop` beat later); never again on that page. A space's state change eases its tint and glyph in place (`--dur-state`, `km-ring`; a new glyph grows in with `km-on`). Pressing a space zooms into it (row 6, the space's box grows into its picture); pressing the floor zooms into the office plan on that floor, the thumbnail growing into the plan (`plan-<site>-<floor>`, the same picture box) | Drawn at once; the zoom is a cross-fade |
 
 A list that appears with the page (a card grid, a list of rows) makes one quiet stagger, once: the first 12 items rise into place `--stagger` apart, the rest together; filtering, sorting and live changes never replay it.
 
@@ -222,7 +223,7 @@ A list that appears with the page (a card grid, a list of rows) makes one quiet 
 - The page under the pointer (M6).
 - A fine glyph. Nothing that is fine pulses, breathes or glows.
 - The floor plan: it never pans or zooms on its own.
-- Sparklines and charts after their one draw-in (M19), and small multiples: updated by a still redraw.
+- Sparklines and charts after their one draw-in (M19), and small multiples: updated by a still redraw (a floor thumbnail: row 50).
 - Focus rings and error text.
 - An empty Restricted slot for a partner: drawn at once with its reason.
 
