@@ -53,7 +53,7 @@ const SHELL = {
   'shell.capability': e('{name}', 'A capability of this module: a bigger piece a team switches on when it needs it, such as licences or room checks. Off takes every trace of it away, so nothing looks missing; Connected shows where its records come from.', 'Use the switch, then Built in or Connected. The pages change in place. A capability that needs another module says so and waits for it.', 'l:modules'),
 };
 
-// The places (one per module, UX-V2 §2.1) and their tabs. "place" and "tab" are the general entries; the specific ones follow.
+// The places (one per module, design notes) and their tabs. "place" and "tab" are the general entries; the specific ones follow.
 const PLACES = {
   place: e('A place', 'One of the places in the sidebar. The pages inside it show as tabs across the top of the page.', 'Select it to go there.'),
   'place:home': e('Home', def('home-page'), 'Select it to see what is ready for you today.', 'l:home'),
@@ -82,8 +82,6 @@ const PLACES = {
   'tab:audit-log': e('Audit log', 'Every run of a standing rule with its trace, and every hand-off and priority on a job. Nothing is edited in place.', 'Select it to open the log.', 'g:standing-rule'),
   'tab:playbooks': e('Playbooks', def('playbook'), 'Select it to see the playbooks.', 'g:playbook'),
   'tab:refresh': e('Work plan', 'The plan for replacing devices as they reach the end of their planned life.', 'Select it to see what is due and when.'),
-  'tab:budget': e('Budget', 'Planning: the budget, scenarios and the team\'s capacity, by financial year.', 'Select it to open Planning on the Budget view.'),
-  'tab:scenarios': e('Scenarios', 'Planning: the budget, scenarios and the team\'s capacity, by financial year. Scenarios are changes to the plan you can compare and adopt.', 'Select it to open Planning on the Scenarios view.'),
   'tab:planning': e('Planning', 'The budget, scenarios and the team\'s capacity as one place, by financial year: this year, next, and five ahead.', 'Select it to open Planning. Pick a year in the filter bar; every view follows it.'),
   'tab:lab': e('Lab', def('lab'), 'Select it to see what is being tested.', 'g:lab'),
   'tab:types': e('Space types', def('room-profile'), 'Select it to see the space types.', 'g:room-profile'),
@@ -105,7 +103,7 @@ const PLACES = {
   'tab:spares': e('IT stores', 'Each office\'s storage room: its spare units, its counted stock, and where the stock is below its minimum.', 'Select it to see the stores.'),
   'tab:cables': e('Cables', 'Every cable, where it runs and what it joins.', 'Select it to see the cables.'),
   'tab:team': e('People', 'Everyone on the team, as an org chart or a list.', 'Select it to see the team.'),
-  'tab:vendors': e('Vendors', 'The companies that install and repair for Aigna, and who looks after each.', 'Select it to see the vendors.', 'l:t-vendors'),
+  'tab:vendors': e('Vendors', 'The companies that install and repair for Aigna, their contracts and how they are doing.', 'Select it to see the vendors.', 'l:t-vendors'),
 };
 
 // Whole pages: the general "what is this page" card, from Shell's `section`.
@@ -122,8 +120,6 @@ const PAGES = {
   'page.audit-log': e('Audit log', 'The raw layer behind every How was this done? card: each run\'s trace, line by line, and every hand-off and priority on a job.', 'Filter by kind or rule, or find a run by its number.', 'g:standing-rule'),
   'page.playbooks': e('Playbooks', def('playbook'), 'Open one to see its phases, steps, who does each and the gates.', 'g:playbook'),
   'page.refresh': e('Work plan', 'The plan for replacing devices as they pass their planned life, grouped by office and year.', 'Filter by office or kind, then open a line to see the devices behind it.'),
-  'page.budget': e('Planning', 'The budget, scenarios and the team\'s capacity by financial year. The band answers the year in one line and four figures; the views below carry the detail.', 'Pick a year in the filter bar, then Budget, Scenarios or Capacity. Every figure opens the projects and work plan items behind it.'),
-  'page.scenarios': e('Planning', 'The budget, scenarios and the team\'s capacity by financial year.', 'Pick a year in the filter bar, then Budget, Scenarios or Capacity.'),
   'page.planning': e('Planning', 'The budget, scenarios and the team\'s capacity by financial year. The band answers the year in one line and four figures; the views below carry the detail.', 'Pick a year in the filter bar, then Budget, Scenarios or Capacity. Every figure opens the projects and work plan items behind it.'),
   'page.lab': e('The Lab', def('lab'), 'Open a test to see its result and who signs it off.', 'g:lab'),
   'page.types': e('Space types', def('room-profile'), 'Open one to see the devices it needs, its build options and how it is wired.', 'g:room-profile'),
@@ -543,7 +539,6 @@ const UNIT = {
   'unit.repeats': e('Repeat faults', 'How many faults this unit has had this quarter, from the incidents and the fault history recorded against it, with a strip of faults per month for the last year.', 'A unit that keeps failing is a case for the manufacturer or a replacement, not another restart.'),
   'unit.security': e('Security support', 'How long the manufacturer keeps fixing security holes in this model, its firmware line, where to report a flaw, and whether this unit\'s default password was changed.', 'When support ends within a year, plan the replacement. A unit still on the default password needs its vault password set.', 'g:firmware'),
   'unit.security-chip': e('Security support warning', 'The manufacturer stops fixing security holes in this model within 12 months, or already has.', 'Select it for the dates, then plan the replacement.', 'g:firmware'),
-  'unit.password-chip': e('Default password not changed', 'This unit still has the manufacturer\'s default admin password, which anyone can look up.', 'Set the office\'s vault password on it, then record the change.'),
   'unit.demo-value': e('Demo value', 'The manufacturer has not published this, so the value is made up for the demo. A real one would cite the manufacturer\'s page.', 'Nothing to do. Do not rely on it.'),
   'unit.privacy': e('Privacy', 'The privacy record for this sensing device: what it captures, why, the legal footing, the room notice, how long anything is kept and the works-council agreement. Rooms are counted, never people.', 'Show all opens the rest of the record. Questions go to the data protection officer.'),
   'model.security': e('Security support', 'The manufacturer\'s end date for security updates, its firmware line and where it takes reports of flaws. Dates the manufacturer has not published are marked as demo values.', 'Plan a replacement before support ends.', 'g:firmware'),
@@ -880,7 +875,6 @@ const SERVICES = {
   'home.partner-clock': e('The contract clock', 'The same clock Aigna sees, from the hand-off to the contract\'s service level. Waiting on Aigna stops it, with the reason.'),
   'home.partner-contract': e('Your contract with Aigna', 'The service levels you promised, the contract\'s end and your contact at Aigna.'),
   'home.partner-access': e('Your access', 'How many spaces your jobs let you open today. Access is tied to each job; there is no standing access, and everything opened is logged.'),
-  'tab:vendors': e('Vendors', 'The companies that install and repair for Aigna, their contracts and how they are doing.', 'Select it to see the vendors.'),
   'tab:licences': e('Licences', 'Room and platform licences: seats used of seats bought, when each renews and what it costs.', 'Select it to see every licence, soonest renewal first.', 'l:modules'),
   'tab:checks': e('Room checks', 'Recurring checks and planned maintenance: every round, its spaces, who does it and its checklist.', 'Select it to see what is due.', 'l:modules'),
   'tab:alerts': e('Alert rules', 'What counts as an alert and who gets it, each rule in one sentence.', 'Select it to see every rule and its last 30 days.', 'l:modules'),

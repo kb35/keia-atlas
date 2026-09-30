@@ -1,4 +1,4 @@
-// Zoom levels from an address alone (UX-V2 §2.2), for the build (src/lib/zoom.mjs) and the browser (the
+// Zoom levels from an address alone (design notes), for the build (src/lib/zoom.mjs) and the browser (the
 // Shell's zoom script). No imports. Levels: 0 Locations, 1 region, 2 office, 3 floor (a state of the office
 // page), 4 space, 5 device, 6 port (a state of the device page). `path` is inside the site: base removed.
 export const ZOOM_LEVELS = ['locations', 'region', 'office', 'floor', 'space', 'device', 'port'];
@@ -18,7 +18,7 @@ export function zoomLevel(path, search = '', hash = '') {
 export const pageLevel = (level) => (level == null ? null : [0, 1, 2, 2, 3, 4, 4][level]);
 
 // 'in' or 'out' when a move goes exactly one page level down or up the zoom; null for any other move
-// (a jump of two levels, as from the palette, plays the ordinary page move instead: MOTION-V2 4.6).
+// (a jump of two levels, as from the palette, plays the ordinary page move instead: docs/rules/motion.md).
 export function zoomDir(from, to) {
   const a = pageLevel(from), b = pageLevel(to);
   if (a == null || b == null) return null;

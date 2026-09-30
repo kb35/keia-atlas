@@ -372,7 +372,7 @@ export function createScene(host, D, hooks) {
   }
   const glowPhase = () => (0.5 - 0.5 * Math.cos((performance.now() / (motion().pulse || 2400)) * Math.PI * 2));
   function pulse() {
-    const still = true, p = still ? 0.6 : glowPhase(); // the fault pulse is retired (MOTION-V2 §2): rings are drawn still
+    const still = true, p = still ? 0.6 : glowPhase(); // the fault pulse is retired (docs/rules/motion.md): rings are drawn still
     for (const ring of rings.values()) {
       setBase(ring.mat, still ? 0.9 : 0.35 + 0.6 * p);
       for (const m of ring.mats ?? []) if (m.emissive) m.emissive.copy(ring.mat.color).multiplyScalar(still ? 0.25 : 0.1 + 0.4 * p);

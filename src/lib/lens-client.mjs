@@ -1,4 +1,4 @@
-// The office plan's lenses and selection in the browser (UX-V2 §2.5; MOTION-V2 4.9 and 4.10).
+// The office plan's lenses and selection in the browser (design notes; docs/rules/motion.md).
 //
 // Markup it reads, inside the office's root:
 //   [data-lens-strip]       LensStrip.astro: [data-lens-pick] pills, [data-lens-select], [data-lens-says]

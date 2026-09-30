@@ -20,6 +20,7 @@ function loadAccess() {
   access = existsSync(dir) ? Object.fromEntries(readdirSync(dir).filter((f) => f.endsWith('.yaml')).map((f) => [f.slice(0, -5), loadYaml(path.join(dir, f))])) : {};
   return access;
 }
+// The demo's one "today", as every other page reads it, so the guide agrees with them and builds are repeatable.
 const TODAY = DEMO_TODAY;
 const titleOf = (x) => (x.number ? `${x.number} ${x.name}` : x.name);
 

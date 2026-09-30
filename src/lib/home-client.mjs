@@ -3,7 +3,7 @@
 //
 // The rules are in src/lib/homecore.mjs (what each role sees, in which order, with which words) and
 // src/lib/ownership.mjs (who has a job, and what each verb does); this file only draws and moves.
-// Motion (MOTION-V2 §4): the chip slides (4.17); a row that changes list moves there (persist), one that arrives grows
+// Motion (docs/rules/motion.md): the chip slides (4.17); a row that changes list moves there (persist), one that arrives grows
 // from its centre (enter), one that leaves shrinks to its centre (exit), while the box eases to its new height and the
 // page keeps still under the pointer (rsHold, rsAnchor). A new signal changes exactly three things once: the sentence,
 // one figure's tone and the glyph (4.15). Reduced motion: every change at once, every meaning kept.
@@ -259,7 +259,7 @@ function details(viewer, items) {
   const pa2 = root.querySelector('[data-projects-all]'); if (pa2) pa2.setAttribute('href', link(me && me.roleId === 'pm' ? `/projects/?owner=${viewer}` : '/projects/'));
 }
 
-// ---- Welcome back and the cover card: one card, two moments (UX-V2 §4.3) ------------------------------------------
+// ---- Welcome back and the cover card: one card, two moments (design notes) ------------------------------------------
 function welcomeCard(viewer, fresh) {
   const w = H.cockpit.welcome[viewer]; if (!w) return;
   const card = D.querySelector('[data-ho="welcome"]');
@@ -403,7 +403,7 @@ function draw(fresh = false, quietly = false) {
   W.__rsInboxRender?.();
   D.dispatchEvent(new CustomEvent('rs:sa-refresh'));
   root.removeAttribute('aria-busy');
-  // A new signal while you look: exactly three things change, once (MOTION-V2 4.15).
+  // A new signal while you look: exactly three things change, once (docs/rules/motion.md).
   if (prev && !quietly && model.ready.length > prev.ready.length) signal(model);
   lastModel = model; lastWho = viewer; drawn = true;
 }

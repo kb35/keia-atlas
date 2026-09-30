@@ -116,6 +116,9 @@ const json = JSON.stringify({ ...lean(model), base: href('/'), cls: CLASS_LABEL 
   <script>
     import { prepare, snapshot, diff, eventsBetween, TICK_MS, tickOf } from '../../lib/livesim.mjs';
     import { every, steady, refresh, repeek, ping, syncList, pushFeed, filterOf, visible, stickSide, esc, clock, ago, span } from '../../lib/liveview.mjs';
+    // The same words, attention list and counts as the Services pages, so both count the same units.
+    import { reason as reasonOf, attentionRows } from '../../lib/services-client.mjs';
+    import { tally, counted } from '../../lib/services.mjs';
 
     const FEED = 8, KEEP = 400, BACK = 15 * 60e3;
     const STW: Record<string, string> = { online: 'Online', alert: 'Alert', offline: 'Offline' };
@@ -138,12 +141,7 @@ const json = JSON.stringify({ ...lean(model), base: href('/'), cls: CLASS_LABEL 
       const cleanups: (() => void)[] = [];
 
       // ---- Words for a unit's state ----
-      function reason(u: any, s: any) {
-        if (s.down) return 'Offline';
-        if (s.al >= 0) return u.alerts[s.al];
-        if (s.inc >= 0) return model.incs[s.inc].title;
-        return '';
-      }
+      const reason = (u: any, s: any) => reasonOf(model, u, s);
       const minsSince = (s: any, t: number) => (s.since != null ? Math.max(1, Math.round((t - s.since) / 60e3)) : null);
       function fwLine(u: any) {
         if (!u.fw) return '';
@@ -180,8 +178,9 @@ const json = JSON.stringify({ ...lean(model), base: href('/'), cls: CLASS_LABEL 
         const add = (o: any, st: string, fw: boolean) => { o[st]++; o.all++; if (fw) o.fw++; };
         const blank = () => ({ online: 0, alert: 0, offline: 0, fw: 0, all: 0 });
         els.forEach((el, i) => {
-          if (el.classList.contains('fb-out')) return;
-          const u = model.units[i], st = el.dataset.st!, s = siteOf(u);
+          const u = model.units[i];
+          if (el.classList.contains('fb-out') || !counted(u)) return;
+          const st = el.dataset.st!, s = siteOf(u);
           add(byK[u.cls] ??= blank(), st, !!u.fw); add(byS[s.id] ??= blank(), st, !!u.fw); add(bySi.get(u.site) ?? (bySi.set(u.site, blank()), bySi.get(u.site)), st, !!u.fw);
         });
         const kinds = bar?.rsFilter ? bar.rsFilter.get('kind') : [], sites = bar?.rsFilter ? bar.rsFilter.get('site') : [];
@@ -229,8 +228,7 @@ const json = JSON.stringify({ ...lean(model), base: href('/'), cls: CLASS_LABEL 
         lastN[id] = String(v);
       }
       function paintNumbers() {
-        const n: Record<string, number> = { online: 0, alert: 0, offline: 0, fw: 0 };
-        model.units.forEach((u: any, i: number) => { n[snap.units[i].st]++; if (u.fw) n.fw++; });
+        const n = tally(model, snap);
         number('lv-on', n.online, ''); number('lv-off', n.offline, 'bad'); number('lv-al', n.alert, 'warn'); number('lv-fw', n.fw, 'warn');
         if (W.rsAnswer) W.rsAnswer(n.offline || n.alert ? `${n.offline} ${n.offline === 1 ? 'unit' : 'units'} offline, ${n.alert} alerting · ${n.online.toLocaleString('en-IE')} online` : `All ${n.online.toLocaleString('en-IE')} units online`);
         firstNumbers = false;
@@ -239,19 +237,15 @@ const json = JSON.stringify({ ...lean(model), base: href('/'), cls: CLASS_LABEL 
       // ---- Needs attention: offline first, then alerts, then open incidents ----
       let lastAtt: any[] = [];
       function paintAttention(t: number, animate: boolean) {
-        const out: any[] = [];
-        model.units.forEach((u: any, i: number) => {
-          const s = snap.units[i]; if (s.st === 'online') return;
-          const site = siteOf(u), m = minsSince(s, t), inc = s.inc >= 0 ? model.incs[s.inc] : null;
-          const rank = s.down ? 0 : s.al >= 0 ? 1 : 2;
-          out.push({
-            key: u.id, sort: `${rank}${inc ? inc.pri : 9}${String(1e6 - (m ?? 0)).padStart(7, '0')}${u.n}`,
+        lastAtt = attentionRows(model, snap, t).map(({ u, s, m, inc, rank, key }: any) => {
+          const site = siteOf(u);
+          return {
+            key: u.id, sort: key,
             find: `${u.n} ${u.rn} ${site.name} ${u.id} ${reason(u, s)}`, region: site.region, site: site.id, kind: u.cls,
             html: `<i data-r="${rank}" aria-hidden="true"></i><span class="lv-ar-b"><a href="${unitHref(u)}">${esc(u.n)}</a><small><b>${esc(reason(u, s))}</b> · ${esc(site.name)}</small></span>` +
               `<span class="lv-ar-e">${m ? `<span>${span(m)}</span>` : ''}${inc ? `<a href="${esc(inc.to)}" title="${esc(inc.title)}">${esc(inc.no)}</a>` : ''}</span>`,
-          });
+          };
         });
-        lastAtt = out.sort((a, b) => (a.sort < b.sort ? -1 : 1));
         syncList(attList, lastAtt, () => { const li = document.createElement('li'); li.className = 'lv-ar'; return li; }, { animate });
         filterAttention();
       }
@@ -269,7 +263,8 @@ const json = JSON.stringify({ ...lean(model), base: href('/'), cls: CLASS_LABEL 
       let feed: any[] = [], seq = 0;
       function describe(e: any) {
         if (e.unit == null) return null;
-        const u = model.units[e.unit], s = siteOf(u), name = `<b>${esc(u.n)}</b>`;
+        const u = model.units[e.unit]; if (!counted(u)) return null;
+        const s = siteOf(u), name = `<b>${esc(u.n)}</b>`;
         const text = e.k === 'offline' ? `${name} went offline` : e.k === 'online' ? `${name} back online${e.dur ? ` after ${span(e.dur)}` : ''}`
           : e.k === 'alert' ? `Alert on ${name}: ${esc(u.alerts[e.al].toLowerCase())}` : `Alert cleared on ${name}`;
         return { key: `e${seq++}`, t: e.t, k: e.k, href: unitHref(u), text, sub: `${s.name} · ${u.rn}`, find: `${u.n} ${u.rn} ${s.name} ${u.id}`, region: s.region, site: s.id, kind: u.cls };

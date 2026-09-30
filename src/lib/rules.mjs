@@ -1,4 +1,4 @@
-// Standing rules (Keia Method 2.8; SYNTHESIS 2.3, 2.9, 2.12; UX-V2 §4.1, §4.5, §6): the run model, the way back each
+// Standing rules (Keia Method 2.8; SYNTHESIS 2.3, 2.9, 2.12; design notes): the run model, the way back each
 // rule declares, the conditions and caps checked before every run, the default owner clock and the major incident's
 // commander. Pure: no data, no browser. src/lib/rules-view.mjs joins it to data/standing-rules; the pages and the
 // browser (src/lib/rules-client.mjs) run the same functions; tests/rules.test.mjs checks them.
@@ -150,7 +150,7 @@ export function runningWords(rule, state) {
 }
 
 // ---- Who may do what ----------------------------------------------------------------------------------------------
-/** Run again appears only for the rule's owner or the job's owner (UX-V2 §6). */
+/** Run again appears only for the rule's owner or the job's owner (design notes). */
 export const mayRunAgain = (rule, viewer, jobOwner = null) => !!viewer && (viewer === rule.owner || (!!jobOwner && viewer === jobOwner));
 /** The way back a run offers, or null. Only the verb the rule declared; only on a run that changed something and
     has not been put back; never a fake Undo (SYNTHESIS 2.9). */
@@ -233,7 +233,7 @@ export function stripWords(runs) {
   return `${runs.length} ${runs.length === 1 ? 'run' : 'runs'}${unable ? ` · ${unable} unable to complete` : ''}${back ? ` · ${back} put back by a person` : ''}`;
 }
 
-// ---- "How was this done?" (UX-V2 §6) ------------------------------------------------------------------------------
+// ---- "How was this done?" (design notes) ------------------------------------------------------------------------------
 /** The card's rows in their fixed order, and the actions the viewer may take. `viewer` and `jobOwner` gate Run again.
     Returns { id, title, meta, rows: [{ k, v }], ai, actions: [{ verb, kind, words }], trace } */
 export function howCard(rule, run, { people = {}, today = '', viewer = null, jobOwner = null, conditions = null } = {}) {

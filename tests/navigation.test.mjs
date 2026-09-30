@@ -3,6 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { needsDist } from './helpers/dist.mjs';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -90,7 +91,7 @@ test('no stage ladder is left: no stage selector, no "N of 6", no rs4-stage', ()
   assert.deepEqual(hits, []);
 });
 
-test('built pages: a space\'s path is the zoom trail, and the palette carries its modes (runs when dist/ exists)', { skip: !existsSync(join(ROOT, 'dist')) }, () => {
+test('built pages: a space\'s path is the zoom trail, and the palette carries its modes (runs when dist/ exists)', { skip: needsDist() }, () => {
   const html = read('dist/rooms/dub-3-09/index.html');
   const crumbs = /<nav class="crumbs"[^>]*>([\s\S]*?)<\/nav>/.exec(html)[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
   assert.equal(crumbs, 'Locations / EMEA / Dublin office / Third floor / 3.09 Whooper Swan');

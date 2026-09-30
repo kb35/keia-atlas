@@ -1,4 +1,4 @@
-// Leadership: "are we OK, and what does it cost?" (UX-V2 §4.7, BUILD-PLAN V7 H3, ROADMAP "Leadership").
+// Leadership: "are we OK, and what does it cost?" (design notes, BUILD-PLAN V7 H3, ROADMAP "Leadership").
 //
 // Claire's Home answers it on one page: the band (four experience and cost figures, each with a 30-day sparkline and
 // its source and time), the estate as small multiples, What it costs (four figures with a 12-month strip each), To

@@ -1,9 +1,10 @@
-// People are never ranked (UX-V2 §4.7 step 5, UI-V2 §10 "No person's name appears beside a count, rate or rank").
+// People are never ranked (design notes step 5, design notes "No person's name appears beside a count, rate or rank").
 // Leadership's Home names an owner ("Owner: Anna") but never counts, rates or ranks a person ("Tom: 12 closed this
 // week"). Checked three ways: the leadership model (src/lib/costs.mjs), the experience figures behind it, and, when the
 // site has been built, the text of Claire's sections on Home.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { needsDist } from './helpers/dist.mjs';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -64,7 +65,7 @@ test('experience measures are per space or per service, never per person', () =>
   for (const list of Object.values(MEASURES)) for (const m of list) assert.equal(nameIn(`${m.label} ${m.method}`), null, m.label);
 });
 
-test('Claire\'s sections on the built Home name no person beside a number (runs when dist/ exists)', { skip: !existsSync(join(ROOT, 'dist', 'index.html')) }, () => {
+test('Claire\'s sections on the built Home name no person beside a number (runs when dist/ exists)', { skip: needsDist('index.html') }, () => {
   const html = readFileSync(join(ROOT, 'dist', 'index.html'), 'utf8');
   const bad = [];
   for (const sec of ['costs', 'lreview', 'pilot', 'model']) {

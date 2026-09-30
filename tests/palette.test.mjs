@@ -1,63 +1,27 @@
-// The palette (⌘K; UX-V2 §2.3, SearchOverlay.astro): three modes on the first character, the first row of results
-// in under 50 ms from the in-memory index, and verbs that are only ever the page's own buttons.
+// The palette (⌘K; SearchOverlay.astro): three modes on the first character, results from the in-memory index, and
+// verbs that are only ever the page's own buttons.
 //
-// The speed test runs on the real index when the site has been built (dist/search/index.json), and otherwise on a
-// made-up index of the same size, so it always runs. Each query is timed on its own, the first one cold.
+// Always on the made-up index of the real one's size (tests/helpers/palette-index.mjs), so the answer does not change
+// with the build. The 50 ms speed budget is a wall-clock check, so it runs on its own: `npm run perf`.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load, search } from '../src/lib/search-query.mjs';
 import { VERBS, verbRows, matchVerbs, matchPeople, paletteMode } from '../src/lib/verbs.mjs';
+import { bigIndex, QUERIES, MAY_BE_EMPTY } from './helpers/palette-index.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const BUDGET_MS = 50;
+const I = load(bigIndex());
 
-// A made-up index the size of the real one: 3,000 spaces and 12,000 units across five offices.
-function bigIndex() {
-  const sites = { dub: ['DUB', 'Dublin office', 'Dublin', 'emea', 'Ireland'], lon: ['LON', 'London office', 'London', 'emea', 'United Kingdom'], nyc: ['NYC', 'New York office', 'New York', 'amer', 'United States'], sin: ['SIN', 'Singapore office', 'Singapore', 'apac', 'Singapore'], mel: ['MEL', 'Melbourne office', 'Melbourne', 'apac', 'Australia'] };
-  const S = Object.keys(sites), birds = ['Gannet', 'Curlew', 'Wren', 'Heron', 'Skylark', 'Whooper Swan', 'Goldcrest', 'Kestrel'];
-  const rooms = {}, items = [], units = [];
-  for (let i = 0; i < 3000; i++) {
-    const st = S[i % S.length], id = `${st}-${i}`, fl = String(1 + (i % 20)), name = `${birds[i % birds.length]} ${i}`;
-    rooms[id] = [name, `${fl}.${i % 40}`, st, fl, 'conference-room-medium'];
-    items.push(['room', `rooms/${id}/`, name, `${sites[st][1]} ${fl}.${i % 40} · Medium meeting room`, '', { st, fl, p: 'conference-room-medium', m: ['poly-studio-x52'], c: ['video-bar', 'display'] }]);
-    for (let u = 0; u < 4; u++) units.push([id, u ? 'display' : 'video bar', u ? 0 : 'poly-studio-x52', u ? 'display' : 'video-bar', `${id}-d${u}`, `DEMO-${i}-${u}`, `AG-${String(i * 4 + u).padStart(6, '0')}`, '2021-01-01', 0, 'in-service']);
-  }
-  return {
-    v: 1, today: '2026-09-30', sites,
-    classes: { 'video-bar': 'Video bar', display: 'Display' },
-    models: { 'poly-studio-x52': ['Poly', 'Studio X52', 'video-bar', 'standard'] },
-    rp: { 'conference-room-medium': 'Medium meeting room' }, roles: { tech: 'On-site technician' },
-    rooms, items, units,
-  };
-}
-
-const built = join(ROOT, 'dist', 'search', 'index.json');
-const RAW = existsSync(built) ? JSON.parse(readFileSync(built, 'utf8')) : bigIndex();
-const I = load(RAW);
-
-test(`the first row of results comes back in under ${BUDGET_MS} ms, from the in-memory index`, () => {
-  const queries = ['x52', 'EMEA spaces with X52', 'whooper swan', 'dublin', 'displays older than 7 years', 'AG-000101', 'who is on site in APAC', 'gannet'];
-  const slow = [];
-  search(I, 'warm up'); // the first call pays for compiling the search code, which a person never waits for twice
-  for (const q of queries) {
-    // Best of three: the budget is about the search, not about a busy machine running other tests beside it.
-    let ms = Infinity, R;
-    for (let i = 0; i < 3; i++) {
-      const t0 = performance.now();
-      R = search(I, q);
-      ms = Math.min(ms, performance.now() - t0);
-    }
+test('each query a person types finds its first row in the in-memory index', () => {
+  for (const q of QUERIES) {
+    const R = search(I, q);
     const first = R.top[0] ?? R.groups[0]?.items[0];
-    if (ms >= BUDGET_MS) slow.push(`${q}: ${ms.toFixed(1)} ms`);
-    // The made-up index (no dist/ yet, as in CI before the build) has no displays with ages, so only the real one must answer it.
-    const needs = q !== 'who is on site in APAC' && (existsSync(built) || q !== 'displays older than 7 years');
-    if (needs) assert.ok(first, `"${q}" finds something`);
+    if (!MAY_BE_EMPTY.has(q)) assert.ok(first, `"${q}" finds something`);
   }
-  assert.deepEqual(slow, [], `over ${BUDGET_MS} ms`);
 });
 
 test('the first character picks the mode: > does, ? asks, anything else finds', () => {

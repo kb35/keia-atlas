@@ -16,7 +16,7 @@ import { MODULES, MODULE_STATES, CAPABILITIES, CAPABILITY_IDS, CAPABILITY_DEFAUL
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const walk = (d) => readdirSync(d).flatMap((n) => { const p = join(d, n); return statSync(p).isDirectory() ? walk(p) : [p]; });
 
-// The sections another change adds (src/lib/features-added.mjs, when it exists), registered here all the same.
+// The sections the overlooked batch added, registered in modules.mjs with `helper: true`.
 const HELPER_IDS = ['warranty', 'oncall', 'circuits', 'comms-environment', 'repeat-faults', 'room-accessibility', 'cable-tests', 'certified-platforms', 'change-windows'];
 // The capabilities built behind their switches in this change, with their defaults.
 const BUILT = { licences: 'on', maintenance: 'on', 'out-of-service': 'on', alerts: 'connected', credentials: 'off', cves: 'on', 'config-backups': 'connected', 'meeting-quality': 'connected' };
@@ -37,16 +37,16 @@ test('the registry: unique ids, a real module, a valid default, a source, and re
   for (const [id, st] of Object.entries(BUILT)) assert.equal(CAPABILITY_DEFAULTS[id], st, `${id} defaults to ${st}`);
 });
 
-test('the overlooked batch\'s sections (FEATURES_ADDED) are registered here, each in the same module', async () => {
-  const { FEATURES_ADDED } = await import(pathToFileURL(join(ROOT, 'src/lib/features-added.mjs')).href);
-  assert.ok(FEATURES_ADDED.length >= HELPER_IDS.length);
-  for (const f of FEATURES_ADDED) {
-    const c = CAPABILITIES.find((x) => x.id === f.id);
-    assert.ok(c, `${f.id} is registered in src/lib/modules.mjs`);
-    assert.equal(c.module, f.module, `${f.id} sits under the same module`);
-    assert.ok(c.helper, `${f.id} is marked as another change's section`);
+test('the overlooked batch\'s sections are registered in the one capability list, and there is no second list', () => {
+  for (const id of HELPER_IDS) {
+    const c = CAPABILITIES.find((x) => x.id === id);
+    assert.ok(c, `${id} is registered in src/lib/modules.mjs`);
+    assert.ok(c.helper, `${id} is marked as another change's section`);
   }
-  for (const id of HELPER_IDS) assert.ok(FEATURES_ADDED.some((f) => f.id === id), `${id} is in FEATURES_ADDED`);
+  assert.ok(!existsSync(join(ROOT, 'src/lib/features-added.mjs')), 'CAPABILITIES in modules.mjs is the only list of capabilities');
+  const lib = readdirSync(join(ROOT, 'src/lib')).filter((n) => /\.m?js$/.test(n) && n !== 'modules.mjs');
+  const second = lib.filter((n) => /export const (FEATURES|CAPABILIT)[A-Z_]*\s*=\s*\[/.test(readFileSync(join(ROOT, 'src/lib', n), 'utf8')));
+  assert.deepEqual(second, [], 'no second list of capabilities');
   assert.equal(CAPABILITY_DEFAULTS.engagements, 'on', 'service-provider engagements, under Vendors, on by default');
 });
 

@@ -1,4 +1,4 @@
-// The heartbeat (UI-V2 §8.6): "checked 40 s ago" at the end of a page's answer sentence, the proof that a quiet
+// The heartbeat (design notes): "checked 40 s ago" at the end of a page's answer sentence, the proof that a quiet
 // page is alive. The words change every 10 s; nothing moves. When the feed has said nothing for longer than its
 // window, the heartbeat reads "Not reporting since 08:12" in fault ink, the page gets data-stale, and it counts as
 // a fault.

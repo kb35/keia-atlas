@@ -1,4 +1,4 @@
-// Depth and density, remembered per person (UX-V2 §5.2 and §5.3, UI-V2 §7 and §8.8; docs/rules/platform.md P11).
+// Depth and density, remembered per person (design notes; docs/rules/platform.md P11).
 //
 // Depth: every page has four layers, Band, Summary, Record and Raw. "Open pages like this here" (OpenHere.astro) at a
 // layer's boundary sets the person's default layer for that kind of page (home, space, device, job...). The next

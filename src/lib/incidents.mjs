@@ -11,7 +11,7 @@ export const RES_LABEL = { fixed: 'Fixed', workaround: 'Workaround', 'no-fault-f
 export const STATE_ORDER = ['new', 'in-progress', 'on-hold', 'resolved'];
 export const PRIORITY_LABEL = { 1: 'Critical', 2: 'High', 3: 'Moderate', 4: 'Low' };
 export const SOURCE_LABEL = { servicenow: 'ServiceNow', keia_atlas: 'Keia Atlas' };
-// A story the demo plays from the start (UX-V2 flow 4.1) is held at its own moment (keia_atlas.held_at) and says so.
+// A story the demo plays from the start (design notes) is held at its own moment (keia_atlas.held_at) and says so.
 export const nowOf = (inc) => inc.keia_atlas?.held_at ?? DEMO_NOW;
 
 const ms = (t) => new Date(t).getTime();

@@ -5,6 +5,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { integrateModel, nextInQueue } from '../src/lib/integrate-view.mjs';
 import { replay } from '../src/lib/live.mjs';
+import { readFileSync } from 'node:fs';
+import { building } from '../src/lib/floors.mjs';
+import { spaceCentre, floorSides } from '../src/lib/floorplan.mjs';
 
 const unit = (id, extra = {}) => ({
   id, room: 'r1', roomName: '1.01 Wren', site: 's', name: `Wren ${id}`, short: id, cls: 'video-bar', clsName: 'Video bar', model: 'm', modelName: 'Model', host: `h-${id}`, tag: null, serial: null,
@@ -146,4 +149,30 @@ test('applying from a space sends the setup guide to its units alone, and they r
   const M4 = integrateModel(p3, { get: (item, base) => replay(events, item, base), stage: () => 6 });
   assert.equal(M4.stepOf('a', 'configure').sub, 'Reading back');
   assert.equal(M3.applyEvents(M3.groupsBy('type')[0])[0].item, 'int:PRJ-1:c:batch');
+});
+
+// "Deliver by floor or zone" sorts spaces north or south of the core from the one building model. A space turned
+// 180 degrees extends south-west of its placed corner; a private copy once assumed north-east and put 14 spaces
+// (Chicago 12.09 among them) on the wrong side.
+test('a space turned 180 degrees sits south-west of its placed corner, on the right side of the core', () => {
+  const M = building('chi');
+  const c = spaceCentre(M, 'chi-12-09');
+  assert.deepEqual({ x: +c.x.toFixed(2), y: +c.y.toFixed(2) }, { x: +(32.72 - 2.12 / 2).toFixed(2), y: +(12 - 4 / 2).toFixed(2) });
+  assert.equal(floorSides(M, '12').side(c), 'south');
+  let turned = 0;
+  for (const [id, r] of Object.entries(M.rooms)) {
+    const at = M._raw.spaces[id]?.geometry?.on_floor;
+    if (at?.turn_deg !== 180 || !r.rect) continue;
+    const m = spaceCentre(M, id); turned++;
+    assert.ok(m.x < at.x_m && m.y < at.y_m, `${id} is south-west of its placed corner`);
+  }
+  assert.ok(turned > 0);
+});
+
+test('Deploy reads space positions and floor sides from the shared floor geometry, not a private copy', () => {
+  const src = readFileSync(new URL('../src/lib/integrate.mjs', import.meta.url), 'utf8');
+  assert.match(src, /spaceCentre\(/);
+  assert.match(src, /floorSides\(/);
+  assert.doesNotMatch(src, /turn_deg/, 'no second rotation rule');
+  assert.doesNotMatch(src, /'floors'/, 'no private read of data/floors');
 });

@@ -1,7 +1,7 @@
-// The page's verbs for the palette's Do mode (⌘K, then ">"; UX-V2 §2.3). A verb is never only in the palette:
+// The page's verbs for the palette's Do mode (⌘K, then ">"; design notes). A verb is never only in the palette:
 // it is a button or link on the page that carries data-verb="<id>", and the palette lists the ones you can
 // see right now under the button's own name, then presses that button. So the palette can never do anything
-// the page cannot do by clicking, and every verb has the same name as its button (UI-V2 §10).
+// the page cannot do by clicking, and every verb has the same name as its button (design notes).
 //
 // A verb marked data-verb-always is listed even while its button is out of sight (the quick menu's links to the
 // Settings pages, which are closed until the gear is pressed): pressing it follows the link.

@@ -371,7 +371,7 @@ const warSpan = (r) => (r.first.slice(0, 7) === r.last.slice(0, 7) ? monthYear(r
 
   <script type="application/json" data-pl-data set:html={JSON.stringify(DATA)} />
   <script>
-    import { ROLES, REGIONS, fyLabel, yearTotals, applyScenario, compare, effectWords, changeFromForm } from '../../../lib/planningcore.mjs';
+    import { ROLES, REGIONS, fyLabel, yearTotals, applyScenario, compare, effectWords, changeFromForm, groupOf } from '../../../lib/planningcore.mjs';
     import { flat, ledeFor, compareHtml, money, kmoney } from '../../../lib/planningview.mjs';
 
     type Sc = { id: string; name: string; say: string; owner: string; changes: any[]; typed?: boolean };
@@ -458,7 +458,7 @@ const warSpan = (r) => (r.first.slice(0, 7) === r.last.slice(0, 7) ? monthYear(r
         for (const y of planYears) for (const site of Object.keys(planCtx.siteRegion)) for (const group of ['av', 'network']) {
           const row = q(`[data-line="${y.id}:${site}:${group}"]`); if (!row) continue;
           const o = y.planned.byOffice[site]; let units = 0, eur = 0;
-          if (o) for (const [cls, n] of Object.entries(o.classes) as [string, number][]) { if (!n) continue; const g = ['network-switch', 'network-gateway', 'wireless-access-point', 'security-device'].includes(cls) ? 'network' : 'av'; if (g !== group) continue; units += n; const c = planCtx.CLASS[cls] || { eur: 500, hours: {} }; eur += (c.eur + ROLES.reduce((a: number, r: string) => a + (c.hours[r] || 0) * planCtx.rate, 0)) * n; }
+          if (o) for (const [cls, n] of Object.entries(o.classes) as [string, number][]) { if (!n) continue; if (groupOf(cls) !== group) continue; units += n; const c = planCtx.CLASS[cls] || { eur: 500, hours: {} }; eur += (c.eur + ROLES.reduce((a: number, r: string) => a + (c.hours[r] || 0) * planCtx.rate, 0)) * n; }
           row.hidden = !units; if (units) row.setAttribute('data-fi', ''); else row.removeAttribute('data-fi');
           row.dataset.eur = String(Math.round(eur));
           const e = q('[data-lv="eur"]', row); if (e) e.textContent = money(eur);

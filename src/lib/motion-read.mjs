@@ -1,5 +1,5 @@
 // Motion tokens for page scripts that may run outside the console's Shell (the front door has no Shell, so no
-// window.rsMotion). Reads the same CSS custom properties (motion.css, MOTION-V2 section 2); nothing types a number
+// window.rsMotion). Reads the same CSS custom properties (motion.css, docs/rules/motion.md); nothing types a number
 // except the fallbacks, which are the token values. Browser only.
 
 const ms = (cs, name, d) => {

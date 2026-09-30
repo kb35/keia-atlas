@@ -1,4 +1,4 @@
-// The zoom in the browser (UX-V2 §2.2, MOTION-V2 4.6 and 4.7). Loaded once by Shell.astro; it lives across
+// The zoom in the browser (design notes, docs/rules/motion.md). Loaded once by Shell.astro; it lives across
 // page changes. What it does:
 //   - tells a zoom from any other move: one page level in or out along region, office, space, device
 //     (src/lib/zoom-level.mjs), and marks it on <html> as data-nav-dir="zoom-in" or "zoom-out" for nav.css;

@@ -1,4 +1,4 @@
-// Springs for scripted moves (MOTION-V2 §2): the zoom, drags, scrubs and a chip that changes twice.
+// Springs for scripted moves (docs/rules/motion.md): the zoom, drags, scrubs and a chip that changes twice.
 // A spring described by a duration and zero bounce is a critically damped curve: it never overshoots, and
 // it can be retargeted mid-flight from where it is, at the speed it is going, so an interrupted move still
 // reads as one motion. No library: the curve becomes a CSS `linear()` easing for the Web Animations API

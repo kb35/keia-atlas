@@ -12,7 +12,7 @@ import { warrantyWords, supportWords, monthsUntil, endingSoon, money, renewalWor
 import { TARGETS, upsWords, tempWords, envAnswer, simulatedTemp } from '../src/lib/environment.mjs';
 import { hoursWords, daysWords, windowWords, nextWindow, plusHour } from '../src/lib/hours.mjs';
 import { ordinal, quarterStart, lastMonths, repeatsOf, mostRepeats } from '../src/lib/repeats.mjs';
-import { FEATURES_ADDED } from '../src/lib/features-added.mjs';
+import { CAPABILITIES } from '../src/lib/modules.mjs';
 import { rotaAt, lineFor, outOfHours, localAt, utcOf, whenWords } from '../src/lib/oncall.mjs';
 import { PEOPLE } from '../src/lib/demo.mjs';
 import { accessForStaff, cableTestsOf, platformsOf } from '../src/lib/roomfacts.mjs';
@@ -23,6 +23,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const walk = (d) => readdirSync(d).flatMap((n) => { const p = path.join(d, n); return statSync(p).isDirectory() ? walk(p) : n.endsWith('.yaml') ? [p] : []; });
 const load = (dir) => walk(path.join(ROOT, 'data', dir)).map((f) => ({ id: path.basename(f, '.yaml'), file: f, ...parse(readFileSync(f, 'utf8')) }));
 const TODAY = '2026-09-28';
+const HELPERS = CAPABILITIES.filter((c) => c.helper);   // the overlooked batch's sections, in the one registry
 
 // ---- Warranty, support cover and purchase ----------------------------------------------------------------------
 
@@ -82,10 +83,10 @@ test('every unit with a date has a purchase and a warranty, marked demo; support
 // ---- Every new block can be switched off -------------------------------------------------------------------------
 
 test('each capability added is listed once, with a label, a line and a module', () => {
-  const ids = FEATURES_ADDED.map((f) => f.id);
+  const ids = HELPERS.map((f) => f.id);
   assert.equal(new Set(ids).size, ids.length);
-  for (const f of FEATURES_ADDED) {
-    assert.ok(f.label && f.description && ['assets', 'locations', 'team', 'support', 'projects'].includes(f.module), f.id);
+  for (const f of HELPERS) {
+    assert.ok(f.label && f.what && ['assets', 'locations', 'team', 'support', 'projects'].includes(f.module), f.id);
   }
 });
 
@@ -275,7 +276,7 @@ test('the trend strip is drawn at its own size, one stroke a period, and says it
 // ---- Every new block can be switched off -------------------------------------------------------------------------
 
 test('every capability in the list is carried by a block on some page (data-feature)', () => {
-  const ids = new Set(FEATURES_ADDED.map((f) => f.id));
+  const ids = new Set(HELPERS.map((f) => f.id));
   const files = [];
   const walkSrc = (d) => readdirSync(d).forEach((n) => { const p = path.join(d, n); if (statSync(p).isDirectory()) walkSrc(p); else if (/\.(astro|mjs|js)$/.test(n)) files.push(p); });
   walkSrc(path.join(ROOT, 'src'));

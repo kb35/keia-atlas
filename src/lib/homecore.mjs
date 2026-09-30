@@ -110,7 +110,7 @@ export function dueWords(it, today, fmt = (d) => d) {
 // A working day near today (the Schedule's next working day), for links that need a weekday.
 export const nextWorkingDay = (d) => { let x = d; while (isWeekend(x)) x = addDays(x, 1); return x; };
 
-// ==== v2: the dark cockpit (UX-V2 §3, UI-V2 §3.1) ================================================================
+// ==== v2: the dark cockpit (design notes) ================================================================
 // One Home skeleton for every role: the band answers "is it all right?" in one sentence, four figures say how many
 // need you, and the sections follow in the role's order. Role changes what comes first, never what exists.
 // cockpit() is pure: the page passes the Home blob (src/lib/home.mjs), who has each job now (the base plus the live
@@ -216,7 +216,7 @@ export function cockpit(H, ownOf, who) {
       answer = `${X.onPlan ?? 0} of ${plural(X.projects ?? 0, 'project')} on plan · ${X.gatesWeek ? `${plural(X.gatesWeek, 'gate')} this week` : 'no gate this week'}`;
       break;
     case 'lead':
-      // Leadership (UX-V2 §4.7): experience and cost, each with its sparkline and its source; nothing per person.
+      // Leadership (design notes): experience and cost, each with its sparkline and its source; nothing per person.
       if (C.lead) { figures = C.lead.figures.map((f) => F(f.id, f.n, f.label, f.to, { spark: f.spark, title: f.title })); answer = C.lead.answer; break; }
       // falls through without the leadership figures
     case 'everyone':
@@ -231,7 +231,7 @@ export function cockpit(H, ownOf, who) {
       break;
     }
     case 'vendor': {
-      // A partner (UI-V2 §3.6): the jobs handed to their company and the one contract clock (src/lib/vendors.mjs).
+      // A partner (design notes): the jobs handed to their company and the one contract clock (src/lib/vendors.mjs).
       const P = C.partner?.[who];
       if (P) {
         figures = [F('with', P.withYou, 'With you', '#partner'), F('waiting', P.waiting, 'Waiting on the client', '#partner'), F('late', P.past, 'Past the clock', '#partner', { tone: P.past ? 'bad' : '' }), F('spaces', P.spaces, 'Spaces you can open today', '#partner')];
@@ -249,7 +249,7 @@ export function cockpit(H, ownOf, who) {
   return { kind, layout: LAYOUT[kind], office, ready, withYou, review, todayN, queue, figures, answer, signal: ready.length > 0 || !!sh?.fault.length };
 }
 
-/** Welcome back (UX-V2 §4.3): the band and four figures while the person has not started the day yet. */
+/** Welcome back (design notes): the band and four figures while the person has not started the day yet. */
 export function welcomeBand(w, person) {
   const first = person?.first ?? person?.name ?? '';
   return {

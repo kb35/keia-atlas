@@ -1,4 +1,4 @@
-// Lenses on the floor plan (UX-V2 §2.5) and Replay (UX-V2 §8): the pure rules in src/lib/lenses.mjs and
+// Lenses on the floor plan (design notes) and Replay (design notes): the pure rules in src/lib/lenses.mjs and
 // src/lib/replay.mjs. The facts they read are gathered at build time (src/lib/lens-data.mjs).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

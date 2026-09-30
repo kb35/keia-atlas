@@ -1,4 +1,4 @@
-// The handover card (UI-V2 §8.10, UX-V2 §4.3 and §4.4): one fixed card for three moments, so a person learns it once.
+// The handover card (design notes): one fixed card for three moments, so a person learns it once.
 //
 //   park      three lines when you stop part way: Where I stopped, Next step, Open question. Written in a minute;
 //             no line is required. Shown read-only on the job's row and above its timeline until Resume.

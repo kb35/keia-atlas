@@ -246,7 +246,7 @@ export function homeData() {
 export const groupsFor = (id) => groupFor(ITEMS, id, TODAY);
 export { BY_ID as itemById };
 
-// ==== v2: the cockpit (UX-V2 §3, §4.3, §4.4; UI-V2 §3.1) ========================================================
+// ==== v2: the cockpit (design notes) ========================================================
 // Everything Home needs to say who has what, which spaces are not all right, what was done automatically, what
 // changed overnight and, after time away, what happened. Worked out once here; src/lib/homecore.mjs turns it into
 // each role's answer sentence, four figures and lists in the browser, with the live layer's changes on top.
@@ -273,7 +273,7 @@ const lower1 = (s) => String(s ?? '').replace(/^./, (c) => c.toLowerCase());
 export const MATCH_RULE = { name: 'Match tickets to spaces', owner: 'priya' };
 
 // ---- Who has each piece of work, before any live change ----------------------------------------------------
-// Parked jobs in the demo (UX-V2 §4.4): Liam stopped part way through labelling the IDF 3 panel for the cutover;
+// Parked jobs in the demo (design notes): Liam stopped part way through labelling the IDF 3 panel for the cutover;
 // Anna stopped part way through commissioning Heron in Juneau.
 export const PARKED_SEED = {
   'task:T-1605': { by: 'liam', at: `${DEMO_TODAY}T10:14`, park: { where: 'Labelled ports 1 to 8 on the IDF 3 panel', next: 'Label 9 to 12, then check each against the build sheet', question: 'Is port 11 the booking panel? Its label is missing' } },
@@ -365,7 +365,7 @@ CHANGED.sort((a, b) => b.at.localeCompare(a.at));
 // ---- Knowledge to review: known errors from the manufacturers' feeds that may affect Aigna ------------------------
 export const KNOWLEDGE = kiIssues.filter((i) => i.status === 'open' && i.affects !== 'no').map((i) => ({ title: i.title, sub: `${i.maker} · ${i.affects === 'yes' ? `affects ${i.ex.exposed.length} ${i.ex.exposed.length === 1 ? 'unit' : 'units'}` : 'may affect us'}`, href: href(i.path) }));
 
-// ---- To review, per person: things someone should look at, where nothing is down (UI-V2 §5.2, the notched ring) ----
+// ---- To review, per person: things someone should look at, where nothing is down (design notes, the notched ring) ----
 const openLogOf = (pid) => Object.values(projects).filter((prj) => prj.phase !== 'closed').flatMap((prj) => (prj.log ?? []).filter((l) => l.status === 'open' && l.owner === pid && ['risk', 'issue'].includes(l.kind)).map((l) => ({ l, prj })));
 function reviewFor(p) {
   const out = [], office = p.office;
@@ -428,7 +428,7 @@ function reviewFor(p) {
 }
 export const REVIEW = Object.fromEntries(PEOPLE.map((p) => [p.id, reviewFor(p)]));
 
-// ---- Welcome back, and the hand over for cover (UX-V2 §4.3) ------------------------------------------------------
+// ---- Welcome back, and the hand over for cover (design notes) ------------------------------------------------------
 // Who covers whom while they are away: the first colleague in the same role (Marcus covers Anna).
 export const coverOf = (p) => PEOPLE.find((x) => x.id !== p.id && x.roleId === p.roleId && !x.vendor)?.id ?? null;
 const scopeSites = (p) => (p.roleId === 'tech' ? [p.office] : p.region ? SITE_ORDER.filter((s) => sites[s].region === p.region) : SITE_ORDER);

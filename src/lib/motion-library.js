@@ -2,7 +2,7 @@
    Pairs with src/styles/motion-library.css. Loaded once on every page by Motion.astro; sets window.km.
    Durations and curves are read from the tokens (so each look keeps its
    own tempo), and the spring is V2's (src/lib/spring.mjs), one curve for the whole site.
-   Every function checks km.reduced() and applies the end state at once when it is on (MOTION-V2 section 7). */
+   Every function checks km.reduced() and applies the end state at once when it is on (docs/rules/motion.md). */
 import { springEasing } from './spring.mjs';
 
 const doc = document;

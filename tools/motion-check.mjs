@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* Motion check (MOTION-V2 §6 and §7, docs/rules/motion.md M7): with prefers-reduced-motion: reduce, no script may
+/* Motion check (docs/rules/motion.md, docs/rules/motion.md M7): with prefers-reduced-motion: reduce, no script may
    animate. It opens pages in a browser set to reduced motion, does what a person does on them (zoom into a space
    on the floor plan and back out with [ and ], open the palette in each of its modes, switch a module off and on
    in Settings, choose a port on a unit, press a space and a floor on a Home thumbnail; open and close a disclosure, filter a list, scroll sections and charts into

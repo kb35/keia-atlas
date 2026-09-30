@@ -18,7 +18,7 @@
 //
 // Coordinates: building metres, x east and y north from the outline's south-west corner; the drawings' SVG y runs
 // down, so Y(y) flips it. Every drawing uses the same padding (PAD), so a thumbnail and the plan have the same
-// picture box and one can grow into the other (the shared-element zoom, MOTION-V2 4.6).
+// picture box and one can grow into the other (the shared-element zoom, docs/rules/motion.md).
 
 export const PAD = 1.5;
 
@@ -52,7 +52,7 @@ export function planOf(M, floorId) {
   };
 }
 
-// One scale for a set of plans (UI-V2 §8.7): the largest floor sets it.
+// One scale for a set of plans (design notes): the largest floor sets it.
 export function frameOf(plans) {
   const ok = plans.filter(Boolean);
   return { VW: Math.max(1, ...ok.map((p) => p.VW)), VH: Math.max(1, ...ok.map((p) => p.VH)) };
@@ -66,3 +66,22 @@ export function hitBox(plan, rect) {
   return { left: pc((b.x + PAD) / plan.VW), top: pc((b.y + PAD) / plan.VH), width: pc(b.width / plan.VW), height: pc(b.height / plan.VH) };
 }
 export const glyphShare = (plan, r) => +(Math.min(r.rect[2] - r.rect[0], r.rect[3] - r.rect[1]) / plan.VW).toFixed(4);
+
+// Where a space's middle sits on its floor, in building metres (x east, y north), from the building model's rect.
+// floors.mjs roomGeometry is the one place that turns and mirrors a space, so a space turned 180 degrees is never
+// put on the wrong side of anything.
+export function spaceCentre(M, id) {
+  const r = M?.rooms?.[id]?.rect;
+  return r ? { x: (r[0] + r[2]) / 2, y: (r[1] + r[3]) / 2 } : null;
+}
+// The two sides of a floor a crew works in turn: north and south of the core on a wide floor, west and east on a
+// deep one. side(point) names the side a point is on. Null when the floor has no core to split by.
+export function floorSides(M, floorId) {
+  const F = M?.floors?.find((f) => String(f.id) === String(floorId));
+  const core = F?.core ?? [], xs = (F?.outline ?? []).map((p) => p[0]), ys = (F?.outline ?? []).map((p) => p[1]);
+  if (!core.length || !xs.length) return null;
+  const cx = (Math.min(...core.map((c) => c.rect[0])) + Math.max(...core.map((c) => c.rect[2]))) / 2;
+  const cy = (Math.min(...core.map((c) => c.rect[1])) + Math.max(...core.map((c) => c.rect[3]))) / 2;
+  const wide = Math.max(...xs) - Math.min(...xs) >= Math.max(...ys) - Math.min(...ys);
+  return wide ? { order: ['north', 'south'], side: (p) => (p.y >= cy ? 'north' : 'south') } : { order: ['west', 'east'], side: (p) => (p.x < cx ? 'west' : 'east') };
+}
