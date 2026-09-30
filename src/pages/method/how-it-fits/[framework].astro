@@ -1,0 +1,110 @@
+---
+// How it fits: one framework (ITIL, ISO/IEC 20000-1, PMI, PRINCE2, Agile and DevOps, AVIXA, ISO 41001 and 55001,
+// ISO/IEC 27001 and NIS2, COBIT). Always in the same order: the band answers "what is it?" in one line; then which
+// version is mapped and how Keia relates to it; the mapping (each Keia idea, the framework's practices it serves,
+// what Keia adds), with the five ideas above it to light their rows; what the framework covers that Keia does not;
+// the words side by side; the sources last. Every word comes from docs/keia-method.md (src/lib/method.mjs); this
+// page only lays the groups out. A table is a table: its rows never move (docs/rules/motion.md, M16).
+import MethodPage from '../../../components/method/MethodPage.astro';
+import Section from '../../../components/Section.astro';
+import { href } from '../../../lib/data.mjs';
+import { FITS, IDEAS, md, plain } from '../../../lib/method.mjs';
+import { FIT_PAGES } from '../_pages.mjs';
+
+export function getStaticPaths() {
+  return FIT_PAGES.filter((p) => p.fit).map((p) => ({ params: { framework: p.fit } }));
+}
+const page = FIT_PAGES.find((p) => p.fit === Astro.params.framework);
+const fw = FITS.frameworks.find((f) => f.num === page.num);
+const row = FITS.rows.find((r) => r[3] === fw.num);
+const rel = row?.[2].match(/^([^:]+):\s*(.*)$/);
+const TOP = /^(What (it is|they are)|Which version|How it fits)$/;
+const END = /^(Official source|Sources)$/;
+const version = fw.groups.filter((g) => /^(Which version|How it fits)$/.test(g.label));
+const body = fw.groups.filter((g) => g.label && !TOP.test(g.label) && !END.test(g.label));
+const official = fw.groups.find((g) => g.label === 'Official source');
+const sources = fw.groups.find((g) => g.label === 'Sources');
+const ideaOf = (name) => IDEAS.find((i) => i.name === plain(name));
+const isMap = (g) => g.label === 'How the ideas map';
+---
+<MethodPage slug={page.slug} title={fw.title} lede={fw.what} level={3} part="How it fits" num={fw.num}
+  parent={{ label: 'How it fits', to: '/method/how-it-fits/' }} try={page.try}>
+  <section class="card pad ff-top" aria-label="Which version, and how Keia relates">
+    <dl class="mp-parts">
+      {rel && <div><dt>How Keia relates</dt><dd><b>{rel[1]}</b>: {rel[2]}</dd></div>}
+      {version.map((g) => <div><dt>{g.label === 'How it fits' ? 'In short' : g.label}</dt><dd set:html={md(g.text)} /></div>)}
+    </dl>
+  </section>
+  {body.map((g) => (
+    <Section title={g.label}>
+      {g.text && <div class="mp-prose"><p set:html={md(g.text)} /></div>}
+      {isMap(g) ? (
+        <div class="ff-map" data-fit-map data-help="method.fits">
+          <ul class="ff-ideas" aria-label="The five ideas: point at one to light its row">
+            {IDEAS.map((i) => <li><a class="ff-idea" href={href(`/method/${i.slug}/`)} data-idea={i.slug}><span class="ff-n">{i.n}</span>{i.name}</a></li>)}
+          </ul>
+          {g.blocks.filter((b) => b.kind === 'table').map((t) => (
+            <div class="tablewrap card">
+              <table class="mp-table to-cards ff-table">
+                <thead><tr>{t.head.map((h) => <th>{h}</th>)}</tr></thead>
+                <tbody>
+                  {t.rows.map((r) => {
+                    const i = ideaOf(r[0]);
+                    return (
+                      <tr data-idea={i?.slug}>
+                        <td>{i ? <a href={href(`/method/${i.slug}/`)} data-idea={i.slug}>{r[0]}</a> : <span set:html={md(r[0])} />}</td>
+                        {r.slice(1).map((c) => <td set:html={md(c)} />)}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
+      ) : g.blocks.map((b) => (
+        b.kind === 'table' ? (
+          <div class="tablewrap card">
+            <table class="mp-table to-cards">
+              <thead><tr>{b.head.map((h) => <th>{h}</th>)}</tr></thead>
+              <tbody>{b.rows.map((r) => <tr>{r.map((c) => <td set:html={md(c)} />)}</tr>)}</tbody>
+            </table>
+          </div>
+        ) : b.kind === 'list' ? (
+          <ul class="ff-list">{b.items.map((x) => <li set:html={md(x)} />)}</ul>
+        ) : <div class="mp-prose"><p set:html={md(b.text)} /></div>
+      ))}
+    </Section>
+  ))}
+  <Section title="Sources">
+    <div class="mp-prose ff-src">
+      {official && <p><span class="ff-label">Official source.</span> <span set:html={md(official.text)} /></p>}
+      {sources?.text && <p set:html={md(sources.text)} />}
+      {sources?.blocks.filter((b) => b.kind === 'list').map((b) => <ul class="ff-list">{b.items.map((x) => <li set:html={md(x)} />)}</ul>)}
+      <p class="ff-back"><a href={href('/method/how-it-fits/')}>Every framework, and how Keia relates to each</a></p>
+    </div>
+  </Section>
+</MethodPage>
+
+<style>
+  .ff-top { display: grid; }
+  .ff-map { display: grid; gap: 12px; margin-top: 6px; }
+  .ff-ideas { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .ff-idea { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 4px 12px 4px 5px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--text); font-size: 13px; font-weight: 550; text-decoration: none;
+    transition: background-color var(--dur-state) var(--ease-settle), border-color var(--dur-state) var(--ease-settle); }
+  .ff-n { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); font: 500 11px/1 var(--font-mono); color: var(--text-2); }
+  .ff-idea.is-on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--surface)); }
+  /* Pointing at an idea lights its row (a state change in place, --dur-state); the other rows quieten, nothing moves. */
+  .ff-table tbody tr { transition: background-color var(--dur-state) var(--ease-settle), opacity var(--dur-state) var(--ease-settle); }
+  .ff-map.is-lit .ff-table tbody tr[data-idea]:not(.is-on) { opacity: .55; }
+  .ff-table tbody tr.is-on { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  .ff-table td:first-child a { color: var(--text); text-decoration: none; }
+  .ff-table td:first-child a:hover, .ff-table tr.is-on td:first-child a { color: var(--accent); }
+  .ff-list { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; line-height: 1.5; max-width: 80ch; }
+  .ff-src p { font-size: 13.5px; }
+  .ff-label { font-weight: 600; }
+  .ff-src .ff-list { font-size: 13.5px; }
+  .ff-back { margin-top: 4px !important; }
+  @container content (min-width: 700px) { .ff-table td:first-child { width: 170px; } }
+  @media (prefers-reduced-motion: reduce) { .ff-idea, .ff-table tbody tr { transition: none; } }
+</style>

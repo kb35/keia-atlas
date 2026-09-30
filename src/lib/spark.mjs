@@ -1,7 +1,7 @@
 // Sparklines (UI-V2 §8.2): the last 30 days (or 12 months, or the last 12 runs) of one figure as a small line, 64 by
 // 16 px, drawn in --quiet with no axes and no numbers. The last point gets a 3 px dot in the state's fill only when the
 // figure is not fine. The tooltip gives the lowest, the highest and the latest. Drawn still and redrawn when the figure
-// changes (MOTION-V2 §5: sparklines never move).
+// changes. It draws in once, the first time it is seen (km-draw-in, docs/rules/motion.md M19), and is otherwise still.
 //
 // Pure: no DOM. FigureTile.astro and KeyNumbers.astro draw on the server with sparkSvg(); page scripts redraw with it.
 

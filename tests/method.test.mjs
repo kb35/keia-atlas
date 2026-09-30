@@ -3,8 +3,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { METHOD, LEVEL1, IDEAS, SECTIONS, WORDS, STANDARDS, WORDS_FOR, MAPS, part, moves, md } from '../src/lib/method.mjs';
-import { PAGES, LEVEL1_TRY } from '../src/pages/method/_pages.mjs';
+import { METHOD, LEVEL1, IDEAS, SECTIONS, WORDS, STANDARDS, WORDS_FOR, MAPS, FITS, part, moves, md } from '../src/lib/method.mjs';
+import { PAGES, LEVEL1_TRY, FIT_PAGES } from '../src/pages/method/_pages.mjs';
 import { LINE, SENTENCE } from '../src/lib/brand.mjs';
 
 test('Level 1: the sentence, the paragraph, five ideas with an example each, eight words', () => {
@@ -50,4 +50,28 @@ test('the line under the name is one constant, used by the README', () => {
 
 test('inline Markdown is escaped before it is rendered', () => {
   assert.equal(md('<b>x</b> **y** *z* [a](https://e.org)'), '&lt;b&gt;x&lt;/b&gt; <strong>y</strong> <em>z</em> <a href="https://e.org">a</a>');
+});
+
+test('How it fits: the overview, nine frameworks in order, each with its line, mapping, sources and a page', () => {
+  assert.ok(FITS, 'docs/keia-method.md has a "## How it fits" part');
+  assert.deepEqual(FITS.head, ['Framework', 'What it is for', 'How Keia relates', 'Section']);
+  assert.deepEqual(FITS.frameworks.map((f) => f.title), ['ITIL', 'ISO/IEC 20000-1', 'PMI: the PMBOK Guide', 'PRINCE2', 'Agile, DevOps and SRE', 'AVIXA standards', 'ISO 41001 and ISO 55001', 'ISO/IEC 27001 and NIS2', 'COBIT']);
+  assert.deepEqual(FITS.rows.map((r) => r[3]), FITS.frameworks.map((f) => f.num), 'the overview lists every framework, in order');
+  for (const r of FITS.rows) assert.match(r[2], /^(Implements part of it|Companion|Out of scope)/, r[0]);
+  assert.ok(FITS.notes.some((n) => n.label === 'Trademarks' && /PeopleCert/.test(n.text) && /Project Management Institute/.test(n.text) && /ISACA/.test(n.text) && /AVIXA/.test(n.text)));
+  const ideaNames = IDEAS.map((i) => i.name);
+  for (const f of FITS.frameworks) {
+    assert.ok(f.what && f.what.length <= 110, `${f.title}: one line, at most 110 characters`);
+    const g = (label) => f.groups.find((x) => x.label === label);
+    assert.match(g('Official source')?.text ?? '', /\]\(https:\/\//, `${f.title}: an official source link`);
+    assert.ok(g('Sources')?.blocks.some((b) => b.kind === 'list'), `${f.title}: sources listed`);
+    if (f.title === 'COBIT') continue;
+    const map = g('How the ideas map')?.blocks.find((b) => b.kind === 'table');
+    assert.ok(map && map.head[0] === 'Keia idea' && map.head.length === 3, `${f.title}: a mapping table`);
+    for (const r of map.rows) assert.ok(ideaNames.includes(r[0]), `${f.title}: "${r[0]}" is one of the five ideas`);
+    assert.ok(g('Use your normal process here')?.blocks.some((b) => b.kind === 'list'), `${f.title}: what it covers that Keia does not`);
+    assert.ok(g('Words side by side')?.blocks.some((b) => b.kind === 'table'), `${f.title}: the words side by side`);
+  }
+  assert.equal(FIT_PAGES.length, FITS.frameworks.length + 1);
+  assert.ok(FIT_PAGES.every((p) => PAGES.includes(p) && p.to.startsWith('/method/how-it-fits/')));
 });

@@ -1,0 +1,60 @@
+---
+// How it fits: the overview. The Keia Method beside ITIL, ISO/IEC 20000-1, PMI, PRINCE2, Agile and DevOps, AVIXA,
+// ISO 41001 and 55001, ISO/IEC 27001 and NIS2, and COBIT. One table: each framework, what it is for, how Keia
+// relates to it, and its page, first; then how to read each page, and the trademarks. Every word comes from docs/keia-method.md ("## How it fits", src/lib/method.mjs).
+import MethodPage from '../../../components/method/MethodPage.astro';
+import Section from '../../../components/Section.astro';
+import { href } from '../../../lib/data.mjs';
+import { FITS, md } from '../../../lib/method.mjs';
+import { FIT_PAGES } from '../_pages.mjs';
+const page = FIT_PAGES[0];
+const byNum = Object.fromEntries(FIT_PAGES.filter((p) => p.num).map((p) => [p.num, p]));
+const lede = FITS.intro[0].split(/(?<=\.)\s/)[0];
+const rest = [FITS.intro[0].slice(lede.length).trim(), ...FITS.intro.slice(1)].filter(Boolean);
+// "Implements part of it: the everyday practices" -> the kind of relation, then the rest.
+const relation = (text) => { const m = text.match(/^([^:]+):\s*(.*)$/); return m ? { kind: m[1], rest: m[2] } : { kind: text, rest: '' }; };
+---
+<MethodPage slug={page.slug} title={page.title} lede={lede} level={3} num="part 4" try={page.try}>
+  <section class="card pad fo-top" aria-label="In short" data-help="method.paragraph">
+    <p set:html={md(rest[0])} />
+  </section>
+  <Section title={`${FITS.rows.length} frameworks, and how Keia relates to each`}>
+    <div class="tablewrap card">
+      <table class="mp-table to-cards fo-table">
+        <thead><tr><th>Framework</th><th>{FITS.head[1]}</th><th>{FITS.head[2]}</th></tr></thead>
+        <tbody>
+          {FITS.rows.map((r) => {
+            const p = byNum[r[3]], rel = relation(r[2]);
+            return (
+              <tr>
+                <td>{p ? <a href={href(p.to)}><span class="mn-num fo-num">{r[3]}</span> {r[0]}</a> : r[0]}</td>
+                <td set:html={md(r[1])} />
+                <td><b class="fo-kind">{rel.kind}</b>{rel.rest && <span>: {rel.rest}</span>}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  </Section>
+  {rest.length > 1 && (
+    <Section title="How to read each page">
+      <div class="mp-prose">{rest.slice(1).map((p) => <p set:html={md(p)} />)}</div>
+    </Section>
+  )}
+  {FITS.notes.map((n) => (
+    <Section title={n.label}>
+      <div class="mp-prose"><p class="fo-note" set:html={md(n.text)} /></div>
+    </Section>
+  ))}
+</MethodPage>
+
+<style>
+  .fo-top { display: grid; gap: 10px; }
+  .fo-top p { margin: 0; font-size: 15px; line-height: 1.55; max-width: 76ch; }
+  .fo-table a { font-weight: 550; text-decoration: none; }
+  .fo-table a:hover { text-decoration: underline; }
+  .fo-num { font: 500 11.5px/1 var(--font-mono); color: var(--text-3); margin-right: 4px; }
+  .fo-kind { font-weight: 600; }
+  .fo-note { font-size: 13px !important; color: var(--text-2); }
+</style>

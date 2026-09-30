@@ -236,7 +236,14 @@ const GLYPH = shape('fine');
   const W = window as any, D = document;
   const esc = (s: string) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as any)[c]);
   // Reduced motion, or the page's own motion switch: every change lands at once.
-  const still = () => { const r = D.documentElement; return r.dataset.reduced === 'true' || /^(off|reduced)$/.test(r.dataset.motion ?? '') || (r.dataset.reduced !== 'false' && matchMedia('(prefers-reduced-motion: reduce)').matches); };
+  const still = () => {
+    if (W.rsReducedNow) return !!W.rsReducedNow();
+    if (W.km?.reduced) return !!W.km.reduced();
+    const r = D.documentElement, m = r.dataset.motion ?? '';
+    if (/^(off|reduced)$/.test(m) || r.dataset.reduced === 'true') return true;
+    if (/^(full|on)$/.test(m) || r.dataset.reduced === 'false') return false;
+    return matchMedia('(prefers-reduced-motion: reduce)').matches;
+  };
   // The peek for a space, made when it is first pointed at or focused (hundreds of spaces, one small card each time).
   function peekOf(el: HTMLElement) {
     el.querySelector("template")?.remove();
@@ -482,7 +489,7 @@ const GLYPH = shape('fine');
   @keyframes fm-t-in { from { opacity: 0; } }
   .fm-thumb:not([data-drawn]) .fm-t-slab { animation: fm-t-slab var(--km-enter, var(--dur-enter)) var(--ease-settle) both; }
   .fm-thumb:not([data-drawn]) .fm-t-fill, .fm-thumb:not([data-drawn]) .fm-t-hits { animation: fm-t-in var(--km-state, var(--dur-state)) var(--ease-settle) both; animation-delay: calc(var(--dur-pop) * var(--km-t, 1)); }
-  @media (prefers-reduced-motion: reduce) { :root:not([data-reduced="false"]) .fm-thumb * { animation: none !important; transition: none !important; } }
+  @media (prefers-reduced-motion: reduce) { :root:not([data-reduced="false"]):not([data-motion="full"]):not([data-motion="on"]) .fm-thumb * { animation: none !important; transition: none !important; } }
   :root[data-reduced="true"] .fm-thumb *, :root[data-motion="off"] .fm-thumb *, :root[data-motion="reduced"] .fm-thumb * { animation: none !important; transition: none !important; }
   @media (pointer: coarse) { .fm-t-hit:hover { box-shadow: none; background: none; } }
 </style>

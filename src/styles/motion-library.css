@@ -140,3 +140,31 @@
 .km-skel { position: relative; }
 .km-skel > .km-wash { position: absolute; inset: 0; z-index: 1; border-radius: inherit; background: var(--surface-2); pointer-events: none; transition: opacity var(--km-state) var(--ease-settle); }
 .km-skel.km-loaded > .km-wash { opacity: 0; }
+
+/* ---------- 13. km-settle: a section below the fold waits just under its place, then settles in once (km.settle).
+   Only transform (the individual translate property, so a press's scale still composes) and opacity move. */
+.km-settle-wait { opacity: 0; translate: 0 12px; }
+.km-settling { transition: opacity var(--km-enter) var(--ease-settle), translate var(--km-enter) var(--ease-settle); }
+@media print { .km-settle-wait { opacity: 1; translate: none; } }
+
+/* 14. km-disclose, 15. km-tick and 16. km-draw-in are scripted (src/lib/motion-library.js). */
+
+/* ---------- 17. km-lift: a card that opens something lifts 2 px on hover and gains the next shadow, over
+   --dur-hover, and settles back when the pointer leaves. Rows never lift (they darken, row 1). No hover on touch;
+   no lift under reduced motion (--km-t is 0). */
+@media (hover: hover) {
+  a.card, a.site-card, .card.oc, [data-lift] { transition: background-color var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle), box-shadow var(--dur-hover) var(--ease-settle), translate var(--dur-hover) var(--ease-settle), transform var(--dur-press) var(--ease-settle); }
+  a.card:hover, a.site-card:hover, .card.oc:hover, [data-lift]:hover { translate: 0 calc(-2px * var(--km-t)); box-shadow: var(--shadow-md); }
+}
+
+/* ---------- Reduced motion from the site's own switch (html data-motion="off" or "reduced"), as well as the
+   system's: every library motion lands on its end state, CSS moves stop, and pages change without a move.
+   data-motion="full" keeps motion on even when the system asks for less. */
+:root[data-motion="off"], :root[data-motion="reduced"] { --km-t: 0; }
+:root[data-motion="full"], :root[data-motion="on"] { --km-t: 1; }
+:root[data-motion="off"] *, :root[data-motion="off"] *::before, :root[data-motion="off"] *::after,
+:root[data-motion="reduced"] *, :root[data-motion="reduced"] *::before, :root[data-motion="reduced"] *::after { animation: none !important; transition: none !important; }
+:root[data-motion="off"]::view-transition-group(*), :root[data-motion="off"]::view-transition-old(*), :root[data-motion="off"]::view-transition-new(*),
+:root[data-motion="reduced"]::view-transition-group(*), :root[data-motion="reduced"]::view-transition-old(*), :root[data-motion="reduced"]::view-transition-new(*) { animation: none !important; }
+:root[data-motion="off"] .km-settle-wait, :root[data-motion="reduced"] .km-settle-wait { opacity: 1; translate: none; }
+@media (prefers-reduced-motion: reduce) { :root:not([data-motion="full"]):not([data-motion="on"]) .km-settle-wait { opacity: 1; translate: none; } }
