@@ -28,6 +28,8 @@ import GuideLive from '../../components/GuideLive.astro';
 import { GUIDE_KINDS } from '../../lib/guide.mjs';
 import { base } from '../../lib/data.mjs';
 import Restricted from '../../components/Restricted.astro';
+import BlastRadius from '../../components/BlastRadius.astro';
+import { explorersForRoom, BLAST_NOW } from '../../lib/blast-view.mjs';
 
 
 export function getStaticPaths() {
@@ -82,6 +84,8 @@ const isComms = kind === 'comms';
 const cf = isComms ? commsFacts(x) : null;
 const std = isComms ? standardPill(x) : null;
 const size = isComms ? sizeFor(x, cf) : null;
+// If this were off (V9): each switch, gateway and circuit in the room, with what it would cut off.
+const blast = isComms ? explorersForRoom(x.id) : [];
 // An IT store (decision 0009): its spare units are not installed kit, so the room shows its stock and links to the store's page.
 const store = kind === 'stores' ? storeOf(x.site) : null;
 const showElev = !repeated && !isComms && kind !== 'kits' && kind !== 'open';   // open areas: the floor plan and 3D model show them
@@ -154,6 +158,7 @@ const deskWord =kind === 'kits' ? 'kit' : 'desk';
           <div id="rack">{cf.racks.map((r, i) => <RackView rack={r} space={x} uid={`rm-${r.id}`} patching="patching" rec={i === 0 ? recHere(x.id) : {}} />)}</div>
         ) : <p class="card pad muted" {...recHere(x.id)}>No rack is recorded for this comms room yet.</p>}
         <CommsSummary facts={cf} size={size} />
+        {blast.length > 0 && <BlastRadius targets={blast} now={BLAST_NOW} pick="Take off" lede="Pick a switch, gateway or circuit here to see which spaces, meetings and services would lose the internet. Worked out from the recorded patching." />}
       </>
     )}
     {store && (

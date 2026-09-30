@@ -17,6 +17,8 @@ import HealthGlyph from '../../components/HealthGlyph.astro';
 import WithChip from '../../components/WithChip.astro';
 import EmptyState from '../../components/EmptyState.astro';
 import SourceMark from '../../components/SourceMark.astro';
+import BlastRadius from '../../components/BlastRadius.astro';
+import { explorerForVendor, BLAST_NOW } from '../../lib/blast-view.mjs';
 import { vendors, sites, spaces, SITE_ORDER, VENDOR_KIND, modelName, href, plural } from '../../lib/data.mjs';
 import { building } from '../../lib/floors.mjs';
 import { PEOPLE, person } from '../../lib/demo.mjs';
@@ -62,6 +64,8 @@ const NUMBERS = [
   { n: L.left < 0 ? 'Ended' : L.left, label: L.left < 0 ? 'Contract' : 'Days left on the contract', fact: true, tone: L.state === 'review' ? 'warn' : L.state === 'fault' ? 'bad' : undefined },
   { n: R.open, label: 'Access open now', to: `/vendors/access/?vendor=${id}&status=open` },
 ];
+// If they stopped (V9): the spaces that depend on them, on the plan, with the meetings in them.
+const blast = explorerForVendor(id);
 const PERF_FMT = { '%': '%', n: '', x: 'x', d: 'd' };
 const raw = JSON.stringify({ id: V.id, name: V.name, kind: V.kind, regions: V.regions, sites: V.sites ?? null, owner: V.owner, contract: C, record: V.record ?? null }, null, 2);
 ---
@@ -102,6 +106,8 @@ const raw = JSON.stringify({ id: V.id, name: V.name, kind: V.kind, regions: V.re
         ))}
       </div>
     </section>
+
+    {blast && <BlastRadius targets={[blast]} now={BLAST_NOW} title="If they stopped" lede={`${blast.why.charAt(0).toUpperCase()}${blast.why.slice(1)}. Every floor with a space that depends on them, at one scale.`} />}
 
     <Section title="Jobs with them" id="jobs" aside={`${open.length} open · ${jobs.length - open.length} closed recently`} help="vendors.jobs">
       {jobs.length ? (

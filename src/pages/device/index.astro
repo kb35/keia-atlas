@@ -18,6 +18,9 @@ import { models, spaces, STAGES, STAGE_LABEL, TASK_STATUS, INC_STATE } from '../
 import { artParts, artSource } from '../../lib/art.mjs';
 import '../../styles/viz.css';
 import '../../styles/classification.css';
+import { unitExplorerLinks } from '../../lib/blast-view.mjs';
+// A switch or gateway's own page links to its comms room's "If this were off" (V9), picked for it.
+const blastLinks = JSON.stringify(Object.fromEntries(Object.entries(unitExplorerLinks()).map(([t, v]) => [t, { r: v.to.split('?')[0].replace(/^\//, ''), q: v.to.slice(v.to.indexOf('?')), line: v.line }])));
 const used = [...new Set(Object.values(spaces).flatMap((s) => [...s.positions, ...s.olderKit].map((p) => p.model).filter(Boolean)))];
 const clsUsed = [...new Set(Object.values(spaces).flatMap((s) => [...s.positions, ...s.olderKit].map((p) => p.cls)))];
 const words = { stages: STAGES.map((s) => [s, STAGE_LABEL[s]]), task: TASK_STATUS, inc: INC_STATE };
@@ -25,7 +28,7 @@ const mm = (id) => models[id]?.dimensions_mm;
 const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d.depth].filter(Boolean).map((n) => (+n).toLocaleString('en-IE', { maximumFractionDigits: 1 })).join(' × ') + ' mm' : ''; };
 ---
 <Shell vendorOk title="Unit" section="devices" crumbs={[{ label: 'Units', to: '/devices/' }, { label: 'Find a unit' }]}>
-  <div id="dv" data-dv data-words={JSON.stringify(words)}>
+  <div id="dv" data-dv data-words={JSON.stringify(words)} data-blast={blastLinks}>
     <PageBand overline="Unit" title="Find a unit" heartbeat>
       <span slot="overline" data-dv-status hidden></span>
       <span slot="overline" data-dv-sim hidden><SimTag kind="simulated" /></span>
@@ -47,6 +50,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
     (function () {
       var root = document.querySelector('[data-dv]'); if (!root) return;
       var W = JSON.parse(root.dataset.words);
+      var BL = JSON.parse(root.dataset.blast || '{}');
       var preview = /\.html$/.test(location.pathname);
       var L = function (p) { return '../' + p + (preview ? 'index.html' : ''); };
       var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
@@ -210,6 +214,12 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
             '<ul class="dv-kis">' + kis.map(function (k) {
               return '<li><a href="' + k.to + '"><span class="mono">' + esc(k.id) + '</span> ' + esc(k.t) + '</a><small class="faint"> · ' + esc(k.maker) + ', ' + (k.sure ? 'this unit runs ' + esc(k.fw) : 'version not tracked yet') + ' · ' + esc(k.st) + (k.fx ? ', fixed in ' + esc(k.fx) : '') + '</small></li>';
             }).join('') + '</ul></section>';
+        }
+
+        // If this were off (V9): a switch or gateway links to its comms room's explorer, with it picked.
+        if (BL[u.tag]) {
+          body += '<section class="card dv-card s-12" data-help="unit.blast" id="if-off">' + head('If this were off', '') +
+            '<p class="dv-sub"><b>' + esc(BL[u.tag].line) + '.</b> <span class="sim-t is-sim">Simulated</span></p><p class="dv-sub"><a href="' + L(BL[u.tag].r) + BL[u.tag].q + '">See it on the floor plans, port by port</a></p></section>';
         }
 
         // Security support and privacy: when the maker stops fixing security holes (with a warning within 12 months),
