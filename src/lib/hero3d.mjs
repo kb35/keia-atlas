@@ -4,31 +4,32 @@
 // Loaded by HeroZoom.astro after first paint, only where the screen is wide and WebGL draws, so the static first
 // frame (an SVG of the same building) is what a visitor sees first and what a phone keeps.
 //
-// The look is the office itself, not the UI, and calm (Keith, 30 Sept): painted walls between rooms, one muted
-// feature wall per meeting room, glass only where a room meets a corridor or an open area (with a frosted band at
-// eye height, as offices have), every wall topped with a clean cap; chairs in one tone, each table one shape, the
-// pendants soft discs, one sun with soft, light shadows. Every material and light is a --in-* token from the interior
-// palette (src/lib/interior-palette.mjs: per look, light and dark), read again when the look changes and eased there
-// over --dur-theme, colours only, so the geometry never pops. Health is only ever the look's own --h-fine and
-// --h-fault, never mixed with a material.
+// The look is an architect's model (Keith, 30 Sept): smooth slabs, the corridors a shade apart, the core as low solid
+// blocks, every space a floor plate inside low partitions in one or two quiet tones (bone clay and pale oak; in dark,
+// charcoal and slate), glass drawn as a thinner, lighter partition. The rings and the fault are the only saturated
+// colour. Furniture appears only at the space level, in the story's room: its table (one shape), its chairs (one
+// tone), its displays and video bar, a soft pendant disc. Every material and light is a --in-* token from the
+// interior palette (src/lib/interior-palette.mjs: per look, light and dark), read again when the look changes and
+// eased there over --dur-theme, colours only, so the geometry never pops.
 //
 // Why it is steady (the glitch Keith saw was the fourth floor left in view at 5% opacity, every material sorted as
 // transparent, and glass overlapping its frames):
-//   - Everything is opaque except the glass, which never writes depth and draws in a fixed order after the rooms.
+//   - Everything is opaque. Only the fourth floor, while it fades, and the rings' discs are ever blended.
 //   - The fourth floor fades with a depth pre-pass (only its nearest surface shows, so nothing inside it flickers)
 //     and is hidden, not faint, once it has lifted away. It casts no shadows, so nothing dapples the third floor.
-//   - No two faces share a plane: walls meet end to face, glass stops at the walls, caps sit on top.
+//   - No two faces share a plane: partitions meet end to face, caps sit on top, screens stand 8 mm off their bezels.
 //   - The sun's shadow map is drawn once for the still scene (renderer.shadowMap.autoUpdate off) and again only
-//     while a level change moves furniture; never because the camera moves.
-//   - Furniture is merged: one draw per material per group. The scene draws only while something moves, and not
-//     at all while it is off screen or the tab is hidden.
+//     while a level change moves something that casts; never because the camera moves.
+//   - Geometry is merged: one draw per material per group (about 15 to 30 draws a frame). The scene draws only
+//     while something moves, and not at all while it is off screen or the tab is hidden.
 //
 // The sequence runs, settles on its end frame, and HeroZoom's loop holds it, cross-fades and runs it again:
 //   1  a beat on the building, then a slow dolly in with a slight turn
 //   2  the fourth floor lifts away and fades while the camera settles over the third; the spaces are named
 //   3  every space's ring comes on in turn; one breaks, once; the heartbeat appears
-//   4  the camera eases into 3.09 Whooper Swan: the rooms beside it empty to their floors, the corridor glass in
-//      front of it drops away, and its devices come on in turn, named; the video bar's ring breaks
+//   4  the camera eases into 3.09 Whooper Swan, which fits itself out as it arrives: the furniture grows up from the
+//      floor, the display wall rises, the partition in front drops away; its devices come on in turn, named; the
+//      video bar's ring breaks
 // Every camera move is one critically damped spring (src/lib/spring.mjs) started from wherever the camera is, so
 // the level strip, a click on a space or a drag can take over mid-move without a jump (and ends the loop). Distance
 // eases on a log scale, so a long zoom reads as one even move. Reduced motion: the final frame, still and labelled,
@@ -41,10 +42,10 @@
 //   hooks                            { onReady(), onLevel(i, room?), onHover(o | null), onPick(room, go), onTouch(), onFrame(project), onBeat() }
 //   opts                             { labels: the element the labels are written into }
 import {
-  WebGLRenderer, Scene, PerspectiveCamera, OrthographicCamera, Group, Mesh, InstancedMesh, BoxGeometry, ExtrudeGeometry, Shape,
-  RingGeometry, CircleGeometry, CylinderGeometry, IcosahedronGeometry, PlaneGeometry, MeshLambertMaterial, MeshBasicMaterial,
+  WebGLRenderer, Scene, PerspectiveCamera, OrthographicCamera, Group, Mesh, BoxGeometry, ExtrudeGeometry, Shape,
+  RingGeometry, CircleGeometry, CylinderGeometry, PlaneGeometry, MeshLambertMaterial, MeshBasicMaterial,
   ShadowMaterial, HemisphereLight, DirectionalLight, AmbientLight, Color, Vector2, Vector3, Spherical, Raycaster, CanvasTexture, SRGBColorSpace,
-  Quaternion, Matrix4, PCFShadowMap,
+  Quaternion, PCFShadowMap,
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -59,12 +60,10 @@ const NUMBERS = { '--in-sun-i': 1.5, '--in-sky-i': 1.3, '--in-amb-i': 0.3, '--in
 // Furniture materials, by the index HeroZoom writes for each part (the room drawings' materials, grouped).
 const FURN = ['--in-wood', '--in-oak', '--in-chair', '--in-chair-2', '--in-sofa', '--in-dev', '--in-screen', '--in-cream', '--in-leg', '--in-leaf', '--in-pot'];
 const LIT = 6;                                   // the screens: unlit, so they glow a little
-const WALL_H = 2.4, LIFT = 4.5;                  // wall height; how far the fourth floor rises as it fades
-const T_WALL = 0.1, T_GLASS = 0.02, RAIL = 0.05, CAP = 0.012, BAND = [1.05, 1.35];
-const CUT = 1.15;                                // the section cut: the story room's side walls, at the space level
-const CORE_H = 1.1;                              // the core (stairs, lifts, toilets): low, solid, matte blocks
+const WALL_H = 2.4, LIFT = 4.5;                  // a full wall (the story room's display wall); the fourth floor's rise
+const MODEL_H = 1.1, CORE_H = 1.5, SLAB = 0.32;  // the model's partitions, its core blocks, its slab
+const T_WALL = 0.1, T_GLASS = 0.04, CAP = 0.012;
 const AZ = 24, EL = 38;                          // one camera angle for every level: only distance and target change
-const NB_TINT = 0.55;                            // how far the rooms beside the story room fade to their floor
 const world = (x, y, z) => new Vector3(x, z, -y);
 const rad = (deg) => (deg * Math.PI) / 180;
 
@@ -90,9 +89,6 @@ const prism = (pts, z0, z1) => {
 };
 const rectPts = (x0, y0, x1, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
 const boxG = (x0, y0, z0, x1, y1, z1) => prism(rectPts(Math.min(x0, x1), Math.min(y0, y1), Math.max(x0, x1), Math.max(y0, y1)), z0, z1);
-const LEAF = new IcosahedronGeometry(0.5, 1); LEAF.deleteAttribute('uv');
-const POT = new CylinderGeometry(0.5, 0.42, 1, 10).toNonIndexed(); POT.rotateX(Math.PI / 2); POT.deleteAttribute('uv');
-const placed = (geo, x, y, z, sx, sy, sz) => geo.clone().scale(sx, sy, sz).translate(x, y, z);
 
 // ---- Walls from the plan: each walled room's edges, split wherever another rectangle starts or ends, and each
 // piece typed by what is on its other side: another walled room (one shared party wall), the core, the outside, or
@@ -153,6 +149,7 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const DUR = { theme: ms(cs, '--dur-theme', 360), move: ms(cs, '--dur-hero-move', 1800), hold: ms(cs, '--dur-hero-hold', 700), state: ms(cs, '--dur-state', 300), stagger: ms(cs, '--stagger', 24), lift: ms(cs, '--dur-hero-lift', 1400) };
   let T = readTokens(host);
+  let lifted = 0, focus = 0, shadowDirty = true;   // the fourth floor's lift, the story room's fit-out (0..1)
 
   // A laptop draws at up to twice its pixels; a machine that reports few cores or little memory at one and a half.
   const lowPower = (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4;
@@ -178,12 +175,12 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
   const mats = [];
   const colourOf = (e) => (e.derive ? e.derive(T) : T.c[e.token] ?? new Color(e.token));
   const mk = (kind, token, o = {}) => {
-    const e = { token, base: o.base ?? 1, floor: o.floor ?? null, alpha: 1, derive: o.derive ?? null, emissive: o.emissive ?? 0, glass: o.glass ?? null, nb: !!o.nb };
+    const e = { token, base: o.base ?? 1, floor: o.floor ?? null, alpha: 1, derive: o.derive ?? null, emissive: o.emissive ?? 0 };
     const col = colourOf(e);
     const m = kind === 'basic' ? new MeshBasicMaterial({ color: col }) : kind === 'shadow' ? new ShadowMaterial({ color: col }) : new MeshLambertMaterial({ color: col });
     m.opacity = e.base;
-    m.transparent = !!(o.glass || o.fade || kind === 'shadow' || o.transparent);
-    if (o.glass || o.depthWrite === false) m.depthWrite = false;
+    m.transparent = !!(o.fade || kind === 'shadow' || o.transparent);
+    if (o.depthWrite === false) m.depthWrite = false;
     if (e.emissive) { m.emissive = T.c['--in-lamp'].clone(); m.emissiveIntensity = T.n['--in-lamp-i'] * e.emissive; }
     e.m = m; mats.push(e); m.userData.e = e; return m;
   };
@@ -200,17 +197,17 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
   const f0 = D.floors[0], xs = f0.outline.map((p) => p[0]), ys = f0.outline.map((p) => p[1]);
   const bx = [Math.min(...xs), Math.max(...xs)], by = [Math.min(...ys), Math.max(...ys)];
   const cx = (bx[0] + bx[1]) / 2, cy = (by[0] + by[1]) / 2;
-  const topZ = Math.max(...D.floors.map((f) => f.level)) + WALL_H;
+  const topZ = Math.max(...D.floors.map((f) => f.level)) + MODEL_H;
   {
     const c = document.createElement('canvas'); c.width = c.height = 128;
     const g = c.getContext('2d'), gr = g.createRadialGradient(64, 64, 8, 64, 64, 64);
     gr.addColorStop(0, 'rgba(0,0,0,.5)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
     const tex = new CanvasTexture(c), plane = new PlaneGeometry(1, 1); owned.push(plane);
     const glow = new Mesh(plane, new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, color: T.c['--hz-ground'], opacity: T.a['--hz-ground'] }));
-    glow.scale.set((bx[1] - bx[0]) * 1.5, (by[1] - by[0]) * 2.2, 1); glow.position.set(cx + 2, cy - 2, f0.level - 0.405); glow.renderOrder = -2; root.add(glow); glow.userData.ground = true;
+    glow.scale.set((bx[1] - bx[0]) * 1.5, (by[1] - by[0]) * 2.2, 1); glow.position.set(cx + 2, cy - 2, f0.level - SLAB - 0.005); glow.renderOrder = -2; root.add(glow); glow.userData.ground = true;
     // The model's contact shadow: the sun's shadow of the building on an invisible ground just under it.
     const gnd = new Mesh(plane, mk('shadow', '--hz-ground', { base: T.n['--in-shadow-a'], depthWrite: false }));
-    gnd.scale.set((bx[1] - bx[0]) * 3, (by[1] - by[0]) * 4, 1); gnd.position.set(cx, cy, f0.level - 0.402); gnd.receiveShadow = true; gnd.renderOrder = -1; root.add(gnd);
+    gnd.scale.set((bx[1] - bx[0]) * 3, (by[1] - by[0]) * 4, 1); gnd.position.set(cx, cy, f0.level - SLAB - 0.002); gnd.receiveShadow = true; gnd.renderOrder = -1; root.add(gnd);
   }
   // The sun stands high to the south-west. Its shadow camera is fitted to the story floor and the ground under it
   // (only that floor casts), so each shadow-map texel is small and the edges soft rather than stepped.
@@ -219,7 +216,7 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
   {
     const eye = new OrthographicCamera(); eye.position.copy(sun.position); eye.lookAt(sun.target.position); eye.updateMatrixWorld();
     const lo = new Vector3(Infinity, Infinity, Infinity), hi = new Vector3(-Infinity, -Infinity, -Infinity);
-    for (const x of [bx[0] - 4, bx[1] + 4]) for (const y of [by[0] - 4, by[1] + 4]) for (const z of [f0.level - 0.45, f0.level + WALL_H + 0.3]) { const p = world(x, y, z).applyMatrix4(eye.matrixWorldInverse); lo.min(p); hi.max(p); }
+    for (const x of [bx[0] - 4, bx[1] + 4]) for (const y of [by[0] - 4, by[1] + 4]) for (const z of [f0.level - SLAB - 0.05, f0.level + WALL_H + 0.3]) { const p = world(x, y, z).applyMatrix4(eye.matrixWorldInverse); lo.min(p); hi.max(p); }
     const sc = sun.shadow.camera; sc.left = lo.x; sc.right = hi.x; sc.bottom = lo.y; sc.top = hi.y; sc.near = Math.max(0.5, -hi.z - 2); sc.far = -lo.z + 2; sc.updateProjectionMatrix();
   }
   sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.025; sun.shadow.radius = 4; sun.shadow.intensity = T.n['--in-shadow-i'];
@@ -242,11 +239,13 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
     rings.push(r); return r;
   };
 
-  // ---- The floors: slab, core, corridors and areas, the spaces' floors, walls and glass, then the furniture.
+  // ---- The floors, as an architect's model: a smooth slab, the corridors a shade apart, the core as low solid
+  // blocks, each walled space a floor plate inside low partitions (painted where it meets another room, the core or
+  // the outside; thinner and lighter where it meets open floor, where the office has glass). No furniture: that
+  // arrives only in the story's room, at the space level, where it tells the story.
   const roomMeshes = [], pick = new MeshBasicMaterial({ visible: false });
   const fading = [];          // the fourth floor's meshes, drawn after a depth pre-pass while it fades
-  let nb = null, storyWalls = null, storyGlass = null, nbLamps = null;
-  const nbLampAt = [];
+  let storyFront = null, storyWall = null, storyFurn = null, storyLamp = null, featureMat = null;
   const storyFloor = D.floors.find((f) => f.id === D.story.floor);
   const L3 = storyFloor.level;
   for (const [fi, f] of D.floors.entries()) {
@@ -256,134 +255,67 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
     const M = (token, o = {}) => mk(o.kind ?? 'lambert', token, { floor: f.id, fade, ...o });
     const rooms = D.rooms.filter((x) => x.f === f.id);
 
-    // Slab, core, corridors, areas.
-    bake(g, [prism(f.outline, L - 0.4, L)], M('--in-slab'), lit);
-    const core = [], wc = [], corr = [], rug = [], town = [];
-    for (const c of f.core) (c.kind === 'toilets' ? wc : core).push(boxG(c.r[0], c.r[1], L, c.r[2], c.r[3], L + (c.flat ? 0.02 : CORE_H)));
-    for (const r of f.corr) corr.push(boxG(r[0], r[1], L, r[2], r[3], L + 0.015));
-    for (const a of f.areas) (a.k === 'town-hall' ? town : rug).push(boxG(a.r[0], a.r[1], L, a.r[2], a.r[3], L + 0.012));
-    bake(g, core, M('--in-core'), lit); bake(g, wc, M('--in-wc'), lit);
-    const corrMat = M('--in-corr');
-    bake(g, corr, corrMat, { receive: isStory }); bake(g, rug, M('--in-rug'), { receive: isStory }); bake(g, town, M('--in-town'), { receive: isStory });
+    // Slab, corridors, core.
+    bake(g, [prism(f.outline, L - SLAB, L)], M('--in-slab'), lit);
+    bake(g, f.corr.map((r) => boxG(r[0], r[1], L, r[2], r[3], L + 0.012)), M('--in-corr'), { receive: isStory });
+    const coreMat = M('--in-core'), capMat = M('--in-cap');
+    const solid = f.core.filter((c) => !c.flat);
+    bake(g, solid.map((c) => boxG(c.r[0], c.r[1], L, c.r[2], c.r[3], L + CORE_H)), coreMat, lit);
+    bake(g, f.core.filter((c) => c.flat).map((c) => boxG(c.r[0], c.r[1], L, c.r[2], c.r[3], L + 0.014)), M('--in-corr'), { receive: isStory });
 
     // The spaces' floors (the story room's on its own, for its tint), an invisible volume to point at, a ring above.
-    const floorMat = M('--in-room-floor'), sharedMat = M('--in-corr');
-    const plates = { floor: [], shared: [], corr: [] };
+    const floorMat = M('--in-room-floor');
+    const plates = [];
     for (const r of rooms) {
       const fault = r.id === D.story.room, [x0, y0, x1, y1] = r.r;
-      const kind = ['reception', 'pantry', 'print', 'comms', 'store'].includes(r.k) ? 'shared' : r.bank ? 'corr' : 'floor';
-      const mat = fault ? M('--in-room-floor') : kind === 'shared' ? sharedMat : kind === 'corr' ? corrMat : floorMat;
-      const plate = boxG(x0, y0, L, x1, y1, L + (r.bank ? 0.02 : 0.03));
-      if (fault) bake(g, [plate], mat, { receive: isStory }); else plates[kind].push(plate);
-      const vol = volume(g, [x0, y0, L], [x1, y1, L + (r.bank ? 0.8 : WALL_H)], pick); vol.userData.room = r; roomMeshes.push(vol);
-      const centre = [(x0 + x1) / 2, (y0 + y1) / 2], top = L + (r.bank ? 1.1 : WALL_H) + 0.55;
+      const mat = fault ? M('--in-room-floor') : floorMat;
+      const plate = boxG(x0, y0, L, x1, y1, L + 0.02);
+      if (fault) bake(g, [plate], mat, { receive: isStory }); else plates.push(plate);
+      const walled = r.w !== 'none';
+      const vol = volume(g, [x0, y0, L], [x1, y1, L + (walled ? MODEL_H : 0.6)], pick); vol.userData.room = r; roomMeshes.push(vol);
+      const centre = [(x0 + x1) / 2, (y0 + y1) / 2], top = L + (walled ? MODEL_H : 0.4) + 0.6;
       const rg = ring(g, new Vector3(centre[0], centre[1], top), { px: fault ? 19 : 13, fault });
       roomObj.set(r.id, { r, m: vol, mat, ring: rg, centre: new Vector3(centre[0], centre[1], L + 1.0), top: new Vector3(centre[0], centre[1], top), fault, area: (x1 - x0) * (y1 - y0), L });
     }
-    bake(g, plates.floor, floorMat, { receive: isStory }); bake(g, plates.shared, sharedMat, { receive: isStory }); bake(g, plates.corr, corrMat, { receive: isStory });
+    bake(g, plates, floorMat, { receive: isStory });
 
-    // Walls. The story room's own (its side walls, its feature wall, its corridor glass) are kept apart so the space
-    // level can cut them: the glass drops away and the side walls lower to a clean section.
-    const W = { paint: [], feature: [], cap: [], glass: [], band: [], rail: [] };
-    const SW = { paint: [], cap: [], feature: [], fcap: [], glass: [], band: [], rail: [] };
+    // Partitions. The story room's own are kept apart: at the space level the one in front of it drops away and
+    // its display wall rises to full height in the feature colour; the side partitions stay as they are.
+    const W = { paint: [], cap: [], glass: [] }, SF = [], SW = [], SWcap = [];
     const box = (s, t, z0, z1) => (s.ax === 'x' ? boxG(s.a, s.c - t / 2, z0, s.b, s.c + t / 2, z1) : boxG(s.c - t / 2, s.a, z0, s.c + t / 2, s.b, z1));
     for (const s of wallPlan(f, rooms)) {
       const mine = isStory && s.rooms.includes(D.story.room);
-      const z = mine ? 0 : L;   // the story room's walls are built from 0 inside a group raised to the floor
-      if (s.kind === 'glass') {
-        const to = mine ? SW : W;
-        to.glass.push(box(s, T_GLASS, z, z + BAND[0]), box(s, T_GLASS, z + BAND[1], z + WALL_H - RAIL));
-        to.band.push(box(s, T_GLASS, z + BAND[0], z + BAND[1]));
-        to.rail.push(box(s, RAIL, z + WALL_H - RAIL, z + WALL_H));
-      } else if (mine && s.feature) { SW.feature.push(box(s, T_WALL, z, z + WALL_H)); SW.fcap.push(box(s, T_WALL, z + WALL_H, z + WALL_H + CAP)); }
-      else if (mine) { SW.paint.push(box(s, T_WALL, z, z + WALL_H)); SW.cap.push(box(s, T_WALL, z + WALL_H, z + WALL_H + CAP)); }
-      else { (s.feature ? W.feature : W.paint).push(box(s, T_WALL, z, z + WALL_H)); W.cap.push(box(s, T_WALL, z + WALL_H, z + WALL_H + CAP)); }
+      if (s.kind === 'glass') (mine ? SF : W.glass).push(box(s, T_GLASS, mine ? 0 : L, (mine ? 0 : L) + MODEL_H));
+      else if (mine && s.feature) { SW.push(box(s, T_WALL, 0, WALL_H)); SWcap.push(box(s, T_WALL, WALL_H, WALL_H + CAP)); }
+      else { W.paint.push(box(s, T_WALL, L, L + MODEL_H)); W.cap.push(box(s, T_WALL, L + MODEL_H, L + MODEL_H + CAP)); }
     }
-    const paintMat = M('--in-wall'), featureMat = M('--in-feature'), capMat = M('--in-cap'), railMat = M('--in-frame', { derive: (t) => t.c['--in-frame'].clone().lerp(t.c['--in-cap'], 0.55) });
-    const glassMat = M('--in-glass', { kind: 'basic', base: T.n['--in-glass-a'], glass: 'clear' });
-    const bandMat = M('--in-glass', { kind: 'basic', base: Math.min(0.78, T.n['--in-glass-a'] * 2.4), glass: 'band', derive: (t) => t.c['--in-glass'].clone().lerp(t.c['--in-cream'], 0.55) });
-    const glassOrder = fade ? 12 : 2;
-    bake(g, W.paint, paintMat, lit); bake(g, W.feature, featureMat, lit); bake(g, W.cap, capMat, lit); bake(g, W.rail, railMat, lit);
-    bake(g, W.glass, glassMat, { order: glassOrder }); bake(g, W.band, bandMat, { order: glassOrder + 1 });
+    const paintMat = M('--in-wall'), glassMat = M('--in-glass');
+    bake(g, W.paint, paintMat, lit); bake(g, W.cap, capMat, lit); bake(g, W.glass, glassMat, lit);
     if (isStory) {
-      storyWalls = new Group(); storyWalls.position.z = L; g.add(storyWalls);
-      const feat = new Group(); feat.position.z = L; g.add(feat);
-      storyGlass = new Group(); storyGlass.position.z = L; g.add(storyGlass);
-      bake(storyWalls, SW.paint, paintMat, lit); bake(storyWalls, SW.cap, capMat, lit);
-      bake(feat, SW.feature, featureMat, lit); bake(feat, SW.fcap, capMat, lit);
-      bake(storyGlass, SW.glass, glassMat, { order: glassOrder }); bake(storyGlass, SW.band, bandMat, { order: glassOrder + 1 }); bake(storyGlass, SW.rail, railMat, lit);
-    }
+      storyFront = new Group(); storyFront.position.z = L; g.add(storyFront); bake(storyFront, SF, glassMat, lit);
+      featureMat = M('--in-wall', { derive: (t) => t.c['--in-wall'].clone().lerp(t.c['--in-feature'], focus) });
+      storyWall = new Group(); storyWall.position.z = L; g.add(storyWall); bake(storyWall, SW, featureMat, lit); bake(storyWall, SWcap, capMat, lit);
 
-    // Furniture: the room drawings (HeroZoom), then desk banks, lounges, cafés and the town hall made here. One merged
-    // mesh per material: the story room's apart (always whole), the rest of its floor together (they empty to the
-    // floor at the space level: flattened and faded towards the floor's tone).
-    const put = (to, mi, geo) => { (to[mi] ??= []).push(geo); };
-    const own = [], rest = [];
-    for (const b of D.furn) {
-      if (b[0] !== fi) continue;
-      const pts = []; for (let i = 5; i < b.length; i += 2) pts.push([b[i], b[i + 1]]);
-      put(b[2] && isStory ? own : rest, b[1], prism(pts, b[3], b[4]));
-    }
-    const bx6 = (mi, x0, y0, z0, x1, y1, z1) => put(rest, mi, boxG(x0, y0, z0, x1, y1, z1));
-    // Desk banks: an oak desk, a chair on the person's side, a dark monitor with a lit screen facing them.
-    for (const r of rooms.filter((x) => x.bank)) for (const d of r.desks ?? []) {
-      const [x, y, mx, my] = d, dx = Math.sign(mx - x), dy = Math.sign(my - y);
-      bx6(1, x - 0.72, y - 0.36, L + 0.7, x + 0.72, y + 0.36, L + 0.735);
-      const along = dy !== 0, mw = 0.56, md = 0.035, mz0 = L + 0.86, mz1 = L + 1.19;
-      const mb = along ? [mx - mw / 2, my - md / 2, mz0, mx + mw / 2, my + md / 2, mz1] : [mx - md / 2, my - mw / 2, mz0, mx + md / 2, my + mw / 2, mz1];
-      bx6(5, ...mb);
-      const s = 0.012, sm = 0.02;
-      bx6(6, ...(along ? [mx - mw / 2 + sm, my - dy * (md / 2 + s), mz0 + sm, mx + mw / 2 - sm, my - dy * (md / 2), mz1 - sm] : [mx - dx * (md / 2 + s), my - mw / 2 + sm, mz0 + sm, mx - dx * (md / 2), my + mw / 2 - sm, mz1 - sm]));
-      const chx = x - dx * 0.62, chy = y - dy * 0.62;
-      bx6(2, chx - 0.24, chy - 0.24, L + 0.4, chx + 0.24, chy + 0.24, L + 0.46);
-      bx6(2, chx - 0.22 - dx * 0.2, chy - 0.22 - dy * 0.2, L + 0.46, chx + 0.22 - dx * 0.2, chy + 0.22 - dy * 0.2, L + 0.92);
-    }
-    const plant = (x, y, s = 1) => { put(rest, 10, placed(POT, x, y, L + 0.21 * s, 0.4 * s, 0.4 * s, 0.42 * s)); put(rest, 9, placed(LEAF, x, y, L + 0.9 * s, 0.72 * s, 0.72 * s, 0.7 * s)); };
-    for (const a of f.areas) {
-      const [x0, y0, x1, y1] = a.r, w = x1 - x0, d = y1 - y0, ax = (x0 + x1) / 2, ay = (y0 + y1) / 2;
-      if (a.k === 'town-hall') {
-        for (let i = 0; i < 2; i++) for (let j = 0; j < 5; j++) { const x = x0 + 3.4 + j * 1.3, y = y0 + 2.2 + i * 1.3; if (x < x1 - 1.2 && y < y1 - 0.8) { bx6(2, x - 0.22, y - 0.22, L + 0.42, x + 0.22, y + 0.22, L + 0.47); bx6(2, x - 0.22, y - 0.28, L + 0.47, x + 0.22, y - 0.22, L + 0.88); } }
-        plant(x1 - 0.8, y0 + 0.8, 1.3);
-        continue;
+      // The story room's furniture (the room drawing, from HeroZoom): one merged mesh per material, grown up from
+      // the floor at the space level. The pendant over the table: a soft, low-contrast disc.
+      const own = [];
+      for (const b of D.furn) {
+        if (b[0] !== fi) continue;
+        const pts = []; for (let i = 5; i < b.length; i += 2) pts.push([b[i], b[i + 1]]);
+        (own[b[1]] ??= []).push(prism(pts, b[3] - L, b[4] - L));
       }
-      if (w >= 5.5 && d >= 5.5) {
-        // Lounge: a sofa, two armchairs (the one accent tone), a round walnut table, a plant.
-        bx6(4, ax - 1.0, ay - 1.3, L + 0.15, ax + 1.0, ay - 0.5, L + 0.45); bx6(4, ax - 1.0, ay - 1.3, L + 0.45, ax + 1.0, ay - 1.1, L + 0.82);
-        for (const sx of [-1, 1]) { bx6(3, ax + sx * 0.65, ay + 0.2, L + 0.15, ax + sx * 1.35, ay + 0.9, L + 0.45); bx6(3, ax + sx * 0.65, ay + 0.75, L + 0.45, ax + sx * 1.35, ay + 0.9, L + 0.78); }
-        put(rest, 0, placed(POT, ax, ay, L + 0.2, 0.9, 0.7, 0.4));
-        plant(x0 + 0.7, y1 - 0.7, 1.2);
-      } else if (w >= 3 && d >= 3) {
-        // Two café tables with stools.
-        for (const [tx, ty] of [[ax - 1.2, ay], [ax + 1.2, ay]]) { put(rest, 0, placed(POT, tx, ty, L + 0.37, 0.8, 0.8, 0.74)); for (const [sx, sy] of [[-0.7, 0], [0.7, 0], [0, 0.7]]) bx6(2, tx + sx - 0.17, ty + sy - 0.17, L + 0.42, tx + sx + 0.17, ty + sy + 0.17, L + 0.46); }
-      }
+      storyFurn = new Group(); storyFurn.position.z = L; g.add(storyFurn);
+      for (const [i, list] of own.entries()) if (list) bake(storyFurn, list, i === LIT ? M(FURN[i], { kind: 'basic' }) : M(FURN[i]), { cast: i !== LIT, receive: i !== LIT });
+      const lampGeo = new CylinderGeometry(0.3, 0.3, 0.025, 28); lampGeo.rotateX(Math.PI / 2); owned.push(lampGeo);
+      const sr = D.rooms.find((x) => x.id === D.story.room).r;
+      storyLamp = new Mesh(lampGeo, M('--in-lamp', { derive: (t) => t.c['--in-lamp'].clone().lerp(t.c['--in-wall'], 0.5), emissive: 0.28 }));
+      storyLamp.position.set((sr[0] + sr[2]) / 2, (sr[1] + sr[3]) / 2, L + 2.08); g.add(storyLamp);
     }
-    // The pendants: a soft, low-contrast disc over each meeting table.
-    const lampMat = M('--in-lamp', { derive: (t) => t.c['--in-lamp'].clone().lerp(t.c['--in-wall'], 0.5), emissive: 0.28 });
-    const lampGeo = new CylinderGeometry(0.3, 0.3, 0.025, 28); lampGeo.rotateX(Math.PI / 2); owned.push(lampGeo);
-    const lamps = rooms.filter((x) => !x.bank && ['meeting', 'small'].includes(x.k)).map((r) => [(r.r[0] + r.r[2]) / 2, (r.r[1] + r.r[3]) / 2, L + 2.08, r.id]);
-    const furnMats = (nbMat) => FURN.map((token, i) => (i === LIT ? M(token, { kind: 'basic', nb: nbMat }) : M(token, { nb: nbMat })));
-    if (isStory) {
-      const ownMats = furnMats(false), restMats = furnMats(true);
-      nb = new Group(); g.add(nb);
-      for (const [i, list] of own.entries()) if (list) bake(g, list, ownMats[i], { cast: i !== LIT, receive: i !== LIT });
-      for (const [i, list] of rest.entries()) if (list) bake(nb, list, restMats[i], { cast: i !== LIT, receive: i !== LIT });
-      const mine = lamps.filter((l) => l[3] === D.story.room), others = lamps.filter((l) => l[3] !== D.story.room);
-      bake(g, mine.map(([x, y, z]) => lampGeo.clone().translate(x, y, z)), lampMat);
-      nbLamps = new InstancedMesh(lampGeo, lampMat, Math.max(1, others.length)); nbLamps.count = others.length; g.add(nbLamps);
-      nbLampAt.push(...others.map(([x, y, z]) => new Vector3(x, y, z)));
-    } else {
-      const fm = furnMats(false);
-      for (const [i, list] of rest.entries()) if (list) bake(g, list, fm[i]);
-      bake(g, lamps.map(([x, y, z]) => lampGeo.clone().translate(x, y, z)), lampMat);
-    }
-    if (fade) g.traverse((o) => { if (o.isMesh && o.material !== pick && !o.material.userData.e?.glass && o.renderOrder < 30) fading.push(o); });
+    if (fade) g.traverse((o) => { if (o.isMesh && o.material !== pick && o.renderOrder < 30) fading.push(o); });
   }
   // The fading floor: a depth-only twin of each mesh draws first, so only the floor's nearest surface is blended.
   const depthOnly = new MeshBasicMaterial({ colorWrite: false, transparent: true });
   for (const o of fading) { const t = new Mesh(o.geometry, depthOnly); t.position.copy(o.position); t.scale.copy(o.scale); t.renderOrder = 10; o.renderOrder = 11; o.parent.add(t); }
-  const m4 = new Matrix4(), q0 = new Quaternion(), s3 = new Vector3();
-  const placeLamps = (k) => { if (!nbLamps) return; const s = Math.max(0.0001, 1 - k); nbLampAt.forEach((p, i) => nbLamps.setMatrixAt(i, m4.compose(p, q0, s3.set(s, s, s)))); nbLamps.instanceMatrix.needsUpdate = true; nbLamps.visible = s > 0.01 && nbLampAt.length > 0; };
-  placeLamps(0);
 
   // The story's devices, as rings where they are in the space (shown once the camera is in the room).
   const storyG = floorGroups.get(D.story.floor);
@@ -423,9 +355,9 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
   controls.minPolarAngle = 0.55; controls.maxPolarAngle = 1.32; controls.enabled = false;
   const target = controls.target;
   const bounds = (which) => {
-    if (which === 'all') return { min: [bx[0], by[0], f0.level - 0.4], max: [bx[1], by[1], topZ] };
+    if (which === 'all') return { min: [bx[0], by[0], f0.level - SLAB], max: [bx[1], by[1], topZ] };
     const f = D.floors.find((x) => x.id === which);
-    return { min: [bx[0], by[0], f.level - 0.4], max: [bx[1], by[1], f.level + WALL_H] };
+    return { min: [bx[0], by[0], f.level - SLAB], max: [bx[1], by[1], f.level + MODEL_H] };
   };
   function fitView(b, az, el, k = 1) {
     const c = world((b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2);
@@ -482,20 +414,18 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
     return anims.size > 0;
   }
   const g4 = floorGroups.get(D.floors[1]?.id);
-  let lifted = 0, focus = 0, shadowDirty = true;
   // The fourth floor rises a little and fades out completely, then is not drawn at all.
   const setLift = (k) => { lifted = k; if (!g4) return; g4.position.z = LIFT * k; const a = Math.max(0, 1 - k * 1.3); setAlpha(D.floors[1].id, a); g4.visible = a > 0.004; };
-  // The space level: the rooms beside the story room empty to their floors (furniture flattens and fades to the
-  // floor's tone, pendants shrink away), the corridor glass in front of it drops, its side walls lower to the cut.
-  const nbMats = mats.filter((e) => e.nb);
+  // The space level: the story room fits itself out. Its furniture grows up from the floor, its display wall rises
+  // to full height in the feature colour, the pendant opens, and the partition in front of it drops away.
   const setFocus = (k) => {
     focus = k;
-    const s = Math.max(0.001, 1 - k);
-    if (nb) { nb.scale.z = s; nb.position.z = L3 * (1 - s); nb.visible = s > 0.004; }
-    for (const e of nbMats) e.m.color.copy(colourOf(e)).lerp(T.c['--in-room-floor'], NB_TINT * k);
-    placeLamps(k);
-    if (storyGlass) { storyGlass.scale.z = s; storyGlass.visible = s > 0.004; }
-    if (storyWalls) storyWalls.scale.z = 1 - k * (1 - CUT / WALL_H);
+    const grow = Math.max(0.001, k), drop = Math.max(0.001, 1 - k);
+    storyFurn.scale.z = grow; storyFurn.visible = k > 0.004;
+    storyLamp.scale.setScalar(grow); storyLamp.visible = k > 0.004;
+    storyWall.scale.z = MODEL_H / WALL_H + (1 - MODEL_H / WALL_H) * k;
+    featureMat.color.copy(colourOf(featureMat.userData.e));
+    storyFront.scale.z = drop; storyFront.visible = k < 0.996;
     shadowDirty = true;
   };
   const toward = (get, set, to, dur) => { const from = get(); if (Math.abs(from - to) < 1e-4) { set(to); return Promise.resolve(); } return animate(dur, (e) => set(from + (to - from) * e)); };
@@ -504,8 +434,6 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
   const setRing = (r, on) => { r.on = on; r.g.visible = on > 0.004; r.back.opacity = 0.92 * on; (r.state === 'fault' ? r.hot : r.quiet).opacity = on; };
   const ringsTo = (list, to) => { for (const r of list) toward(() => r.on, (v) => setRing(r, v), to, DUR.state); };
   const breakRing = (r) => { r.state = 'fault'; r.fine.visible = false; r.broken.visible = true; r.hot.opacity = r.on; r.quiet.opacity = 0; };
-  const TINT = 0.08;   // the fault room's floor: a hint of the fault colour, not a wash
-  const tintRoom = (o, k) => { o.mat.color.copy(T.c['--in-room-floor']).lerp(T.c['--h-fault'], TINT * k); };
   const sleep = (t) => new Promise((r) => setTimeout(r, reduced ? 0 : t));
 
   // ---- Rings face the camera and keep their size on screen.
@@ -622,7 +550,7 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
   async function run() {
     const my = ++seq;
     const alive_ = () => seq === my;
-    if (reduced) { setLift(1); setFocus(1); for (const r of rings) setRing(r, besideRings.includes(r) ? 0 : 1); ringsShown = true; breakRing(story.ring); tintRoom(story, 1); moveTo(VIEWS.space(), 0); showDevRings(true); level = 2; labels.level(2); hooks.onLevel?.(2); hooks.onBeat?.(); requestRender(); return true; }
+    if (reduced) { setLift(1); setFocus(1); for (const r of rings) setRing(r, besideRings.includes(r) ? 0 : 1); ringsShown = true; breakRing(story.ring); moveTo(VIEWS.space(), 0); showDevRings(true); level = 2; labels.level(2); hooks.onLevel?.(2); hooks.onBeat?.(); requestRender(); return true; }
     moveTo(VIEWS.far(), 0);
     await sleep(DUR.hold); if (!alive_()) return false;
     moveTo(VIEWS.building()); labels.level(0); requestRender(); await sleep(DUR.move + DUR.hold * 0.4); if (!alive_()) return false;
@@ -633,7 +561,7 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
     floorRings.forEach((r, i) => setTimeout(() => { if (alive_()) animate(DUR.state, (e) => setRing(r, e)); }, i * DUR.stagger * 2));
     ringsShown = true;
     await sleep(floorRings.length * DUR.stagger * 2 + DUR.state + DUR.hold * 0.8); if (!alive_()) return false;
-    breakRing(story.ring); animate(DUR.state, (e) => tintRoom(story, e)); hooks.onBeat?.();
+    breakRing(story.ring); requestRender(); hooks.onBeat?.();
     await sleep(DUR.hold * 1.8); if (!alive_()) return false;
     level = 2; hooks.onLevel?.(2);
     moveTo(VIEWS.space()); focusTo(1); ringsTo(besideRings, 0); await sleep(DUR.move * 0.5); if (!alive_()) return false;
@@ -648,26 +576,24 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
     seq++; tween = null; anims.clear(); controls.enabled = false;
     setLift(0); setFocus(0); roomRingWas = 0; ringsShown = false;
     for (const r of rings) { if (r.broken) { r.state = 'fine'; r.fine.visible = true; r.broken.visible = false; } setRing(r, 0); }
-    tintRoom(story, 0); labels.level(-1);
+    labels.level(-1);
     moveTo(VIEWS.far(), 0); level = 0; hooks.onLevel?.(0); requestRender();
   }
   // The rings are on from the start when a level is chosen before the run reaches it.
-  function ringsOn() { ringsShown = true; for (const r of rings.filter((x) => !devRings.includes(x))) if (r.on < 1 && !(level === 2 && besideRings.includes(r))) setRing(r, 1); if (story.ring.state !== 'fault') { breakRing(story.ring); tintRoom(story, 1); } }
+  function ringsOn() { ringsShown = true; for (const r of rings.filter((x) => !devRings.includes(x))) if (r.on < 1 && !(level === 2 && besideRings.includes(r))) setRing(r, 1); if (story.ring.state !== 'fault') { breakRing(story.ring); } }
 
   // A look change: every material, light and opacity eases from what it shows now to the new look's value, together,
   // on one zero-bounce spring (--dur-theme; at once under reduced motion). Only colours change; nothing moves.
   let fadeLook = 0;
   function recolour() {
     T = readTokens(host);
-    const faultOn = story.ring.state === 'fault' ? 1 : 0;
-    const colTo = (e) => (e.m === story.mat ? T.c['--in-room-floor'].clone().lerp(T.c['--h-fault'], TINT * faultOn) : e.nb ? colourOf(e).lerp(T.c['--in-room-floor'], NB_TINT * focus) : colourOf(e));
+    const colTo = (e) => colourOf(e);
     const jobs = [];
     const col = (c, to) => { if (to && !c.equals(to)) jobs.push({ c, a: c.clone(), b: to.clone() }); };
     const num = (get, set, to) => { const a = get(); if (Math.abs(a - to) > 1e-4) jobs.push({ get, set, a, b: to }); };
     for (const e of mats) {
       col(e.m.color, colTo(e));
       if (e.emissive) { col(e.m.emissive, T.c['--in-lamp']); num(() => e.m.emissiveIntensity, (v) => { e.m.emissiveIntensity = v; }, T.n['--in-lamp-i'] * e.emissive); }
-      if (e.glass) num(() => e.base, (v) => { e.base = v; e.m.opacity = v * e.alpha; }, e.glass === 'band' ? Math.min(0.78, T.n['--in-glass-a'] * 2.4) : T.n['--in-glass-a']);
       if (e.token === '--hz-ground') num(() => e.base, (v) => { e.base = v; e.m.opacity = v; }, T.n['--in-shadow-a']);
     }
     col(sky.color, T.c['--in-sky']); col(sky.groundColor, T.c['--in-bounce']); col(amb.color, T.c['--in-sky']); col(sun.color, T.c['--in-sun']);
@@ -694,7 +620,7 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
       alive = false; ro.disconnect(); io?.disconnect(); document.removeEventListener('visibilitychange', onVis); controls.dispose(); labels.dispose();
       renderer.domElement.remove(); renderer.dispose();
       for (const e of mats) e.m.dispose();
-      depthOnly.dispose(); pick.dispose(); nbLamps?.dispose();
+      depthOnly.dispose(); pick.dispose();
       for (const g of owned) g.dispose();
     },
   };

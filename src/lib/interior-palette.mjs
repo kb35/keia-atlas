@@ -9,8 +9,10 @@
 //   High contrast  flat and clearly separated: few tones, strong frames, light shadows
 //   Drawing set  drafting film and blueprint: pale blue-greys, ink frames
 //   Playful      brighter: mustard, coral, teal, honey oak
-// Floors are warm greys and pale oak, never dark brown. Dark is the same rooms in the evening: cool-neutral surfaces
-// under a cool sky, with the lamps the only warm accent, never neon.
+// The building and its floors are an architect's model (Keith, 30 Sept): slab, corridor, core and partitions in one
+// or two quiet tones (bone clay with a hint of pale oak on the room floors; in dark, charcoal and slate), glass drawn
+// as a thinner, lighter partition. The furniture tones are used only inside the room the story visits. Never dark
+// brown. Dark is the evening: cool-neutral surfaces under a cool sky, the lamps the only warm accent, never neon.
 //
 //   INTERIOR[look][mode]   the values: colours as hex (wall is the paint, feature the one accent wall a meeting room
 //                          has, cap the wall tops), and seven numbers (glass and ground-shadow opacity, how dark the
@@ -23,44 +25,44 @@
 export const INTERIOR = {
   studio: {
     light: {
-      slab: '#D8D3CA', roomFloor: '#E7DDCB', corr: '#EEEBE5', rug: '#DDD6C9', town: '#E0D8C8', wall: '#F4F1EB', core: '#E2DED6', wc: '#E1DFDA',
-      glass: '#CFE3E4', frame: '#3A332B', wood: '#A98C68', oak: '#D6C29F', chair: '#EEE9DF', chair2: '#B98468', sofa: '#A8B3A1',
+      slab: '#E6E1D8', roomFloor: '#ECE3D2', corr: '#F0EDE7', rug: '#DDD6C9', town: '#E0D8C8', wall: '#F7F4EF', core: '#E2DDD4', wc: '#E2DDD4',
+      glass: '#EDF0F0', frame: '#3A332B', wood: '#A98C68', oak: '#D6C29F', chair: '#EEE9DF', chair2: '#B98468', sofa: '#A8B3A1',
       dev: '#2A2B31', screen: '#8395AE', cream: '#F6F1E6', leg: '#6B6459', leaf: '#7E9A68', pot: '#B3876B', lamp: '#F4DDA9',
-      sun: '#FFF1DC', sky: '#FFF8EE', bounce: '#8C877E',
-      feature: '#C8CDBB', cap: '#D5CFC4',
+      sun: '#FFF7EC', sky: '#FBFAF7', bounce: '#A8A397',
+      feature: '#C9CFBF', cap: '#D6CFC3',
       glassA: 0.3, sunI: 1.55, skyI: 1.25, ambI: 0.3, lampI: 0.5, shadowA: 0.32, shadowI: 0.5,
     },
     dark: {
-      slab: '#43464B', roomFloor: '#58595D', corr: '#44474C', rug: '#505256', town: '#525357', wall: '#72757A', core: '#515459', wc: '#4B4E53',
-      glass: '#8FA6B2', frame: '#191B1E', wood: '#6A625A', oak: '#7C746A', chair: '#AEACA7', chair2: '#8C6B5B', sofa: '#5D6862',
+      slab: '#32363C', roomFloor: '#454A51', corr: '#3B4046', rug: '#505256', town: '#525357', wall: '#5E656E', core: '#50565F', wc: '#50565F',
+      glass: '#6C7883', frame: '#191B1E', wood: '#6A625A', oak: '#7C746A', chair: '#AEACA7', chair2: '#8C6B5B', sofa: '#5D6862',
       dev: '#15161B', screen: '#6E82A3', cream: '#9D9B96', leg: '#25272B', leaf: '#4F6B55', pot: '#6E5B51', lamp: '#FFCF8A',
       sun: '#E4E8F0', sky: '#7C8596', bounce: '#2E3238',
-      feature: '#5F6964', cap: '#34373B',
+      feature: '#5B6660', cap: '#747C86',
       glassA: 0.22, sunI: 1.45, skyI: 1.25, ambI: 0.75, lampI: 1.6, shadowA: 0.55, shadowI: 0.6,
     },
   },
   enterprise: {
     light: {
-      slab: '#D5D9DE', roomFloor: '#E4E1DA', corr: '#ECEFF2', rug: '#C7CFDA', town: '#CBD3DE', wall: '#F1F3F5', core: '#DDE2E8', wc: '#D6DEE8',
-      glass: '#D4E3EE', frame: '#3B4656', wood: '#CDBFA5', oak: '#DCD1BC', chair: '#7F8FA6', chair2: '#2E3D5C', sofa: '#95A3B6',
+      slab: '#E2E5E9', roomFloor: '#EAE8E3', corr: '#F0F2F4', rug: '#C7CFDA', town: '#CBD3DE', wall: '#F6F7F9', core: '#DDE2E8', wc: '#DDE2E8',
+      glass: '#E8EFF4', frame: '#3B4656', wood: '#CDBFA5', oak: '#DCD1BC', chair: '#7F8FA6', chair2: '#2E3D5C', sofa: '#95A3B6',
       dev: '#23262D', screen: '#8A9BB5', cream: '#F4F5F7', leg: '#A3ACB6', leaf: '#6E8B72', pot: '#8A939E', lamp: '#EEF2F8',
       sun: '#F5F7FC', sky: '#F4F7FC', bounce: '#7C838E',
-      feature: '#B9C3D1', cap: '#CDD3DA',
+      feature: '#B9C3D1', cap: '#C8CFD7',
       glassA: 0.3, sunI: 1.5, skyI: 1.3, ambI: 0.32, lampI: 0.45, shadowA: 0.3, shadowI: 0.5,
     },
     dark: {
-      slab: '#2A3242', roomFloor: '#4E5157', corr: '#323A48', rug: '#3F4A5C', town: '#3A4556', wall: '#4F5866', core: '#3A4352', wc: '#36404F',
-      glass: '#7F9AB0', frame: '#121821', wood: '#6B665F', oak: '#77726A', chair: '#56657C', chair2: '#1F2A40', sofa: '#5A6678',
+      slab: '#30353C', roomFloor: '#424851', corr: '#394048', rug: '#3F4A5C', town: '#3A4556', wall: '#59616C', core: '#4B525C', wc: '#4B525C',
+      glass: '#687888', frame: '#121821', wood: '#6B665F', oak: '#77726A', chair: '#56657C', chair2: '#1F2A40', sofa: '#5A6678',
       dev: '#0E1116', screen: '#6B7FA0', cream: '#A9AFB8', leg: '#6E7680', leaf: '#4A614E', pot: '#5B636E', lamp: '#FFE2B0',
       sun: '#D9E2F5', sky: '#7A879E', bounce: '#3A414C',
-      feature: '#46505F', cap: '#394150',
+      feature: '#46505F', cap: '#6F7884',
       glassA: 0.22, sunI: 1.1, skyI: 1.2, ambI: 0.7, lampI: 1.4, shadowA: 0.55, shadowI: 0.6,
     },
   },
   contrast: {
     light: {
       slab: '#C9CED6', roomFloor: '#FFFFFF', corr: '#E9ECF0', rug: '#D5DAE1', town: '#D5DAE1', wall: '#F5F6F8', core: '#9AA3AF', wc: '#B7C0CC',
-      glass: '#FFFFFF', frame: '#0B1220', wood: '#5B6472', oak: '#7A8391', chair: '#334155', chair2: '#1E293B', sofa: '#475569',
+      glass: '#E4E9EF', frame: '#0B1220', wood: '#5B6472', oak: '#7A8391', chair: '#334155', chair2: '#1E293B', sofa: '#475569',
       dev: '#0B1220', screen: '#5B6B85', cream: '#E2E8F0', leg: '#0B1220', leaf: '#3F5B45', pot: '#4B5563', lamp: '#FFFFFF',
       sun: '#FFFFFF', sky: '#FFFFFF', bounce: '#BFC5CE',
       feature: '#DDE1E7', cap: '#8A93A0',
@@ -68,7 +70,7 @@ export const INTERIOR = {
     },
     dark: {
       slab: '#1A2130', roomFloor: '#2C3546', corr: '#111827', rug: '#232C3B', town: '#232C3B', wall: '#3A4456', core: '#4B5563', wc: '#3B4658',
-      glass: '#9FB3C8', frame: '#E5E9F0', wood: '#A8B3C2', oak: '#8F9AAA', chair: '#CBD5E1', chair2: '#E2E8F0', sofa: '#94A3B8',
+      glass: '#6B7A8E', frame: '#E5E9F0', wood: '#A8B3C2', oak: '#8F9AAA', chair: '#CBD5E1', chair2: '#E2E8F0', sofa: '#94A3B8',
       dev: '#05080D', screen: '#7F93B5', cream: '#64748B', leg: '#CBD5E1', leaf: '#6B8F74', pot: '#94A3B8', lamp: '#FFFFFF',
       sun: '#FFFFFF', sky: '#C8D2E0', bounce: '#1A2130',
       feature: '#2F394A', cap: '#5E6A7C',
@@ -78,7 +80,7 @@ export const INTERIOR = {
   draw: {
     light: {
       slab: '#DCE6F1', roomFloor: '#F2F6FB', corr: '#E7EEF6', rug: '#D3DFEC', town: '#D3DFEC', wall: '#F7FAFD', core: '#C5D4E5', wc: '#CBD8E8',
-      glass: '#E3EEF8', frame: '#10284A', wood: '#A9BED6', oak: '#BFD0E3', chair: '#8FA9C7', chair2: '#6F8DB2', sofa: '#9FB5CE',
+      glass: '#E6EFF8', frame: '#10284A', wood: '#A9BED6', oak: '#BFD0E3', chair: '#8FA9C7', chair2: '#6F8DB2', sofa: '#9FB5CE',
       dev: '#1D3354', screen: '#7C9AC0', cream: '#EEF3F9', leg: '#3A5578', leaf: '#8FB0B6', pot: '#9FB5CE', lamp: '#FFFFFF',
       sun: '#FFFFFF', sky: '#F3F7FC', bounce: '#9FB0C6',
       feature: '#D5E1EE', cap: '#9FB4CC',
@@ -86,7 +88,7 @@ export const INTERIOR = {
     },
     dark: {
       slab: '#10345C', roomFloor: '#174272', corr: '#123A66', rug: '#1B4A7E', town: '#1B4A7E', wall: '#2A5A8E', core: '#1E4E82', wc: '#1E4E82',
-      glass: '#9FC3E6', frame: '#EAF3FF', wood: '#4E7AAD', oak: '#5C88BA', chair: '#7FA3CC', chair2: '#9FBEE0', sofa: '#6690BF',
+      glass: '#3A6A9E', frame: '#EAF3FF', wood: '#4E7AAD', oak: '#5C88BA', chair: '#7FA3CC', chair2: '#9FBEE0', sofa: '#6690BF',
       dev: '#0A1E38', screen: '#9FC3E6', cream: '#3A6699', leg: '#CFE0F5', leaf: '#5E9AA0', pot: '#6690BF', lamp: '#EAF3FF',
       sun: '#EAF3FF', sky: '#8FB3DC', bounce: '#0E3259',
       feature: '#22558C', cap: '#6F95C2',
@@ -95,19 +97,19 @@ export const INTERIOR = {
   },
   classic: {
     light: {
-      slab: '#E3DCCF', roomFloor: '#EEE5D5', corr: '#F3EFE7', rug: '#EAD9B0', town: '#E6D7B8', wall: '#FAF6EE', core: '#EDE6D8', wc: '#DDE7EA',
-      glass: '#CDEAF0', frame: '#2B2B2B', wood: '#B98D5E', oak: '#D9B884', chair: '#E8A93A', chair2: '#D2603F', sofa: '#5E9E8C',
+      slab: '#E8E3D9', roomFloor: '#EFE6D4', corr: '#F3F0EA', rug: '#EAD9B0', town: '#E6D7B8', wall: '#FAF8F3', core: '#E6E0D5', wc: '#E6E0D5',
+      glass: '#E6F1F0', frame: '#2B2B2B', wood: '#B98D5E', oak: '#D9B884', chair: '#E8A93A', chair2: '#D2603F', sofa: '#5E9E8C',
       dev: '#24252A', screen: '#7FA3D6', cream: '#FFF8EC', leg: '#3A2E24', leaf: '#5E9E5A', pot: '#C8663E', lamp: '#FFE3A0',
-      sun: '#FFF4E0', sky: '#FFFBF2', bounce: '#948C7C',
-      feature: '#B9D6CC', cap: '#E0D6C4',
+      sun: '#FFF7EC', sky: '#FBFAF7', bounce: '#A8A397',
+      feature: '#B9D6CC', cap: '#DACFBC',
       glassA: 0.3, sunI: 1.6, skyI: 1.3, ambI: 0.32, lampI: 0.5, shadowA: 0.3, shadowI: 0.5,
     },
     dark: {
-      slab: '#44474C', roomFloor: '#58595D', corr: '#44474C', rug: '#56575B', town: '#58595D', wall: '#73767B', core: '#52555A', wc: '#4C5157',
-      glass: '#8FB8C4', frame: '#141414', wood: '#6C6258', oak: '#7E7468', chair: '#A87A2A', chair2: '#94432C', sofa: '#3F6E62',
+      slab: '#32363C', roomFloor: '#454A51', corr: '#3B4046', rug: '#56575B', town: '#58595D', wall: '#5E656E', core: '#50565F', wc: '#50565F',
+      glass: '#6C7883', frame: '#141414', wood: '#6C6258', oak: '#7E7468', chair: '#A87A2A', chair2: '#94432C', sofa: '#3F6E62',
       dev: '#121317', screen: '#6E8FC0', cream: '#BFB09A', leg: '#25272B', leaf: '#3F6E3C', pot: '#7A5140', lamp: '#FFCF8A',
       sun: '#E4E8F0', sky: '#7A8499', bounce: '#2E3238',
-      feature: '#4A6E64', cap: '#35383C',
+      feature: '#4A6E64', cap: '#747C86',
       glassA: 0.22, sunI: 1.4, skyI: 1.2, ambI: 0.72, lampI: 1.6, shadowA: 0.55, shadowI: 0.6,
     },
   },

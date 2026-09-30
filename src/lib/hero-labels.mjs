@@ -55,7 +55,7 @@ export function createLabels(host, { reduced = false, caps = {} } = {}) {
       if (show && L.lifts) show = lifted < 0.5;   // on the floor that lifts away: gone once it has gone
       const p = show ? project(L.at()) : null;
       if (!p || p[0] < -20 || p[1] < -20 || p[0] > W + 20 || p[1] > H + 20) show = false;
-      if (show) { L.x = Math.round(p[0] + (L.side ? L.dx ?? 12 : 0)); L.y = Math.round(p[1] - (L.side ? 0 : L.dy ?? 10)); live.push(L); }
+      if (show) { L.ax = p[0]; L.ay = p[1]; L.x = Math.round(p[0] + (L.side ? L.dx ?? 12 : 0)); L.y = Math.round(p[1] - (L.side ? 0 : L.dy ?? 10)); live.push(L); }
       L.want = show;
     }
     live.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
@@ -67,7 +67,9 @@ export function createLabels(host, { reduced = false, caps = {} } = {}) {
       const m = L.shown ? -1 : 7, r = L.side ? { x0: L.x - m, x1: L.x + L.w + m, y0: L.y - L.h / 2 - m, y1: L.y + L.h / 2 + m }
         : { x0: L.x - L.w / 2 - m, x1: L.x + L.w / 2 + m, y0: L.y - L.h - m, y1: L.y + m };
       const fault = L.ring === 'fault', counted = !fault && !L.free;
-      if ((counted && others >= cap) || taken.some((t) => (!fault || !t.glyph) && overlap(t, r))) { L.want = false; continue; }
+      // A label never tests against its own glyph (the ring it names sits just under it).
+      const own = (t) => t.glyph && Math.abs((t.x0 + t.x1) / 2 - L.ax) < 2 && Math.abs((t.y0 + t.y1) / 2 - L.ay) < 2;
+      if ((counted && others >= cap) || taken.some((t) => (!fault || !t.glyph) && !own(t) && overlap(t, r))) { L.want = false; continue; }
       if (counted) others++;
       taken.push(r);
     }

@@ -88,10 +88,10 @@ const typeWord = (t) => spaceTypes[t]?.profile?.name ?? '';
 const peekOf = (r) => { const n = (r.positions ?? []).reduce((k, p) => k + (p.units?.length ?? 0), 0); return r.id === ROOM ? `Fault · video bar offline since ${STORY.since} · With ${STORY.who}` : `Fine · ${n === 1 ? '1 device' : `${n} devices`}`; };
 const floorIndex = Object.fromEntries(M.floors.map((f, i) => [f.id, i]));
 
-// The room drawings' materials, grouped for the scene (the index is hero3d's FURN list). Calm (Keith, 30 Sept): every
-// chair in one tone, no legs, bases or small kit in any room, and each table one clean shape (its parts joined).
+// The story room's drawing, for the scene's space level (the building and the floor are an architect's model with
+// no furniture; Keith, 30 Sept). Grouped by material (the index is hero3d's FURN list): every chair in one tone, no
+// legs, bases or small kit, and the table one clean shape (its parts joined).
 const FURN_MAT = { table: 0, wood: 0, counter: 0, chair: 2, 'chair-back': 2, sofa: 4, 'sofa-back': 4, dev: 5, bezel: 5, 'led-wall': 5, board: 7, stone: 7, appliance: 7, printer: 7, 'printer-top': 7, leaf: 9, pot: 10 };
-const NO_DRAWING = new Set(['mdf', 'idf', 'it-store', 'open-area']);
 // A part as the scene draws it: [floor index, material, 1 if in the story's room, z0, z1, x, y, x, y, ...], its outline
 // in the room's own frame (the profile's) stretched, mirrored and turned onto the plan, with the floor's level.
 // Millimetres, not centimetres: a screen stands 8 mm proud of its bezel, and rounding it to the centimetre would lay
@@ -118,10 +118,9 @@ const furn = [];
 const storyDev = {};
 let booking = null;
 for (const r of Object.values(M.rooms)) {
-  if (!r.geo || r.count > 1 || NO_DRAWING.has(r.space_type)) continue;
-  const sp = spaces[r.id]; if (!sp?.option) continue;
-  const fl = M.floors.find((f) => f.id === r.floor), fi = floorIndex[r.floor], isStory = r.id === ROOM;
-  const drawn = isStory ? RM : buildRoom(sp.space_type, sp.option, roomItems(sp.option, { fitted: sp.fitted, space: sp }), { plugs: sites[SITE].mains?.plugs ?? null, country: sp.country ?? sites[SITE].country ?? null, fitted: sp.fitted, models });
+  if (r.id !== ROOM || !r.geo) continue;
+  const fl = M.floors.find((f) => f.id === r.floor), fi = floorIndex[r.floor], isStory = true;
+  const drawn = RM;
   const tables = new Map();
   for (const s of drawn.b.S) {
     if (s.ghost || s.outside || s.hid || s.mat === 'plate' || s.mat === 'floorbox') continue;
