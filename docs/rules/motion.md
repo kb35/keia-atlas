@@ -4,7 +4,7 @@ Motion explains a change. Tokens and shared moves are in `src/styles/motion.css`
 
 ### M1. Durations and curves are tokens
 
-Moves use `--dur-morph` (520 ms), enters `--dur-enter` (440), exits `--dur-exit` (240), pages `--dur-page` (420), colour and status `--dur-state` (300), hovers `--dur-hover` (140), menus and peek cards `--dur-pop` (200), growing from `--pop-scale` (.94); a look or light and dark cross-fades the page in `--dur-theme` (360); list items start `--stagger` (24) apart; a live change stays marked for `--dur-linger` (4000). Loops have their own: `--dur-blink`, `--dur-pulse`, `--dur-flow`. The curve is `--ease-settle`. Scripts read the same values from `window.rsMotion()`.
+Moves use `--dur-morph` (520 ms), enters `--dur-enter` (440), exits `--dur-exit` (240), pages `--dur-page` (420), colour and status `--dur-state` (300), hovers `--dur-hover` (140), menus and peek cards `--dur-pop` (200), growing from `--pop-scale` (.94); a look or light and dark cross-fades the page in `--dur-theme` (360); list items start `--stagger` (24) apart; a live change stays marked for `--dur-linger` (4000). Loops have their own: `--dur-blink` (rack link lights) and `--dur-flow` (signal flow you start). `--dur-pulse` is retired: nothing on a working page loops. The curve is `--ease-settle`. Scripts read the same values from `window.rsMotion()`.
 
 - **Why:** one rhythm reads as one system, and one edit retunes it.
 - **Do:** `transition: background var(--dur-state) var(--ease-settle)`.
@@ -20,7 +20,7 @@ A thing on both views moves and resizes into its new place. A new thing grows fr
 
 ### M3. Nothing overshoots
 
-Everything decelerates into place on one curve. No springs, no bounce. Exceptions: a status light flashes once when it gets its result (M8), spinners and signal flow run at an even speed, and a fault pulse breathes.
+Everything decelerates into place on one curve. No springs, no bounce. Exceptions: a health glyph comes on once when it gets its result (M8), and spinners and signal flow run at an even speed. Nothing pulses: stillness means fine, and a fault is told by its shape and word.
 
 - **Why:** bounce is noise in a tool used all day.
 - **Do:** one curve for moves, enters and exits.
@@ -52,7 +52,7 @@ Switching a tab, filter, view or step never moves the page under the pointer. Wr
 
 ### M7. Reduced motion turns it off
 
-With reduced motion on, nothing moves, and states still change at once. CSS is covered by `base.css` and `motion.css`; scripts must check `window.rsMotion().reduced` themselves. A fault pulse becomes a still ring.
+With reduced motion on, nothing moves, and states still change at once. CSS is covered by `base.css` and `motion.css`; scripts must check `window.rsMotion().reduced` themselves. Glyphs are drawn at once, and the heartbeat's words still change.
 
 - **Why:** [WCAG 2.2, 2.3.3](https://www.w3.org/WAI/WCAG22/Understanding/animation-from-interactions.html): motion makes some people ill.
 - **Do:** guard every `el.animate()` and `startViewTransition()`.
@@ -60,11 +60,11 @@ With reduced motion on, nothing moves, and states still change at once. CSS is c
 
 ### M8. Lights come on in turn
 
-Status lights (`.hl[data-state]`: ok, warn, bad, off) arrive grey, then flash once to their colour, one after another, as they scroll into view. A fault keeps a slow pulse.
+Health glyphs (`HealthGlyph.astro`, `.hg`; UI-V2 §6) arrive quiet, then come on once to their state, one after another (`--stagger` apart), as they scroll into view. The heartbeat ("checked 40 s ago") shows last. A later change of state eases in place over `--dur-state`. Nothing pulses, a fault included: the fault pulse and the radiating glow are retired.
 
-- **Why:** it shows something was checked, not just asserted.
-- **Do:** use `.hl`, with a word beside it.
-- **Don't:** invent another status dot.
+- **Why:** it shows something was checked, not just asserted; and a still page reads as fine.
+- **Do:** use `HealthGlyph` (or `glyph()` from `src/lib/health.mjs` in a script, `.hg-m` in an inline script), with a word beside it.
+- **Don't:** invent another status dot, or loop anything on a working page.
 
 ### M9. When not to animate
 

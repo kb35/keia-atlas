@@ -7,12 +7,12 @@ import PageBand from '../../components/PageBand.astro';
 import FilterBar from '../../components/FilterBar.astro';
 import Section from '../../components/Section.astro';
 import EmptyState from '../../components/EmptyState.astro';
-import { href } from '../../lib/data.mjs';
+import { href, plural } from '../../lib/data.mjs';
 const SEED = [
   { id: 'CHG-040', title: 'AV refresh playbook: add a step to label both ends of every patch cable', kind: 'playbook', path: 'data/playbooks/av-refresh.yaml', change: 'adds a step to Install, version 1.3 to 1.4', by: 'Liam Doyle', byRole: 'On-site technician', approver: 'Tomás Varga, Programme manager with Sofia Reyes, Service manager, AV', date: '2026-09-28', status: 'review', project: 'PRJ-12',
     text: '  - phase: install\n    steps:\n+     - { title: "Label both ends of every patch cable", role: tech, note: "Skylark" }\n', note: 'Suggested from PRJ-12 New York office video bar refresh, about 21.05 Skylark. It is already on that project as a one-off.' },
   { id: 'CHG-039', title: 'Video bar profile: add a symptom for the external camera switching back after a reboot', kind: 'profile', path: 'data/device-classes/video-bar.yaml', change: 'changes, version 1.0 to 1.1', by: 'Aoife Byrne', byRole: 'AV and IT delivery engineer', approver: 'Sofia Reyes, Service manager, AV', date: '2026-09-27', status: 'review',
-    text: '  discrimination:\n+   external_camera_reverts:\n+     likely_causes: [Known issue after a reboot on X52 and X32 (ADV-002); camera not re-selected after an update]\n+     first_check: device_management\n', note: 'Came from the Heron snag on PRJ-14.' },
+    text: '  discrimination:\n+   external_camera_reverts:\n+     likely_causes: [Known error after a reboot on X52 and X32 (ADV-002); camera not re-selected after an update]\n+     first_check: device_management\n', note: 'Came from the Heron snag on PRJ-14.' },
   { id: 'CHG-038', title: 'Poly VideoOS 5.0.1 logged: do not install', kind: 'firmware', path: 'data/firmware/poly-videoos.yaml', change: 'adds a release above 4.7.0-466077', by: 'Vendor watcher', byRole: 'Agent', approver: 'Niamh Walsh (Lab), then Sofia Reyes', date: '2026-08-29', status: 'merged',
     text: 'releases:\n+ - version: 5.0.1.470014\n+   released: "2026-08-28"\n+   status: blocked\n+   advisory: ADV-001\n', note: 'Proposed by an agent; approved by people.' },
   { id: 'CHG-037', title: 'AV refresh playbook 1.3: reserve addresses by MAC before the units ship', kind: 'playbook', path: 'data/playbooks/av-refresh.yaml', change: 'changes, version 1.2 to 1.3', by: 'Ruth Kelly', byRole: 'Project manager', approver: 'Tomás Varga, Programme manager with Sofia Reyes', date: '2026-09-18', status: 'merged',
@@ -32,6 +32,7 @@ const FACETS = [
 ];
 const SORT = { options: [{ value: 'newest', label: 'Newest first' }, { value: 'review', label: 'Waiting for review first' }, { value: 'kind', label: 'By kind' }] };
 const count = (st) => SEED.filter((c) => c.status === st).length;
+const answer = `${count('review') ? `${plural(count('review'), 'proposal')} to review` : 'Nothing to review'} · ${count('changes') ? `${count('changes')} sent back for changes` : 'none sent back for changes'}`;
 const NUMBERS = [
   { n: count('review'), label: 'Waiting for review', to: '?status=review' },
   { n: count('changes'), label: 'Edits asked for', to: '?status=changes', tone: count('changes') ? 'warn' : undefined },
@@ -40,7 +41,7 @@ const NUMBERS = [
 ];
 ---
 <Shell title="Proposals" section="changes" crumbs={[{ label: 'Proposals' }]}>
-  <PageBand overline="Register" title="Proposals" lede="Every proposal to change what Keia Atlas knows, who approves it, and the file it writes." sim numbers={NUMBERS}>
+  <PageBand overline="Register" title="Proposals" answer={answer} lede="Every proposal to change what Keia Atlas knows, who approves it, and the file it writes." sim numbers={NUMBERS}>
     <a slot="action" class="btn primary" href={href('/edit/')}><Icon name="plus" size={16} />Propose an edit</a>
   </PageBand>
   <div class="content changes">

@@ -9,6 +9,7 @@ import FilterBar from '../../../components/FilterBar.astro';
 import EmptyState from '../../../components/EmptyState.astro';
 import Section from '../../../components/Section.astro';
 import OfficeCard from '../_OfficeCard.astro';
+import HealthGlyph from '../../../components/HealthGlyph.astro';
 import { href, DEMO_TODAY, fmtDate } from '../../../lib/data.mjs';
 import { REGIONS, REGION_SHORT, OFFICE_IDS, office, homeOffices, liveModelFor, sitesFloored, LIGHT_WORD, ROLE_WORD, OPEN_Q } from '../../../lib/locations.mjs';
 
@@ -31,7 +32,7 @@ const NUMBERS = [
 const json = JSON.stringify({ ...liveModelFor(sitesFloored()), base: href('/') }).replace(/</g, '\\u003c');
 ---
 <Shell title="Offices" section="offices" crumbs={[{ label: 'Locations', to: '/locations/' }, { label: 'Offices' }]} about={{ kind: 'page', label: 'Offices' }}>
-  <PageBand overline="Locations" title="Offices" rec="dd-locations-offices" lede={`Every office: its local time, how its services are, and who is in on ${fmtDate(DEMO_TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}.`} sim="live" numbers={NUMBERS} />
+  <PageBand overline="Locations" title="Offices" rec="dd-locations-offices" answer={openInc ? `${openInc} open ${openInc === 1 ? 'incident' : 'incidents'} across ${OFFICES.length} offices · ${onSite} people on site` : `No open incidents across ${OFFICES.length} offices · ${onSite} people on site`} lede={`Every office: its local time, how its services are, and who is in on ${fmtDate(DEMO_TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}.`} sim="live" numbers={NUMBERS} />
 
   <div class="content offices" data-loc="offices">
     <FilterBar facets={FACETS} placeholder="Find an office, city or code" label="Find an office" noun={['office', 'offices']} scope=".content.offices" views={VIEWS} viewKey="rs-offices-view" sort={SORT} />
@@ -49,7 +50,7 @@ const json = JSON.stringify({ ...liveModelFor(sitesFloored()), base: href('/') }
               <td data-label="Office"><a href={href(`/locations/${o.id}/`)}><b>{o.s.name}</b></a><small class="faint"> {ROLE_WORD[o.s.role]}</small></td>
               <td data-label="Region"><a href={href(`/locations/${o.s.region}/`)}>{REGION_SHORT[o.s.region]}</a></td>
               <td data-label="Local time"><span data-loc-clock>--:--</span> <small class="of-open" data-loc-open></small></td>
-              <td data-label="Services"><span class="of-lights">{o.lights.map((l) => <a href={l.to.startsWith('#') ? href(`/locations/${o.id}/${l.to}`) : href(l.to)} title={`${l.label}: ${LIGHT_WORD[l.tone]}, ${l.text}`}><i class="hl" data-state={l.tone} aria-hidden="true"></i>{l.label}</a>)}</span></td>
+              <td data-label="Services"><span class="of-lights">{o.lights.map((l) => <a href={l.to.startsWith('#') ? href(`/locations/${o.id}/${l.to}`) : href(l.to)} title={`${l.label}: ${LIGHT_WORD[l.tone]}, ${l.text}`}><HealthGlyph state={l.tone} size={12} quiet title={l.text} />{l.label}</a>)}</span></td>
               <td data-label="Open incidents" class="num"><a href={href(`/incidents/?site=${o.id}&${OPEN_Q}`)}>{o.inc.length}</a></td>
               <td data-label="On site today" class="num"><a href={href(`/locations/${o.id}/#today`)}>{o.people.length}</a></td>
               <td data-label="Spaces" class="num"><a href={href(`/rooms/?site=${o.id}`)}>{o.rooms.length}</a></td>
@@ -113,7 +114,6 @@ const json = JSON.stringify({ ...liveModelFor(sitesFloored()), base: href('/') }
   .of-list table { width: 100%; }
   .of-lights { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; }
   .of-lights a { display: inline-flex; align-items: center; gap: 5px; color: var(--ink); text-decoration: none; font-size: 13px; }
-  .of-lights .hl { width: 10px; height: 10px; }
   .of-open { color: var(--text-2); }
   .of-open[data-open="1"] { color: var(--green-ink, var(--green)); }
   .ho-rows { display: grid; gap: 10px; }

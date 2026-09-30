@@ -1,0 +1,30 @@
+---
+/* HealthGlyph: the one way to show health (UI-V2 §6; docs/rules/looks.md T4). It replaces the old status dots
+   (the .hl lights). The shape carries the state, the word sits beside it, colour only reinforces.
+   Props:  state   fine, review, fault, stale (Not reporting), progress, planned, off; the older words
+                   (ok, warn, bad, good, idle...) are mapped by stateOf() in src/lib/health.mjs
+           size    12, 16 (default), 24 or 40 px
+           word    true shows the state's word beside the glyph; a string shows that word instead
+                   (use it at 16 px and above; at 12 px on a plan the word goes in `title` and the label)
+           quiet   draws Fine in --quiet: Home, region and office pages colour nothing that is fine
+           title   what the state is about ("offline since 07:51"); read out as "Fault: offline since 07:51"
+           label   the full spoken label, when the default does not fit
+   Scripts draw the same markup with glyph() and change a glyph in place with setGlyph() (src/lib/health.mjs).
+   Motion: comes on once, in turn, as the page lights up (M8, the Shell adds .lit); a state change eases in
+   place over --dur-state. It never pulses. */
+import { glyphParts, shape } from '../lib/health.mjs';
+interface Props { state: string; size?: 12 | 16 | 24 | 40; word?: boolean | string; quiet?: boolean; title?: string; label?: string; class?: string }
+const { state, size = 16, word = false, quiet = false, title, label, class: extra } = Astro.props;
+const g = glyphParts(state, { size, word, quiet, title, label });
+const svg = shape(g.s);
+---
+{g.showWord ? (
+  <span class:list={[g.cls, extra]} data-state={g.s} data-size={g.px} title={title}>
+    <svg viewBox="0 0 16 16" width={g.px} height={g.px} style={`--hg-px:${g.px}`} aria-hidden="true" focusable="false" set:html={svg} />
+    <span class="hg-w">{g.text}</span>
+  </span>
+) : (
+  <span class:list={[g.cls, extra]} data-state={g.s} data-size={g.px} role="img" aria-label={g.aria} title={title}>
+    <svg viewBox="0 0 16 16" width={g.px} height={g.px} style={`--hg-px:${g.px}`} aria-hidden="true" focusable="false" set:html={svg} />
+  </span>
+)}

@@ -8,7 +8,7 @@ import PageBand from '../../components/PageBand.astro';
 import FilterBar from '../../components/FilterBar.astro';
 import Section from '../../components/Section.astro';
 import EmptyState from '../../components/EmptyState.astro';
-import { vendors, sites, VENDOR_KIND, DEMO_TODAY, SITE_ORDER, modelName, fmtDate, href } from '../../lib/data.mjs';
+import { vendors, sites, VENDOR_KIND, DEMO_TODAY, SITE_ORDER, modelName, fmtDate, href, plural } from '../../lib/data.mjs';
 import { person, REGION_SHORT } from '../../lib/demo.mjs';
 const ORDER = ['integration', 'service', 'manufacturer'];
 const list = Object.values(vendors).sort((a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind) || a.name.localeCompare(b.name));
@@ -33,6 +33,7 @@ const jobs = list.reduce((n, v) => n + (v.record?.jobs ?? 0), 0);
 const snags = list.reduce((n, v) => n + (v.record?.snags_open ?? 0), 0);
 const ending = list.filter((v) => leftOf(v) >= 0 && leftOf(v) < 183).length;
 const portal = list.reduce((n, v) => n + (v.people?.length ?? 0), 0);
+const answer = `${snags ? `${plural(snags, 'snag')} open` : 'No snags open'} · ${ending ? `${plural(ending, 'contract')} ending within 6 months` : 'no contract ends within 6 months'}`;
 const NUMBERS = [
   { n: jobs, label: 'Jobs in the last year', fact: true },
   { n: snags, label: snags === 1 ? 'Snag open' : 'Snags open', to: '?snags=1', tone: snags ? 'warn' : undefined },
@@ -60,7 +61,7 @@ const fattrs = (v) => ({ 'data-fi': '', 'data-id': v.id, 'data-find': find(v), '
 const ROWS = list.map((v, i) => ({ id: v.id, i, name: v.name, left: leftOf(v) }));
 ---
 <Shell title="Vendors" section="vendors" minStage={3} crumbs={[{ label: 'Team', to: '/team/' }, { label: 'Vendors' }]}>
-  <PageBand overline="Directory" title="Vendors" lede="What each contract covers, its service levels, and how the last year went." sim numbers={NUMBERS} />
+  <PageBand overline="Directory" title="Vendors" answer={answer} lede="What each contract covers, its service levels, and how the last year went." sim numbers={NUMBERS} />
 
   <div class="content vendors">
     <FilterBar facets={FACETS} toggles={TOGGLES} placeholder="Find a vendor, contract or model" label="Find a vendor" noun={['vendor', 'vendors']} scope=".content.vendors" views={VIEWS} viewKey="rs5-vendors-view" sort={SORT} />

@@ -1,0 +1,39 @@
+---
+/* HealthKey: "Key", the one legend for the health glyphs (UI-V2 §6). It sits closed under every plan, map and
+   set of small multiples, and lists the seven shapes with their words. One per picture, never repeated in rows.
+   Props:  only   the states to list (default all seven, in order)
+           open   start open (default closed) */
+import HealthGlyph from './HealthGlyph.astro';
+import { STATES, WORD } from '../lib/health.mjs';
+interface Props { only?: string[]; open?: boolean }
+const { only = STATES, open = false } = Astro.props;
+const SAYS = {
+  fine: 'Working as it should',
+  review: 'Someone should look, nothing is down',
+  fault: 'Not working, or past its target',
+  stale: 'No word from its feed within the window',
+  progress: 'Being worked on or installed',
+  planned: 'Planned or proposed, not there yet',
+  off: 'Switched off, or not recorded',
+};
+---
+<details class="hkey" open={open} data-help="health.key">
+  <summary>Key</summary>
+  <ul>
+    {only.map((s) => <li><HealthGlyph state={s} size={16} /><b>{WORD[s]}</b><span>{SAYS[s]}</span></li>)}
+  </ul>
+</details>
+
+<style is:global>
+  .hkey { font-size: 13px; color: var(--text-2); }
+  .hkey > summary { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; list-style: none; font-size: 12.5px; color: var(--text-2); border-radius: var(--radius); padding: 2px 4px; margin-left: -4px; }
+  .hkey > summary::-webkit-details-marker { display: none; }
+  .hkey > summary::after { content: ""; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); transition: transform var(--dur-hover) var(--ease-settle); }
+  .hkey[open] > summary::after { transform: translateY(1px) rotate(-135deg); }
+  .hkey > summary:hover { color: var(--text); }
+  .hkey ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 16px; }
+  .hkey li { display: grid; grid-template-columns: 16px auto minmax(0, 1fr); align-items: center; gap: 8px; }
+  .hkey li b { font-weight: 550; color: var(--text); white-space: nowrap; }
+  .hkey li span:last-child { color: var(--text-3); font-size: 12.5px; }
+  @media (prefers-reduced-motion: reduce) { .hkey > summary::after { transition: none; } }
+</style>

@@ -47,6 +47,8 @@ const raciRows = pb.phases.map((ph) => {
   if (!ph.steps.some((st) => st.role === 'pm') && !ph.gate.by.includes('pm') && raciCols.includes('pm')) cells.pm = { letter: 'I', detail: 'Kept up to date to run the dates.' };
   return { label: PHASE_LABEL[ph.phase], sub: wk(ph.weeks), cells };
 });
+const liveUsing = using.filter((p) => p.phase !== 'closed').length;
+const answer = `Version ${pb.version} · ${liveUsing ? `${plural(liveUsing, 'live project')} following it` : 'no live project follows it'}`;
 const NUMBERS = [
   { n: duration, label: 'Weeks', fact: true },
   { n: total, label: 'Steps', to: '#steps' },
@@ -55,7 +57,7 @@ const NUMBERS = [
 ];
 ---
 <Shell title={pb.name} section="playbooks" minStage={3} crumbs={[{ label: 'Playbooks', to: '/playbooks/' }, { label: pb.name }]} about={{ kind: 'playbook', label: pb.name, to: `/playbooks/${pb.id}/` }}>
-  <PageBand overline="Playbook" title={pb.name} lede={pb.summary} sim numbers={NUMBERS}>
+  <PageBand overline="Playbook" title={pb.name} answer={answer} lede={pb.summary} sim numbers={NUMBERS}>
     <span slot="overline" class="pill plain">Version {pb.version}</span>
     <span slot="overline" class="pill plain">{INTENSITY[pb.intensity]}</span>
     <a slot="action" class="btn primary" href={href(`/edit/?kind=project&pb=${pb.id}`)}><Icon name="plus" size={16} />New project</a>

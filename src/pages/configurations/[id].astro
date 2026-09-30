@@ -12,6 +12,7 @@ import Icon from '../../components/Icon.astro';
 import DeviceArt from '../../components/DeviceArt.astro';
 import ConfigView from '../../components/ConfigView.astro';
 import ConfigScript from '../../components/ConfigScript.astro';
+import HealthGlyph from '../../components/HealthGlyph.astro';
 import { recHere } from '../../lib/vt.mjs';
 import { configurations, models, href, fmtDate, plural, modelName } from '../../lib/data.mjs';
 import { useOf, factsOf, provisioningOf, mapOf, ROOM_STATE } from './_use.mjs';
@@ -37,12 +38,13 @@ const NUMBERS = [
   { n: u.configuring, label: u.configuring === 1 ? 'Device to configure' : 'Devices to configure', to: '#in-use' },
   { n: u.drifted, label: u.drifted === 1 ? 'Unit drifted' : 'Units drifted', to: '#in-use', tone: u.drifted ? 'warn' : undefined },
 ];
+const ANSWER = `${u.drifted ? `${u.drifted} ${u.drifted === 1 ? "unit doesn't" : "units don't"} match this setup guide` : 'Every unit in use matches it'}${u.configuring ? ` · ${u.configuring} still to configure` : ''}`;
 const pct = (p) => (p.total ? Math.round((p.done / p.total) * 100) : 0);
 const STATE_PILL = { done: 'manage', doing: 'deploy', todo: 'plain', blocked: 'bad' };
 ---
 <Shell vendorOk title={cfg.name} section="configurations" about={{ kind: 'configuration', label: cfg.name, to: `/configurations/${cfg.id}/` }}
   crumbs={[{ label: 'Setup guides', to: '/configurations/' }, { label: f.kind, to: `/configurations/?cls=${f.cls}` }, { label: cfg.name }]}>
-  <PageBand overline="Setup guide" title={cfg.name} numbers={NUMBERS} sim>
+  <PageBand overline="Setup guide" title={cfg.name} answer={ANSWER} numbers={NUMBERS} sim>
     <Fragment slot="overline">
       <a href={href(`/profiles/${f.cls}/`)}>{f.kind}</a>
       <span class="pill info plain" title={cfg.mode}>{cfg.mode.length > 30 ? f.mode : cfg.mode}</span>
@@ -182,7 +184,7 @@ const STATE_PILL = { done: 'manage', doing: 'deploy', todo: 'plain', blocked: 'b
                         <td>{x.site}</td>
                         <td>{x.model}</td>
                         <td><span class={`pill ${x.stage}`}>{x.status}</span></td>
-                        <td>{x.drift ? <span class="iu-dr"><i class="hl" data-state="warn"></i>{x.drift}</span> : x.live ? <span class="iu-ok"><i class="hl" data-state="ok"></i>In sync</span> : <span class="faint">Checked when live</span>}</td>
+                        <td>{x.drift ? <span class="iu-dr"><HealthGlyph state="review" size={12} title="doesn't match" />{x.drift}</span> : x.live ? <span class="iu-ok"><HealthGlyph state="fine" size={12} />In sync</span> : <span class="faint">Checked when live</span>}</td>
                       </tr>
                     ))}
                   </tbody>

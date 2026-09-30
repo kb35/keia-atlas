@@ -14,6 +14,7 @@ import PageBand from '../../components/PageBand.astro';
 import FilterBar from '../../components/FilterBar.astro';
 import EmptyState from '../../components/EmptyState.astro';
 import LiveSide from '../../components/LiveSide.astro';
+import HealthGlyph from '../../components/HealthGlyph.astro';
 import { REGION_LABEL, href } from '../../lib/data.mjs';
 import { devicesModel, lean, CLASS_LABEL } from '../../lib/livemodel.mjs';
 
@@ -40,8 +41,8 @@ const find = (u, s) => `${u.n} ${u.host} ${u.mn} ${CLASS_LABEL[u.cls]} ${u.rn} $
 const json = JSON.stringify({ ...lean(model), base: href('/'), cls: CLASS_LABEL }).replace(/</g, '\\u003c');
 ---
 <Shell title="Devices overview" section="devices-overview" crumbs={[{ label: 'Devices', to: '/devices/' }, { label: 'Overview' }]} about={{ kind: 'page', label: 'Devices overview' }}>
-  <PageBand overline="Devices" title="Overview" lede="Simulated live from each unit's health. Real feeds replace this with the same shape." sim="live" numbers={NUMBERS}>
-    <span slot="overline" class="lv-live" data-lv-live title="A new moment every five seconds, the same in every window"><span class="lv-dot" aria-hidden="true"></span>Live</span>
+  <PageBand overline="Devices" title="Overview" answer={`${U.length.toLocaleString('en-IE')} units report in across ${SITES.length} places`} lede="Simulated live from each unit's health. Real feeds replace this with the same shape." sim="live" numbers={NUMBERS}>
+    <span slot="overline" class="lv-live" data-lv-live title="A new moment every five seconds, the same in every window"><HealthGlyph state="fine" size={12} quiet class="lv-dot" title="The feed is running" />Live</span>
   </PageBand>
 
   <div class="content lvd lv-page" data-lv="devices">
@@ -231,6 +232,7 @@ const json = JSON.stringify({ ...lean(model), base: href('/'), cls: CLASS_LABEL 
         const n: Record<string, number> = { online: 0, alert: 0, offline: 0, fw: 0 };
         model.units.forEach((u: any, i: number) => { n[snap.units[i].st]++; if (u.fw) n.fw++; });
         number('lv-on', n.online, ''); number('lv-off', n.offline, 'bad'); number('lv-al', n.alert, 'warn'); number('lv-fw', n.fw, 'warn');
+        if (W.rsAnswer) W.rsAnswer(n.offline || n.alert ? `${n.offline} ${n.offline === 1 ? 'unit' : 'units'} offline, ${n.alert} alerting · ${n.online.toLocaleString('en-IE')} online` : `All ${n.online.toLocaleString('en-IE')} units online`);
         firstNumbers = false;
       }
 

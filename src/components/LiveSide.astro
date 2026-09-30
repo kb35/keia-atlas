@@ -13,6 +13,7 @@
                       overview never expands in place; the page's own filtered view, '?status=problem')
    The feed keeps a fixed number of rows of one height, so it never changes size (motion.md, M6). */
 import Section from './Section.astro';
+import HealthGlyph from './HealthGlyph.astro';
 interface Props { attention: string; feedTitle: string; none: string; note: string; attentionTo?: string; attentionPlace?: string }
 const { attention, feedTitle, none, note, attentionTo, attentionPlace } = Astro.props;
 ---
@@ -23,7 +24,7 @@ const { attention, feedTitle, none, note, attentionTo, attentionPlace } = Astro.
     <p class="lv-none" data-att-none hidden>{none}</p>
   </Section>
   <Section title={feedTitle} class="card lv-card lv-feed" id="feed">
-    <span slot="aside" class="lv-meta"><span class="lv-dot" aria-hidden="true"></span><span data-feed-clock>Updating</span></span>
+    <span slot="aside" class="lv-meta"><HealthGlyph state="fine" size={12} quiet class="lv-dot" title="The feed is running" /><span data-feed-clock>Updating</span></span>
     <ol class="lv-feed-list" data-feed></ol>
     <p class="lv-none" data-feed-none hidden>Nothing has happened here in the last hour.</p>
     <p class="lv-note">{note}</p>
@@ -59,18 +60,20 @@ const { attention, feedTitle, none, note, attentionTo, attentionPlace } = Astro.
   .lv-none[hidden] { display: none; }
   .lv-note { margin: 10px 0 0; font-size: 12px; line-height: 1.45; color: var(--text-3); }
 
-  /* The live pulse: in the band's overline and beside the feed. It breathes; with reduced motion it is still. */
-  .lv-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex: none; animation: pulse var(--dur-pulse) ease-in-out infinite; --accent: var(--green); }
-  .lv-live { display: inline-flex; align-items: center; gap: 6px; font: 700 11px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--green-ink); }
-  .lv-paused .lv-dot { animation: none; background: var(--grey); }
+  /* The live mark: in the band's overline and beside the feed. A quiet Fine glyph that never moves (the pulse is retired);
+     it goes Off while the window is hidden and the feed pauses. */
+  .lv-meta .lv-dot { flex: none; }
+  .lv-live { display: inline-flex; align-items: center; gap: 6px; font: 700 11px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }
+  .lv-paused .lv-meta .lv-dot { color: var(--h-off); }
 
   /* Needs attention: one row per thing, a room or a unit, worst first. */
   .lv-att-list, .lv-feed-list { list-style: none; margin: 0; padding: 0; display: grid; }
-  .lv-ar { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 4px 10px; align-items: start; padding: 9px 4px; border-top: var(--border-rule); }
+  .lv-ar { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 4px 10px; align-items: start; padding: 9px 4px; border-top: var(--border-rule); }
   .lv-ar:first-child { border-top: 0; }
   .lv-ar[hidden] { display: none; }
-  .lv-ar > i { width: 10px; height: 10px; margin-top: 4px; border-radius: 50%; background: var(--red); }
-  .lv-ar > i[data-r="1"], .lv-ar > i[data-r="2"], .lv-ar > i[data-r="3"] { background: var(--amber); }
+  /* Each row's mark is the health glyph's shape (base.css masks): the worst (rank 0) a Fault, the rest To review. */
+  .lv-ar > i { width: 12px; height: 12px; margin-top: 3px; background: var(--h-fault); -webkit-mask: var(--hg-mask-fault) center / contain no-repeat; mask: var(--hg-mask-fault) center / contain no-repeat; }
+  .lv-ar > i[data-r="1"], .lv-ar > i[data-r="2"], .lv-ar > i[data-r="3"] { background: var(--h-review); -webkit-mask-image: var(--hg-mask-review); mask-image: var(--hg-mask-review); }
   .lv-ar-b { min-width: 0; display: grid; gap: 1px; }
   .lv-ar-b > a { color: inherit; text-decoration: none; font-weight: 700; font-size: 14px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lv-ar-b > a:hover { text-decoration: underline; text-underline-offset: 2px; }
@@ -87,7 +90,7 @@ const { attention, feedTitle, none, note, attentionTo, attentionPlace } = Astro.
   .lv-et { font: 600 12px/1 var(--font-mono); color: var(--text-3); font-variant-numeric: tabular-nums; }
   .lv-ek { align-self: stretch; margin: 9px 0; border-radius: 2px; background: var(--grey); }
   .lv-ev[data-k=use] .lv-ek, .lv-ev[data-k=call-on] .lv-ek { background: var(--blue); }
-  .lv-ev[data-k=free] .lv-ek, .lv-ev[data-k=clear] .lv-ek, .lv-ev[data-k=online] .lv-ek, .lv-ev[data-k=cleared] .lv-ek { background: var(--green); }
+  .lv-ev[data-k=free] .lv-ek, .lv-ev[data-k=clear] .lv-ek, .lv-ev[data-k=online] .lv-ek, .lv-ev[data-k=cleared] .lv-ek { background: var(--quiet); } /* fine is not coloured */
   .lv-ev[data-k=problem] .lv-ek, .lv-ev[data-k=offline] .lv-ek { background: var(--red); }
   .lv-ev[data-k=alert] .lv-ek { background: var(--amber); }
   .lv-ev[data-k=call-off] .lv-ek { background: color-mix(in srgb, var(--blue) 45%, var(--surface-3)); }
@@ -176,5 +179,4 @@ const { attention, feedTitle, none, note, attentionTo, attentionPlace } = Astro.
   .lv-pk-st[data-st=online]::before { background: var(--green); } .lv-pk-st[data-st=offline]::before { background: var(--red); }
   .lv-pk-st[data-st=offline] { color: var(--red-ink); } .lv-pk-st[data-st=alert]::before { background: var(--amber); } .lv-pk-st[data-st=alert] { color: var(--amber-ink); }
 
-  @media (prefers-reduced-motion: reduce) { .lv-dot { animation: none; } }
 </style>

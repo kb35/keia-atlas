@@ -6,6 +6,7 @@ import Guide from '../../layouts/Guide.astro';
 import RoomScene from '../../components/RoomScene.astro';
 import DeviceArt from '../../components/DeviceArt.astro';
 import GuideLive from '../../components/GuideLive.astro';
+import HealthGlyph from '../../components/HealthGlyph.astro';
 import { spaces, sites, KIND, href } from '../../lib/data.mjs';
 import { incidentList, byUrgency } from '../../lib/incidents.mjs';
 import { roomGuide, knownWords, GUIDE_KINDS, PLATFORMS } from '../../lib/guide.mjs';
@@ -28,6 +29,8 @@ const G = `/guide/${room}/`;
 const startArt = g.bar?.model ?? g.monitor?.model;
 const startCls = g.bar?.class ?? g.monitor?.class ?? 'display';
 const sub = [office, floor, seats ? `${seats} seats` : null].filter(Boolean).join(' · ');
+// The answer, in the employee's words: is this space working, and do we already know if not.
+const ANSWER = known.length ? `We know about ${known.length === 1 ? 'a problem' : `${known.length} problems`} here, and someone has it` : 'Everything in this space is working';
 ---
 <Guide title={title} office={office} home={G}>
   <div class="g-room" data-guide-room data-room={room}>
@@ -47,6 +50,7 @@ const sub = [office, floor, seats ? `${seats} seats` : null].filter(Boolean).joi
         <p class="g-over">{x.type.profile.name}</p>
         <h1 transition:name="g-room-title">{title}</h1>
         <p class="g-sub">{sub}</p>
+        <p class="g-answer" data-help="band.answer"><HealthGlyph state={known.length ? 'fault' : 'fine'} size={16} title={ANSWER} /><span>{ANSWER}</span></p>
       </div>
       <div class="g-actions">
         <a class="g-act bad" href={href(`${G}report/`)}>
@@ -152,6 +156,7 @@ const sub = [office, floor, seats ? `${seats} seats` : null].filter(Boolean).joi
   .g-known :global(.g-ref) { font: 600 12px/1 var(--font-mono); color: var(--text-3); }
 
   .g-hero { display: grid; gap: 14px; }
+  .g-answer { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; font-size: 14.5px; color: var(--text); }
   .g-over { margin: 0; font: 600 12px/1.2 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
   .g-id h1 { font-size: clamp(28px, 7vw, 40px); line-height: 1.1; margin: 4px 0 4px; letter-spacing: -.01em; }
   .g-sub { margin: 0; color: var(--text-2); font-size: 15px; }

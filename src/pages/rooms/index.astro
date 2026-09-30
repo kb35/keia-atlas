@@ -7,13 +7,14 @@ import RoomPlanSprite from '../../components/RoomPlanSprite.astro';
 import FilterBar from '../../components/FilterBar.astro';
 import PageBand from '../../components/PageBand.astro';
 import EmptyState from '../../components/EmptyState.astro';
+import HealthGlyph from '../../components/HealthGlyph.astro';
 import { spaces, sites, spaceTypes, incidents, SITE_ORDER, KIND, KIND_LABEL, REGION_LABEL, INC_STATE, countryName, href } from '../../lib/data.mjs';
 import { NOW_YEAR, lifeOf } from '../../lib/refresh.mjs';
 import { PEOPLE } from '../../lib/demo.mjs';
 
 const STATUS = { service: 'In service', installing: 'Being installed', replacing: 'Being replaced', planned: 'Planned' };
 const statusOf = (s) => (s.positions.some((p) => p.legacy) ? 'replacing' : s.stages.deploy ? 'installing' : (s.stages.plan || s.stages.procure) && !s.stages.manage ? 'planned' : 'service');
-const LIGHT = { service: 'ok', installing: 'warn', replacing: 'warn', planned: 'off' };
+const LIGHT = { service: 'fine', installing: 'progress', replacing: 'progress', planned: 'planned' };
 const floorName = (s) => sites[s.site].floors?.find((f) => f.id === s.floor)?.name?.replace(/:.*$/, '') ?? null;
 const rooms = SITE_ORDER.flatMap((sid) => Object.values(spaces).filter((s) => s.site === sid).sort((a, b) => String(a.number ?? a.id).localeCompare(String(b.number ?? b.id), 'en', { numeric: true })));
 const units = (s) => s.positions.reduce((n, p) => n + p.units.length, 0);
@@ -40,6 +41,8 @@ const SORT = { options: [
 ] };
 const VIEWS = [{ value: 'cards', label: 'Cards', show: '[data-grid]' }, { value: 'list', label: 'List', show: '[data-list]' }];
 const withIssues = rooms.filter((s) => (openInc[s.id] ?? []).length > 0).length;
+const nInstalling = rooms.filter((s) => statusOf(s) === 'installing').length;
+const ANSWER = `${withIssues ? `${withIssues} ${withIssues === 1 ? 'space has' : 'spaces have'} an open incident` : 'No space has an open incident'} · ${nInstalling} being installed`;
 const NUMBERS = [
   { n: SITE_ORDER.filter((id) => sites[id].kind === 'office').length, label: 'Offices', fact: true },
   { n: rooms.filter((s) => statusOf(s) === 'installing').length, label: 'Being installed', to: '?status=installing' },
@@ -51,7 +54,7 @@ const SITES = Object.fromEntries(SITE_ORDER.map((sid) => {
 }));
 ---
 <Shell title="Spaces" section="rooms" crumbs={[{ label: 'Spaces' }]}>
-  <PageBand overline="Directory" title="Spaces" rec="dd-rooms" lede="Every space at every site. Hover a filter to open it; the list changes as you pick." numbers={NUMBERS} />
+  <PageBand overline="Directory" title="Spaces" rec="dd-rooms" answer={ANSWER} lede="Every space at every site. Hover a filter to open it; the list changes as you pick." numbers={NUMBERS} />
 
   <div class="content spaces">
     <RoomPlanSprite />
@@ -66,7 +69,7 @@ const SITES = Object.fromEntries(SITE_ORDER.map((sid) => {
           <a class:list={['rcard', { alert: (openInc[s.id] ?? []).length > 0 }]} href={href(`/rooms/${s.id}/`)} data-id={s.id} data-i={i} data-vk={s.id} data-kind={KIND(s)} data-fi data-find={R[i].q} data-f-region={R[i].region} data-f-site={s.site} data-f-kind={KIND(s)} data-f-type={s.space_type} data-f-status={st} data-t-issues={(openInc[s.id] ?? []).length ? '1' : undefined}>
             <span class="rc-plan" data-vt-rec={s.id}><svg class="rplan" viewBox="0 0 120 80" aria-hidden="true"><use href={`#rp-${s.space_type}`} /></svg></span>
             <span class="rc-body">
-              <span class="rc-top"><span class="mono rc-no">{s.number ?? sites[s.site].code}</span><i class="hl" data-state={n ? LIGHT[st] : 'off'} title={n ? STATUS[st] : 'No tracked devices'}></i></span>
+              <span class="rc-top"><span class="mono rc-no">{s.number ?? sites[s.site].code}</span><HealthGlyph state={(openInc[s.id] ?? []).length ? 'fault' : n ? LIGHT[st] : 'off'} size={12} title={(openInc[s.id] ?? []).length ? 'an open incident' : n ? STATUS[st] : 'No tracked devices'} /></span>
               <b>{s.name}</b>
               <small>{s.type.profile.name}</small>
               <small class="faint">{sites[s.site].name}{floorName(s) ? ` · ${floorName(s)}` : ''} · {n} {n === 1 ? 'device' : 'devices'}</small>
@@ -97,7 +100,7 @@ const SITES = Object.fromEntries(SITE_ORDER.map((sid) => {
                 <td>{sites[s.site].name}</td>
                 <td>{floorName(s) ?? ''}</td>
                 <td class="num">{units(s) + s.olderKit.length}</td>
-                <td><i class="hl" data-state={LIGHT[st]}></i> {STATUS[st]}</td>
+                <td><HealthGlyph state={LIGHT[st]} size={16} word={STATUS[st]} /></td>
                 <td>
                   {inc.map((x) => <span class="rc-st st-issue" title={x.short_description}>{x.number}</span>)}
                   {oldKit(s) > 0 && <span class="rc-st st-older">{oldKit(s)} older</span>}
@@ -213,17 +216,11 @@ const SITES = Object.fromEntries(SITE_ORDER.map((sid) => {
   .rlist tr[hidden] { display: none; }
   .rlist td a { color: inherit; text-decoration: none; } .rlist td a:hover { text-decoration: underline; }
   .rlist td .rc-st { margin: 0 4px 0 0; }
-  /* Radiate red: an open incident gives the room a soft pulsing red glow. Reduced motion gets a still red ring. */
-  .rcard.alert, .rlist tr.alert { --glow: var(--red, #d92d20); }
-  .rcard.alert { border-color: var(--glow); box-shadow: 0 0 0 1px var(--glow), 0 0 14px 1px color-mix(in srgb, var(--glow) 40%, transparent); animation: radiate var(--dur-pulse) ease-in-out infinite; }
-  .rlist tr.alert td { background: color-mix(in srgb, var(--glow) 9%, transparent); animation: radiate-row var(--dur-pulse) ease-in-out infinite; }
+  /* An open incident: a still fault outline and the Fault glyph (the pulsing glow is retired, MOTION-V2 §2). */
+  .rcard.alert, .rlist tr.alert { --glow: var(--h-fault); }
+  .rcard.alert { border-color: var(--glow); box-shadow: 0 0 0 1px var(--glow); }
+  .rlist tr.alert td { background: var(--h-fault-soft); }
   .rlist tr.alert td:first-child { box-shadow: inset 4px 0 0 var(--glow); }
-  @keyframes radiate { 0%, 100% { box-shadow: 0 0 0 1px var(--glow), 0 0 6px 0 color-mix(in srgb, var(--glow) 25%, transparent); } 50% { box-shadow: 0 0 0 1px var(--glow), 0 0 22px 4px color-mix(in srgb, var(--glow) 50%, transparent); } }
-  @keyframes radiate-row { 0%, 100% { background-color: color-mix(in srgb, var(--glow) 6%, transparent); } 50% { background-color: color-mix(in srgb, var(--glow) 16%, transparent); } }
-  @media (prefers-reduced-motion: reduce) {
-    .rcard.alert, .rlist tr.alert td { animation: none; }
-    .rcard.alert { box-shadow: 0 0 0 3px var(--glow); }
-  }
   @media (max-width: 760px) {
     .site-card { grid-template-columns: 1fr; }
     .room-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

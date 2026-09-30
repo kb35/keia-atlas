@@ -14,7 +14,7 @@ Every Keia Atlas page has the same slots in the same order and is built from the
 ## 2. Fill the slots, in this order
 
 1. `Shell` with `title`, `section`, `crumbs` (every step but the last a link) and `about`.
-2. `PageBand`: `overline` (the kind of thing, W9), `title`, `lede` (one line), `sim` or `stage` if needed, `numbers` (3 or 4, each a drill-down with `to`, or `fact: true`; rule P10), one `.btn.primary` in `slot="action"` if the page has a main action (W7). A list page that numbers elsewhere open sets `rec="dd-<path>"` (`dd-incidents` for `/incidents/`), so their figure flies into its title.
+2. `PageBand`: `overline` (the kind of thing, W9), `title`, `answer` (the one-line answer to "is it all right?", section 8), `lede` (what the page is; it becomes the answer line's tooltip), `sim` if needed (it also switches on the heartbeat), `source` for a connected record, `numbers` (3 or 4, each a drill-down with `to`, or `fact: true`; rule P10), one `.btn.primary` in `slot="action"` if the page has a main action (W7). A list page that numbers elsewhere open sets `rec="dd-<path>"` (`dd-incidents` for `/incidents/`), so their figure flies into its title.
 3. `<div class="content">`, and first inside it (lists and boards) `FilterBar`: find box "Find a ...", facets Region, Office, Kind, Status then the page's own, switches, then `views` and `sort`. The count is automatic.
 4. Main area: the list, or `<div class="g12 top">` with the picture (`s-7`, `stick`) and `SidePanel` (`s-5`).
 5. Secondary detail: tiles in `<div class="g12">` (`.card.side-card.s-4` each), then `Section`s (on an overview or summary, `to` and `place` for a short preview and "See all N in <place> →"; `showAll` only on a list's own page or for a few rows in a record), or `DetailTabs` when there are more than four.
@@ -39,16 +39,20 @@ Every Keia Atlas page has the same slots in the same order and is built from the
 
 | Part | Props | Slots |
 |---|---|---|
-| `PageBand` | `overline`, `title`, `lede?`, `sim?` (true: "Simulated"; `"live"`: "Simulated live"), `stage?`, `numbers?`, `rec?` (the record's id: the title takes the shared-element name) | `overline` (extra items), `lede`, `numbers`, `action` |
+| `PageBand` | `overline`, `title`, `answer` (section 8), `lede?`, `heartbeat?` (default on with `sim`; `{ window }` in seconds), `source?` (`{ from, ref?, at?, to?, stale? }`), `sim?` (true: "Simulated"; `"live"`: "Simulated live"), `numbers?`, `rec?` (the record's id: the title takes the shared-element name) | `overline` (extra items), `answer`, `lede`, `numbers`, `action` |
+| `HealthGlyph` | `state` (fine, review, fault, stale, progress, planned, off; ok, warn, bad map across), `size?` (12, 16, 24, 40), `word?`, `quiet?`, `title?` | |
+| `HealthKey` | `only?`, `open?`: the closed "Key" under a plan, map or set of small multiples | |
+| `Heartbeat` | `window?`, `feed?`, `large?` (used by `PageBand`) | |
+| `SourceMark` | `from`, `ref?`, `at?`, `to?`, `synced?`, `stale?`, `native?` (used by `PageBand`, and beside any borrowed figure) | |
 | `KeyNumbers` | `items: [{ n, label, to?, fact?, tone?, id? }]`, at most 4. `to` is the list it counts, filtered (P10); `fact: true` is the documented exception for a figure that counts no list | |
-| `SimTag` | `kind: 'simulated' \| 'stage:<n>'` (used by `PageBand`) | |
+| `SimTag` | `kind: 'simulated' \| 'live'` (used by `PageBand`) | |
 | `FilterBar` | `facets: [{ key, label, options, single?, value? }]`, `toggles`, `placeholder`, `noun`, `scope`, `views: [{ value, label, show, noun? }]`, `viewKey?`, `viewsHelp?` (a help key for the view switch), `sort: { options, value? }` | default (extra controls, left of the view switch) |
 | `DetailTabs` | `tabs: [{ id, label, count? }]`, `label?`, `initial?`, `param?` (a query name that also opens a tab, default `tab`) | one per tab, named by its `id` |
 | `SidePanel` | `title`, `meta?`, `sticky?`, `help?` | default, `head` |
 | `Section` | `title?`, `aside?`, `id?`, `showAll?`, `to?` (the page that owns the list: the section shows the first `showAll` and "See all N in <place> →", never expanding; P10), `place?` (the words after "in"), `carry?` (take this page's filters onto the link), `help?` (a help key for the heading), any other attribute (such as `data-fb-group`) goes on the section | default (mark the item list `data-items`; a `data-sa-btn` button, or with `to` an `<a data-sa-to>`, inside puts the button or link where you want it), `aside` |
 | `EmptyState` | `text`, `action?`, `to?`, `filter?` | |
 
-Scripts: `window.rsPanelSwap(panel, update)` changes a `SidePanel`'s content; `window.rsMarkChanged(el, who)` marks a live change; `window.rsKeyNumber(id, value, { label?, tone?, title? })` changes a band figure that was given an `id`; `window.rsWhoId()` is who this window is signed in as; a `FilterBar` fires `fb:sort` and `fb:view`, a `DetailTabs` fires `dt:change`.
+Scripts: `window.rsAnswer(text)` changes the band's answer sentence; `window.rsSetFeed('off' | 'on')` switches the demo feed (the heartbeat); `glyph(state, opts)` and `setGlyph(el, state)` from `src/lib/health.mjs` draw and change a health glyph (an inline script uses `<i class="hg-m" data-state>`); `window.rsPanelSwap(panel, update)` changes a `SidePanel`'s content; `window.rsMarkChanged(el, who)` marks a live change; `window.rsKeyNumber(id, value, { label?, tone?, title? })` changes a band figure that was given an `id`; `window.rsWhoId()` is who this window is signed in as; a `FilterBar` fires `fb:sort` and `fb:view`, a `DetailTabs` fires `dt:change`.
 
 Filter bar options worth knowing:
 
@@ -163,3 +167,55 @@ The frame (sidebar, top bar, place tabs, padding) and the shared parts already c
 - A board: `repeat(4, minmax(0, 1fr))`, then 2, then 1 column, by the width of `content`.
 - A timeline or gantt: narrow the name column, then put each name above its bar (`ScheduleYear.astro`).
 - A closed pop-up takes no room (`display: none`, with `@starting-style` for its fade in); a hidden one past the window's edge widens the page.
+
+## 8. The answer sentence (v2, UI-V2 §8.1)
+
+Every page's band answers "is it all right?" in one line, before any figure or detail: `PageBand answer`. It leads with what someone has to act on, and says so calmly when nothing needs anyone. At most 25 words; it fits one line at 1440 px and two at 375. Plain words, no retired word (escalate, tier, blocked, pending, error, failed, overdue, warning, critical, stage, needs you); Space, Manufacturer, Known error, Waiting on, To review, Fault and Not working are the words. No person's name beside a count.
+
+On a page that reads a feed the sentence ends with the heartbeat, "checked 40 s ago" (on by default with `sim`, or `heartbeat`). When the feed is quiet for longer than its window it reads "Not reporting since 13:15" in fault ink with the dashed glyph, and the page gets `data-stale`: a stale feed counts as a fault. To show it in the demo, add `?feed=off` to any address (`?feed=on` puts it back).
+
+A live page keeps its sentence current with `window.rsAnswer(text)` from the same simulation as its figures. The sentences, with `{n}` for a number:
+
+| Page | Answer |
+|---|---|
+| Home | per role: technician "{Office}: {n} open incidents · {n} jobs today" or "{Office}: {n} spaces, no open incidents · …"; engineers "{n} open tasks, {n} tasks waiting on something · {n} jobs today"; service managers "{n} items for your approval · {n} open incidents"; project and programme managers "{n} projects, nothing waiting on anyone"; head "All {n} offices running, no open incidents"; service desk "{n} new incidents to take · {n} in progress"; vendors "No snags in your installation · {n} jobs today"; people managers "{n} open tasks in your team, …" |
+| Locations overview (live) | "{n} spaces not working now · {n} of {n} offices open", or "All {n} spaces working · …" |
+| Region, office (live) | "{n} spaces not working now", or "All {n} spaces working" |
+| Offices | "{n} open incidents across {n} offices · {n} people on site" |
+| Home offices | "{n} home offices with an open incident · {n} of {n} in use today" |
+| Office in 3D | "Every copper run within 90 m · fullest tray at {n}% of its limit" |
+| Space | the open incident first, "{title} · With {first name} · {n} more open"; else "All {n} units in service · no open incidents" (or missing, being installed, being replaced; comms rooms their standard; IT stores their minimums) |
+| Spaces | "{n} spaces have an open incident · {n} being installed" |
+| Unit (device) | the open incident's title; else "{status} · no open incidents · {n} advisories to review" |
+| Units | "{n} units have an open incident · {n} being installed" |
+| Devices overview (live) | "{n} units offline, {n} alerting · {n} online", or "All {n} units online" |
+| Services (live) | "All 3 services within target", or "{n} service past target · {n} services to review · {n} within target" |
+| A service (live) | "Within target · all {n} working", or "Past target · {n} offline, {n} alerting" |
+| Incidents | "{n} open, {n} high priority · {n} new, not taken yet" |
+| Incident | "In progress · With {first name} · open for {time}"; "On hold · waiting on {what}"; "New, not taken yet · open for {time}"; "Resolved: {how} · took {time}". Source mark: the ticket system, number and time |
+| Known errors | "{n} to review · {n} known errors affect {n} units" |
+| Known error | "{n} units run an affected version · fixed in {version}" (or "no fix yet") |
+| Manufacturer case | "Waiting on {manufacturer} · investigating" |
+| Work, Work list | "{n} incidents open · no task past due"; "{n} items with nobody yet · {n} items waiting on something" |
+| Schedule | "{n} items need cover · {n} people over-booked in the next 4 weeks" |
+| Projects | "{n} open projects · {n} past target · {n} tasks waiting on something" |
+| Project | "{Phase} gate due {date} · {n} open tasks, none waiting" |
+| Task | "{status} · due in {n} days" |
+| Deploy, batch, space test, build sheet | "{n} of {n} units set up · nothing waiting on you"; "{n} units checked, ready to accept · {n} of {n} set up"; "Signed off · {n} of {n} tests passed"; "{n} values not recorded yet · {n} settings to set, {n} to check" |
+| Work report | "{n} of {n} tasks done · {n} differences from the plan" |
+| Work plan | "{n} devices due by {year} · {n} not yet in a project" |
+| Planning | "{year}: {n} devices due with no project yet · technician hours at {n}%" |
+| Lab | "{n} test waiting for a decision · {n} on the bench" |
+| Proposals, Propose an edit | "{n} proposals to review · {n} sent back for changes"; "Nothing changes until it is approved · {n} kinds of edit to propose" |
+| Space types, a space type | "{n} space types · {n} spaces built to them"; "{n} spaces built to it · no open incidents" |
+| Device types, a device type | "{n} kinds of device with advisories to review · {n} units in service"; "{n} units in service · {n} advisories to review" |
+| Models, a model | "{n} models past manufacturer support · {n} older models to replace"; "{n} units in service · {n} past planned life · firmware {status}" |
+| Setup guides, a setup guide | "{n} setup guides with drift to review · {n} being configured"; "{n} units don't match this setup guide · {n} still to configure" |
+| Standards, a standard, cable colours | "{n} of {n} standards in force · {n} new from {date}"; "Version {v}, in force since {date} · {n} rules that must be met" |
+| Playbooks, a playbook | "{n} live projects following {n} of {n} playbooks"; "Version {v} · {n} live projects following it" |
+| IT stores, a store, cables | "{n} stores below minimum · {n} stores due a count"; "{n} models below minimum · {n} spare units"; "{n} spare lines below minimum · {n} patched lines recorded" |
+| Usage, equipment usage | "{n} spaces with an open incident · {n}% of the week occupied"; "{n} devices with an open incident · {n} flagged to review" |
+| Team, vendors, vendor portal | "{n} of {n} staff on site today · {n} away"; "{n} snag open · {n} contract ending within 6 months"; "{n} devices to record · {n} waiting on Aigna's review" |
+| About, decisions, rule book, Learn, fields, Search | reference pages: what they hold ("{n} rules in {n} chapters · {n} known gaps still open", "Accepted {date} · in force") |
+| Room guide | "Everything in this space is working", or "We know about a problem here, and someone has it" |
+

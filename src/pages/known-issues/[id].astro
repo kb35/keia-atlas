@@ -51,10 +51,11 @@ const NUMBERS = [
   { n: 0, label: 'Incidents linked', to: '#incidents', id: 'linked' },
   { n: it.fixed_in ? it.fixed_in.split(/[.-]/).slice(0, 3).join('.') : it.status === 'wont-fix' ? 'None' : 'Not yet', label: 'Fixed in', to: '#the-fix' },
 ];
+const ANSWER = `${picHead} · ${it.fixed_in ? `fixed in ${it.fixed_in}` : it.status === 'wont-fix' ? 'no fix planned' : 'no fix yet'}`;
 const tellText = `Known error ${ref} (${it.maker}): ${it.symptom}${it.workaround ? ` Workaround: ${it.workaround.text}` : ''}`;
 ---
 <Shell title={`${ref}: ${it.title}`} section="known-issues" minStage={2} crumbs={[{ label: 'Work', to: '/work/' }, { label: 'Known errors', to: '/known-issues/' }, { label: it.maker, to: `/known-issues/?maker=${it.feed.id}` }, { label: ref }]} about={{ kind: 'known-issue', label: `${ref}, ${it.title}`, to: it.path }}>
-  <PageBand overline="Known error" title={it.title} lede={it.symptom} sim numbers={NUMBERS} rec={it.id}>
+  <PageBand overline="Known error" title={it.title} answer={ANSWER} lede={it.symptom} sim numbers={NUMBERS} rec={it.id}>
     <Fragment slot="overline">
       <span class="code" data-help="ki.ref">{ref}</span>
       <span>{it.maker}</span>
@@ -231,11 +232,12 @@ const tellText = `Known error ${ref} (${it.maker}): ${it.symptom}${it.workaround
   .ki-site { display: grid; color: inherit; text-decoration: none; font-size: 14px; } .ki-site:hover b { text-decoration: underline; }
   .ki-site small { font-size: 12px; }
   .ki-dots { display: flex; flex-wrap: wrap; gap: 4px; }
-  .ki-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--grey-soft); border: 1.5px solid var(--grey, #8a8a8a); transition: transform var(--dur-hover) var(--ease-settle); }
+  /* Each unit is a health glyph (the shape drawn by base.css masks): exposed To review, version not known Off, not exposed Fine. */
+  .ki-dot { display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 3px; transition: transform var(--dur-hover) var(--ease-settle); }
+  .ki-dot::before { content: ""; width: 12px; height: 12px; background: var(--h-off); -webkit-mask: var(--hg-mask-off) center / contain no-repeat; mask: var(--hg-mask-off) center / contain no-repeat; }
   a.ki-dot:hover, a.ki-dot:focus-visible { transform: scale(1.35); }
-  .ki-dot.st-exposed { background: var(--red, #d92d20); border-color: var(--red, #d92d20); }
-  .ki-dot.st-unknown { background: var(--amber-soft, #fff1cc); border-color: var(--amber, #c98a00); }
-  .ki-dot.st-safe { background: var(--green-soft, #dff3e4); border-color: var(--green, #2e9e58); }
+  .ki-dot.st-exposed::before { background: var(--h-review); -webkit-mask-image: var(--hg-mask-review); mask-image: var(--hg-mask-review); }
+  .ki-dot.st-safe::before { background: var(--h-fine); -webkit-mask-image: var(--hg-mask-fine); mask-image: var(--hg-mask-fine); }
   .ki-sn { text-align: right; font-size: 13px; }
   .t-bad { color: var(--red-ink, #9a2318); } .t-warn { color: var(--amber-ink, #7a5600); }
   .ki-key { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0; font-size: 12.5px; }

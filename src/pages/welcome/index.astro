@@ -1,0 +1,239 @@
+---
+// The front door (FRONT-DOOR.md; UI-V2 section 3.9; UX-V2 section 2.7). Five seconds: the sentence, the live plan
+// and two doors. One minute: the five ideas and one morning. Ten minutes: a path per audience, then the limits,
+// the proof and how to get involved. Every door is open: no sign-up, no form, no "request a demo".
+//
+// Why /welcome/ and not the root: the console's Home is "/" and is linked from the sidebar, the mark, lessons,
+// help cards and every role's first screen. Moving it would touch the shared navigation other work is changing,
+// and break the demo's first screen. /welcome/ adds a page and changes nothing that exists.
+import Front from '../../layouts/Front.astro';
+import HeroPlan from '../../components/front/HeroPlan.astro';
+import MorningStrip from '../../components/front/MorningStrip.astro';
+import IdeaArt from '../../components/method/IdeaArt.astro';
+import { readdirSync, statSync } from 'node:fs';
+import path from 'node:path';
+import { href, sites, spaces, models } from '../../lib/data.mjs';
+import { NAME, LINE, SENTENCE, LINKS } from '../../lib/brand.mjs';
+import { IDEAS } from '../../lib/method.mjs';
+
+const PATHS = [
+  {
+    id: 'run', door: 'I run IT', who: 'Engineers, technicians, service desk',
+    lead: 'Break a space in the demo, then check the words, the limits and the source.',
+    steps: [
+      { label: 'Open the demo as Liam, the Dublin technician', to: href('/'), as: 'liam' },
+      { label: `Read one idea: ${IDEAS[1].name}`, to: href(`/method/${IDEAS[1].slug}/`) },
+      { label: 'Check the words against ITIL and ISO/IEC 20000', to: href('/method/words/') },
+      { label: 'Read what is restricted by default', to: href('/method/trust/') },
+      { label: 'Read the source and the licence', to: LINKS.source },
+    ],
+  },
+  {
+    id: 'lead', door: 'I lead IT', who: 'Heads of IT, workplace and service owners',
+    lead: 'Rooms that work when meetings start, fewer site visits, one record your auditors can read, no licence per seat.',
+    steps: [
+      { label: 'The problems it answers, with sources and years', to: href('/method/problems/') },
+      { label: 'Why IT can trust it: owners, caps, the audit log', to: href('/method/trust/') },
+      { label: 'How it maps to ITIL, PMI and ISO', to: href('/method/words/') },
+      { label: 'Open the demo as Claire, head of the service', to: href('/'), as: 'claire' },
+    ],
+    next: 'Next: a cost model with its assumptions as editable figures, and a pilot plan (one site, thirty days, a success measure, a stop rule).',
+  },
+  {
+    id: 'use', door: 'I use the rooms', who: 'Everyone who books a room or works from home',
+    lead: 'When a room or your kit does not work: scan the code, tap the symptom, and a named person sees it.',
+    steps: [
+      { label: 'Open the room guide for 3.09 Whooper Swan', to: href('/guide/dub-3-09/') },
+      { label: 'Report a fault in two taps; nothing else is required', to: href('/guide/dub-3-09/') },
+    ],
+  },
+];
+const STATUS = [
+  { word: 'Real today', what: 'Schemas, validation, floor plans, drawings, build sheets, the room guide. Repo mode: your estate as YAML in Git.' },
+  { word: 'Simulated', what: 'Live health, bookings, every connector, and any automatic work. The page says so wherever a figure is simulated.' },
+  { word: 'Next', what: 'The API, export, database mode. An order, not dates: the roadmap.', to: LINKS.roadmap },
+  { word: 'Out of scope', what: 'Laptops and phones.' },
+  { word: 'Connected, never owned', what: 'Real estate and space planning.' },
+  { word: 'Not planned', what: 'A certification as an entry fee.' },
+];
+// Figures counted from the repo when the site is built, each with the path that holds it.
+const walk = (d) => readdirSync(d).flatMap((n) => { const p = path.join(d, n); return statSync(p).isDirectory() ? walk(p) : [p]; });
+const schemaCount = walk(path.join(process.cwd(), 'schemas')).filter((f) => f.endsWith('.yaml') && !f.endsWith('registry.yaml')).length;
+const COUNTS = [
+  { n: Object.values(sites).filter((x) => x.kind === 'office').length, label: 'offices, all fictional', path: 'data/sites/' },
+  { n: Object.keys(spaces).length, label: 'spaces, each with its devices', path: 'data/spaces/' },
+  { n: Object.keys(models).length, label: "device models, ports from makers' public documents", path: 'data/device-models/' },
+  { n: schemaCount, label: 'schemas; every record checked on build', path: 'schemas/' },
+];
+const PROOF = [
+  { name: 'Licence', what: 'Code under Apache 2.0; the method text under CC BY-SA 4.0.', to: LINKS.licence, link: 'LICENSE' },
+  { name: 'Source', what: 'Every page, schema and check in this site.', to: LINKS.source, link: 'github.com/kb35/keia-atlas' },
+  { name: 'Releases', what: 'What changed in each version, roughly monthly.', to: LINKS.releases, link: 'Releases' },
+  { name: 'Roadmap', what: 'What is next and what is under consideration.', to: LINKS.roadmap, link: 'ROADMAP.md' },
+  { name: 'Mapping', what: 'Every on-screen word against ITIL, PMI and ISO/IEC 20000.', to: href('/method/words/'), link: 'The words' },
+  { name: 'Security', what: 'Restricted by default: floor plans, camera and door positions, IP plans. Camera feeds are never stored.', to: LINKS.security, link: 'SECURITY.md' },
+];
+---
+<Front title={`${NAME}: ${LINE}`}>
+  <section class="fd-hero" aria-labelledby="fd-sentence">
+    <div class="fd-intro">
+      <p class="fd-line">{LINE}</p>
+      <h1 id="fd-sentence">{SENTENCE}</h1>
+      <div class="fd-act">
+        <div class="fd-doors">
+          <a class="btn primary fd-door" href={href('/')} data-as="liam">See it in use <span class="fd-door-note">no sign-up</span></a>
+          <a class="btn fd-door" href={href('/method/')}>The Keia Method <span class="fd-door-note">ten minutes</span></a>
+        </div>
+        <p class="fd-proof">Apache 2.0 · method CC BY-SA 4.0 · v0.1 preview · live figures simulated, and say so</p>
+      </div>
+    </div>
+    <HeroPlan />
+  </section>
+
+  <section class="fd-screen" aria-labelledby="fd-ideas">
+    <p class="fd-over">Level 1 · one minute</p>
+    <h2 id="fd-ideas">Five ideas run the whole method</h2>
+    <ol class="fd-ideas">
+      {IDEAS.map((i) => (
+        <li>
+          <a class="fd-idea" href={href(`/method/${i.slug}/`)}>
+            <IdeaArt idea={i.slug} />
+            <span class="fd-idea-n">{i.n}</span>
+            <b>{i.name}</b>
+            <span class="fd-idea-line">{i.line}</span>
+          </a>
+        </li>
+      ))}
+    </ol>
+  </section>
+
+  <section class="fd-screen" aria-labelledby="fd-morning">
+    <p class="fd-over">Worked example · simulated</p>
+    <h2 id="fd-morning">One morning: a video bar fails at 07:52 and is fixed by 08:31</h2>
+    <MorningStrip />
+  </section>
+
+  <section class="fd-screen" aria-labelledby="fd-paths">
+    <p class="fd-over">Ten minutes</p>
+    <h2 id="fd-paths">Three paths, ten minutes each</h2>
+    <div class="fd-paths">
+      {PATHS.map((p) => (
+        <article class="fd-path" aria-labelledby={`fd-p-${p.id}`}>
+          <h3 id={`fd-p-${p.id}`}>{p.door}</h3>
+          <p class="fd-who">{p.who}</p>
+          <p class="fd-lead">{p.lead}</p>
+          <ol>
+            {p.steps.map((s) => <li><a href={s.to} data-as={s.as}>{s.label}</a></li>)}
+          </ol>
+          {p.next && <p class="fd-next">{p.next}</p>}
+        </article>
+      ))}
+    </div>
+    <p class="fd-also">New to IT service work? <a href={href('/method/')}>Start here: Level 1 on one screen</a>. Integrator or service partner? <a href={href('/vendor/')} data-as="sam">Open the demo as Sam, partner staff</a>.</p>
+  </section>
+
+  <section class="fd-screen" aria-labelledby="fd-not">
+    <p class="fd-over">Limits</p>
+    <h2 id="fd-not">What is real today, what is simulated, and what it will not do</h2>
+    <dl class="fd-status">
+      {STATUS.map((s) => <div><dt>{s.word}</dt><dd>{s.what}{s.to && <> <a href={s.to}>ROADMAP.md</a></>}</dd></div>)}
+    </dl>
+  </section>
+
+  <section class="fd-screen" aria-labelledby="fd-proof">
+    <p class="fd-over">Proof</p>
+    <h2 id="fd-proof">Everything is public: the code, the data, the method, the mapping</h2>
+    <dl class="fd-counts">
+      {COUNTS.map((c) => <div><dt>{c.label}</dt><dd class="fd-n">{c.n}</dd><dd><a href={`${LINKS.source}/tree/main/${c.path}`}><code>{c.path}</code></a></dd></div>)}
+    </dl>
+    <ul class="fd-proofs">
+      {PROOF.map((p) => <li><b>{p.name}</b><span>{p.what}</span><a href={p.to}>{p.link}</a></li>)}
+    </ul>
+  </section>
+
+  <section class="fd-screen" aria-labelledby="fd-join">
+    <p class="fd-over">Get involved</p>
+    <h2 id="fd-join">Add a device model, a connector or a better sentence</h2>
+    <ul class="fd-join">
+      <li><b>Contribute</b><span>A device model with cited facts, a connector, a fix to a page or to the method text.</span><a href={LINKS.contributing}>How to contribute</a></li>
+      <li><b>Ask</b><span>Questions and ideas, answered in public.</span><a href={LINKS.discussions}>GitHub Discussions</a></li>
+      <li><b>Run it</b><span>Your estate as YAML in a private repository; validation runs on every change.</span><a href={LINKS.gettingStarted}>Getting started</a></li>
+    </ul>
+  </section>
+</Front>
+
+<style>
+  .fd-hero { display: grid; gap: 28px; padding: 40px 0 16px; }
+  .fd-intro { display: grid; gap: 12px 48px; align-items: end; }
+  .fd-line { margin: 0; font-size: 14.5px; color: var(--text-2); }
+  .fd-intro h1 { margin: 0; font: 600 clamp(26px, 2.6vw, 32px)/1.2 var(--font-sans); letter-spacing: -.02em; color: var(--text); max-width: 36ch; text-wrap: balance; }
+  .fd-act { display: grid; gap: 10px; }
+  .fd-doors { display: flex; flex-wrap: wrap; gap: 12px; }
+  .fd-door { min-height: 44px; }
+  .fd-door-note { font: 500 12px/1 var(--font-mono); opacity: .8; }
+  .fd-proof { margin: 0; font: 500 12px/1.5 var(--font-mono); color: var(--text-3); }
+  @container fd (min-width: 1000px) {
+    .fd-intro { grid-template-columns: minmax(0, 1fr) auto; }
+    .fd-line { grid-column: 1 / -1; }
+    .fd-proof { text-align: right; }
+    .fd-doors { justify-content: flex-end; }
+  }
+
+  .fd-screen { display: grid; gap: 12px; padding-top: 72px; }
+  .fd-over { margin: 0; font: 500 10.5px/1.2 var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); }
+  .fd-screen h2 { font: 600 clamp(20px, 2vw, 24px)/1.25 var(--font-sans); letter-spacing: -.015em; margin: 0 0 12px; max-width: 40ch; }
+
+  .fd-ideas { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
+  .fd-ideas li { display: grid; min-width: 0; }
+  .fd-idea { display: grid; grid-template-rows: auto auto auto 1fr; gap: 6px; padding: 16px; border-radius: var(--radius-lg); background: var(--surface); border: var(--border-card); box-shadow: var(--shadow-sm); color: var(--text); text-decoration: none; transition: border-color var(--dur-hover) var(--ease-settle), box-shadow var(--dur-hover) var(--ease-settle); }
+  .fd-idea:hover { color: var(--text); border-color: var(--line-strong); box-shadow: var(--shadow-md); }
+  .fd-idea :global(.idea-art) { margin-bottom: 6px; }
+  .fd-idea-n { font: 500 12px/1 var(--font-mono); color: var(--text-3); }
+  .fd-idea b { font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+  .fd-idea-line { font-size: 13px; color: var(--text-2); }
+
+  .fd-paths { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .fd-path { display: grid; grid-template-rows: auto auto auto 1fr auto; gap: 8px; padding: 20px 22px; border-radius: var(--radius-lg); background: var(--surface); border: var(--border-card); box-shadow: var(--shadow-sm); min-width: 0; }
+  .fd-path h3 { font: 600 17px/1.2 var(--font-sans); letter-spacing: -.01em; }
+  .fd-who { margin: 0; font-size: 12.5px; color: var(--text-3); }
+  .fd-lead { margin: 0; font-size: 14px; }
+  .fd-path ol { margin: 4px 0 0; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; }
+  .fd-path li a { display: inline-block; padding: 4px 0; }
+  .fd-next { margin: 4px 0 0; font-size: 13px; color: var(--text-2); }
+  .fd-also { margin: 8px 0 0; font-size: 14px; color: var(--text-2); }
+
+  .fd-status { margin: 0; display: grid; border-top: 1px solid var(--line); }
+  .fd-status div { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .fd-status dt { font: 500 12.5px/1.5 var(--font-mono); color: var(--text-2); }
+  .fd-status dd { margin: 0; font-size: 14px; }
+
+  .fd-counts { margin: 0 0 16px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  .fd-counts div { display: grid; gap: 4px; align-content: start; }
+  .fd-counts dd { margin: 0; }
+  .fd-counts .fd-n { order: -1; font: 600 30px/1 var(--font-sans); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .fd-counts dt { font-size: 13px; color: var(--text-2); }
+  .fd-counts a { font-size: 12px; min-height: 24px; display: inline-flex; align-items: center; }
+  .fd-proofs, .fd-join { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .fd-proofs li, .fd-join li { display: grid; grid-template-rows: auto 1fr auto; gap: 6px; padding: 16px 18px; border-radius: var(--radius-lg); border: 1px solid var(--line); min-width: 0; }
+  .fd-proofs b, .fd-join b { font-size: 14px; font-weight: 600; }
+  .fd-proofs span, .fd-join span { font-size: 13px; color: var(--text-2); }
+  .fd-proofs a, .fd-join a { font-size: 13.5px; overflow-wrap: anywhere; min-height: 32px; display: inline-flex; align-items: center; }
+
+  @container fd (max-width: 1099px) {
+    .fd-ideas { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .fd-paths, .fd-proofs, .fd-join, .fd-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @container fd (max-width: 699px) {
+    .fd-hero { padding-top: 24px; }
+    .fd-screen { padding-top: 56px; }
+    .fd-ideas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .fd-paths, .fd-proofs, .fd-join { grid-template-columns: minmax(0, 1fr); }
+    .fd-status div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  }
+  @container fd (max-width: 459px) {
+    .fd-ideas { grid-template-columns: minmax(0, 1fr); }
+    .fd-idea { grid-template-columns: 96px minmax(0, 1fr); grid-template-rows: auto; column-gap: 14px; row-gap: 4px; }
+    .fd-idea :global(.idea-art) { grid-row: 1 / span 3; margin: 0; }
+    .fd-door { flex: 1 1 100%; justify-content: center; }
+  }
+</style>

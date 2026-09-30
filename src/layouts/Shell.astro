@@ -18,6 +18,7 @@ import '../styles/motion.css';
 import '../styles/nav.css';
 
 import { PEOPLE, TEAMS } from '../lib/demo.mjs';
+import { LINE } from '../lib/brand.mjs';
 import { MODULES, MODULE_DEFAULTS } from '../lib/modules.mjs';
 import { zoomTrail } from '../lib/zoom.mjs';
 import { springEasing } from '../lib/spring.mjs';
@@ -81,6 +82,8 @@ const NAV = [
     { id: 'changes', label: 'Proposals', to: '/changes/' },
   ] },
   { id: 'learn', label: 'Learn', to: '/learn/', icon: 'book', vendorOk: true, tabs: [] },
+  // The Keia Method (/method/): what Atlas is built on, below the rule beside Learn.
+  { id: 'method', label: 'Method', to: '/method/', icon: 'decisions', vendorOk: true, tabs: [] },
 ];
 const parent = NAV.find((n) => n.id === section || n.tabs.some((t) => t.id === section) || (n.also ?? []).includes(section));
 const tabs = parent && parent.tabs.length > 1 ? parent.tabs : [];
@@ -130,7 +133,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>{pageTitle}</title>
-  <meta name="description" content="Keia Atlas: the open-source platform for workplace technology and the IT work around it. A console for a made-up company, built on public device data and the Keia framework." />
+  <meta name="description" content={`Keia Atlas: ${LINE} A demo of a made-up company, built on public device data.`} />
   <script is:inline data-astro-rerun define:vars={{ VENDOR_IDS, WHO_ROLE, PEOPLE_LITE, MODULE_DEFAULTS, MOVED_HREF }}>window.RS_VENDORS = VENDOR_IDS; window.RS_WHO_ROLE = WHO_ROLE; window.RS_PEOPLE = PEOPLE_LITE; window.RS_MODULES = MODULE_DEFAULTS; window.RS_MOVED = MOVED_HREF;</script>
   <script is:inline data-astro-rerun>
     /* Small shared helpers for pages that keep demo records in this browser: read and write a JSON list
@@ -444,6 +447,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
             </div>
             <div class="am-links">
               <button type="button" role="menuitem" data-open-settings><Icon name="gear" size={16} />Settings</button>
+              <a role="menuitem" href={href('/welcome/')}><Icon name="globe" size={16} />Welcome page</a>
               <a role="menuitem" href={href('/about/')}><Icon name="about" size={16} />About</a>
               <a role="menuitem" href={href('/about/#decisions')}><Icon name="decisions" size={16} />Decisions</a>
             </div>
@@ -577,11 +581,11 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         });
       };
       window.rsSyncDemo();
-      /* Status lights: grey first, then light up one after another once they're on screen. */
-      var lights = document.querySelectorAll('.hl[data-state]:not(.lit)');
+      /* Health glyphs (M8): quiet first, then each comes on in turn, once, as it scrolls into view. */
+      var lights = document.querySelectorAll('.hg:not(.lit)');
       if (lights.length) {
-        var n = 0;
-        var light = function (el) { setTimeout(function () { el.classList.add('lit'); }, 350 + (n++ % 40) * 70); };
+        var n = 0, gap = (window.rsMotion && window.rsMotion().stagger) || 24;
+        var light = function (el) { setTimeout(function () { el.classList.add('lit'); }, 200 + (n++ % 40) * gap); };
         if ('IntersectionObserver' in window) {
           var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { io.unobserve(e.target); light(e.target); } }); }, { threshold: 0.5 });
           lights.forEach(function (el) { io.observe(el); });

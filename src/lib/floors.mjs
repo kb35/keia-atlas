@@ -25,7 +25,7 @@ import path from 'node:path';
 import { parse } from 'yaml';
 import { buildRoom, outletPlates, parseEnd, devKey } from './room3d.mjs';
 
-export const FICTION = 'Fictional floor plan: room sizes from the room profiles; layout, trays and cable lengths made up for the demo.';
+export const FICTION = 'Fictional floor plan: space sizes from the space types; layout, trays and cable lengths made up for the demo.';
 export const U_M = 0.04445;              // one rack unit
 export const RACK_BASE_M = 0.1;          // plinth and castors under U1
 export const SLACK = { rack: 3, outlet: 0.3 };   // house: service loop at the panel, spare at the outlet

@@ -8,6 +8,7 @@
 // The choice, the view, the floors, the cables and their colouring stay in the address, so a view can be shared.
 import { prepare, snapshot, tickOf } from './livesim.mjs';
 import { every, esc, span } from './liveview.mjs';
+import { glyph, setGlyph } from './health.mjs';
 
 const W = window;
 const NARROW = '(max-width: 759px)';
@@ -71,7 +72,8 @@ export function mount(root) {
     return null;
   };
   const LIGHT = { ok: 'ok', warn: 'warn', bad: 'bad', idle: 'off' };
-  const light = (s, title) => (s ? `<span class="hl lit" data-state="${LIGHT[s] ?? 'off'}" title="${esc(title ?? HW[s] ?? '')}"></span>` : '<span class="o3-dot" aria-hidden="true"></span>');
+  // Each row's health glyph (UI-V2 §6); a hop with no health of its own keeps the plain path dot.
+  const light = (s, title) => (s ? glyph(LIGHT[s] ?? 'off', { size: 12, title: title ?? HW[s] ?? '' }) : '<span class="o3-dot" aria-hidden="true"></span>');
   const roomName = (r) => `${r.no ? `${r.no} ` : ''}${r.n}`;
   const base = () => D?.base ?? '/';
   const to = (p) => (p ? `${base()}${p.replace(/^\//, '')}` : null);
@@ -188,7 +190,7 @@ export function mount(root) {
     body.querySelectorAll('[data-h]').forEach((el) => {
       const h = el.dataset.h; if (!h) return;
       const s = unitIx.has(h) ? unitSt(h) ?? 'ok' : byId.run.has(h) ? runSt(byId.run.get(h)) : null;
-      const l = el.querySelector(':scope > .hl'); if (l && s) { l.dataset.state = LIGHT[s]; l.title = HW[s]; }
+      const l = el.querySelector(':scope > .hg'); if (l && s) setGlyph(l, LIGHT[s], { title: HW[s] });
     });
     if (st.sel) { const p = body.querySelector('[data-o3-pill]'); if (p) { const tmp = document.createElement('div'); tmp.innerHTML = head(st.sel); const np = tmp.querySelector('[data-o3-pill]'); if (np && np.outerHTML !== p.outerHTML) p.replaceWith(np); } }
     const att = body.querySelector('[data-o3-att]');

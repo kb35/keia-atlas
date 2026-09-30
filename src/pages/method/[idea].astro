@@ -1,0 +1,79 @@
+---
+// One page per idea (Level 2), always in the same order: name, line, paragraph, worked example, how to do it, why
+// it works (with its limits beside it), how to measure it, what it maps to; one picture to explore; then the thing
+// to try in the demo. Every word of method text comes from docs/keia-method.md (src/lib/method.mjs).
+import MethodPage from '../../components/method/MethodPage.astro';
+import SidePanel from '../../components/SidePanel.astro';
+import Section from '../../components/Section.astro';
+import ZoomStrip from '../../components/method/ZoomStrip.astro';
+import CaptureDemo from '../../components/method/CaptureDemo.astro';
+import DrillFrames from '../../components/method/DrillFrames.astro';
+import WithDemo from '../../components/method/WithDemo.astro';
+import FadeChecklist from '../../components/method/FadeChecklist.astro';
+import { IDEAS, part, moves, md, WORDS, WORDS_FOR, MAPS } from '../../lib/method.mjs';
+import { pageBySlug } from './_pages.mjs';
+
+export function getStaticPaths() {
+  return IDEAS.map((i) => ({ params: { idea: i.slug } }));
+}
+const idea = IDEAS.find((i) => i.slug === Astro.params.idea);
+const page = pageBySlug(idea.slug);
+const doIt = part(idea, /^What you do/);
+const see = part(idea, /^What you'll see/);
+const mv = part(idea, /^The moves/);
+const moveList = moves(mv?.text);
+const why = part(idea, /^Why it works/);
+const limits = part(idea, /^Limits/);
+const measure = part(idea, /^Measure/);
+// Anything else the section says ("Urgency when it is real", "Cover", "Progress, never points"...) belongs with how to do it.
+const known = /^(What you do|What you'll see|The moves|Why it works|Limits|Measure)$/;
+const more = idea.parts.filter((p) => !known.test(p.label));
+const maps = WORDS_FOR(MAPS[idea.slug]);
+const PICTURE = {
+  'start-from-the-building': { title: 'The zoom: region to port', Comp: ZoomStrip },
+  'capture-dont-ask': { title: 'Where each field came from', Comp: CaptureDemo },
+  'answer-first': { title: 'The answer, the list, the log', Comp: DrillFrames },
+  'own-it-hand-it-on': { title: 'The job moves; the record stays', Comp: WithDemo },
+  'learn-as-you-go': { title: 'The same guide, shorter each time', Comp: FadeChecklist },
+}[idea.slug];
+const Pic = PICTURE.Comp;
+---
+<MethodPage slug={idea.slug} title={idea.name} lede={idea.line} level={2} num={`${idea.num} · idea ${idea.n} of 5`} try={page.try}>
+  <div class="g12 top">
+    <section class="card pad s-7 mp-pic" aria-labelledby="pic-h">
+      <h2 id="pic-h">{PICTURE.title}</h2>
+      <Pic />
+    </section>
+    <SidePanel class="s-5" title="In one paragraph" meta={`Method ${idea.num}`} help="method.paragraph">
+      <div class="mp-side">
+        <p set:html={md(doIt.text)} />
+        <h3>Worked example</h3>
+        <p class="mp-example" set:html={md(idea.example)} />
+        {see && <p set:html={md(see.text)} />}
+      </div>
+    </SidePanel>
+  </div>
+  <Section title="How to do it">
+    <dl class="mp-parts">
+      {moveList ? moveList.map((x) => <div><dt>{x.move}</dt><dd set:html={md(x.meaning)} /></div>) : <div><dt>The moves</dt><dd set:html={md(mv.text)} /></div>}
+      {more.map((p) => <div><dt>{p.label}</dt><dd set:html={md(p.text)} /></div>)}
+    </dl>
+  </Section>
+  <Section title="Why it works, and its limits">
+    <dl class="mp-parts">
+      <div><dt>Why it works</dt><dd set:html={md(why.text)} /></div>
+      <div><dt>Limits</dt><dd set:html={md(limits.text)} /></div>
+    </dl>
+  </Section>
+  <Section title="How to measure it">
+    <div class="mp-prose"><p set:html={md(measure.text)} /></div>
+  </Section>
+  <Section title="What it maps to">
+    <div class="tablewrap card">
+      <table class="mp-table to-cards">
+        <thead><tr>{WORDS.head.map((h) => <th>{h}</th>)}</tr></thead>
+        <tbody>{maps.map((r) => <tr>{r.map((c) => <td set:html={md(c)} />)}</tr>)}</tbody>
+      </table>
+    </div>
+  </Section>
+</MethodPage>

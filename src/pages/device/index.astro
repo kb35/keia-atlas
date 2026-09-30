@@ -26,10 +26,10 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
 ---
 <Shell vendorOk title="Unit" section="devices" crumbs={[{ label: 'Units', to: '/devices/' }, { label: 'Find a unit' }]}>
   <div id="dv" data-dv data-words={JSON.stringify(words)}>
-    <PageBand overline="Unit" title="Find a unit">
+    <PageBand overline="Unit" title="Find a unit" heartbeat>
       <span slot="overline" data-dv-status hidden></span>
       <span slot="overline" data-dv-sim hidden><SimTag kind="simulated" /></span>
-      <span slot="lede" data-dv-lede>Search every unit by hostname, serial number, asset tag, space or model. Scanning an asset tag lands here.</span>
+      <span slot="answer" data-dv-lede>Search every unit by hostname, serial number, asset tag, space or model. Scanning an asset tag lands here.</span>
       <div slot="numbers" data-dv-kn></div>
     </PageBand>
     <div class="content dv-content">
@@ -126,7 +126,13 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
           (u.pw === false ? ' <a class="ss-chip bad" href="#security" data-help="unit.password-chip">Default password not changed</a>' : '');
         stEl.hidden = false;
         root.querySelector('[data-dv-sim]').hidden = !u.usage;
-        root.querySelector('[data-dv-lede]').innerHTML = esc(u.pos.role) + (m ? ', ' + esc(m.name) : '') + ', in <a href="' + L('rooms/' + u.room + '/') + '">' + esc(roomLabel(r)) + '</a> at ' + esc(s.name) + (s.city ? ', ' + esc(s.city) : '') + '.';
+        // The answer (UI-V2 §3.4): an open incident first; otherwise its status. Where it is goes in the line's tooltip.
+        var advN0 = m ? m.advisories.length : 0;
+        var answer = openInc.length ? openInc[0].title + (openInc.length > 1 ? ' · ' + (openInc.length - 1) + ' more open' : '')
+          : status + ' · no open incidents' + (advN0 ? ' · ' + advN0 + (advN0 === 1 ? ' advisory' : ' advisories') + ' to review' : '');
+        var lede = root.querySelector('[data-dv-lede]');
+        lede.textContent = answer;
+        var ans = lede.closest('p'); if (ans) ans.title = answer + '\n' + u.pos.role + (m ? ', ' + m.name : '') + ', in ' + roomLabel(r) + ' at ' + s.name + (s.city ? ', ' + s.city : '') + '.';
         root.querySelector('.dv-search').hidden = true;
         root.querySelector('[data-dv-results]').hidden = true;
         // Key numbers in the band: how many need attention, each a link to the card that holds them.
@@ -174,7 +180,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
             }).join('') + '</div></section>';
         }
 
-        // Known issues for this firmware (decision 0029): what the maker publishes about the version this unit runs.
+        // Known errors for this firmware (decision 0029): what the maker publishes about the version this unit runs.
         var kis = KI[u.tag] || [];
         if (kis.length) {
           body += '<section class="card dv-card" data-help="unit.known-issues" id="known-issues">' + head('Known errors for this firmware', '<a class="faint dv-aside" href="' + L('known-issues/') + '">All known errors</a>') +
@@ -311,7 +317,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
   .dv-hit-art { width: 70px; height: 36px; display: grid; place-items: center; color: var(--text-2); }
   .dv-hit-art svg, .dv-hit-art .model-art { max-width: 100%; max-height: 100%; }
 
-  /* Known issues for this firmware (decision 0029): one line each, a link to the known issue. */
+  /* Known errors for this firmware (decision 0029): one line each, a link to the known issue. */
   .dv-kis { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13.5px; }
   .dv-kis li { padding: 8px 12px; border-radius: var(--radius); background: var(--surface-2); overflow-wrap: anywhere; }
 
@@ -353,7 +359,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
   .dv-life li.done i { background: var(--text-2); border-color: var(--text-2); } .dv-life li.done::before, .dv-life li.now::before { background: var(--text-2); }
   .dv-life li.now { color: var(--text); font-weight: 700; }
   .dv-life li.now i { border-color: currentColor; background: currentColor; }
-  .dv-life li.now.manage i { color: var(--green); } .dv-life li.now.deploy i { color: var(--blue); } .dv-life li.now.retire i { color: var(--amber); } .dv-life li.now.plan i, .dv-life li.now.procure i { color: var(--violet); }
+  .dv-life li.now.manage i { color: var(--green-ink); } .dv-life li.now.deploy i { color: var(--blue-ink); } .dv-life li.now.retire i { color: var(--amber-ink); } .dv-life li.now.plan i, .dv-life li.now.procure i { color: var(--violet-ink); }
 
   /* Facts: where it is, and what identifies it. */
   .dv-facts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 24px; }

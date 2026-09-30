@@ -28,7 +28,6 @@
   --dur-pop: 200ms;     /* menus, peek cards and popovers appearing */
   --dur-flash: 800ms;   /* a status light's one flash when it gets its result */
   --dur-blink: 1.1s;    /* a link light's blink (rack views): on, off, on */
-  --dur-pulse: 2.4s;    /* the slow pulse of something that needs attention (a fault, radiate red) */
   --dur-flow: 800ms;    /* one lap of signal flowing along a wire (an even loop) */
   --dur-fill: 900ms;    /* a bar or ring filling to its value */
   --delay-enter: 120ms; /* enter: the beat after persistent things start moving */
@@ -125,30 +124,30 @@ main { view-transition-name: page; }
 :not(.is-changed) > .rs-changed-mark { opacity: 0; }
 
 /* ---------- Health lights: grey until checked, a spinner while checking, then one flash ----------
-   Green for healthy, red for not. The light keeps its colour afterwards; a failed one keeps a slow pulse. */
+   Green for healthy, red for not. The light keeps its colour afterwards and stays still (the fault pulse is retired). */
 .hc-rows .hr-c, .dv-checks .dv-c { width: 18px; height: 18px; border-radius: 50%; background: var(--surface-3); box-shadow: inset 0 0 0 1.5px var(--line-strong); color: #fff; transition: background var(--dur-state) var(--ease-settle); }
 .hc-rows .hr-c svg, .dv-checks .dv-c svg { width: 11px; height: 11px; stroke-width: 3; }
 .hc-rows .hr-c.checking, .dv-checks .dv-c.checking { background: transparent; box-shadow: none; }
 .hc-rows .hr-c.ok, .dv-checks .dv-c.ok { background: var(--green); box-shadow: none; animation: rs-flash-ok var(--dur-flash) var(--ease-settle); }
-.dv-checks .dv-c.bad, .hc-rows .hr-c.bad { background: var(--red); box-shadow: none; animation: rs-flash-bad var(--dur-flash) var(--ease-settle), rs-bad-pulse var(--dur-pulse) var(--dur-flash) ease-in-out infinite; }
+.dv-checks .dv-c.bad, .hc-rows .hr-c.bad { background: var(--red); box-shadow: none; animation: rs-flash-bad var(--dur-flash) var(--ease-settle); }
 .dv-checks .dv-c .x, .hc-rows .hr-c .x { opacity: 0; }
 .dv-checks .dv-c.bad .x, .hc-rows .hr-c.bad .x { opacity: 1; }
 .dv-checks .dv-c.bad svg:not(.x) { opacity: 0 !important; }
 @keyframes rs-flash-ok { 0% { transform: scale(.5); box-shadow: 0 0 0 0 color-mix(in srgb, var(--green) 70%, transparent); } 45% { transform: scale(1.35); } 100% { transform: scale(1); box-shadow: 0 0 0 12px transparent; } }
 @keyframes rs-flash-bad { 0% { transform: scale(.5); box-shadow: 0 0 0 0 color-mix(in srgb, var(--red) 70%, transparent); } 45% { transform: scale(1.35); } 100% { transform: scale(1); box-shadow: 0 0 0 12px transparent; } }
-@keyframes rs-bad-pulse { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--red) 22%, transparent); } }
 @media (prefers-reduced-motion: reduce) { .hc-rows .hr-c, .dv-checks .dv-c { animation: none !important; } }
 
-/* Status lights anywhere (.hl[data-state]): grey on arrival, then each flashes to its colour in turn. */
-.hl { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--surface-3); box-shadow: inset 0 0 0 1.5px var(--line-strong); vertical-align: middle; transition: background var(--dur-state) var(--ease-settle), box-shadow var(--dur-state); }
-.hl.lit[data-state="ok"] { background: var(--green); box-shadow: none; animation: rs-flash-ok var(--dur-flash) var(--ease-settle); }
-.hl.lit[data-state="bad"] { background: var(--red); box-shadow: none; animation: rs-flash-bad var(--dur-flash) var(--ease-settle), rs-bad-pulse var(--dur-pulse) var(--dur-flash) ease-in-out infinite; }
-.hl.lit[data-state="warn"] { background: var(--amber, #E0A100); box-shadow: none; animation: rs-flash-ok var(--dur-flash) var(--ease-settle); }
-.hl.lit[data-state="off"] { background: var(--surface-3); }
-@media (prefers-reduced-motion: reduce) { .hl { animation: none !important; } }
+/* Health glyphs (.hg, HealthGlyph.astro), M8: drawn quiet on arrival, then each comes on in turn, once, as it
+   scrolls into view (the Shell adds .lit, --stagger apart). A later change of state eases in place over
+   --dur-state. Nothing pulses: stillness means fine, and a fault is told by its shape and word. */
+.hg { transition: color var(--dur-state) var(--ease-settle), opacity var(--dur-state) var(--ease-settle); }
+.hg:not(.lit) { color: var(--quiet); }
+.hg:not(.lit) svg { opacity: .45; }
+.hg.lit svg { animation: rs-hg-on var(--dur-flash) var(--ease-settle); }
+@keyframes rs-hg-on { from { opacity: .45; transform: scale(.7); } }
+.hg-m.lit { animation: rs-hg-on var(--dur-flash) var(--ease-settle); }
+@media (prefers-reduced-motion: reduce) { .hg, .hg svg, .hg-m { animation: none !important; transition: none !important; } }
 
-/* Radiate red (rule book D6): a card or row whose device has an open incident glows and slowly pulses.
-   Reduced motion gets a still red ring. Rooms and Devices still carry their own copies (Known gaps). */
-.rs-radiate { --glow: var(--red); border-color: var(--glow); box-shadow: 0 0 0 1px var(--glow), 0 0 14px 1px color-mix(in srgb, var(--glow) 40%, transparent); animation: rs-radiate var(--dur-pulse) ease-in-out infinite; }
-@keyframes rs-radiate { 0%, 100% { box-shadow: 0 0 0 1px var(--glow), 0 0 6px 0 color-mix(in srgb, var(--glow) 25%, transparent); } 50% { box-shadow: 0 0 0 1px var(--glow), 0 0 22px 4px color-mix(in srgb, var(--glow) 50%, transparent); } }
-@media (prefers-reduced-motion: reduce) { .rs-radiate { animation: none !important; box-shadow: 0 0 0 3px var(--glow); } }
+/* A card or row whose device has an open incident (rule book D6): a still fault outline. The pulse that used to
+   radiate from it is retired (MOTION-V2 §2); the glyph and its word say what is wrong. */
+.rs-radiate { --glow: var(--h-fault, var(--red)); border-color: var(--glow); box-shadow: 0 0 0 1px var(--glow); }

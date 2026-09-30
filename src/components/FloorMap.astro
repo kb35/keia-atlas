@@ -13,6 +13,7 @@
 // stay big enough to read and tap (as room plans do on cards, rooms.md R6); the words stay upright.
 import { building } from '../lib/floors.mjs';
 import { doorOf } from '../lib/office3d.mjs';
+import { shape } from '../lib/health.mjs';
 import Restricted from '../components/Restricted.astro';
 
 
@@ -36,6 +37,9 @@ const roomName = (r) => `${r.number ? `${r.number} ` : ''}${r.name}`;
 const apModel = (a) => (a.model === 'unifi-u7-pro-max' ? 'U7 Pro Max' : 'U7 Pro');
 const pick = (key, name) => (interactive ? { 'data-sel': key, tabindex: 0, role: 'button', 'aria-label': name, 'aria-pressed': 'false' } : {});
 const coreLabel = { stair: 'Stairs', lift: 'Lifts', riser: 'Riser', toilets: 'WC', store: 'Store' };
+// Each room's health glyph (UI-V2 §6), drawn at the room's centre under its number once the page gives the room a
+// live state (data-st): Fine (in --quiet: the plan colours nothing that is fine) or Fault. CSS shows the one that applies.
+const GLYPHS = `<g class="fm-g-fine">${shape('fine')}</g><g class="fm-g-fault">${shape('fault')}</g>`;
 ---
 {F && (
   <figure class:list={['floormap', { 'fm-pick': interactive }]} data-fm={floor} data-fm-w={W} data-fm-h={H} data-fm-pad={pad}>
@@ -60,6 +64,7 @@ const coreLabel = { stair: 'Stairs', lift: 'Lifts', riser: 'Riser', toilets: 'WC
               {door && <line class="fm-door" x1={door[0][0]} y1={Y(door[0][1])} x2={door[1][0]} y2={Y(door[1][1])} />}
               {r.geo.entry && r.count === 1 && <circle class="fm-entry" cx={r.geo.entry[0]} cy={Y(r.geo.entry[1])} r="0.18" />}
               <text x={(r.rect[0] + r.rect[2]) / 2} y={Y((r.rect[1] + r.rect[3]) / 2)}>{label(r)}</text>
+              {r.count <= 1 && <g class="fm-g" transform={`translate(${(r.rect[0] + r.rect[2]) / 2 - 0.4} ${Y((r.rect[1] + r.rect[3]) / 2) + 0.5}) scale(0.05)`} aria-hidden="true" set:html={GLYPHS} />}
             </g>
           );
         })}
@@ -152,18 +157,25 @@ const coreLabel = { stair: 'Stairs', lift: 'Lifts', riser: 'Riser', toilets: 'WC
   .fm-scale line { stroke: var(--ink); stroke-width: 0.1; }
   .floormap figcaption { font-size: 0.8rem; color: var(--text-2, var(--ink)); margin-top: 0.4rem; }
 
-  /* Chosen and live (set by the page's script). Room states: the same colours as the Rooms overview. */
+  /* Chosen and live (set by the page's script). The dark cockpit (UI-V2 §5.2): in use and free are neutral, and only a
+     space that is not working takes a colour, with the Fault glyph at its centre. Nothing pulses. */
   .fm-pick [data-sel]:not(.fm-run) { cursor: pointer; }
   .fm-pick [data-sel]:focus { outline: none; }
   .fm-pick [data-sel]:focus-visible > rect:not(.fm-hit), .fm-pick [data-sel]:focus-visible > circle:not(.fm-hit) { stroke: var(--focus, var(--accent)); stroke-width: 0.3; }
-  .fm-room[data-st=use] > rect { fill: color-mix(in srgb, var(--blue) 24%, var(--bg)); }
-  .fm-room[data-st=free] > rect { fill: color-mix(in srgb, var(--green) 20%, var(--bg)); }
+  .fm-room[data-st=use] > rect { fill: var(--surface-3); }
+  .fm-room[data-st=free] > rect { fill: var(--bg); }
   .fm-room[data-st=closed] > rect { fill: var(--surface-2); }
-  .fm-room[data-st=problem] > rect { fill: color-mix(in srgb, var(--red) 22%, var(--bg)); stroke: var(--red); stroke-width: 0.22; animation: fm-pulse var(--dur-pulse, 2.4s) ease-in-out infinite; }
-  .fm-ap[data-st=warn] circle:not(.fm-hit) { stroke: var(--amber); fill: var(--amber-soft); }
-  .fm-ap[data-st=bad] circle:not(.fm-hit) { stroke: var(--red); fill: var(--red-soft); stroke-width: 0.25; animation: fm-pulse var(--dur-pulse, 2.4s) ease-in-out infinite; }
-  .fm-rack[data-st=bad] rect:not(.fm-hit), .fm-rack[data-st=warn] rect:not(.fm-hit) { fill: var(--red); }
-  @keyframes fm-pulse { 50% { stroke-opacity: 0.35; } }
+  .fm-room[data-st=problem] > rect { fill: var(--h-fault-soft); stroke: var(--h-fault); stroke-width: 0.22; }
+  .fm-g { display: none; pointer-events: none; }
+  .fm-g :global(.hg-s) { fill: none; stroke: currentColor; stroke-width: 2.4; }
+  .fm-g :global(.hg-dot) { fill: currentColor; }
+  .fm-room[data-st=use] .fm-g, .fm-room[data-st=free] .fm-g, .fm-room[data-st=problem] .fm-g { display: inline; }
+  .fm-g :global(.fm-g-fine) { color: var(--quiet); } .fm-g :global(.fm-g-fault) { display: none; color: var(--h-fault); }
+  .fm-room[data-st=problem] .fm-g :global(.fm-g-fine) { display: none; } .fm-room[data-st=problem] .fm-g :global(.fm-g-fault) { display: inline; }
+  .fm-room[data-st=problem] text { fill: var(--h-fault-ink); }
+  .fm-ap[data-st=warn] circle:not(.fm-hit) { stroke: var(--h-review); fill: var(--h-review-soft); }
+  .fm-ap[data-st=bad] circle:not(.fm-hit) { stroke: var(--h-fault); fill: var(--h-fault-soft); stroke-width: 0.25; }
+  .fm-rack[data-st=bad] rect:not(.fm-hit) { fill: var(--h-fault); } .fm-rack[data-st=warn] rect:not(.fm-hit) { fill: var(--h-review); }
   .fm-nocables .fm-runs { display: none; }
   .fm-health .fm-run { stroke: var(--grey); }
   .fm-health .fm-run[data-st=ok] { stroke: var(--green); }
