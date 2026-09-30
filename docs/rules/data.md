@@ -81,7 +81,7 @@ Four labels. **Public**: facts about models (ports, drawings, datasheets, space 
 Each folder's default label is `classification` in `schemas/registry.yaml`. A field more sensitive than its folder carries `x-classification: Restricted` in its schema (install units' `default_password_changed`, vendors' `people`). Views worked out from several folders are listed in `RESTRICTED_VIEWS` (`src/lib/classification.mjs`). Wherever Restricted content shows, the page shows a small "Restricted: floor plan" label beside it (`src/components/Restricted.astro`).
 
 - **Why:** the model catalogue is open and shared, but a building's plan, addresses and weak spots are a map for an attacker (ISO 19650-5). The label on the schema means each new folder or field is classified when it is made.
-- **Do:** give every new folder a label in the registry; label a new sensitive field in its schema; put the Restricted label beside any new view of Restricted facts. Keep an estate repository private.
+- **Do:** give every new folder a label in the registry; label a new sensitive field in its schema; put the Restricted label beside any new view of Restricted facts. Keep a repository that describes real offices private.
 - **Don't:** label a folder Secret (the validator refuses it), or publish a real building's plan, camera positions or addresses, even from a friendly site.
 
 ### F11. Sensing devices carry a privacy record; models carry their security support

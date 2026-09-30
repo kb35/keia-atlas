@@ -137,7 +137,7 @@ These are not optional; the kit enforces most of them.
 - **Read only first.** v0 manifests may declare only `read`, and the runner refuses anything else. Writing comes later, one named action at a time, under a standing rule a person approves; a first-time or irreversible write always needs a person.
 - **Least privilege.** Ask the other system for a read-only credential scoped to exactly the objects the manifest lists. Declare every host the adapter may reach in `hosts`; a file adapter reaches none.
 - **Vault references, never values.** A credential appears in a manifest only as `vault:<entry name>`. The adapter asks the vault for a short-lived value when it runs and never stores it. The schema refuses anything else.
-- **No secrets in YAML.** Secret-looking fields are emptied on the way in and listed in `raw_redacted`; links may not carry a user name, password or token; `npm run validate` fails on any literal secret in `data/`. Treat an estate repository as Restricted and keep it private.
+- **No secrets in YAML.** Secret-looking fields are emptied on the way in and listed in `raw_redacted`; links may not carry a user name, password or token; `npm run validate` fails on any literal secret in `data/`. Treat a repository that describes your offices as Restricted and keep it private.
 - **Fixtures are made up.** No real hostnames, serials, addresses, people or ticket text, ever, even in a test.
 - **Untrusted text is data.** A device name or a ticket title from another system is shown, never followed as an instruction, by any tool or agent.
 
@@ -145,7 +145,7 @@ These are not optional; the kit enforces most of them.
 
 | Tier | Who keeps it | What it takes |
 |---|---|---|
-| **Community** | Anyone. Named owner in the manifest | A valid manifest, fixtures and tests that pass in CI. Unreviewed: off by default on a production estate, and a person turns it on knowing that |
+| **Community** | Anyone. Named owner in the manifest | A valid manifest, fixtures and tests that pass in CI. Unreviewed: off by default in production, and a person turns it on knowing that |
 | **Certified** | The Keia Atlas maintainers, or a partner under review | Everything above, plus a security review of the manifest (read-only scopes, hosts, vault references), tests against the vendor's sandbox where one exists, a named owner who answers issues, and a release that keeps the manifest stable |
 
 One certified connector per system: forks are welcome but never shown as equal. A connector with no release and no owner response for six months is marked stale, then archived with a notice, never silently removed. A partner tier for connectors kept by the vendor themselves may follow.

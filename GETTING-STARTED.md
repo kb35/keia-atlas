@@ -1,10 +1,10 @@
-# Getting started: run Keia Atlas for your own estate
+# Getting started: run Keia Atlas for your own offices
 
 Keia is a way of running IT from one living record of every room, device and job: kept by the work itself, readable in a minute, as deep as you need.
 
 Keia Atlas v0.1 is a preview: a working demo with simulated live data. Repo mode is real, which means everything you see is built from YAML files in `data/`, checked against the schemas in `schemas/`, and served as a static site. You can replace the demo data with your own and host the result anywhere static files can be served.
 
-> **Keep your estate safe**
+> **Keep your workplace data safe**
 > - Floor plans, camera and door positions and IP plans are sensitive. Treat them like keys.
 > - Use a private repository only. Fork or copy the code into one before you add a single real record.
 > - No passwords in YAML. Write a vault reference instead, such as `vault:site/admin-password`; `npm run validate` fails on a literal secret.
@@ -90,7 +90,7 @@ npm run preview    # serve dist/ locally to check it
 The build is static files in `dist/`. Any of these works:
 
 - **Any static host or web server.** Copy `dist/` to the server. Set `base` in `astro.config.mjs` to the path it will be served from before building.
-- **GitHub Pages.** Note that GitHub Pages sites are public unless your organisation is on a GitHub Enterprise plan with access control. Do not publish real estate data to public Pages.
+- **GitHub Pages.** Note that GitHub Pages sites are public unless your organisation is on a GitHub Enterprise plan with access control. Do not publish real data about your offices to public Pages.
 - **Docker.** A Dockerfile that builds the site and serves `dist/` with a small web server:
 
   ```sh
@@ -115,8 +115,24 @@ Ask, where present, says it is AI. Nothing here trains on your data.
 
 Everything else is real data handling: the schemas, the validator, the cross-reference checks, the build sheets worked out from your house values, the drawings, the floor plans and the 3D model.
 
-## 8. Where to go next
+## 8. Running it for real
 
+What you can run today is **repo mode**: your offices as YAML in a private Git repository, checked on every change, built into a static site you host behind your own sign-in. It suits one person or a small team who are happy to review every change like code, and it will stay fully supported.
+
+What a whole IT organisation needs on top of that is **database mode**, and it is designed but not built yet:
+
+- **Knowledge stays in Git** (the device catalogue, space types, standards, setup guides, playbooks, standing rules), reviewed like code. Edits made on a page become pull requests.
+- **Operations move to Postgres** (incidents, tasks, events, live status, ownership, audit), behind an API server with sign-in (single sign-on, SCIM, passkeys) and real roles.
+- **Automation runs for real:** standing rules executed by a worker, within caps and rings, with Undo or Roll back, every action through one gateway and logged.
+- **Connectors go live:** webhooks and polling instead of file imports, each connector sandboxed with short-lived credentials from your vault.
+- **Modules install and remove** as packages without breaking each other.
+- **It runs** from `docker compose up` for a small team to Kubernetes, Helm or OpenShift with high-availability Postgres for an enterprise.
+
+[docs/architecture.md](docs/architecture.md) is the design, with a table of what is built today and what is next. If you are choosing now: start in repo mode. Everything you write is the same YAML that database mode imports, so nothing is thrown away when you move up, and an export brings you back.
+
+## 9. Where to go next
+
+- [docs/architecture.md](docs/architecture.md) for how Keia Atlas is built to run in production.
 - `docs/rules/` is the rule book: how pages are laid out, how devices and rooms are drawn, how things move and how they are worded.
 - `docs/standards/new-device.md` for adding a model; `docs/standards/page-anatomy.md` for adding a page.
 - `docs/decisions/` records why things are the way they are.

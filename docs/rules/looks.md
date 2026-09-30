@@ -40,7 +40,7 @@ Each state has three tokens in every look and mode:
 
 The states are `fine`, `review`, `fault`, `progress`, `planned` and `off`.
 
-Fine is calm, not grey. A Fine glyph always has its own soft green-teal (`--h-fine`), on overviews too, so a healthy estate reads as healthy rather than off or unknown. The dark cockpit keeps overviews still, not colourless: To review, Fault and Not reporting stand out by a stronger colour, their shape and their word. Red at more than glyph size is only for a P1 or major incident, a safety matter or a live event at risk, and it leaves when that is over.
+Fine is calm, not grey. A Fine glyph always has its own soft green-teal (`--h-fine`), on overviews too, so a healthy workplace reads as healthy rather than off or unknown. The dark cockpit keeps overviews still, not colourless: To review, Fault and Not reporting stand out by a stronger colour, their shape and their word. Red at more than glyph size is only for a P1 or major incident, a safety matter or a live event at risk, and it leaves when that is over.
 
 Useful colour beyond health: each service and each lens has its own colour (`--svc-av`, `--svc-network`, `--svc-infrastructure`; `--lens-health`, `--lens-support`, `--lens-network`, `--lens-projects`, `--lens-vendors`, `--lens-knowledge`, in `src/styles/craft.css`), for charts, a section's accent and small highlights. They are chosen away from the health hues, are at least 3 to 1 in every look and mode, and never mean health.
 
