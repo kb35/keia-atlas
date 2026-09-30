@@ -1,0 +1,132 @@
+---
+// One change (Support › Changes). A standard change made by a standing rule's run reads, in its band, the run's one
+// line: "Unable to complete, rolled back · DNS rule (owner: Niamh) · 02:01 · How was this done?" (UX-V2 §4.5); below
+// it, the run's steps as they happened, the incident it raised, and the rule. A rule's approval and a normal change
+// show who proposed and approved it, what it touches and the incidents that name it.
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import SidePanel from '../../../components/SidePanel.astro';
+import Section from '../../../components/Section.astro';
+import HealthGlyph from '../../../components/HealthGlyph.astro';
+import WithChip from '../../../components/WithChip.astro';
+import HowCard from '../../../components/HowCard.astro';
+import Timeline from '../../../components/Timeline.astro';
+import RulesData from '../../../components/RulesData.astro';
+import LiveBar from '../../../components/LiveBar.astro';
+import { CHANGES, CHANGE_STATUS, CHANGE_KIND, changeById, changePath, rulePath, personName, firstName, RULES, runById, cardFor, lineFor, LOG_PATH } from '../../../lib/rules-view.mjs';
+import { at, seconds, RESULT, REVERSAL_WORD, rolledBack } from '../../../lib/rules.mjs';
+import { traceOf } from '../../../lib/audit.mjs';
+import { OWN, HISTORY } from '../../../lib/home.mjs';
+import { href, DEMO_TODAY, incidents, incidentPath, INC_STATE, spaces } from '../../../lib/data.mjs';
+
+export function getStaticPaths() { return CHANGES.map((c) => ({ params: { id: c.id.toLowerCase() } })); }
+const c = changeById(Astro.params.id.toUpperCase());
+const rule = c.rule ? RULES[c.rule] : null;
+const x = c.run ? runById(c.run) : null;
+const run = x?.run ?? null;
+const incs = (c.incidents ?? []).map((n) => Object.values(incidents).find((i) => i.number === n)).filter(Boolean);
+const card = run ? cardFor(run.id, { jobOwner: incs[0]?.keia_atlas.assigned ?? null }) : null;
+const space = c.space ? spaces[c.space] : null;
+const GLYPH = { auto: 'fine', 'unable-back': 'fault', unable: 'fault', approved: 'fine', done: 'fine' };
+const own = run ? { s: run.result === 'done' ? 'auto' : 'unable', rule: { name: rule.name, owner: rule.owner }, at: run.at } : null;
+const NUMBERS = run
+  ? [{ n: c.blast.replace(/ .*/, ''), label: 'Unit' }, { n: seconds(run.ms), label: 'Took' }, { n: incs.length, label: incs.length === 1 ? 'Incident raised' : 'Incidents', to: '#incidents' }]
+  : [{ n: incs.length, label: incs.length === 1 ? 'Incident names it' : 'Incidents name it', to: '#incidents' }];
+// The run's trace, as the record's timeline: each step with what it called and what came back.
+const TL = run ? traceOf(rule, run).map((l, i) => ({ at: `${run.at.slice(0, 10)}T${l.t.slice(0, 5)}`, order: i, kind: l.src === 'AI' ? 'rule' : l.src === 'Keia Atlas' ? 'rule' : 'connector', who: l.src === 'Keia Atlas' ? `rule: ${rule.name} (${firstName(rule.owner)})` : l.src, what: `${l.what}: ${l.got}`, sub: l.t, state: /Refused|Does not match/.test(l.got) ? 'fault' : /Restored/.test(l.got) ? 'review' : undefined })) : [];
+const title = run ? `${rule.name}: ${run.target}` : c.title;
+---
+<Shell about={{ kind: 'change', label: `${c.id} ${title}`, to: changePath(c.id) }} title={`${c.id} ${title}`} section="support-changes" crumbs={[{ label: 'Support', to: '/support/' }, { label: 'Changes', to: '/support/changes/' }, { label: c.id }]}>
+  <PageBand overline={`Change · ${CHANGE_KIND[c.kind]}`} title={title} numbers={NUMBERS} sim rec={c.id}>
+    <Fragment slot="overline"><span class="mono">{c.id}</span></Fragment>
+    <Fragment slot="answer">{run ? <>{lineFor(run.id).split(' · ')[0]} · owner {firstName(rule.owner)} · {at(run.at, DEMO_TODAY)} · <HowCard run={run.id} job={incs[0]?.keia_atlas.assigned ?? null} /></> : `${CHANGE_STATUS[c.status]} · ${c.approver ? `approved by ${personName(c.approver)}` : `owner ${personName(c.owner)}`} · ${c.blast}`}</Fragment>
+  </PageBand>
+
+  <div class="content chg-page" data-job-owner={incs[0]?.keia_atlas.assigned ?? ''}>
+    <RulesData />
+    <div class="g12 top">
+      {run ? (
+        <section class="card pad s-7 cr-steps" aria-labelledby="cr-s-h">
+          <h2 id="cr-s-h">Where it stopped</h2>
+          <ol class="cr-lights">
+            {rule.steps.map((s) => {
+              const stop = run.stopped_at, idx = rule.steps.findIndex((y) => y.kind === stop), me = rule.steps.findIndex((y) => y.kind === s.kind);
+              const st = !stop ? 'fine' : me < idx ? 'fine' : me === idx ? 'fault' : 'off';
+              return <li class={`cr-${st}`}><HealthGlyph state={st} size={16} word={st === 'fine' ? 'Done' : st === 'fault' ? 'Stopped here' : 'Not reached'} /><span>{s.words}</span></li>;
+            })}
+            {run.result === 'unable' && rolledBack(rule, run) && <li class="cr-fine"><HealthGlyph state="fine" size={16} word="Rolled back" /><span>Restored {run.before}</span></li>}
+          </ol>
+          {run.why && <p class="cr-why">{run.why}</p>}
+        </section>
+      ) : (
+        <section class="card pad s-7 cr-steps"><h2>What it changes</h2><p class="cr-why">{c.note}</p>{space && <p class="cr-why">Space: <a href={href(`/rooms/${space.id}/`)}>{space.number} {space.name}</a></p>}</section>
+      )}
+      <SidePanel class="s-5" title="The change" meta={CHANGE_KIND[c.kind]} help="change.facts">
+        <dl class="cr-f">
+          <div><dt>Status</dt><dd><HealthGlyph state={GLYPH[c.status] ?? 'fine'} size={12} title={CHANGE_STATUS[c.status]} /> {CHANGE_STATUS[c.status]}</dd></div>
+          <div><dt>Owner</dt><dd>{personName(c.owner)}</dd></div>
+          {c.kind === 'standard' && rule && <div><dt>Approved</dt><dd>Once, as the <a href={href(rulePath(rule.id))}>{rule.name}</a> ({rule.approved.change}, version {rule.approved.version ?? 1})</dd></div>}
+          {c.kind === 'normal' && c.approver && <div><dt>Approved by</dt><dd>{personName(c.approver)}</dd></div>}
+          {rule && <div><dt>Way back</dt><dd>{REVERSAL_WORD[rule.reversal.kind]}. {rule.reversal.words}</dd></div>}
+          <div><dt>Touches</dt><dd>{c.blast}</dd></div>
+          <div><dt>When</dt><dd>{at(c.at, DEMO_TODAY)}</dd></div>
+          {c.note && run && <div><dt>Note</dt><dd>{c.note}</dd></div>}
+        </dl>
+      </SidePanel>
+    </div>
+
+    {incs.length > 0 && (
+      <Section title={run ? 'The incident it raised' : 'Incidents that name it'} id="incidents" help="change.incidents">
+        <div class="list">
+          {incs.map((inc) => (
+            <div class="row cr-inc">
+              <span class="cr-g"><HealthGlyph state={inc.state === 'resolved' ? 'fine' : 'fault'} size={16} title={INC_STATE[inc.state]} /></span>
+              <span><a class="name" href={href(incidentPath(inc.number))}>{inc.short_description}</a><span class="sub mono">{inc.number} · P{inc.priority}{inc.priority_reason ? `, proposed: ${inc.priority_reason}` : ''} · {INC_STATE[inc.state]}</span></span>
+              <span class="end"><WithChip own={OWN[`inc:${inc.number}`] ?? null} item={`inc:${inc.number}`} history={HISTORY[`inc:${inc.number}`] ?? []} /></span>
+            </div>
+          ))}
+        </div>
+      </Section>
+    )}
+
+    {run && (
+      <Section title="The run, step by step" id="trace" aside="From the audit log" help="change.trace">
+        <Timeline entries={TL} today={DEMO_TODAY} id={`tl-${c.id}`} label="The run's trace" />
+        <p class="cr-log"><a href={`${href(LOG_PATH)}#run-${run.id}`}>Open the full trace in the log</a></p>
+      </Section>
+    )}
+    <LiveBar page={`change:${c.id}`} />
+  </div>
+  <script>
+    const W = window as any;
+    // Run again from this change's card goes to the incident it raised, where the job is.
+    document.addEventListener('astro:page-load', () => {
+      const a = document.querySelector<HTMLAnchorElement>('.cr-inc a.name'); if (!a) return;
+      W.rsRunAgain = () => { location.href = `${a.href}#do`; };
+    });
+  </script>
+</Shell>
+
+<style>
+  .chg-page { gap: 24px; padding-top: 18px; }
+  .cr-steps { display: grid; gap: 12px; align-content: start; }
+  .cr-steps h2 { margin: 0; font-size: var(--fs-h3); }
+  .cr-lights { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .cr-lights li { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; align-items: baseline; font-size: var(--fs-body); }
+  .cr-off span:last-child { color: var(--text-3); }
+  .cr-why { margin: 0; font-size: var(--fs-body); color: var(--text-2); }
+  .cr-f { margin: 0; display: grid; }
+  .cr-f div { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); font-size: var(--fs-body); }
+  .cr-f div:first-child { border-top: 0; }
+  .cr-f dt { color: var(--text-2); font-size: var(--fs-support); }
+  .cr-f dd { margin: 0; }
+  .cr-inc { grid-template-columns: 28px minmax(0, 1fr) auto; }
+  .cr-g { display: grid; place-items: center; }
+  .cr-log { margin: 12px 0 0; font-size: var(--fs-support); }
+  @media (max-width: 767px) {
+    .cr-lights li { grid-template-columns: 1fr; gap: 2px; }
+    .cr-f div { grid-template-columns: 1fr; gap: 2px; }
+    .cr-inc { grid-template-columns: 28px minmax(0, 1fr); }
+    .cr-inc .end { grid-column: 2; justify-content: flex-start; }
+  }
+</style>

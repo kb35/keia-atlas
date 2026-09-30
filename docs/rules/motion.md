@@ -191,6 +191,9 @@ Each interaction on a page is one of these rows (MOTION-V2 section 4), with its 
 | 33 | Wall mode | Nothing moves but a new signal and the heartbeat's words | Same |
 | 34 | Front door: the strip and the five ideas | Each tile grows in once as it scrolls into view, `--stagger` apart | Present at once |
 | 35 | Front door hero: the live plan | Glyphs on in turn, one breaks once, then the heartbeat; hover peeks; click zooms into the room | At once; the zoom is a cross-fade |
+| 36 | The suggestion after your call (P1, P2) | The folded suggestion opens once the call is saved: its box holds (`rsHold`) and eases to the new height; the suggestion rises 6 px and fades in over `--dur-enter` | Appears at once |
+| 37 | A timeline row arrives (a step of a run, a hand-off, a colleague's change) | Enters at its place in time, scaling from .97 over `--dur-enter` inside a held box; someone else's carries the M10 mark | Appears at once; the mark still shows |
+| 38 | A run joins a rule's strip | The new square grows from its centre once at the right end (`--dur-enter`); the words under the strip change in place | Appears at once |
 
 A list that appears with the page (a card grid, a list of rows) makes one quiet stagger, once: the first 12 items rise into place `--stagger` apart, the rest together; filtering, sorting and live changes never replay it.
 

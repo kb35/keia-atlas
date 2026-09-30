@@ -1,0 +1,113 @@
+---
+// Standing rules (Keia Method 2.8; BUILD-PLAN V5 H2): every routine job a named person approved once, with who owns
+// it, the way back it declares, its caps and its runs as a strip of squares. List archetype: band, FilterBar, cards.
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import FilterBar from '../../../components/FilterBar.astro';
+import EmptyState from '../../../components/EmptyState.astro';
+import Section from '../../../components/Section.astro';
+import HealthGlyph from '../../../components/HealthGlyph.astro';
+import RunStrip from '../../../components/RunStrip.astro';
+import HowCard from '../../../components/HowCard.astro';
+import RulesData from '../../../components/RulesData.astro';
+import LiveBar from '../../../components/LiveBar.astro';
+import { RULE_LIST, rulePath, personName, stripFor, lastRun, lineFor } from '../../../lib/rules-view.mjs';
+import { REVERSAL_WORD, RESULT, at } from '../../../lib/rules.mjs';
+import { SERVICES, SERVICE_ORDER } from '../../../lib/services.mjs';
+import { href, DEMO_TODAY, plural } from '../../../lib/data.mjs';
+
+const week = (r) => r.at.slice(0, 10) > '2026-09-21';
+const unable = RULE_LIST.filter((r) => r.allRuns.some((x) => x.result === 'unable' && week(x)));
+const today = RULE_LIST.flatMap((r) => r.allRuns.filter((x) => x.at.slice(0, 10) === DEMO_TODAY));
+const asks = RULE_LIST.filter((r) => r.reversal.kind === 'ask');
+const ANSWER = unable.length
+  ? `${plural(unable.length, 'rule')} unable to complete this week, rolled back · every other run read back and matched`
+  : 'Every run this week read back and matched';
+const NUMBERS = [
+  { n: RULE_LIST.length, label: 'Standing rules' },
+  { n: today.length, label: 'Ran today' },
+  { n: unable.length, label: 'Unable to complete this week', to: '?status=unable', tone: unable.length ? 'bad' : undefined },
+  { n: asks.length, label: 'Ask a person every time', to: '?back=ask' },
+];
+const FACETS = [
+  { key: 'service', label: 'Service', options: SERVICE_ORDER.filter((s) => RULE_LIST.some((r) => r.service === s)).map((s) => ({ value: s, label: SERVICES[s].name })) },
+  { key: 'status', label: 'Status', options: [{ value: 'fine', label: 'Every run matched' }, { value: 'unable', label: 'Unable to complete this week' }] },
+  { key: 'back', label: 'Way back', options: ['undo', 'rollback', 'none', 'ask'].map((k) => ({ value: k, label: REVERSAL_WORD[k] })) },
+  { key: 'owner', label: 'Owner', options: [...new Set(RULE_LIST.map((r) => r.owner))].map((o) => ({ value: o, label: personName(o) })) },
+];
+const SORT = { options: [{ value: 'name', label: 'By name' }, { value: 'recent', label: 'Ran most recently' }, { value: 'service', label: 'By service' }] };
+---
+<Shell title="Standing rules" section="rules" crumbs={[{ label: 'Support', to: '/support/' }, { label: 'Standing rules' }]}>
+  <PageBand overline="Support" title="Standing rules" answer={ANSWER} numbers={NUMBERS} sim />
+  <div class="content rules-page">
+    <RulesData />
+    <FilterBar facets={FACETS} placeholder="Find a rule, owner or device" label="Find a standing rule" noun={['rule', 'rules']} scope=".content.rules-page" sort={SORT} />
+    <div class="rl-grid" data-rl>
+      {RULE_LIST.map((r, i) => {
+        const last = lastRun(r), strip = stripFor(r);
+        const bad = unable.includes(r);
+        return (
+          <article class="card rl" data-fi data-i={i} data-at={last?.at ?? ''} data-find={`${r.name} ${r.title} ${personName(r.owner)} ${(r.applies_to.classes ?? []).join(' ')}`} data-f-service={r.service} data-f-status={bad ? 'unable' : 'fine'} data-f-back={r.reversal.kind} data-f-owner={r.owner}>
+            <header class="rl-h">
+              <HealthGlyph state={bad ? 'fault' : 'fine'} size={16} word={bad ? 'Unable to complete this week' : 'Every run matched'} />
+              <span class="rl-svc">{SERVICES[r.service].name}</span>
+            </header>
+            <h2 class="rl-n"><a href={href(rulePath(r.id))} data-vt-rec={`rule-${r.id}`}>{r.name}</a></h2>
+            <p class="rl-t">{r.title}</p>
+            <dl class="rl-f">
+              <div><dt>Owner</dt><dd>{personName(r.owner)}</dd></div>
+              <div><dt>Way back</dt><dd>{REVERSAL_WORD[r.reversal.kind]}</dd></div>
+              <div><dt>Caps</dt><dd>{r.caps.per_wave} per wave · never in a booked meeting or a freeze · halts after {r.caps.halt_after} {r.caps.halt_after === 1 ? 'run' : 'runs'} unable to complete</dd></div>
+              {r.window && <div><dt>Window</dt><dd>{r.window}</dd></div>}
+            </dl>
+            <RunStrip rule={r.id} runs={strip.runs} words={strip.words} />
+            {last && <p class="rl-last"><span class="faint">Last run {at(last.at, DEMO_TODAY)}:</span> {RESULT[last.result]?.word}{!last.quiet && <> · <HowCard run={last.id} /></>}</p>}
+          </article>
+        );
+      })}
+    </div>
+    <EmptyState text="No standing rules match these filters." />
+    <Section title="What a standing rule is" id="about-rules" aside="Reversible runs, irreversible asks">
+      <div class="card pad rl-about">
+        <p>A standing rule is a standard change its owner approved once. It runs only within its caps, never in a booked meeting or a change freeze, and halts after runs that are unable to complete. Each rule declares its way back: Undo where the action truly reverses, Roll back where the previous state is kept, nothing where it ends as it started, and a person's confirmation every time where it cannot be put back.</p>
+      </div>
+    </Section>
+    <LiveBar page="rules" />
+  </div>
+  <script is:inline data-astro-rerun slot="end">
+    (function () {
+      var bar = document.querySelector('[data-fb]'), grid = document.querySelector('[data-rl]'); if (!bar || !grid) return;
+      var order = function () {
+        var v = bar.rsFilter ? bar.rsFilter.sort() : 'name';
+        Array.prototype.slice.call(grid.querySelectorAll('[data-fi]')).sort(function (a, b) {
+          if (v === 'recent') return String(b.dataset.at).localeCompare(String(a.dataset.at));
+          if (v === 'service') return String(a.dataset.fService).localeCompare(String(b.dataset.fService)) || (+a.dataset.i - +b.dataset.i);
+          return +a.dataset.i - +b.dataset.i;
+        }).forEach(function (el) { grid.appendChild(el); });
+      };
+      bar.addEventListener('fb:sort', function () { bar.rsFilter.run(true, order); });
+      var s0 = new URLSearchParams(location.search).get('sort'); if (s0 && s0 !== 'name') order();
+    })();
+  </script>
+</Shell>
+
+<style>
+  .rules-page { gap: 24px; padding-top: 18px; }
+  .rl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 20px; align-items: stretch; }
+  .rl { display: grid; gap: 10px; align-content: start; padding: 20px 22px; }
+  .rl-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: var(--fs-support); }
+  .rl-svc { font: 500 var(--fs-overline)/1 var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); }
+  .rl-n { margin: 0; font-size: var(--fs-h3); }
+  .rl-n a { color: inherit; text-decoration: none; }
+  .rl-n a:hover { text-decoration: underline; }
+  .rl-n a::after { content: ""; position: absolute; inset: 0; }
+  .rl { position: relative; transition: box-shadow var(--dur-hover) var(--ease-settle); }
+  .rl:hover { box-shadow: var(--shadow-md); }
+  .rl-t { margin: 0; font-size: var(--fs-body); color: var(--text-2); }
+  .rl-f { margin: 0; display: grid; gap: 4px; }
+  .rl-f div { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 10px; font-size: var(--fs-support); }
+  .rl-f dt { color: var(--text-3); }
+  .rl-f dd { margin: 0; }
+  .rl-last { margin: 0; font-size: var(--fs-support); position: relative; z-index: 1; }
+  .rl-about p { margin: 0; max-width: 72ch; font-size: var(--fs-body); color: var(--text-2); }
+</style>
