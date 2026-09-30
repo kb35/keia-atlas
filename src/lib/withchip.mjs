@@ -7,6 +7,7 @@
 //
 // chipHtml(chip, opts) is pure (no DOM); setChip() and the spring run only in the browser.
 import { chipOf } from './ownership.mjs';
+import { spring, springEasing, retarget } from './spring.mjs';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
@@ -42,22 +43,6 @@ export function chipHtml(c, { item = '', history = [], help = 'chip.with', tag =
 /** The chip for a record straight from ownership.mjs. */
 export const chipFor = (own, viewer, ctx, opts) => chipHtml(chipOf(own, viewer, ctx), opts);
 
-// ---- The spring (critically damped): x(t) = to + (A + B t) e^(-w t), A = x0 - to, B = v0 + w A ----------------
-// `duration` is the perceptual duration (MOTION-V2 §2: --dur-chip 320 ms): w = 2π / duration. The move runs a
-// little longer than that so it lands without a visible last step.
-export function springAt(t, { x0, v0 = 0, to, w }) {
-  const A = x0 - to, B = v0 + w * A, e = Math.exp(-w * t);
-  return { x: to + (A + B * t) * e, v: (B - w * (A + B * t)) * e };
-}
-export const omega = (durationMs) => (2 * Math.PI) / durationMs;
-/** A CSS linear() easing for a spring from rest, for moves that never retarget (the words). */
-export function springEasing(durationMs, steps = 24) {
-  const w = omega(durationMs), T = durationMs * 1.5, pts = [];
-  for (let i = 0; i <= steps; i++) pts.push(springAt((T * i) / steps, { x0: 0, to: 1, w }).x);
-  pts[steps] = 1;
-  return { easing: `linear(${pts.map((p) => +p.toFixed(4)).join(', ')})`, total: T };
-}
-
 // ---- Browser: change a chip in place --------------------------------------------------------------------------
 const cssMs = (name, d) => {
   if (typeof getComputedStyle !== 'function') return d;
@@ -89,11 +74,10 @@ export function setChip(el, c, { history, aria } = {}) {
     return;
   }
   const dur = cssMs('--dur-chip', 320), exit = cssMs('--dur-exit', 240);
-  const w = omega(dur), T = dur * 1.5;
-  // Where the width is now, and how fast it is changing (a running slide keeps its speed).
+  // Where the width is now, and how fast it is changing: a running slide hands its speed to the next (spring.mjs).
   const now = performance.now(), run = el.__wc;
-  let x0 = el.getBoundingClientRect().width, v0 = 0;
-  if (run && now - run.t0 < run.T) { const s = springAt(now - run.t0, run.p); x0 = s.x; v0 = s.v; }
+  let x0 = el.getBoundingClientRect().width, pxSpeed = 0;
+  if (run && now - run.t0 < run.s.duration) { const r = retarget(run, now); x0 = run.from + (run.to - run.from) * r.at; pxSpeed = (run.to - run.from) * r.speed; }
   // Measure the new width with the new words in place (and no width animation running).
   el.getAnimations().forEach((a) => { if (a.id === 'wc-w') a.cancel(); });
   el.querySelectorAll(':scope > .wc-in.wc-out').forEach((n) => n.remove());
@@ -103,18 +87,19 @@ export function setChip(el, c, { history, aria } = {}) {
   el.insertBefore(next, cur);
   el.style.width = '';
   const to = el.getBoundingClientRect().width;
-  const p = { x0, v0, to, w };
-  el.__wc = { t0: now, T, p };
-  // The width: keyframes sampled from the spring, so a retarget carries its velocity.
+  const dist = to - x0;
+  const s = spring({ duration: dur, bounce: 0, velocity: Math.abs(dist) > 0.5 ? pxSpeed / dist : 0 });
+  el.__wc = { s, t0: now, from: x0, to };
+  // The width: keyframes sampled from the spring, so a retarget keeps its speed.
   const frames = [];
-  for (let i = 0; i <= 24; i++) frames.push({ width: `${springAt((T * i) / 24, p).x}px` });
+  for (let i = 0; i <= 24; i++) frames.push({ width: `${x0 + dist * s.at((dur * i) / 24)}px` });
   frames[24] = { width: `${to}px` };
-  const aw = el.animate(frames, { duration: T, easing: 'linear' }); aw.id = 'wc-w';
+  const aw = el.animate(frames, { duration: dur, easing: 'linear' }); aw.id = 'wc-w';
   aw.onfinish = () => { if (el.__wc?.t0 === now) el.__wc = null; };
   // The words: the old ones slide out to the left and fade; the new ones come in from the right.
-  const { easing } = springEasing(dur);
+  const easing = springEasing({ duration: dur, bounce: 0 });
   const shift = Math.max(12, Math.min(28, to * 0.18));
-  cur.animate([{ transform: from === 'none' ? 'translateX(0)' : from, opacity: op }, { transform: `translateX(${-shift}px)`, opacity: 0 }], { duration: exit, easing: 'cubic-bezier(.4, 0, 1, 1)', fill: 'forwards' })
+  cur.animate([{ transform: from === 'none' ? 'translateX(0)' : from, opacity: op }, { transform: `translateX(${-shift}px)`, opacity: 0 }], { duration: exit, easing: getComputedStyle(document.documentElement).getPropertyValue('--ease-exit').trim() || 'ease-in', fill: 'forwards' })
     .onfinish = () => cur.remove();
-  next.animate([{ transform: `translateX(${shift}px)`, opacity: 0 }, { transform: 'translateX(0)', opacity: 1 }], { duration: T, easing, fill: 'backwards' });
+  next.animate([{ transform: `translateX(${shift}px)`, opacity: 0 }, { transform: 'translateX(0)', opacity: 1 }], { duration: dur, easing, fill: 'backwards' });
 }
