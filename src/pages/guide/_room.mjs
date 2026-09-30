@@ -3,7 +3,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { parse } from 'yaml';
-import { spaces, sites, KIND, href } from '../../lib/data.mjs';
+import { spaces, sites, KIND, href, DEMO_TODAY } from '../../lib/data.mjs';
 import { incidentList, byUrgency } from '../../lib/incidents.mjs';
 import { PEOPLE } from '../../lib/demo.mjs';
 import { loadPrivacy, recordFor, isSensing } from '../../lib/privacy.mjs';
@@ -19,7 +19,8 @@ function loadAccess() {
   access = existsSync(dir) ? Object.fromEntries(readdirSync(dir).filter((f) => f.endsWith('.yaml')).map((f) => [f.slice(0, -5), parse(readFileSync(path.join(dir, f), 'utf8'))])) : {};
   return access;
 }
-const TODAY = new Date().toISOString().slice(0, 10);
+// The demo's one "today", as every other page reads it, so the guide agrees with them and builds are repeatable.
+const TODAY = DEMO_TODAY;
 const titleOf = (x) => (x.number ? `${x.number} ${x.name}` : x.name);
 
 // The nearest room at the site whose loop passed a test in the last year: same floor first.

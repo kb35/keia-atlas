@@ -25,13 +25,15 @@
 // when, what passed for that unit and step (ev) and the group it was accepted in (in), written as one event
 // with a summary in its note. Everything here is simulated: the systems' answers are made up from the
 // project's tasks, so the page is labelled Simulated live.
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { parse } from 'yaml';
 import { spaces, sites, classes, configFor, standardFirmware, firmwareFor, advisoriesFor, ADV_LEVEL, REGION_LABEL, className, modelName, href, LOC_LABEL, INTEGRATE_STEPS, STEP_LABEL, PHASE_LABEL, PHASES, SITE_ORDER, deviceName, countryName, DEMO_TODAY } from './data.mjs';
 import { SYSTEMS } from './cfgstate.mjs';
 import { PEOPLE, person } from './demo.mjs';
 import { buildSheet, resolve, varsOf } from './buildsheet.mjs';
+import { building } from './floors.mjs';
+import { spaceCentre, floorSides } from './floorplan.mjs';
 
 const hash = (str) => [...String(str)].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 7);
 
@@ -63,24 +65,15 @@ const NAMED = [[/video bar/i, 'video-bar'], [/booking panel|scheduler/i, 'schedu
 const PAIRS_WITH = { 'video-bar': ['touch-controller', 'microphone', 'camera'], codec: ['touch-controller', 'microphone', 'camera'] };
 const NEW_STAGES = new Set(['plan', 'procure', 'deploy']);
 
-// Where a space sits on its floor (metres from the outline's south-west corner), and the floor plan's core, so
-// a fit-out on one floor can be delivered side by side. A space turned a quarter swaps its width and depth.
+// Where a space sits on its floor, and the sides of its floor, so a fit-out on one floor can be delivered side by
+// side. Both come from the one building model (floors.mjs building(), read through floorplan.mjs), so a turned or
+// mirrored space lands where every floor drawing puts it.
+const siteModel = (site) => (site ? building(site) : null);
 function centreOf(room) {
-  const g = room.geometry, at = g?.on_floor, sz = g?.size_m;
-  if (!at) return null;
-  if (!sz) return { x: at.x_m, y: at.y_m };   // built to its space type's size: its placed corner is near enough for a side
-  const quarter = Math.round(((at.turn_deg ?? 0) % 180) / 90) % 2 === 1;
-  const w = quarter ? sz.depth : sz.width, d = quarter ? sz.width : sz.depth;
-  return { x: at.x_m + w / 2, y: at.y_m + d / 2 };
-}
-const floorPlans = new Map();
-function floorPlan(site, floor) {
-  const k = `${site}-${floor}`;
-  if (!floorPlans.has(k)) {
-    const p = path.join(process.cwd(), 'data', 'floors', `${k}.yaml`);
-    floorPlans.set(k, existsSync(p) ? parse(readFileSync(p, 'utf8')) : null);
-  }
-  return floorPlans.get(k);
+  const c = spaceCentre(siteModel(room.site), room.id);
+  if (c) return c;
+  const at = room.geometry?.on_floor;
+  return at ? { x: at.x_m, y: at.y_m } : null;   // a bank of desks with no size of its own: its placed corner is near enough for a side
 }
 const floorName = (site, floor) => String(sites[site]?.floors?.find((f) => String(f.id) === String(floor))?.name ?? `Floor ${floor}`).split(':')[0].trim();
 // Rooms grouped for "Deliver by: floor or zone". Work over several floors goes floor by floor. Work on one
@@ -96,13 +89,9 @@ function zonesOf(rooms) {
   let split = null;
   if (sided) {
     const [site, floor] = floorsUsed[0].split('|');
-    const fp = floorPlan(site, floor), core = fp?.core ?? [];
-    const xs = (fp?.outline ?? []).map((p) => p[0]), ys = (fp?.outline ?? []).map((p) => p[1]);
-    if (core.length && xs.length && office.every((r) => r.at)) {
-      const cx = (Math.min(...core.map((c) => c.rect[0])) + Math.max(...core.map((c) => c.rect[2]))) / 2;
-      const cy = (Math.min(...core.map((c) => c.rect[1])) + Math.max(...core.map((c) => c.rect[3]))) / 2;
-      const wide = Math.max(...xs) - Math.min(...xs) >= Math.max(...ys) - Math.min(...ys);
-      split = wide ? { key: (r) => (r.at.y >= cy ? 'north' : 'south'), order: ['north', 'south'] } : { key: (r) => (r.at.x < cx ? 'west' : 'east'), order: ['west', 'east'] };
+    const sides = floorSides(siteModel(site), floor);
+    if (sides && office.every((r) => r.at)) {
+      split = { key: (r) => sides.side(r.at), order: sides.order };
       if (new Set(office.map(split.key)).size < 2) split = null;
     }
   }
