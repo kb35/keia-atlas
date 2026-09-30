@@ -118,7 +118,7 @@ When someone else changes something you are looking at, it stays where it is. Th
 
 ### M11. Opening things: one move, from where it came
 
-Everything that opens makes one move from its origin. Peek cards grow from the hovered item (`--dur-pop`, after `--peek-rest` of rest) and, when you move to the next item, slide there instead of closing and opening. Settings and the View as menu grow from the button that opened them and shrink back to it (`window.rsPopIn`, `rsPopOut`). Search grows from the search button. Filter and Sort menus drop from their pill. A side panel's content cross-fades in place; the panel never slides. Toasts rise from the bottom (`window.rsToast`). Every exit uses `--dur-exit` on `--ease-exit` and takes no clicks.
+Everything that opens makes one move from its origin. Peek cards grow from the hovered item (`--dur-pop`, after `--peek-rest` of rest) and, when you move to the next item, slide there instead of closing and opening. Settings and View as grow from the button that opened them and shrink back to it (`window.rsPopIn`, `rsPopOut`). Search grows from the search button. Filter and Sort menus drop from their pill. A side panel's content cross-fades in place; the panel never slides. Toasts rise from the bottom (`window.rsToast`). Every exit uses `--dur-exit` on `--ease-exit` and takes no clicks.
 
 - **Why:** the move says where the thing came from, so people know how to put it back.
 - **Do:** start the move at the control that opened it.
@@ -194,6 +194,7 @@ Each interaction on a page is one of these rows (MOTION-V2 section 4), with its 
 | 36 | The suggestion after your call (P1, P2) | The folded suggestion opens once the call is saved: its box holds (`rsHold`) and eases to the new height; the suggestion rises 6 px and fades in over `--dur-enter` | Appears at once |
 | 37 | A timeline row arrives (a step of a run, a hand-off, a colleague's change) | Enters at its place in time, scaling from .97 over `--dur-enter` inside a held box; someone else's carries the M10 mark | Appears at once; the mark still shows |
 | 38 | A run joins a rule's strip | The new square grows from its centre once at the right end (`--dur-enter`); the words under the strip change in place | Appears at once |
+| 39 | View as: open a role, find, choose | The picker grows from the control that opened it (`rsPopIn`) and shrinks back to it. A role with several people opens a panel on the row under its tile: the panel grows out of the tile (from the tile's width to the row's, and downwards) on `--spring-settle`, the rows below slide down on the same spring, the card's height eases with them, and the people enter `--stagger` apart over `--dur-enter`; the tiles never change order. Closing folds the panel back into its tile over `--dur-exit`. A second press starts from where things are. Finding dims what does not match and moves nothing. Choosing closes the picker, then `rsPickWho` (row 26) | Opens, closes and dims at once |
 
 A list that appears with the page (a card grid, a list of rows) makes one quiet stagger, once: the first 12 items rise into place `--stagger` apart, the rest together; filtering, sorting and live changes never replay it.
 

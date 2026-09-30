@@ -1,6 +1,6 @@
 ---
 // Settings: look, light or dark, agents, and Modules (each On, Connected or Off: src/lib/modules.mjs), all on one
-// short screen. Who you're viewing as moved to the switcher under your name, bottom left.
+// short screen. Who you're viewing as is one row at the top that opens View as (src/components/ViewAs.astro).
 // Choices are saved in this browser (localStorage keys rs4-skin, rs4-theme, rs4-agents and rs6-modules) and
 // applied by the boot script in the page head before first paint.
 // Motion (docs/rules/motion.md, M12): it grows from the button that opened it and shrinks back to it; it keeps
@@ -14,10 +14,8 @@ const LOOKS = [
   { id: 'drawing', name: 'Drawing set', note: 'Ink on drafting paper.', sw: ['#111111', '#F3F3EE', '#0B2A4C', '#B8860B'] },
   { id: 'classic', name: 'Playful', note: 'Ink outlines, bold colour.', sw: ['#15161B', '#F3F0E8', '#FFCB2E', '#1E5BFF'] },
 ];
-import { PEOPLE, TEAMS } from '../lib/demo.mjs';
 import { MODULES, MODULE_STATES } from '../lib/modules.mjs';
 import SettingsPersonal from './SettingsPersonal.astro';
-const GROUPS = ['delivery', 'onsite', 'av-it', 'it-infra', 'service-desk', 'leadership', 'vendor'].map((tm) => ({ tm, ps: PEOPLE.filter((p) => p.team === tm) })).filter((g) => g.ps.length);
 const MODES = [
   { id: 'system', name: 'Auto' },
   { id: 'light', name: 'Light' },
@@ -32,12 +30,11 @@ const MODES = [
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
       </button>
     </header>
-    <label class="who-phone"><span class="overline">View as</span>
-      <select name="who" data-who-select>
-        <optgroup label="Overview"><option value="everyone">Everyone (overview) · Every role at once</option></optgroup>
-        {GROUPS.map((g) => <optgroup label={TEAMS[g.tm]}>{g.ps.map((p) => <option value={p.id}>{p.role} · {p.where}</option>)}</optgroup>)}
-      </select>
-    </label>
+    <button type="button" class="who-row" data-open-viewas data-help="shell.account">
+      <span class="avatar" aria-hidden="true" data-who-initials>AB</span>
+      <span class="who-t"><span class="overline">View as</span><b data-who-name>Anna Byrne</b><small data-who-role>AV and IT delivery engineer</small></span>
+      <span class="who-go">Change<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg></span>
+    </button>
     <fieldset>
       <legend class="overline">Look</legend>
       <div class="looks">
@@ -83,7 +80,7 @@ const MODES = [
       </ul>
     </fieldset>
     <SettingsPersonal />
-    <p class="faint">Saved in this browser only. On a computer, switch who you're viewing as from under your name, bottom left.</p>
+    <p class="faint">Saved in this browser only. On a computer, your name at the bottom left opens View as too.</p>
   </form>
 </dialog>
 
@@ -123,7 +120,6 @@ const MODES = [
         n.textContent = v === 'connected' ? n.dataset.conn : v === 'off' ? n.dataset.off : n.dataset.on;
       });
       dlg.querySelectorAll('[data-look-note]').forEach(function (p) { p.classList.toggle('on', p.dataset.lookNote === s); });
-      var ws = dlg.querySelector('[data-who-select]'); if (ws) ws.value = window.rsWhoId ? window.rsWhoId() : get('rs4-who', 'anna');
       markLook(); markSegs();
     }
     // Open beside the button that opened it, top edge fixed, so nothing moves under the pointer as you choose.
@@ -159,11 +155,10 @@ const MODES = [
       if (i.name === 'mode') { put('rs4-theme', v); window.rsTheme(function () { window.rsApplyTheme(); if (window.rsSyncMode) window.rsSyncMode(); }); }
       if (i.dataset.mod) window.rsSetModule(i.dataset.mod, v);
       if (i.name === 'agents') window.rsSetAgents(v);
-      if (i.name === 'who') window.rsPickWho(v);
       sync();
     });
     document.querySelectorAll('[data-open-settings]').forEach(function (b) {
-      b.addEventListener('click', function () { var a = document.querySelector('[data-acct-menu]'); open(b.closest('.acct-menu') ? a : b); });
+      b.addEventListener('click', function () { var a = document.querySelector('[data-acct-menu]'); open(b.closest('.vp') ? a : b); });
     });
     dlg.querySelector('[data-settings-close]').addEventListener('click', close);
     dlg.addEventListener('cancel', function (e) { e.preventDefault(); close(); });
@@ -210,14 +205,20 @@ const MODES = [
   .settings .seg-s label:has(input:checked) span { color: var(--text); }
   .settings .seg-s label:focus-within span { outline: 2px solid var(--focus); }
   .settings p { margin: 0; font-size: 12.5px; }
-  .settings .who-phone { display: none; gap: 6px; }
-  .settings .who-phone select { width: 100%; min-width: 0; font: inherit; font-size: 15px; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); }
+  /* View as: one row that opens the picker (it grows from here). */
+  .settings .who-row { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: background var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle); }
+  .settings .who-row:hover { background: var(--surface-2); border-color: var(--line-strong); }
+  .settings .who-row:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .settings .who-row .avatar { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-ink); font: 650 12px/1 var(--font-sans); }
+  .settings .who-t { display: grid; min-width: 0; flex: 1; }
+  .settings .who-t b { font-size: 14.5px; font-weight: 600; line-height: 1.3; }
+  .settings .who-t small { font-size: 12.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .settings .who-go { display: inline-flex; align-items: center; gap: 2px; flex: none; font-size: 13px; font-weight: 600; color: var(--accent-ink); }
   /* While the page cross-fades to a new look, the markers in here still slide (motion.css turns other easing off). */
   @media (prefers-reduced-motion: no-preference) {
     :root.rs-theming .settings .look-mark { transition: transform var(--dur-morph) var(--ease-settle), width var(--dur-morph) var(--ease-settle), height var(--dur-morph) var(--ease-settle) !important; }
     :root.rs-theming .settings .rs-mark { transition: transform var(--dur-morph) var(--ease-settle), width var(--dur-morph) var(--ease-settle) !important; }
   }
-  @media (max-width: 760px) { .settings .who-phone { display: grid; } }
   @media (max-width: 420px) { .settings .looks { grid-template-columns: repeat(3, 1fr); } .settings .set-row { grid-template-columns: 1fr; } }
   @media (prefers-reduced-motion: reduce) { .settings::backdrop, .settings.closing::backdrop { animation: none; } }
 </style>
