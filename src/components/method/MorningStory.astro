@@ -11,6 +11,11 @@ import IdeaArt from './IdeaArt.astro';
 import { LEVEL1, md } from '../../lib/method.mjs';
 const { story, ideas } = LEVEL1;
 const art = (i: number) => ideas[i]?.slug ?? 'on-time';
+// The drawings carry the story's own words: Liam's list counts one room; the job goes from Liam to the network team.
+const LABEL: Record<string, { figure?: string; was?: string; now?: string }> = {
+  'answer-first': { figure: '1' },
+  'own-it-hand-it-on': { was: 'With Liam', now: 'With Network' },
+};
 ---
 <div class="st" data-help="method.story">
   {story.before && (
@@ -25,7 +30,7 @@ const art = (i: number) => ideas[i]?.slug ?? 'on-time';
     <ol class="st-steps" data-story>
       {story.steps.map((s, i) => (
         <li class:list={['st-step', { 'st-end': i >= ideas.length }]} id={`st-${s.time.replace(':', '')}`} style={`--i: ${i}`}>
-          <IdeaArt idea={art(i)} class="st-art" />
+          <IdeaArt idea={art(i)} class="st-art" label={LABEL[art(i)]} />
           <time>{s.time}</time>
           <p set:html={md(s.text)} />
         </li>
@@ -47,12 +52,12 @@ const art = (i: number) => ideas[i]?.slug ?? 'on-time';
   .st-end { border-color: color-mix(in srgb, var(--h-fine, var(--green)) 45%, var(--line)); }
   .st-step time { font: 600 13px/1.2 var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text); }
   .st-step p { margin: 0; font-size: 13px; line-height: 1.5; }
-  :global(.method) .st-art { max-height: 72px; }
+  .st-step :global(.st-art) { max-height: 72px; }
   @container st (max-width: 1060px) { .st-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   @container st (max-width: 620px) {
     .st-steps { grid-template-columns: minmax(0, 1fr); gap: 8px; }
     .st-step { grid-template-columns: 88px minmax(0, 1fr); grid-template-rows: auto 1fr; column-gap: 12px; }
-    :global(.method) .st-step .st-art { grid-row: 1 / span 2; align-self: start; max-height: 56px; }
+    .st-step :global(.st-art) { grid-row: 1 / span 2; align-self: start; max-height: 56px; }
   }
   /* Played once (.km-play on the list, added by MethodPage when it comes into view). The markup is the end frame. */
   .st-steps.km-play .st-step { animation: km-step-in var(--km-enter) var(--ease-settle) both; animation-delay: calc(var(--i) * var(--dur-state) * var(--km-t)); }

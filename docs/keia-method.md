@@ -8,7 +8,7 @@ Level 1 takes ten minutes. Level 2 takes an afternoon. Level 3 is for looking th
 
 ## Level 1: the short version
 
-The Keia Method is a way of working for the teams who look after an organisation's meeting rooms, screens, networks and home-office kit. Most of that work is pieced together from vendor consoles, forms and memory, so faults are found by the people trying to use a room, and what was learnt leaves with whoever learnt it. The method is five habits built around one shared record of every space and what is in it. A team can keep that record in a spreadsheet; Keia Atlas is open-source software that does much of the keeping for you.
+The Keia Method is a way of working for the teams who look after an organisation's meeting rooms, screens, networks and home-office kit. Most of that work is pieced together from vendor consoles, forms and memory, so faults are found by the people trying to use a room, and what was learnt leaves with whoever learnt it. The method is five habits built around one shared record of every space and what is in it. A team can keep that record in a spreadsheet. Keia Atlas is open-source software that keeps it for you and connects to the service desk and monitoring tools you already run.
 
 ### One morning, before and after
 
@@ -16,11 +16,11 @@ The Keia Method is a way of working for the teams who look after an organisation
 
 **After.** The same room, the same fault, and a team that works the Keia way. This team uses Keia Atlas, so some steps happen by themselves; with a spreadsheet, the same steps are done by hand.
 
-- **07:52** The video bar in 3.09 goes offline, and the team's monitoring tool raises an alert. The team's record already lists what is in the room, what each device plugs into, and the booking at 9:00.
-- **07:53** A job opens with those facts filled in, and the last change beside them: the switch on that floor was updated on Tuesday. Nobody is asked for a room number or an asset tag.
+- **07:52** The video bar in 3.09 goes offline, and the team's monitoring tool raises an alert. The record already lists what is in the room, what each device plugs into, and the 9:00 booking.
+- **07:53** A job opens with those facts filled in, and the last change beside them: the switch on that floor was updated on Tuesday. Nobody is asked for a room number or an asset tag. With a spreadsheet, the desk copies the same facts from the room's row.
 - **08:05** Liam, the technician on site, starts his day. His list opens with one line: one room at risk before 9:00, everything else fine.
-- **08:15** Liam finds that Tuesday's update turned the room's network port off. He cannot change the switch, so he hands the job to the network team with everything he found. It now reads "With Network team: needs the port for 3.09 turned back on."
-- **08:31** The network team turns the port on. Liam checks the room and closes the job with one sentence: what fixed it. The sentence is kept on the video bar's record.
+- **08:15** Liam finds that Tuesday's update turned the room's network port off. He cannot change the switch, so he hands the job to the network team with everything he found. The job now reads "With Network team: needs the port for 3.09 turned back on."
+- **08:31** The network team turns the port on. Liam checks the room and closes the job with one sentence: what fixed it. The sentence is kept in the record, against the video bar.
 - **09:00** The call starts on time. The next time that fault appears, whoever opens the job sees what fixed it before.
 
 ### The five ideas
@@ -46,7 +46,7 @@ The steps from 07:52 to 08:31 are the five ideas, one step each, in order. Each 
 - **Instead of** long reports, and alerts that nobody acts on.
 - **You** open every report and every morning with one line: is everything all right, and if not, what needs someone first. Detail comes after.
 - **You'll know it's working when** people can act on the first line, and every alert leads to an action.
-- **In Keia Atlas:** every page opens with one line that says whether all is well; each number under it opens its list.
+- **In Keia Atlas:** every page opens with one line that says whether all is well; each count under it opens the list it counts.
 
 #### 4. Own it, hand it on
 
@@ -64,7 +64,7 @@ The steps from 07:52 to 08:31 are the five ideas, one step each, in order. Each 
 
 ### Start in 30 days
 
-One habit a week. The order is a suggestion, and no software is needed to begin.
+Four weeks, one or two habits at a time. The order is a suggestion, and no software is needed to begin.
 
 - **Week 1: record your rooms.** List each space and what is in it: every device, its model and what it connects to. Start with one floor. A spreadsheet is enough. From now on, note each change against the device it touches.
 - **Week 2: name an owner.** Give every open job one named owner and a line saying who has it now and why. When you pass a job on, pass all of it. Whoever changes something updates the list as part of the job, never as a separate chore.
@@ -87,10 +87,11 @@ The method keeps the names IT teams already use, and adds a few plain words of i
 **Keia's own words.** Plain words for things ITIL names differently, or not at all.
 
 - **The record:** the one shared list of every space, what is in it, and every job on it. It stays current because each job updates it.
+- **Job:** any piece of work on the record: an incident, a request, a change or a task.
 - **Space:** any place where technology lives, such as a meeting room, a comms room or a home office.
 - **Setup guide:** the settings for one kind of device, in the order you apply them.
-- **With:** who holds a job now, and why.
-- **Hand to:** pass a job, with everything known about it, to a colleague, a team or a vendor. It replaces "escalate".
+- **With:** who holds a job now, and why, as in "With Network team: needs a port turned on".
+- **Hand to:** pass a job, with everything known about it, to a colleague, a team or a vendor. It replaces "escalate", because the job moves sideways to whoever can act, not up a ladder.
 
 ---
 
