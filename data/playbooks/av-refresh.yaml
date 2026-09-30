@@ -5,8 +5,8 @@ kind: refresh
 version: "1.4"
 intensity: light
 weeks: { min: 10, max: 16 }
-summary: Replace devices that are past their years in service with the current standard model, one room at a time, keeping each position and hostname so nothing downstream breaks.
-when: Use when the room type stays the same and devices are swapped like for like. If the room is being redesigned, use the custom room design playbook instead.
+summary: Replace devices that are past their years in service with the current standard model, one space at a time, keeping each position and hostname so nothing downstream breaks.
+when: Use when the space type stays the same and devices are swapped like for like. If the space is being redesigned, use the custom room design playbook instead.
 changes:
   - { date: "2026-09-29", change: "Install and Commission merged into one Deploy phase, with Provision, Install, Configure and Commission steps for each device (decision 0025)." }
   - { date: "2026-09-18", change: "Reserve addresses by MAC before the units ship.", from: PRJ-12 }
@@ -17,16 +17,16 @@ phases:
     steps:
       - { title: "Pull the units past their years in service from the refresh plan", role: delivery, output: List of units due }
       - { title: "Confirm the current standard model for each position", role: sm-av }
-      - { title: "Group rooms into batches that avoid busy weeks", role: pm, output: Batch plan }
+      - { title: "Group spaces into batches that avoid busy weeks", role: pm, output: Batch plan }
       - { title: "Budget line and purchase request", role: programme }
     gate: { by: [programme], checks: [Scope and budget agreed, Batches fit the year plan] }
   - phase: design
     weeks: "1 to 2"
     steps:
-      - { title: "Swap sheet per room: position, old model, new model, hostname kept", role: delivery, output: Swap sheet }
+      - { title: "Swap sheet per space: position, old model, new model, hostname kept", role: delivery, output: Swap sheet }
       - { title: "Check mounts, cables and power suit the new model", role: delivery }
       - { title: "Take the configuration from the new model's configuration page", role: delivery }
-    gate: { by: [sm-av], checks: [Every swap is to the current standard, No change to room types or wiring] }
+    gate: { by: [sm-av], checks: [Every swap is to the current standard, No change to space types or wiring] }
   - phase: procure
     weeks: "3 to 6"
     steps:
@@ -35,24 +35,24 @@ phases:
       - { title: "Record serials on arrival against the swap sheet", role: tech }
     gate: { by: [pm], checks: [Everything received, Addresses reserved] }
   - phase: integrate
-    weeks: Half a day per room, then 1
+    weeks: Half a day per space, then 1
     steps:
       - { title: Retire the old unit in the asset register the same day, role: tech, step: provision }
       - { title: "When a vendor does the swap: record serial and MAC for each position, with a label photo", role: vendor, note: Through the vendor portal, step: provision }
-      - { title: Book the room out, role: pm, step: install }
+      - { title: Book the space out, role: pm, step: install }
       - { title: "Swap the unit, keeping position and hostname", role: tech, step: install }
       - { title: "Configure each device in its setup order, then set and verify its settings", role: delivery, step: configure }
-      - { title: Run the verification for each room, role: delivery, step: commission }
+      - { title: Run the verification for each space, role: delivery, step: commission }
       - { title: Test call on the room's meeting platform, role: tech, step: commission }
       - { title: Snag list, role: delivery, output: Snag list, step: commission }
       - { title: "When a vendor did the swap: fix snags on their work within five working days", role: vendor, step: commission }
-    gate: { by: [delivery], checks: [Every room in the batch installed, "Every room passes, or its snags are accepted"] }
+    gate: { by: [delivery], checks: [Every space in the batch installed, "Every space passes, or its snags are accepted"] }
   - phase: handover
     weeks: "1"
     steps:
       - { title: "Handover note to the service desk", role: pm, output: Handover note }
       - { title: "Redeploy or dispose of the old units", role: pm }
-    gate: { by: [sm-av], checks: [Records match what is in the rooms] }
+    gate: { by: [sm-av], checks: [Records match what is in the spaces] }
   - phase: closed
     weeks: "-"
     steps:
