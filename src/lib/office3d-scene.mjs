@@ -48,7 +48,7 @@ const world = (x, y, z) => new Vector3(x, z, -y);
 export function createScene(host, D, hooks) {
   // The motion tokens, read once and again when the look changes (not on every frame).
   const readMotion = () => {
-    const base = window.rsMotion ? window.rsMotion() : { reduced: matchMedia('(prefers-reduced-motion: reduce)').matches, morph: 520, state: 300, ease: '' };
+    const base = window.rsMotion ? window.rsMotion() : { reduced: (window.rsReducedNow ? window.rsReducedNow() : matchMedia('(prefers-reduced-motion: reduce)').matches), morph: 520, state: 300, ease: '' };
     const v = getComputedStyle(document.documentElement).getPropertyValue('--dur-pulse').trim(), n = parseFloat(v);
     return { ...base, pulse: isNaN(n) ? 2400 : /ms$/.test(v) ? n : /s$/.test(v) ? n * 1000 : n };
   };
@@ -56,6 +56,7 @@ export function createScene(host, D, hooks) {
   const motion = () => MO;
   const rm = matchMedia('(prefers-reduced-motion: reduce)'), onRm = () => { MO = readMotion(); paintAll(); };
   rm.addEventListener?.('change', onRm);
+  document.addEventListener('rs:a11y', onRm);   // Settings › Accessibility › Motion
   const renderer = new WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.domElement.className = 'o3-canvas';
@@ -523,7 +524,7 @@ export function createScene(host, D, hooks) {
     preset, key, recolour, requestRender,
     dispose() {
       alive = false; clearTimeout(pulseTimer); cancelAnimationFrame(fadeT);
-      ro.disconnect(); io.disconnect(); rm.removeEventListener?.('change', onRm); document.removeEventListener('visibilitychange', onVis); host.removeEventListener('wheel', onWheel, { capture: true });
+      ro.disconnect(); io.disconnect(); rm.removeEventListener?.('change', onRm); document.removeEventListener('rs:a11y', onRm); document.removeEventListener('visibilitychange', onVis); host.removeEventListener('wheel', onWheel, { capture: true });
       controls.dispose();
       scene.traverse((o) => { if (o.isInstancedMesh) o.dispose(); });
       for (const d of disposables) d.dispose?.();

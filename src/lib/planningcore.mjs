@@ -20,7 +20,7 @@ export const ROLE_LABEL = { tech: 'On-site technicians', delivery: 'Delivery eng
 export const ROLE_ONE = { tech: 'on-site technician', delivery: 'delivery engineer', pm: 'project manager', network: 'network engineer' };
 export const REGIONS = ['amer', 'emea', 'apac'];
 export const REGION_NAME = { amer: 'Americas', emea: 'EMEA', apac: 'APAC' };
-export const NET_CLASSES = new Set(['network-switch', 'network-gateway', 'wireless-access-point', 'security-device']);
+export const NET_CLASSES = new Set(['network-switch', 'network-gateway', 'wireless-access-point', 'security-device', 'building-sensor']);
 export const groupOf = (cls) => (NET_CLASSES.has(cls) ? 'network' : 'av');
 export const GROUP_LABEL = { av: 'AV refresh', network: 'Comms room refresh' };
 // What a project's role (roles[].as) counts as in the capacity model.

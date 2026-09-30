@@ -6,7 +6,7 @@
 
 **Files written.** A renamed copy of the CSV (outside the repository), then `data/connected/servicenow/` by the spreadsheet importer.
 
-**There is no ServiceNow importer yet.** Until there is, the export goes through the spreadsheet importer with `--system servicenow`, so the records are marked as coming from ServiceNow. Renaming the columns is the only step an agent helps with. A lasting importer can be written by following [docs/connectors/README.md](../connectors/README.md).
+**There is no ServiceNow importer yet.** Until there is, the export goes through the spreadsheet importer with `--system servicenow`, so the records are marked as coming from ServiceNow. Renaming the columns is the only step an agent helps with. A lasting importer can be written by following [docs/connectors/README.md](../connectors/README.md) and the field-by-field mapping in [docs/connectors/servicenow.md](../connectors/servicenow.md).
 
 ## Steps
 

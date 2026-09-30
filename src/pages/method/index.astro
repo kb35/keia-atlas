@@ -1,82 +1,83 @@
 ---
-// Level 1 on one screen: the sentence, the paragraph, the five ideas with one example each, the eight words, how
-// routine work gets done and where it comes from. Everything from docs/keia-method.md. Below it, the way into
-// Level 2 and Level 3 (MethodNav).
+// Level 1, the short version, in the method's own order: what it is and who it is for; one morning, before and
+// after (MorningStory); the five ideas, each on the same card (IdeaCard: three lines of method, then one line on
+// Keia Atlas); a 30-day start; and the words, split into the ITIL words the method keeps and Keia's own. Every word
+// is from docs/keia-method.md (src/lib/method.mjs). Below it, the way into Level 2 and Level 3 (MethodNav).
 import MethodPage from '../../components/method/MethodPage.astro';
 import Section from '../../components/Section.astro';
-import IdeaArt from '../../components/method/IdeaArt.astro';
+import MorningStory from '../../components/method/MorningStory.astro';
+import IdeaCard from '../../components/method/IdeaCard.astro';
 import { href } from '../../lib/data.mjs';
 import { METHOD, LEVEL1, md } from '../../lib/method.mjs';
 import { LEVEL1_TRY } from './_pages.mjs';
+const { story, ideas, start, words } = LEVEL1;
 ---
-<MethodPage slug="level1" title={METHOD.title} lede={METHOD.sentence} level={1} num="one screen" try={LEVEL1_TRY}>
-  <section class="card pad l1-top" aria-label="In one paragraph" data-help="method.paragraph">
-    <p class="l1-para" set:html={md(LEVEL1.paragraph)} />
+<MethodPage slug="level1" title={METHOD.title} lede={METHOD.sentence} level={1} num="the short version" try={LEVEL1_TRY}>
+  <section class="card pad l1-top" aria-label="What it is" data-help="method.paragraph">
+    {LEVEL1.opening.map((p) => <p class="l1-para" set:html={md(p)} />)}
     <p class="l1-intro" set:html={md(METHOD.intro)} />
   </section>
-  <Section title={LEVEL1.ideasHeading}>
+  <Section title={story.title}>
+    <MorningStory />
+  </Section>
+  <Section title={LEVEL1.ideasTitle}>
+    {LEVEL1.ideasIntro.map((p) => <p class="l1-lead" set:html={md(p)} />)}
     <ol class="l1-ideas" data-help="method.ideas">
-      {LEVEL1.ideas.map((i) => (
-        <li>
-          <a class="card l1-idea" href={href(`/method/${i.slug}/`)}>
-            <IdeaArt idea={i.slug} />
-            <span class="l1-n">Idea {i.n}</span>
-            <b>{i.name}</b>
-            <span class="l1-line" set:html={md(i.line)} />
-            <span class="l1-ex" set:html={md(i.example)} />
-          </a>
+      {ideas.map((i, k) => <IdeaCard as="li" idea={i} link at={story.steps[k]?.time} />)}
+    </ol>
+  </Section>
+  <Section title={start.title}>
+    {start.intro.map((p) => <p class="l1-lead" set:html={md(p)} />)}
+    <ol class="l1-start" data-help="method.start">
+      {start.steps.map((s) => (
+        <li class="card">
+          <span class="l1-when">{s.when}</span>
+          <b>{s.what}</b>
+          <p set:html={md(s.text)} />
         </li>
       ))}
     </ol>
   </Section>
-  <Section title={LEVEL1.wordsLabel}>
-    <dl class="l1-words">
-      {LEVEL1.words.map((w) => <div><dt>{w.word}</dt>{w.meaning && <dd>{w.meaning}</dd>}</div>)}
-    </dl>
-    <p class="l1-more">Every word, mapped to ITIL, PMI and ISO: <a href={href('/method/words/')}>the words</a>.</p>
+  <Section title={words.title}>
+    {words.intro.map((p) => <p class="l1-lead" set:html={md(p)} />)}
+    <div class="l1-words" data-help="method.words">
+      {words.groups.map((g) => (
+        <section class="card pad" aria-label={g.label}>
+          <h3>{g.label}</h3>
+          <p class="l1-wnote" set:html={md(g.text)} />
+          <dl>{g.words.map((w) => <div><dt>{w.word}</dt><dd set:html={md(w.meaning)} /></div>)}</dl>
+        </section>
+      ))}
+    </div>
+    <p class="l1-more">Every word on screen, mapped to ITIL, PMI and ISO: <a href={href('/method/words/')}>the words, in full</a>. How the method sits beside ITIL, ISO, PMI and the rest: <a href={href('/method/how-it-fits/')}>how it fits</a>.</p>
   </Section>
-  <div class="g12">
-    {LEVEL1.routine && (
-      <section class="card pad s-6 l1-block" aria-labelledby="l1-routine">
-        <h2 id="l1-routine">{LEVEL1.routine.label}</h2>
-        <p set:html={md(LEVEL1.routine.text)} />
-        <a href={href('/method/how-the-work-gets-done/')}>How the work gets done, in full</a>
-      </section>
-    )}
-    {LEVEL1.origin && (
-      <section class="card pad s-6 l1-block" aria-labelledby="l1-origin">
-        <h2 id="l1-origin">{LEVEL1.origin.label}</h2>
-        <p set:html={md(LEVEL1.origin.text)} />
-        <a href={href('/method/words/')}>The words, mapped</a>
-        <a href={href('/method/how-it-fits/')}>How it fits: ITIL, ISO, PMI and more</a>
-      </section>
-    )}
-  </div>
   <p class="l1-licence" set:html={md(METHOD.licence)} />
 </MethodPage>
 
 <style>
   .l1-top { display: grid; gap: 10px; }
-  .l1-para { margin: 0; font-size: 16px; line-height: 1.55; max-width: 72ch; }
+  .l1-para { margin: 0; font-size: 16px; line-height: 1.6; max-width: 78ch; }
   .l1-intro { margin: 0; font-size: 13.5px; color: var(--text-2); }
-  .l1-ideas { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--gutter); }
-  .l1-ideas li { display: grid; min-width: 0; }
-  .l1-idea { display: grid; grid-template-rows: auto auto auto auto 1fr; gap: 6px; padding: 16px; color: var(--text); text-decoration: none; transition: box-shadow var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle); }
-  .l1-idea:hover { color: var(--text); box-shadow: var(--shadow-md); }
-  .l1-n { font: 500 10.5px/1.2 var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); margin-top: 6px; }
-  .l1-idea b { font-size: 15px; font-weight: 600; }
-  .l1-line { font-size: 13px; }
-  .l1-ex { font-size: 12.5px; color: var(--text-2); }
-  .l1-words { margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-  .l1-words div { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--surface); }
+  .l1-lead { margin: 0 0 12px; font-size: 14px; line-height: 1.55; max-width: 80ch; color: var(--text-2); }
+  .l1-ideas { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--gutter); }
+  .l1-start { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--gutter); }
+  .l1-start li { display: grid; gap: 4px; align-content: start; padding: 14px 16px; }
+  .l1-when { font: 500 10.5px/1.3 var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); }
+  .l1-start b { font-size: 15px; font-weight: 600; }
+  .l1-start b::first-letter { text-transform: uppercase; }
+  .l1-start p { margin: 4px 0 0; font-size: 13.5px; line-height: 1.5; }
+  .l1-words { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gutter); }
+  .l1-words section { display: grid; gap: 8px; align-content: start; }
+  .l1-words h3 { margin: 0; font: 600 15px/1.3 var(--font-sans); }
+  .l1-wnote { margin: 0; font-size: 13px; color: var(--text-2); }
+  .l1-words dl { margin: 4px 0 0; display: grid; }
+  .l1-words dl div { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); }
   .l1-words dt { font-weight: 600; font-size: 14px; }
-  .l1-words dd { margin: 2px 0 0; font-size: 13px; color: var(--text-2); }
-  .l1-more { margin: 10px 0 0; font-size: 13.5px; }
-  .l1-block { display: grid; gap: 8px; align-content: start; }
-  .l1-block h2 { font: 600 15px/1.3 var(--font-sans); }
-  .l1-block p { margin: 0; font-size: 14px; line-height: 1.55; }
+  .l1-words dd { margin: 0; font-size: 14px; line-height: 1.5; }
+  .l1-more { margin: 12px 0 0; font-size: 13.5px; }
   .l1-licence { margin: 0; font-size: 12.5px; color: var(--text-2); }
-  @container content (max-width: 1099px) { .l1-ideas { grid-template-columns: repeat(3, minmax(0, 1fr)); } .l1-words { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  @container content (max-width: 699px) { .l1-ideas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  @container content (max-width: 459px) { .l1-ideas, .l1-words { grid-template-columns: minmax(0, 1fr); } }
+  @container content (max-width: 1099px) { .l1-start { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @container content (max-width: 899px) { .l1-words { grid-template-columns: minmax(0, 1fr); } }
+  @container content (max-width: 699px) { .l1-start { grid-template-columns: minmax(0, 1fr); } }
+  @container content (max-width: 459px) { .l1-words dl div { grid-template-columns: minmax(0, 1fr); gap: 2px; } }
 </style>

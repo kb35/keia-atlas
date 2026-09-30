@@ -14,6 +14,8 @@ import '../styles/base.css';
 import '../styles/motion.css';
 import '../styles/craft.css';
 import '../styles/motion-library.css';
+import '../styles/a11y.css';
+import { A11Y_BOOT } from '../lib/a11y.mjs';
 import { href } from '../lib/data.mjs';
 
 interface Props { title: string; office: string; home: string }
@@ -28,6 +30,7 @@ const { title, office, home } = Astro.props;
   <title>{title} · Room guide</title>
   <meta name="description" content="How this room works, and a quick way to report a problem or ask for something." />
   <link rel="icon" href={href('/favicon.svg')} type="image/svg+xml" />
+  <script is:inline data-astro-rerun set:html={A11Y_BOOT}></script>
   <script is:inline data-astro-rerun>
     (function () {
       var r = document.documentElement, t = 'system', hp = 'off';
@@ -35,12 +38,14 @@ const { title, office, home } = Astro.props;
       if (t === 'light' || t === 'dark') r.setAttribute('data-theme', t); else r.removeAttribute('data-theme');
       try { hp = sessionStorage.getItem('rs5-help') === 'on' ? 'on' : 'off'; } catch (_) {}
       r.setAttribute('data-help', hp);
+      /* Reduced motion (M7): window.rsReducedNow() comes from the accessibility boot script above (src/lib/a11y.mjs). */
     })();
   </script>
   <FeatureBoot />
   <ClientRouter />
 </head>
 <body class="guide-body">
+  <a class="skip-link" href="#main">Skip to content</a>
   <header class="g-top">
     <a class="g-brand" href={href(home)} aria-label="Room guide home" data-help="guide.brand">
       <svg class="g-mark" viewBox="0 0 32 32" aria-hidden="true"><rect class="tile" x="1.5" y="1.5" width="28" height="28" rx="7" stroke-width="2" /><path class="tick" d="M8.5 16l4.5 4.5 10-10" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
@@ -62,7 +67,9 @@ const { title, office, home } = Astro.props;
   <slot name="end" />
   <script>
     import km from '../lib/motion-library.js';
+    import { wirePage } from '../lib/motion-wire.js';
     (window as any).km = km;
+    wirePage(km);
   </script>
   <script is:inline data-astro-rerun>
     /* Health glyphs (M8, as in the Shell): quiet first, then each comes on in turn, once, as it scrolls into view. */
@@ -70,7 +77,7 @@ const { title, office, home } = Astro.props;
       var lights = document.querySelectorAll('.hg:not(.lit)'), n = 0;
       var gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--stagger')) || 24;
       var light = function (el) { setTimeout(function () { el.classList.add('lit'); }, 200 + (n++ % 40) * gap); };
-      if (matchMedia('(prefers-reduced-motion: reduce)').matches) { lights.forEach(function (el) { el.classList.add('lit'); }); return; }
+      if ((window.rsReducedNow ? window.rsReducedNow() : matchMedia('(prefers-reduced-motion: reduce)').matches)) { lights.forEach(function (el) { el.classList.add('lit'); }); return; }
       if (!('IntersectionObserver' in window)) { lights.forEach(light); return; }
       var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { io.unobserve(e.target); light(e.target); } }); }, { threshold: 0.5 });
       lights.forEach(function (el) { io.observe(el); });
@@ -89,6 +96,7 @@ const { title, office, home } = Astro.props;
     --g-fs-title: clamp(28px, 7vw, 40px);   /* the room's name */
   }
   .guide-body { min-height: 100svh; display: grid; grid-template-rows: auto 1fr auto; background: var(--bg); font-size: var(--g-fs-body); }
+  html:has(.guide-body) { scroll-padding-top: 76px; }   /* focus never under the sticky bar (2.4.11) */
   .g-top {
     position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 12px;
     padding: max(10px, env(safe-area-inset-top)) 16px 10px; background: color-mix(in srgb, var(--bg) 86%, transparent);

@@ -51,6 +51,46 @@ properties:
   notes:
     type: array
     items: { type: string }
+  power:
+    description: >-
+      Comms rooms only: where the rack's feeds come from and what the UPS did when it was measured (the power standard's
+      dedicated circuits, UPS size and runtime rules). Live runtime and battery state come by connector.
+    type: object
+    additionalProperties: false
+    properties:
+      feeds:
+        description: One per feed (A and B), each from its own circuit at a distribution board.
+        type: array
+        minItems: 1
+        items:
+          type: object
+          additionalProperties: false
+          required: [feed, board, way]
+          properties:
+            feed: { enum: [A, B] }
+            board: { description: "The distribution board's label (DB-3A).", type: string, pattern: "^[A-Z0-9][A-Z0-9-]{1,20}$" }
+            way: { description: "The circuit's way (breaker) number on that board.", type: integer, minimum: 1 }
+      ups:
+        description: The UPS as measured at handover or its last timed test.
+        type: object
+        additionalProperties: false
+        required: [runtime_min, load_pct, measured]
+        properties:
+          runtime_min: { description: "Minutes of runtime at the measured load.", type: number, minimum: 0 }
+          load_pct: { description: "Load as a share of the UPS's rating, in per cent.", type: number, minimum: 0, maximum: 150 }
+          measured: { description: "When it was measured.", type: string, format: date }
+      demo: { const: true }
+  environment:
+    description: >-
+      Comms rooms only: where the room's temperature is read from. The target is the racks standard's; the reading itself
+      comes by connector (simulated in the demo).
+    type: object
+    additionalProperties: false
+    required: [probe]
+    properties:
+      probe: { description: "The sensor, in words, and where it sits.", type: string }
+      reports_to: { description: "The system it reports to (monitoring).", type: string }
+      demo: { const: true }
   geometry:
     description: >-
       How this real room differs from its profile, and where it sits on its floor.

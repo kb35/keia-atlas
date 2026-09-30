@@ -29,6 +29,7 @@ import LeadershipHome from '../components/LeadershipHome.astro';
 import PartnerHome from '../components/PartnerHome.astro';
 // Room checks due for the viewer (the Room checks capability, src/lib/modules.mjs).
 import HomeChecks from '../components/HomeChecks.astro';
+import PortfolioHome from '../components/PortfolioHome.astro';
 import '../styles/withchip.css';
 import '../styles/handover.css';
 import '../styles/home.css';
@@ -47,7 +48,11 @@ import { experience, serviceLevels } from '../lib/experience.mjs';
 import { SERVICE_ORDER } from '../lib/services.mjs';
 import { leadership } from '../lib/costs.mjs';
 import { partnerBand } from '../lib/vendors.mjs';
+import { portfolio } from '../lib/engagements.mjs';
 import { sparkSvg } from '../lib/spark.mjs';
+import { tally } from '../lib/health.mjs';
+import Arrive from '../components/Arrive.astro';
+import { homeLines } from '../lib/oncall-view.mjs';
 
 const H = homeData();
 // Leadership (V7): "are we OK, and what does it cost?" The AV service's experience across every office (the same figures
@@ -67,6 +72,9 @@ H.cockpit.lead = {
 };
 // Partners (V7): the jobs handed to each partner's company, with the contract clock (src/lib/vendors.mjs; simulated).
 H.cockpit.partner = Object.fromEntries(PEOPLE.filter((p) => p.vendor).map((p) => { const B = partnerBand(p.id); return [p.id, { withYou: B.withYou, waiting: B.waiting, past: B.past, spaces: B.spaces, answer: B.answer }]; }));
+// Providers with more than one client (docs/service-providers.md): the portfolio leads their Home (simulated).
+H.cockpit.portfolio = Object.fromEntries(PEOPLE.filter((p) => p.vendor).map((p) => [p.id, portfolio(p.vendor)]).filter(([, P]) => P.cards.length > 1)
+  .map(([id, P]) => [id, { clients: P.cards.length, jobs: P.jobs, past: P.past, crews: P.crews.length, answer: P.answer }]));
 // Welcome back is shown for Anna (the demo switch in Settings); keep the blob to the people who need it.
 H.cockpit.welcome = { anna: H.cockpit.welcome.anna };
 const json = JSON.stringify(H).replace(/</g, '\\u003c');
@@ -83,8 +91,9 @@ const floorCards = offices.flatMap((s) => floorsOf(s).map((f) => ({ key: `${s}-$
 const rank = (id) => (health[id]?.h === 'fault' ? 0 : health[id]?.h === 'review' ? 1 : 2);
 const estateCards = offices.map((s) => {
   const fl = floorsOf(s), worst = fl.map((f) => ({ f, r: Math.min(2, ...Object.keys(health).filter((id) => id.startsWith(`${s}-${f.id}-`)).map(rank)) })).sort((a, b) => a.r - b.r)[0];
-  const sh = SITE_HEALTH[s], bad = sh.fault.length + sh.review.length;
-  return { key: s, site: s, floor: (worst?.f ?? fl[0])?.id, title: sites[s].name.replace(/ office$/, ''), to: `/locations/${s}/`, figure: sh.fault.length ? `${sh.fault.length} fault${sh.fault.length === 1 ? '' : 's'}` : bad ? `${bad} to review` : `${sh.n} ready`, sub: fl.length > 1 ? `${(worst?.f ?? fl[0]).name} of ${fl.length} floors` : undefined };
+  const sh = SITE_HEALTH[s];
+  const f = worst?.f ?? fl[0];
+  return { key: s, site: s, floor: f?.id, title: sites[s].name.replace(/ office$/, ''), to: `/locations/${s}/?floor=${f?.id}`, figure: tally(sh.fault.length, sh.review.length), sub: fl.length > 1 ? `${f.name} of ${fl.length} floors` : undefined };
 }).filter((c) => c.floor);
 
 // ---- Static blocks for the record layer (the same for everyone of a role) --------------------------------------------
@@ -117,6 +126,10 @@ const labWaiting = Object.values(labTests).filter((l) => ['passed', 'testing', '
 const pms = PEOPLE.filter((p) => p.roleId === 'pm');
 // A project manager sees the projects they run; everyone else sees them all.
 const pmCss = pms.map((pm) => `:root[data-who="${pm.id}"] [data-pm]:not([data-pm="${pm.id}"]){display:none}`).join('');
+// On call (the overlooked items, #6): the line for whoever is viewing, when they are on the rota this week or next.
+// Every line is drawn once; the viewer's own shows (View as switches it with the rest of Home).
+const OCL = homeLines();
+const oclCss = Object.keys(OCL).map((id) => `:root[data-who="${id}"] .ocl-home{display:block}:root[data-who="${id}"] [data-oncall-for="${id}"]{display:grid}`).join('');
 ---
 <Shell title="Home" section="home" vendorOk crumbs={[{ label: 'Home' }]}>
   <PageBand overline="Home" title="Anna, ready for you" answer={H.cockpit ? ' ' : ''} heartbeat>
@@ -137,6 +150,17 @@ const pmCss = pms.map((pm) => `:root[data-who="${pm.id}"] [data-pm]:not([data-pm
     </section>
 
     <div class="layer" data-layer="summary" id="summary">
+      <!-- On call: "You're on call until Monday 08:00", only for the people on the rota. -->
+      <section class="ck card ocl-home" data-feature="oncall" data-settle aria-label="On call" data-help="home.oncall">
+        {Object.entries(OCL).map(([id, l]) => (
+          <div class:list={['ocl-line', `k-${l.kind}`]} data-oncall-for={id}>
+            <span class="ocl-ic" aria-hidden="true"><Icon name="schedule" size={16} /></span>
+            <p class="ocl-t"><b>{l.lead}</b> <span class="rs-tick">{l.when}</span></p>
+            <p class="ocl-s">{l.sub}</p>
+            <a class="ocl-a" href={href('/team/#on-call')}>The rota <span aria-hidden="true">→</span></a>
+          </div>
+        ))}
+      </section>
       <!-- Hand over for cover: on the colleague's Home while the person is away (UX-V2 §4.3, step 4). -->
       <section data-sec="cover" id="cover" hidden aria-label="Covering">
         <HandoverCard variant="cover" id="cv" overline="Hand over for cover" title="Covering" meta="" />
@@ -155,7 +179,7 @@ const pmCss = pms.map((pm) => `:root[data-who="${pm.id}"] [data-pm]:not([data-pm
           <span class="day-place" data-day-place></span>
           <a class="aside" data-day-full href={href(`/work/schedule/?view=day&d=${DEMO_TODAY}`)}>Full schedule <span aria-hidden="true">→</span></a>
         </header>
-        <div class="day-bar" data-day-bar aria-hidden="true"></div>
+        <div class="day-bar" data-day-bar data-chart-bar="each" aria-hidden="true"></div>
         <ol class="day-list" data-day-list></ol>
         <p class="hp-empty" data-day-empty hidden>Nothing booked today. Your open work is below.</p>
       </section>
@@ -222,18 +246,19 @@ const pmCss = pms.map((pm) => `:root[data-who="${pm.id}"] [data-pm]:not([data-pm
 
       <!-- Your office's floors, every space a quiet ring unless it is not fine. -->
       <section class="ck card" data-sec="floors" id="floors" aria-labelledby="h-floors" hidden>
-        <header class="ck-h"><h2 id="h-floors" data-help="home.floors"><span data-floors-name>Your office</span>, every space</h2><span class="ck-n faint" data-floors-say></span><a class="aside" data-floors-link href={href('/locations/')}>Open the office <span aria-hidden="true">→</span></a></header>
+        <header class="ck-h"><h2 id="h-floors" data-help="home.floors"><span data-floors-name>Your office</span>, every space</h2><span class="ck-say" data-floors-say></span><a class="aside" data-floors-link href={href('/locations/')}>Open the office <span aria-hidden="true">→</span></a></header>
         <SmallMultiples cards={floorCards} health={health} people={FIRST} min={300} label="Your office's floors" />
       </section>
 
       <!-- The estate: one card per office, the same tiny plan at the same scale (UI-V2 §8.7). -->
       <section class="ck card" data-sec="estate" id="estate" aria-labelledby="h-estate" hidden>
-        <header class="ck-h"><h2 id="h-estate" data-help="home.estate">The estate</h2><span class="ck-n faint" data-estate-say></span><a class="aside" href={href('/locations/')}>Locations <span aria-hidden="true">→</span></a></header>
+        <header class="ck-h"><h2 id="h-estate" data-help="home.estate">The estate</h2><span class="ck-say" data-estate-say></span><a class="aside" href={href('/locations/')}>Locations <span aria-hidden="true">→</span></a></header>
         <SmallMultiples cards={estateCards} health={health} people={FIRST} min={200} label="Every office, one card each" />
       </section>
 
       <!-- Leadership: what it costs, and what is to review (V7). Partners: the jobs with their company (V7). -->
       <LeadershipHome part="summary" L={LEAD} />
+      <PortfolioHome />
       <PartnerHome />
 
       <!-- Vendors: only their installation. -->
@@ -469,4 +494,5 @@ const pmCss = pms.map((pm) => `:root[data-who="${pm.id}"] [data-pm]:not([data-pm
     document.addEventListener('astro:page-load', start);
   </script>
 </Shell>
-<style is:global set:html={pmCss}></style>
+<style is:global set:html={pmCss + oclCss}></style>
+<Arrive />

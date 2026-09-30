@@ -84,6 +84,7 @@ const COLS = ['A typical ITSM tool', 'AV monitoring', 'A facilities tool', 'Keia
       </li>
     ))}
   </ol>
+  <div class="df-ctl" data-df-ctl></div>
 
   <div class="df-cmp-box">
     <p class="df-cmp-h">A fair comparison, in words</p>
@@ -102,12 +103,12 @@ const COLS = ['A typical ITSM tool', 'AV monitoring', 'A facilities tool', 'Keia
 <script>
   import { motion } from '../../lib/motion-read.mjs';
   import { setGlyph } from '../../lib/health.mjs';
-  import { loop } from '../../lib/front-loop.mjs';
+  import { loop, clock as loopClock } from '../../lib/front-loop.mjs';
   function init(root: HTMLElement) {
     if ((root as any).__df) return; (root as any).__df = true;
     const tiles = Array.from(root.querySelectorAll<HTMLElement>('[data-df-tile]'));
-    let timers: number[] = [];
-    const later = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
+    const clk = loopClock();
+    const later = (ms: number, fn: () => void) => { clk.later(ms, fn); };
     const on = (t: HTMLElement) => {
       t.classList.add('is-on');
       const g = t.querySelector<HTMLElement>('.df-g');
@@ -118,12 +119,13 @@ const COLS = ['A typical ITSM tool', 'AV monitoring', 'A facilities tool', 'Keia
     // The proof's two buttons are real: the words open, and Roll back puts the record back, on the glyph and in words.
     const x = root.querySelector<HTMLElement>('[data-df-x]'), g3 = root.querySelector<HTMLElement>('[data-df-tile="owner"] .df-g');
     const howB = root.querySelector<HTMLButtonElement>('[data-df-how]'), backB = root.querySelector<HTMLButtonElement>('[data-df-back]');
-    let lp: { stop(): void; pause(ms?: number): void } | null = null;
+    let lp: ReturnType<typeof loop> | null = null;
     howB?.addEventListener('click', () => { lp?.pause(8000); const open = howB.getAttribute('aria-expanded') === 'true'; howB.setAttribute('aria-expanded', String(!open)); if (x) { x.hidden = open; x.textContent = 'Read the build sheet and the zone, wrote the record, read it back. The record it replaced is kept for Roll back.'; } });
     backB?.addEventListener('click', () => { lp?.pause(8000); if (g3) setGlyph(g3, 'review', { title: 'rolled back' }); if (x) { x.hidden = false; x.textContent = 'Rolled back under the DNS rule (owner: Nora): the previous record is back.'; } });
     lp = loop(root.querySelector<HTMLElement>('.df-list')!, {
       play: () => { tiles.forEach((t, i) => later(200 + i * 220, () => on(t))); return 200 + tiles.length * 220 + m.enter * 2 + m.morph + 500; },
-      reset: () => { timers.forEach(clearTimeout); timers = []; if (x) x.hidden = true; howB?.setAttribute('aria-expanded', 'false'); tiles.forEach((t) => { t.classList.remove('is-on'); const g = t.querySelector<HTMLElement>('.df-g'); if (g) setGlyph(g, 'progress', { title: 'running' }); }); },
+      finish: () => tiles.forEach(on), clock: clk, label: "why it's different", control: root.querySelector<HTMLElement>('[data-df-ctl]')!,
+      reset: () => { clk.clear(); if (x) x.hidden = true; howB?.setAttribute('aria-expanded', 'false'); tiles.forEach((t) => { t.classList.remove('is-on'); const g = t.querySelector<HTMLElement>('.df-g'); if (g) setGlyph(g, 'progress', { title: 'running' }); }); },
     });
   }
   const boot = () => document.querySelectorAll<HTMLElement>('[data-df]').forEach(init);
@@ -133,6 +135,9 @@ const COLS = ['A typical ITSM tool', 'AV monitoring', 'A facilities tool', 'Keia
 
 <style>
   .df { display: grid; gap: 22px; }
+  .df-ctl { display: flex; justify-content: flex-end; margin-top: -4px; }
+  .df-ctl:empty { display: none; }
+  .df-ctl :global(.rs-pause) { position: static; }
   .df-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
   .df-tile { display: grid; grid-template-rows: auto auto 1fr; gap: 8px; padding: 12px 12px 16px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-md); min-width: 0;
     opacity: 0; transform: scale(.97); transition: opacity var(--dur-enter) var(--ease-settle), transform var(--dur-enter) var(--ease-settle); }
@@ -183,7 +188,7 @@ const COLS = ['A typical ITSM tool', 'AV monitoring', 'A facilities tool', 'Keia
   .df-home-l { display: grid; font-size: 11.5px; line-height: 1.3; color: var(--text-2); }
   .df-x { grid-area: 1 / 1; transition: opacity var(--dur-state) var(--ease-settle) var(--dur-enter); }
   .df-s2, .df-f2 { opacity: 0; }
-  .df-s2, .df-f2 { color: var(--h-fault-ink, #F5B1A9); font-weight: 550; }
+  .df-s2, .df-f2 { color: #F5B1A9; font-weight: 550; }   /* on the tile's dark screen in either mode: the dark-mode fault ink */
   .df-tile.is-on .df-s1, .df-tile.is-on .df-f1 { opacity: 0; }
   .df-tile.is-on .df-s2, .df-tile.is-on .df-f2 { opacity: 1; }
   .df-figs { margin: 0; display: flex; gap: 16px; }

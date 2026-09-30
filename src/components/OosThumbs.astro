@@ -1,0 +1,46 @@
+---
+/* OosThumbs: a space out of service reads Off on the floor-map thumbnails too (Home, the region and office cards, the
+   leadership and vendor pages), while the Out of service capability is on (src/lib/modules.mjs,
+   src/lib/outofservice.mjs). It asks the thumbnails' own helper (rsFloorThumbs.set in FloorMap.astro) to mark the
+   space Off, the same move as any state change there (the tint and glyph ease in place, --dur-state; at once with
+   reduced motion), and gives the space back its own state when it returns. The office plan does the same through
+   src/lib/locations-client.mjs. Rendered once by the Shell; it does nothing on a page with no thumbnail. */
+import { oosSeed } from '../lib/capabilities-view.mjs';
+---
+<script type="application/json" data-oos-thumbs set:html={JSON.stringify(oosSeed.map((r) => ({ space: r.space, reason: r.reason, since: r.since, until: r.until, alternative: r.alternative ?? null, notice: r.notice })))}></script>
+
+<script>
+  import { outNow, readChanges, whenWords, EVENT, KEY } from '../lib/outofservice.mjs';
+  const W = window as any, D = document;
+  // A space marked Off keeps the state it had before on its link (data-oos-was), so it gets it back when it returns.
+  function paint() {
+    const T = W.rsFloorThumbs; if (!T || !D.querySelector('[data-fm-thumb]')) return;
+    let seed = []; try { seed = JSON.parse(D.querySelector('[data-oos-thumbs]')?.textContent || '[]'); } catch (_) {}
+    const out = !W.rsFeatureOn || W.rsFeatureOn('out-of-service') ? outNow(seed, readChanges()) : {};
+    D.querySelectorAll<HTMLElement>('.fm-t-hit[data-oos-was]').forEach((a) => {
+      const id = a.dataset.fmSpace!; if (out[id]) return;
+      const was = JSON.parse(a.dataset.oosWas || '{}');
+      D.querySelectorAll<HTMLElement>(`.fm-t-hit[data-fm-space="${CSS.escape(id)}"]`).forEach((x) => x.removeAttribute('data-oos-was'));
+      T.set(id, was.h ?? null, was.why ?? '');
+    });
+    for (const [id, rec] of Object.entries<any>(out)) {
+      const links = D.querySelectorAll<HTMLElement>(`.fm-t-hit[data-fm-space="${CSS.escape(id)}"]`);
+      if (!links.length) continue;
+      links.forEach((x) => { if (!x.dataset.oosWas) x.dataset.oosWas = JSON.stringify({ h: x.dataset.h ?? null, why: x.dataset.why ?? '' }); });
+      T.set(id, 'off', `Out of service until ${whenWords(rec.until)}`);
+    }
+  }
+  if (!W.__rsOosThumbs) {
+    W.__rsOosThumbs = true;
+    D.addEventListener(EVENT, paint);
+    D.addEventListener('rs:demo-change', paint);
+    W.addEventListener('storage', (e: StorageEvent) => { if (e.key === KEY) paint(); });
+    D.addEventListener('astro:page-load', paint);
+  }
+  paint();
+</script>
+
+<style is:global>
+  /* Off on a thumbnail: the room's tint quietens and its outline dashes, the Off glyph beside it (rsFloorThumbs). */
+  .fm-t-room[data-h="off"], .fm-t-room[data-st="off"] { fill: var(--surface-2); stroke: var(--h-off, var(--quiet)); stroke-width: .16; stroke-dasharray: .3 .2; }
+</style>

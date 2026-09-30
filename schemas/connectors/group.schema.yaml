@@ -1,0 +1,45 @@
+# Connected group (v1, Experimental): records that act together, as another system knows them. A stack of switches
+# (NetBox's virtual chassis), a high-availability pair, a cluster, a link aggregation or a diverse pair of circuits.
+# A group changes a job: stack members reboot together, and one of a pair is upgraded while the other carries on.
+# Files live in data/connected/<system>/groups/<id>.yaml. See docs/connectors/model.md.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/connectors/group
+title: Connected group
+type: object
+additionalProperties: false
+required: [kind, id, name, type, members, source]
+properties:
+  kind: { const: group }
+  id: { $ref: "common#/$defs/id" }
+  name: { type: string, minLength: 1 }
+  type:
+    description: >-
+      stack: switches joined by stacking cables and run as one. virtual-chassis: chassis joined over the network and
+      run as one. ha-pair: two units sharing one job, one active. cluster: several units sharing one job. lag: ports
+      bundled into one link. diverse-pair: two circuits on separate routes.
+    enum: [stack, virtual-chassis, ha-pair, cluster, lag, diverse-pair]
+  type_native: { type: string, minLength: 1, description: "The system's own word (Virtual chassis, FHRP group, Cluster)." }
+  members:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [ref]
+      properties:
+        ref: { $ref: "common#/$defs/id", description: "A connected unit, port, circuit or other record." }
+        role: { enum: [master, member, primary, backup, active, standby] }
+        role_native: { type: string, minLength: 1 }
+        position: { type: integer, minimum: 0, description: "Its number in the group (a stack member's switch number)." }
+  domain: { type: string, minLength: 1, description: "The group's own name on the network (a stack or HA domain)." }
+  space: { $ref: "common#/$defs/id", description: "The connected space it is in, when the whole group is in one place." }
+  status: { $ref: "common#/$defs/status" }
+  status_native: { type: string, minLength: 1 }
+  team: { $ref: "common#/$defs/team" }
+  notes: { $ref: "common#/$defs/notes" }
+  source: { $ref: "common#/$defs/source" }
+  field_sources: { $ref: "common#/$defs/field_sources" }
+  seen: { $ref: "common#/$defs/seen" }
+  raw: { $ref: "common#/$defs/raw" }
+  raw_redacted: { $ref: "common#/$defs/raw_redacted" }

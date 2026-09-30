@@ -16,6 +16,8 @@ import { crossCheckKnownIssues } from './crossrefs-knownissues.mjs';
 import { crossCheckFloors } from './crossrefs-floors.mjs';
 import { crossCheckPrivacy } from './crossrefs-privacy.mjs';
 import { crossCheckConnected } from './crossrefs-connected.mjs';
+import { crossCheckOperations } from './crossrefs-operations.mjs';
+import { crossCheckSwitchPorts } from './crossrefs-switchports.mjs';
 import { crossCheckCapabilities } from './crossrefs-capabilities.mjs';
 import path from 'node:path';
 
@@ -647,6 +649,8 @@ export function crossCheck(records, root) {
   problems.push(...crossCheckFloors(records));
   problems.push(...crossCheckPrivacy(records));
   problems.push(...crossCheckConnected(records));
+  problems.push(...crossCheckOperations(records));
+  problems.push(...crossCheckSwitchPorts(records));
   // The capabilities' records: licences, checks, alert rules, certificates and the rest (src/lib/modules.mjs).
   problems.push(...crossCheckCapabilities(records));
 

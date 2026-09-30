@@ -37,20 +37,17 @@ test('the registry: unique ids, a real module, a valid default, a source, and re
   for (const [id, st] of Object.entries(BUILT)) assert.equal(CAPABILITY_DEFAULTS[id], st, `${id} defaults to ${st}`);
 });
 
-test('the other change\'s sections are registered here, and features-added.mjs (when present) names no other id', async () => {
-  for (const id of HELPER_IDS) assert.ok(CAPABILITY_IDS.includes(id), `${id} is registered`);
-  const file = join(ROOT, 'src/lib/features-added.mjs');
-  if (!existsSync(file)) return;
-  const mod = await import(pathToFileURL(file).href);
-  const ids = new Set();
-  const collect = (v) => {
-    if (typeof v === 'string') { if (/^[a-z][a-z-]*$/.test(v)) ids.add(v); }
-    else if (Array.isArray(v)) v.forEach(collect);
-    else if (v && typeof v === 'object') { if (typeof v.id === 'string') ids.add(v.id); else Object.keys(v).forEach((k) => ids.add(k)); }
-  };
-  Object.values(mod).forEach(collect);
-  const unknown = [...ids].filter((id) => !CAPABILITY_IDS.includes(id) && !MODULES.some((m) => m.id === id));
-  assert.deepEqual(unknown, [], 'register these capability ids in src/lib/modules.mjs');
+test('the overlooked batch\'s sections (FEATURES_ADDED) are registered here, each in the same module', async () => {
+  const { FEATURES_ADDED } = await import(pathToFileURL(join(ROOT, 'src/lib/features-added.mjs')).href);
+  assert.ok(FEATURES_ADDED.length >= HELPER_IDS.length);
+  for (const f of FEATURES_ADDED) {
+    const c = CAPABILITIES.find((x) => x.id === f.id);
+    assert.ok(c, `${f.id} is registered in src/lib/modules.mjs`);
+    assert.equal(c.module, f.module, `${f.id} sits under the same module`);
+    assert.ok(c.helper, `${f.id} is marked as another change's section`);
+  }
+  for (const id of HELPER_IDS) assert.ok(FEATURES_ADDED.some((f) => f.id === id), `${id} is in FEATURES_ADDED`);
+  assert.equal(CAPABILITY_DEFAULTS.engagements, 'on', 'service-provider engagements, under Vendors, on by default');
 });
 
 test('requires cascades: a module Off takes its capabilities, and a capability waits for what it requires', () => {

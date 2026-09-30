@@ -37,6 +37,7 @@ export const RESTRICTED_VIEWS = {
   exposure: 'vulnerable-firmware list',
   passwords: 'default password status',
   credentials: 'credential references',
+  circuits: 'internet circuits',
 };
 
 // Every `x-classification` in a schema, as [{ at: 'properties.units.items...', label }], following $defs.

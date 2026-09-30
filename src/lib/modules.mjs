@@ -67,14 +67,16 @@ export function moduleAttrs(map) {
 //   state     the default: on, connected or off
 //   source    the tool it reads from when Connected (the source mark: "from Datadog")
 //   requires  modules or capabilities that must not be Off for it to be on
-//   helper    a section another change adds (src/lib/features-added.mjs lists them); registered here, so that list
-//             never needs a switch of its own
+//   helper    a section another change added (src/lib/features-added.mjs, FEATURES_ADDED, lists them with the same
+//             module); registered here, so that list never needs a switch of its own
 export const CAPABILITIES = [
   // Locations
   { id: 'room-accessibility', module: 'locations', label: 'Room accessibility', what: 'Hearing loops, captions and step-free access on each space', state: 'on', source: 'the workplace system', helper: true },
   { id: 'circuits', module: 'locations', label: 'Internet circuits', what: 'Circuit ids, bandwidth, support lines and contract ends per office', state: 'on', source: 'the carrier portals', helper: true },
   { id: 'comms-environment', module: 'locations', label: 'Comms room power and climate', what: 'UPS runtime, load, temperature and cooling in each comms room', state: 'on', source: 'the power monitoring', helper: true },
   { id: 'change-windows', module: 'locations', label: 'Change windows', what: 'Each office\'s hours and the window when changes may run', state: 'on', source: 'the change calendar', helper: true },
+  { id: 'cable-tests', module: 'locations', label: 'Cable test results', what: 'Certification results for every cable run and outlet', state: 'on', source: 'the cable tester', helper: true },
+  { id: 'certified-platforms', module: 'locations', label: 'Certified platforms', what: 'Which meeting platforms each space\'s kit is certified for', state: 'on', source: 'the manufacturers', helper: true },
   { id: 'meeting-quality', module: 'locations', label: 'Meeting quality', what: 'A call-quality score per space, its trend and the worst rooms', state: 'connected', source: 'the meeting platform' },
   // Assets
   { id: 'licences', module: 'assets', label: 'Licences', what: 'Room and platform licences, seats, renewals and cost', state: 'on', source: 'the licence portals' },
@@ -82,14 +84,14 @@ export const CAPABILITIES = [
   { id: 'cves', module: 'assets', label: 'Security flaws', what: 'Published security flaws per firmware line, and the units exposed', state: 'on', source: 'the vendor advisories' },
   { id: 'credentials', module: 'assets', label: 'Certificates and secrets', what: 'Certificates, service accounts and secrets by reference, with expiry', state: 'off', source: 'the vault' },
   { id: 'config-backups', module: 'assets', label: 'Config backups', what: 'The last config backup of each network device, and its drift', state: 'connected', source: 'Oxidized' },
-  { id: 'cable-tests', module: 'assets', label: 'Cable test results', what: 'Certification results for every cable run and outlet', state: 'on', source: 'the cable tester', helper: true },
-  { id: 'certified-platforms', module: 'assets', label: 'Certified platforms', what: 'Which meeting platforms each space\'s kit is certified for', state: 'on', source: 'the manufacturers', helper: true },
   // Support
   { id: 'out-of-service', module: 'support', label: 'Out of service', what: 'Take a space out of service and tell the people booked into it', state: 'on', source: 'the booking system', requires: ['locations'] },
   { id: 'alerts', module: 'support', label: 'Alert rules', what: 'What counts as an alert, who gets it, quiet hours and silences', state: 'connected', source: 'monitoring', requires: ['services'] },
   { id: 'repeat-faults', module: 'support', label: 'Repeat faults', what: 'Spaces and models that keep failing, and the trend', state: 'on', source: 'ServiceNow', helper: true },
   // Projects
   { id: 'maintenance', module: 'projects', label: 'Room checks', what: 'Recurring checks and planned maintenance, scheduled with a checklist', state: 'on', source: 'the maintenance planner', requires: ['locations'] },
+  // Vendors
+  { id: 'engagements', module: 'vendors', label: 'Service providers', what: 'Engagements with service providers: scope, service levels and reviews', state: 'on', source: 'the supplier portal' },
   // Team
   { id: 'oncall', module: 'team', label: 'On-call', what: 'Who is on call now, by region and service', state: 'on', source: 'the paging tool', requires: ['support'], helper: true },
 ];

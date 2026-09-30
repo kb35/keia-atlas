@@ -58,6 +58,9 @@ $defs:
       arrived: { description: The day it arrived in the store., type: string, format: date }
       cabinet: { description: "A cabinet of the store room profile option, in words (Cabinet A).", type: string }
       shelf: { description: "A shelf of that cabinet, in words (Shelf 2).", type: string }
+      purchase: { $ref: "#/$defs/purchase" }
+      warranty: { $ref: "#/$defs/warranty" }
+      support: { $ref: "#/$defs/support" }
       notes: { type: string }
 
   olderUnit:
@@ -125,4 +128,34 @@ $defs:
           map for an attacker.
         type: boolean
         x-classification: Restricted
+      purchase: { $ref: "#/$defs/purchase" }
+      warranty: { $ref: "#/$defs/warranty" }
+      support: { $ref: "#/$defs/support" }
       notes: { type: string }
+
+  # What a technician needs to know before a repair: when it was bought and on which order, what it cost, when the
+  # manufacturer's warranty ends and which support contract covers it. Full asset finance stays in the finance
+  # system; these are the figures a technician needs. Demo values say demo: true.
+  purchase:
+    type: object
+    additionalProperties: false
+    required: [date]
+    properties:
+      date: { description: "The day it was bought (the order date).", type: string, format: date }
+      order: { description: "The purchase order reference (PO-DUB-2022-004).", type: string, pattern: "^[A-Z0-9][A-Z0-9-]{2,40}$" }
+      cost: { description: "What one unit cost to buy, in the currency below.", type: number, minimum: 0 }
+      currency: { description: "ISO 4217 code.", type: string, pattern: "^[A-Z]{3}$" }
+      demo: { description: "True when the figures are made up for the demo.", const: true }
+  warranty:
+    type: object
+    additionalProperties: false
+    required: [ends]
+    properties:
+      ends: { description: "The last day of the manufacturer's warranty.", type: string, format: date }
+      demo: { const: true }
+  support:
+    description: >-
+      The vendor whose contract covers repairs (data/vendors/<id>.yaml): a service vendor that lists the model, or the
+      manufacturer. The contract reference and dates come from the vendor's record.
+    type: string
+    pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"

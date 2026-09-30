@@ -47,6 +47,7 @@ sections:
         rule: Choose the display so the farthest seat is no more than six times the image height away, or four times for rooms used for detailed content.
         why: Text on a slide must be readable from the back of the room; too small a display is the most common design fault in meeting rooms.
         check: Measure the farthest seat on the room plan and compare it with the table.
+        record: on-site
         house: true
         sources: [avixa-discas]
       - id: discas
@@ -60,6 +61,7 @@ sections:
         rule: Use only commercial displays rated for the hours they will run (24/7 for signage), from the house lines in the space type.
         why: Consumer TVs are not rated for long hours, lack network control and can change their settings with an update.
         check: The model in Keia Atlas is a house model with a 24/7 rating.
+        record: device-models:rated_hours
         house: true
   - id: mounting
     title: Mounting height and fixing
@@ -70,6 +72,7 @@ sections:
         rule: In seated rooms, mount the display with its bottom edge 1,000 mm above the floor (plus or minus 50 mm), centred on the table, with the camera or video bar directly above or below it.
         why: Faces on the far end then sit close to a seated person's eye height (about 1,200 mm), so people look at the camera while they look at the screen.
         check: Measure from the finished floor to the bottom edge of the display.
+        record: on-site
         house: true
       - id: vertical-angle
         level: should
@@ -82,18 +85,21 @@ sections:
         rule: Fix the mount into studs, blockwork or a backing plate with fixings rated for at least four times the display's weight, never into plasterboard alone.
         why: An 85 inch display weighs over 40 kg; a mount that pulls out of a wall is a serious injury.
         check: Photo of the fixings before the display is hung, and the mount's rating in the handover pack.
+        record: on-site
         house: true
       - id: protrusion
         level: must
         rule: In corridors, reception and other routes people walk along, keep the display and mount within 100 mm of the wall when its bottom edge is between 685 and 2,030 mm above the floor.
         why: Someone with a visual impairment finds obstacles with a cane at floor level; a display sticking out above that is not detected.
         check: Measure the depth from the wall to the front of the display.
+        record: on-site
         sources: [ada-307]
       - id: outlets-behind
         level: must
         rule: Put the power and data outlets in a recessed box behind the display, inside its outline.
         why: No cables below the screen, and the plugs can be reached by lifting the display off its mount.
         check: See the power and earthing standard; photo before the display is hung.
+        record: on-site
         house: true
   - id: network
     title: Network connection and fleet management
@@ -103,12 +109,14 @@ sections:
         rule: Connect every display's LAN port to a wired outlet on the Displays and signage VLAN (31), with a DHCP reservation and the hostname site-room-dsp and number.
         why: A display on the network can be turned on, checked and updated from anywhere; one without is only found broken when a meeting starts.
         check: The display answers on its reserved address and its name resolves in DNS.
+        record: [installs:hostname, switch-ports:addresses.mac]
         house: true
       - id: fleet
         level: must
         rule: Enrol every display in its manufacturer's fleet management (Samsung VXT or LG Business Cloud) under its hostname, and turn on SNMP for monitoring.
         why: Fleet management shows every display's power, input, temperature and firmware in one place and can act on it; monitoring raises an alert when one stops answering.
         check: The display is online in fleet management and in monitoring.
+        record: connect
         house: true
         sources: [samsung-manual, lg-guide]
       - id: network-standby
@@ -116,6 +124,7 @@ sections:
         rule: Set the display to keep its network connection in standby (Samsung Remote Configuration on; LG PM Mode Network Ready and Wake On LAN on).
         why: With the default standby the display drops off the network when it is off, so nothing can turn it back on remotely.
         check: Turn the display off, then turn it on from fleet management.
+        record: on-site
         sources: [samsung-manual, lg-guide]
       - id: ip-control
         level: should
@@ -132,18 +141,21 @@ sections:
         rule: Set an On timer on working days at the office's opening time and an Off timer every day at closing time plus one hour, with the country's public holidays, from a clock set by NTP.
         why: Signage is on when people arrive, and every display is off overnight even if the room system misses it; that is where the energy is saved.
         check: The timers in fleet management match the office's hours in Keia Atlas.
+        record: sites:office_hours
         house: true
       - id: energy-saving-off
         level: must
         rule: Turn the display's energy saving and automatic brightness modes off (Samsung Energy Saving Solution; LG Energy Saving and Smart Energy Saving).
         why: They dim the picture, make content look dull and change the brightness under the camera during a call. Turning the display off when nobody is there saves far more.
         check: The settings read Off in fleet management.
+        record: connect
         sources: [samsung-manual, lg-guide]
       - id: auto-off-off
         level: must
         rule: Turn off every automatic power off (no signal power off, auto power off, no IR power off, DPM standby).
         why: When the video bar sleeps the display switches itself off and may not wake for the next meeting, which people report as no picture; nobody uses a remote, so an idle timer turns working displays off.
         check: Leave a room idle for 20 minutes, then start a call; the display wakes and shows the call.
+        record: on-site
         sources: [samsung-manual, lg-guide]
       - id: power-on-after-cut
         level: should
@@ -159,6 +171,7 @@ sections:
         rule: Connect the video bar or signage player to HDMI 1, and keep HDMI 2 for a wired laptop input where the space type has one.
         why: The same input everywhere makes remote support simple, and on the LG line HDMI 3 and DisplayPort cannot wake the display.
         check: The wiring in Keia Atlas matches the display's inputs.
+        record: space-types:wiring
         house: true
         sources: [lg-owners-manual]
       - id: cec
@@ -166,6 +179,7 @@ sections:
         rule: Turn HDMI-CEC on in rooms where the video bar wakes the display, and off for signage and rooms with a control system.
         why: The video bar uses CEC to wake the display and select its input; anywhere else CEC from a player or laptop switches the display unexpectedly.
         check: Start a call from the touch controller in a video bar room; the display wakes on the right input.
+        record: on-site
         house: true
       - id: auto-input
         level: should
@@ -181,12 +195,14 @@ sections:
         rule: Turn automatic updates off and apply the release the Lab has passed, from fleet management, in the office's change window.
         why: An update can change menus and defaults or restart a display during a meeting.
         check: Every display runs the fleet standard firmware for its model.
+        record: firmware:releases
         house: true
       - id: locks
         level: must
         rule: Change the default PIN or password to the site's, then lock the menus, the buttons, USB and (LG) Wi-Fi and screen share, as the last setup step.
         why: Displays are in public rooms; a changed setting is a support call, and a default PIN is on the internet.
         check: The remote cannot open the menu without the PIN; fleet management still works.
+        record: on-site
         house: true
       - id: clone
         level: should

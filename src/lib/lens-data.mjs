@@ -1,8 +1,9 @@
 // The facts behind each lens, per space, for one office (build time; the rules are in src/lib/lenses.mjs).
 // Every figure is from the demo data: made up where the data is made up, and the page says Simulated.
 //   Support    the open work on the space (incidents, tasks, device swaps due this year, urgent reports)
-//   Network    the cable runs to the space (their count and test margin), the monitoring fact on an open incident,
-//              the nearest access point, the floor's access switch and the VLANs by what the space holds
+//   Network    the switch ports serving the space as recorded (data/switch-ports, src/lib/switchports.mjs): how many,
+//              their VLANs and switches, and any the switch reports off the plan; the cables' test margin, the
+//              monitoring fact on an open incident and the nearest access point
 //   Projects   open projects that list the space, with the space's own state in the project
 //   Vendors    the service vendor whose contract covers a model in the space, else the office's integration partner
 //   Knowledge  setup guides for the models in the space, known errors that affect a unit here, captured fixes
@@ -14,6 +15,7 @@ import { issues } from './knownissues-view.mjs';
 import { PEOPLE } from './demo.mjs';
 import { supportLens, networkLens, projectsLens, vendorsLens, knowledgeLens } from './lenses.mjs';
 import { jobWindow } from './replay.mjs';
+import { siteNet } from './switchports.mjs';
 
 const FIRST = Object.fromEntries(PEOPLE.map((p) => [p.id, p.name.split(' ')[0]]));
 const YEAR = DEMO_TODAY.slice(0, 4);
@@ -32,15 +34,16 @@ function jobsOf(id) {
     });
 }
 
-// What a space holds decides its VLANs (data/standards/network.yaml, the VLAN plan).
-function vlansOf(s, runs) {
-  const k = KIND(s), v = new Set();
-  if (['meeting', 'small', 'shared'].includes(k)) { v.add(30); v.add(31); }
-  if (runs.some((r) => r.purpose === 'av')) v.add(40);
-  if (k === 'desks') v.add(20);
-  if (/print/.test(s.space_type)) v.add(70);
-  if (!v.size) v.add(20);
-  return [...v].sort((a, b) => a - b);
+// The switch ports serving a space, as recorded: comms room ports whose outlet is in it, and its in-room switches'
+// ports. Their VLANs, the switches, and the first port the switch reports off the plan.
+function portsServing(net, id) {
+  if (!net) return { ports: [], vlans: [], sw: null, off: null };
+  const ports = net.switches.flatMap((s) => s.ports.filter((p) => p.f && ((p.f.kind === 'outlet' && p.f.space === id) || (s.where === 'room' && s.space === id))).map((p) => ({ s, p })));
+  const active = ports.filter(({ p }) => p.state === 'active');
+  const vlans = [...new Set(active.map(({ p }) => p.native))].sort((a, b) => a - b);
+  const sw = [...new Set(ports.filter(({ s }) => s.where === 'rack').map(({ s }) => s.id))].join(', ') || null;
+  const bad = ports.find(({ p }) => p.check.ok === false);
+  return { ports, vlans, sw, off: bad ? `${bad.s.id} ${bad.p.word}: ${bad.p.check.why}` : null };
 }
 
 function vendorFor(site, models) {
@@ -85,6 +88,7 @@ export function officeLenses(siteId) {
   if (!M) return {};
   const out = {};
   const openPrj = Object.values(projects).filter((p) => p.phase !== 'closed');
+  const net = siteNet(siteId);
   for (const r of Object.values(M.rooms)) {
     if (!r.rect) continue;
     const s = spaces[r.id], models = modelsIn(s);
@@ -92,7 +96,7 @@ export function officeLenses(siteId) {
     const margins = runs.map((x) => x.test?.margin_db).filter((x) => typeof x === 'number');
     const cx = (r.rect[0] + r.rect[2]) / 2, cy = (r.rect[1] + r.rect[3]) / 2;
     const ap = M.aps.filter((a) => a.floor === r.floor).map((a) => ({ a, d: Math.hypot(a.at[0] - cx, a.at[1] - cy) })).sort((x, y) => x.d - y.d)[0]?.a ?? null;
-    const sw = M.racks.filter((k) => k.floor === r.floor).flatMap((k) => k.items).find((i) => i.kind === 'switch' && /access/i.test(i.label ?? ''))?.label ?? null;
+    const sp = portsServing(net, r.id);
     const openInc = (incByRoom.get(r.id) ?? []).filter((v) => v.inc.state !== 'resolved');
     const bad = openInc.flatMap((v) => v.inc.keia_atlas?.facts ?? []).find((f) => /switch port/i.test(f.label) && f.level === 'bad');
     const entries = openPrj.flatMap((p) => (p.spaces ?? []).filter((x) => x.space === r.id).map((x) => ({ code: p.id, name: p.name, phase: p.phase, space: x.state, note: x.note })));
@@ -104,7 +108,7 @@ export function officeLenses(siteId) {
     ];
     out[r.id] = {
       support: supportLens({ jobs: jobsOf(r.id) }),
-      network: networkLens({ ports: runs.length, portFault: bad ? `${bad.label}: ${bad.value}` : null, minMargin: margins.length ? Math.min(...margins) : null, ap: ap?.hostname ?? null, vlans: s ? vlansOf(s, runs) : [], sw }),
+      network: networkLens({ ports: sp.ports.length || runs.length, portFault: bad ? `${bad.label}: ${bad.value}` : null, vlanOff: sp.off, minMargin: margins.length ? Math.min(...margins) : null, ap: ap?.hostname ?? null, vlans: sp.vlans, sw: sp.sw }),
       projects: projectsLens({ entries }),
       vendors: vendorsLens({ vendor: models.length ? vendorFor(siteId, models) : null, today: DEMO_TODAY }),
       knowledge: knowledgeLens({ guides, errors, fixes, today: DEMO_TODAY }),

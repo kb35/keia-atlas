@@ -7,6 +7,7 @@
 // Motion (docs/rules/motion.md, M13 rows 41 to 45; all from the motion library and the tokens):
 //   - blocks below the fold settle in once as they enter the view (opacity and 8 px, --dur-enter);
 //   - each idea's picture (IdeaArt) plays its point once when it comes into view, one after another;
+//   - the morning story's steps step in once, one after another, each drawing playing as its step arrives;
 //   - on a mapping table, an idea's chip and its rows light together on hover or focus (--dur-state);
 //   - the navigation's marker slides from the page you came from to this one (rsZoom, the zero-bounce spring);
 //   - "Try it" links zoom into the demo (the Shell's zoom-in page move, from the link).
@@ -77,9 +78,17 @@ const crumbs = slug === 'level1' ? [{ label: 'The Keia Method' }]
 
   // Each idea's picture plays its point once, one after another when several arrive together (--dur-state apart).
   function pictures(root: HTMLElement) {
-    const arts = Array.from(root.querySelectorAll('.idea-art')) as SVGElement[];
+    const arts = Array.from(root.querySelectorAll('.idea-art:not(.st-art)')) as SVGElement[];
     if (!arts.length || still()) return;
     inView(arts, (batch) => batch.forEach((a, i) => { (a as any).style.setProperty('--ia-n', String(i)); km.play(a as any); }));
+  }
+
+  // The morning story (MorningStory): when its steps come into view they step in once, one after another, and each
+  // step's drawing plays its point as its step arrives (the step's --i sets both delays).
+  function story(root: HTMLElement) {
+    const list = root.querySelector<HTMLElement>('[data-story]');
+    if (!list || still()) return;
+    inView([list], () => { km.play(list as any); list.querySelectorAll('.st-art').forEach((a) => km.play(a as any)); });
   }
 
   // A mapping table: an idea's chip and every row that carries the same idea light together.
@@ -128,7 +137,7 @@ const crumbs = slug === 'level1' ? [{ label: 'The Keia Method' }]
     const root = D.querySelector<HTMLElement>('.content.method');
     if (!root || (root as any).__mp) return;
     (root as any).__mp = true;
-    settle(root); pictures(root); mapping(root); marker(root);
+    settle(root); pictures(root); story(root); mapping(root); marker(root);
   }
   boot();
   D.addEventListener('astro:page-load', boot);

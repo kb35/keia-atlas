@@ -100,7 +100,7 @@ test('counted stock on a shelf the store does not have', async () => {
 });
 
 test('a spare unit in a cabinet the store does not have', async () => {
-  const errors = await withEdit('data/installs/lon/lon-2-11.yaml', 'cabinet: Cabinet A, shelf: Shelf 2 }', 'cabinet: Cabinet Z, shelf: Shelf 2 }');
+  const errors = await withEdit('data/installs/lon/lon-2-11.yaml', 'cabinet: Cabinet A, shelf: Shelf 2,', 'cabinet: Cabinet Z, shelf: Shelf 2,');
   assert.ok(errors.some((e) => e.includes('"Cabinet Z" is not a cabinet of it-store / compact')), errors.join('\n'));
 });
 

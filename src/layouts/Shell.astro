@@ -7,6 +7,7 @@ import ViewAs from '../components/ViewAs.astro';
 import Report from '../components/Report.astro';
 import Peek from '../components/Peek.astro';
 import Motion from '../components/Motion.astro';
+import OosThumbs from '../components/OosThumbs.astro';
 import HelpMode from '../components/HelpMode.astro';
 import SearchOverlay from '../components/SearchOverlay.astro';
 import { ClientRouter } from 'astro:transitions';
@@ -19,6 +20,8 @@ import '../styles/base.css';
 import '../styles/motion.css';
 import '../styles/nav.css';
 import '../styles/craft.css';
+import '../styles/a11y.css';
+import { A11Y_BOOT } from '../lib/a11y.mjs';
 
 import { PEOPLE } from '../lib/demo.mjs';
 import { LINE } from '../lib/brand.mjs';
@@ -37,6 +40,8 @@ const NAV = [
   { id: 'home', label: 'Home', to: '/', icon: 'home', mobile: true, vendorOk: true, tabs: [] },
   { id: 'vendor', label: 'Your installation', short: 'Install', to: '/vendor/', icon: 'kit', vendorOnly: true, vendorOk: true, mobile: true, tabs: [] },
   { id: 'vschedule', label: 'Your schedule', short: 'Schedule', to: '/work/schedule/', icon: 'schedule', vendorOnly: true, vendorOk: true, tabs: [] },
+  // A provider's own Keia (docs/service-providers.md): every client it serves, each through its own engagement.
+  { id: 'portfolio', label: 'Your clients', short: 'Clients', to: '/portfolio/', icon: 'sites', vendorOnly: true, vendorOk: true, tabs: [], also: ['portfolio-client', 'portfolio-engagement'] },
   // Locations: offices, regions and home offices, with the spaces inside them. Spaces keep their
   // address (/rooms/) but live here. Region, office and home-office pages light the place, not a tab.
   { id: 'locations', label: 'Locations', to: '/locations/', icon: 'sites', mobile: true, tabs: [
@@ -93,7 +98,7 @@ const NAV = [
   { id: 'vendors', label: 'Vendors', to: '/vendors/', icon: 'kit', tabs: [
     { id: 'vendors', label: 'Vendors', to: '/vendors/' },
     { id: 'vendors-access', label: 'Access register', to: '/vendors/access/' },
-  ], also: ['vendor-record'] },
+  ], also: ['vendor-record', 'engagement'] },
   { id: 'team', label: 'Team', to: '/team/', icon: 'team', tabs: [] },
   { id: 'knowledge', label: 'Knowledge', to: '/known-issues/', icon: 'playbook', tabs: [
     { id: 'known-issues', label: 'Known errors', to: '/known-issues/' },
@@ -159,6 +164,9 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>{pageTitle}</title>
   <meta name="description" content={`Keia Atlas: ${LINE} A demo of a made-up company, built on public device data.`} />
+  <!-- Settings › Accessibility (src/lib/a11y.mjs): motion, text size, outlines, links, status words, keep still. Before
+       anything paints. It also defines window.rsReducedNow(), the one reduced-motion question every script asks (M7). -->
+  <script is:inline data-astro-rerun set:html={A11Y_BOOT}></script>
   <script is:inline data-astro-rerun define:vars={{ VENDOR_IDS, WHO_ROLE, PEOPLE_LITE, MODULE_DEFAULTS, MOVED_HREF, RS_CAPS }}>window.RS_VENDORS = VENDOR_IDS; window.RS_WHO_ROLE = WHO_ROLE; window.RS_PEOPLE = PEOPLE_LITE; window.RS_MODULES = MODULE_DEFAULTS; window.RS_MOVED = MOVED_HREF; window.RS_CAPS = RS_CAPS;</script>
   <script is:inline data-astro-rerun set:html={RESOLVE}></script>
   <script is:inline data-astro-rerun>
@@ -363,7 +371,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
           var load = e.loader, src = e.sourceElement && e.sourceElement.closest ? e.sourceElement : null;
           e.loader = async function () {
             await load();
-            var nd = e.newDocument; if (!nd || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+            var nd = e.newDocument; if (!nd || (window.rsReducedNow && window.rsReducedNow())) return;
             var safe = function (id) { return 'rec-' + String(id).replace(/[^a-zA-Z0-9_-]/g, '-'); };
             var esc = function (s) { return window.CSS && CSS.escape ? CSS.escape(s) : s; };
             var named = function (el, id) { el.style.viewTransitionName = safe(id); el.style.viewTransitionClass = 'rec'; };
@@ -402,7 +410,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
   <slot name="head" />
 </head>
 <body>
-  <a class="sr-only" href="#main">Skip to content</a>
+  <a class="skip-link" href="#main">Skip to content</a>
   <header class="mast">
     <a class="brand" href={href('/')} aria-label="Keia Atlas home" data-help="shell.brand">
       <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect class="tile" x="1.5" y="1.5" width="28" height="28" rx="7" stroke-width="2" /><path class="tick" d="M8.5 16l4.5 4.5 10-10" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
@@ -533,6 +541,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
   <Report about={aboutThis} />
   <Peek />
   <Motion />
+  <OosThumbs />
   <HelpMode />
   <SearchOverlay />
   <slot name="end" />
@@ -629,7 +638,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         return isNaN(n) ? d : /ms$/.test(v) ? n : /s$/.test(v) ? n * 1000 : n;
       };
       return {
-        reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
+        reduced: window.rsReducedNow(),
         ease: cs.getPropertyValue('--ease-settle').trim() || 'cubic-bezier(.22,1,.36,1)',
         morph: ms('--dur-morph', 520), enter: ms('--dur-enter', 440), exit: ms('--dur-exit', 240), page: ms('--dur-page', 420),
         state: ms('--dur-state', 300), hover: ms('--dur-hover', 140), pop: ms('--dur-pop', 200), flash: ms('--dur-flash', 800),
@@ -865,9 +874,12 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         pins.forEach(function (p) { p.r = p.el.getBoundingClientRect(); });
         pins.forEach(function (p) { p.el.style.left = (p.b.left - p.r.left) + 'px'; p.el.style.top = (p.b.top - p.r.top) + 'px'; });
         var undos = pins.map(function (p) {
-          var o = originOf(p.b), k = bigBox(p.b) ? [{ opacity: 1 }, { opacity: 0 }] : [{ opacity: 1, transform: 'none', transformOrigin: o }, { opacity: 0, transform: 'scale(0)', transformOrigin: o }];
-          var an = p.el.animate(k, { duration: m.exit, easing: m.exitEase || m.ease, fill: 'forwards' }), gone = false;
-          var undo = function () { if (gone) return; gone = true; an.cancel(); if (p.saved == null) p.el.removeAttribute('style'); else p.el.setAttribute('style', p.saved); };
+          // The words fade early (in the first 60% of the exit, on the settle curve) while the box shrinks on the exit
+          // curve, so a leaving row never sits at full strength over a row sliding into its place.
+          var o = originOf(p.b), big = bigBox(p.b);
+          var fade = p.el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: Math.round(m.exit * 0.6), easing: m.ease, fill: 'forwards' });
+          var an = big ? fade : p.el.animate([{ transform: 'none', transformOrigin: o }, { transform: 'scale(0)', transformOrigin: o }], { duration: m.exit, easing: m.exitEase || m.ease, fill: 'forwards' }), gone = false;
+          var undo = function () { if (gone) return; gone = true; fade.cancel(); an.cancel(); if (p.saved == null) p.el.removeAttribute('style'); else p.el.setAttribute('style', p.saved); };
           an.onfinish = undo;
           return undo;
         });

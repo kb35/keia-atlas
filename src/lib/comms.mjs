@@ -144,6 +144,9 @@ export function commsFacts(space) {
     battery: items.some((it) => it.kind === 'battery'),
     feeds: [...new Set(pdus.map((p) => p.feed))],
     strip: pdus.length ? shortModel(rackGear[pdus[0].gear]) : null,
+    // The room's own record (data/spaces power, environment): its circuits, and the UPS as last measured.
+    record: space.power ?? null,
+    env: space.environment ?? null,
   };
 
   // PoE budget as the vendor states it, per access switch model. The draw is not measured anywhere.
@@ -229,7 +232,7 @@ const qtyMax = (q) => (typeof q === 'number' ? q : q && typeof q === 'object' ? 
 const isVideo = (opt) => opt.equipment.some((e) => e.requirement === 'required' && ['video-bar', 'codec'].includes(e.class));
 // What a PoE-powered model draws, as the vendor states it: null when it is powered another way, 'unknown'
 // when it is PoE-powered but no figure is recorded.
-function poeDraw(model) {
+export function poeDraw(model) {
   const m = models[model]; if (!m) return null;
   const inp = (m.power?.inputs ?? []).find((i) => i.type === 'poe' && (i.poe?.role ?? 'powered') === 'powered');
   if (!inp) return null;

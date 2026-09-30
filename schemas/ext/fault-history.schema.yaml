@@ -1,0 +1,29 @@
+# Fault history: the faults resolved before the incidents Keia Atlas holds in full (data/fault-history/<site>.yaml).
+# One line per fault, matched to a space and, where it was a device, the unit and the symptom from its device class's
+# guide. The full ticket stays in the service desk (ServiceNow); this is what repeat faults are counted from, with the
+# open and recent incidents in data/incidents/.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/fault-history
+title: Fault history
+type: object
+additionalProperties: false
+required: [site, source, faults]
+properties:
+  site: { type: string, pattern: "^[a-z]{3}$" }
+  source: { description: "Where the lines come from, in words.", type: string }
+  faults:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [number, opened, resolved, space]
+      properties:
+        number: { description: "The service desk's ticket number.", type: string, pattern: "^INC[0-9]{7}$" }
+        opened: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$" }
+        resolved: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$" }
+        space: { description: "The space id.", type: string, pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
+        unit: { description: "The unit's asset tag, when the fault was a device's.", type: string, pattern: "^AG-[0-9]{6}$" }
+        symptom: { description: "A symptom from the unit's device class guide.", type: string, pattern: "^[a-z_]+$" }
+        fix: { description: "How it was fixed, in a few words.", type: string }
+  demo: { const: true }

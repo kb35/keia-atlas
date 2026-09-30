@@ -1,0 +1,33 @@
+# Connected address (v1, Experimental): one IP address, as another system knows it: the port it is on, its DNS
+# name, whether it is a DHCP reservation (and the MAC address the reservation is keyed on), and its status.
+# Subnets and ranges are networks, not addresses.
+# Files live in data/connected/<system>/addresses/<id>.yaml. See docs/connectors/model.md.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/connectors/address
+title: Connected address
+type: object
+additionalProperties: false
+required: [kind, id, address, source]
+properties:
+  kind: { const: address }
+  id: { $ref: "common#/$defs/id" }
+  address: { $ref: "common#/$defs/ip", description: "The address, with its prefix length when the system gives one (192.0.2.70/26)." }
+  port: { $ref: "common#/$defs/id", description: The connected port it is on. }
+  unit: { $ref: "common#/$defs/id", description: "The connected unit it belongs to." }
+  network: { $ref: "common#/$defs/id", description: "The connected network (prefix) it sits in." }
+  dns_name: { type: string, minLength: 1, pattern: "^[A-Za-z0-9_*]([A-Za-z0-9_.-]*[A-Za-z0-9])?\\.?$", description: "Its name in DNS (dub-3-04-bar.aigna.example)." }
+  mac: { $ref: "common#/$defs/mac", description: "The MAC address it belongs to: the port's own, or the one a DHCP reservation is keyed on." }
+  assignment:
+    description: "How the device gets it. static: set on the device. dhcp-reservation: DHCP always gives this device this address. dhcp: from a pool. slaac: IPv6 self-assigned."
+    enum: [static, dhcp-reservation, dhcp, slaac]
+  role_native: { type: string, minLength: 1, description: "The system's own role for it (Loopback, VIP, Secondary)." }
+  status: { $ref: "common#/$defs/status" }
+  status_native: { type: string, minLength: 1 }
+  description: { type: string, minLength: 1 }
+  notes: { $ref: "common#/$defs/notes" }
+  source: { $ref: "common#/$defs/source" }
+  field_sources: { $ref: "common#/$defs/field_sources" }
+  seen: { $ref: "common#/$defs/seen" }
+  raw: { $ref: "common#/$defs/raw" }
+  raw_redacted: { $ref: "common#/$defs/raw_redacted" }

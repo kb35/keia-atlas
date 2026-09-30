@@ -14,6 +14,8 @@
 //   S.missing the rows that are Not recorded
 //   S.counts  { rows, set, verify, per, missing }
 
+import { daysWords, plusHour } from './hours.mjs';
+
 const SEP = ' › ';
 const fill = (pattern, vars) => String(pattern ?? '').replace(/\{(\w+)\}/g, (m, k) => (vars[k] ?? m));
 const segs = (s) => String(s ?? '').split(/\s*(?:>|›)\s*/).map((x) => x.trim()).filter(Boolean);
@@ -98,7 +100,14 @@ export function resolve(key, st, ctx) {
       const pat = house.vault[key.slice(6)];
       return { val: fill(pat, { ...V, setting: st?.name ?? 'password' }), secret: true, from: 'The password vault. The secret itself is never shown here.' };
     }
-    case 'office-hours': return missing(`${site.name}'s opening and closing times are not recorded.`);
+    case 'office-hours': {
+      // The office's hours (data/sites office_hours): on at opening, off an hour after closing as a backstop.
+      const h = site.office_hours;
+      if (!h) return missing(`${site.name}'s opening and closing times are not recorded.`);
+      const days = daysWords(h.days), name = st?.name ?? '';
+      const val = /off timer/i.test(name) ? `Every day at ${plusHour(h.close)}` : /on timer/i.test(name) ? `${days} at ${h.open}` : `On ${days} at ${h.open}; off every day at ${plusHour(h.close)}`;
+      return { val, note: `The office is open ${h.open} to ${h.close}, ${days}.`, from: `${site.name}'s office hours` };
+    }
     case 'on-site': return missing('Decided or measured on site, during setup or commissioning, so it is not recorded before. Note it on the unit afterwards.');
     case 'as-written': return { val: st?.value ?? '', from: 'The setup guide: the same instruction on every unit' };
     default: return missing('This setting has no value template yet.');

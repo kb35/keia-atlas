@@ -6,6 +6,9 @@ import { spaces as SPACES, sites, KIND, models, rackGear, vendors, DEMO_TODAY, S
 import { JOBS } from './vendors.mjs';
 import { stateOf, windowOf, lineOf } from './blast-render.mjs';
 import { cutOff, portsOf, uplinksOf, itemNode, circuitNodes, servicesOf, meetingsOf, approvalFor, APPROVAL } from './blast.mjs';
+import { readSwitchPorts, groupsOf } from './switchcore.mjs';
+
+const SWITCH_PORTS = readSwitchPorts();
 
 /** The demo's "now" for bookings: noon on the demo's day, the same moment the vendor clocks use. */
 export const BLAST_NOW = `${DEMO_TODAY}T12:00`;
@@ -33,7 +36,7 @@ const plansOf = (siteIds, only = null) => siteIds.flatMap((s) => { const M = bui
 
 // ---- One space as the explorer lists it --------------------------------------------------------------------------
 const BUSY = { meeting: 0.3, small: 0.16 };
-function spaceRow(id, units = 0, sv = []) {
+export function spaceRow(id, units = 0, sv = []) {
   const s = SPACES[id]; const k = kindOf(id);
   const seats = s?.type?.keia_atlas?.capacity?.max ?? 0;
   const meet = BUSY[k] ? meetingsOf(id, { seats: Math.max(2, seats || 4), busy: BUSY[k], now: BLAST_NOW, hours: HOURS }) : [];
@@ -192,9 +195,19 @@ export function explorerForSpaces(ids, { key, kind = 'spaces', kindWord = '', ti
 // ---- Changes: what each touches, and the approval it needs ------------------------------------------------------
 // What each planned change touches (read with the change list in src/lib/rules-view.mjs). A standing rule's run
 // touches the space of the unit it ran on; a rule's own approval touches no space until it runs.
+/** A change's items with the rest of any group they belong to (a virtual chassis, a stack, an HA pair: data/switch-ports
+    groups). Kit that acts as one is changed as one, so the change touches every member. */
+export function withGroups(site, items = []) {
+  const M = building(site);
+  if (!M || !items.length) return items;
+  const groups = groupsOf(M, SWITCH_PORTS[site]);
+  const out = new Map(items.map((i) => [`${i.rack}:${i.u}`, i]));
+  for (const i of items) for (const g of groups) if (g.members.some((m) => m.rack === i.rack && m.u === i.u)) for (const m of g.members) if (m.key && !out.has(m.key)) out.set(m.key, { rack: m.rack, u: m.u });
+  return [...out.values()];
+}
 export function explorerForChange(c, { incidents = {} } = {}) {
   const t = c.touches;
-  if (t?.site) return explorerFor(t.site, { kind: 'touch', key: `chg-${c.id}`, items: t.items ?? [], circuits: t.circuits ?? [], spaces: t.spaces ?? [], title: c.title });
+  if (t?.site) return explorerFor(t.site, { kind: 'touch', key: `chg-${c.id}`, items: withGroups(t.site, t.items ?? []), circuits: t.circuits ?? [], spaces: t.spaces ?? [], title: c.title });
   const room = c.space ?? Object.values(incidents).find((i) => (c.incidents ?? []).includes(i.number))?.room ?? null;
   if (room && SPACES[room]) return explorerFor(SPACES[room].site, { kind: 'touch', key: `chg-${c.id}`, spaces: [room], title: c.title });
   return null;

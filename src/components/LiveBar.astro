@@ -66,19 +66,26 @@ const { page } = Astro.props;
       (e.undoneBy ? '' : `<button type="button" class="btn small ghost" data-help="live.undo" data-lb-undo="${esc(e.id)}">Undo</button>`) + '</li>').join('')
       : `<li class="faint">No changes yet. This is version 0, as the page was built.</li>`;
   }
+  // Focus goes into the drawer on opening and back to what opened it on closing (Close or Escape).
+  let opener: HTMLElement | null = null;
+  const closeDrawer = () => {
+    const d = document.querySelector('[data-lb-drawer]') as HTMLElement | null; if (d) d.hidden = true; open = null;
+    if (opener?.isConnected) opener.focus({ preventScroll: true }); opener = null;
+  };
   function history(item: string, title: string) {
     open = { item, title };
+    opener = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
     const d = document.querySelector('[data-lb-drawer]') as HTMLElement | null;
     if (!d) return;
     d.hidden = false; draw(); d.focus({ preventScroll: true });
   }
   document.addEventListener('click', (ev) => {
     const t = ev.target as HTMLElement;
-    if (t.closest('[data-lb-close]')) { const d = document.querySelector('[data-lb-drawer]') as HTMLElement; d.hidden = true; open = null; return; }
+    if (t.closest('[data-lb-close]')) { closeDrawer(); return; }
     const u = t.closest('[data-lb-undo]') as HTMLElement | null;
     if (u && open) live.undo(u.dataset.lbUndo!, { who: who(), base: baseOf(open.item) });
   });
-  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && open) { const d = document.querySelector('[data-lb-drawer]') as HTMLElement | null; if (d) d.hidden = true; open = null; } });
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && open) closeDrawer(); });
   live.subscribe('*', () => draw());
 
   // Presence: say this window is on the page, and show everyone else who is.
@@ -93,9 +100,12 @@ const { page } = Astro.props;
     const page = bar.dataset.page!;
     const show = (list: { who: string }[]) => {
       const others = [...new Set(list.map((h) => h.who))];
-      (bar.querySelector('[data-lb-here]') as HTMLElement).innerHTML = others.length
+      const html = others.length
         ? `<span class="lb-who">${others.map((id) => `<span class="av" title="${esc(name(id))}">${esc(initials(id))}</span>`).join('')}</span><span>${others.length === 1 ? `${esc(name(others[0]))} is` : `${others.length} others are`} here too</span>`
         : '<span class="faint">Nobody else is on this page</span>';
+      // A live region: write only when who is here has changed, so a screen reader hears a change once, not every 5 s.
+      const here = bar.querySelector('[data-lb-here]') as HTMLElement;
+      if (here.dataset.k !== html) { here.dataset.k = html; here.innerHTML = html; }
     };
     leave = live.here(page, who());
     stopWatch = live.onPresence(page, show);

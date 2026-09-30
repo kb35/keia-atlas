@@ -1,26 +1,32 @@
 ---
-// Level 2, section 2.7: choose your modules. The picture is the one explorable: each module On, Connected or Off,
-// and the sidebar it makes. Text from docs/keia-method.md.
+// Level 2: start anywhere. The method's words first (no stages; the smallest start), then what Keia Atlas adds: the
+// one explorable, each module On, Connected or Off and the sidebar it makes, and the table of modules. Text from
+// docs/keia-method.md (the section is found by its title, src/lib/method.mjs SEC2.modules).
 import MethodPage from '../../components/method/MethodPage.astro';
 import Section from '../../components/Section.astro';
 import ModuleSwitch from '../../components/method/ModuleSwitch.astro';
-import { SECTIONS, md, WORDS, WORDS_FOR, MAPS } from '../../lib/method.mjs';
+import { SEC2, md, WORDS, WORDS_FOR, MAPS } from '../../lib/method.mjs';
 import { pageBySlug } from './_pages.mjs';
 const page = pageBySlug('modules');
-const sec = SECTIONS['2.7'];
-const lede = sec.paras[0].split(/(?<=\.)\s/)[0];
+const sec = SEC2.modules;
+const [lede, ...rest] = sec.paras;
 const maps = WORDS_FOR(MAPS.modules);
 ---
 <MethodPage slug="modules" title={sec.title} lede={lede} level={2} num={sec.num} try={page.try}>
-  <div class="g12 top">
-    <section class="card pad s-7 mp-pic" aria-labelledby="pic-h">
-      <h2 id="pic-h">Switch a module; the sidebar follows</h2>
-      <ModuleSwitch />
-    </section>
-    <section class="card pad s-5 mp-side" aria-label="The method's words">
-      {sec.paras.map((p) => <p set:html={md(p)} />)}
-    </section>
-  </div>
+  <section class="card pad mp-side" aria-label="Where to start">
+    {rest.map((p) => <p set:html={md(p)} />)}
+  </section>
+  <Section title="In Keia Atlas">
+    <div class="g12 top">
+      <section class="card pad s-7 mp-pic" aria-labelledby="pic-h">
+        <h2 id="pic-h">Switch a module; the sidebar follows</h2>
+        <ModuleSwitch />
+      </section>
+      <section class="card pad s-5" aria-label="What Keia Atlas does">
+        <dl class="mp-parts">{sec.parts.map((p) => <div class="mo-part"><dt>{p.label}</dt><dd set:html={md(p.text)} /></div>)}</dl>
+      </section>
+    </div>
+  </Section>
   <Section title="Each module, on its own and with the others on">
     <div class="tablewrap card">
       <table class="mp-table to-cards">
@@ -38,3 +44,7 @@ const maps = WORDS_FOR(MAPS.modules);
     </div>
   </Section>
 </MethodPage>
+
+<style>
+  .method .mo-part { grid-template-columns: minmax(0, 1fr) !important; gap: 4px !important; }
+</style>

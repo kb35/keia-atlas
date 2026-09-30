@@ -54,6 +54,62 @@ Connector names for each item are in [Connectors by module](#connectors-by-modul
 10. **Database mode:** a database behind a small server, with sign-in, real role-based access, live collaboration, an API, full export and live connectors one at a time; YAML stays as import, export and seed data. Real automation: agents under standing rules with their own service accounts, least privilege and a full audit trail; you choose the AI model and where it runs, including local models on your own servers, or turn AI off. What enterprises need before they adopt: single sign-on (SAML and OIDC), audit logs, EU data residency as a standard option, backups and restore, high availability, a published threat model (what an attacker learns from a model of your offices, and how the platform limits it), and SOC 2 and ISO/IEC 27001 as targets, not claims.
 11. **Migration in:** importers from service-management tools, spreadsheets and integrator handover documents, so switching is realistic.
 
+## Road to production
+
+The features above say what Atlas does. This track says when a team can rely on it with real records. There are three milestones, each with the checks that must be true before it is done. They run alongside the order above, not after it. Ticked items are done; the rest are open. [docs/architecture.md](docs/architecture.md) is the design behind most of them.
+
+### M1: record keeping for a technical team
+
+A small technical team keeps its real offices, rooms and devices in repo mode, in a private repository, and trusts the record.
+
+- [ ] **A blank starter template:** a copy with no demo company in it, only the folders, the house values to fill in and one worked example, so a team starts from nothing rather than deleting Aigna.
+- [ ] **Demo-only checks switchable for real data.** Today the validator insists on things that only make sense for made-up data: serials must look like `DEMO-…`, every floor must carry the "Fictional" label, every office must have a cabling file, and every end-of-support date must be cited or marked `demo: true`. Real data needs a switch that turns these off (and keeps every other check on).
+- [ ] **Importers** for the records teams already have: spreadsheets and NetBox first (a start exists in `tools/connectors/`), then asset tools and integrator handover documents.
+- [ ] **An internal hosting guide:** how to run the site behind your own sign-in on your own network, step by step, with the container and without it.
+- [ ] **A project contact address** for the code of conduct and for general questions (the code of conduct has a placeholder today).
+- [ ] **One real pilot:** one team runs it on its own records, and what was missing is written down and fixed.
+
+### M2: a small company runs it
+
+An IT team of a few people runs its offices from Atlas every day, with sign-in and live data.
+
+- [ ] **Database mode:** operations (incidents, tasks, events, live status) in Postgres, knowledge still in Git.
+- [ ] **An API:** one documented way in for pages, rules, connectors and scripts.
+- [ ] **SSO** (single sign-on: people sign in with the account they already use at work, through OIDC or SAML).
+- [ ] **Roles and permissions** that lock things, not only shape the page.
+- [ ] **Three to five live connectors, read only:** one service-management tool, one device platform and one network controller at least.
+- [ ] **Notifications:** the right person hears about the right thing, by email or chat, and can turn it down.
+- [ ] **Backup and restore,** with a restore that has been practised.
+- [ ] **Upgrades with migrations:** moving to a new version changes stored data by a tested, repeatable step, and never loses any.
+- [ ] **A security review** of the whole system by someone who did not build it.
+- [ ] **Install with one command** for a small team (for example `docker compose up`).
+- [ ] **Service-provider engagements:** an integrator or managed service provider works inside a customer's Atlas with scoped, time-limited, audited access (the design is being written in `docs/service-providers.md`).
+
+### M3: enterprise-ready
+
+A large organisation can adopt it and pass its own security and procurement checks.
+
+- [ ] **HA** (high availability: no single failure takes the service down), including the database.
+- [ ] **Write-back through approvals:** Atlas changes another system only through a standing rule or a person's approval, with a way back.
+- [ ] **An audit log** that cannot be changed after the fact and can be copied to the organisation's own security log system.
+- [ ] **Penetration testing** by an independent tester, with the findings fixed.
+- [ ] **SOC 2 and ISO/IEC 27001 readiness** for any hosted offer: the controls in place and evidenced, ready for an auditor.
+- [ ] **Scale testing** at the size of a large estate (thousands of spaces, tens of thousands of devices), with the results published.
+- [ ] **Support tiers:** what a user can expect from the community, and from any paid support, written down.
+
+### Production principles
+
+These hold for every release, from now on:
+
+- **Signed releases.** Every container image is signed in CI, never on a laptop, so anyone can check it came from this repository.
+- **An SBOM with every release** (a software bill of materials: the list of every package inside, so you can check it against new vulnerabilities).
+- **Semantic versions:** major.minor.patch, where a major version is the only kind allowed to break something.
+- **A changelog** ([CHANGELOG.md](CHANGELOG.md)) that says what changed in plain words.
+- **A deprecation policy:** nothing is removed without notice in an earlier release and a way to move off it.
+- **Data is never lost on upgrade.** Every change to stored data comes with a tested migration.
+- **Secrets only in a vault.** Records hold vault references, never passwords, tokens or keys.
+- **Privacy by default.** Collect the least that does the job, count people and never identify them, and describe where a camera is, never what it sees.
+
 ## Beyond meeting rooms: the whole workplace
 
 Workplace technology is more than meeting rooms. The scope rule above applies to all of it. In order:

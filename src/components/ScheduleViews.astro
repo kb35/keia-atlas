@@ -913,13 +913,16 @@ const KEY = [
     }
     dlg?.addEventListener('change', hint);
     dlg?.addEventListener('input', hint);
-    dlg?.querySelector('[data-dlg-cancel]')?.addEventListener('click', () => dlg.close());
+    // The dialog shrinks back the way it grew (the library's closeDialog), on Cancel, Escape and after Assign.
+    const shutDlg = () => { const k = (window as any).km; if (k) k.closeDialog(dlg); else dlg.close(); };
+    dlg?.addEventListener('cancel', (e) => { if ((window as any).km) { e.preventDefault(); shutDlg(); } });
+    dlg?.querySelector('[data-dlg-cancel]')?.addEventListener('click', shutDlg);
     dlg?.addEventListener('close', () => { if (dlgFrom && document.body.contains(dlgFrom)) dlgFrom.focus?.(); dlgFrom = null; });
     dlg?.querySelector('[data-dlg-form]')?.addEventListener('submit', (e) => {
       e.preventDefault();
       const who = dlg.querySelector('[data-dlg-who]').value, day = dlg.querySelector('[data-dlg-day]').value;
       if (!who || !day || isWeekend(day)) { hint(); return; }
-      dlg.close();
+      shutDlg();
       if (dlgItem) assign(dlgItem.id, who, day);
     });
 
