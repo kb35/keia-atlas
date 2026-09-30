@@ -1,8 +1,15 @@
 ---
-// One change (Support › Changes). A standard change made by a standing rule's run reads, in its band, the run's one
-// line: "Unable to complete, rolled back · DNS rule (owner: Niamh) · 02:01 · How was this done?" (UX-V2 §4.5); below
-// it, the run's steps as they happened, the incident it raised, and the rule. A rule's approval and a normal change
-// show who proposed and approved it, what it touches and the incidents that name it.
+// One change (Support › Changes), in the record shape every record has (UI-V2 §2; V9):
+//   band     the kind of change, the answer (the approval it needs and where it stands, or for a standing rule's run
+//            its one line: "Unable to complete, rolled back · DNS rule (owner: Niamh) · 02:01 · How was this done?"),
+//            the heartbeat and four figures
+//   top      the picture: what it would take off (the blast-radius explorer, on the plan) for a planned change,
+//            where the run stopped for a rule's run, the rule's runs strip for a rule's own approval; beside it the
+//            approval it needs (one space goes ahead, one floor needs the owner, more needs two people) with why,
+//            who has approved, and the change's facts
+//   record   if this were off (for runs and rules), the rule's runs strip, the incidents that name it, the timeline
+//   raw      the change as data and the audit log's entries
+// Everything is simulated: the changes are the demo's, the bookings made up per space.
 import Shell from '../../../layouts/Shell.astro';
 import PageBand from '../../../components/PageBand.astro';
 import SidePanel from '../../../components/SidePanel.astro';
@@ -12,34 +19,80 @@ import WithChip from '../../../components/WithChip.astro';
 import HowCard from '../../../components/HowCard.astro';
 import Timeline from '../../../components/Timeline.astro';
 import RulesData from '../../../components/RulesData.astro';
+import RunStrip from '../../../components/RunStrip.astro';
 import LiveBar from '../../../components/LiveBar.astro';
-import { CHANGES, CHANGE_STATUS, CHANGE_KIND, changeById, changePath, rulePath, personName, firstName, RULES, runById, cardFor, lineFor, LOG_PATH } from '../../../lib/rules-view.mjs';
+import OpenHere from '../../../components/OpenHere.astro';
+import BlastRadius from '../../../components/BlastRadius.astro';
+import { CHANGES, CHANGE_STATUS, CHANGE_KIND, changeById, changePath, rulePath, personName, firstName, RULES, runById, lineFor, stripFor, LOG, LOG_PATH, serviceOwner } from '../../../lib/rules-view.mjs';
 import { at, seconds, RESULT, REVERSAL_WORD, rolledBack } from '../../../lib/rules.mjs';
 import { traceOf } from '../../../lib/audit.mjs';
 import { OWN, HISTORY } from '../../../lib/home.mjs';
-import { href, DEMO_TODAY, incidents, incidentPath, INC_STATE, spaces } from '../../../lib/data.mjs';
+import { href, DEMO_TODAY, incidents, incidentPath, INC_STATE, spaces, plural } from '../../../lib/data.mjs';
+import { explorerForChange, explorerForRule, approvalOfChange, BLAST_NOW, HOURS } from '../../../lib/blast-view.mjs';
+import { APPROVAL, APPROVAL_ORDER } from '../../../lib/blast.mjs';
+import { stateOf, windowOf, clock, span } from '../../../lib/blast-render.mjs';
 
 export function getStaticPaths() { return CHANGES.map((c) => ({ params: { id: c.id.toLowerCase() } })); }
 const c = changeById(Astro.params.id.toUpperCase());
 const rule = c.rule ? RULES[c.rule] : null;
 const x = c.run ? runById(c.run) : null;
 const run = x?.run ?? null;
+const ruleApproval = !run && c.kind === 'standard' && !!rule;
 const incs = (c.incidents ?? []).map((n) => Object.values(incidents).find((i) => i.number === n)).filter(Boolean);
-const card = run ? cardFor(run.id, { jobOwner: incs[0]?.keia_atlas.assigned ?? null }) : null;
 const space = c.space ? spaces[c.space] : null;
-const GLYPH = { auto: 'fine', 'unable-back': 'fault', unable: 'fault', approved: 'fine', done: 'fine' };
-const own = run ? { s: run.result === 'done' ? 'auto' : 'unable', rule: { name: rule.name, owner: rule.owner }, at: run.at } : null;
+const GLYPH = { auto: 'fine', 'unable-back': 'fault', unable: 'fault', approved: 'fine', done: 'fine', planned: 'planned' };
+
+// What it would take off, and so the approval it needs.
+const ex = ruleApproval ? explorerForRule(rule, { incidents }) : explorerForChange(c, { incidents });
+const ap = approvalOfChange(c, ruleApproval ? null : ex, rule);
+// A planned change inside the next 24 hours is off for its own window; the handle starts there.
+const minsFromNow = Math.round((Date.parse(`${c.at}Z`) - Date.parse(`${BLAST_NOW}Z`)) / 60000);
+const win = c.status === 'planned' && minsFromNow >= 0 && minsFromNow < HOURS * 60 ? { start: minsFromNow, len: (c.hours ?? 1) * 60 } : null;
+const w = windowOf({ hours: HOURS, start: win?.start ?? 0, len: win?.len ?? 0 }, win?.start ?? 0);
+const st = ex ? stateOf(ex, null, w) : null;
+const strip = rule ? stripFor(rule) : null;
+const unableRuns = rule ? rule.allRuns.filter((r) => r.result === 'unable' || r.result === 'halted').length : 0;
+
+// Who confirms when the owner must: the service owner of what it touches (Network for switches and circuits).
+const svcOwner = c.touches?.items?.length || c.touches?.circuits?.length ? serviceOwner('network') : serviceOwner('av');
+const approvedWords = ap.need === 0 ? 'None needed' : `${Math.min(ap.by.length, ap.need)} of ${ap.need}`;
 const NUMBERS = run
-  ? [{ n: c.blast.replace(/ .*/, ''), label: 'Unit' }, { n: seconds(run.ms), label: 'Took' }, { n: incs.length, label: incs.length === 1 ? 'Incident raised' : 'Incidents', to: '#incidents' }]
-  : [{ n: incs.length, label: incs.length === 1 ? 'Incident names it' : 'Incidents name it', to: '#incidents' }];
-// The run's trace, as the record's timeline: each step with what it called and what came back.
-const TL = run ? traceOf(rule, run).map((l, i) => ({ at: `${run.at.slice(0, 10)}T${l.t.slice(0, 5)}`, order: i, kind: l.src === 'AI' ? 'rule' : l.src === 'Keia Atlas' ? 'rule' : 'connector', who: l.src === 'Keia Atlas' ? `rule: ${rule.name} (${firstName(rule.owner)})` : l.src, what: `${l.what}: ${l.got}`, sub: l.t, state: /Refused|Does not match/.test(l.got) ? 'fault' : /Restored/.test(l.got) ? 'review' : undefined })) : [];
+  ? [{ n: 1, label: 'Unit' }, { n: seconds(run.ms), label: 'Took' }, { n: incs.length, label: incs.length === 1 ? 'Incident raised' : 'Incidents raised', to: '#incidents' }, { n: approvedWords, label: 'Approvals', to: '#approval' }]
+  : ruleApproval
+    ? [{ n: strip.runs.length, label: 'Runs since', to: '#runs' }, { n: unableRuns, label: 'Unable to complete', to: '#runs', tone: unableRuns ? 'bad' : undefined }, { n: rule.caps.per_wave, label: rule.caps.per_wave === 1 ? 'Unit per wave' : 'Units per wave', fact: true }, { n: approvedWords, label: 'Approvals', to: '#approval', tone: ap.still ? 'warn' : undefined }]
+    : [{ n: st?.sp.length ?? 0, label: st?.sp.length === 1 ? 'Space it takes off' : 'Spaces it takes off', to: '#if-off' }, { n: st?.meetings.length ?? 0, label: win ? 'Meetings in its window' : 'Meetings, next 24 h', to: '#if-off' }, { n: approvedWords, label: 'Approvals', to: '#approval', tone: ap.still ? 'warn' : undefined }, { n: incs.length, label: incs.length === 1 ? 'Incident names it' : 'Incidents name it', to: '#incidents' }];
+// The answer: the approval it needs and when. How many approvals are in is the third figure.
+const whenWords = c.status === 'planned' ? null : `${CHANGE_STATUS[c.status].toLowerCase()} ${at(c.at, DEMO_TODAY)}`;   // a planned change's time is in its facts and its picture
+const stillWords = null;
 const title = run ? `${rule.name}: ${run.target}` : c.title;
+
+// The timeline: what happened to the change, newest first (the run's own trace for a rule's run).
+const shift = (t, days, hm) => { const d = new Date(Date.parse(`${t.slice(0, 10)}T00:00Z`) + days * 864e5).toISOString().slice(0, 10); return `${d}T${hm}`; };
+const TL = [];
+if (run) {
+  traceOf(rule, run).forEach((l, i) => TL.push({ at: `${run.at.slice(0, 10)}T${l.t.slice(0, 5)}`, order: i, kind: l.src === 'AI' || l.src === 'Keia Atlas' ? 'rule' : 'connector', who: l.src === 'Keia Atlas' ? `rule: ${rule.name} (${firstName(rule.owner)})` : l.src, what: `${l.what}: ${l.got}`, sub: l.t, state: /Refused|Does not match/.test(l.got) ? 'fault' : /Restored/.test(l.got) ? 'review' : undefined }));
+  TL.push({ at: rule.approved.at, kind: 'person', who: personName(rule.owner), what: `Approved the ${rule.name} as a standard change, ${rule.approved.change}`, href: href(changePath(rule.approved.change)) });
+} else if (ruleApproval) {
+  ap.by.forEach((p, i) => TL.push({ at: rule.approved.at, order: i, kind: 'person', who: personName(p), what: i === 0 ? `Approved the ${rule.name}, version ${rule.approved.version ?? 1}` : 'Gave the second approval', state: 'fine' }));
+  rule.allRuns.filter((r) => !r.quiet).slice(-6).forEach((r) => TL.push({ at: r.at, kind: 'rule', who: `rule: ${rule.name} (${firstName(rule.owner)})`, what: `${RESULT[r.result]?.word ?? r.result}: ${r.did}`, state: RESULT[r.result]?.glyph, href: r.change ? href(changePath(r.change)) : undefined }));
+} else {
+  const proposed = c.proposed ?? shift(c.at, -3, '10:15');
+  TL.push({ at: proposed, order: 0, kind: 'person', who: personName(c.owner), what: `Proposed ${c.id}` });
+  TL.push({ at: proposed, order: 1, kind: 'change', who: 'Keia Atlas', what: `Worked out the approval from what it takes off: ${approvalOfChange({ ...c, status: 'planned', approvers: [] }, ex, rule).words}` });
+  ap.by.forEach((p, i) => TL.push({ at: shift(proposed, i + 1, '09:30'), kind: 'person', who: personName(p), what: 'Approved', state: 'fine' }));
+  if (c.status === 'planned') TL.push({ at: c.at, kind: 'change', who: 'Keia Atlas', what: `Planned to start${ap.still ? `, once ${plural(ap.still, 'more approval')} ${ap.still === 1 ? 'is' : 'are'} in` : ''}`, state: 'planned', stateWords: 'Planned' });
+  else TL.push({ at: c.at, kind: 'change', who: personName(c.owner), what: `${CHANGE_STATUS[c.status]}: read back and matched`, state: 'fine' });
+}
+const logHere = LOG.filter((e) => (run ? e.run === run.id : rule && e.rule === rule.id)).slice(0, 10);
+const raw = JSON.stringify({ id: c.id, kind: c.kind, title: c.title, at: c.at, hours: c.hours ?? null, owner: c.owner, status: c.status, rule: c.rule ?? null, run: c.run ?? null, touches: c.touches ?? (c.space ? { space: c.space } : null), firmware: !!c.firmware, approval: { needs: ap.level, why: ap.why, approved_by: ap.by }, incidents: c.incidents ?? [] }, null, 2);
+const LADDER = { go: 'One space, or a standing rule inside its caps', owner: 'More than one space, on one floor', two: 'More than a floor, a whole office, firmware or no way back' };
 ---
 <Shell about={{ kind: 'change', label: `${c.id} ${title}`, to: changePath(c.id) }} title={`${c.id} ${title}`} section="support-changes" crumbs={[{ label: 'Support', to: '/support/' }, { label: 'Changes', to: '/support/changes/' }, { label: c.id }]}>
   <PageBand overline={`Change · ${CHANGE_KIND[c.kind]}`} title={title} numbers={NUMBERS} sim rec={c.id}>
     <Fragment slot="overline"><span class="mono">{c.id}</span></Fragment>
-    <Fragment slot="answer">{run ? <>{lineFor(run.id).split(' · ')[0]} · owner {firstName(rule.owner)} · {at(run.at, DEMO_TODAY)} · <HowCard run={run.id} job={incs[0]?.keia_atlas.assigned ?? null} /></> : `${CHANGE_STATUS[c.status]} · ${c.approver ? `approved by ${personName(c.approver)}` : `owner ${personName(c.owner)}`} · ${c.blast}`}</Fragment>
+    <Fragment slot="answer">{run
+      ? <>{lineFor(run.id).split(' · ')[0]} · owner {firstName(rule.owner)} · {at(run.at, DEMO_TODAY)} · <HowCard run={run.id} job={incs[0]?.keia_atlas.assigned ?? null} /></>
+      : [ap.words, stillWords, whenWords].filter(Boolean).join(' · ')}</Fragment>
   </PageBand>
 
   <div class="content chg-page" data-job-owner={incs[0]?.keia_atlas.assigned ?? ''}>
@@ -51,29 +104,69 @@ const title = run ? `${rule.name}: ${run.target}` : c.title;
           <ol class="cr-lights">
             {rule.steps.map((s) => {
               const stop = run.stopped_at, idx = rule.steps.findIndex((y) => y.kind === stop), me = rule.steps.findIndex((y) => y.kind === s.kind);
-              const st = !stop ? 'fine' : me < idx ? 'fine' : me === idx ? 'fault' : 'off';
-              return <li class={`cr-${st}`}><HealthGlyph state={st} size={16} word={st === 'fine' ? 'Done' : st === 'fault' ? 'Stopped here' : 'Not reached'} /><span>{s.words}</span></li>;
+              const state = !stop ? 'fine' : me < idx ? 'fine' : me === idx ? 'fault' : 'off';
+              return <li class={`cr-${state}`}><HealthGlyph state={state} size={16} word={state === 'fine' ? 'Done' : state === 'fault' ? 'Stopped here' : 'Not reached'} /><span>{s.words}</span></li>;
             })}
             {run.result === 'unable' && rolledBack(rule, run) && <li class="cr-fine"><HealthGlyph state="fine" size={16} word="Rolled back" /><span>Restored {run.before}</span></li>}
           </ol>
           {run.why && <p class="cr-why">{run.why}</p>}
+          <div class="cr-strip">
+            <p class="cr-sh"><b>The {rule.name}'s runs</b> <span class="faint">one square each, oldest on the left</span></p>
+            <RunStrip rule={rule.id} runs={strip.runs} words={strip.words} to="page" />
+          </div>
         </section>
+      ) : ruleApproval ? (
+        <section class="card pad s-7 cr-steps" aria-labelledby="cr-r-h" id="runs">
+          <h2 id="cr-r-h">What it approved</h2>
+          <p class="cr-why"><a href={href(rulePath(rule.id))}>{rule.name}</a>: {rule.title}. {c.note}</p>
+          <p class="cr-sh"><b>Its runs since</b> <span class="faint">one square each, oldest on the left</span></p>
+          <RunStrip rule={rule.id} runs={strip.runs} words={strip.words} size="large" to="page" />
+          <dl class="cr-f cr-caps">
+            <div><dt>Caps</dt><dd>At most {plural(rule.caps.per_wave, 'unit')} a wave · never in a booked meeting · never in a change freeze · halts after {plural(rule.caps.halt_after, 'run')} in a row unable to complete</dd></div>
+            <div><dt>When</dt><dd>{rule.window ? `Only ${rule.window}` : 'Whenever its conditions hold'}</dd></div>
+            <div><dt>Way back</dt><dd><b>{REVERSAL_WORD[rule.reversal.kind]}</b>. {rule.reversal.words}</dd></div>
+          </dl>
+        </section>
+      ) : ex ? (
+        <BlastRadius class="s-7" targets={[ex]} now={BLAST_NOW} open window={win} title="What it takes off" lede={win ? `Shown for its window, ${span(BLAST_NOW, win.start, win.start + win.len)}. Drag the handle to see another time.` : 'Shown for the next 24 hours from now.'} />
       ) : (
-        <section class="card pad s-7 cr-steps"><h2>What it changes</h2><p class="cr-why">{c.note}</p>{space && <p class="cr-why">Space: <a href={href(`/rooms/${space.id}/`)}>{space.number} {space.name}</a></p>}</section>
+        <section class="card pad s-7 cr-steps"><h2>What it changes</h2><p class="cr-why">{c.note}</p></section>
       )}
-      <SidePanel class="s-5" title="The change" meta={CHANGE_KIND[c.kind]} help="change.facts">
-        <dl class="cr-f">
+
+      <SidePanel class="s-5" title="Approval" meta={APPROVAL[ap.level].word} help="change.approval" id="approval">
+        <div class="ap">
+          <ol class="ap-ladder" aria-label="The approval a change needs, by what it takes off">
+            {APPROVAL_ORDER.map((k) => (
+              <li class:list={['ap-step', `ap-${k}`, { 'ap-on': k === ap.level }]} aria-current={k === ap.level ? 'true' : undefined}>
+                <b>{APPROVAL[k].word}</b>
+                <small>{LADDER[k]}</small>
+              </li>
+            ))}
+          </ol>
+          <p class="ap-why"><b>{ap.words}.</b>{ap.detail ? ` ${ap.detail}.` : ''}</p>
+          {ap.need > 0 && (
+            <ul class="ap-by">
+              {ap.by.map((p) => <li><HealthGlyph state="fine" size={16} word={`${personName(p)} approved`} /></li>)}
+              {Array.from({ length: ap.still }, (_, i) => <li><HealthGlyph state="planned" size={16} word={i === 0 && !ap.by.length && ap.level === 'owner' ? `${personName(svcOwner)}, the service owner, to confirm` : 'One more approval to come'} /></li>)}
+            </ul>
+          )}
+        </div>
+        <dl class="cr-f" data-help="change.facts">
           <div><dt>Status</dt><dd><HealthGlyph state={GLYPH[c.status] ?? 'fine'} size={12} title={CHANGE_STATUS[c.status]} /> {CHANGE_STATUS[c.status]}</dd></div>
           <div><dt>Owner</dt><dd>{personName(c.owner)}</dd></div>
-          {c.kind === 'standard' && rule && <div><dt>Approved</dt><dd>Once, as the <a href={href(rulePath(rule.id))}>{rule.name}</a> ({rule.approved.change}, version {rule.approved.version ?? 1})</dd></div>}
-          {c.kind === 'normal' && c.approver && <div><dt>Approved by</dt><dd>{personName(c.approver)}</dd></div>}
-          {rule && <div><dt>Way back</dt><dd>{REVERSAL_WORD[rule.reversal.kind]}. {rule.reversal.words}</dd></div>}
-          <div><dt>Touches</dt><dd>{c.blast}</dd></div>
-          <div><dt>When</dt><dd>{at(c.at, DEMO_TODAY)}</dd></div>
-          {c.note && run && <div><dt>Note</dt><dd>{c.note}</dd></div>}
+          {c.kind === 'standard' && rule && !ruleApproval && <div><dt>Approved</dt><dd>Once, as the <a href={href(rulePath(rule.id))}>{rule.name}</a> ({rule.approved.change}, version {rule.approved.version ?? 1})</dd></div>}
+          {rule && !ruleApproval && <div><dt>Way back</dt><dd>{REVERSAL_WORD[rule.reversal.kind]}. {rule.reversal.words}</dd></div>}
+          <div><dt>When</dt><dd>{at(c.at, DEMO_TODAY)}{c.hours ? ` to ${clock(c.at, c.hours * 60)}` : ''}</dd></div>
+          <div><dt>Touches</dt><dd>{c.blast}{space ? <>: <a href={href(`/rooms/${space.id}/`)}>{space.number} {space.name}</a></> : ''}</dd></div>
+          {c.note && !ruleApproval && <div><dt>Note</dt><dd>{c.note}</dd></div>}
         </dl>
       </SidePanel>
     </div>
+
+    <OpenHere kind="change" layer="record" />
+    {(run || ruleApproval) && ex && (
+      <BlastRadius targets={[ex]} now={BLAST_NOW} open={!ruleApproval} title={ruleApproval ? 'If this rule were off' : 'If this were off'} lede={ruleApproval ? 'The spaces its runs have acted on. Without the rule, each would wait for a person.' : 'The space its run acted on, if the unit were off.'} />
+    )}
 
     {incs.length > 0 && (
       <Section title={run ? 'The incident it raised' : 'Incidents that name it'} id="incidents" help="change.incidents">
@@ -89,12 +182,32 @@ const title = run ? `${rule.name}: ${run.target}` : c.title;
       </Section>
     )}
 
-    {run && (
+    {run ? (
       <Section title="The run, step by step" id="trace" aside="From the audit log" help="change.trace">
         <Timeline entries={TL} today={DEMO_TODAY} id={`tl-${c.id}`} label="The run's trace" />
         <p class="cr-log"><a href={`${href(LOG_PATH)}#run-${run.id}`}>Open the full trace in the log</a></p>
       </Section>
+    ) : (
+      <Section title="Timeline" id="trace" aside="Newest first" help="change.timeline">
+        <Timeline entries={TL} today={DEMO_TODAY} id={`tl-${c.id}`} label="The change's timeline" />
+      </Section>
     )}
+
+    <OpenHere kind="change" layer="raw" />
+    <Section title="Raw" id="raw" help="change.raw">
+      <details class="cr-rawd"><summary>Show the change as data</summary><pre class="cr-raw">{raw}</pre></details>
+      {logHere.length > 0 && (
+        <div class="list cr-logl">
+          {logHere.map((e) => (
+            <a class="row plain" href={`${href(LOG_PATH)}#${e.id}`}>
+              <span><span class="name"><span class="mono faint">{at(e.at, DEMO_TODAY)}</span> {e.what}</span><span class="sub">{e.who} · {e.src}</span></span>
+              <span class="end faint">Trace →</span>
+            </a>
+          ))}
+        </div>
+      )}
+      <p class="cr-note faint">Simulated: the demo's changes, and bookings made up per space. What each change takes off is worked out from the recorded patching.</p>
+    </Section>
     <LiveBar page={`change:${c.id}`} />
   </div>
   <script>
@@ -115,14 +228,34 @@ const title = run ? `${rule.name}: ${run.target}` : c.title;
   .cr-lights li { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; align-items: baseline; font-size: var(--fs-body); }
   .cr-off span:last-child { color: var(--text-3); }
   .cr-why { margin: 0; font-size: var(--fs-body); color: var(--text-2); }
+  .cr-strip { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .cr-sh { margin: 4px 0 0; font-size: var(--fs-support); }
+  .cr-sh b { font-weight: 550; font-size: var(--fs-body); }
   .cr-f { margin: 0; display: grid; }
   .cr-f div { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); font-size: var(--fs-body); }
-  .cr-f div:first-child { border-top: 0; }
   .cr-f dt { color: var(--text-2); font-size: var(--fs-support); }
   .cr-f dd { margin: 0; }
+  .cr-caps div:first-child { border-top: 1px solid var(--line); }
+  .ap { display: grid; gap: 12px; padding-bottom: 12px; }
+  .ap-ladder { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .ap-step { display: grid; gap: 4px; align-content: start; padding: 10px 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--text-2); }
+  .ap-step b { font-size: var(--fs-support); font-weight: 550; color: var(--text); }
+  .ap-step small { font-size: 12px; line-height: 1.35; }
+  .ap-step.ap-on { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 3px 0 var(--accent); }
+  .ap-step.ap-on b { color: var(--accent-ink, var(--text)); }
+  .ap-why { margin: 0; font-size: var(--fs-body); }
+  .ap-why b { font-weight: 550; }
+  .ap-by { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
   .cr-inc { grid-template-columns: 28px minmax(0, 1fr) auto; }
   .cr-g { display: grid; place-items: center; }
   .cr-log { margin: 12px 0 0; font-size: var(--fs-support); }
+  .cr-rawd summary { cursor: pointer; font-size: var(--fs-support); color: var(--text-2); margin-bottom: 8px; }
+  .cr-raw { margin: 0; padding: 14px 16px; border-radius: var(--radius); background: var(--surface-2); font: 400 var(--fs-code)/1.5 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .cr-logl { margin-top: 12px; }
+  .cr-note { margin: 12px 0 0; font-size: var(--fs-support); }
+  @container content (max-width: 559px) {
+    .ap-ladder { grid-template-columns: minmax(0, 1fr); }
+  }
   @media (max-width: 767px) {
     .cr-lights li { grid-template-columns: 1fr; gap: 2px; }
     .cr-f div { grid-template-columns: 1fr; gap: 2px; }

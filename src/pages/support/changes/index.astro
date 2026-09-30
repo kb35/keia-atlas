@@ -13,21 +13,28 @@ import HowCard from '../../../components/HowCard.astro';
 import RulesData from '../../../components/RulesData.astro';
 import { CHANGES, CHANGE_STATUS, CHANGE_KIND, changePath, personName, RULES } from '../../../lib/rules-view.mjs';
 import { at } from '../../../lib/rules.mjs';
-import { href, DEMO_TODAY } from '../../../lib/data.mjs';
+import { href, DEMO_TODAY, incidents } from '../../../lib/data.mjs';
+import { explorerForChange, approvalOfChange } from '../../../lib/blast-view.mjs';
+import { APPROVAL, APPROVAL_ORDER } from '../../../lib/blast.mjs';
 
-const GLYPH = { auto: 'fine', 'unable-back': 'fault', unable: 'fault', approved: 'fine', done: 'fine', 'rolled-back': 'review', undone: 'review' };
+const GLYPH = { planned: 'planned', auto: 'fine', 'unable-back': 'fault', unable: 'fault', approved: 'fine', done: 'fine', 'rolled-back': 'review', undone: 'review' };
+// The approval each change needs (V9), from what it takes off: one space goes ahead, one floor needs the owner, more
+// than that, firmware or no way back needs two people.
+const APPR = Object.fromEntries(CHANGES.map((c) => { const rule = c.rule ? RULES[c.rule] : null; const standardRule = !c.run && c.kind === 'standard' && rule; return [c.id, approvalOfChange(c, standardRule ? null : explorerForChange(c, { incidents }), rule)]; }));
 const month = CHANGES.filter((c) => c.at.slice(0, 7) === DEMO_TODAY.slice(0, 7));
 const unable = CHANGES.filter((c) => c.status.startsWith('unable'));
-const ANSWER = unable.length ? `${unable.length} unable to complete, rolled back · nothing left half done · ${month.length} changes this month` : `${month.length} changes this month, every one read back`;
+const toApprove = CHANGES.filter((c) => APPR[c.id].still).length;
+const ANSWER = [unable.length ? `${unable.length} unable to complete, rolled back` : 'Every change read back', toApprove ? `${toApprove} to approve` : 'nothing to approve', `${month.length} changes this month`].join(' · ');
 const NUMBERS = [
   { n: CHANGES.filter((c) => c.run).length, label: 'Run by a standing rule', to: '?kind=standard' },
   { n: CHANGES.filter((c) => c.kind === 'normal').length, label: 'Normal', to: '?kind=normal' },
   { n: unable.length, label: 'Unable to complete', to: '?status=unable-back', tone: unable.length ? 'bad' : undefined },
-  { n: CHANGES.filter((c) => c.status === 'approved').length, label: 'Rules approved', to: '?status=approved' },
+  { n: toApprove, label: 'To approve', to: '?status=planned', tone: toApprove ? 'warn' : undefined },
 ];
 const FACETS = [
   { key: 'kind', label: 'Kind', options: Object.entries(CHANGE_KIND).filter(([k]) => CHANGES.some((c) => c.kind === k)).map(([value, label]) => ({ value, label })) },
   { key: 'status', label: 'Status', options: Object.entries(CHANGE_STATUS).filter(([k]) => CHANGES.some((c) => c.status === k)).map(([value, label]) => ({ value, label })) },
+  { key: 'approval', label: 'Approval', options: APPROVAL_ORDER.filter((k) => CHANGES.some((c) => APPR[c.id].level === k)).map((k) => ({ value: k, label: APPROVAL[k].word })) },
   { key: 'owner', label: 'Owner', options: [...new Set(CHANGES.map((c) => c.owner))].map((o) => ({ value: o, label: personName(o) })) },
 ];
 const SORT = { options: [{ value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' }] };
@@ -40,11 +47,12 @@ const own = (c) => (c.run ? { s: c.status === 'auto' ? 'auto' : 'unable', rule: 
     <FilterBar facets={FACETS} placeholder="Find a change, rule or person" label="Find a change" noun={['change', 'changes']} scope=".content.chg2" sort={SORT} />
     <ol class="list chg2-l" data-chg2>
       {CHANGES.map((c, i) => (
-        <li class="row chg2-r" data-fi data-i={i} data-find={`${c.id} ${c.title} ${personName(c.owner)}`} data-f-kind={c.kind} data-f-status={c.status} data-f-owner={c.owner}>
+        <li class="row chg2-r" data-fi data-i={i} data-find={`${c.id} ${c.title} ${personName(c.owner)}`} data-f-kind={c.kind} data-f-status={c.status} data-f-owner={c.owner} data-f-approval={APPR[c.id].level}>
           <span class="chg2-g"><HealthGlyph state={GLYPH[c.status] ?? 'fine'} size={16} title={CHANGE_STATUS[c.status]} /></span>
           <span>
             <a class="name" href={href(changePath(c.id))} data-vt-rec={c.id}><span class="mono">{c.id}</span> {c.title}</a>
             <span class="sub">{CHANGE_KIND[c.kind]} · {CHANGE_STATUS[c.status]} · owner {personName(c.owner)} · {c.blast}</span>
+            <span class="sub chg2-ap" data-help="changes.approval"><span class={`chg2-apk chg2-${APPR[c.id].level}`}>{APPROVAL[APPR[c.id].level].short}</span> {APPR[c.id].words.replace(/^[^:]*: /, '')}{APPR[c.id].still ? ` · ${APPR[c.id].still} more to approve` : ''}</span>
           </span>
           <span class="end">
             <span class="mono faint">{at(c.at, DEMO_TODAY)}</span>
@@ -77,6 +85,9 @@ const own = (c) => (c.run ? { s: c.status === 'auto' ? 'auto' : 'unable', rule: 
   .chg2-r .name { color: inherit; text-decoration: none; }
   .chg2-r .name:hover { text-decoration: underline; }
   .chg2-r .end { font-size: var(--fs-support); }
+  .chg2-ap { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 4px; }
+  .chg2-apk { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: var(--pill-radius); border: 1px solid var(--line-strong); font-size: 12px; font-weight: 550; color: var(--text); }
+  .chg2-two { border-color: var(--accent); color: var(--accent-ink, var(--text)); background: var(--accent-soft); }
   @media (max-width: 767px) {
     .chg2-r { grid-template-columns: 28px minmax(0, 1fr); }
     .chg2-r .end { grid-column: 2; justify-content: flex-start; }

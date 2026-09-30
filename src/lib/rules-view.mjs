@@ -77,7 +77,12 @@ export function clockFor(v, { now }) {
 
 // ---- Changes (Support › Changes): standard changes are rule runs and rule approvals; normal ones are planned --------
 const NORMAL = [
-  { id: 'CHG-201', kind: 'normal', title: 'Firmware 4.7.0 on the Whooper Swan video bar, for the Lab pilot', at: '2026-09-16T18:30', owner: 'niamh', approver: 'sofia', status: 'done', space: 'dub-3-09', note: 'A pilot of 4.7.0 before it can enter the standard (LAB test). The standard stays 4.6.2 until the Lab passes it.', incidents: ['INC0041210'], blast: 'One space, one unit' },
+  { id: 'CHG-201', kind: 'normal', title: 'Firmware 4.7.0 on the Whooper Swan video bar, for the Lab pilot', at: '2026-09-16T18:30', owner: 'niamh', approver: 'sofia', approvers: ['sofia', 'declan'], status: 'done', space: 'dub-3-09', firmware: true, note: 'A pilot of 4.7.0 before it can enter the standard (LAB test). The standard stays 4.6.2 until the Lab passes it.', incidents: ['INC0041210'], blast: 'One space, one unit' },
+  // Planned changes (V9): each touches something the blast-radius explorer can take off, so its approval is worked
+  // out from what it would cut off (src/lib/blast-view.mjs). Times are the demo's local time; hours is the window.
+  { id: 'CHG-202', kind: 'normal', title: 'Replace access switch 1 in the fourth-floor comms room, Dublin', at: '2026-09-28T19:00', hours: 2, owner: 'marco', approver: null, approvers: [], status: 'planned', touches: { site: 'dub', items: [{ rack: 'dub-4-21-r1', u: 37 }] }, note: 'Like for like, from the spares shelf: the ports move across in order and the uplink comes back on the same riser fibre.', blast: 'One floor' },
+  { id: 'CHG-203', kind: 'normal', title: 'Firmware 17.12.4 on both core switches, Dublin', at: '2026-09-29T02:00', hours: 2, owner: 'marco', approver: null, approvers: ['declan'], status: 'planned', firmware: true, touches: { site: 'dub', items: [{ rack: 'dub-3-21-r1', u: 19 }, { rack: 'dub-3-21-r1', u: 20 }] }, note: 'Both core switches restart one after the other; for a few minutes each, what hangs off it has no way out.', blast: 'The whole office' },
+  { id: 'CHG-204', kind: 'normal', title: 'Replace the cracked touch panel in 4.05', at: '2026-09-29T08:00', hours: 1, owner: 'liam', approver: null, approvers: [], status: 'planned', touches: { site: 'dub', spaces: ['dub-4-05'] }, note: 'A spare panel from the Dublin store, paired to the room system; the room stays bookable without it for the hour.', blast: 'One space' },
 ];
 function ruleChanges() {
   const out = [];
@@ -89,7 +94,7 @@ function ruleChanges() {
   }
   return out;
 }
-export const CHANGE_STATUS = { auto: 'Done automatically', 'unable-back': 'Unable to complete, rolled back', unable: 'Unable to complete', approved: 'Approved', done: 'Done', 'rolled-back': 'Rolled back', undone: 'Undone' };
+export const CHANGE_STATUS = { planned: 'Planned', auto: 'Done automatically', 'unable-back': 'Unable to complete, rolled back', unable: 'Unable to complete', approved: 'Approved', done: 'Done', 'rolled-back': 'Rolled back', undone: 'Undone' };
 export const CHANGE_KIND = { standard: 'Standard', normal: 'Normal', emergency: 'Emergency' };
 export const CHANGES = [...NORMAL, ...ruleChanges()].sort((a, b) => b.at.localeCompare(a.at));
 export const changeById = (id) => CHANGES.find((c) => c.id === id) ?? null;
