@@ -33,7 +33,7 @@ export const STAGES = [
   { id: 'lost', word: 'Lost', what: 'Not going ahead' },
 ];
 export const TASK_WORDS = { install: 'Install', configure: 'Configure', commission: 'Commission', manage: 'Manage the project' };
-export const STATUS_WORDS = { draft: 'Draft, not sent', sent: 'Sent', superseded: 'Replaced by a later version', accepted: 'Accepted' };
+export const STATUS_WORDS = { draft: 'Planned · draft, not sent', sent: 'In progress · with the client', superseded: 'Off · replaced by a later version', accepted: 'Fine · accepted' };
 
 // The order lines are listed in: what people see first in a room, then what sits behind it.
 const CLASS_ORDER = ['display', 'monitor', 'video-bar', 'codec', 'touch-controller', 'camera', 'microphone', 'scheduler-panel', 'signage-player', 'av-extender', 'adapter'];

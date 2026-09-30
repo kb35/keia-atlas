@@ -1,0 +1,379 @@
+# A provider's operations (data/providers/<provider>/ops/): the provider's own stock, purchase orders, jobs, crew,
+# visits, site surveys, RAMS reviews and handover packs. None of it flows to a client except what an engagement
+# shares (visit readiness, as-builts and handovers; docs/service-providers.md). The RAMS and most of a handover pack are
+# generated from the record (src/lib/provider-ops.mjs), so only what a person decides or only the provider knows is
+# kept here. Each file says its `kind`; the branch for that kind checks the rest.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/provider-ops
+title: A provider's operations record
+type: object
+required: [area, provider, kind, demo]
+$defs:
+  id: { type: string, pattern: "^[a-z][a-z0-9-]*$" }
+  person: { description: "A person's id in the provider's crew (crew.yaml), or in the demo's people.", type: string, pattern: "^[a-z]+$" }
+  job: { description: "The provider's job number.", type: string, pattern: "^NL-[0-9]{4}$" }
+  date: { type: string, format: date }
+  time: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$" }
+  serial: { description: "A made-up serial number.", type: string, pattern: "^DEMO-NL-[0-9]{5}$" }
+  qty: { type: integer, minimum: 1 }
+  words: { type: string, minLength: 1 }
+  access: { enum: [approved, requested, not-needed] }
+  line:
+    description: One line of a bill of materials or an order. Kit from the device library by `model`; a part the library does not hold by `part`.
+    type: object
+    additionalProperties: false
+    required: [qty]
+    oneOf: [{ properties: { model: true }, required: [model] }, { properties: { part: true }, required: [part] }]
+    properties:
+      model: { $ref: "#/$defs/id" }
+      part: { $ref: "#/$defs/id" }
+      qty: { $ref: "#/$defs/qty" }
+      serials: { type: array, uniqueItems: true, items: { $ref: "#/$defs/serial" } }
+properties:
+  area: { const: ops }
+  provider: { $ref: "#/$defs/id" }
+  kind: { enum: [stock, orders, jobs, crew, visits, surveys, rams, handovers] }
+  demo: { const: true }
+allOf:
+  # ---- Stock: where each item is, by model or part --------------------------------------------------------------
+  - if: { properties: { kind: { const: stock } } }
+    then:
+      additionalProperties: false
+      required: [counted, locations, items]
+      properties:
+        area: true
+        provider: true
+        kind: true
+        demo: true
+        counted: { description: "When the stock was last counted.", $ref: "#/$defs/date" }
+        locations:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, name, kind]
+            properties:
+              id: { $ref: "#/$defs/id" }
+              name: { $ref: "#/$defs/words" }
+              kind: { enum: [warehouse, van] }
+              crew: { $ref: "#/$defs/words" }
+              based: { $ref: "#/$defs/words" }
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [reorder_point, distributor]
+            oneOf:
+              - { properties: { model: true, serials: true }, required: [model, serials] }
+              - { properties: { part: true, what: true, unit: true, on_hand: true }, required: [part, what, unit, on_hand] }
+            properties:
+              model: { description: "A model in data/device-models/.", $ref: "#/$defs/id" }
+              part: { description: "A part the device library does not hold.", $ref: "#/$defs/id" }
+              what: { $ref: "#/$defs/words" }
+              unit: { $ref: "#/$defs/words" }
+              reorder_point: { description: "Order more when what is available falls below this.", type: integer, minimum: 0 }
+              distributor: { $ref: "#/$defs/id" }
+              notes: { $ref: "#/$defs/words" }
+              serials:
+                description: Serialised kit, one line per unit.
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [serial, at]
+                  properties:
+                    serial: { $ref: "#/$defs/serial" }
+                    at: { description: "The location id.", $ref: "#/$defs/id" }
+                    job: { description: "The job it is reserved for.", $ref: "#/$defs/job" }
+              on_hand:
+                description: Counted parts at each location.
+                type: object
+                additionalProperties: { type: integer, minimum: 0 }
+              reserved:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [job, qty]
+                  properties:
+                    job: { $ref: "#/$defs/job" }
+                    qty: { $ref: "#/$defs/qty" }
+  # ---- Distributors and purchase orders ------------------------------------------------------------------------------
+  - if: { properties: { kind: { const: orders } } }
+    then:
+      additionalProperties: false
+      required: [distributors, orders]
+      properties:
+        area: true
+        provider: true
+        kind: true
+        demo: true
+        distributors:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, name, lead_days]
+            properties:
+              id: { $ref: "#/$defs/id" }
+              name: { $ref: "#/$defs/words" }
+              lead_days: { description: "Working days from sending an order to delivery.", type: integer, minimum: 0 }
+              carries: { $ref: "#/$defs/words" }
+        orders:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, distributor, raised, expected, deliver_to, status, lines]
+            properties:
+              id: { type: string, pattern: "^PO-[0-9]{4}-[0-9]{4}$" }
+              distributor: { $ref: "#/$defs/id" }
+              job: { $ref: "#/$defs/job" }
+              raised: { $ref: "#/$defs/date" }
+              by: { $ref: "#/$defs/person" }
+              expected: { $ref: "#/$defs/date" }
+              received: { $ref: "#/$defs/date" }
+              deliver_to: { $ref: "#/$defs/id" }
+              status: { enum: [sent, received] }
+              lines: { type: array, minItems: 1, items: { $ref: "#/$defs/line" } }
+              notes: { $ref: "#/$defs/words" }
+  # ---- Jobs: the provider's work orders -----------------------------------------------------------------------------
+  - if: { properties: { kind: { const: jobs } } }
+    then:
+      additionalProperties: false
+      required: [jobs]
+      properties:
+        area: true
+        provider: true
+        kind: true
+        demo: true
+        jobs:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, title, client, engagement, ref, site, days]
+            properties:
+              id: { $ref: "#/$defs/job" }
+              title: { $ref: "#/$defs/words" }
+              client: { $ref: "#/$defs/id" }
+              engagement: { $ref: "#/$defs/id" }
+              ref: { description: "The client's job or project this work is for.", $ref: "#/$defs/words" }
+              site: { $ref: "#/$defs/id" }
+              spaces: { description: "The client's spaces, where the client's record holds them.", type: array, items: { $ref: "#/$defs/id" } }
+              where: { description: "Where on site, in words, for a client whose spaces are not in this record.", $ref: "#/$defs/words" }
+              days: { type: array, minItems: 1, items: { $ref: "#/$defs/date" } }
+              status: { enum: [planned, done] }
+              tasks: { type: array, items: { enum: [survey, ceiling-mics, cabling, maintenance, configure, audio, mount-display, rack] } }
+              bom:
+                oneOf:
+                  - { type: array, items: { $ref: "#/$defs/line" } }
+                  - type: object
+                    additionalProperties: false
+                    required: [from, project]
+                    properties:
+                      from: { const: build-sheet }
+                      project: { type: string, pattern: "^PRJ-[0-9]+$" }
+                      picks:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: false
+                          required: [space, position, why]
+                          oneOf: [{ properties: { model: true }, required: [model] }, { properties: { part: true }, required: [part] }]
+                          properties:
+                            space: { $ref: "#/$defs/id" }
+                            position: { type: string, minLength: 1 }
+                            model: { $ref: "#/$defs/id" }
+                            part: { $ref: "#/$defs/id" }
+                            why: { $ref: "#/$defs/words" }
+                      add: { type: array, items: { $ref: "#/$defs/line" } }
+  # ---- Crew: people, certifications and the days on site that are not a visit ----------------------------------------
+  - if: { properties: { kind: { const: crew } } }
+    then:
+      additionalProperties: false
+      required: [people]
+      properties:
+        area: true
+        provider: true
+        kind: true
+        demo: true
+        people:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, name, role, based, certs]
+            properties:
+              id: { $ref: "#/$defs/person" }
+              name: { $ref: "#/$defs/words" }
+              role: { $ref: "#/$defs/words" }
+              crew: { $ref: "#/$defs/words" }
+              based: { $ref: "#/$defs/words" }
+              skills: { type: array, items: { $ref: "#/$defs/words" } }
+              certs:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [kind, expires]
+                  properties:
+                    kind: { enum: [cts, cts-d, cts-i, dante-2, dante-3, wah, ipaf, site-card, first-aid] }
+                    expires: { $ref: "#/$defs/date" }
+        rota:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [people, client, site, from, to, what]
+            properties:
+              people: { type: array, minItems: 1, items: { $ref: "#/$defs/person" } }
+              client: { $ref: "#/$defs/id" }
+              site: { $ref: "#/$defs/id" }
+              from: { $ref: "#/$defs/date" }
+              to: { $ref: "#/$defs/date" }
+              weekdays: { type: boolean }
+              what: { $ref: "#/$defs/words" }
+  # ---- Visits: who goes where, and what the client has confirmed -------------------------------------------------------
+  - if: { properties: { kind: { const: visits } } }
+    then:
+      additionalProperties: false
+      required: [visits]
+      properties:
+        area: true
+        provider: true
+        kind: true
+        demo: true
+        visits:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, client, site, where, days, people, jobs, access]
+            properties:
+              id: { type: string, pattern: "^visit-nl-[a-z]+$" }
+              client: { $ref: "#/$defs/id" }
+              site: { $ref: "#/$defs/id" }
+              where: { $ref: "#/$defs/words" }
+              days: { type: array, minItems: 1, items: { $ref: "#/$defs/date" } }
+              people: { type: array, minItems: 1, items: { $ref: "#/$defs/person" } }
+              jobs: { type: array, minItems: 1, items: { $ref: "#/$defs/job" } }
+              access:
+                type: object
+                additionalProperties: false
+                required: [badge, escort, induction, comms_room, ceiling]
+                properties:
+                  badge: { description: "Each person's site badge.", type: object, additionalProperties: { $ref: "#/$defs/access" } }
+                  escort: { $ref: "#/$defs/access" }
+                  escort_note: { $ref: "#/$defs/words" }
+                  induction: { description: "Who has done this site's induction.", type: array, items: { $ref: "#/$defs/person" } }
+                  comms_room: { $ref: "#/$defs/access" }
+                  ceiling: { $ref: "#/$defs/access" }
+                  ceiling_note: { $ref: "#/$defs/words" }
+  # ---- Surveys: the provider's own record of a space it has no client record for -------------------------------------
+  - if: { properties: { kind: { const: surveys } } }
+    then:
+      additionalProperties: false
+      required: [surveys]
+      properties:
+        area: true
+        provider: true
+        kind: true
+        demo: true
+        surveys:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [site, where, surveyed, by, ceiling_m, access, occupied, setting]
+            properties:
+              site: { $ref: "#/$defs/id" }
+              where: { $ref: "#/$defs/words" }
+              surveyed: { $ref: "#/$defs/date" }
+              by: { $ref: "#/$defs/person" }
+              ceiling_m: { type: number, exclusiveMinimum: 0 }
+              access: { $ref: "#/$defs/words" }
+              occupied: { type: boolean }
+              setting: { $ref: "#/$defs/words" }
+              comms: { $ref: "#/$defs/words" }
+              emergency: { $ref: "#/$defs/words" }
+  # ---- RAMS reviews: who reviewed each generated document, and when ------------------------------------------------------
+  - if: { properties: { kind: { const: rams } } }
+    then:
+      additionalProperties: false
+      required: [reviews]
+      properties:
+        area: true
+        provider: true
+        kind: true
+        demo: true
+        reviews:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [job, status, generated]
+            properties:
+              job: { $ref: "#/$defs/job" }
+              status: { enum: [draft, approved] }
+              generated: { $ref: "#/$defs/time" }
+              reviewed_by: { $ref: "#/$defs/person" }
+              reviewed: { $ref: "#/$defs/time" }
+              notes: { type: array, items: { $ref: "#/$defs/words" } }
+  # ---- Handover packs ---------------------------------------------------------------------------------------------------------
+  - if: { properties: { kind: { const: handovers } } }
+    then:
+      additionalProperties: false
+      required: [warranty, packs]
+      properties:
+        area: true
+        provider: true
+        kind: true
+        demo: true
+        warranty:
+          description: The warranty terms the provider bought kit under, by manufacturer.
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [manufacturer, months, from]
+            properties:
+              manufacturer: { $ref: "#/$defs/words" }
+              months: { type: integer, minimum: 1 }
+              from: { enum: [handover] }
+        packs:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, job, handed_over]
+            properties:
+              id: { type: string, pattern: "^HO-NL-[0-9]{4}$" }
+              job: { $ref: "#/$defs/job" }
+              handed_over: { $ref: "#/$defs/date" }
+              sent: { $ref: "#/$defs/time" }
+              accepted:
+                type: object
+                additionalProperties: false
+                required: [by, at]
+                properties:
+                  by: { $ref: "#/$defs/person" }
+                  at: { $ref: "#/$defs/time" }
+              training:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [on, for, what]
+                  properties:
+                    on: { $ref: "#/$defs/date" }
+                    for: { $ref: "#/$defs/words" }
+                    what: { $ref: "#/$defs/words" }
+              notes: { type: array, items: { $ref: "#/$defs/words" } }

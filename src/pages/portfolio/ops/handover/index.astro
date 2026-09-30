@@ -1,0 +1,59 @@
+---
+// Handover packs (src/lib/provider-ops.mjs, handoverPack): one per finished job, put together from the record and
+// delivered over the engagement, where it lands in the client's record as a reviewed change. Then what is still to hand
+// over on the same project. Only Northlight's own people see it. Simulated.
+import Shell from '../../../../layouts/Shell.astro';
+import PageBand from '../../../../components/PageBand.astro';
+import Section from '../../../../components/Section.astro';
+import HealthGlyph from '../../../../components/HealthGlyph.astro';
+import Gate from '../_Gate.astro';
+import { href, projects } from '../../../../lib/data.mjs';
+import { dateWords } from '../../../../lib/provider-ops.mjs';
+import { packs } from './_pack.mjs';
+import '../../../../styles/engagements.css';
+import '../../../../styles/provider-ops.css';
+
+const P = packs();
+const accepted = P.filter((p) => p.state === 'accepted').length;
+const units = P.reduce((n, p) => n + p.asBuilt.length, 0);
+const next = Object.values(projects).find((p) => p.id === 'PRJ-14');
+const handoverTask = next?.tasks.find((t) => t.kind === 'handover');
+const left = next ? next.spaces.filter((s) => !['done', 'snags'].includes(s.state)).length : 0;
+const answer = `${P.length} pack${P.length === 1 ? '' : 's'} delivered, ${accepted} accepted · Juneau's full handover due ${dateWords(handoverTask?.due ?? next?.target)}`;
+const NUMBERS = [
+  { n: P.length, label: P.length === 1 ? 'Pack delivered' : 'Packs delivered', to: '#packs' },
+  { n: accepted, label: 'Accepted by the client', to: '#packs' },
+  { n: units, label: 'Units handed over', to: '#packs' },
+  { n: left, label: 'Juneau spaces to go', to: '#next' },
+];
+---
+<Shell vendorOk title="Handover packs" section="ops-handover" crumbs={[{ label: 'Operations', to: '/portfolio/ops/' }, { label: 'Handover packs' }]}>
+  <div class="pf-for">
+    <PageBand overline="Operations · Northlight AV" title="Handover packs" answer={answer} lede="Everything a client needs at handover, put together from the record and sent over the engagement." sim numbers={NUMBERS} />
+    <div class="content po-page">
+      <Section title="Delivered" id="packs" help="ops.handover" data-feature="engagements">
+        <ul class="po-docs">
+          {P.map((p) => (
+            <li class="po-doc">
+              <HealthGlyph state={p.state === 'accepted' ? 'fine' : 'progress'} size={16} title={p.state === 'accepted' ? 'Accepted' : 'With the client'} />
+              <span>
+                <a href={href(`/portfolio/ops/handover/${p.id.toLowerCase()}/`)}><span class="mono">{p.id}</span> {p.job.title}</a>
+                <small>{p.facts.clientName} · {p.facts.where} · handed over {dateWords(p.pack.handed_over)}</small>
+                <small>{p.answer}</small>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </Section>
+      {next && (
+        <Section title="Next on the same project" id="next" help="ops.handover-next" data-feature="engagements">
+          <div class="card pad">
+            <p class="po-none"><HealthGlyph state="progress" size={16} title="Being put together" /><span><b>{next.name}: the full handover</b>, due {dateWords(handoverTask?.due ?? next.target)}. {next.spaces.length - left} of {next.spaces.length} spaces are done or snagging; each one's as-built, tests and guides join the pack as it passes its room test.</span></p>
+          </div>
+        </Section>
+      )}
+      <p class="po-foot">A pack is sent over the engagement: handovers and as-builts are in its scope. It lands in the client's record as a reviewed change, so nobody retypes a spreadsheet: the client's engineer sees the difference and accepts it.</p>
+    </div>
+  </div>
+  <Gate />
+</Shell>

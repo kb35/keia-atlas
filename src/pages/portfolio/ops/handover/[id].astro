@@ -1,0 +1,138 @@
+---
+// One handover pack as a document (src/lib/provider-ops.mjs, handoverPack): how it was delivered over the engagement
+// and accepted, then the as-built (units, serials, ports and VLANs from the record), the room tests from Deploy, the
+// operation and maintenance documents (setup guides and the manufacturers' own), training, warranty, open snags and
+// what the record does not hold yet. Prints as a clean document. Simulated.
+import Shell from '../../../../layouts/Shell.astro';
+import PageBand from '../../../../components/PageBand.astro';
+import HealthGlyph from '../../../../components/HealthGlyph.astro';
+import Gate from '../_Gate.astro';
+import Base from '../_Base.astro';
+import { href } from '../../../../lib/data.mjs';
+import { dateWords } from '../../../../lib/provider-ops.mjs';
+import { engagement, RECORD_KINDS } from '../../../../lib/engagements.mjs';
+import { atWords } from '../../../../lib/vendors.mjs';
+import { packs } from './_pack.mjs';
+import '../../../../styles/engagements.css';
+import '../../../../styles/provider-ops.css';
+
+export function getStaticPaths() {
+  return packs().map((p) => ({ params: { id: p.id.toLowerCase() }, props: { id: p.id } }));
+}
+const { id } = Astro.props;
+const p = packs().find((x) => x.id === id);
+const e = engagement(p.job.engagement);
+const inScope = ['handover', 'as-built'].every((k) => e?.scope.kinds.includes(k));
+const byModel = [...new Set(p.asBuilt.map((u) => u.modelName ?? `${u.clsName}, model not recorded`))].map((m) => {
+  const us = p.asBuilt.filter((u) => (u.modelName ?? `${u.clsName}, model not recorded`) === m);
+  return { m, n: us.length, w: us[0].warranty };
+});
+const at = (t) => `${dateWords(t)}, ${t.slice(11, 16)}`;
+---
+<Shell vendorOk title={`Handover: ${p.job.title}`} section="ops-handover-doc" crumbs={[{ label: 'Operations', to: '/portfolio/ops/' }, { label: 'Handover packs', to: '/portfolio/ops/handover/' }, { label: p.id }]}>
+  <div class="pf-for">
+    <PageBand overline={`Handover pack · ${p.id}`} title={p.job.title} answer={p.answer} lede="The as-built, tests, guides, training and warranty, from the record." sim heartbeat={false}>
+      <div slot="action" class="rm-print"><button type="button" class="btn small" data-po-print>Print</button></div>
+    </PageBand>
+    <div class="content po-page" data-po-root data-po-page="handover-doc" data-feature="engagements">
+      <article class="rm-doc" aria-labelledby="pb-title">
+        <header class="rm-head">
+          <h1 class="rm-print-only">Handover pack {p.id}: {p.job.title}</h1>
+          <dl class="rm-facts">
+            <div><dt>Client</dt><dd>{p.facts.clientName}</dd></div>
+            <div><dt>Project</dt><dd>{p.project}</dd></div>
+            <div><dt>Spaces</dt><dd>{p.facts.where}</dd></div>
+            <div><dt>Handed over</dt><dd>{dateWords(p.pack.handed_over)}</dd></div>
+            <div><dt>Accepted</dt><dd>{p.pack.accepted ? `${p.acceptedName}, ${at(p.pack.accepted.at)}` : 'Not yet'}</dd></div>
+          </dl>
+        </header>
+
+        <section class="rm-sec" aria-labelledby="ho-del" data-help="ops.handover-trail">
+          <h2 id="ho-del">Delivered through the engagement</h2>
+          <ul class="ho-trail">
+            {p.delivery.map((d, i) => (
+              <li><HealthGlyph state={i === p.delivery.length - 1 && p.state === 'accepted' ? 'fine' : 'progress'} size={16} title={d.by} /><span><b>{d.what}</b><small>{d.by} · {atWords(d.at)}</small></span></li>
+            ))}
+          </ul>
+          <p>{inScope ? `Handovers and as-builts are in the ${p.facts.clientName} and Northlight AV engagement's scope (${RECORD_KINDS.handover.how.toLowerCase()}).` : 'Handovers are not in this engagement\'s scope, so the pack cannot be sent.'} <a href={href(`/portfolio/${p.job.engagement}/engagement/`)}>The engagement</a></p>
+        </section>
+
+        <section class="rm-sec" aria-labelledby="ho-ab" data-help="ops.asbuilt">
+          <h2 id="ho-ab">As-built</h2>
+          <p>Every unit in the spaces, from {p.facts.clientName}'s record: serials and asset tags from the installs, ports, VLANs and addresses from the switch ports.</p>
+          <div class="card">
+            <table class="ho-tbl to-cards">
+              <thead><tr><th>Unit</th><th>Model</th><th>Serial</th><th>Asset tag</th><th>Hostname</th><th>Port and VLAN</th><th>Address</th></tr></thead>
+              <tbody>
+                {p.asBuilt.map((u) => (
+                  <tr>
+                    <td data-label=""><b>{u.name}</b></td>
+                    <td data-label="Model">{u.modelName ?? 'Not in the record'}</td>
+                    <td data-label="Serial"><span class="mono">{u.serial}</span></td>
+                    <td data-label="Asset tag"><span class="mono">{u.tag}</span></td>
+                    <td data-label="Hostname"><span class="mono">{u.host ?? 'None'}</span></td>
+                    <td data-label="Port and VLAN">{u.port ? <><span class="mono">{u.port}</span><small>VLAN {u.vlan}{u.vlanName ? `, ${u.vlanName}` : ''}</small></> : 'Not networked'}</td>
+                    <td data-label="Address"><span class="mono">{u.address ?? 'None'}</span>{u.mac && <small class="mono">{u.mac}</small>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="rm-sec" aria-labelledby="ho-t" data-help="ops.tests">
+          <h2 id="ho-t">Room tests</h2>
+          <p>From Deploy's room tests on the project, as they were signed.</p>
+          <div class="ho-tests">
+            {p.tests.map((r) => (
+              <div class="ho-room">
+                <h3>{r.name}</h3>
+                <ul>{r.rows.map((t) => <li><HealthGlyph state={t.r === 'pass' ? 'fine' : t.r === 'fail' ? 'fault' : 'planned'} size={16} title={t.r === 'pass' ? 'Passed' : t.r === 'fail' ? 'Failed' : 'Not run'} /><span>{t.t}{t.note && <small>{t.note}</small>}</span></li>)}</ul>
+                <small>{r.passed} of {r.rows.length} passed{r.signedName ? ` · signed by ${r.signedName}` : ''}</small>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section class="rm-sec" aria-labelledby="ho-om" data-help="ops.om">
+          <h2 id="ho-om">Operation and maintenance</h2>
+          <ul class="ho-om">
+            {p.om.map((o) => (
+              <li>
+                <b>{o.modelName}</b>
+                {o.guide ? <a href={o.guide.href}>Setup guide: {o.guide.name}</a> : <small>No setup guide in the standard</small>}
+                {o.sources.map((s) => <a href={s.url} rel="noopener">{s.title}</a>)}
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <div class="rm-top">
+          <section class="rm-sec" aria-labelledby="ho-w" data-help="ops.warranty">
+            <h2 id="ho-w">Warranty</h2>
+            <table class="ho-tbl to-cards">
+              <thead><tr><th>Model</th><th>Units</th><th>Ends</th></tr></thead>
+              <tbody>{byModel.map((r) => <tr><td data-label=""><b>{r.m}</b></td><td data-label="Units">{r.n}</td><td data-label="Ends">{r.w ? `${dateWords(r.w.ends)} (${r.w.months} months from handover)` : 'No term on record'}</td></tr>)}</tbody>
+            </table>
+            <p class="po-src">Terms from Northlight's purchase records, by manufacturer, from the handover date.</p>
+          </section>
+          <section class="rm-sec" aria-labelledby="ho-tr" data-help="ops.training">
+            <h2 id="ho-tr">Training given</h2>
+            <ul class="rm-list">{p.training.map((t) => <li><b>{dateWords(t.on)}, {t.for}:</b> {t.what}.</li>)}</ul>
+          </section>
+        </div>
+
+        <section class="rm-sec" aria-labelledby="ho-open" data-help="ops.handover-open">
+          <h2 id="ho-open">Still open, and what the record does not hold yet</h2>
+          <ul class="rm-comp">
+            {p.snags.map((s) => <li><HealthGlyph state="progress" size={16} title="Open snag" /><span><b>{s.id}: {s.title}</b><small>With Northlight AV under the snag period · {s.clock.text}</small></span></li>)}
+            {p.gaps.map((g) => <li><HealthGlyph state="review" size={16} title="Gap" /><span><b>{g}</b></span></li>)}
+            {p.notes.map((n) => <li><HealthGlyph state="planned" size={16} title="Note" /><span>{n}</span></li>)}
+          </ul>
+        </section>
+      </article>
+    </div>
+  </div>
+  <Gate />
+  <Base />
+</Shell>

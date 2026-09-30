@@ -17,10 +17,10 @@ const nav = shell.slice(shell.indexOf('const NAV = ['), shell.indexOf('const par
 const places = [...nav.matchAll(/^  \{ id: '([a-z-]+)', label: '([^']+)'/gm)].map((m) => ({ id: m[1], label: m[2] }));
 
 test('the sidebar: Home, the modules in their fixed order, then Learn and Method below the rule', () => {
-  // The places only a provider's people see (vendorOnly: their installation, schedule, clients and sales) sit
-  // outside the modules' order.
+  // The places only a provider's people see (vendorOnly: their installation, schedule, clients, sales and operations)
+  // sit outside the modules' order.
   const vendorOnly = [...nav.matchAll(/^  \{ id: '([a-z-]+)',[^\n]*vendorOnly: true/gm)].map((m) => m[1]);
-  assert.ok(['vendor', 'vschedule', 'portfolio', 'sales'].every((id) => vendorOnly.includes(id)), 'the provider\'s own places are vendor-only');
+  assert.ok(['vendor', 'vschedule', 'portfolio', 'sales', 'ops'].every((id) => vendorOnly.includes(id)), 'the provider\'s own places are vendor-only');
   const staff = places.map((p) => p.id).filter((id) => !vendorOnly.includes(id));
   assert.deepEqual(staff, ['home', 'locations', 'services', 'assets', 'support', 'projects', 'vendors', 'team', 'knowledge', 'learn', 'method']);
   assert.deepEqual(MODULES.map((m) => m.id), ['locations', 'services', 'assets', 'support', 'projects', 'vendors', 'team', 'knowledge']);

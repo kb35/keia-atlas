@@ -1,11 +1,11 @@
 // The sales pages' own script (src/pages/portfolio/sales/): the design's edits, the quote's versions, the handoff and
 // printing. The maths is the same module the pages were built with (src/lib/provider-sales.mjs), so a figure here is
 // always the figure the build would give. Every move is the motion library's, once, and lands at once under reduced
-// motion (docs/rules/motion.md, rows 55 to 57):
-//   55  the design: a changed quantity, model or rate ticks the room, the BOM and the totals into place (km-tick, wired
+// motion (docs/rules/motion.md, rows 57 to 59):
+//   57  the design: a changed quantity, model or rate ticks the room, the BOM and the totals into place (km-tick, wired
 //       site-wide on [data-tick]); the BOM's totals tick in the first time they are seen (arrive)
-//   56  the quote: switching versions cross-fades the two, and the box eases to its new height
-//   57  accept: the design card flies into the client's Keia on the zero-bounce spring, and the proposed project
+//   58  the quote: switching versions cross-fades the two, and the box eases to its new height
+//   59  accept: the design card flies into the client's Keia on the zero-bounce spring, and the proposed project
 //       fills in where it lands
 import km from './motion-library.js';
 import { arrive } from './arrive.mjs';

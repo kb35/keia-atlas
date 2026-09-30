@@ -1,0 +1,81 @@
+---
+// Crews (src/lib/provider-ops.mjs): who is on which client's site each day this week and next, then each person's
+// skills and certifications with their expiry, and anything that expires before a visit that needs it. Crews and rotas
+// are the provider's own: they never flow to a client. Simulated (data/providers/northlight/ops/crew.yaml).
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import Section from '../../../components/Section.astro';
+import HealthGlyph from '../../../components/HealthGlyph.astro';
+import Gate from './_Gate.astro';
+import { href } from '../../../lib/data.mjs';
+import { opsBase } from '../../../lib/provider-ops-load.mjs';
+import { opsView, WEEKS, certState, crewCheck, dayWords, CERTS } from '../../../lib/provider-ops.mjs';
+import { ORGS, CLIENT_SITES } from '../../../lib/engagements.mjs';
+import '../../../styles/engagements.css';
+import '../../../styles/provider-ops.css';
+
+const base = opsBase();
+const V = opsView(base);
+const siteShort = (client, site) => (CLIENT_SITES[client]?.find((s) => s.id === site)?.city ?? site);
+const certs = V.people.flatMap((p) => p.certs.map((c) => certState(c)));
+const expired = certs.filter((c) => c.state === 'fault').length, renew = certs.filter((c) => c.state === 'review').length;
+// What each person's certifications mean for the visits they are on.
+const needsOf = {};
+for (const r of V.visits) {
+  const needs = r.visit.jobs.flatMap((j) => V.rams[j]?.needs ?? []);
+  for (const p of crewCheck(r.visit, V.people, needs)) if (p.person) (needsOf[p.person] ??= []).push(`${p.words}: needed ${dayWords(r.visit.days[0])} in ${siteShort(r.visit.client, r.visit.site)}`);
+}
+const risky = new Set(V.visits.filter((r) => !r.ready).map((r) => r.visit.id));
+const W = V.weeks.this;
+const answer = `${V.people.length} people · ${W.onSite} on client sites this week · ${expired ? `${expired} certification expired` : 'no certification expired'}`;
+const NUMBERS = [
+  { n: W.onSite, label: 'On site this week', to: '#this-week' },
+  { n: V.weeks.next.onSite, label: 'On site next week', to: '#next-week' },
+  { n: expired, label: 'Expired', to: '#people', tone: expired ? 'bad' : undefined },
+  { n: renew, label: 'To renew in 60 days', to: '#people', tone: renew ? 'warn' : undefined },
+];
+const weeks = [{ w: WEEKS.this, id: 'this-week' }, { w: WEEKS.next, id: 'next-week' }];
+---
+<Shell vendorOk title="Crews" section="ops-crews" crumbs={[{ label: 'Operations', to: '/portfolio/ops/' }, { label: 'Crews' }]}>
+  <div class="pf-for">
+    <PageBand overline="Operations · Northlight AV" title="Crews" answer={answer} lede="Who is on which client's site each day, and whether their certifications cover the work." sim numbers={NUMBERS} />
+    <div class="content po-page" data-po-root data-po-page="crews">
+      {weeks.map(({ w, id }) => (
+        <Section title={w.label} id={id} help="ops.week" data-feature="provider-crews" aside={`${dayWords(w.from)} to ${dayWords(w.to)} · ${V.weeks[w.id].onSite} people on ${V.weeks[w.id].sites} client sites`}>
+          <div class="card pad po-week" role="table" aria-label={`${w.label}: who is where`}>
+            <div class="po-wk-head" role="row"><span role="columnheader">Person</span>{V.weeks[w.id].days.map((d) => <span role="columnheader">{dayWords(d).slice(0, 6)}</span>)}</div>
+            {V.weeks[w.id].rows.map((row) => (
+              <div class="po-wk-row" role="row">
+                <span class="po-wk-who" role="rowheader"><b>{row.person.name}</b><small>{row.person.role} · {row.person.based}</small></span>
+                {row.cells.map((c) => (
+                  <span class="po-wk-c" role="cell" data-client={c.client} data-kind={c.kind} data-risk={c.visit && risky.has(c.visit) ? '' : undefined} title={c.client ? `${ORGS[c.client]?.name}, ${siteShort(c.client, c.site)}: ${c.what}${c.visit && risky.has(c.visit) ? ' (visit at risk)' : ''}` : c.what}>
+                    <span class="po-wk-d">{dayWords(c.day).slice(0, 3)}</span>
+                    {c.client ? <><b>{ORGS[c.client]?.name.split(' ')[0]}</b><small>{siteShort(c.client, c.site)}</small></> : <small>{c.what}</small>}
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
+        </Section>
+      ))}
+      <Section title="People and certifications" id="people" help="ops.people" data-feature="provider-crews" aside={`To review within 60 days of expiry`}>
+        <ul class="po-people">
+          {V.people.map((p) => (
+            <li class="po-person">
+              <header><h3>{p.name}</h3><small>{p.role} · {p.crew} · {p.based}</small></header>
+              {needsOf[p.id]?.length > 0 && <p class="po-needs">{needsOf[p.id].join('. ')}</p>}
+              <ul class="po-certs">
+                {p.certs.map((c) => certState(c)).sort((a, b) => a.left - b.left).map((c) => (
+                  <li><HealthGlyph state={c.state} size={16} title={c.state === 'fine' ? 'In date' : c.state === 'review' ? 'Renew soon' : 'Expired'} /><span><b>{c.label}</b><small>{CERTS[c.kind]?.by} · {c.words}</small></span></li>
+                ))}
+              </ul>
+              {p.skills?.length > 0 && <p class="po-skills">Skills: {p.skills.join(', ')}</p>}
+            </li>
+          ))}
+        </ul>
+      </Section>
+      <p class="po-foot">Crews, rotas and certifications are Northlight's own and never flow to a client; a client sees only each visit's readiness. Certifications are checked against every visit that needs them on its last day: <a href={href('/portfolio/ops/visits/')}>visit readiness</a>. Rotas and time off come from Northlight's scheduling tool, which connects.</p>
+    </div>
+  </div>
+  <Gate />
+</Shell>

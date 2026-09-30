@@ -172,7 +172,7 @@ A provider can draft a design in its own Keia before any contract: space types, 
 
 **Connects to** (designed, not built): **Xero or QuickBooks** for invoicing, from an accepted quote's payment schedule; **D-Tools or Jetbuilt** import, a project from a quoting tool brought in as a design and matched to the space types and the library.
 
-**Built (simulated):** `src/lib/provider-sales.mjs` (the maths, tested in `tests/provider-sales.test.mjs`), Northlight AV's records in `data/providers/northlight/sales/` (schema `schemas/ext/provider-sales.schema.yaml`), and the pages under `/portfolio/sales/`: the pipeline, a design, its quote, the statement of work and Accept. Behind the Provider sales capability (Vendors, on by default). What is simulated is listed in [gaps.md, gap 48](rules/gaps.md). **Designed:** saving a draft as a new version, the proposal record crossing a real engagement, and the connections above.
+**Built (simulated):** `src/lib/provider-sales.mjs` (the maths, tested in `tests/provider-sales.test.mjs`), Northlight AV's records in `data/providers/northlight/sales/` (schema `schemas/ext/provider-sales.schema.yaml`), and the pages under `/portfolio/sales/`: the pipeline, a design, its quote, the statement of work and Accept. Behind the Provider sales capability (Vendors, on by default). What is simulated is listed in [gaps.md, gap 49](rules/gaps.md). **Designed:** saving a draft as a new version, the proposal record crossing a real engagement, and the connections above.
 
 ## 8. Standards
 

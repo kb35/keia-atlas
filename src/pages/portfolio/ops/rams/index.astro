@@ -1,0 +1,42 @@
+---
+// RAMS (risk assessment and method statement), one per job, generated from the record (src/lib/provider-ops.mjs,
+// generateRams) and approved by a person. Waiting for review first, then by the day the work starts.
+// Only Northlight's own people see it. Simulated; a demo template, not safety advice.
+import Shell from '../../../../layouts/Shell.astro';
+import PageBand from '../../../../components/PageBand.astro';
+import Section from '../../../../components/Section.astro';
+import Gate from '../_Gate.astro';
+import Base from '../_Base.astro';
+import { href } from '../../../../lib/data.mjs';
+import { opsBase } from '../../../../lib/provider-ops-load.mjs';
+import { opsView, DISCLAIMER } from '../../../../lib/provider-ops.mjs';
+import { ramsListHtml, ramsListAnswer } from '../../../../lib/provider-ops-view.mjs';
+import '../../../../styles/engagements.css';
+import '../../../../styles/provider-ops.css';
+
+const V = opsView(opsBase());
+const docs = Object.values(V.rams);
+const waiting = docs.filter((d) => d.status !== 'approved').length;
+const hazards = docs.reduce((n, d) => n + d.hazards.length, 0);
+const high = docs.reduce((n, d) => n + d.hazards.filter((h) => h.after.id === 'high').length, 0);
+const NUMBERS = [
+  { n: waiting, label: 'Waiting for review', to: '#rams', tone: waiting ? 'warn' : undefined, id: 'po-waiting' },
+  { n: docs.length, label: 'Documents', to: '#rams' },
+  { n: hazards, label: 'Hazards found', to: '#rams' },
+  { n: high, label: 'High after controls', to: '#rams', tone: high ? 'bad' : undefined },
+];
+const base = href('');
+---
+<Shell vendorOk title="RAMS" section="ops-rams" crumbs={[{ label: 'Operations', to: '/portfolio/ops/' }, { label: 'RAMS' }]}>
+  <div class="pf-for">
+    <PageBand overline="Operations · Northlight AV" title="RAMS" answer={ramsListAnswer(V)} lede="Risk assessments and method statements, written from what the record knows of each site and job." sim numbers={NUMBERS} />
+    <div class="content po-page" data-po-root data-po-page="rams" data-base={base}>
+      <Section title="By job" id="rams" help="ops.rams" data-feature="provider-rams" aside="Waiting for review first">
+        <div data-po-slot="rams-list" set:html={ramsListHtml(V, base)} />
+      </Section>
+      <p class="rm-disclaimer" data-feature="provider-rams"><b>Demo template.</b> {DISCLAIMER}</p>
+    </div>
+  </div>
+  <Gate />
+  <Base />
+</Shell>

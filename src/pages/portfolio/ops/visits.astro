@@ -1,0 +1,43 @@
+---
+// Visit readiness (src/lib/provider-ops.mjs, readiness): every visit this week and next, by day, each
+// with its blockers in words ("Badge not approved: Tuesday at risk") and its eight checks: badges, escort, induction,
+// comms room and ceiling access, the RAMS approved, certifications in date for the work, and parts. The same readiness
+// is shared with the client over the engagement (both marks). Simulated (data/providers/northlight/ops/visits.yaml).
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import Section from '../../../components/Section.astro';
+import Gate from './_Gate.astro';
+import Base from './_Base.astro';
+import { href } from '../../../lib/data.mjs';
+import { opsBase } from '../../../lib/provider-ops-load.mjs';
+import { opsView, WEEKS, dayWords } from '../../../lib/provider-ops.mjs';
+import { visitsHtml } from '../../../lib/provider-ops-view.mjs';
+import '../../../styles/engagements.css';
+import '../../../styles/provider-ops.css';
+
+const V = opsView(opsBase());
+const risk = V.visits.filter((r) => !r.ready).length;
+const NUMBERS = [
+  { n: risk, label: 'At risk', to: '#this-week', tone: risk ? 'bad' : undefined, id: 'po-risk' },
+  { n: V.visits.length - risk, label: 'Ready', to: '#this-week', id: 'po-ready' },
+  { n: V.visits.length, label: 'Visits, two weeks', to: '#this-week' },
+  { n: V.weeks.this.onSite, label: 'People on site', to: '/portfolio/ops/crews/' },
+];
+const base = href('');
+---
+<Shell vendorOk title="Visit readiness" section="ops-visits" crumbs={[{ label: 'Operations', to: '/portfolio/ops/' }, { label: 'Visit readiness' }]}>
+  <div class="pf-for">
+    <PageBand overline="Operations · Northlight AV" title="Visit readiness" answer={V.visitsAnswer} lede="Each visit is ready when access, the RAMS, certifications and parts are all in place." sim numbers={NUMBERS} />
+    <div class="content po-page" data-po-root data-po-page="visits" data-base={base}>
+      <Section title="This week" id="this-week" help="ops.visits" data-feature="provider-crews" aside={`${dayWords(WEEKS.this.from)} to ${dayWords(WEEKS.this.to)}`}>
+        <div data-po-slot="visits-this" set:html={visitsHtml(V, WEEKS.this, base)} />
+      </Section>
+      <Section title="Next week" id="next-week" help="ops.visits" data-feature="provider-crews" aside={`${dayWords(WEEKS.next.from)} to ${dayWords(WEEKS.next.to)}`}>
+        <div data-po-slot="visits-next" set:html={visitsHtml(V, WEEKS.next, base)} />
+      </Section>
+      <p class="po-foot">Readiness is shared over each engagement with both marks: Northlight books the visit, the client confirms badges, escorts and access, and both see what is missing. Parts follow the <a href={href('/portfolio/ops/orders/')}>orders</a>, the RAMS its <a href={href('/portfolio/ops/rams/')}>review</a>, and certifications the <a href={href('/portfolio/ops/crews/')}>crew record</a>. What you change on those pages is kept in this browser. <button type="button" data-po-reset>Start again from the record</button></p>
+    </div>
+  </div>
+  <Gate />
+  <Base />
+</Shell>
