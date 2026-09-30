@@ -30,11 +30,18 @@ import { schedule } from '../../lib/schedule.mjs';
 import { placeOn, STEPS } from '../../lib/schedulecore.mjs';
 import { projects, sites, spaces, SITE_ORDER, DEMO_TODAY, STEP_LABEL, href, fmtDate, plural } from '../../lib/data.mjs';
 import { PEOPLE } from '../../lib/demo.mjs';
+import TrendStrip from '../../components/TrendStrip.astro';
+import Arrive from '../../components/Arrive.astro';
+import { topRepeats } from '../../lib/repeats-view.mjs';
 
 interface Props { list?: boolean }
 const { list: isList = false } = Astro.props;
 const TODAY = DEMO_TODAY;
 const P = Object.fromEntries(PEOPLE.map((p) => [p.id, p]));
+
+// Repeat faults (the overlooked items, #15): the spaces with the most faults this quarter, on the overview.
+const REPS = isList ? [] : topRepeats(5);
+const REP_ANSWER = REPS.length ? `${REPS.length} ${REPS.length === 1 ? 'space has' : 'spaces have'} failed more than once this quarter · most: ${REPS[0].name}, ${REPS[0].office.replace(/ office$/, '')}` : '';
 
 // ---- Open work (src/lib/openwork.mjs: the same count as Team's "Who has the open work") ------------------
 const open = openWork;
@@ -175,6 +182,24 @@ const whoLine = (who) => (who.length === 1 ? P[who[0]]?.role ?? '' : who.length 
                 <span class="sub q-due">{r.due}</span>
               </span>
               <span class="end"><WithChip own={r.o} item={`inc:${r.v.inc.number}`} history={HISTORY[`inc:${r.v.inc.number}`] ?? []} /></span>
+            </li>
+          ))}
+        </ol>
+      </Section>
+    )}
+
+    {REPS.length > 0 && (
+      <Section title="Repeat faults this quarter" id="repeats" help="overview.repeats" data-feature="repeat-faults" data-settle aside="Spaces with two faults or more since 1 July">
+        <p class="rpt-answer">{REP_ANSWER}</p>
+        <ol class="list rpt-l">
+          {REPS.map((r) => (
+            <li class="row rpt-r">
+              <span class="rpt-n"><b class="rs-tick">{r.quarter}</b><small>this quarter</small></span>
+              <span class="rpt-m">
+                <a class="name" href={href(`/rooms/${r.space}/`)}>{r.name}</a>
+                <span class="sub">{r.office}{r.symptom ? ` · last: ${r.symptom.toLowerCase()}` : ''} · {r.year} in 12 months</span>
+              </span>
+              <span class="end"><TrendStrip bars={r.bars} label={`Faults in ${r.name} per month, the last 12 months`} tone="fault" mark={r.bars.length - 1} height={22} step={10} /></span>
             </li>
           ))}
         </ol>
@@ -441,9 +466,19 @@ const whoLine = (who) => (who.length === 1 ? P[who[0]]?.role ?? '' : who.length 
       if (bar) { if (bar.rsFilter) start(); else document.addEventListener('DOMContentLoaded', start, { once: true }); }
     })();
   </script>
+  <Arrive />
 </Shell>
 
 <style>
+  /* Repeat faults: the answer, then one row a space with its count and strip. */
+  .rpt-answer { margin: 0 0 10px; font: var(--fw-title) var(--fs-h3)/1.35 var(--font-display); color: var(--text); }
+  .rpt-l { list-style: none; margin: 0; padding: 0; }
+  .rpt-r { grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; }
+  .rpt-n { display: grid; justify-items: start; line-height: 1; }
+  .rpt-n b { font: var(--fw-title) 24px/1 var(--font-display, var(--font-sans)); color: var(--red-ink); }
+  .rpt-n small { font-size: var(--fs-mark); color: var(--text-3); margin-top: 3px; }
+  .rpt-m { display: grid; gap: 2px; min-width: 0; }
+  @container content (max-width: 559px) { .rpt-r { grid-template-columns: 56px minmax(0, 1fr); } .rpt-r .end { grid-column: 2; justify-self: start; } }
   /* The queue: the same row as the Queue page. */
   .q-l { list-style: none; margin: 0; padding: 0; }
   .q-r { grid-template-columns: var(--glyph-col, 28px) minmax(0, 1fr) auto; align-items: start; }

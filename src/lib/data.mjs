@@ -80,7 +80,7 @@ for (const [id, s] of Object.entries(spacesRaw)) {
   // wiring or stage count sees them.
   const spareKit = (inst.spare_units ?? []).map((u, i) => {
     const cls = models[u.model]?.class;
-    const unit = { serial: u.serial, asset_tag: u.asset_tag, stage: 'spare', installed: null, arrived: u.arrived, notes: u.notes };
+    const unit = { serial: u.serial, asset_tag: u.asset_tag, stage: 'spare', installed: null, arrived: u.arrived, notes: u.notes, purchase: u.purchase, warranty: u.warranty, support: u.support };
     return { position: `spare#${i + 1}`, key: 'spare', model: u.model, cls, role: className(cls), spare: true, cabinet: u.cabinet, shelf: u.shelf, units: [unit], current: unit };
   });
   spaces[id] = { id, ...s, type: spaceTypes[s.space_type], option, fitted: inst.fitted ?? [], positions, spareKit, olderKit: older.filter((p) => !p.units[0].retired), retiredKit: older.filter((p) => p.units[0].retired), stages, attention, notes: [...(s.notes ?? []), ...(inst.notes ?? [])] };
@@ -253,6 +253,13 @@ export function networkPath(space) {
   return { mdf, idf };
 }
 export const vendors = readFolder('vendors');
+// On call per region (data/on-call/, src/lib/oncall.mjs).
+export const onCall = readFolder('on-call');
+// Faults resolved before the incidents held in full (data/fault-history/, src/lib/repeats-view.mjs).
+export const faultHistory = readFolder('fault-history');
+// Room accessibility and the cable runs by site, for the space page (src/lib/roomfacts-view.mjs).
+export const accessibility = readFolder('accessibility');
+export const runsBySite = readFolder('runs');
 export const VENDOR_KIND = { integration: 'Integration', service: 'Service and maintenance', manufacturer: 'Manufacturer' };
 
 // The name people use for a device: where it is and what it does ("Curlew video bar", "Reception

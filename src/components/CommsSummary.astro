@@ -5,6 +5,7 @@
 // (where the room connects to). Everything comes from src/lib/comms.mjs; what the data does not hold says
 // "Not recorded". What the room serves is in the band and in "Rooms it serves".
 import { href, plural } from '../lib/data.mjs';
+import { upsWords } from '../lib/environment.mjs';
 const { facts: f, size = null } = Astro.props;
 const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
 const tone = (a, b) => (b && a / b >= 0.9 ? 'hi' : '');
@@ -12,6 +13,8 @@ const poe = f.poe.filter((p) => p.text);
 // What the floor needs (src/lib/comms.mjs, sizeFor): the shortfall or spare against what is installed.
 const need = (id) => size?.rows.find((r) => r.id === id) ?? null;
 const portsNeed = need('ports'), rackNeed = need('rack');
+// The UPS as last measured (the room's record); "Not recorded" only when the room has none.
+const U = upsWords(f.power.record?.ups);
 ---
 <div class="g12 cm-sum">
   <section class="card side-card s-3" aria-labelledby="cm-u">
@@ -51,10 +54,11 @@ const portsNeed = need('ports'), rackNeed = need('rack');
       <p class="cm-big cm-big-s"><b>{f.power.ups.model}</b>{f.power.battery && <span class="faint">, with a battery pack</span>}</p>
     ) : <p class="cm-big cm-big-s faint">No UPS recorded</p>}
     <ul class="cm-lines">
-      <li><span>Feeds</span><b>{f.power.feeds.length ? f.power.feeds.join(' and ') : 'Not recorded'}</b></li>
-      <li><span>Load and runtime</span><b class="faint">Not recorded</b></li>
+      <li><span>Feeds</span><b>{f.power.feeds.length ? f.power.feeds.join(' and ') : f.power.record?.feeds ? f.power.record.feeds.map((x) => x.feed).join(' and ') : 'Not recorded'}</b></li>
+      {U ? <li><span>Load and runtime</span><b class:list={{ 'cm-bad': !U.ok }}>{U.load.n}%, {U.runtime.n} min</b></li> : <li><span>Load and runtime</span><b class="faint">Not recorded</b></li>}
     </ul>
     {f.power.strip && <p class="cm-foot">{plural(f.power.feeds.length || 1, 'power strip')} at the back: {f.power.strip.replace(/, 0U$/, '')}.</p>}
+    {f.power.record?.feeds && <p class="cm-foot">Circuits: {f.power.record.feeds.map((x) => `${x.feed} from ${x.board}, way ${x.way}`).join('; ')}.</p>}
   </section>
 
   <section class="card side-card s-3" aria-labelledby="cm-up">
@@ -81,6 +85,7 @@ const portsNeed = need('ports'), rackNeed = need('rack');
   .cm-lines li { display: flex; justify-content: space-between; gap: 12px; }
   .cm-lines li > span { color: var(--text-2); min-width: 0; }
   .cm-lines li > b { font-weight: var(--fw-name); white-space: nowrap; }
+  .cm-lines li > b.cm-bad { color: var(--red-ink); }
   .cm-links { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
   .cm-links b { display: block; font-size: var(--fs-body); font-weight: var(--fw-name); line-height: 1.3; }
   .cm-links small { display: block; font-size: var(--fs-code); color: var(--text-2); line-height: 1.35; margin-top: 1px; }

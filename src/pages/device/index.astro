@@ -16,6 +16,7 @@ import PageBand from '../../components/PageBand.astro';
 import SimTag from '../../components/SimTag.astro';
 import HealthGlyph from '../../components/HealthGlyph.astro';
 import '../../styles/vlan.css';
+import Arrive from '../../components/Arrive.astro';
 import { models, spaces, STAGES, STAGE_LABEL, TASK_STATUS, INC_STATE, DEMO_TODAY } from '../../lib/data.mjs';
 import { artParts, artSource } from '../../lib/art.mjs';
 import '../../styles/viz.css';
@@ -48,6 +49,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
   {clsUsed.map((c) => <template data-glyph={c}><DeviceGlyph cls={c} size={120} /></template>)}
   <template data-icon="check"><Icon name="check" size={12} /></template>
   <template data-glyph-review><HealthGlyph state="review" size={16} /></template>
+  <Arrive />
 
   <script is:inline data-astro-rerun slot="end">
     (function () {
@@ -111,6 +113,22 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
       // Classification (docs/rules/data.md F10): the small label beside Restricted content. Same as src/components/Restricted.astro.
       function R(what) { return '<span class="cls-tag" data-help="classification.restricted"><b>Restricted:</b> ' + esc(what) + '</span>'; }
       function demoVal() { return ' <span class="demo-val" data-help="unit.demo-value">Demo value</span>'; }
+      // Warranty, support cover and purchase (the overlooked items, #3): the answer first ("Warranty ends in 4 months"),
+      // then what backs it. Only what the unit's record holds; a unit with none of it has no block.
+      function coverBlock(u) {
+        var c = u.cover; if (!c) return '';
+        var w = c.warranty, sp = c.support, p = c.purchase;
+        var tone = w ? w.tone : 'quiet';
+        var answer = w ? esc(w.lead) + ' <b class="rs-tick">' + esc(w.value) + '</b>' : sp ? 'Covered by <b>' + esc(sp.name) + '</b>' : 'Bought <b>' + esc(p.date) + '</b>';
+        // After the warranty: who picks up a repair, or that nobody does.
+        var then = !w || w.state === 'active' ? '' : sp && sp.live ? ' · ' + esc(sp.name) + ' covers repairs' : ' · no support contract';
+        var rows = (w ? row('Warranty', 'Ends ' + esc(w.ends) + (w.demo ? demoVal() : '')) : '') +
+          (sp ? row('Support', '<a href="' + L('vendors/' + sp.id + '/') + '">' + esc(sp.name) + '</a>' + (sp.ref ? ', contract <span class="mono">' + esc(sp.ref) + '</span>' : '') + (sp.until ? (sp.live ? ' until ' : ', ended ') + esc(sp.until) : '')) : '') +
+          (p ? row('Bought', esc(p.date) + (p.order ? ' · order <span class="mono">' + esc(p.order) + '</span>' : '') + (p.demo ? demoVal() : '')) : '') +
+          (p && p.cost ? row('Cost', esc(p.cost)) : '');
+        return '<div class="dv-cover t-' + tone + '" id="cover" data-feature="warranty" data-settle data-help="unit.cover"><p class="overline">Warranty and purchase</p>' +
+          '<p class="dv-cover-a">' + answer + then + '</p><dl class="dv-kv dv-cover-kv">' + rows + '</dl></div>';
+      }
       function head(title, aside) { return '<header class="dv-ch"><h2>' + title + '</h2>' + (aside || '') + '</header>'; }
       // The path is the zoom (src/lib/zoom.mjs): Locations / region / office / floor / space / this unit, and a
       // port as a last step while one is chosen (#port-lan-1). Each step is a link but the last.
@@ -228,7 +246,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
             (u.retired ? row('Taken out', fmt(u.retired)) : '') +
             // No setup guide: one line here instead of an empty card (REVIEW-SITE fix 8).
             (m && m.config ? '' : row('Setup guide', '<span class="dv-none" data-help="unit.config">None: nothing to set on the unit itself</span>')) +
-          '</dl></div></div></section>';
+          '</dl></div></div>' + coverBlock(u) + '</section>';
 
         body += portsCardOf();
         // Advisories for this model change what you do next: one line each, open for the action.
@@ -300,6 +318,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
         // History: incidents, tasks in this room, Lab tests of this model, and the unit's own dates. Newest first.
         var H = [];
         inc.forEach(function (i) { H.push({ d: i.opened, k: 'inc', open: OPEN(i.state), href: L('incidents/' + i.number.toLowerCase() + '/'), id: i.number, t: i.title, sub: 'Incident · P' + i.priority + ' · ' + (W.inc[i.state] || cap(i.state)) }); });
+        if (u.repeats) u.repeats.past.forEach(function (f) { H.push({ d: f.d, k: 'inc', id: f.number, t: f.t, sub: 'Resolved' + (f.fix ? ': ' + esc(f.fix) : '') + ' · in the service desk' }); });
         r.tasks.forEach(function (t) { H.push({ d: t.due, k: 'task', open: t.status !== 'done', href: L('projects/' + t.project.toLowerCase() + '/'), id: t.id, t: t.title, sub: 'Task · ' + esc(t.projectName || t.project) + ' · ' + (W.task[t.status] || cap(t.status)) + (t.status !== 'done' ? ', due' : '') }); });
         if (m) m.labs.forEach(function (l) { H.push({ d: l.end || l.start, k: 'lab', href: L('lab/') + '#' + l.id.toLowerCase(), id: l.id, t: l.title, sub: 'Lab test of the ' + esc(m.name) + ' · ' + cap(l.status) }); });
         if (u.installed) H.push({ d: u.installed, k: 'life', t: 'Installed', sub: 'Went live in ' + esc(roomLabel(r)) });
@@ -310,7 +329,10 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
           return '<li class="hx hx-' + h.k + (h.open ? ' open' : '') + '"' + (i >= FIRST - 1 ? ' data-more hidden' : '') + '><time>' + when(h) + '</time><i aria-hidden="true"></i><div>' +
             (h.href ? '<a href="' + h.href + '"><span class="mono">' + esc(h.id) + '</span> ' + esc(h.t) + '</a>' : '<b>' + esc(h.t) + '</b>') + '<small>' + h.sub + '</small></div></li>';
         }).join('');
-        var histCard = '<section class="card dv-card s-4 c-history" data-help="unit.history" id="history">' + head('Work and incidents', '<span class="faint dv-aside">Newest first</span>') +
+        // Repeat faults (the overlooked items, #15): this quarter's faults on this unit, with a strip by month.
+        var rp = u.repeats;
+        var repBlock = rp ? '<div class="rp' + (rp.repeat ? ' is-repeat' : '') + '" data-feature="repeat-faults" data-settle data-help="unit.repeats"><p class="rp-a">' + (rp.ordinal ? '<b class="rs-tick">' + rp.ordinal + '</b> fault this quarter' : esc(rp.text)) + '</p>' + rp.strip + '<p class="rp-s">' + rp.year + ' in the last 12 months' + (rp.repeat ? ' · a case for the manufacturer or a replacement' : '') + '</p></div>' : '';
+        var histCard = '<section class="card dv-card s-4 c-history" data-help="unit.history" id="history">' + head('Work and incidents', '<span class="faint dv-aside">Newest first</span>') + repBlock +
           (H.length ? '<ol class="dv-hx">' + hx + '</ol>' + (H.length >= FIRST ? '<button type="button" class="btn small dv-all" data-help="section.showall" data-show-all>Show all ' + H.length + '</button>' : '') : '<p class="faint">No work or incidents on this unit yet.</p>') + '</section>';
 
         // Key numbers in the band (REVIEW-SITE fix 8): figures that say something about this unit. Open work first,
@@ -322,6 +344,8 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
         var figs = [kn(openInc.length + openTasks, 'Open work', '#history', openInc.length ? 'bad' : '', openInc.length + ' open incident' + (openInc.length === 1 ? '' : 's') + ' on this unit, ' + openTasks + ' open task' + (openTasks === 1 ? '' : 's') + ' in ' + roomLabel(r))];
         if (advN) figs.push(kn(advN, 'Advisories', '#advisories', 'warn'));
         if (since) figs.push(kn(mon(since), status + ' since', '#history', '', fmt(since)));
+        var cw = u.cover && u.cover.warranty;
+        if (cw && cw.state === 'soon') figs.push(kn(cw.short.replace(/^([A-Z][a-z]{2})[a-z]*/, '$1'), 'Warranty until', '#cover', 'warn', cw.text + ', on ' + cw.ends));
         if (sec && sec.ends) figs.push(kn(sec.ends.replace(/^\d+ /, '').replace(/^([A-Z][a-z]{2})[a-z]+/, '$1'), sec.state === 'ended' ? 'Support ended' : 'Support until', '#security', sec.tone === 'bad' ? 'bad' : sec.tone === 'warn' ? 'warn' : '', sec.text));
         var last = H.filter(function (h) { return h.d && h.d.slice(0, 10) <= W.today; })[0];   // a due date ahead is not a change
         if (last && (!since || mon(last.d) !== mon(since))) figs.push(kn(mon(last.d), 'Last change', '#history', '', fmt(last.d) + ': ' + last.t));
@@ -380,6 +404,8 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
         var span3 = r3.length === 1 ? 's-12' : r3.length === 2 ? 's-6' : 's-4';
         r3.forEach(function (h) { body += h.replace('SPAN', span3); });
         var el = root.querySelector('[data-dv-body]'); el.innerHTML = body; el.hidden = false;
+        // New blocks arrive once (src/lib/arrive.mjs): the warranty's figure ticks into place.
+        if (window.rsArrive) window.rsArrive(el);
         // No traced drawing: the space drawn to scale with this unit lit, in place of the outline for its kind.
         var slot = el.querySelector('[data-dv-scene]');
         if (slot && !u.spare) loadScene(u, r, m, slot, openInc.length > 0);
@@ -501,6 +527,17 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
   .dv-life li.now i { border-color: currentColor; background: currentColor; }
   .dv-life li.now.manage i { color: var(--green-ink); } .dv-life li.now.deploy i { color: var(--blue-ink); } .dv-life li.now.retire i { color: var(--amber-ink); } .dv-life li.now.plan i, .dv-life li.now.procure i { color: var(--violet-ink); }
 
+  /* Warranty and purchase: the answer first, then what backs it, across the facts card's width. */
+  .dv-cover { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line-strong); display: grid; gap: 4px; }
+  .dv-cover .overline { margin: 0; }
+  .dv-cover-a { margin: 0 0 4px; font: var(--fw-title) var(--fs-h3)/1.3 var(--font-display); color: var(--text); }
+  .dv-cover-a b { font-weight: inherit; }
+  .dv-cover.t-warn .dv-cover-a b { color: var(--amber-ink); }
+  .dv-cover-kv { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; }
+  .dv-cover-kv .mono { white-space: nowrap; }
+  .dv-cover-kv .dv-row:nth-child(2) { border-top: 0; }
+  @container content (max-width: 700px) { .dv-cover-kv { grid-template-columns: minmax(0, 1fr); } .dv-cover-kv .dv-row:nth-child(2) { border-top: 1px solid var(--line); } }
+
   /* Facts: where it is, and what identifies it. */
   .dv-facts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 24px; }
   .dv-facts .overline { margin: 0 0 4px; }
@@ -531,6 +568,13 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
   @keyframes hc-spin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .dv-c .sp { animation: none !important; } }
 
+
+  /* Repeat faults on this unit: the answer, the strip, the year. */
+  .c-history .rp { display: grid; gap: 6px; padding: 0 0 10px; border-bottom: 1px solid var(--line); }
+  .c-history .rp-a { margin: 0; font: var(--fw-title) var(--fs-h3)/1.25 var(--font-display); color: var(--text); }
+  .c-history .rp-a b { font-weight: inherit; }
+  .c-history .rp.is-repeat .rp-a b { color: var(--red-ink); }
+  .c-history .rp-s { margin: 0; font-size: var(--fs-code); color: var(--text-2); }
 
   /* History: a timeline, newest first. Open incidents are red, open work blue. */
   .dv-hx { list-style: none; margin: 0; padding: 0; display: grid; }

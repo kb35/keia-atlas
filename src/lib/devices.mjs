@@ -9,6 +9,34 @@ import { loadPrivacy, recordFor, privacyRows } from './privacy.mjs';
 import { supportStatus, monthLabel } from './security.mjs';
 import { RESTRICTED_VIEWS } from './classification.mjs';
 import { portsOfUnit, addressOf } from './switchports.mjs';
+import { vendors } from './data.mjs';
+import { warrantyWords, supportWords, money, dayMonthYear } from './cover.mjs';
+import { unitRepeats, FAULTS, symptomWords } from './repeats-view.mjs';
+import { trendStrip } from './strip.mjs';
+
+// A unit's repeat faults (the overlooked items, #15), with its strip ready-made: only for a unit with faults this year.
+function repeatsInfo(tag) {
+  const r = unitRepeats(tag);
+  if (!r) return null;
+  // The faults resolved before the incidents held in full, for the unit's history (the tickets stay in the service desk).
+  const past = FAULTS.filter((f) => f.unit === tag && !f.href).map((f) => ({ number: f.number, d: f.opened, t: symptomWords(f.symptom) ?? 'Fault', fix: f.fix }));
+  return { text: r.text, ordinal: r.ordinal, repeat: r.repeat, quarter: r.quarter, year: r.year, past,
+    strip: trendStrip({ bars: r.bars, label: 'Faults on this unit per month, the last 12 months', tone: r.repeat ? 'fault' : 'quiet', mark: r.bars.length - 1, height: 24, step: 12, ends: true }) };
+}
+
+// A unit's warranty, support cover and purchase, shaped for the unit page's facts (the answer first). Only what the
+// record holds: a unit with none of them has no cover block at all.
+export function coverInfo(u) {
+  if (!u.purchase && !u.warranty && !u.support) return null;
+  const w = u.warranty ? warrantyWords(u.warranty.ends, DEMO_TODAY) : null;
+  const s = u.support ? supportWords(vendors[u.support], DEMO_TODAY) : null;
+  const p = u.purchase;
+  return {
+    warranty: w ? { ...w, ends: dayMonthYear(u.warranty.ends), demo: Boolean(u.warranty.demo) } : null,
+    support: s ? { ...s, until: s.ends ? dayMonthYear(s.ends) : null } : null,
+    purchase: p ? { date: dayMonthYear(p.date), order: p.order ?? null, cost: p.cost != null ? money(p.cost, p.currency) : null, demo: Boolean(p.demo) } : null,
+  };
+}
 
 // A model's security support, shaped for the unit page: the firmware line by name, the end date with its
 // source (or "demo value"), the maker's vulnerability contact, and the warning when support ends within
@@ -107,6 +135,8 @@ export function buildDevices() {
           usage: usageCard(u.asset_tag),
           privacy: pr ? pr.id : null,
           pw: typeof u.default_password_changed === 'boolean' ? u.default_password_changed : null,
+          cover: coverInfo(u),
+          repeats: repeatsInfo(u.asset_tag),
         });
       }
     }

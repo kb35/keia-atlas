@@ -144,6 +144,9 @@ export function commsFacts(space) {
     battery: items.some((it) => it.kind === 'battery'),
     feeds: [...new Set(pdus.map((p) => p.feed))],
     strip: pdus.length ? shortModel(rackGear[pdus[0].gear]) : null,
+    // The room's own record (data/spaces power, environment): its circuits, and the UPS as last measured.
+    record: space.power ?? null,
+    env: space.environment ?? null,
   };
 
   // PoE budget as the vendor states it, per access switch model. The draw is not measured anywhere.

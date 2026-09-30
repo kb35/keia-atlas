@@ -9,6 +9,8 @@
 //      a password, token or key field must be a vault reference).
 //   4. Checks classification (docs/rules/data.md F10): every folder has a default label in the registry,
 //      every x-classification in a schema is one of the four labels, and no folder is Secret.
+//   5. Reports standards coverage (tools/coverage.mjs): every "must" rule whose check names a record field
+//      that no record carries. A report, not a failure; docs/rules/gaps.md keeps the current list.
 //
 // Run it with:  npm run validate
 // Exit code 0 means everything passed, 1 means at least one problem.
@@ -23,6 +25,7 @@ import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 import { parseDocument, LineCounter } from 'yaml';
 import { crossCheck } from './crossrefs.mjs';
+import { standardsCoverage, coverageLines } from './coverage.mjs';
 import { findSecrets } from './secrets.mjs';
 import { LABELS, KEYWORD, checkRegistry } from '../src/lib/classification.mjs';
 
@@ -105,11 +108,13 @@ export async function validate(root = REPO_ROOT) {
     collections: collections.length,
     checked,
     errors,
+    coverage,
   });
 
   let schemaFiles = [];
   let collections = [];
   let checked = 0;
+  let coverage = null;
 
   // 1. The registry.
   const registryPath = path.join(schemasDir, 'registry.yaml');
@@ -209,6 +214,15 @@ export async function validate(root = REPO_ROOT) {
     problem(p.file, p.message, line);
   }
 
+  // 5. Standards coverage: a report, never an error.
+  // A field in a folder the registry does not know is a typo, and that is an error.
+  coverage = standardsCoverage(records, new Set(collections.map((c) => c?.folder)));
+  for (const u of coverage.unknown) {
+    const rec = records.find((r) => r.rel === u.file);
+    const node = rec?.doc.getIn(u.at, true);
+    problem(rec?.file ?? path.join(root, u.file), u.message, node?.range ? rec.lineCounter.linePos(node.range[0]).line : undefined);
+  }
+
   return result();
 }
 
@@ -220,6 +234,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   console.log(`  schemas loaded:     ${r.schemas}`);
   console.log(`  data folders:       ${r.collections}`);
   console.log(`  data files checked: ${r.checked}`);
+  if (r.coverage) console.log(`\n${coverageLines(r.coverage).join('\n')}`);
   if (r.ok) {
     console.log(`\nPASS: no problems found`);
   } else {
