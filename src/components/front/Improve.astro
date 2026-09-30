@@ -1,0 +1,205 @@
+---
+// Improve it (the front door's lifecycle, stage 6): the record learns. Three things it keeps, then the measures that
+// show whether it is working. Kept: the fix from Fix it stays as a known error and its count goes up by one. Spotted:
+// the same model and symptom three times in thirty days, or in two offices, is a repeat across the fleet (the rule in
+// src/lib/knownissues.mjs) and becomes a case with the maker. Shorter: the same setup checklist on the first, third
+// and fifth install, the lines a fifth-timer no longer needs gone (the method's "learn as you go", folded in from the
+// five ideas). Then the experience measures and one service level, drawn still from the same simulation the service
+// pages use (src/lib/experience.mjs): counted per space and per office, never per person.
+//
+// Motion (MOTION-V2 §4.4, §4.15, §5): once, as the stage scrolls into view. A count changes in place (never counts
+// up); the repeat's rows enter in turn and the case line enters at its centre; checklist lines leave on --ease-exit
+// inside a held box. Sparklines and strips are drawn still. Reduced motion: the final frame.
+import HealthGlyph from '../HealthGlyph.astro';
+import { experience, serviceLevels } from '../../lib/experience.mjs';
+import { sparkSvg } from '../../lib/spark.mjs';
+import { CLUSTER_RULE } from '../../lib/knownissues.mjs';
+import { href, spaces, sites, SITE_ORDER } from '../../lib/data.mjs';
+
+const offices = SITE_ORDER.filter((id) => sites[id] && sites[id].kind !== 'remote').map((id) => ({ id, weight: Object.values(spaces).filter((s) => s.site === id).length }));
+const AV = experience('av', offices);
+const pick = (id) => AV.find((m) => m.id === id);
+const ontime = pick('ontime'), first = pick('first');
+const SL = serviceLevels('av').find((r) => r.id === 'f2');
+const CHECK = ['Mount the bar under the display', 'Patch data 1 to the switch', 'Set the room name and time zone', 'Pair the touch controller', 'Set the camera framing', 'Run the audio check', 'Photograph the plate'];
+const FADE = { third: [2, 6], fifth: [1, 2, 4, 6] };
+const LISTS = [['First setup', 7, []], ['Fifth setup', 3, FADE.fifth]];
+const REPEATS = [
+  { when: '12 Sept', where: 'London 2.03', what: 'Touch controller restarts in a loop' },
+  { when: '19 Sept', where: 'Copenhagen 4.07', what: 'Touch controller restarts in a loop' },
+  { when: '24 Sept', where: 'Dublin 3.04', what: 'Touch controller restarts in a loop' },
+];
+const spark = (m) => sparkSvg(m.series, { w: 120, h: 28, state: m.within ? 'fine' : 'review', fmt: (v) => `${Math.round(v)}%` });
+---
+<section class="im" id="improve" data-im data-shot="improve" aria-labelledby="im-h">
+  <header class="fd-head">
+    <p class="fd-eyebrow">Month by month</p>
+    <h2 id="im-h">Improve it</h2>
+    <p class="fd-sub">Every fix is kept where the next person will look, repeats are spotted across the fleet, and the measures come from the record, not from a report.</p>
+  </header>
+
+  <div class="im-stage">
+    <div class="im-light" aria-hidden="true"></div>
+
+    <article class="im-card" data-im-card="kept" aria-label="Kept as a known error">
+      <p class="im-over"><b>Kept</b><span>a known error</span></p>
+      <p class="im-title"><HealthGlyph state="fine" size={16} title="resolved" class="lit" /> Codec hang after firmware 4.6.x</p>
+      <dl class="im-facts">
+        <div><dt>What fixed it</dt><dd>Restart under the restart rule</dd></div>
+        <div><dt>Used on</dt><dd><span class="im-swap"><span class="im-x im-c1">14</span><span class="im-x im-c2">15</span></span> installs <small>this morning's fix in 3.09 is the fifteenth</small></dd></div>
+        <div><dt>Matched by</dt><dd>the last change on the unit, when the next fault arrives</dd></div>
+      </dl>
+      <p class="im-quiet">The next technician sees it under Known error, filled in, before they leave their desk.</p>
+    </article>
+
+    <article class="im-card" data-im-card="spotted" aria-label="A repeat across the fleet">
+      <p class="im-over"><b>Spotted</b><span>a repeat across the fleet</span></p>
+      <ol class="im-reps">
+        {REPEATS.map((r, i) => <li class="im-rep" style={`--i:${i}`}><time>{r.when}</time><span><b>{r.where}</b> · {r.what}</span></li>)}
+      </ol>
+      <p class="im-cluster" data-im-cluster><HealthGlyph state="review" size={16} title="repeat across the fleet" class="lit" /><span><b>Same model, same symptom, {CLUSTER_RULE.count} times in {CLUSTER_RULE.days} days, {CLUSTER_RULE.sites} offices or more.</b> The record raises it as a repeat, with the evidence as a count.</span></p>
+      <p class="im-case" data-im-case><HealthGlyph state="progress" size={16} title="with the maker" class="lit" /><span><b>Maker case sent</b> · Poly · acknowledged. When the maker publishes a known error, the fleet is matched to it. <a href={href('/known-issues/')}>Known issues</a></span></p>
+    </article>
+
+    <article class="im-card im-learn" data-im-card="shorter" aria-label="The checklist gets shorter">
+      <p class="im-over"><b>Shorter</b><span>the same checklist, five setups on</span></p>
+      <div class="im-lists">
+        {LISTS.map(([name, n, fade]) => (
+          <div class="im-list">
+            <p class="im-over"><span>{name}</span></p>
+            <p class="im-count"><span class="im-x im-c1">7</span><span class:list={['im-x', 'im-c2', { 'is-same': n === 7 }]}>{n}</span><small>steps</small></p>
+            <ul>{CHECK.map((c, i) => <li class:list={{ 'is-fade': fade.includes(i) }} style={`--i:${fade.indexOf(i)}`}><span class="im-box"></span>{c}</li>)}</ul>
+          </div>
+        ))}
+      </div>
+      <p class="im-quiet">Steps a person has done five times without a fault fold away; a proposal to change the standard is one click.</p>
+    </article>
+
+    <div class="im-measures" aria-label="Experience measures and service levels">
+      <div class="im-fig">
+        <p class="im-fig-n" data-tone={ontime.within ? 'fine' : 'review'}>{ontime.words}</p>
+        <p class="im-fig-l">{ontime.label}<small>last 30 days · target {ontime.target}%</small></p>
+        <Fragment set:html={spark(ontime)} />
+      </div>
+      <div class="im-fig">
+        <p class="im-fig-n" data-tone={first.within ? 'fine' : 'review'}>{first.words}</p>
+        <p class="im-fig-l">{first.label}<small>last 30 days · target {first.target}%</small></p>
+        <Fragment set:html={spark(first)} />
+      </div>
+      <div class="im-fig">
+        <p class="im-fig-n" data-tone={SL.kept ? 'fine' : 'review'}>{SL.words.replace(' this month', '')}</p>
+        <p class="im-fig-l">{SL.what} within {SL.promise}<small>this month · the promise, measured from the incident records</small></p>
+        <ol class="im-weeks" role="img" aria-label={`Last 12 weeks: ${SL.weeks.map((w) => `${Math.round(w)}%`).join(', ')} of jobs met the promise`}>{SL.weeks.map((w) => <li style={`--v:${(w / 100).toFixed(2)}`} data-tone={w >= 90 ? 'fine' : 'review'}></li>)}</ol>
+      </div>
+      <p class="im-src">Counted per space and per office, never per person. From room booking, device monitoring and the incident records. Simulated.</p>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { motion } from '../../lib/motion-read.mjs';
+  import { loop } from '../../lib/front-loop.mjs';
+  function init(root: HTMLElement) {
+    if ((root as any).__im) return; (root as any).__im = true;
+    const on = () => root.classList.add('is-on');
+    if (motion().reduced) { on(); return; }
+    const m = motion();
+    loop(root.querySelector<HTMLElement>('.im-stage')!, { play: () => { on(); return 1100 + m.enter + m.state * 3 + m.morph; }, reset: () => root.classList.remove('is-on') });
+  }
+  const boot = () => document.querySelectorAll<HTMLElement>('[data-im]').forEach(init);
+  boot();
+  document.addEventListener('astro:page-load', boot);
+</script>
+
+<style>
+  .im { display: grid; gap: 20px; }
+  .im-stage {
+    --im-bg: #EFE9DF; --im-light: #FFFDF9; --im-glow: rgba(226, 122, 58, .14);
+    position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; padding: 22px 24px 20px; border-radius: 24px;
+    background: var(--im-bg); box-shadow: inset 0 0 0 1px var(--hairline); overflow: clip; align-items: stretch;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .im-stage { --im-bg: #15130F; --im-light: #2B2621; --im-glow: rgba(238, 138, 78, .12); } }
+  :root[data-theme="dark"] .im-stage { --im-bg: #15130F; --im-light: #2B2621; --im-glow: rgba(238, 138, 78, .12); }
+  .im-light { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(80% 70% at 22% 6%, var(--im-light) 0%, transparent 62%), radial-gradient(60% 46% at 90% 100%, var(--im-glow) 0%, transparent 70%); }
+  .im-card { position: relative; display: grid; gap: 10px; align-content: start; padding: 16px 18px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-md); min-width: 0; }
+  .im-over { margin: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 6px 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-2); }
+  .im-over b { font-size: 14.5px; font-weight: 600; color: var(--text); letter-spacing: -.01em; }
+  .im-title { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+  .im-facts { margin: 0; display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .im-facts div { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 2px 10px; align-items: baseline; }
+  .im-facts dt { font-size: 12.5px; color: var(--text-3); }
+  .im-facts dd { margin: 0; font-size: 13.5px; font-weight: 550; line-height: 1.4; }
+  .im-facts small { display: block; font-size: 12px; font-weight: 450; color: var(--text-3); }
+  .im-swap { display: inline-grid; vertical-align: baseline; font-variant-numeric: tabular-nums; }
+  .im-x { grid-area: 1 / 1; transition: opacity var(--dur-state) var(--ease-settle) var(--dur-state); }
+  .im-c2 { opacity: 0; color: var(--h-fine-ink, #235537); }
+  .im.is-on .im-c1 { opacity: 0; }
+  .im.is-on .im-c2 { opacity: 1; }
+  .im-quiet { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--text-3); }
+
+  .im-reps { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .im-rep { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 8px; font-size: 13px; line-height: 1.4; padding: 6px 10px; border-radius: 8px; background: var(--surface-2);
+    opacity: 0; transform: translateY(4px); transition: opacity var(--dur-state) var(--ease-settle) calc(var(--i, 0) * 160ms), transform var(--dur-state) var(--ease-settle) calc(var(--i, 0) * 160ms); }
+  .im.is-on .im-rep { opacity: 1; transform: none; }
+  .im-rep time { color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .im-rep b { font-weight: 600; }
+  .im-cluster, .im-case { margin: 0; display: flex; gap: 10px; align-items: start; font-size: 13px; line-height: 1.4; padding: 9px 11px; border-radius: 10px; opacity: 0; transform: scale(.97); transition: opacity var(--dur-enter) var(--ease-settle), transform var(--dur-enter) var(--ease-settle); }
+  .im-cluster { background: var(--h-review-soft, #F6EBD3); color: var(--h-review-ink, #614B05); transition-delay: 620ms; }
+  .im-case { background: var(--h-progress-soft, #E3EBF4); color: var(--h-progress-ink, #214A75); transition-delay: 1100ms; }
+  .im-cluster .hg, .im-case .hg { flex: none; margin-top: 2px; }
+  .im-case a { color: inherit; font-weight: 600; }
+  .im.is-on .im-cluster, .im.is-on .im-case { opacity: 1; transform: none; }
+
+  .im-lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .im-list { display: grid; gap: 6px; align-content: start; padding: 10px; border-radius: 10px; background: var(--surface-2); min-width: 0; }
+  .im-list .im-over span { font-size: 12px; font-weight: 550; color: var(--text-3); }
+  .im-count { margin: 0; display: grid; grid-template-columns: max-content max-content; justify-content: start; column-gap: 5px; align-items: baseline; font: 600 22px/1 var(--font-sans); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .im-count .im-c1, .im-count .im-c2 { grid-area: 1 / 1; color: var(--text); }
+  .im-count small { grid-area: 1 / 2; font-size: 11.5px; font-weight: 500; color: var(--text-2); }
+  .im-count .im-c2 { transition-delay: calc(var(--dur-state) * 2.5); }
+  .im.is-on .im-count .im-c1 { transition-delay: calc(var(--dur-state) * 2.5); }
+  .im-count .im-c2.is-same, .im.is-on .im-count .im-c2.is-same { opacity: 0; }
+  .im.is-on .im-list:first-child .im-c1 { opacity: 1; }
+  .im-list ul { list-style: none; margin: 0; padding: 0; display: grid; }
+  .im-list li { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 1.25; color: var(--text-2); max-height: 26px; padding: 3px 0; overflow: hidden; white-space: nowrap;
+    transition: opacity var(--dur-exit) var(--ease-exit) calc(var(--dur-state) * .5 * var(--i, 0) + var(--dur-state)), transform var(--dur-exit) var(--ease-exit) calc(var(--dur-state) * .5 * var(--i, 0) + var(--dur-state)), max-height var(--dur-morph) var(--ease-settle) calc(var(--dur-state) * .5 * var(--i, 0) + var(--dur-state) * 1.6), padding var(--dur-morph) var(--ease-settle) calc(var(--dur-state) * .5 * var(--i, 0) + var(--dur-state) * 1.6); }
+  .im-box { width: 10px; height: 10px; flex: none; border-radius: 2.5px; border: 1.4px solid var(--line-strong); }
+  .im.is-on .im-list li.is-fade { opacity: 0; transform: scale(.94); max-height: 0; padding: 0; }
+
+  .im-measures { position: relative; grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 20px; padding: 14px 18px 12px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-md); align-items: start; }
+  .im-fig { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 2px 14px; align-items: end; min-width: 0; }
+  .im-fig-n { margin: 0; grid-row: 1; font: 600 26px/1 var(--font-sans); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .im-fig-n[data-tone="fine"] { color: var(--text); }
+  .im-fig-n[data-tone="review"] { color: var(--h-review-ink, #614B05); }
+  .im-fig-l { margin: 0; grid-row: 2; font-size: 13px; font-weight: 550; line-height: 1.35; }
+  .im-fig-l small { display: block; font-size: 12px; font-weight: 450; color: var(--text-3); }
+  .im-fig :global(.spk) { grid-column: 2; grid-row: 1 / span 2; width: 120px; height: 28px; align-self: center; }
+  .im-fig :global(.spk path) { fill: none; stroke: var(--quiet, var(--text-3)); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .im-fig :global(.spk-dot) { fill: var(--h-review, #B36B00); }
+  .im-weeks { grid-column: 2; grid-row: 1 / span 2; list-style: none; margin: 0; padding: 0; display: flex; gap: 3px; align-items: center; align-self: center; }
+  .im-weeks li { width: 8px; height: 22px; border-radius: 2px; background: color-mix(in srgb, var(--h-fine, #0E8A63) calc(var(--v, 1) * 100%), var(--surface-2)); }
+  .im-weeks li[data-tone="review"] { background: var(--h-review, #B36B00); }
+  .im-src { grid-column: 1 / -1; margin: 2px 0 0; font-size: 12px; color: var(--text-3); line-height: 1.4; }
+
+  @container fd (max-width: 1099px) {
+    .im-stage { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .im-learn { grid-column: 1 / -1; }
+    .im-measures { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @container fd (max-width: 899px) {
+    .im-measures { grid-template-columns: minmax(0, 1fr); }
+  }
+  @container fd (max-width: 699px) {
+    .im-stage { grid-template-columns: minmax(0, 1fr); padding: 18px 16px; border-radius: 18px; gap: 12px; }
+    .im-card, .im-measures { padding: 14px; border-radius: 14px; }
+    .im-lists { grid-template-columns: minmax(0, 1fr); }
+    .im-list li { white-space: normal; max-height: 40px; }
+    .im-facts div { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .im *, .im *::before, .im *::after { transition: none !important; }
+    .im .im-rep, .im .im-cluster, .im .im-case { opacity: 1; transform: none; }
+    .im .im-c1 { opacity: 0; } .im .im-c2 { opacity: 1; } .im .im-list:first-child .im-c1 { opacity: 1; } .im .im-c2.is-same { opacity: 0; }
+    .im .im-list li.is-fade { display: none; }
+  }
+</style>

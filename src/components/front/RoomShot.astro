@@ -2,7 +2,8 @@
 // A room as a product shot: the same to-scale cut-away drawing Atlas draws for a space (src/lib/room3d.mjs, rendered
 // by RoomScene.astro), with only the room and its kit. No tools, cables, markers or rulers: those belong to the
 // record, and this picture is the front door's. The caller renders the model (buildRoom, render) so it can also read
-// where a device sits (R.marks); this draws it. Materials use the same tones as RoomScene, light and dark.
+// where a device sits (R.marks); this draws it. Furniture, floor and walls are the interior palette's --in-* tokens
+// (src/lib/interior-palette.mjs, per look, light and dark), falling back to RoomScene's tones where a page has none.
 interface Props { R: any; label: string; class?: string; x?: number; y?: number; width?: number; height?: number }
 const { R, label, class: cls, x, y, width, height } = Astro.props;
 const nested = x !== undefined;
@@ -25,14 +26,14 @@ const nested = x !== undefined;
 <style is:global>
   .rshot {
     display: block; overflow: visible;
-    --sc-wall: #ECE6DA; --sc-wall-2: #E2DACB; --sc-cut: #9C9384; --sc-floor: #D8D0C0; --sc-slab: #B9AF9C; --sc-line: rgba(28,26,23,.28); --sc-edge: rgba(28,26,23,.30);
-    --sc-dev: #2A2B31; --sc-bezel: #17181C; --sc-table: #C9A77A; --sc-wood: #B8976D; --sc-chair: #5C6474; --sc-chair-2: #464C59; --sc-base: #3A3E47;
-    --sc-sofa: #7F8C8A; --sc-counter: #DAD3C6; --sc-stone: #EFEBE3; --sc-door: #C8B596; --sc-board: #FBFBF8; --sc-leaf: #5E8C5A; --sc-pot: #B7704A;
+    --sc-wall: var(--in-wall, #ECE6DA); --sc-wall-2: color-mix(in srgb, var(--in-wall, #E2DACB) 90%, #000); --sc-cut: #9C9384; --sc-floor: var(--in-room-floor, #D8D0C0); --sc-slab: #B9AF9C; --sc-line: rgba(28,26,23,.28); --sc-edge: rgba(28,26,23,.30);
+    --sc-dev: var(--in-dev, #2A2B31); --sc-bezel: #17181C; --sc-table: var(--in-wood, #C9A77A); --sc-wood: var(--in-oak, #B8976D); --sc-chair: var(--in-chair, #5C6474); --sc-chair-2: color-mix(in srgb, var(--in-chair, #464C59) 84%, #000); --sc-base: var(--in-leg, #3A3E47);
+    --sc-sofa: var(--in-sofa, #7F8C8A); --sc-counter: #DAD3C6; --sc-stone: var(--in-cream, #EFEBE3); --sc-door: #C8B596; --sc-board: #FBFBF8; --sc-leaf: var(--in-leaf, #5E8C5A); --sc-pot: var(--in-pot, #B7704A);
     --sc-app: #C9CDD2; --sc-printer: #E6E6E2; --sc-ceil: #F4F2EE; --sc-screen: #14161C; --sc-lit: #2C4A7E;
     --sc-plate: #FCFBF8; --sc-plate-edge: rgba(28,26,23,.55); --sc-lid: #A7A298; --sc-well: #5B5750; --sc-hole: #24252A;
   }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .rshot { --sc-wall: #34312B; --sc-wall-2: #2C2A25; --sc-cut: #57524A; --sc-floor: #3E3A33; --sc-slab: #24221E; --sc-line: rgba(255,255,255,.22); --sc-edge: rgba(0,0,0,.45); --sc-dev: #0F1013; --sc-bezel: #08090B; --sc-table: #8C744F; --sc-wood: #7A6446; --sc-chair: #6B7384; --sc-chair-2: #555C6A; --sc-base: #2A2D34; --sc-sofa: #5C6866; --sc-counter: #5A554D; --sc-stone: #6E685E; --sc-door: #6B5E48; --sc-board: #D8D6CF; --sc-leaf: #4A7447; --sc-pot: #8E5638; --sc-app: #7C8085; --sc-printer: #A9A9A4; --sc-ceil: #CFCBC2; --sc-plate: #E9E6DF; --sc-plate-edge: rgba(0,0,0,.6); --sc-lid: #77736B; --sc-well: #2A2825; } }
-  :root[data-theme="dark"] .rshot { --sc-wall: #34312B; --sc-wall-2: #2C2A25; --sc-cut: #57524A; --sc-floor: #3E3A33; --sc-slab: #24221E; --sc-line: rgba(255,255,255,.22); --sc-edge: rgba(0,0,0,.45); --sc-dev: #0F1013; --sc-bezel: #08090B; --sc-table: #8C744F; --sc-wood: #7A6446; --sc-chair: #6B7384; --sc-chair-2: #555C6A; --sc-base: #2A2D34; --sc-sofa: #5C6866; --sc-counter: #5A554D; --sc-stone: #6E685E; --sc-door: #6B5E48; --sc-board: #D8D6CF; --sc-leaf: #4A7447; --sc-pot: #8E5638; --sc-app: #7C8085; --sc-printer: #A9A9A4; --sc-ceil: #CFCBC2; --sc-plate: #E9E6DF; --sc-plate-edge: rgba(0,0,0,.6); --sc-lid: #77736B; --sc-well: #2A2825; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .rshot { --sc-wall: var(--in-wall, #34312B); --sc-wall-2: color-mix(in srgb, var(--in-wall, #2C2A25) 90%, #000); --sc-cut: #57524A; --sc-floor: var(--in-room-floor, #3E3A33); --sc-slab: #24221E; --sc-line: rgba(255,255,255,.22); --sc-edge: rgba(0,0,0,.45); --sc-dev: var(--in-dev, #0F1013); --sc-bezel: #08090B; --sc-table: var(--in-wood, #8C744F); --sc-wood: var(--in-oak, #7A6446); --sc-chair: var(--in-chair, #6B7384); --sc-chair-2: color-mix(in srgb, var(--in-chair, #555C6A) 84%, #000); --sc-base: var(--in-leg, #2A2D34); --sc-sofa: var(--in-sofa, #5C6866); --sc-counter: #5A554D; --sc-stone: var(--in-cream, #6E685E); --sc-door: #6B5E48; --sc-board: #D8D6CF; --sc-leaf: var(--in-leaf, #4A7447); --sc-pot: var(--in-pot, #8E5638); --sc-app: #7C8085; --sc-printer: #A9A9A4; --sc-ceil: #CFCBC2; --sc-plate: #E9E6DF; --sc-plate-edge: rgba(0,0,0,.6); --sc-lid: #77736B; --sc-well: #2A2825; } }
+  :root[data-theme="dark"] .rshot { --sc-wall: var(--in-wall, #34312B); --sc-wall-2: color-mix(in srgb, var(--in-wall, #2C2A25) 90%, #000); --sc-cut: #57524A; --sc-floor: var(--in-room-floor, #3E3A33); --sc-slab: #24221E; --sc-line: rgba(255,255,255,.22); --sc-edge: rgba(0,0,0,.45); --sc-dev: var(--in-dev, #0F1013); --sc-bezel: #08090B; --sc-table: var(--in-wood, #8C744F); --sc-wood: var(--in-oak, #7A6446); --sc-chair: var(--in-chair, #6B7384); --sc-chair-2: color-mix(in srgb, var(--in-chair, #555C6A) 84%, #000); --sc-base: var(--in-leg, #2A2D34); --sc-sofa: var(--in-sofa, #5C6866); --sc-counter: #5A554D; --sc-stone: var(--in-cream, #6E685E); --sc-door: #6B5E48; --sc-board: #D8D6CF; --sc-leaf: var(--in-leaf, #4A7447); --sc-pot: var(--in-pot, #8E5638); --sc-app: #7C8085; --sc-printer: #A9A9A4; --sc-ceil: #CFCBC2; --sc-plate: #E9E6DF; --sc-plate-edge: rgba(0,0,0,.6); --sc-lid: #77736B; --sc-well: #2A2825; }
 
   .rshot .ft { fill: var(--m); stroke: var(--sc-edge); stroke-width: .7; stroke-linejoin: round; }
   .rshot .fs { fill: color-mix(in srgb, var(--m) var(--k, 80%), #000); stroke: var(--sc-edge); stroke-width: .7; stroke-linejoin: round; }

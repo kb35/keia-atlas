@@ -1,0 +1,241 @@
+---
+// Why it's different (the front door, after the lifecycle): five things, each with a small moving proof that plays
+// once as it scrolls into view, then a compact, fair comparison in words (no logos, no scores). The proofs reuse the
+// product's own parts: the floor model (IsoFloor), the health glyph, the words a run writes. Motion (MOTION-V2 §4.15,
+// §4.19, §4.34): tiles enter --stagger apart; inside each, exactly the thing the idea is about changes, once; lines
+// draw on (pathLength); nothing loops. Reduced motion: every proof in its final state.
+import IsoFloor from './IsoFloor.astro';
+import HealthGlyph from '../HealthGlyph.astro';
+import { building } from '../../lib/floors.mjs';
+import { floorScene } from '../../lib/isofloor.mjs';
+import { href } from '../../lib/data.mjs';
+
+const M = building('dub');
+const S = floorScene(M, '3', { width: 320, height: 170, pad: 14, rings: 'all' });
+const SOURCES = ['Poly Lens', 'UniFi', 'Room booking', 'ServiceNow'];
+const WHY = [
+  { id: 'building', word: 'It starts from the building, not the ticket', line: 'A fault shows in the room where it happened. The incident is opened from the room, filled in from the record.' },
+  { id: 'record', word: 'One record across every vendor and tool', line: 'AV, network, print and security, from every system you already run, joined on the space and the unit. Each fact names its source.' },
+  { id: 'owner', word: 'Automation with a named owner', line: 'Routine work runs only under a standing rule someone approved once. Every run says who owns it, how it was done, and how to put it back.' },
+  { id: 'people', word: 'Designed for people', line: 'The answer first, then the detail. A page that is fine is quiet; one sentence and one figure change when something is not.' },
+  { id: 'open', word: 'Open source, no lock-in', line: 'Apache 2.0. Your record is YAML in your own repository, readable without us, and export is a copy.' },
+];
+const ROWS = [
+  ['Starts from the building', ['No: the ticket or the CMDB', 'No: the device', 'Yes: floors and bookings', 'Yes: the room is the front door']],
+  ['One record across vendors', ['Partly: alerts arrive through integrations', 'AV only', 'No: not devices', 'Yes: AV, network, print, security']],
+  ['Runs the IT work: incidents, changes, projects', ['Yes', 'No: alerts pushed to your ITSM', 'Work orders for facilities', 'Yes, and it sits on top of your ITSM']],
+  ['Automation with a declared way back', ['Workflows; the way back is yours to build', 'Reboot and firmware, vendor by vendor', 'No', 'Yes: Undo, Roll back or Asks, per rule']],
+  ['Open source', ['Some are', 'No', 'Rarely', 'Yes: Apache 2.0']],
+];
+const COLS = ['A typical ITSM tool', 'AV monitoring', 'A facilities tool', 'Keia Atlas'];
+---
+<section class="df" id="different" data-df data-shot="different" aria-labelledby="df-h">
+  <header class="fd-head">
+    <p class="fd-eyebrow">Why it's different</p>
+    <h2 id="df-h">Five things no ticket tool, room monitor or facilities system does together.</h2>
+  </header>
+
+  <ol class="df-list">
+    {WHY.map((w, i) => (
+      <li class="df-tile" style={`--i:${i}`} data-df-tile={w.id}>
+        <div class="df-pic" aria-hidden={w.id === 'owner' ? undefined : 'true'}>
+          {w.id === 'building' && (
+            <div class="df-floor">
+              <IsoFloor scene={S} states={{ 'dub-3-09': 'fault' }} label="" />
+              <span class="df-tag df-in"><b>Incident</b> opened from 3.09, filled in</span>
+            </div>
+          )}
+          {w.id === 'record' && (
+            <svg class="df-join" viewBox="0 0 320 170">
+              {SOURCES.map((s, k) => { const y = 26 + k * 40; return (<>
+                <text class="df-src" x="8" y={y + 4}>{s}</text>
+                <path class="df-wire" pathLength="1" d={`M104 ${y} C 150 ${y}, 160 85, 200 85`} />
+              </>); })}
+              <rect class="df-rec" x="200" y="52" width="112" height="66" rx="10" />
+              <text class="df-rec-t" x="256" y="80">3.09 Whooper Swan</text>
+              <text class="df-rec-s" x="256" y="98">one record</text>
+            </svg>
+          )}
+          {w.id === 'owner' && (
+            <div class="df-run">
+              <p class="df-run-h"><HealthGlyph state="progress" size={16} title="running" class="df-g lit" /><span>DNS record for dub-309-vc01</span></p>
+              <p class="df-run-l df-in">Done automatically under the DNS rule <b>(owner: Niamh)</b></p>
+              <p class="df-run-b df-in"><button type="button" class="df-btn" data-df-how aria-expanded="false">How was this done?</button><button type="button" class="df-btn" data-df-back>Roll back</button></p>
+              <p class="df-run-x" data-df-x hidden></p>
+            </div>
+          )}
+          {w.id === 'people' && (
+            <div class="df-home">
+              <p class="df-home-n">Liam, ready for you</p>
+              <p class="df-home-l"><span class="df-x df-s1">Dublin: {S.rings.length} spaces fine · checked 40 s ago</span><span class="df-x df-s2">1 space failing before a booking · checked 10 s ago</span></p>
+              <dl class="df-figs"><div><dd><span class="df-x df-f1">0</span><span class="df-x df-f2">1</span></dd><dt>ready for you</dt></div><div><dd>2</dd><dt>with you</dt></div><div><dd>3</dd><dt>today</dt></div></dl>
+            </div>
+          )}
+          {w.id === 'open' && (
+            <div class="df-open">
+              <div class="df-file"><i class="k"></i><i></i><i class="k s"></i><i></i><i class="k s"></i><i></i><i class="k"></i><i></i></div>
+              <svg class="df-tick" viewBox="0 0 48 48"><circle class="df-tick-r" cx="24" cy="24" r="19" pathLength="1" /><path class="df-tick-p" pathLength="1" d="M14 25l7 7 13-14" /></svg>
+              <p class="df-open-w">YAML you own · Apache 2.0</p>
+            </div>
+          )}
+        </div>
+        <h3>{w.word}</h3>
+        <p>{w.line}</p>
+      </li>
+    ))}
+  </ol>
+
+  <div class="df-cmp-box">
+    <p class="df-cmp-h">A fair comparison, in words</p>
+    <div class="df-scroll">
+      <table class="df-cmp">
+        <thead><tr><th scope="col"><span class="sr-only">What</span></th>{COLS.map((c) => <th scope="col">{c}</th>)}</tr></thead>
+        <tbody>
+          {ROWS.map(([what, cells]) => <tr><th scope="row">{what}</th>{cells.map((c, k) => <td class:list={{ 'is-keia': k === 3 }} data-col={COLS[k]}>{c}</td>)}</tr>)}
+        </tbody>
+      </table>
+    </div>
+    <p class="df-cmp-note">Typical of each kind of tool, not of any one product. Keia sits on top of your ITSM and your monitoring; it replaces neither. <a href={href('/method/')}>How it relates to ITIL, PMI and ISO/IEC 20000</a>.</p>
+  </div>
+</section>
+
+<script>
+  import { motion } from '../../lib/motion-read.mjs';
+  import { setGlyph } from '../../lib/health.mjs';
+  import { loop } from '../../lib/front-loop.mjs';
+  function init(root: HTMLElement) {
+    if ((root as any).__df) return; (root as any).__df = true;
+    const tiles = Array.from(root.querySelectorAll<HTMLElement>('[data-df-tile]'));
+    let timers: number[] = [];
+    const later = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
+    const on = (t: HTMLElement) => {
+      t.classList.add('is-on');
+      const g = t.querySelector<HTMLElement>('.df-g');
+      if (g) { const m = motion(); later(m.reduced ? 0 : m.enter + 500, () => setGlyph(g, 'fine', { title: 'done' })); }
+    };
+    if (motion().reduced) { tiles.forEach(on); return; }
+    const m = motion();
+    // The proof's two buttons are real: the words open, and Roll back puts the record back, on the glyph and in words.
+    const x = root.querySelector<HTMLElement>('[data-df-x]'), g3 = root.querySelector<HTMLElement>('[data-df-tile="owner"] .df-g');
+    const howB = root.querySelector<HTMLButtonElement>('[data-df-how]'), backB = root.querySelector<HTMLButtonElement>('[data-df-back]');
+    let lp: { stop(): void; pause(ms?: number): void } | null = null;
+    howB?.addEventListener('click', () => { lp?.pause(8000); const open = howB.getAttribute('aria-expanded') === 'true'; howB.setAttribute('aria-expanded', String(!open)); if (x) { x.hidden = open; x.textContent = 'Read the build sheet and the zone, wrote the record, read it back. The record it replaced is kept for Roll back.'; } });
+    backB?.addEventListener('click', () => { lp?.pause(8000); if (g3) setGlyph(g3, 'review', { title: 'rolled back' }); if (x) { x.hidden = false; x.textContent = 'Rolled back under the DNS rule (owner: Niamh): the previous record is back.'; } });
+    lp = loop(root.querySelector<HTMLElement>('.df-list')!, {
+      play: () => { tiles.forEach((t, i) => later(200 + i * 220, () => on(t))); return 200 + tiles.length * 220 + m.enter * 2 + m.morph + 500; },
+      reset: () => { timers.forEach(clearTimeout); timers = []; if (x) x.hidden = true; howB?.setAttribute('aria-expanded', 'false'); tiles.forEach((t) => { t.classList.remove('is-on'); const g = t.querySelector<HTMLElement>('.df-g'); if (g) setGlyph(g, 'progress', { title: 'running' }); }); },
+    });
+  }
+  const boot = () => document.querySelectorAll<HTMLElement>('[data-df]').forEach(init);
+  boot();
+  document.addEventListener('astro:page-load', boot);
+</script>
+
+<style>
+  .df { display: grid; gap: 22px; }
+  .df-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
+  .df-tile { display: grid; grid-template-rows: auto auto 1fr; gap: 8px; padding: 12px 12px 16px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-md); min-width: 0;
+    opacity: 0; transform: scale(.97); transition: opacity var(--dur-enter) var(--ease-settle), transform var(--dur-enter) var(--ease-settle); }
+  .df-tile.is-on { opacity: 1; transform: none; }
+  .df-tile h3 { margin: 0; padding: 6px 6px 0; font: 600 16px/1.25 var(--font-sans); letter-spacing: -.015em; text-wrap: balance; }
+  .df-tile p { margin: 0; padding: 0 6px; font-size: 13.5px; line-height: 1.5; color: var(--text-2); text-wrap: pretty; }
+  .df-pic {
+    --pic-bg: #EFE9DF; --pic-light: #FFFDF9;
+    position: relative; display: grid; place-items: center; height: 168px; padding: 10px; border-radius: 12px; overflow: clip; box-shadow: inset 0 0 0 1px var(--hairline);
+    background: radial-gradient(90% 80% at 24% 8%, var(--pic-light) 0%, transparent 62%), var(--pic-bg);
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .df-pic { --pic-bg: #15130F; --pic-light: #2B2621; } }
+  :root[data-theme="dark"] .df-pic { --pic-bg: #15130F; --pic-light: #2B2621; }
+  /* What each proof changes, once, when its tile is on. */
+  .df-in { opacity: 0; transform: scale(.94); transition: opacity var(--dur-enter) var(--ease-settle) var(--dur-enter), transform var(--dur-enter) var(--ease-settle) var(--dur-enter); }
+  .df-tile.is-on .df-in { opacity: 1; transform: none; }
+
+  .df-floor { position: relative; width: 100%; display: grid; padding-bottom: 30px; }
+  .df-floor :global(.ifl) { width: 100%; max-height: 118px; }
+  .df-tag { position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%); padding: 5px 9px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line-strong); box-shadow: var(--shadow-md); font-size: 11.5px; white-space: nowrap; color: var(--text-2); }
+  .df-tag b { color: var(--text); font-weight: 600; }
+  .df-tile.is-on .df-tag { transform: translateX(-50%); }
+
+  .df-join { width: 100%; height: 100%; font-family: var(--font-sans); }
+  .df-src { font-size: 12px; font-weight: 550; fill: var(--text-2); }
+  .df-wire { fill: none; stroke: var(--text-3); stroke-width: 1.6; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset var(--dur-morph) var(--ease-settle) var(--dur-state); }
+  .df-tile.is-on .df-wire { stroke-dashoffset: 0; }
+  .df-rec { fill: var(--surface); stroke: var(--line-strong); }
+  .df-rec-t { font-size: 12px; font-weight: 600; fill: var(--text); text-anchor: middle; }
+  .df-rec-s { font-size: 11px; fill: var(--text-3); text-anchor: middle; }
+
+  .df-run { display: grid; gap: 7px; width: 100%; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-md); }
+  .df-run p { margin: 0; padding: 0; }
+  .df-run-h { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--text); line-height: 1.3; }
+  .df-run-l { font-size: 12px; color: var(--text-2); line-height: 1.4; }
+  .df-run-l b { font-weight: 600; color: var(--text); }
+  .df-run-b { display: flex; gap: 6px; flex-wrap: wrap; }
+  .df-btn { display: inline-flex; align-items: center; min-height: 26px; padding: 0 9px; border-radius: 7px; border: 1px solid var(--line-strong); background: var(--surface-2); font: 550 11.5px/1 var(--font-sans); color: var(--text); cursor: pointer; transition: background var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle), transform var(--dur-press, 80ms) var(--ease-settle); }
+  .df-btn:hover { background: var(--surface); border-color: var(--text-3); }
+  .df-btn:active { transform: scale(var(--press-scale, .97)); }
+  .df-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .df-run-x { font-size: 11.5px; line-height: 1.35; color: var(--text-2); }
+  .df-run-x[hidden] { display: none; }
+
+  .df-home { --bg: #12110F; --surface: #191816; --text: #F2EEE7; --text-2: #B5AEA3; --text-3: #978F83; display: grid; gap: 6px; width: 100%; padding: 10px 12px; border-radius: 12px; background: var(--bg); color: var(--text); border: 1px solid #2A2825; box-shadow: var(--shadow-lg); }
+  .df-home p { margin: 0; padding: 0; }
+  .df-home-n { font: 600 15px/1.2 var(--font-sans); letter-spacing: -.015em; color: var(--text); }
+  .df-home-l { display: grid; font-size: 11.5px; line-height: 1.3; color: var(--text-2); }
+  .df-x { grid-area: 1 / 1; transition: opacity var(--dur-state) var(--ease-settle) var(--dur-enter); }
+  .df-s2, .df-f2 { opacity: 0; }
+  .df-s2, .df-f2 { color: var(--h-fault-ink, #F5B1A9); font-weight: 550; }
+  .df-tile.is-on .df-s1, .df-tile.is-on .df-f1 { opacity: 0; }
+  .df-tile.is-on .df-s2, .df-tile.is-on .df-f2 { opacity: 1; }
+  .df-figs { margin: 0; display: flex; gap: 16px; }
+  .df-figs div { display: grid; gap: 1px; }
+  .df-figs dd { margin: 0; display: grid; font: 600 18px/1 var(--font-sans); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .df-figs dt { font-size: 10.5px; color: var(--text-2); white-space: nowrap; }
+
+  .df-open { display: grid; grid-template-columns: auto auto; gap: 6px 14px; align-items: center; justify-content: center; }
+  .df-file { display: grid; grid-template-columns: auto auto; gap: 6px 5px; width: 96px; padding: 12px 10px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line-strong); }
+  .df-file i { display: block; height: 6px; border-radius: 3px; background: var(--surface-3); width: 42px; }
+  .df-file i.k { background: var(--text-3); opacity: .55; width: 26px; }
+  .df-file i.s { margin-left: 8px; width: 18px; }
+  .df-tick { width: 48px; height: 48px; }
+  .df-tick-r { fill: var(--surface); stroke: var(--h-fine, var(--green)); stroke-width: 2.4; stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset var(--dur-morph) var(--ease-settle) var(--dur-state); }
+  .df-tick-p { fill: none; stroke: var(--h-fine, var(--green)); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset var(--dur-state) var(--ease-settle) calc(var(--dur-state) + var(--dur-morph)); }
+  .df-tile.is-on .df-tick-r, .df-tile.is-on .df-tick-p { stroke-dashoffset: 0; }
+  .df-open-w { grid-column: 1 / -1; margin: 0; padding: 0; text-align: center; font-size: 12px; font-weight: 550; color: var(--text-2); }
+
+  .df-cmp-box { display: grid; gap: 10px; padding: 18px 20px; border-radius: 20px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-md); }
+  .df-cmp-h { margin: 0; font-size: 13.5px; font-weight: 550; color: var(--text-3); }
+  .df-scroll { overflow-x: auto; }
+  .df-cmp { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 13.5px; line-height: 1.4; }
+  .df-cmp th, .df-cmp td { text-align: left; vertical-align: top; padding: 10px 12px 10px 0; border-top: 1px solid var(--line); font-family: var(--font-sans); text-transform: none; letter-spacing: 0; }
+  .df-cmp thead th { border-top: 0; padding-top: 0; font-size: 12.5px; font-weight: 550; color: var(--text-3); }
+  .df-cmp tbody th { font-weight: 600; width: 26%; padding-right: 18px; }
+  .df-cmp td { color: var(--text-2); }
+  .df-cmp td.is-keia { color: var(--text); font-weight: 550; }
+  .df-cmp thead th:last-child { color: var(--text); }
+  .df-cmp-note { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--text-3); }
+
+  @container fd (max-width: 1099px) {
+    .df-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .df-tile:nth-child(4), .df-tile:nth-child(5) { grid-column: span 1; }
+  }
+  @container fd (max-width: 699px) {
+    .df-list { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+    .df-pic { height: 150px; }
+    .df-cmp-box { padding: 14px; border-radius: 14px; }
+    /* The comparison as a stacked list: each row its question, then the four answers named. */
+    .df-cmp { min-width: 0; }
+    .df-cmp thead { display: none; }
+    .df-cmp, .df-cmp tbody, .df-cmp tr, .df-cmp th, .df-cmp td { display: block; width: auto; }
+    .df-cmp tr { padding: 10px 0; border-top: 1px solid var(--line); }
+    .df-cmp th, .df-cmp td { border-top: 0; padding: 2px 0; }
+    .df-cmp tbody th { padding-bottom: 4px; }
+    .df-cmp td::before { content: attr(data-col) ': '; color: var(--text-3); font-weight: 450; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .df *, .df *::before, .df *::after { transition: none !important; }
+    .df-tile, .df-in { opacity: 1; transform: none; }
+    .df-tag { transform: translateX(-50%); }
+    .df-wire, .df-tick-r, .df-tick-p { stroke-dashoffset: 0; }
+    .df-s1, .df-f1 { opacity: 0; } .df-s2, .df-f2 { opacity: 1; }
+  }
+</style>

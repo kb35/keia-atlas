@@ -1,0 +1,209 @@
+---
+// Maintain it (the front door's lifecycle, stage 4): kept right without firefighting. One night of standing rules
+// running quietly inside their windows (the firmware rule in waves of five, the DNS rule, the calendar re-sync), each
+// run read, written and read back, and each one on the record as "Done automatically under the … rule (owner: …)"
+// with "How was this done?". Beside it, what is coming: security support ending (the same units Plan it brings
+// forward), tonight's wave, and the office's quiet status with its heartbeat. The rules, their owners, windows and
+// caps are the real ones on record (data/standing-rules); the night's runs are simulated and say so.
+//
+// Motion (MOTION-V2 §4.19, §4.20, §4.38): one sequence, once, as the stage scrolls into view: each run's square joins
+// the night strip at its time and its row enters at its centre (--dur-enter), its glyph shows In progress, still, then
+// eases to Done once (--dur-state). "How was this done?" grows from the words (--dur-pop). Nothing loops; the heartbeat
+// is words only. Reduced motion: the final frame at once.
+import HealthGlyph from '../HealthGlyph.astro';
+import { RULES, firstName } from '../../lib/rules-view.mjs';
+import { ENDING, ADD, NEXT } from '../../lib/front-plan.mjs';
+import { href, spaces } from '../../lib/data.mjs';
+
+const rule = (id) => RULES[id];
+const owner = (id) => firstName(rule(id).owner);
+const line = (id) => `Done automatically under the ${rule(id).name} (owner: ${owner(id)})`;
+const nDub = Object.values(spaces).filter((s) => s.site === 'dub').length;
+// The night, 22:00 to 06:00. `at` is minutes after 22:00. Simulated runs of the real rules.
+const NIGHT = [
+  { at: 30, t: '22:30', rule: 'firmware-to-standard', result: 'done', target: 'Wave 1 · 5 video bars, London', did: 'Updated to the standard firmware and made a test call on each', how: { read: 'Each unit\'s version, the standard and its Lab result, and the room\'s bookings', did: 'Sent the update, let the unit restart, read the version back and made a test call', out: 'Any room booked before the update would end; any version the Lab has not passed', not: 'Each accessory\'s own firmware (each is its own run)' } },
+  { at: 100, t: '23:40', rule: 'firmware-to-standard', result: 'done', target: 'Wave 2 · 5 units, Copenhagen', did: 'Updated and read back; every test call connected' },
+  { at: 135, t: '00:15', rule: 'firmware-to-standard', result: 'not-run', target: 'Wave 3 · 4.02 Kingfisher, Dublin', did: 'Not run: the room is booked until 01:00. Tonight instead' },
+  { at: 180, t: '01:00', rule: 'dns-from-build-sheet', result: 'done', target: 'dub-309-vc01, renamed on its build sheet', did: 'DNS record updated and read back; the old record kept for Roll back' },
+  { at: 300, t: '03:00', rule: 'calendar-resync', result: 'done', target: '2.02 Heron\'s booking panel', did: 'Panel re-synced with the space\'s calendar; Undo puts the old link back' },
+];
+const HOURS = ['22:00', '00:00', '02:00', '04:00', '06:00'];
+const done = NIGHT.filter((r) => r.result === 'done').length, notRun = NIGHT.filter((r) => r.result === 'not-run').length;
+const fw = rule('firmware-to-standard');
+---
+<section class="mt" id="maintain" data-mt data-shot="maintain" aria-labelledby="mt-h">
+  <header class="fd-head">
+    <p class="fd-eyebrow">Every night</p>
+    <h2 id="mt-h">Maintain it</h2>
+    <p class="fd-sub">Standing rules run inside their windows, read back what they did and write it down. The record says what is coming before it becomes a fault.</p>
+  </header>
+
+  <div class="mt-stage">
+    <div class="mt-light" aria-hidden="true"></div>
+
+    <div class="mt-night">
+      <p class="mt-h4"><span>Last night · 22:00 to 06:00</span><span data-mt-sum>{done} done automatically · {notRun} not run · 0 unable to complete</span></p>
+      <div class="mt-rail" role="img" aria-label={`The night's runs: ${NIGHT.map((r) => `${r.t} ${rule(r.rule).name}, ${r.result === 'done' ? 'done' : 'not run'}`).join('; ')}`}>
+        <div class="mt-line"></div>
+        {HOURS.map((h, i) => <span class="mt-tick" style={`left:${(i / (HOURS.length - 1)) * 100}%`}>{h}</span>)}
+        <span class="mt-window" style={`left:0%; width:${(420 / 480) * 100}%`} title={`The firmware rule's window: ${fw.window}`}></span>
+        {NIGHT.map((r, i) => <i class:list={['mt-sq', `mt-sq-${r.result}`]} data-mt-sq={i} style={`left:${(r.at / 480) * 100}%`} title={`${r.t} · ${rule(r.rule).name}`}></i>)}
+      </div>
+      <ol class="mt-log" data-mt-log>
+        {NIGHT.map((r, i) => (
+          <li class="mt-run" data-mt-run={i} data-result={r.result}>
+            <time>{r.t}</time>
+            <HealthGlyph state={r.result === 'not-run' ? 'off' : 'progress'} size={16} title={r.result === 'not-run' ? 'not run' : 'running'} class="mt-g lit" />
+            <span class="mt-what"><b>{rule(r.rule).name}</b> · {r.target}<small>{r.did}.</small></span>
+            <span class="mt-line-w" data-mt-line>{r.result === 'done' ? line(r.rule) : `Not run under the ${rule(r.rule).name} (owner: ${owner(r.rule)}): a condition held`}{r.how && <> · <button type="button" class="mt-how" data-mt-how aria-expanded="false">How was this done?</button></>}</span>
+            {r.how && (
+              <dl class="mt-howcard" data-mt-howcard hidden>
+                <div><dt>Read</dt><dd>{r.how.read}</dd></div>
+                <div><dt>Did</dt><dd>{r.how.did}</dd></div>
+                <div><dt>Ruled out</dt><dd>{r.how.out}</dd></div>
+                <div><dt>Not checked</dt><dd>{r.how.not}</dd></div>
+                <div><dt>Way back</dt><dd>{fw.reversal.words}</dd></div>
+                <div><dt>Caps</dt><dd>{fw.caps.per_wave} units a wave · never in a booked meeting · never in a change freeze · halted after {fw.caps.halt_after} unable to complete</dd></div>
+              </dl>
+            )}
+          </li>
+        ))}
+      </ol>
+    </div>
+
+    <aside class="mt-side">
+      <section class="mt-card" aria-labelledby="mt-coming">
+        <p class="mt-h4" id="mt-coming"><span>Coming up</span><span>from the record</span></p>
+        <ul class="mt-coming">
+          <li><HealthGlyph state="progress" size={16} title="tonight" class="lit" /><span><b>Tonight, 22:00</b> · firmware wave 3: 4.02 Kingfisher and 4 more, once their rooms are free.</span></li>
+          {ENDING.slice(0, 3).map((r) => <li><HealthGlyph state="review" size={16} title={`security support ${r.ended ? 'ended' : 'ends'} ${r.when}`} class="lit" /><span><b>{r.name}</b> · {r.n} {r.n === 1 ? 'unit' : 'units'} · security support {r.ended ? 'ended' : 'ends'} {r.when}. <a href="#plan">In the {NEXT.label} plan</a>.</span></li>)}
+          {ENDING.length > 3 && <li class="mt-more"><span>and {ENDING.length - 3} more {ENDING.length - 3 === 1 ? 'model' : 'models'}: {ADD.units} units in all.</span></li>}
+        </ul>
+      </section>
+      <section class="mt-card mt-now" aria-label="Now">
+        <p class="mt-h4"><span>Now · Dublin office</span><span class="mt-beat" data-mt-beat>checked just now</span></p>
+        <p class="mt-now-line"><HealthGlyph state="fine" size={24} title={`all ${nDub} spaces fine`} class="lit" /><span><b>All {nDub} spaces fine.</b> Nothing needs you. A quiet page means fine; a fault is told by its shape and its word, never by a pulse.</span></p>
+        <p class="mt-links"><a href={href('/support/rules/')}>The standing rules</a> · <a href={href('/support/log/')}>the audit log</a></p>
+      </section>
+    </aside>
+  </div>
+  <p class="mt-cap">The rules, their owners, windows, caps and ways back are the ones on record. The night's runs are simulated.</p>
+</section>
+
+<script>
+  import { motion } from '../../lib/motion-read.mjs';
+  import { setGlyph } from '../../lib/health.mjs';
+  import { loop } from '../../lib/front-loop.mjs';
+  function init(root: HTMLElement) {
+    if ((root as any).__mt) return; (root as any).__mt = true;
+    let timers: number[] = [];
+    const later = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
+    const runs = Array.from(root.querySelectorAll<HTMLElement>('[data-mt-run]'));
+    const sqs = Array.from(root.querySelectorAll<HTMLElement>('[data-mt-sq]'));
+    const beat = root.querySelector<HTMLElement>('[data-mt-beat]')!;
+    const finishRun = (li: HTMLElement) => { const g = li.querySelector<HTMLElement>('.hg'); if (li.dataset.result === 'done') setGlyph(g, 'fine', { title: 'done' }); li.classList.add('is-done'); };
+    const finish = () => { runs.forEach((li) => { li.classList.add('is-in'); finishRun(li); }); sqs.forEach((s) => s.classList.add('is-in')); };
+    const reset = () => {
+      timers.forEach(clearTimeout); timers = [];
+      runs.forEach((li) => { li.classList.remove('is-in', 'is-done'); setGlyph(li.querySelector<HTMLElement>('.hg'), li.dataset.result === 'done' ? 'progress' : 'off', { title: li.dataset.result === 'done' ? 'running' : 'not run' }); const card = li.querySelector<HTMLElement>('[data-mt-howcard]'); const how = li.querySelector<HTMLButtonElement>('[data-mt-how]'); if (card) card.hidden = true; how?.setAttribute('aria-expanded', 'false'); });
+      sqs.forEach((s) => s.classList.remove('is-in'));
+    };
+    const run = () => {
+      const m = motion();
+      if (m.reduced) { finish(); return 0; }
+      runs.forEach((li, i) => {
+        const t = 300 + i * (m.enter + 260);
+        later(t, () => { li.classList.add('is-in'); sqs[i]?.classList.add('is-in'); });
+        later(t + m.enter + 500, () => finishRun(li));
+      });
+      return 300 + runs.length * (m.enter + 260) + m.enter + 500;
+    };
+    root.querySelectorAll<HTMLButtonElement>('[data-mt-how]').forEach((how) => how.addEventListener('click', () => {
+      const li = how.closest('[data-mt-run]')!, card = li.querySelector<HTMLElement>('[data-mt-howcard]')!;
+      const open = how.getAttribute('aria-expanded') === 'true';
+      how.setAttribute('aria-expanded', String(!open));
+      const m = motion();
+      if (open) { if (m.reduced) { card.hidden = true; return; } card.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.96)' }], { duration: m.exit, easing: m.exitEase }).onfinish = () => { card.hidden = true; }; return; }
+      card.hidden = false;
+      if (!m.reduced) card.animate([{ opacity: 0, transform: 'scale(.96)', transformOrigin: 'left top' }, { opacity: 1, transform: 'none', transformOrigin: 'left top' }], { duration: m.pop, easing: m.ease });
+    }));
+    const t0 = Date.now();
+    const tick = () => { if (!root.isConnected) return; const s = Math.round((Date.now() - t0) / 10000) * 10; beat.textContent = s < 10 ? 'checked just now' : s < 60 ? `checked ${s} s ago` : `checked ${Math.floor(s / 60)} min ago`; setTimeout(tick, 10000); };
+    setTimeout(tick, 10000);
+    if (motion().reduced) { finish(); return; }
+    loop(root.querySelector<HTMLElement>('.mt-stage')!, { play: run, reset });
+  }
+  const boot = () => document.querySelectorAll<HTMLElement>('[data-mt]').forEach(init);
+  boot();
+  document.addEventListener('astro:page-load', boot);
+</script>
+
+<style>
+  .mt { display: grid; gap: 20px; }
+  .mt-stage {
+    --mt-bg: #EFE9DF; --mt-light: #FFFDF9; --mt-glow: rgba(226, 122, 58, .14);
+    position: relative; display: grid; grid-template-columns: minmax(0, 7fr) minmax(320px, 5fr); gap: 16px 24px; padding: 22px 24px 20px; border-radius: 24px;
+    background: var(--mt-bg); box-shadow: inset 0 0 0 1px var(--hairline); overflow: clip; align-items: start;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .mt-stage { --mt-bg: #15130F; --mt-light: #2B2621; --mt-glow: rgba(238, 138, 78, .12); } }
+  :root[data-theme="dark"] .mt-stage { --mt-bg: #15130F; --mt-light: #2B2621; --mt-glow: rgba(238, 138, 78, .12); }
+  .mt-light { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(80% 70% at 22% 6%, var(--mt-light) 0%, transparent 62%), radial-gradient(60% 46% at 90% 100%, var(--mt-glow) 0%, transparent 70%); }
+  .mt-h4 { margin: 0; display: flex; justify-content: space-between; gap: 6px 12px; flex-wrap: wrap; font-size: 13px; font-weight: 550; color: var(--text-3); }
+
+  .mt-night { position: relative; display: grid; gap: 14px; padding: 18px 20px 16px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-md); min-width: 0; }
+  .mt-rail { position: relative; height: 46px; margin: 4px 6px 0; }
+  .mt-line { position: absolute; left: 0; right: 0; top: 22px; height: 2px; background: var(--line-strong); border-radius: 1px; }
+  .mt-window { position: absolute; top: 18px; height: 10px; border-radius: 5px; background: color-mix(in srgb, var(--h-progress, #2A5B8F) 14%, transparent); }
+  .mt-tick { position: absolute; top: 32px; transform: translateX(-50%); font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .mt-tick:first-child, .mt-tick:nth-child(2) { transform: translateX(0); }
+  .mt-tick:last-of-type { transform: translateX(-100%); }
+  .mt-sq { position: absolute; top: 15px; width: 16px; height: 16px; border-radius: 4px; transform: translateX(-50%) scale(.6); opacity: 0; transition: opacity var(--dur-enter) var(--ease-settle), transform var(--dur-enter) var(--ease-settle); }
+  .mt-sq.is-in { opacity: 1; transform: translateX(-50%) scale(1); }
+  .mt-sq-done { background: var(--h-fine, #0E8A63); }
+  .mt-sq-not-run { border: 1.5px dashed var(--text-3); background: var(--surface); }
+  .mt-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+  .mt-run { display: grid; grid-template-columns: 44px 16px minmax(0, 1fr); gap: 2px 10px; align-items: start; font-size: 13.5px; line-height: 1.4; padding: 8px 10px; border-radius: 10px; background: var(--surface-2);
+    opacity: 0; transform: scale(.97); transition: opacity var(--dur-enter) var(--ease-settle), transform var(--dur-enter) var(--ease-settle); }
+  .mt-run.is-in { opacity: 1; transform: none; }
+  .mt-run time { font-size: 13px; color: var(--text-3); font-variant-numeric: tabular-nums; line-height: 1.45; }
+  .mt-run .hg { margin-top: 2px; }
+  .mt-what b { font-weight: 600; }
+  .mt-what small { display: block; font-size: 12.5px; color: var(--text-2); }
+  .mt-line-w { grid-column: 3; font-size: 12.5px; color: var(--text-3); opacity: 0; transition: opacity var(--dur-state) var(--ease-settle); }
+  .mt-run.is-done .mt-line-w { opacity: 1; }
+  .mt-run[data-result="not-run"] .mt-line-w { color: var(--text-3); }
+  .mt-how { font: 550 12.5px/1 var(--font-sans); color: var(--accent-ink); background: none; border: 0; padding: 4px 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; min-height: 26px; }
+  .mt-howcard { grid-column: 3; margin: 4px 0 0; display: grid; gap: 6px; padding: 10px 12px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); font-size: 12.5px; line-height: 1.45; }
+  .mt-howcard[hidden] { display: none; }
+  .mt-howcard div { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 8px; }
+  .mt-howcard dt { color: var(--text-3); }
+  .mt-howcard dd { margin: 0; color: var(--text-2); }
+
+  .mt-side { position: relative; display: grid; gap: 12px; min-width: 0; }
+  .mt-card { display: grid; gap: 10px; padding: 14px 16px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-md); min-width: 0; }
+  .mt-coming { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+  .mt-coming li { display: flex; gap: 10px; align-items: start; font-size: 13.5px; line-height: 1.4; }
+  .mt-coming .hg { flex: none; margin-top: 3px; }
+  .mt-coming b { font-weight: 600; }
+  .mt-more span { color: var(--text-3); font-size: 12.5px; padding-left: 26px; }
+  .mt-now-line { margin: 0; display: flex; gap: 12px; align-items: start; font-size: 13.5px; line-height: 1.45; color: var(--text-2); }
+  .mt-now-line .hg { flex: none; margin-top: 2px; }
+  .mt-now-line b { color: var(--text); font-weight: 600; }
+  .mt-beat { font-weight: 450; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .mt-links { margin: 0; font-size: 13px; color: var(--text-3); }
+  .mt-cap { margin: -4px 0 0; font-size: 13.5px; line-height: 1.45; color: var(--text-3); }
+
+  @container fd (max-width: 1099px) {
+    .mt-stage { grid-template-columns: minmax(0, 1fr); }
+    .mt-side { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  }
+  @container fd (max-width: 899px) { .mt-side { grid-template-columns: minmax(0, 1fr); } }
+  @container fd (max-width: 699px) {
+    .mt-stage { padding: 18px 16px; border-radius: 18px; gap: 14px; }
+    .mt-night, .mt-card { padding: 14px; border-radius: 14px; }
+    .mt-run { grid-template-columns: 40px 16px minmax(0, 1fr); }
+    .mt-howcard div { grid-template-columns: minmax(0, 1fr); gap: 1px; }
+    .mt-tick:nth-child(3), .mt-tick:nth-child(5) { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .mt-run, .mt-sq, .mt-line-w { transition: none; } .mt-run, .mt-sq { opacity: 1; transform: translateX(-50%); } .mt-run { transform: none; } }
+</style>

@@ -1,0 +1,79 @@
+---
+// The lifecycle strip (the front door's spine): See · Plan · Deliver · Maintain · Fix · Improve. One slim segmented
+// switch that sticks under the masthead while the six stages scroll past, marks the stage in view, and jumps to a
+// stage on click. The marker slides like every segmented switch in the console (M12, --dur-morph); the stage in view
+// is read from an IntersectionObserver, never from scroll maths. Reduced motion: the marker is simply there, and a
+// click scrolls without smoothing. Keyboard: the buttons are links to the sections, so Tab and Enter work with no
+// script at all.
+import { STAGES } from '../../lib/front.mjs';
+---
+<nav class="lc" aria-label="The lifecycle" data-lc>
+  <div class="lc-strip" role="list">
+    <span class="lc-mark no-slide" aria-hidden="true" data-lc-mark></span>
+    {STAGES.map((s, i) => <a role="listitem" class="lc-go" href={`#${s.id}`} data-lc-go={s.id} aria-current={i === 0 ? 'location' : undefined} title={`${s.word} it: ${s.what}`}>{s.word}</a>)}
+  </div>
+</nav>
+
+<script>
+  import { motion } from '../../lib/motion-read.mjs';
+  function init(root: HTMLElement) {
+    if ((root as any).__lc) return; (root as any).__lc = true;
+    const links = Array.from(root.querySelectorAll<HTMLAnchorElement>('[data-lc-go]'));
+    const mark = root.querySelector<HTMLElement>('[data-lc-mark]')!;
+    const ids = links.map((a) => a.dataset.lcGo!);
+    const sections = ids.map((id) => document.getElementById(id)).filter(Boolean) as HTMLElement[];
+    let cur = '';
+    const place = (id: string, slide = true) => {
+      const a = links.find((l) => l.dataset.lcGo === id); if (!a) return;
+      cur = id;
+      links.forEach((l) => { if (l === a) l.setAttribute('aria-current', 'location'); else l.removeAttribute('aria-current'); });
+      mark.classList.toggle('no-slide', !slide || motion().reduced);
+      mark.style.width = `${a.offsetWidth}px`; mark.style.transform = `translateX(${a.offsetLeft}px)`;
+    };
+    // The stage in view: the section whose top is nearest above the strip's own line on screen.
+    const line = () => root.getBoundingClientRect().bottom + 24;
+    const pick = () => {
+      let best = sections[0];
+      for (const s of sections) if (s.getBoundingClientRect().top <= line()) best = s;
+      if (best && best.id !== cur) place(best.id);
+    };
+    if ('IntersectionObserver' in window) {
+      const io = new IntersectionObserver(() => pick(), { rootMargin: '-20% 0px -60% 0px', threshold: [0, 0.2, 0.5, 1] });
+      sections.forEach((s) => io.observe(s));
+    }
+    window.addEventListener('scroll', pick, { passive: true });
+    if ('ResizeObserver' in window) new ResizeObserver(() => place(cur || ids[0], false)).observe(root);
+    links.forEach((a) => a.addEventListener('click', (e) => {
+      const el = document.getElementById(a.dataset.lcGo!); if (!el) return;
+      e.preventDefault();
+      const top = el.getBoundingClientRect().top + window.scrollY - (root.offsetHeight + 72);
+      window.scrollTo({ top: Math.max(0, top), behavior: motion().reduced ? 'auto' : 'smooth' });
+      history.replaceState(null, '', `#${a.dataset.lcGo}`);
+      place(a.dataset.lcGo!);
+    }));
+    place(ids[0], false);
+    requestAnimationFrame(() => { mark.classList.remove('no-slide'); pick(); });
+  }
+  const boot = () => document.querySelectorAll<HTMLElement>('[data-lc]').forEach(init);
+  boot();
+  document.addEventListener('astro:page-load', boot);
+</script>
+
+<style>
+  /* Sticks just under the masthead (Front.astro's .fd-top is about 64 px tall), inside the spine only. */
+  .lc { position: sticky; top: 64px; z-index: 10; display: flex; justify-content: center; padding: 10px 0; pointer-events: none; }
+  .lc-strip { position: relative; display: inline-flex; padding: 3px; border-radius: 999px; background: color-mix(in srgb, var(--surface-2) 94%, transparent); border: 1px solid var(--line); box-shadow: var(--shadow-md); pointer-events: auto;
+    -webkit-backdrop-filter: saturate(160%) blur(14px); backdrop-filter: saturate(160%) blur(14px); max-width: 100%; }
+  .lc-go { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; min-height: 36px; padding: 0 16px; border-radius: 999px; font: 550 13.5px/1 var(--font-sans); color: var(--text-2); text-decoration: none; transition: color var(--dur-hover) var(--ease-settle); white-space: nowrap; }
+  .lc-go:hover { color: var(--text); }
+  .lc-go[aria-current] { color: var(--text); }
+  .lc-go:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+  .lc-mark { position: absolute; left: 0; top: 3px; bottom: 3px; width: 0; border-radius: 999px; background: var(--surface); border: 1px solid var(--line-strong); transition: transform var(--dur-morph) var(--ease-settle), width var(--dur-morph) var(--ease-settle); }
+  .lc-mark.no-slide { transition: none; }
+  @container fd (max-width: 699px) {
+    .lc { top: 64px; padding: 8px 0; }
+    .lc-strip { width: 100%; }
+    .lc-go { flex: 1 1 0; padding: 0 4px; font-size: 12.5px; min-height: 34px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .lc-mark, .lc-go { transition: none; } }
+</style>

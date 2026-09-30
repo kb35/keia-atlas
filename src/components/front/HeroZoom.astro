@@ -2,28 +2,37 @@
 // The front door's hero (FRONT-DOOR-V2 sections 2 and 3): the product, four levels deep, and the zoom that joins
 // them. Building (the Dublin office as a model, from src/lib/floors.mjs), floor (the third floor, every space a
 // ring, one broken), space (3.09 Whooper Swan) and device (the video bar, the same product drawing, DeviceArt).
+// Each level answers first, in words placed where the thing is: the office and its counts; every space's number,
+// name and kind, the core and who is on site; the room's devices and its booking; the device's facts.
 //
 // Two ways to draw it, one story:
-//   3D    on a wide screen that draws WebGL, src/lib/hero3d.mjs builds the office in three.js after first paint and
-//         plays one cinematic sequence (MOTION-V2 4.36): a slow dolly over the building, the fourth floor lifting
-//         away, the rings coming on in turn, one breaking once, then the camera easing into the space. The visitor
-//         can drag a little, point at a space, click one, or use the level strip; the device level is the product
-//         drawing over the scene.
+//   3D    on a wide screen that draws WebGL, src/lib/hero3d.mjs builds the office in three.js after first paint from
+//         the building data and the room drawings (furniture, displays, the bar, from src/lib/room3d.mjs) and plays
+//         one cinematic sequence (MOTION-V2 4.36): a slow dolly over the building, the fourth floor lifting away,
+//         the rings coming on in turn, one breaking once, then the camera easing into the space. The visitor can
+//         drag a little, point at a space, click one, or use the level strip; the device level is the product
+//         drawing over the scene. The words over the scene are src/lib/hero-labels.mjs.
 //   2D    the first frame everywhere, and the whole hero on a phone: an isometric SVG of the same building
 //         (src/lib/iso.mjs), the floor, the real room drawing (src/lib/room3d.mjs) and the device, joined by a
-//         continuous zoom on the settle spring, each parent scaling up around the point its child lives at.
-// Reduced motion: the final frame, still; every level a click away and changing at once.
+//         continuous zoom on the settle spring, each parent scaling up around the point its child lives at. Each
+//         layer carries its own words, so they fade with the level.
+// The run loops on its own (Keith, 30 Sept): it settles on its end frame, holds a calm pause (--dur-hero-rest), cross-
+// fades back to its first frame and runs again. It waits while the stage is off screen or the tab is hidden, and ends
+// for good once the visitor takes over (the strip, a key, a drag or a click). There is no replay control.
+// Reduced motion: the final frame, still and labelled, no loop; every level a click away and changing at once.
 import { building } from '../../lib/floors.mjs';
 import { isoBuilding, isoFloor, fit, iso } from '../../lib/iso.mjs';
 import { buildRoom, render } from '../../lib/room3d.mjs';
 import { roomItems } from '../../lib/scene.mjs';
 import { ringParts } from '../../lib/ring.mjs';
-import { spaces, sites, models } from '../../lib/data.mjs';
+import { spaces, spaceTypes, sites, models, DEMO_TODAY } from '../../lib/data.mjs';
+import { PEOPLE } from '../../lib/demo.mjs';
+import { interiorCss } from '../../lib/interior-palette.mjs';
 import RoomShot from './RoomShot.astro';
 import DeviceArt from '../DeviceArt.astro';
 
 const SITE = 'dub', FLOOR = '3', ROOM = 'dub-3-09', DEVICE = 'video-bar';
-const STORY = { since: '07:52', who: 'Liam', whoSince: '08:10', next: '09:00', model: 'Poly Studio X72', host: 'dub-309-vc01' };
+const STORY = { since: '07:52', who: 'Liam', whoSince: '08:10', next: '09:00', people: 8, model: 'Poly Studio X72', host: 'dub-309-vc01', firmware: '4.6.1', firmwareAgo: '12 days ago' };
 const VW = 960, VH = 600;
 
 // ---- Building and floor, in isometric.
@@ -38,6 +47,10 @@ const swan = FL.rings.find((r) => r.room.id === ROOM);
 const floorCentre = fb.T(iso((FL.box[0] + FL.box[2]) / 2, (FL.box[1] + FL.box[3]) / 2, FL.z));
 const swanTop = ff.T(swan.top);
 const nRooms = Object.values(M.rooms).filter((r) => r.rect).length;
+const siteName = sites[SITE].name;
+const SITE_LINE = `${M.floors.length} floors · ${nRooms} spaces · 1 fault`;
+const topFloor = B.floors[B.floors.length - 1];
+const siteAt = fb.T(iso((topFloor.box[0] + topFloor.box[2]) / 2, (topFloor.box[1] + topFloor.box[3]) / 2, topFloor.z + 9));
 
 // ---- The space: the real drawing of 3.09.
 const space = spaces[ROOM];
@@ -45,14 +58,18 @@ const items = roomItems(space.option, { fitted: space.fitted, space });
 const RM = buildRoom(space.space_type, space.option, items, { plugs: sites[SITE].mains?.plugs ?? null, country: space.country ?? sites[SITE].country ?? null, fitted: space.fitted, models });
 const R = render(RM, { width: 900, pad: 12, aspect: 1.6 });
 const roomH = VH - 40, roomW = Math.round((roomH * R.width) / R.height), roomX = Math.round((VW - roomW) / 2), roomY = 20;
-const bar = R.marks.find((m) => m.sk === DEVICE);
-const barAt = [roomX + ((bar.bb.x0 + bar.bb.x1) / 2) * (roomW / R.width), roomY + ((bar.bb.y0 + bar.bb.y1) / 2) * (roomH / R.height)];
-const barW = (bar.bb.x1 - bar.bb.x0) * (roomW / R.width);
+const markAt = (sk) => { const m = R.marks.find((x) => x.sk === sk); return m ? { x: roomX + ((m.bb.x0 + m.bb.x1) / 2) * (roomW / R.width), y: roomY + m.bb.y0 * (roomH / R.height), w: (m.bb.x1 - m.bb.x0) * (roomW / R.width), cy: roomY + ((m.bb.y0 + m.bb.y1) / 2) * (roomH / R.height) } : null; };
+const bar = markAt(DEVICE);
+const barAt = [bar.x, bar.cy];
+const barW = bar.w;
+const DEV_WORDS = { 'display#1': 'Display 1', 'display#2': 'Display 2', 'video-bar': `${STORY.model} video bar`, 'touch-controller': 'Touch controller' };
+const dev2 = ['display#1', 'display#2', 'touch-controller'].map((sk) => ({ sk, word: DEV_WORDS[sk], at: markAt(sk) })).filter((d) => d.at);
 
-// ---- The device: the product drawing, 320 x 180 art units, drawn at three quarters of the stage.
-const ART = { s: 0.75, x: 120, y: 40 };
+// ---- The device: the product drawing, 320 x 180 art units, with its facts beside it.
+const ART = { s: 0.62, x: 84, y: 30 };
 const art = (x, y) => [ART.x + x * 3 * ART.s, ART.y + (30 + y * 3) * ART.s];
 const devAt = art(160, 62);
+const FACTS = [['Model', STORY.model], ['Hostname', STORY.host], ['Firmware', `${STORY.firmware}, changed ${STORY.firmwareAgo}`], ['Booked', `${STORY.next}, ${STORY.people} people`], ['With', `${STORY.who} since ${STORY.whoSince}`]];
 
 // ---- How far each level zooms into the next (clamped so a leaving layer never grows past what a GPU draws well).
 const clamp = (v) => Math.max(1.5, Math.min(5, v));
@@ -60,22 +77,82 @@ const swanW = (swan.room.rect[2] - swan.room.rect[0]) + (swan.room.rect[3] - swa
 const S = [clamp(ff.k / fb.k), clamp(roomW / (swanW * 0.866 * ff.k)), clamp((294 * 3 * ART.s) / barW)];
 const hot = [floorCentre, swanTop, barAt];
 
-// ---- What the 3D scene needs, inline (no fetch): each floor, every room, the story's devices where they sit.
+// ---- What the 3D scene needs, inline (no fetch): each floor, every room, the furniture, who is on site, the story.
 const r2 = (v) => Math.round(v * 100) / 100;
-// A space's kind, as the floor plan's key has it (src/components/FloorMap.astro).
-const kindOf = (t) => (t === 'mdf' || t === 'idf' ? 'comms' : t?.startsWith('workstation') ? 'desks' : t === 'reception-concierge' ? 'reception'
-  : ['pantry', 'pantry-expanded', 'cafeteria'].includes(t) ? 'pantry' : ['copy-print-room', 'it-store'].includes(t) ? 'print'
+// A space's kind, as the floor plan's key has it (src/components/FloorMap.astro), plus the IT store.
+const kindOf = (t) => (t === 'mdf' || t === 'idf' ? 'comms' : t === 'it-store' ? 'store' : t?.startsWith('workstation') ? 'desks' : t === 'reception-concierge' ? 'reception'
+  : ['pantry', 'pantry-expanded', 'cafeteria'].includes(t) ? 'pantry' : t === 'copy-print-room' ? 'print'
   : t === 'focus-room' || t === 'office' || t?.startsWith('huddle-room') ? 'small' : 'meeting');
+const wallsOf = (k) => (['meeting', 'small'].includes(k) ? 'glass' : ['comms', 'store', 'print'].includes(k) ? 'solid' : 'none');
+const typeWord = (t) => spaceTypes[t]?.profile?.name ?? '';
 const peekOf = (r) => { const n = (r.positions ?? []).reduce((k, p) => k + (p.units?.length ?? 0), 0); return r.id === ROOM ? `Fault · video bar offline since ${STORY.since} · With ${STORY.who}` : `Fine · ${n === 1 ? '1 device' : `${n} devices`}`; };
-const DEV_WORDS = { 'display#1': 'Display 1', 'display#2': 'Display 2', 'video-bar': 'Video bar', 'touch-controller': 'Touch controller', 'scheduler-panel': 'Scheduler panel' };
-// A device ring sits a little in from its outlet, towards the room's centre (an outlet is on a wall or under a table).
-const swanC = [(M.rooms[ROOM].rect[0] + M.rooms[ROOM].rect[2]) / 2, (M.rooms[ROOM].rect[1] + M.rooms[ROOM].rect[3]) / 2];
-const nudge = (o) => { const [x, y, z] = o.at, dx = swanC[0] - x, dy = swanC[1] - y, d = Math.hypot(dx, dy) || 1; return [x + (dx / d) * 0.45, y + (dy / d) * 0.45, o.surface === 'floor' ? z + 0.45 : z]; };
+const floorIndex = Object.fromEntries(M.floors.map((f, i) => [f.id, i]));
+
+// The room drawings' materials, grouped for the scene (the index is hero3d's FURN list); what a far room keeps.
+const FURN_MAT = { table: 0, wood: 0, counter: 0, chair: 2, 'chair-back': 2, sofa: 4, 'sofa-back': 4, dev: 5, bezel: 5, router: 5, laptop: 5, 'led-wall': 5, deskmod: 5, board: 7, stone: 7, appliance: 7, printer: 7, 'printer-top': 7, leg: 8, 'chair-base': 8, leaf: 9, pot: 10 };
+const FAR_SKIP = new Set(['leg', 'chair-base', 'deskmod', 'router', 'laptop']);
+const NO_DRAWING = new Set(['mdf', 'idf', 'it-store', 'open-area']);
+// A box in a room's own frame (the profile's), stretched, mirrored and turned onto the plan, with the floor's level.
+const toPlan = (geo, level, x0, y0, z0, x1, y1, z1) => {
+  const pts = [[x0, y0], [x1, y0], [x0, y1], [x1, y1]].map(([x, y]) => geo.toFloor(geo.fromProfile([x, y, 0])));
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  return [r2(Math.min(...xs)), r2(Math.min(...ys)), r2(level + z0), r2(Math.max(...xs)), r2(Math.max(...ys)), r2(level + z1)];
+};
+const furn = [];
+const storyDev = {};
+let booking = null;
+for (const r of Object.values(M.rooms)) {
+  if (!r.geo || r.count > 1 || NO_DRAWING.has(r.space_type)) continue;
+  const sp = spaces[r.id]; if (!sp?.option) continue;
+  const fl = M.floors.find((f) => f.id === r.floor), fi = floorIndex[r.floor], isStory = r.id === ROOM;
+  const drawn = isStory ? RM : buildRoom(sp.space_type, sp.option, roomItems(sp.option, { fitted: sp.fitted, space: sp }), { plugs: sites[SITE].mains?.plugs ?? null, country: sp.country ?? sites[SITE].country ?? null, fitted: sp.fitted, models });
+  let seat = 0, mustard = false;
+  for (const s of drawn.b.S) {
+    if (s.ghost || s.outside || s.hid || s.mat === 'plate' || s.mat === 'floorbox') continue;
+    if (!isStory && FAR_SKIP.has(s.mat)) continue;
+    let mi = FURN_MAT[s.mat]; if (mi == null) continue;
+    if (s.mat === 'chair') { seat++; mustard = seat % 3 === 1; }
+    if ((s.mat === 'chair' || s.mat === 'chair-back') && mustard) mi = 3;
+    const { x0, x1, y0, y1 } = s.bb;
+    if (!isStory && (x1 - x0) * (y1 - y0) < 0.02) continue;
+    furn.push([fi, mi, ...toPlan(r.geo, fl.level_m, x0, y0, s.z0, x1, y1, s.z1)]);
+    // A display's lit screen, on the face towards the room.
+    if (s.mat === 'bezel') furn.push([fi, 6, ...toPlan(r.geo, fl.level_m, x0 + 0.02, y1, s.z0 + 0.02, x1 - 0.02, y1 + 0.004, s.z1 - 0.02)]);
+  }
+  if (isStory) {
+    // Where each named device sits, for its ring and its label: a little in front of a wall device, above a table one.
+    for (const key of Object.keys(DEV_WORDS)) {
+      const parts = drawn.placed.get(key); if (!parts?.length) continue;
+      const bb = { x0: Math.min(...parts.map((p) => p.bb.x0)), x1: Math.max(...parts.map((p) => p.bb.x1)), y0: Math.min(...parts.map((p) => p.bb.y0)), y1: Math.max(...parts.map((p) => p.bb.y1)), z0: Math.min(...parts.map((p) => p.z0)), z1: Math.max(...parts.map((p) => p.z1)) };
+      const onWall = bb.y0 < 0.2, mid = (bb.x0 + bb.x1) / 2;
+      // A display's ring sits at its outer top corner, so two displays and the bar between them each keep their words.
+      const dx = key.startsWith('display') ? (mid < drawn.room.W / 2 ? bb.x0 + 0.12 : bb.x1 - 0.12) : mid;
+      const p = onWall ? [dx, bb.y1 + 0.3, key === DEVICE ? (bb.z0 + bb.z1) / 2 : bb.z1 + 0.42] : [mid, (bb.y0 + bb.y1) / 2, bb.z1 + 0.3];
+      const q = r.geo.toFloor(r.geo.fromProfile(p));
+      storyDev[key] = [r2(q[0]), r2(q[1]), r2(fl.level_m + p[2])];
+    }
+    const t = drawn.anchors.table ?? drawn.anchors.desk;
+    if (t) { const q = r.geo.toFloor(r.geo.fromProfile([(t.x0 + t.x1) / 2, t.y1 + 1.1, 0])); booking = { at: [r2(q[0]), r2(q[1]), r2(fl.level_m + (t.z ?? 0.74) + 0.75)], text: `${STORY.next} · booked, ${STORY.people} people` }; }
+  }
+}
+// Who is on site today (the demo's day), and where they plausibly are: the technician by the IT store, the vendor
+// in the town hall she is fitting out, the managers at the assigned desks upstairs, the rest in the café.
+const DAY = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date(DEMO_TODAY).getDay()];
+const deskD = M.rooms['dub-4-20']?.desks ?? [];
+const PLACES = {
+  liam: { f: '3', at: [41.6, 7.2] }, lena: { f: '3', at: [9.2, 3.4] }, sofia: { f: '3', at: [37.6, 20.4] }, niamh: { f: '3', at: [35.6, 21.8] },
+  claire: { f: '4', at: deskD[1]?.at }, olivia: { f: '4', at: deskD[4]?.at }, fionn: { f: '4', at: deskD[9]?.at }, declan: { f: '4', at: deskD[12]?.at },
+};
+const onSite = PEOPLE.filter((p) => p.base === SITE && p.office_days.includes(DAY) && PLACES[p.id]?.at);
+const people = onSite.map((p) => ({ i: p.initials, n: p.name, r: p.role, f: PLACES[p.id].f, at: PLACES[p.id].at.slice(0, 2).map(r2), story: p.id === 'liam' }));
+const DEV_SUB = { [DEVICE]: `Fault: offline since ${STORY.since}` };
 const D3 = {
-  floors: M.floors.map((f) => ({ id: f.id, name: f.name, level: f.level_m, outline: f.outline, core: f.core.map((c) => ({ r: c.rect.map(r2), kind: c.kind, flat: !!c.circulation || c.kind === 'lift-lobby' })), corr: f.corridors.map((c) => c.rect.map(r2)), areas: f.areas.map((a) => a.rect.map(r2)) })),
-  rooms: Object.values(M.rooms).filter((r) => r.rect).map((r) => ({ id: r.id, no: r.number ?? '', n: `${r.number ? `${r.number} ` : ''}${r.name}`, f: r.floor, r: r.rect.map(r2), h: 1, peek: peekOf(r),
-    k: kindOf(r.space_type), ...(r.count > 1 ? { bank: 1, desks: r.desks.map((d) => d.at.slice(0, 2).map(r2)) } : {}) })),
-  story: { room: ROOM, floor: FLOOR, devices: M.rooms[ROOM].outlets.filter((o) => DEV_WORDS[o.dev]).map((o) => ({ key: o.dev, label: DEV_WORDS[o.dev], at: nudge(o).map(r2), fault: o.dev === DEVICE })) },
+  site: { name: siteName, line: SITE_LINE },
+  floors: M.floors.map((f) => ({ id: f.id, name: f.name, level: f.level_m, outline: f.outline, core: f.core.map((c) => ({ r: c.rect.map(r2), kind: c.kind, flat: !!c.circulation || c.kind === 'lift-lobby' })), corr: f.corridors.map((c) => c.rect.map(r2)), areas: f.areas.map((a) => ({ r: a.rect.map(r2), k: a.kind, n: a.name })) })),
+  rooms: Object.values(M.rooms).filter((r) => r.rect).map((r) => { const k = kindOf(r.space_type); return { id: r.id, no: r.number ?? '', n: `${r.number ? `${r.number} ` : ''}${r.name}`, t: typeWord(r.space_type) === r.name ? '' : typeWord(r.space_type), f: r.floor, r: r.rect.map(r2), h: 1, peek: peekOf(r), k, w: r.count > 1 ? 'none' : wallsOf(k),
+    ...(r.count > 1 ? { bank: 1, desks: r.desks.map((d) => [...d.at.slice(0, 2).map(r2), ...r.geo.toFloor(d.module).slice(0, 2).map(r2)]) } : {}) }; }),
+  furn, people,
+  story: { room: ROOM, floor: FLOOR, devices: Object.entries(DEV_WORDS).filter(([k]) => storyDev[k]).map(([key, label]) => ({ key, label, sub: DEV_SUB[key] ?? 'Fine', at: storyDev[key], fault: key === DEVICE })), booking },
 };
 
 const LEVELS = [
@@ -87,7 +164,10 @@ const LEVELS = [
 const ring = (state, [cx, cy], r, sw) => ringParts(state, cx, cy, r, sw);
 const rb = Math.max(3.4, 0.42 * fb.k), rf = Math.max(5, 0.5 * ff.k);
 const P = (t, pts) => t.pts(pts);
+const CORE_WORD = { stair: 'Stairs', lift: 'Lifts', toilets: 'Toilets' };
+const KEY = [['meeting', 'Meeting rooms'], ['small', 'Small rooms'], ['shared', 'Shared and back of house'], ['desks', 'Desks']];
 ---
+<style is:global set:html={interiorCss()} />
 <div class="hz" data-hz>
   <div class="hz-stage" data-hz-stage role="group" tabindex="0" aria-label="The demo office, four levels deep: building, floor, space, device. Press ] to go deeper and [ to come back, or use the level buttons.">
     <div class="hz-light" aria-hidden="true"></div>
@@ -106,6 +186,7 @@ const P = (t, pts) => t.pts(pts);
         })}
         {B.floors.map((f) => { const at = fb.T(f.label); return <text class="hz-floor-name" x={at[0] - 8} y={at[1] + 4}>{f.F.name}</text>; })}
       </svg>
+      <div class="hz-lab2 hz-lab2-site" data-hz-tag data-x={siteAt[0]} data-y={siteAt[1]}><b>{siteName}</b><span>{SITE_LINE}</span></div>
     </div>
 
     <!-- Floor -->
@@ -113,16 +194,18 @@ const P = (t, pts) => t.pts(pts);
       <svg class="hz-svg" viewBox={`0 0 ${VW} ${VH}`} aria-hidden="true">
         <polygon class="hz-ground" points={P(ff, FL.prims[2].pts.map(([x, y]) => [x, y + 2.6]))} filter="url(#hz-shadow)" />
         {FL.prims.map((p) => <polygon class:list={['hz-p', `hz-${p.kind}`, p.room && `hz-k-${kindOf(p.room.space_type)}`, { 'is-fault': p.room?.id === ROOM }]} points={P(ff, p.pts)} />)}
+        {F.core.filter((c) => CORE_WORD[c.kind]).map((c) => { const at = ff.T(iso((c.rect[0] + c.rect[2]) / 2, (c.rect[1] + c.rect[3]) / 2, FL.z)); return <text class="hz-core2" x={at[0]} y={at[1] + 3}>{CORE_WORD[c.kind]}</text>; })}
         {FL.rings.map((r) => {
           const fault = r.room.id === ROOM, at = ff.T(r.at), top = ff.T(r.top);
-          const wide = (r.room.rect[2] - r.room.rect[0]) * (r.room.rect[3] - r.room.rect[1]) > 9;
+          const area = (r.room.rect[2] - r.room.rect[0]) * (r.room.rect[3] - r.room.rect[1]);
+          const words = fault ? null : area > 24 && r.room.count === 1 ? `${r.room.number} ${r.room.name}` : area > 9 ? r.room.number : null;
           return (<>
-            {wide && r.room.number && <text class="hz-no" x={top[0]} y={top[1] + rf + 12}>{r.room.number}</text>}
+            {words && <text class="hz-no" x={top[0]} y={top[1] + rf + 12}>{words}</text>}
             <g class:list={['hz-ring', { 'is-fault': fault }]}>{ring(fault ? 'fault' : 'fine', at, fault ? rf * 1.3 : rf, fault ? 2 : 1.6).map(({ tag, attrs }) => tag === 'circle' ? <circle {...attrs} stroke={attrs.stroke ?? 'currentColor'} /> : <path {...attrs} stroke="currentColor" />)}</g>
           </>);
         })}
       </svg>
-      <div class="hz-tag is-fault" data-hz-tag data-x={hot[1][0]} data-y={hot[1][1] - rf * 2.2}><b>3.09 Whooper Swan</b><span>Fault: video bar offline since {STORY.since}</span></div>
+      <div class="hz-tag is-fault" data-hz-tag data-x={hot[1][0]} data-y={hot[1][1] - rf * 2.2}><b>3.09 Whooper Swan</b><span><em class="hz-type">{typeWord(space.space_type)} · </em>Fault: video bar offline since {STORY.since}</span></div>
     </div>
 
     <!-- Space -->
@@ -130,8 +213,13 @@ const P = (t, pts) => t.pts(pts);
       <svg class="hz-svg" viewBox={`0 0 ${VW} ${VH}`} aria-hidden="true">
         <RoomShot R={R} label={`3.09 Whooper Swan, drawn to scale`} x={roomX} y={roomY} width={roomW} height={roomH} />
         <g class="hz-ring is-fault">{ring('fault', [barAt[0], barAt[1] - 30], 11, 2.4).map(({ tag, attrs }) => tag === 'circle' ? <circle {...attrs} stroke={attrs.stroke ?? 'currentColor'} /> : <path {...attrs} stroke="currentColor" />)}</g>
+        {dev2.map((d) => (<g class="hz-dev2">
+          <g class="hz-ring">{ring('fine', [d.at.x, d.at.y - 14], 6, 1.6).map(({ tag, attrs }) => tag === 'circle' ? <circle {...attrs} stroke={attrs.stroke ?? 'currentColor'} /> : <path {...attrs} stroke="currentColor" />)}</g>
+          <text x={d.at.x} y={d.at.y - 26}>{d.word}</text>
+        </g>))}
       </svg>
-      <div class="hz-tag is-fault" data-hz-tag data-x={barAt[0]} data-y={barAt[1] - 48}><b>Video bar</b><span>{STORY.model} · offline since {STORY.since}</span></div>
+      <div class="hz-tag is-fault" data-hz-tag data-x={barAt[0]} data-y={barAt[1] - 48}><b>{STORY.model} video bar</b><span>Fault: offline since {STORY.since} · With {STORY.who} since {STORY.whoSince}</span></div>
+      {booking && <div class="hz-lab2 hz-lab2-booking" data-hz-tag data-x={roomX + roomW * 0.5} data-y={roomY + roomH * 0.62}><b>{booking.text}</b></div>}
     </div>
 
     <!-- Device -->
@@ -140,14 +228,21 @@ const P = (t, pts) => t.pts(pts);
       <svg class="hz-svg" viewBox={`0 0 ${VW} ${VH}`} aria-hidden="true">
         <g transform={`translate(${ART.x} ${ART.y}) scale(${ART.s})`}><DeviceArt model="poly-studio-x72" label={`${STORY.model}, the video bar`} /></g>
         <g class="hz-ring is-fault">{ring('fault', devAt, 13, 2.6).map(({ tag, attrs }) => tag === 'circle' ? <circle {...attrs} stroke={attrs.stroke ?? 'currentColor'} /> : <path {...attrs} stroke="currentColor" />)}</g>
-        <text class="hz-dev-sub" x={VW / 2} y={art(160, 118)[1] + 34}>{STORY.host} · firmware 4.6.1, changed 12 days ago · booked {STORY.next}, 8 people</text>
       </svg>
-      <div class="hz-tag is-fault" data-hz-tag data-x={devAt[0]} data-y={devAt[1] - 22}><b>{STORY.model}</b><span>Offline since {STORY.since} · With {STORY.who} since {STORY.whoSince}</span></div>
+      <div class="hz-tag is-fault" data-hz-tag data-x={devAt[0]} data-y={devAt[1] - 22}><b>{STORY.model} video bar</b><span>Fault: offline since {STORY.since}</span></div>
+      <dl class="hz-facts" data-hz-tag data-x={VW / 2} data-y={art(160, 132)[1] + 8}>
+        {FACTS.map(([k, v]) => <div><dt>{k}</dt><dd>{v}</dd></div>)}
+      </dl>
     </div>
 
-    <!-- Words over the 3D scene: the space under the pointer, and the story's tag once the ring has broken. -->
+    <!-- Words over the 3D scene: each level's labels (src/lib/hero-labels.mjs), the space under the pointer, and the key. -->
+    <div class="hz-labels" data-hz-labels aria-hidden="true"></div>
     <div class="hz-tag hz-hover" data-hz-hover hidden><b data-hz-hover-name></b><span data-hz-hover-state></span></div>
-    <div class="hz-tag is-fault hz-story" data-hz-story hidden><b data-hz-story-name>3.09 Whooper Swan</b><span data-hz-story-state>Fault: video bar offline since {STORY.since}</span></div>
+    <ul class="hz-key" data-hz-key aria-label="Key">
+      {KEY.map(([k, w]) => <li><i class={`hz-key-${k}`}></i>{w}</li>)}
+      <li><i class="hz-key-ring"></i>Fine</li>
+      <li><i class="hz-key-ring is-fault"></i>Fault</li>
+    </ul>
   </div>
 
   <div class="hz-foot">
@@ -163,7 +258,7 @@ const P = (t, pts) => t.pts(pts);
   import { motion } from '../../lib/motion-read.mjs';
   import { springEasing } from '../../lib/spring.mjs';
 
-  const VW = 960, VH = 600, STORY_DEVICE = { name: 'Video bar · Poly Studio X72', state: 'Fault: offline since 07:52 · With Liam since 08:10' };
+  const VW = 960, VH = 600;
   // A duration token in ms. The build writes "760ms" as ".76s", so the unit is read, not assumed.
   const ms = (cs: CSSStyleDeclaration, name: string, d: number) => { const v = cs.getPropertyValue(name).trim(), n = parseFloat(v); return Number.isNaN(n) ? d : /ms$/.test(v) ? n : /s$/.test(v) ? n * 1000 : n; };
   const settleEasing = (fallback: string, o: { duration: number; bounce: number }) => {
@@ -188,11 +283,14 @@ const P = (t, pts) => t.pts(pts);
     const beat = root.querySelector<HTMLElement>('[data-hz-beat]')!;
     const btns = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-hz-go]'));
     const mark = root.querySelector<HTMLElement>('[data-hz-mark]')!;
+    const key = root.querySelector<HTMLElement>('[data-hz-key]')!;
     const S = layers.map((l) => +l.dataset.s! || 4);
     const hot = layers.map((l) => [+l.dataset.hx!, +l.dataset.hy!]);
     const cs = getComputedStyle(root);
-    const dur = ms(cs, '--dur-hero', 760), hold = ms(cs, '--dur-hero-hold', 700);
-    let cur = 0, timers: number[] = [], auto = true;
+    const dur = ms(cs, '--dur-hero', 760), hold = ms(cs, '--dur-hero-hold', 700), rest = ms(cs, '--dur-hero-rest', 3200);
+    // Like every front-door loop (src/lib/front-loop.mjs), the pause gets a random extra beat so loops never fall into step.
+    const restFor = () => rest + Math.random() * hold;
+    let cur = 0, auto = true, gen = 0;
 
     // A point in the drawing (viewBox units) as pixels inside the stage: the drawing is fitted, centred (meet).
     const px = ([x, y]: number[]) => {
@@ -208,12 +306,14 @@ const P = (t, pts) => t.pts(pts);
       return { transform: `translate(${x}px, ${y}px) scale(${1 / S[i - 1]}) translate(${-cx}px, ${-cy}px)`, opacity: 0 };
     };
     const apply = (el: HTMLElement, t: { transform: string; opacity: number }) => { el.getAnimations().forEach((a) => a.cancel()); el.style.transform = t.transform; el.style.opacity = String(t.opacity); };
-    const placeTags = () => root.querySelectorAll<HTMLElement>('[data-hz-tag]').forEach((t) => { const [x, y] = px([+t.dataset.x!, +t.dataset.y!]); t.style.left = `${x}px`; t.style.top = `${y}px`; });
+    // A tag is centred on its point but kept inside the stage (a phone is narrower than the words).
+    const placeTags = () => root.querySelectorAll<HTMLElement>('[data-hz-tag]').forEach((t) => { const [x, y] = px([+t.dataset.x!, +t.dataset.y!]); const half = t.offsetWidth / 2 + 8, W = stage.clientWidth; t.style.left = `${half * 2 < W ? Math.min(W - half, Math.max(half, x)) : x}px`; t.style.top = `${y}px`; });
     const setStrip = (L: number, words?: string) => {
       btns.forEach((b, k) => b.setAttribute('aria-pressed', String(k === L)));
       const b = btns[L]; mark.style.width = `${b.offsetWidth}px`; mark.style.transform = `translateX(${b.offsetLeft}px)`;
       cap.textContent = words ?? layers[L].dataset.cap ?? '';
       stage.classList.toggle('at-end', L === layers.length - 1);
+      key.classList.toggle('is-on', L === 1);
     };
     // The heartbeat: words that change every 10 s, no motion.
     let t0 = 0;
@@ -237,12 +337,42 @@ const P = (t, pts) => t.pts(pts);
       if (L >= 1) startBeat();
       setStrip(L);
     }
-    const stop = () => { auto = false; timers.forEach(clearTimeout); timers = []; };
-    const run2d = () => {
-      if (!auto || motion().reduced) return;
-      const step = dur + hold;
-      [1, 2, 3].forEach((L, k) => timers.push(window.setTimeout(() => { if (auto) go2d(L); }, hold + k * step)));
-    };
+    // The loop's gate: it moves only while the stage is on screen and the tab is shown, and waits otherwise.
+    let inView = false;
+    const waiters: (() => void)[] = [];
+    const visible = () => inView && document.visibilityState === 'visible';
+    const wake = () => { if (visible()) waiters.splice(0).forEach((f) => f()); };
+    const whenVisible = () => (visible() ? Promise.resolve() : new Promise<void>((r) => waiters.push(r)));
+    if ('IntersectionObserver' in window) new IntersectionObserver((es) => { inView = es[es.length - 1].intersectionRatio >= 0.4; wake(); }, { threshold: [0, 0.4] }).observe(stage); else inView = true;
+    document.addEventListener('visibilitychange', wake);
+    const wait = (t: number) => new Promise<void>((r) => setTimeout(r, t));
+    // The visitor takes over: the loop ends (each loop owns one generation, so a newer loop also ends an older one).
+    const stop = () => { auto = false; gen++; };
+    // 2D soft reset: the end frame cross-fades to the first (opacity only, no zoom), and the strip goes home.
+    const reset2d = () => new Promise<void>((res) => {
+      const m = motion(), fromI = cur, from = layers[fromI], zero = layers[0];
+      cur = 0;
+      layers.forEach((el, i) => { if (i !== 0 && i !== fromI) { apply(el, target(i, 0)); el.classList.add('is-off'); } });
+      zero.getAnimations().forEach((a) => a.cancel()); zero.style.transform = 'none'; zero.classList.remove('is-off'); zero.setAttribute('aria-hidden', 'false');
+      zero.animate([{ opacity: 0 }, { opacity: 1 }], { duration: m.morph, easing: m.ease, fill: 'forwards' });
+      from.getAnimations().forEach((a) => a.cancel());
+      const a = from.animate([{ opacity: 1 }, { opacity: 0 }], { duration: m.morph, easing: m.ease, fill: 'forwards' });
+      a.onfinish = () => { apply(from, target(fromI, 0)); from.classList.add('is-off'); from.setAttribute('aria-hidden', 'true'); if (cur === 0) apply(zero, target(0, 0)); res(); };
+      a.oncancel = () => res();
+      setStrip(0);
+    });
+    // 2D: building, floor, space, device, a step each; hold the end frame; cross-fade home; again.
+    async function loop2d() {
+      const my = ++gen, live = () => auto && my === gen;
+      if (motion().reduced) return;
+      for (;;) {
+        await whenVisible(); if (!live()) return;
+        await wait(hold);
+        for (const L of [1, 2, 3]) { await whenVisible(); if (!live()) return; go2d(L); await wait(dur + (L === 3 ? restFor() : hold)); }
+        await whenVisible(); if (!live()) return;
+        await reset2d(); if (!live()) return;
+      }
+    }
 
     layers.forEach((el, i) => apply(el, target(i, 0)));
     placeTags(); setStrip(0);
@@ -251,13 +381,12 @@ const P = (t, pts) => t.pts(pts);
 
     // ---- 3D: the office in three.js, loaded after first paint on a wide screen that draws WebGL.
     const host = root.querySelector<HTMLElement>('[data-hz-3d]')!;
+    const labelsHost = root.querySelector<HTMLElement>('[data-hz-labels]')!;
     const hover = root.querySelector<HTMLElement>('[data-hz-hover]')!, hoverName = root.querySelector<HTMLElement>('[data-hz-hover-name]')!, hoverState = root.querySelector<HTMLElement>('[data-hz-hover-state]')!;
-    const storyTag = root.querySelector<HTMLElement>('[data-hz-story]')!, storyName = root.querySelector<HTMLElement>('[data-hz-story-name]')!, storyState = root.querySelector<HTMLElement>('[data-hz-story-state]')!;
     const wide = stage.clientWidth >= 700;
     const saveData = (navigator as any).connection?.saveData === true;
-    let hero: any = null, hoverAt: (() => number[] | null) | null = null, storyOn = false;
+    let hero: any = null, hoverAt: (() => number[] | null) | null = null;
     const place = (el: HTMLElement, p: number[] | null, dy = -14) => { if (!p) { el.hidden = true; return; } el.hidden = false; el.style.left = `${Math.round(p[0])}px`; el.style.top = `${Math.round(p[1] + dy)}px`; };
-    const words3d = ['3.09 Whooper Swan', 'Fault: video bar offline since 07:52'];
     const use3d = wide && !saveData && hasGL();
 
     // The device level in 3D: the product drawing over the scene, fading in; the scene stays behind it.
@@ -272,11 +401,32 @@ const P = (t, pts) => t.pts(pts);
       el.animate([{ opacity: on ? 0 : 1 }, { opacity: on ? 1 : 0 }], { duration: m.morph, easing: m.ease, fill: 'forwards' }).onfinish = () => { el.style.opacity = on ? '1' : '0'; if (!on) el.classList.add('is-off'); };
     };
     function go3d(L: number) {
-      if (L === 3) { cur = 3; overlay(true); host.classList.add('is-under'); setStrip(3); return; }
-      overlay(false); host.classList.remove('is-under');
+      if (L === 3) { cur = 3; overlay(true); host.classList.add('is-under'); labelsHost.classList.add('is-under'); hero.go(3); setStrip(3); return; }
+      overlay(false); host.classList.remove('is-under'); labelsHost.classList.remove('is-under');
       cur = L; hero.go(L); setStrip(L); startBeat();
     }
     const go = (L: number) => (hero ? go3d(L) : go2d(L));
+    // 3D soft reset: the scene and its words fade out, the scene goes back to its first frame unseen, and fades in.
+    const fade3d = (to: number) => new Promise<void>((res) => {
+      const m = motion(), els = [host, labelsHost]; let n = 0;
+      els.forEach((el) => {
+        el.getAnimations().forEach((a) => a.cancel());
+        const a = el.animate([{ opacity: to ? 0 : 1 }, { opacity: to }], { duration: to ? m.enter : m.exit, easing: to ? m.ease : m.exitEase, fill: 'forwards' });
+        a.onfinish = a.oncancel = () => { if (to) a.cancel(); if (++n === els.length) res(); };
+      });
+    });
+    // 3D: run, hold the end frame, cross-fade home, again. Reduced motion: the end frame once, no loop.
+    async function loop3d(h: any) {
+      const my = ++gen, live = () => auto && my === gen;
+      if (motion().reduced) { h.run(); return; }
+      for (;;) {
+        await whenVisible(); if (!live()) return;
+        const done = await h.run(); if (!done || !live()) return;
+        await wait(restFor()); await whenVisible(); if (!live()) return;
+        await fade3d(0); if (!live()) { fade3d(1); return; }
+        h.reset(); await fade3d(1); if (!live()) return;
+      }
+    }
 
     async function mount3d() {
       const { mountHero } = await import('../../lib/hero3d.mjs');
@@ -289,9 +439,8 @@ const P = (t, pts) => t.pts(pts);
           const m = motion();
           layers.forEach((el, i) => { if (i < 3) { el.setAttribute('aria-hidden', 'true'); if (m.reduced) { el.classList.add('is-off'); } else el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: m.morph, easing: m.ease, fill: 'forwards' }).onfinish = () => el.classList.add('is-off'); } });
           layers[3].classList.add('is-off'); layers[3].style.opacity = '0';
-          stop();
-          const start = () => { if (h.level() === 0 && !storyOn) h.run(); };
-          if ('IntersectionObserver' in window) { const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); start(); } }, { threshold: 0.4 }); io.observe(stage); } else start();
+          // The 2D loop (if it began) gives way to the model's; the visitor may already have taken over.
+          if (auto) loop3d(h); else gen++;
         },
         onLevel(i: number, room?: any) {
           if (over) return;
@@ -299,18 +448,12 @@ const P = (t, pts) => t.pts(pts);
           if (room && room.id !== D.story.room) setStrip(2, `${room.n}: ${room.peek.replace(' · ', ', ').toLowerCase()}.`); else setStrip(i);
           if (i >= 1) startBeat();
         },
-        onBeat() { storyOn = true; startBeat(); },
-        onHover(o: any) { hoverAt = o ? o.at : null; if (o) { hoverName.textContent = o.room.n; hoverState.textContent = o.room.peek; } else hover.hidden = true; h.requestRender(); },
+        onBeat() { startBeat(); },
+        onHover(o: any) { hoverAt = o ? o.at : null; if (o) { hoverName.textContent = o.room.n; hoverState.textContent = `${o.room.t ? `${o.room.t} · ` : ''}${o.room.peek}`; } else hover.hidden = true; h.requestRender(); },
         onPick(_room: any, goThere: () => void) { stop(); overlay(false); goThere(); },
         onTouch() { stop(); },
-        onFrame() {
-          if (hoverAt && (hover.hidden || true)) place(hover, hoverAt());
-          if (!storyOn) return;
-          const dev = h.deviceAt();
-          if (dev) { storyName.textContent = STORY_DEVICE.name; storyState.textContent = STORY_DEVICE.state; place(storyTag, dev, -16); }
-          else { storyName.textContent = words3d[0]; storyState.textContent = words3d[1]; place(storyTag, h.storyAt(), -18); }
-        },
-      });
+        onFrame() { if (hoverAt) place(hover, hoverAt(), -16); },
+      }, { labels: labelsHost });
     }
 
     btns.forEach((b, k) => b.addEventListener('click', () => { stop(); go(k); }));
@@ -325,12 +468,9 @@ const P = (t, pts) => t.pts(pts);
     new MutationObserver(() => hero?.recolour()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-look'] });
 
     if (use3d) {
-      const kick = () => { mount3d().catch(() => { if (!hero) run2dInView(); }); };
+      const kick = () => { mount3d().catch(() => { if (!hero && auto) loop2d(); }); };
       if ('requestIdleCallback' in window) (window as any).requestIdleCallback(kick, { timeout: 1200 }); else setTimeout(kick, 300);
-    } else run2dInView();
-    function run2dInView() {
-      if ('IntersectionObserver' in window) { const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); run2d(); } }, { threshold: 0.4 }); io.observe(stage); } else run2d();
-    }
+    } else loop2d();
   }
   const boot = () => document.querySelectorAll<HTMLElement>('[data-hz]').forEach(init);
   boot();
@@ -339,24 +479,27 @@ const P = (t, pts) => t.pts(pts);
 
 <style>
   .hz {
-    --dur-hero: 760ms; --dur-hero-hold: 700ms; --dur-hero-move: 1800ms; --dur-hero-lift: 1400ms;
-    --hz-bg: #EFE9DF; --hz-light: #FFFDF9; --hz-glow: rgba(226, 122, 58, .16);
-    --hz-slab-top: #E4DCCF; --hz-slab-east: #C8BEAE; --hz-slab-north: #D6CCBC; --hz-corr: #DBD2C3; --hz-core: #CFC5B5; --hz-area: #E0D8CA;
+    --dur-hero: 760ms; --dur-hero-hold: 700ms; --dur-hero-move: 1800ms; --dur-hero-lift: 1400ms; --dur-hero-rest: 3200ms;
+    /* The stage follows the look: its page ground with a little of the floor in it, lit from above, and a soft glow
+       from the lamps (the interior palette's, so Enterprise is cool and Studio warm; never the accent, never health). */
+    --hz-bg: color-mix(in srgb, var(--bg) 86%, var(--in-slab)); --hz-light: var(--surface); --hz-glow: color-mix(in srgb, var(--in-lamp) 30%, transparent);
+    /* The drawn first frame (2D): floors, corridors and desks are the interior palette's (src/lib/interior-palette.mjs);
+       the room tops keep the UI's kind tints, which the key explains. */
+    --hz-slab-top: var(--in-slab); --hz-slab-east: color-mix(in srgb, var(--in-slab) 78%, #000); --hz-slab-north: color-mix(in srgb, var(--in-slab) 89%, #000);
+    --hz-area: var(--in-rug); --hz-corr: var(--in-corr); --hz-core: var(--in-core); --hz-desk: var(--in-oak);
     --hz-top: #FBF9F5; --hz-east: #D3CABB; --hz-north: #E5DED2; --hz-edge: rgba(28, 26, 23, .16); --hz-ground: rgba(40, 30, 15, .32);
-    --hz-k-meeting: #EEF1F6; --hz-k-small: #F2EEF6; --hz-k-shared: #F8EFDF; --hz-wc: #D6DBE2; --hz-desk: #F6F2EA;
+    --hz-k-meeting: #EEF1F6; --hz-k-small: #F2EEF6; --hz-k-shared: #F8EFDF;
     display: grid; gap: 14px; min-width: 0;
   }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .hz {
-    --hz-bg: #15130F; --hz-light: #2B2621; --hz-glow: rgba(238, 138, 78, .12);
-    --hz-slab-top: #2A2621; --hz-slab-east: #121110; --hz-slab-north: #1A1815; --hz-corr: #322E28; --hz-core: #221F1B; --hz-area: #2E2A24;
+    --hz-light: color-mix(in srgb, var(--surface) 70%, var(--in-slab)); --hz-glow: color-mix(in srgb, var(--in-lamp) 14%, transparent);
     --hz-top: #4A453E; --hz-east: #221F1B; --hz-north: #2E2A25; --hz-edge: rgba(255, 235, 210, .09); --hz-ground: rgba(0, 0, 0, .7);
-    --hz-k-meeting: #434850; --hz-k-small: #48434F; --hz-k-shared: #4F4739; --hz-wc: #2C3138; --hz-desk: #5A544B;
+    --hz-k-meeting: #434850; --hz-k-small: #48434F; --hz-k-shared: #4F4739;
   } }
   :root[data-theme="dark"] .hz {
-    --hz-bg: #15130F; --hz-light: #2B2621; --hz-glow: rgba(238, 138, 78, .12);
-    --hz-slab-top: #2A2621; --hz-slab-east: #121110; --hz-slab-north: #1A1815; --hz-corr: #322E28; --hz-core: #221F1B; --hz-area: #2E2A24;
+    --hz-light: color-mix(in srgb, var(--surface) 70%, var(--in-slab)); --hz-glow: color-mix(in srgb, var(--in-lamp) 14%, transparent);
     --hz-top: #4A453E; --hz-east: #221F1B; --hz-north: #2E2A25; --hz-edge: rgba(255, 235, 210, .09); --hz-ground: rgba(0, 0, 0, .7);
-    --hz-k-meeting: #434850; --hz-k-small: #48434F; --hz-k-shared: #4F4739; --hz-wc: #2C3138; --hz-desk: #5A544B;
+    --hz-k-meeting: #434850; --hz-k-small: #48434F; --hz-k-shared: #4F4739;
   }
 
   .hz-stage {
@@ -383,17 +526,20 @@ const P = (t, pts) => t.pts(pts);
   .hz-corr { fill: var(--hz-corr); stroke: none; } .hz-core { fill: var(--hz-core); stroke: none; }
   .hz-room-top { fill: var(--hz-top); } .hz-room-east { fill: var(--hz-east); } .hz-room-north { fill: var(--hz-north); }
   .hz-room-top.hz-k-meeting { fill: var(--hz-k-meeting); } .hz-room-top.hz-k-small { fill: var(--hz-k-small); }
-  .hz-room-top.hz-k-reception, .hz-room-top.hz-k-pantry, .hz-room-top.hz-k-print { fill: var(--hz-k-shared); }
+  .hz-room-top.hz-k-reception, .hz-room-top.hz-k-pantry, .hz-room-top.hz-k-print, .hz-room-top.hz-k-store, .hz-room-top.hz-k-comms { fill: var(--hz-k-shared); }
   .hz-room-top.hz-k-desks { fill: var(--hz-corr); }
   .hz-desk-top { fill: var(--hz-desk); } .hz-desk-east { fill: var(--hz-east); } .hz-desk-north { fill: var(--hz-north); }
   .hz-room-top.is-fault { fill: color-mix(in srgb, var(--h-fault, var(--red)) 22%, var(--hz-top)); }
   .hz-room-east.is-fault { fill: color-mix(in srgb, var(--h-fault, var(--red)) 18%, var(--hz-east)); }
   .hz-room-north.is-fault { fill: color-mix(in srgb, var(--h-fault, var(--red)) 18%, var(--hz-north)); }
-  .hz-ring { color: var(--quiet, var(--text-3)); }
+  .hz-ring { color: var(--h-fine, var(--green)); }
   .hz-ring.is-fault { color: var(--h-fault, var(--red)); }
   .hz-floor-name { font-size: 14px; font-weight: 550; fill: var(--text-3); text-anchor: end; }
-  .hz-no { font-size: 9px; font-weight: 550; fill: var(--text-3); text-anchor: middle; font-variant-numeric: tabular-nums; }
-  .hz-dev-sub { font-size: 15px; fill: var(--text-2); text-anchor: middle; }
+  .hz-no { font-size: 11px; font-weight: 550; fill: var(--text-2); text-anchor: middle; font-variant-numeric: tabular-nums; }
+  .hz-core2 { font-size: 10px; font-weight: 500; fill: var(--text-3); text-anchor: middle; letter-spacing: .02em; }
+  .hz-dev2 text { font-size: 11px; font-weight: 550; fill: var(--text-2); text-anchor: middle; }
+
+  /* Words placed on the drawing: a card for the one thing that matters, quieter labels for the rest. */
   .hz-tag {
     position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); display: grid; gap: 1px; padding: 8px 12px; border-radius: 10px;
     background: var(--surface); border: 1px solid var(--line-strong); box-shadow: var(--shadow-md); white-space: nowrap; pointer-events: none;
@@ -401,12 +547,64 @@ const P = (t, pts) => t.pts(pts);
   }
   .hz-tag b { font-weight: 600; }
   .hz-tag span { color: var(--text-2); }
+  .hz-tag em { font-style: normal; }
   .hz-tag.is-fault b::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--h-fault, var(--red)); margin-right: 7px; vertical-align: -1px; }
-  .hz-hover b::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--quiet, var(--text-3)); margin-right: 7px; vertical-align: -1px; }
+  .hz-hover b::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--h-fine, var(--green)); margin-right: 7px; vertical-align: -1px; }
+  .hz-lab2 { position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); display: grid; gap: 1px; white-space: nowrap; pointer-events: none; text-align: center; font-size: 13px; line-height: 1.3; color: var(--text); z-index: 2; }
+  .hz-lab2 b { font-weight: 600; }
+  .hz-lab2 span { color: var(--text-2); font-size: 12px; }
+  .hz-lab2-site b { font-size: 17px; letter-spacing: -.01em; }
+  .hz-lab2-booking b { font-weight: 550; font-size: 12px; color: var(--text-2); padding: 3px 8px; border-radius: 999px; background: color-mix(in srgb, var(--surface) 82%, transparent); }
+  .hz-facts { position: absolute; left: 0; top: 0; transform: translate(-50%, 0); margin: 0; display: grid; grid-auto-flow: column; gap: 0 28px; white-space: nowrap; pointer-events: none; }
+  .hz-facts div { display: grid; gap: 2px; }
+  .hz-facts dt { font-size: 11px; font-weight: 550; letter-spacing: .04em; text-transform: uppercase; color: var(--text-3); }
+  .hz-facts dd { margin: 0; font-size: 13.5px; color: var(--text); font-variant-numeric: tabular-nums; }
+
+  /* Words over the 3D scene (src/lib/hero-labels.mjs): positioned by transform, faded by opacity, nothing else. */
+  .hz-labels { position: absolute; inset: 0; pointer-events: none; z-index: 2; transition: opacity var(--dur-morph) var(--ease-settle); }
+  .hz-labels.is-under { opacity: 0; }
+  .hz-labels :global(.hz-lab) { position: absolute; left: 0; top: 0; display: grid; gap: 0; white-space: nowrap; text-align: center; font-size: 12px; line-height: 1.3; color: var(--text); opacity: 0; transition: opacity var(--dur-morph) var(--ease-settle); will-change: transform, opacity; }
+  .hz-labels :global(.hz-lab b) { font-weight: 600; }
+  .hz-labels :global(.hz-lab span) { color: var(--text-2); font-size: 11px; }
+  .hz-labels :global(.hz-lab-site) { gap: 2px; }
+  .hz-labels :global(.hz-lab-site b) { font-size: 19px; letter-spacing: -.012em; }
+  .hz-labels :global(.hz-lab-site span) { font-size: 13px; }
+  .hz-labels :global(.hz-lab-floor) { font-size: 12px; font-weight: 550; color: var(--text-2); }
+  .hz-labels :global(.hz-lab-floor b) { font-weight: 550; }
+  .hz-labels :global(.hz-lab-room), .hz-labels :global(.hz-lab-dev) { padding: 4px 8px 5px; border-radius: 8px; background: color-mix(in srgb, var(--surface) 84%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent); }
+  .hz-labels :global(.hz-lab-room.is-fault), .hz-labels :global(.hz-lab-dev.is-fault) { background: var(--surface); box-shadow: var(--shadow-md); padding: 7px 11px; }
+  .hz-labels :global(.hz-lab-room.is-fault b), .hz-labels :global(.hz-lab-dev.is-fault b) { font-size: 13px; }
+  .hz-labels :global(.hz-lab-room.is-fault span), .hz-labels :global(.hz-lab-dev.is-fault span) { color: var(--h-fault-ink, var(--text-2)); }
+  .hz-labels :global(.hz-lab[data-ring] b::before) { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; border: 2px solid var(--h-fine, var(--green)); margin-right: 6px; vertical-align: 0; }
+  .hz-labels :global(.hz-lab[data-ring="fault"] b::before) { border-color: var(--h-fault, var(--red)); width: 8px; height: 8px; }
+  .hz-labels :global(.hz-lab-room.is-small span) { display: none; }
+  .hz-labels :global(.hz-lab-core) { font-size: 10.5px; font-weight: 550; letter-spacing: .03em; color: var(--text-3); }
+  .hz-labels :global(.hz-lab-core b) { font-weight: 550; }
+  .hz-labels :global(.hz-lab-area) { font-size: 10.5px; color: var(--text-3); }
+  .hz-labels :global(.hz-lab-area b) { font-weight: 500; font-style: italic; }
+  .hz-labels :global(.hz-lab-booking) { padding: 3px 9px; border-radius: 999px; background: color-mix(in srgb, var(--surface) 84%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent); }
+  .hz-labels :global(.hz-lab-booking b) { font-weight: 550; color: var(--text-2); }
+  .hz-labels :global(.hz-lab-person) { grid-auto-flow: column; align-items: center; gap: 6px; transform-origin: 50% 100%; }
+  .hz-labels :global(.hz-lab-person b) { font-weight: 550; font-size: 11.5px; }
+  .hz-labels :global(.hz-lab-person span) { font-size: 10.5px; }
+  .hz-labels :global(.hz-lab-person.is-story) { padding: 3px 9px 3px 3px; border-radius: 999px; background: color-mix(in srgb, var(--surface) 88%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent); text-align: left; }
+  .hz-labels :global(.hz-lab-person.is-story > b) { grid-row: 1; }
+  .hz-labels :global(.hz-lab-person.is-story > span) { grid-row: 2; grid-column: 2; }
+  .hz-labels :global(.hz-lab-person.is-story > i) { grid-row: 1 / 3; }
+  .hz-labels :global(.hz-lab-av) { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--surface-3); color: var(--text); font: 600 9.5px/1 var(--font-sans); font-style: normal; letter-spacing: .02em; box-shadow: 0 0 0 2px var(--surface), 0 2px 6px rgba(0, 0, 0, .18); }
+  /* The key: what the tones mean, shown at the floor level. */
+  .hz-key { position: absolute; left: 14px; bottom: 12px; margin: 0; padding: 8px 10px; list-style: none; display: grid; gap: 4px; border-radius: 10px; background: color-mix(in srgb, var(--surface) 84%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent); font-size: 11px; color: var(--text-2); pointer-events: none; opacity: 0; transition: opacity var(--dur-morph) var(--ease-settle); z-index: 2; }
+  .hz-key.is-on { opacity: 1; }
+  .hz-key li { display: flex; align-items: center; gap: 7px; }
+  .hz-key i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12); }
+  .hz-key-meeting { background: var(--in-room-floor); box-shadow: inset 0 0 0 1px var(--in-frame) !important; } .hz-key-small { background: var(--in-room-floor); } .hz-key-shared { background: var(--in-corr); } .hz-key-desks { background: var(--in-oak); }
+  .hz-key-ring { border-radius: 50% !important; box-shadow: none !important; border: 2px solid var(--h-fine, var(--green)); width: 9px !important; height: 9px !important; }
+  .hz-key-ring.is-fault { border-color: var(--h-fault, var(--red)); border-style: dashed; }
+  .hz-3d:not(.is-on) ~ .hz-key { display: none; }
   .hz { gap: 10px; }
   .hz-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px 24px; flex-wrap: wrap; }
   .hz-cap { margin: 0; font-size: 14.5px; line-height: 1.4; color: var(--text-2); min-width: 0; flex: 1 1 320px; }
-  .hz-beat { font: 500 12.5px/1.4 var(--font-mono); color: var(--quiet, var(--text-3)); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .hz-beat { font: 500 12.5px/1.4 var(--font-sans); color: var(--quiet, var(--text-3)); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .hz-levels { position: relative; display: inline-flex; padding: 3px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); flex: none; }
   .hz-levels button { position: relative; z-index: 1; font: 550 13px/1 var(--font-sans); color: var(--text-2); background: none; border: 0; border-radius: 999px; padding: 0 14px; min-height: 34px; cursor: pointer; transition: color var(--dur-hover) var(--ease-settle); }
   .hz-levels button[aria-pressed="true"] { color: var(--text); }
@@ -416,9 +614,15 @@ const P = (t, pts) => t.pts(pts);
   @container fd (max-width: 699px) {
     .hz-stage { height: auto; aspect-ratio: 4 / 3; border-radius: 16px; }
     .hz-tag { font-size: 11px; padding: 5px 8px; }
-    .hz-dev-sub { display: none; }
+    .hz-tag .hz-type { display: none; }
+    .hz-lab2 { font-size: 11.5px; } .hz-lab2 span { font-size: 10.5px; } .hz-lab2-site b { font-size: 14px; }
+    .hz-facts { grid-auto-flow: row; grid-template-columns: 1fr 1fr; gap: 6px 16px; transform: translate(-50%, -10%); }
+    .hz-facts dt { font-size: 9.5px; } .hz-facts dd { font-size: 11.5px; }
+    .hz-facts div:nth-child(5) { display: none; }
+    .hz-dev2 text { font-size: 13px; }
+    .hz-key { display: none; }
     .hz-levels { width: 100%; }
     .hz-levels button { flex: 1; padding: 0 6px; }
   }
-  @media (prefers-reduced-motion: reduce) { .hz-mark, .hz-levels button, .hz-3d { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .hz-mark, .hz-levels button, .hz-3d, .hz-labels, .hz-labels :global(.hz-lab), .hz-key { transition: none; } }
 </style>
