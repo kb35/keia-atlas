@@ -257,6 +257,9 @@ export const vendors = readFolder('vendors');
 export const onCall = readFolder('on-call');
 // Faults resolved before the incidents held in full (data/fault-history/, src/lib/repeats-view.mjs).
 export const faultHistory = readFolder('fault-history');
+// Room accessibility and the cable runs by site, for the space page (src/lib/roomfacts-view.mjs).
+export const accessibility = readFolder('accessibility');
+export const runsBySite = readFolder('runs');
 export const VENDOR_KIND = { integration: 'Integration', service: 'Service and maintenance', manufacturer: 'Manufacturer' };
 
 // The name people use for a device: where it is and what it does ("Curlew video bar", "Reception

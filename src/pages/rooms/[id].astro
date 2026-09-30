@@ -18,6 +18,8 @@ import CommsPower from '../../components/CommsPower.astro';
 import Arrive from '../../components/Arrive.astro';
 import TrendStrip from '../../components/TrendStrip.astro';
 import { spaceRepeats } from '../../lib/repeats-view.mjs';
+import HealthGlyph from '../../components/HealthGlyph.astro';
+import { roomAccess, roomCableTests, roomPlatforms } from '../../lib/roomfacts-view.mjs';
 import RackPatching from '../../components/RackPatching.astro';
 import CommsServes from '../../components/CommsServes.astro';
 import CommsSizing from '../../components/CommsSizing.astro';
@@ -138,6 +140,12 @@ const ANSWER = lead
   : unitCount ? `All ${plural(unitCount, 'unit')} in service · no open incidents` : 'No tracked devices · no open incidents';
 // Repeat faults (the overlooked items, #15): this quarter's faults here, and a strip by month for the last year.
 const REP = spaceRepeats(x.id);
+// Stored but never shown to staff until now: the room's accessibility, its certified meeting platforms, its cable tests.
+const ACC = roomAccess(x), PLAT = roomPlatforms(x), CAB = roomCableTests(x);
+// "data/behind-display#2" to "Behind the display, 2"; an access point's run names its position.
+const outletWord = (o) => { if (!o) return '–'; const [, loc = o, n] = /^(?:[a-z-]+\/)?([a-z-]+)(?:#(\d+))?$/.exec(o) ?? []; return `${LOC_LABEL[loc] ?? loc.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase())}${n ? `, ${n}` : ''}`; };
+const cableWord = (t) => (/^cat/.test(t) ? `Cat${t.slice(3).toUpperCase()}` : /^fibre-/.test(t) ? `${t.slice(6).toUpperCase()} fibre` : t);
+const SUPPORT_WORD = { yes: 'Certified', 'not-confirmed': 'Not confirmed', 'via-partner': 'Through a partner', no: 'Not supported' };
 const kiTitles = JSON.stringify(Object.fromEntries(knownIssues.map((i) => [i.id, i.title])));
 const deskWord =kind === 'kits' ? 'kit' : 'desk';
 ---
@@ -328,6 +336,69 @@ const deskWord =kind === 'kits' ? 'kit' : 'desk';
       </div>
     </div>
 
+    {(PLAT || ACC) && (
+      <div class="g12 rf-row">
+        {PLAT && (
+          <section class:list={['card side-card rf-card', ACC ? 's-5' : 's-12']} id="platforms" aria-labelledby="h-plat" data-feature="certified-platforms" data-arrive>
+            <h3 id="h-plat" data-help="room.platforms">Meeting platforms</h3>
+            <p class="rf-a">{PLAT.answer}</p>
+            <ul class="rf-plat">
+              {PLAT.rows.map((m) => (
+                <li>
+                  <a href={href(`/models/${m.id}/`)}><b>{m.name}</b></a><small>{m.role}</small>
+                  <span class="rf-chips">
+                    {m.yes.map((n) => <span class="pill manage">{n}</span>)}
+                    {m.other.map((pl) => <span class="pill plain" title={pl.note ?? undefined}>{pl.name}: {SUPPORT_WORD[pl.support] ?? pl.support}</span>)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        {ACC && (
+          <section class:list={['card side-card rf-card', PLAT ? 's-7' : 's-12']} id="accessibility" aria-labelledby="h-acc" data-feature="room-accessibility" data-arrive>
+            <h3 id="h-acc" data-help="room.accessibility">Accessibility</h3>
+            <p class:list={['rf-a', { 'is-review': ACC.due?.overdue }]}>{ACC.answer}</p>
+            <dl class="rf-acc">
+              {ACC.rows.map((r) => (
+                <div>
+                  <dt>{r.state ? <HealthGlyph state={r.state} size={12} title={r.label} /> : <span class="rf-g" aria-hidden="true"></span>}{r.label}</dt>
+                  <dd>{r.value}{r.sub && <small>{r.sub}</small>}{r.note && <small>{r.note}</small>}</dd>
+                </div>
+              ))}
+            </dl>
+            <p class="rf-foot faint">From the office's accessibility record (demo), the same one the room guide reads to people in the room.</p>
+          </section>
+        )}
+      </div>
+    )}
+
+    {CAB && (
+      <Section title="Cable tests" id="cable-tests" help="room.cable-tests" data-feature="cable-tests" data-arrive showAll={8}>
+        <span slot="aside"><Restricted view="rack" /></span>
+        <p class:list={['rf-a rf-cab-a', { 'is-bad': CAB.failed }]}>{CAB.answer}{CAB.last ? <span class="faint"> · last tested {CAB.last}</span> : ''}</p>
+        <div class="tablewrap">
+          <table class="to-cards rf-cab">
+            <thead><tr><th scope="col">Link</th><th scope="col">Outlet</th><th scope="col">Cable</th><th scope="col" class="num">Length</th><th scope="col">Result</th><th scope="col" class="num">Margin</th><th scope="col">Tested</th></tr></thead>
+            <tbody data-items>
+              {CAB.rows.map((r) => (
+                <tr>
+                  <td data-label="Link" class="mono">{r.id}</td>
+                  <td data-label="Outlet">{outletWord(r.outlet)}</td>
+                  <td data-label="Cable">{cableWord(r.type)}</td>
+                  <td data-label="Length" class="num">{r.length != null ? `${r.length} m` : '–'}</td>
+                  <td data-label="Result">{r.result ? <span class:list={['pill', r.result === 'pass' ? 'manage' : 'bad']}>{r.result === 'pass' ? 'Pass' : 'Fail'}</span> : <span class="faint">Not tested</span>}</td>
+                  <td data-label="Margin" class="num">{r.margin != null ? <span class:list={{ 'rf-thin': r.thin }}>{r.margin.toFixed(2)} dB</span> : r.loss != null ? `${r.loss} dB loss` : '–'}</td>
+                  <td data-label="Tested">{r.date ?? '–'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p class="rf-foot faint">From the cabling contractor's certification report, recorded on each run (made up for the demo). A margin under 3 dB passes but is worth a look.</p>
+      </Section>
+    )}
+
     {GUIDE_KINDS.includes(kind) && (
       <Section title="Room guide and QR" id="room-guide" help="room.guide" aside="What people in the space see">
         <div class="rg" data-guide-host="room" data-room={x.id} data-base={base}>
@@ -437,5 +508,29 @@ const deskWord =kind === 'kits' ? 'kit' : 'desk';
   .rg-none { margin: 0; font-size: var(--fs-body); }
   @container content (max-width: 839px) { .rg { grid-template-columns: minmax(0, 1fr); } }
   @container content (max-width: 459px) { .rg-qr { grid-template-columns: minmax(0, 1fr); justify-items: start; } }
+  /* Platforms, accessibility and cable tests: the answer first in each. */
+  .rf-row { margin-top: var(--gutter); }
+  .rf-card { gap: 10px; }
+  .rf-a { margin: 0; font: var(--fw-title) var(--fs-h3)/1.3 var(--font-display); color: var(--text); }
+  .rf-a.is-review { color: var(--amber-ink); } .rf-a.is-bad { color: var(--red-ink); }
+  .rf-cab-a { margin-bottom: 10px; }
+  .rf-plat { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .rf-plat li { display: grid; gap: 2px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .rf-plat li:first-child { padding-top: 0; border-top: 0; }
+  .rf-plat small { font-size: var(--fs-code); color: var(--text-2); }
+  .rf-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .rf-chips .pill { font-size: var(--fs-mark); padding: 3px 8px; }
+  .rf-acc { margin: 0; display: grid; }
+  .rf-acc div { display: grid; grid-template-columns: minmax(150px, 34%) minmax(0, 1fr); gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); font-size: var(--fs-body); }
+  .rf-acc div:first-child { border-top: 0; }
+  .rf-acc dt { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: var(--fs-support); }
+  .rf-acc dd { margin: 0; min-width: 0; }
+  .rf-acc small { display: block; font-size: var(--fs-code); color: var(--text-2); }
+  .rf-g { width: 12px; }
+  .rf-foot { margin: 0; font-size: var(--fs-code); }
+  .rf-cab { width: 100%; font-size: var(--fs-support); }
+  .rf-cab + .rf-foot, .tablewrap + .rf-foot { margin-top: 8px; }
+  .rf-thin { color: var(--amber-ink); font-weight: var(--fw-name); }
+  @container content (max-width: 559px) { .rf-acc div { grid-template-columns: minmax(0, 1fr); gap: 2px; } }
   .clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 </style>

@@ -15,6 +15,9 @@ import { ordinal, quarterStart, lastMonths, repeatsOf, mostRepeats } from '../sr
 import { FEATURES_ADDED } from '../src/lib/features-added.mjs';
 import { rotaAt, lineFor, outOfHours, localAt, utcOf, whenWords } from '../src/lib/oncall.mjs';
 import { PEOPLE } from '../src/lib/demo.mjs';
+import { accessForStaff, cableTestsOf, platformsOf } from '../src/lib/roomfacts.mjs';
+import { accessOf } from '../src/lib/guide.mjs';
+import { trendStrip } from '../src/lib/strip.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const walk = (d) => readdirSync(d).flatMap((n) => { const p = path.join(d, n); return statSync(p).isDirectory() ? walk(p) : n.endsWith('.yaml') ? [p] : []; });
@@ -229,4 +232,54 @@ test('the fault history agrees with the incidents: Whooper Swan in Dublin is on 
     assert.ok(h.demo, `${h.id} is marked demo`);
     for (const x of h.faults) assert.ok(x.opened < `${TODAY}T23:59` && x.resolved > x.opened, x.number);
   }
+});
+
+// ---- The space page: accessibility, cable tests and platforms ---------------------------------------------------
+
+test('a room\'s accessibility for staff: the answer first, and the yearly loop test when it is due', () => {
+  const site = { checked_by: 'Facilities', every_room: { captions: true, step_free: { value: true }, checked: '2026-06-18' }, rooms: { r1: { hearing_loop: { standard: 'IEC 60118-4', tested: '2025-08-01', result: 'meets' } }, r2: { hearing_loop: { standard: 'IEC 60118-4', tested: '2026-07-12', result: 'meets' } } } };
+  const r1 = accessForStaff(accessOf(site, 'r1'), TODAY), r2 = accessForStaff(accessOf(site, 'r2'), TODAY);
+  assert.equal(r2.answer, 'A hearing loop, live captions and step-free access');
+  assert.equal(r2.due.text, 'Next loop test due Jul 2027');
+  assert.match(r1.answer, /loop test overdue since Aug 2026$/);
+  assert.equal(accessForStaff(accessOf(site, 'r3'), TODAY).rows[0].value, 'None in this room');
+  assert.equal(accessForStaff(null, TODAY), null, 'no record, no block');
+});
+
+test('cable tests: passed or failed first, with the closest margin', () => {
+  const run = (id, result, margin) => ({ id, type: 'cat6a', to: { space: 's', outlet: 'data/behind-display#1' }, test: { result, date: '2022-01-24', length_m: 30, margin_db: margin } });
+  assert.equal(cableTestsOf([run('a', 'pass', 6.1), run('b', 'pass', 2.4)]).answer, 'All 2 links passed certification · closest margin 2.4 dB');
+  assert.equal(cableTestsOf([run('a', 'pass', 6.1), run('b', 'fail', 0)]).answer, '1 of 2 links failed certification');
+  assert.equal(cableTestsOf([run('a', 'pass', 2.4)]).rows[0].thin, true);
+  assert.equal(cableTestsOf([]), null);
+});
+
+test('platforms: the room\'s call system first, from the model choices', () => {
+  const p = platformsOf([
+    { id: 'tc', name: 'Poly TC10', role: 'Touch controller', platforms: [{ name: 'Google Meet', support: 'yes' }] },
+    { id: 'vb', name: 'Poly Studio X52', role: 'Video bar', platforms: [{ name: 'Microsoft Teams Rooms', support: 'yes' }, { name: 'Google Meet', support: 'yes' }, { name: 'Zoom Rooms', support: 'not-confirmed' }] },
+  ]);
+  assert.equal(p.answer, 'The video bar is certified for Google Meet and Microsoft Teams Rooms');
+  assert.equal(p.rows.find((r) => r.id === 'vb').other.length, 1);
+  assert.equal(platformsOf([{ id: 'x', name: 'X', role: 'Display', platforms: [] }]), null);
+});
+
+test('the trend strip is drawn at its own size, one stroke a period, and says its numbers', () => {
+  const html = trendStrip({ bars: [{ label: 'Aug', n: 0 }, { label: 'Sep', n: 2 }], label: 'Faults', step: 10, height: 20, mark: 1 });
+  assert.match(html, /width="20" height="20"/);
+  assert.equal((html.match(/class="ts-bar km-draw/g) ?? []).length, 1, 'an empty month draws no bar');
+  assert.match(html, /aria-label="Faults: Aug 0, Sep 2"/);
+  assert.match(html, /data-draw/);
+});
+
+// ---- Every new block can be switched off -------------------------------------------------------------------------
+
+test('every capability in the list is carried by a block on some page (data-feature)', () => {
+  const ids = new Set(FEATURES_ADDED.map((f) => f.id));
+  const files = [];
+  const walkSrc = (d) => readdirSync(d).forEach((n) => { const p = path.join(d, n); if (statSync(p).isDirectory()) walkSrc(p); else if (/\.(astro|mjs|js)$/.test(n)) files.push(p); });
+  walkSrc(path.join(ROOT, 'src'));
+  const used = new Set();
+  for (const f of files) for (const m of readFileSync(f, 'utf8').matchAll(/data-feature=\\?["']([a-z-]+)\\?["']/g)) used.add(m[1]);
+  for (const id of ids) assert.ok(used.has(id), `${id} is listed but no page carries data-feature="${id}"`);
 });
