@@ -11,6 +11,7 @@ import { existsSync } from 'node:fs';
 import { PEOPLE } from '../src/lib/demo.mjs';
 import { crossCheckStock } from './crossrefs-stock.mjs';
 import { crossCheckIncidents } from './crossrefs-incidents.mjs';
+import { crossCheckRules } from './crossrefs-rules.mjs';
 import { crossCheckKnownIssues } from './crossrefs-knownissues.mjs';
 import { crossCheckFloors } from './crossrefs-floors.mjs';
 import { crossCheckPrivacy } from './crossrefs-privacy.mjs';
@@ -476,6 +477,8 @@ export function crossCheck(records, root) {
   const taskIds = new Set(inFolder('projects').flatMap((r) => r.data.tasks.map((t) => t.id)));
   // Incidents: subject, lifecycle, people and linked work (their own file, tools/crossrefs-incidents.mjs).
   problems.push(...crossCheckIncidents(records, { people, taskIds }));
+  // Standing rules and the incidents that name them (tools/crossrefs-rules.mjs).
+  problems.push(...crossCheckRules(records, { people }));
   // Known issues and maker cases (their own file, tools/crossrefs-knownissues.mjs, decision 0029).
   problems.push(...crossCheckKnownIssues(records, { people }));
   for (const rec of inFolder('plan')) {

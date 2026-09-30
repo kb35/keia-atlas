@@ -1,0 +1,77 @@
+---
+/* RunStrip: a standing rule's runs as a strip of small squares, one per run, oldest on the left (UX-V2 §4.5; UI-V2
+   §8.7, the squares variant of small multiples). Done is a calm filled square; unable to complete is a notched square
+   in the fault colour; put back by a person is an outlined square. No percentage and no score: the words under the
+   strip count what happened. The strip is a picture (one label for screen readers); the runs list beside it is
+   where each run is opened, so no square is a tap target of its own.
+   Props:  rule   the rule's id (so runs made in the demo join the strip in every window)
+           runs   the runs, oldest first (rules-view.mjs allRuns)
+           to     'log' (default) or 'page' (#run-<id> on this page)
+           size   'small' (the list's cards) or 'large' (the rule's own page)
+   Motion: a run made while you watch joins at the right end, growing from its centre once (--dur-enter). */
+import { RESULT, at } from '../lib/rules.mjs';
+import { DEMO_TODAY } from '../lib/data.mjs';
+interface Props { rule: string; runs: any[]; to?: 'log' | 'page'; size?: 'small' | 'large'; words?: string }
+const { rule, runs, to = 'log', size = 'small', words } = Astro.props;
+const label = (r: any) => `${at(r.at, DEMO_TODAY)}: ${RESULT[r.result]?.word ?? r.result}${r.target && !r.quiet ? `, ${r.target}` : ''}`;
+---
+<div class:list={['rs-strip', `rs-${size}`]} data-run-strip={rule} data-run-to={to} data-help="rule.strip">
+  <ol class="rs-sq" role="img" aria-label={`Runs, oldest first: ${words ?? ''}`}>
+    {runs.map((r) => (
+      <li><span class={`sq sq-${RESULT[r.result]?.square ?? 'done'}`} title={label(r)} data-run-id={r.id}></span></li>
+    ))}
+  </ol>
+  {words && <p class="rs-w" data-run-words>{words}</p>}
+</div>
+
+<script>
+  import { runsOf, ruleOf } from '../lib/rules-client.mjs';
+  import { RESULT, stripWords } from '../lib/rules.mjs';
+  const W = window as any, D = document;
+  function sync(strip: HTMLElement, grow = false) {
+    const id = strip.dataset.runStrip!; if (!ruleOf(id)) return;
+    const list = strip.querySelector('.rs-sq')!;
+    const have = new Set([...list.querySelectorAll<HTMLElement>('[data-run-id]')].map((a) => a.dataset.runId));
+    const runs = runsOf(id);
+    for (const r of runs) {
+      const a = list.querySelector<HTMLElement>(`[data-run-id="${CSS.escape(r.id)}"]`);
+      const sq = RESULT[r.result]?.square ?? 'done';
+      if (a) { a.className = `sq sq-${sq}`; continue; }
+      if (have.has(r.id)) continue;
+      const li = D.createElement('li');
+      li.innerHTML = `<span class="sq sq-${sq}" data-run-id="${r.id}" title="Just now: ${RESULT[r.result]?.word ?? r.result}"></span>`;
+      list.appendChild(li);
+      const m = W.rsMotion ? W.rsMotion() : { reduced: true };
+      if (grow && !m.reduced) li.firstElementChild!.animate([{ transform: 'scale(0)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: m.enter, easing: m.ease });
+    }
+    const w = strip.querySelector<HTMLElement>('[data-run-words]');
+    if (w) { const all = [...list.querySelectorAll<HTMLElement>('[data-run-id]')].map((a) => ({ result: [...a.classList].includes('sq-notch') ? 'unable' : [...a.classList].includes('sq-back') ? 'rolled-back' : 'done' })); w.textContent = stripWords(all as any); }
+  }
+  function init() {
+    const strips = [...D.querySelectorAll<HTMLElement>('[data-run-strip]')]; if (!strips.length) return;
+    const go = () => {
+      strips.forEach((s) => sync(s));
+      const L = W.rsLive?.live; if (!L) return;
+      const stops = [...new Set(strips.map((s) => s.dataset.runStrip))].map((id) => L.subscribe(`rule:${id}`, () => strips.filter((s) => s.dataset.runStrip === id).forEach((s) => sync(s, true))));
+      D.addEventListener('astro:before-swap', () => stops.forEach((s: any) => s()), { once: true });
+    };
+    if (W.rsLive) go(); else { strips.forEach((s) => sync(s)); D.addEventListener('rs:live-ready', go, { once: true }); }
+  }
+  D.addEventListener('astro:page-load', init);
+</script>
+
+<style is:global>
+  .rs-strip { display: grid; gap: 6px; min-width: 0; }
+  .rs-sq { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 3px; }
+  .rs-sq li { display: block; }
+  .sq { --s: 10px; display: block; width: var(--s); height: var(--s); border-radius: 2px; background: color-mix(in srgb, var(--h-fine) 55%, var(--surface)); transition: transform var(--dur-hover) var(--ease-settle), background-color var(--dur-state) var(--ease-settle); }
+  .rs-large .sq { --s: 16px; border-radius: 3px; }
+  .rs-large .rs-sq { gap: 4px; }
+  /* Unable to complete: the fault colour with a notch cut from the top right corner (shape, not only colour). */
+  .sq-notch { background: var(--h-fault); clip-path: polygon(0 0, 55% 0, 100% 45%, 100% 100%, 0 100%); }
+  /* Put back by a person: an outline. */
+  .sq-back { background: transparent; box-shadow: inset 0 0 0 1.5px var(--h-review); }
+  .sq-skip { background: transparent; box-shadow: inset 0 0 0 1px var(--line-strong); }
+  .rs-w { margin: 0; font-size: var(--fs-support); color: var(--text-2); }
+  @media (pointer: coarse) { .sq { --s: 14px; } .rs-large .sq { --s: 18px; } .rs-sq { gap: 5px; } }
+</style>

@@ -1,0 +1,134 @@
+---
+/* HowCard: "How was this done?" (UX-V2 §6, UI-V2 §8.11, MOTION-V2 4.20). The words are the control: pressing them grows
+   one card from where they are, and closing shrinks it back to them. The card is a Peek that stays (it has buttons),
+   520 px wide, full width on a phone, with its rows in one fixed order and no percentage anywhere.
+   Props:  run     a standing rule's run id (RUN-5120); the card is built from data/standing-rules (rules-view.mjs)
+           card    a card already built (howCard() in src/lib/rules.mjs), instead of `run`
+           label   the words (default "How was this done?")
+           job     the job's owner, so Run again shows for them as well as the rule's owner
+   The page is built for everyone; in the browser src/lib/rules-client.mjs redraws the card for the viewer (Run again
+   only for the rule's owner or the job's owner) and for runs made in the demo. Actions raise "rs:how-act" on the
+   document ({ kind: 'rollback' | 'undo' | 'again', run, rule }); the page decides what they do.
+   Include <HowCard /> with no props once on a page that only draws triggers from a script, for the card's styles. */
+import { cardFor, LOG_PATH, href } from '../lib/rules-view.mjs';
+import { howTrigger } from '../lib/howcard.mjs';
+interface Props { run?: string; card?: any; label?: string; job?: string | null; class?: string }
+const { run, card: given, label, job = null, class: cls = '' } = Astro.props;
+const card = given ?? (run ? cardFor(run, { jobOwner: job }) : null);
+const html = card ? howTrigger(card, { log: href(LOG_PATH), label, cls }) : '';
+---
+{html && <Fragment set:html={html} />}
+
+<script>
+  // One card for the page, on <body>, so no grid clips it. Delegated, so triggers drawn later (a new run) work too.
+  const W = window as any, D = document;
+  function motion() { return W.rsMotion ? W.rsMotion() : { reduced: true, pop: 0, exit: 0, ease: 'ease' }; }
+  const ps = () => `scale(${parseFloat(getComputedStyle(D.documentElement).getPropertyValue('--pop-scale')) || 0.94})`;
+  function card(): HTMLElement {
+    let el = D.querySelector<HTMLElement>('body > .how-card');
+    if (!el) {
+      el = D.createElement('div');
+      el.className = 'how-card';
+      el.setAttribute('role', 'dialog');
+      el.setAttribute('aria-modal', 'false');
+      el.setAttribute('aria-labelledby', 'how-card-t');
+      el.tabIndex = -1;
+      el.hidden = true;
+      el.innerHTML = '<div class="how-in" data-how-in></div><button type="button" class="how-x" data-how-x aria-label="Close">Close <span aria-hidden="true">×</span></button>';
+      D.body.appendChild(el);
+    }
+    return el;
+  }
+  let from: HTMLElement | null = null;
+  function place(el: HTMLElement, t: HTMLElement) {
+    const r = t.getBoundingClientRect(), vw = D.documentElement.clientWidth, m = vw < 600 ? 16 : 12;
+    const w = Math.min(520, vw - m * 2);
+    el.style.width = `${w}px`;
+    const x = vw < 600 ? m : Math.min(Math.max(m, r.left), vw - w - m);
+    el.style.left = `${x + scrollX}px`;
+    el.style.top = `${r.bottom + 8 + scrollY}px`;
+    el.style.transformOrigin = `${Math.round(Math.min(Math.max(8, r.left + Math.min(r.width, 140) / 2 - x), w - 8))}px -8px`;
+  }
+  function body(t: HTMLElement) {
+    const id = t.dataset.how || '';
+    if (W.rsHowBody) { const h = W.rsHowBody(id, t); if (h) return h; }
+    return t.querySelector('template[data-how-body]')?.innerHTML ?? '';
+  }
+  function open(t: HTMLElement) {
+    const el = card(), M = motion();
+    if (from === t && !el.hidden) { close(); return; }
+    if (from && from !== t) from.setAttribute('aria-expanded', 'false');
+    el.querySelector('[data-how-in]')!.innerHTML = body(t);
+    const h = el.querySelector('.how-t'); if (h) h.id = 'how-card-t';
+    el.hidden = false; el.classList.remove('out');
+    place(el, t);
+    from = t; t.setAttribute('aria-expanded', 'true');
+    el.getAnimations().forEach((a) => a.cancel());
+    if (!M.reduced && el.animate) el.animate([{ opacity: 0, transform: ps() }, { opacity: 1, transform: 'none' }], { duration: M.pop, easing: M.ease });
+    el.focus({ preventScroll: true });
+  }
+  function close(back = true) {
+    const el = D.querySelector<HTMLElement>('body > .how-card'), M = motion();
+    if (!el || el.hidden) return;
+    const t = from; from = null;
+    if (t) t.setAttribute('aria-expanded', 'false');
+    const done = () => { el.hidden = true; el.classList.remove('out'); };
+    if (M.reduced || !el.animate) done();
+    else { el.classList.add('out'); el.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: ps() }], { duration: M.exit, easing: M.exitEase || 'ease-in', fill: 'forwards' }).onfinish = (e: any) => { done(); e?.target?.cancel?.(); }; }
+    if (back && t && t.isConnected) t.focus({ preventScroll: true });
+  }
+  W.rsHowClose = close;
+  W.rsHowRefresh = () => { if (from && from.isConnected) { const el = card(); el.querySelector('[data-how-in]')!.innerHTML = body(from); } };
+  if (!W.__rsHowBound) {
+    W.__rsHowBound = true;
+    D.addEventListener('click', (e) => {
+      const tg = e.target as HTMLElement;
+      const t = tg.closest<HTMLElement>('[data-how]');
+      if (t && !tg.closest('.how-card')) { e.preventDefault(); open(t); return; }
+      const act = tg.closest<HTMLElement>('[data-how-act]');
+      if (act) {
+        const detail = { kind: act.dataset.howAct, run: act.dataset.howRun, rule: act.dataset.howRule, trigger: from };
+        if (detail.kind === 'again') close(false);
+        D.dispatchEvent(new CustomEvent('rs:how-act', { detail }));
+        return;
+      }
+      if (tg.closest('[data-how-x]')) { close(); return; }
+      if (!tg.closest('.how-card')) close(false);
+    });
+    D.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    D.addEventListener('astro:before-swap', () => close(false));
+  }
+</script>
+
+<style is:global>
+  /* The words that open the card: a link in the sentence, never a button that looks like one. */
+  .how-link { appearance: none; border: 0; background: none; padding: 0; margin: 0; font: inherit; color: var(--accent-ink, var(--accent)); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; cursor: pointer; white-space: nowrap; border-radius: 3px; }
+  .how-link:hover { text-decoration-thickness: 2px; }
+  .how-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .how-link[aria-expanded="true"] { text-decoration-style: solid; color: var(--text); }
+  .how-link template { display: none; }
+
+  .how-card { position: absolute; z-index: 90; box-sizing: border-box; padding: 18px 20px 16px; border-radius: var(--radius-lg); background: var(--surface); color: var(--text); border: var(--border-card); box-shadow: var(--shadow-lg); outline: none; }
+  .how-card[hidden] { display: none; }
+  .how-card.out { pointer-events: none; }
+  .how-x { position: absolute; top: 12px; right: 12px; appearance: none; border: 0; background: none; padding: 6px 8px; min-height: 32px; border-radius: var(--btn-radius, 6px); font: var(--fw-name) var(--fs-support)/1 var(--font-sans); color: var(--text-2); cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+  .how-x:hover { background: var(--surface-2); color: var(--text); }
+  .how-x span { font-size: 16px; line-height: 1; }
+  .how-h { padding-right: 76px; margin-bottom: 12px; }
+  .how-t { margin: 0; font: var(--fw-title) var(--fs-h3)/1.3 var(--font-sans); }
+  .how-m { margin: 3px 0 0; font: 500 var(--fs-code)/1.4 var(--font-mono); color: var(--text-2); }
+  .how-dl { margin: 0; display: grid; }
+  .how-r { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 12px; padding: 8px 0; border-top: var(--border-rule, 1px solid var(--line)); }
+  .how-r dt { font-size: var(--fs-support); color: var(--text-2); }
+  .how-r dd { margin: 0; font-size: var(--fs-body); line-height: 1.45; overflow-wrap: anywhere; }
+  .how-ai { margin: 8px 0 0; padding: 8px 10px; border-radius: var(--radius); border: 1px dashed var(--line-strong); font-size: var(--fs-support); color: var(--text-2); }
+  .how-f { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 14px; padding-top: 12px; border-top: var(--border-rule, 1px solid var(--line)); }
+  .how-f .btn { min-height: 36px; }
+  .how-who { font-size: var(--fs-support); color: var(--text-2); }
+  .how-log { margin-left: auto; font-size: var(--fs-support); }
+  @media (max-width: 599px) {
+    .how-r { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    .how-log { margin-left: 0; }
+    .how-f .btn { min-height: 44px; }
+  }
+</style>

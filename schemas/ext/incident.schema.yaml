@@ -34,6 +34,33 @@ properties:
       reason: { type: string, minLength: 1, description: "Why, in plain words: what the proposal could not know." }
       by: { type: string, description: A person in the demo team (src/lib/demo.mjs). }
       at: { $ref: "#/$defs/when" }
+  priority_reason: { type: string, description: "Why the priority was proposed, in a few words: \"booked in 68 min\", \"no booking affected\". The band shows it beside the priority." }
+  booking:
+    description: The booking the fault puts at risk, captured from room booking. Attendees are counted, never named.
+    type: object
+    additionalProperties: false
+    required: [at, people]
+    properties:
+      at: { $ref: "#/$defs/when" }
+      people: { type: integer, minimum: 1 }
+  major:
+    description: A major incident runs the urgency rule and names one commander (Keia Method 2.5, SYNTHESIS 2.12).
+    type: object
+    additionalProperties: false
+    required: [at, commander, reason]
+    properties:
+      at: { $ref: "#/$defs/when" }
+      commander: { type: string, description: The one person in charge until it is over (src/lib/demo.mjs). }
+      reason: { type: string }
+  raised_by:
+    description: A standing rule raised this incident because a run was unable to complete (data/standing-rules).
+    type: object
+    additionalProperties: false
+    required: [rule, run]
+    properties:
+      rule: { type: string }
+      run: { type: string, pattern: "^RUN-[0-9]+$" }
+      change: { type: string, pattern: "^CHG-[0-9]+$" }
   state: { enum: [new, in-progress, on-hold, resolved], description: The ticket's state now. Must equal the last state in history. }
   assignment_group: { type: string }
   subject:
@@ -70,6 +97,8 @@ properties:
             code: { enum: [fixed, workaround, no-fault-found, duplicate, cancelled] }
             notes: { type: string, minLength: 1 }
         note: { type: string, description: "The comment or work note, in plain words." }
+        rule: { type: string, description: "The standing rule that made this entry (data/standing-rules), when it was done automatically." }
+        run: { type: string, pattern: "^RUN-[0-9]+$", description: "The rule's run, so the entry opens its How was this done? card." }
   demo: { const: true }
   keia_atlas:
     type: object
@@ -94,3 +123,48 @@ properties:
       assigned: { type: string }
       work_note: { description: "Stage 4: the note Keia Atlas would write back to the ticket.", type: string }
       captured_fix: { type: string }
+      held_at: { $ref: "#/$defs/when", description: "The demo holds this incident at this moment, so its flow can be played from the start. The page says so." }
+      facts:
+        description: The unit's facts beside the picture, each one line (last seen, the switch port, the last change).
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [label, value]
+          properties:
+            label: { type: string }
+            value: { type: string }
+            level: { enum: [ok, warn, bad] }
+            to: { type: string, description: A link inside the site. }
+      diagnosis:
+        description: >
+          The suggestion for a P1 or P2, folded until the person has recorded what they think it is (cognitive
+          forcing, SYNTHESIS 2.3). Evidence strength is a count of signals, never a percentage.
+        type: object
+        additionalProperties: false
+        required: [suggests, signals]
+        properties:
+          suggests: { type: string, description: "The cause the signals point to: \"a PoE fault\"." }
+          signals:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              additionalProperties: false
+              required: [says, fits]
+              properties:
+                says: { type: string }
+                fits: { enum: [agrees, differs, not-checked], description: "Whether the signal agrees with the suggestion, differs from it, or was not checked." }
+          unlike: { type: string, description: A known error it looks like and why it is not that one. }
+          ai: { type: string, description: "When AI drafted the words: says so, with the model and region." }
+      actions:
+        description: The standing rules the Do section offers for this record; each shows the verb its rule declares.
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [rule, target]
+          properties:
+            rule: { type: string }
+            target: { type: string, description: "What it acts on, in the verb's words: \"GE1/0/12\"." }
+            again: { type: string, pattern: "^RUN-[0-9]+$", description: The run this would run again. }

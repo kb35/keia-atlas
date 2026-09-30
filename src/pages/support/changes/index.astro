@@ -1,0 +1,84 @@
+---
+// Changes (Support › Changes; ITIL change enablement in the method's words): every planned alteration to something in
+// service. Standard changes are the runs of standing rules (each one a change a named owner approved once) and the
+// approvals of the rules themselves; normal changes are planned and approved each time. List archetype.
+// Proposals to change what Keia Atlas knows are a different thing, under Knowledge (/changes/).
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import FilterBar from '../../../components/FilterBar.astro';
+import EmptyState from '../../../components/EmptyState.astro';
+import HealthGlyph from '../../../components/HealthGlyph.astro';
+import WithChip from '../../../components/WithChip.astro';
+import HowCard from '../../../components/HowCard.astro';
+import RulesData from '../../../components/RulesData.astro';
+import { CHANGES, CHANGE_STATUS, CHANGE_KIND, changePath, personName, RULES } from '../../../lib/rules-view.mjs';
+import { at } from '../../../lib/rules.mjs';
+import { href, DEMO_TODAY } from '../../../lib/data.mjs';
+
+const GLYPH = { auto: 'fine', 'unable-back': 'fault', unable: 'fault', approved: 'fine', done: 'fine', 'rolled-back': 'review', undone: 'review' };
+const month = CHANGES.filter((c) => c.at.slice(0, 7) === DEMO_TODAY.slice(0, 7));
+const unable = CHANGES.filter((c) => c.status.startsWith('unable'));
+const ANSWER = unable.length ? `${unable.length} unable to complete, rolled back · nothing left half done · ${month.length} changes this month` : `${month.length} changes this month, every one read back`;
+const NUMBERS = [
+  { n: CHANGES.filter((c) => c.run).length, label: 'Run by a standing rule', to: '?kind=standard' },
+  { n: CHANGES.filter((c) => c.kind === 'normal').length, label: 'Normal', to: '?kind=normal' },
+  { n: unable.length, label: 'Unable to complete', to: '?status=unable-back', tone: unable.length ? 'bad' : undefined },
+  { n: CHANGES.filter((c) => c.status === 'approved').length, label: 'Rules approved', to: '?status=approved' },
+];
+const FACETS = [
+  { key: 'kind', label: 'Kind', options: Object.entries(CHANGE_KIND).filter(([k]) => CHANGES.some((c) => c.kind === k)).map(([value, label]) => ({ value, label })) },
+  { key: 'status', label: 'Status', options: Object.entries(CHANGE_STATUS).filter(([k]) => CHANGES.some((c) => c.status === k)).map(([value, label]) => ({ value, label })) },
+  { key: 'owner', label: 'Owner', options: [...new Set(CHANGES.map((c) => c.owner))].map((o) => ({ value: o, label: personName(o) })) },
+];
+const SORT = { options: [{ value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' }] };
+const own = (c) => (c.run ? { s: c.status === 'auto' ? 'auto' : 'unable', rule: { name: RULES[c.rule].name, owner: RULES[c.rule].owner }, at: c.at } : null);
+---
+<Shell title="Changes" section="support-changes" crumbs={[{ label: 'Support', to: '/support/' }, { label: 'Changes' }]}>
+  <PageBand overline="Support" title="Changes" answer={ANSWER} numbers={NUMBERS} sim />
+  <div class="content chg2">
+    <RulesData />
+    <FilterBar facets={FACETS} placeholder="Find a change, rule or person" label="Find a change" noun={['change', 'changes']} scope=".content.chg2" sort={SORT} />
+    <ol class="list chg2-l" data-chg2>
+      {CHANGES.map((c, i) => (
+        <li class="row chg2-r" data-fi data-i={i} data-find={`${c.id} ${c.title} ${personName(c.owner)}`} data-f-kind={c.kind} data-f-status={c.status} data-f-owner={c.owner}>
+          <span class="chg2-g"><HealthGlyph state={GLYPH[c.status] ?? 'fine'} size={16} title={CHANGE_STATUS[c.status]} /></span>
+          <span>
+            <a class="name" href={href(changePath(c.id))} data-vt-rec={c.id}><span class="mono">{c.id}</span> {c.title}</a>
+            <span class="sub">{CHANGE_KIND[c.kind]} · {CHANGE_STATUS[c.status]} · owner {personName(c.owner)} · {c.blast}</span>
+          </span>
+          <span class="end">
+            <span class="mono faint">{at(c.at, DEMO_TODAY)}</span>
+            {c.run ? <WithChip own={own(c)} /> : <span class={`pill plain ${c.status === 'approved' ? 'manage' : ''}`}>{CHANGE_STATUS[c.status]}</span>}
+            {c.run && <HowCard run={c.run} />}
+          </span>
+        </li>
+      ))}
+    </ol>
+    <EmptyState text="No changes match these filters." />
+  </div>
+  <script is:inline data-astro-rerun slot="end">
+    (function () {
+      var bar = document.querySelector('[data-fb]'), list = document.querySelector('[data-chg2]'); if (!bar || !list) return;
+      var order = function () {
+        var v = bar.rsFilter ? bar.rsFilter.sort() : 'newest';
+        Array.prototype.slice.call(list.querySelectorAll('[data-fi]')).sort(function (a, b) { return v === 'oldest' ? +b.dataset.i - +a.dataset.i : +a.dataset.i - +b.dataset.i; }).forEach(function (el) { list.appendChild(el); });
+      };
+      bar.addEventListener('fb:sort', function () { bar.rsFilter.run(true, order); });
+      var s0 = new URLSearchParams(location.search).get('sort'); if (s0 && s0 !== 'newest') order();
+    })();
+  </script>
+</Shell>
+
+<style>
+  .chg2 { gap: 20px; padding-top: 18px; }
+  .chg2-l { list-style: none; margin: 0; padding: 0; }
+  .chg2-r { grid-template-columns: 28px minmax(0, 1fr) auto; }
+  .chg2-g { display: grid; place-items: center; }
+  .chg2-r .name { color: inherit; text-decoration: none; }
+  .chg2-r .name:hover { text-decoration: underline; }
+  .chg2-r .end { font-size: var(--fs-support); }
+  @media (max-width: 767px) {
+    .chg2-r { grid-template-columns: 28px minmax(0, 1fr); }
+    .chg2-r .end { grid-column: 2; justify-content: flex-start; }
+  }
+</style>

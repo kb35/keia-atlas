@@ -1,0 +1,49 @@
+# Demo incident (UX-V2 flow 4.1): a space fails before a 09:00 meeting. Made up; the space and devices are the real
+# sample data. The demo holds it at 07:53 (held_at), a minute after it was captured and before anyone has taken it,
+# so the flow can be played from the start: Take, the call before the suggestion, the PoE rule, "What fixed it?".
+number: INC0041210
+opened: "2026-09-28T07:52"
+short_description: Video bar offline before the 09:00
+description: Poly Lens reported the Whooper Swan video bar offline at 07:51. The space is booked at 09:00 for 8 people.
+caller: Poly Lens (device management)
+priority: 2
+priority_proposed: 2
+priority_reason: booked in 68 min
+booking: { at: "2026-09-28T09:00", people: 8 }
+state: new
+assignment_group: AV and IT, EMEA
+subject: { kind: device, room: dub-3-09, position: video-bar, device: AG-000335 }
+demo: true
+history:
+  - { at: "2026-09-28T07:52", state: new, source: keia_atlas, rule: match-tickets, run: RUN-2290, note: "Captured from Poly Lens and filled in: the space, the unit, the firmware change 12 days ago, the 09:00 booking. Offered to Liam, on site in Dublin." }
+keia_atlas:
+  matched_by: Poly Lens named the unit; the unit's record knows its space and its switch port.
+  symptom: meeting_will_not_start
+  firmware: 4.7.0-466077
+  held_at: "2026-09-28T07:53"
+  facts:
+    - { label: Last seen, value: "07:51, by Poly Lens", level: bad }
+    - { label: Switch port, value: "GE1/0/12 on dub-309-sw01 is up · PoE 0 W", level: bad }
+    - { label: Last change, value: "16 Sept · firmware 4.7.0 for the Lab pilot (CHG-201)", level: warn }
+    - { label: Next booking, value: "09:00 to 10:00 · 8 people", level: warn }
+  evidence:
+    - { from: Device management, says: "Poly Lens last heard from the video bar at 07:51.", level: bad }
+    - { from: Monitoring, says: "Its switch port GE1/0/12 is up, but draws 0 W of PoE since 07:51.", level: bad }
+    - { from: Room booking, says: "Booked 09:00 to 10:00 for 8 people. Nothing booked before then.", level: warn }
+    - { from: Change CHG-201, says: "Firmware 4.7.0 was installed on 16 Sept for the Lab pilot; the standard is 4.6.2.", level: warn }
+  diagnosis:
+    suggests: a PoE fault
+    signals:
+      - { says: "Switch port up", fits: agrees }
+      - { says: "PoE draw 0 W", fits: agrees }
+      - { says: "The unit answers no ping", fits: agrees }
+      - { says: "No DSP data in the last hour", fits: not-checked }
+    unlike: "Looks like the known error \"Systems show as offline in Poly Lens while they work\", but this unit answers no ping, so it is not that one."
+    ai: "Drafted by AI (a local model, EU region) from the evidence above; the counts are the rule's own."
+  actions:
+    - { rule: poe-cycle, target: GE1/0/12 }
+  next:
+    - Say what you think it is before you read the suggestion.
+    - If the port draws no power, cycle PoE under the PoE rule; it is allowed while the space is empty.
+    - When the bar is back, make a test call before 09:00.
+  assigned: liam

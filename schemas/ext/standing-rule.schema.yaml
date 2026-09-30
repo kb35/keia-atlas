@@ -1,0 +1,97 @@
+# Standing rule: a routine job a named owner approved once, as a standard change, so software may run it
+# (Keia Method 2.8; SYNTHESIS 2.3 and 2.9). The rule says what it runs on, when it may run, how many it may touch
+# at once, and which way back it has: Undo, Roll back, or none (it asks a person every time). Every run reads,
+# writes and reads back; a write that does not read back as intended is "Unable to complete", never done.
+# Demo data: nothing here runs against a real system. The run model is src/lib/rules.mjs.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/standing-rule
+title: Standing rule
+type: object
+additionalProperties: false
+required: [id, name, title, owner, service, approved, verb, reversal, applies_to, conditions, caps, steps, reads, rules_out, not_checked, runs, demo]
+$defs:
+  when: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$", description: "Local time at the site, to the minute." }
+properties:
+  id: { type: string, pattern: "^[a-z0-9-]+$", description: The file name without .yaml. }
+  name: { type: string, description: "What people call it on a record: \"DNS rule\", \"PoE rule\"." }
+  title: { type: string, description: "What it does, in one plain line: \"Update a DNS record from the build sheet\"." }
+  owner: { type: string, description: The person who approved it and answers for it (src/lib/demo.mjs). Told on every run. }
+  service: { enum: [av, network, infrastructure], description: The service it belongs to (src/lib/services.mjs). }
+  approved:
+    type: object
+    additionalProperties: false
+    required: [at, change]
+    properties:
+      at: { $ref: "#/$defs/when" }
+      change: { type: string, pattern: "^CHG-[0-9]+$", description: The standard change that approved the rule. }
+      version: { type: integer, minimum: 1 }
+  verb: { type: string, description: "The button's words on a record, with {target} for what it acts on: \"Cycle PoE on {target}\"." }
+  reversal:
+    description: >
+      The way back the rule declares (SYNTHESIS 2.9). undo: the action truly reverses (a re-sync, a re-assign).
+      rollback: the previous state is kept and restored (a DNS record, a config with its previous version).
+      none: nothing to put back, because the action ends where it started (a PoE cycle), so no verb is shown.
+      ask: the action cannot be put back, so the rule never runs alone; a person confirms every run.
+    type: object
+    additionalProperties: false
+    required: [kind, words]
+    properties:
+      kind: { enum: [undo, rollback, none, ask] }
+      words: { type: string, description: "What the way back does, in one line, shown beside the verb." }
+  applies_to:
+    type: object
+    additionalProperties: false
+    properties:
+      classes: { type: array, items: { type: string }, description: Device classes it may act on. }
+      symptoms: { type: array, items: { type: string }, description: The symptoms in the device type's guide it helps with. }
+      trigger: { type: string, description: "What starts it on its own, when it has a schedule or a trigger." }
+  window: { type: string, description: "When it may run on its own: \"01:00 to 05:00\". Absent: any time the conditions hold." }
+  conditions: { type: array, minItems: 1, items: { type: string }, description: "Checked before every run, in this order." }
+  caps:
+    type: object
+    additionalProperties: false
+    required: [per_wave, booked_meeting, freeze, halt_after]
+    properties:
+      per_wave: { type: integer, minimum: 1, description: Never more than this many units in one wave. }
+      booked_meeting: { const: never, description: Never while a meeting is booked in the space. }
+      freeze: { const: never, description: Never in a change freeze. }
+      halt_after: { type: integer, minimum: 1, description: Halts itself after this many runs in a row were unable to complete. }
+  steps:
+    type: array
+    minItems: 3
+    items:
+      type: object
+      additionalProperties: false
+      required: [kind, words]
+      properties:
+        kind: { enum: [read, write, wait, readback] }
+        words: { type: string }
+        seconds: { type: number, minimum: 0, description: How long the step takes in a real run. }
+  reads: { type: array, minItems: 1, items: { type: string }, description: "What it reads, with the system: \"Build sheet (Keia Atlas)\"." }
+  rules_out: { type: array, items: { type: string }, description: What it checks is not the case before it writes. }
+  not_checked: { type: array, minItems: 1, items: { type: string }, description: "What it does not check. Never empty: \"Nothing else was in scope\" if so." }
+  cadence: { type: string, description: "How often it runs on its own, for the runs strip: \"nightly 02:00\", \"on a trigger\"." }
+  runs:
+    description: The runs the demo records, oldest first. Runs between them on the cadence are done and read back.
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, at, result, target]
+      properties:
+        id: { type: string, pattern: "^RUN-[0-9]+$" }
+        at: { $ref: "#/$defs/when" }
+        result: { enum: [done, unable, halted, rolled-back, undone] }
+        target: { type: string, description: "What it acted on (a hostname, a port)." }
+        by: { type: string, description: "Who ran it by hand; absent when it ran on its own." }
+        incident: { type: string, pattern: "^INC[0-9]{7}$", description: "The incident it ran for, or raised." }
+        change: { type: string, pattern: "^CHG-[0-9]+$", description: The change record of this run. }
+        stopped_at: { enum: [read, write, wait, readback], description: "For a run unable to complete, the step where it stopped." }
+        why: { type: string, description: "For a run unable to complete, what did not happen, in plain words." }
+        did: { type: string, description: "What it did, in one line." }
+        before: { type: string, description: The value before the write. }
+        after: { type: string, description: The value it wrote. }
+        ms: { type: integer, minimum: 0, description: How long the run took. }
+        ai: { type: string, description: "A line of the card drafted by AI, labelled on the card." }
+  demo: { const: true }

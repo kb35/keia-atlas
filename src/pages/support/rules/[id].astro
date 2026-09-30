@@ -1,0 +1,232 @@
+---
+// One standing rule (UI-V2 §2: "a rule its runs strip"; BUILD-PLAN V5 H2). Record archetype:
+//   band     the rule's name, whether its runs read back, four figures, and "Run it myself" (any rule can be run
+//            by hand to keep the skill; it runs only where its conditions hold, and says which did not)
+//   summary  the runs as squares beside the rule's facts: owner, approval, way back, window, caps
+//   record   the conditions checked before every run, the steps (read, write, read back), what it reads, rules out
+//            and does not check, every run with its card, and the incidents it raised or ran for
+//   raw      the audit log's entries for this rule
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import SidePanel from '../../../components/SidePanel.astro';
+import Section from '../../../components/Section.astro';
+import HealthGlyph from '../../../components/HealthGlyph.astro';
+import RunStrip from '../../../components/RunStrip.astro';
+import HowCard from '../../../components/HowCard.astro';
+import WithChip from '../../../components/WithChip.astro';
+import RulesData from '../../../components/RulesData.astro';
+import LiveBar from '../../../components/LiveBar.astro';
+import OpenHere from '../../../components/OpenHere.astro';
+import { RULES, RULE_LIST, rulePath, personName, stripFor, lastRun, incidentsOfRule, changePath, LOG, LOG_PATH, FREEZES } from '../../../lib/rules-view.mjs';
+import { REVERSAL_WORD, RESULT, STEP_WORD, at, seconds, canRun } from '../../../lib/rules.mjs';
+import { SERVICES } from '../../../lib/services.mjs';
+import { OWN, HISTORY } from '../../../lib/home.mjs';
+import { href, DEMO_TODAY, incidentPath, INC_STATE, plural } from '../../../lib/data.mjs';
+
+export function getStaticPaths() { return RULE_LIST.map((r) => ({ params: { id: r.id } })); }
+const r = RULES[Astro.params.id];
+const strip = stripFor(r);
+const runs = [...r.allRuns].reverse();
+const shown = runs.filter((x) => !x.quiet);
+const quiet = runs.length - shown.length;
+const last = lastRun(r);
+const unable = r.allRuns.filter((x) => x.result === 'unable' || x.result === 'halted');
+const back = r.allRuns.filter((x) => x.result === 'rolled-back' || x.result === 'undone');
+const incs = incidentsOfRule(r.id);
+const lastBad = last && (last.result === 'unable' || last.result === 'halted');
+const ANSWER = lastBad
+  ? `Unable to complete at ${at(last.at, DEMO_TODAY)}, rolled back · ${incs.some((i) => i.state !== 'resolved') ? `incident with ${personName(r.owner).split(' ')[0]}` : 'nothing left half done'}`
+  : `Every run in ${strip.runs.length > 20 ? 'three weeks' : 'the record'} read back and matched${back.length ? `, ${back.length} put back by a person` : ''}`;
+const NUMBERS = [
+  { n: strip.runs.length, label: 'Runs recorded', to: '#runs' },
+  { n: unable.length, label: 'Unable to complete', to: '#runs', tone: unable.length ? 'bad' : undefined },
+  { n: back.length, label: 'Put back by a person', to: '#runs' },
+  { n: r.caps.per_wave, label: r.caps.per_wave === 1 ? 'Unit per wave' : 'Units per wave' },
+];
+// "Run it myself": checked now, at the demo's moment. The reason it may not run is the first check that failed.
+const nowCheck = canRun(r, { now: `${DEMO_TODAY}T12:00`, freezes: FREEZES, confirmed: r.reversal.kind === 'ask' ? null : 'n/a' });
+const logHere = LOG.filter((e) => e.rule === r.id).slice(0, 12);
+---
+<Shell about={{ kind: 'rule', label: r.name, to: rulePath(r.id) }} title={r.name} section="rules" crumbs={[{ label: 'Support', to: '/support/' }, { label: 'Standing rules', to: '/support/rules/' }, { label: r.name }]}>
+  <PageBand overline={`Standing rule · ${SERVICES[r.service].name}`} title={r.name} answer={ANSWER} numbers={NUMBERS} sim rec={`rule-${r.id}`}>
+    <div slot="action" class="rr-act" data-rule-act data-rule={r.id} data-owner={r.owner} data-ok={nowCheck.ok ? 'true' : 'false'} data-why={nowCheck.why ?? ''}>
+      <button type="button" class="btn primary" data-rule-run data-verb="run-rule" data-help="rule.run">Run it myself</button>
+    </div>
+  </PageBand>
+
+  <div class="content rule-page" data-job-owner={r.owner}>
+    <RulesData />
+    <p class="rr-state" data-rule-state role="status" aria-live="polite" hidden></p>
+    <div class="g12 top">
+      <section class="card pad s-7 rr-runs" aria-labelledby="rr-runs-h">
+        <header class="rr-h"><h2 id="rr-runs-h">Runs, one square each</h2><span class="faint">oldest on the left</span></header>
+        <RunStrip rule={r.id} runs={strip.runs} words={strip.words} size="large" to="page" />
+        <ul class="rr-key" aria-label="Key">
+          <li><span class="sq"></span>Done automatically, read back and matched</li>
+          <li><span class="sq sq-notch"></span>Unable to complete</li>
+          <li><span class="sq sq-back"></span>Put back by a person</li>
+        </ul>
+        {last && <p class="rr-last"><HealthGlyph state={RESULT[last.result]?.glyph ?? 'fine'} size={16} word={RESULT[last.result]?.word} /> <span>{at(last.at, DEMO_TODAY)} · {last.did}</span>{!last.quiet && <> · <HowCard run={last.id} /></>}</p>}
+      </section>
+      <SidePanel class="s-5" title="The rule" meta={`version ${r.approved.version ?? 1}`} help="rule.facts">
+        <dl class="rr-f">
+          <div><dt>What it does</dt><dd>{r.title}</dd></div>
+          <div><dt>Owner</dt><dd>{personName(r.owner)} · told on every run</dd></div>
+          <div><dt>Approved</dt><dd>{at(r.approved.at, DEMO_TODAY)} as a standard change, <a href={href(changePath(r.approved.change))}>{r.approved.change}</a></dd></div>
+          <div><dt>Way back</dt><dd><b>{REVERSAL_WORD[r.reversal.kind]}</b>. {r.reversal.words}</dd></div>
+          <div><dt>When</dt><dd>{r.window ? `Only ${r.window}` : 'Whenever its conditions hold'}{r.applies_to.trigger ? `, when ${r.applies_to.trigger.charAt(0).toLowerCase()}${r.applies_to.trigger.slice(1)}` : ''}</dd></div>
+          <div><dt>Caps</dt><dd>At most {plural(r.caps.per_wave, 'unit')} per wave · never in a booked meeting · never in a change freeze · halts after {plural(r.caps.halt_after, 'run')} in a row unable to complete</dd></div>
+          {r.applies_to.classes && <div><dt>Acts on</dt><dd>{r.applies_to.classes.map((c) => c.replace(/-/g, ' ')).join(', ')}</dd></div>}
+        </dl>
+      </SidePanel>
+    </div>
+
+    <OpenHere kind="rule" layer="record" />
+    <Section title="Checked before every run" id="conditions" aside="In this order; the first that fails stops the run before it touches anything" help="rule.conditions">
+      <ol class="card pad rr-cond">
+        {r.conditions.map((c, i) => <li><span class="rr-n mono">{i + 1}</span><span>{c}</span></li>)}
+      </ol>
+    </Section>
+
+    <Section title="How a run goes" id="steps" aside="Read, write, read back: a write that does not read back as intended is Unable to complete" help="rule.steps">
+      <ol class="rr-steps">
+        {r.steps.map((s) => <li class={`rs-${s.kind}`}><span class="rr-k">{STEP_WORD[s.kind]}</span><span>{s.words}</span>{s.seconds != null && <small class="mono">{seconds(s.seconds * 1000)}</small>}</li>)}
+        <li class="rs-end"><span class="rr-k">Then</span><span>Done automatically, or Unable to complete{['rollback', 'undo'].includes(r.reversal.kind) ? ' and rolled back' : ', with nothing left changed'}</span></li>
+      </ol>
+      <div class="g12 rr-three">
+        <div class="card pad s-4"><h3>What it reads</h3><ul>{r.reads.map((x) => <li>{x}</li>)}</ul></div>
+        <div class="card pad s-4"><h3>What it rules out</h3><ul>{r.rules_out.length ? r.rules_out.map((x) => <li>{x}</li>) : <li>Nothing: no other cause to rule out</li>}</ul></div>
+        <div class="card pad s-4"><h3>What it does not check</h3><ul>{r.not_checked.map((x) => <li>{x}</li>)}</ul></div>
+      </div>
+    </Section>
+
+    <Section title="Runs" id="runs" aside={quiet ? `Newest first · ${plural(quiet, 'quiet night')} with nothing to change are in the strip` : 'Newest first'} help="rule.runs">
+      <ol class="list rr-list" data-rule-runs>
+        {shown.map((x) => (
+          <li class="row rr-row" id={`run-${x.id}`}>
+            <span class="rr-g"><HealthGlyph state={RESULT[x.result]?.glyph ?? 'fine'} size={16} title={RESULT[x.result]?.word} /></span>
+            <span>
+              <span class="name">{RESULT[x.result]?.word}{x.result === 'unable' && ['rollback', 'undo'].includes(r.reversal.kind) ? ', rolled back' : ''} · {x.target}</span>
+              <span class="sub">{x.why ?? x.did}</span>
+            </span>
+            <span class="end"><span class="mono faint">{at(x.at, DEMO_TODAY)}</span>{x.by && <span class="faint">by {personName(x.by)}</span>}<HowCard run={x.id} /></span>
+          </li>
+        ))}
+      </ol>
+    </Section>
+
+    {incs.length > 0 && (
+      <Section title="Incidents" id="incidents" aside="Raised by a run, or offered this rule on their Do section" help="rule.incidents">
+        <div class="list">
+          {incs.map((inc) => (
+            <div class="row rr-inc">
+              <span class="rr-g"><HealthGlyph state={inc.state === 'resolved' ? 'fine' : inc.priority <= 3 ? 'fault' : 'review'} size={16} title={INC_STATE[inc.state]} /></span>
+              <span><a class="name" href={href(incidentPath(inc.number))}>{inc.short_description}</a><span class="sub mono">{inc.number} · P{inc.priority}{inc.priority_reason ? ` (${inc.priority_reason})` : ''} · {INC_STATE[inc.state]}</span></span>
+              <span class="end"><WithChip own={OWN[`inc:${inc.number}`] ?? null} item={`inc:${inc.number}`} history={HISTORY[`inc:${inc.number}`] ?? []} /></span>
+            </div>
+          ))}
+        </div>
+      </Section>
+    )}
+
+    <OpenHere kind="rule" layer="raw" />
+    <Section title="Raw" id="raw-log" aside="The audit log for this rule" help="rule.raw">
+      <div class="list">
+        {logHere.map((e) => (
+          <a class="row plain" href={`${href(LOG_PATH)}#${e.id}`}>
+            <span><span class="name"><span class="mono faint">{at(e.at, DEMO_TODAY)}</span> {e.what}</span><span class="sub">{e.who} · {e.src}</span></span>
+            <span class="end faint">Trace →</span>
+          </a>
+        ))}
+      </div>
+    </Section>
+    <LiveBar page={`rule:${r.id}`} />
+  </div>
+
+  <script>
+    import { play, ruleOf, lineOf } from '../../../lib/rules-client.mjs';
+    import { runningWords, canRun, RESULT } from '../../../lib/rules.mjs';
+    import { glyph } from '../../../lib/health.mjs';
+    import { howTrigger } from '../../../lib/howcard.mjs';
+    const W = window as any, D = document;
+    function init() {
+      const act = D.querySelector<HTMLElement>('[data-rule-act]'); if (!act || act.dataset.on) return; act.dataset.on = '1';
+      const id = act.dataset.rule!, btn = act.querySelector<HTMLButtonElement>('[data-rule-run]')!, st = D.querySelector<HTMLElement>('[data-rule-state]')!;
+      const say = (html: string) => { const show = () => { st.hidden = false; st.innerHTML = html; }; if (W.rsHold && st.hidden) W.rsHold(st.parentElement, show); else show(); };
+      const addRow = (run: any) => {
+        const rule = ruleOf(id), list = D.querySelector('[data-rule-runs]'); if (!list || D.getElementById(`run-${run.id}`)) return;
+        const li = D.createElement('li'); li.className = 'row rr-row'; li.id = `run-${run.id}`;
+        const word = RESULT[run.result]?.word ?? run.result;
+        li.innerHTML = `<span class="rr-g">${glyph(RESULT[run.result]?.glyph ?? 'fine', { size: 16, title: word })}</span><span><span class="name"></span><span class="sub"></span></span><span class="end"><span class="mono faint">Just now</span>${howTrigger({ id: run.id, rule: id, title: '', meta: '', rows: [], actions: [], trace: '' } as any, {})}</span>`;
+        li.querySelector('.name')!.textContent = `${word} · ${run.target}`;
+        li.querySelector('.sub')!.textContent = run.why ?? run.did;
+        const put = () => list.insertBefore(li, list.firstChild);
+        if (W.rsHold) W.rsHold(list, put); else put();
+        const m = W.rsMotion ? W.rsMotion() : { reduced: true };
+        if (!m.reduced) li.animate([{ opacity: 0, transform: 'scale(.97)' }, { opacity: 1, transform: 'none' }], { duration: m.enter, easing: m.ease });
+      };
+      const run = async (again = false) => {
+        const rule = ruleOf(id); if (!rule) return;
+        const check = canRun(rule, { now: `${new Date().toISOString().slice(0, 10)}T${new Date().toTimeString().slice(0, 5)}`, confirmed: rule.reversal.kind === 'ask' ? (W.rsWhoId?.() ?? null) : 'n/a' });
+        // A demo run checks the rule's own conditions against the real clock: outside its window it is Not run.
+        const blocked = !again && !check.ok ? check.why : null;
+        btn.disabled = true;
+        const words = btn.textContent;
+        if (blocked) {
+          btn.textContent = 'Checking the conditions';
+          setTimeout(() => { btn.textContent = words; btn.disabled = false; say(`${glyph('off', { size: 16, title: 'Not run' })} <span><b>Not run:</b> ${blocked.charAt(0).toLowerCase()}${blocked.slice(1)}. Nothing was touched.</span>`); }, 600);
+          return;
+        }
+        const r = await play(id, { target: again ? 'the same unit as before' : (rule.applies_to?.classes?.[0] ?? 'the next unit').replace(/-/g, ' '), did: again ? 'Ran the same steps again by hand; read back and matched' : undefined, onStep: (s: any) => { if (!s.end) { btn.textContent = runningWords(rule, s.state); say(`${glyph('progress', { size: 16, title: 'Running' })} <span>${s.words}</span>`); } } });
+        btn.textContent = words; btn.disabled = false;
+        if (r) { say(`${glyph(RESULT[r.result]?.glyph ?? 'fine', { size: 16, title: RESULT[r.result]?.word })} <span>${lineOf(rule, r)} · <button type="button" class="how-link" data-how="${r.id}" aria-haspopup="dialog" aria-expanded="false">How was this done?</button></span>`); addRow(r); }
+      };
+      btn.addEventListener('click', () => run(false));
+      W.rsRunAgain = () => run(true);
+    }
+    D.addEventListener('astro:page-load', init);
+  </script>
+</Shell>
+
+<style>
+  .rule-page { gap: 24px; padding-top: 18px; }
+  .rr-state { margin: 0; display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: var(--radius); background: var(--surface-2); font-size: var(--fs-body); }
+  .rr-state[hidden] { display: none; }
+  .rr-runs { display: grid; gap: 14px; align-content: start; }
+  .rr-h { display: flex; align-items: baseline; gap: 10px; }
+  .rr-h h2 { margin: 0; font-size: var(--fs-h3); }
+  .rr-h .faint { font-size: var(--fs-support); }
+  .rr-key { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: var(--fs-support); color: var(--text-2); }
+  .rr-key li { display: inline-flex; align-items: center; gap: 8px; }
+  .rr-key .sq { --s: 12px; }
+  .rr-last { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: var(--fs-body); }
+  .rr-f { margin: 0; display: grid; }
+  .rr-f div { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); font-size: var(--fs-body); }
+  .rr-f div:first-child { border-top: 0; }
+  .rr-f dt { color: var(--text-2); font-size: var(--fs-support); }
+  .rr-f dd { margin: 0; line-height: 1.45; }
+  .rr-cond { list-style: none; margin: 0; display: grid; gap: 8px; }
+  .rr-cond li { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; font-size: var(--fs-body); align-items: baseline; }
+  .rr-n { width: 22px; height: 22px; display: inline-grid; place-items: center; border-radius: 50%; background: var(--surface-2); font-size: var(--fs-mark); color: var(--text-2); }
+  .rr-steps { list-style: none; margin: 0 0 20px; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+  .rr-steps li { position: relative; display: grid; gap: 4px; align-content: start; padding: 14px 16px; border-radius: var(--radius-lg); background: var(--surface); border: var(--border-card); font-size: var(--fs-body); }
+  .rr-steps small { color: var(--text-3); font-size: var(--fs-mark); }
+  .rr-k { font: 500 var(--fs-overline)/1 var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); }
+  .rr-steps .rs-write { border-left: 3px solid var(--h-progress); }
+  .rr-steps .rs-readback { border-left: 3px solid var(--h-fine); }
+  .rr-steps .rs-end { background: var(--surface-2); border-style: dashed; }
+  .rr-three h3 { margin: 0 0 8px; font-size: var(--fs-h3); }
+  .rr-three ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: var(--fs-body); color: var(--text-2); }
+  .rr-list { list-style: none; margin: 0; padding: 0; }
+  .rr-row { grid-template-columns: 28px minmax(0, 1fr) auto; }
+  .rr-row:target { background: var(--accent-soft); }
+  .rr-g { display: grid; place-items: center; }
+  .rr-row .end, .rr-inc .end { font-size: var(--fs-support); }
+  @media (max-width: 767px) {
+    .rr-row { grid-template-columns: 28px minmax(0, 1fr); }
+    .rr-row .end { grid-column: 2; justify-content: flex-start; }
+    .rr-inc { grid-template-columns: 28px minmax(0, 1fr); }
+    .rr-inc .end { grid-column: 2; justify-content: flex-start; }
+    .rr-f div { grid-template-columns: 1fr; gap: 2px; }
+  }
+</style>

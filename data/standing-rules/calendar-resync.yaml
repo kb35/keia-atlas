@@ -1,0 +1,37 @@
+# Standing rule: re-sync a booking panel with the space's calendar when it shows the wrong day. Demo data (rule F8).
+# A re-sync truly reverses (the previous link is kept), so it declares Undo.
+id: calendar-resync
+name: Calendar re-sync rule
+title: Re-sync a booking panel with its space's calendar
+owner: sofia
+service: av
+approved: { at: "2026-04-14T11:00", change: CHG-166, version: 1 }
+verb: Re-sync the calendar on {target}
+reversal: { kind: undo, words: "Undo puts the panel's previous calendar link back." }
+applies_to:
+  classes: [scheduler-panel]
+  symptoms: [shows_wrong_bookings]
+  trigger: A booking panel shows meetings from another day than the calendar
+conditions:
+  - The panel answers and is signed in to the calendar
+  - No meeting starting in the space in the next 5 minutes
+  - Not in a change freeze
+caps: { per_wave: 5, booked_meeting: never, freeze: never, halt_after: 3 }
+steps:
+  - { kind: read, words: "Read today's bookings from the calendar and from the panel", seconds: 2 }
+  - { kind: write, words: "Re-sync the panel's calendar link, keeping the previous one", seconds: 4 }
+  - { kind: readback, words: "Read back: the panel shows the same meetings as the calendar", seconds: 3 }
+reads:
+  - Today's bookings (room booking)
+  - The panel's status and calendar link (the panel's management tool)
+rules_out:
+  - The panel being offline (it answers)
+  - A meeting starting now
+not_checked:
+  - Whether the calendar itself is right (the rule trusts room booking)
+cadence: on a trigger
+runs:
+  - { id: RUN-3301, at: "2026-09-15T07:20", result: done, target: lon-203-sch01, did: "Re-synced the calendar link; the panel shows today's meetings", ms: 8400 }
+  - { id: RUN-3306, at: "2026-09-21T07:05", result: undone, target: nyc-2005-sch01, by: sofia, did: "Re-synced the calendar link; Sofia undid it because the space had moved calendars that morning", ms: 7900 }
+  - { id: RUN-3310, at: "2026-09-25T07:40", result: done, target: dub-305-sch01, did: "Re-synced the calendar link; the panel shows today's meetings", ms: 8100 }
+demo: true

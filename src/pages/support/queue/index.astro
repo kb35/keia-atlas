@@ -1,0 +1,148 @@
+---
+// The Support queue (UX-V2 §3, the service desk's first section; BUILD-PLAN V3 H2 and V5): every open job, worst
+// first, each row with its With chip, so what is nobody's is plain at a glance. List archetype: band, FilterBar,
+// rows; then what standing rules did today, each with "How was this done?".
+// Chips follow the live layer (Take, Hand to, Park, Resume from any window move them in place, with a "Liam, just
+// now" mark); the figures and the Status facet follow them too.
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import FilterBar from '../../../components/FilterBar.astro';
+import EmptyState from '../../../components/EmptyState.astro';
+import Section from '../../../components/Section.astro';
+import HealthGlyph from '../../../components/HealthGlyph.astro';
+import WithChip from '../../../components/WithChip.astro';
+import HowCard from '../../../components/HowCard.astro';
+import RulesData from '../../../components/RulesData.astro';
+import LiveBar from '../../../components/LiveBar.astro';
+import { sites, SITE_ORDER, REGION_LABEL, href, DEMO_TODAY, INC_STATE } from '../../../lib/data.mjs';
+import { incidentList, spoken, PRIORITY_LABEL } from '../../../lib/incidents.mjs';
+import { OWN, HISTORY, INC_EXTRA } from '../../../lib/home.mjs';
+import { RULE_LIST, runLine, PEOPLE_MAP, clockFor, rulePath } from '../../../lib/rules-view.mjs';
+import { at } from '../../../lib/rules.mjs';
+
+const open = incidentList.filter((v) => v.open);
+const ownOf = (v) => OWN[`inc:${v.inc.number}`] ?? null;
+const statusOf = (o) => (!o || o.s === 'ready' ? 'ready' : o.s === 'waiting' ? 'waiting' : o.s === 'parked' ? 'parked' : 'with');
+const rows = open.map((v) => {
+  const o = ownOf(v), x = INC_EXTRA[`inc:${v.inc.number}`] ?? null, clock = clockFor(v, { now: v.now });
+  const status = statusOf(o);
+  const glyph = v.inc.state === 'on-hold' || v.inc.priority === 4 ? 'review' : 'fault';
+  const due = status === 'ready' ? clock.words : x?.past ? `Past target: open ${spoken(Math.round(x.ageH * 60))}, target ${x.target} h` : `Open ${spoken(v.age)}`;
+  return { v, o, x, status, glyph, due, past: !!x?.past, rank: [v.inc.priority, status === 'ready' ? 0 : 1, x?.past ? 0 : 1, v.inc.opened] };
+}).sort((a, b) => a.rank[0] - b.rank[0] || a.rank[1] - b.rank[1] || a.rank[2] - b.rank[2] || String(a.rank[3]).localeCompare(String(b.rank[3])));
+const nobody = rows.filter((r) => r.status === 'ready');
+const past = rows.filter((r) => r.past);
+const ANSWER = `${nobody.length ? `${nobody.length} nobody has taken yet` : 'Every job has an owner'} · ${rows.length} open${past.length ? ` · ${past.length} past target` : ''}`;
+const NUMBERS = [
+  { n: nobody.length, label: 'Nobody has it', to: '?status=ready', id: 'q-ready', tone: nobody.length ? 'warn' : undefined },
+  { n: rows.filter((r) => r.status === 'with' || r.status === 'parked').length, label: 'With someone', to: '?status=with,parked', id: 'q-with' },
+  { n: rows.filter((r) => r.status === 'waiting').length, label: 'Waiting on', to: '?status=waiting', id: 'q-wait' },
+  { n: past.length, label: 'Past target', to: '?due=past', tone: past.length ? 'bad' : undefined },
+];
+const siteIds = SITE_ORDER.filter((id) => rows.some((r) => r.v.space.site === id));
+const FACETS = [
+  { key: 'region', label: 'Region', options: ['amer', 'emea', 'apac'].filter((g) => siteIds.some((id) => sites[id].region === g)).map((value) => ({ value, label: REGION_LABEL[value].replace('Europe, Middle East and Africa', 'EMEA') })) },
+  { key: 'site', label: 'Office', options: siteIds.map((id) => ({ value: id, label: sites[id].name })) },
+  { key: 'status', label: 'Status', options: [{ value: 'ready', label: 'Nobody has it' }, { value: 'with', label: 'With someone' }, { value: 'parked', label: 'Parked' }, { value: 'waiting', label: 'Waiting on' }] },
+  { key: 'prio', label: 'Priority', options: [1, 2, 3, 4].map((n) => ({ value: String(n), label: `P${n} ${PRIORITY_LABEL[n]}` })) },
+  { key: 'due', label: 'Target', options: [{ value: 'past', label: 'Past target' }, { value: 'within', label: 'Within target' }] },
+];
+const SORT = { options: [{ value: 'worst', label: 'Worst first' }, { value: 'oldest', label: 'Oldest first' }, { value: 'site', label: 'By office' }] };
+const SITE_I = Object.fromEntries(SITE_ORDER.map((id, i) => [id, i]));
+// Done automatically today, and anything a rule was unable to complete (UX-V2 §6: every automatic action carries the card).
+const autoToday = RULE_LIST.flatMap((r) => r.allRuns.filter((x) => x.at.slice(0, 10) === DEMO_TODAY && !x.quiet).map((x) => ({ r, x }))).sort((a, b) => b.x.at.localeCompare(a.x.at));
+---
+<Shell title="Queue" section="queue" crumbs={[{ label: 'Support', to: '/support/' }, { label: 'Queue' }]}>
+  <PageBand overline="Support" title="Queue" answer={ANSWER} numbers={NUMBERS} sim />
+  <div class="content queue">
+    <RulesData />
+    <FilterBar facets={FACETS} placeholder="Find a job, space or person" label="Find a job" noun={['job', 'jobs']} scope=".content.queue" sort={SORT} />
+    <ol class="list q-l" data-q>
+      {rows.map((r, i) => (
+        <li class="row q-r" data-fi data-i={i} data-opened={r.v.inc.opened} data-s={SITE_I[r.v.space.site]} data-item={`inc:${r.v.inc.number}`} data-base={JSON.stringify(r.o)} data-find={`${r.v.inc.number} ${r.v.inc.short_description} ${r.v.roomTitle} ${sites[r.v.space.site].name} ${r.o?.to ? PEOPLE_MAP[r.o.to]?.name ?? '' : ''}`} data-f-region={sites[r.v.space.site].region} data-f-site={r.v.space.site} data-f-status={r.status} data-f-prio={String(r.v.inc.priority)} data-f-due={r.past ? 'past' : 'within'}>
+          <span class="q-g"><HealthGlyph state={r.glyph} size={16} title={r.glyph === 'fault' ? 'Fault' : 'To review'} /></span>
+          <span class="q-m">
+            <a class="name" href={href(r.v.href)} data-vt-rec={r.v.inc.number}>{r.v.inc.short_description}</a>
+            <span class="sub"><span class="mono">{r.v.inc.number}</span> · {r.v.roomTitle}, {sites[r.v.space.site].name} · <span class={`q-p q-p${r.v.inc.priority}`}>P{r.v.inc.priority}</span>{r.v.inc.priority_reason ? `, proposed: ${r.v.inc.priority_reason}` : ''}{r.v.inc.state === 'on-hold' ? ` · ${INC_STATE['on-hold']}` : ''}</span>
+            <span class="sub q-due" data-q-due>{r.due}</span>
+          </span>
+          <span class="end"><WithChip own={r.o} item={`inc:${r.v.inc.number}`} history={HISTORY[`inc:${r.v.inc.number}`] ?? []} /></span>
+        </li>
+      ))}
+    </ol>
+    <EmptyState text="No jobs match these filters." />
+
+    <Section title="Done automatically today" id="auto" aside="Every run under a standing rule someone owns, read back and recorded" help="queue.auto">
+      <ol class="list q-a">
+        {autoToday.length === 0 && <li class="row plain faint">Nothing ran today.</li>}
+        {autoToday.map(({ r, x }) => (
+          <li class="row q-ar">
+            <span class="q-g"><HealthGlyph state={x.result === 'done' ? 'fine' : 'fault'} size={16} title={x.result === 'done' ? 'Done automatically' : 'Unable to complete'} /></span>
+            <span><span class="name">{x.did}</span><span class="sub">{runLine(r, x, PEOPLE_MAP)} · <a href={href(rulePath(r.id))}>the rule</a></span></span>
+            <span class="end"><span class="mono faint">{at(x.at, DEMO_TODAY)}</span><HowCard run={x.id} /></span>
+          </li>
+        ))}
+      </ol>
+    </Section>
+    <LiveBar page="queue" />
+  </div>
+
+  <script>
+    const W = window as any, D = document;
+    const statusOf = (o: any) => (!o || o.s === 'ready' ? 'ready' : o.s === 'waiting' ? 'waiting' : o.s === 'parked' ? 'parked' : o.s === 'done' ? 'done' : 'with');
+    function init() {
+      const list = D.querySelector<HTMLElement>('[data-q]'); if (!list || list.dataset.on) return; list.dataset.on = '1';
+      const bar = D.querySelector<any>('[data-fb]');
+      // Sort: worst first (as built), oldest first, or by office; the rows slide into place inside the bar's run.
+      const order = () => {
+        const v = bar?.rsFilter ? bar.rsFilter.sort() : 'worst';
+        [...list.querySelectorAll<HTMLElement>('[data-fi]')].sort((a, b) => (v === 'oldest' ? String(a.dataset.opened).localeCompare(String(b.dataset.opened)) : v === 'site' ? +a.dataset.s! - +b.dataset.s! : 0) || +a.dataset.i! - +b.dataset.i!).forEach((el) => list.appendChild(el));
+      };
+      bar?.addEventListener('fb:sort', () => bar.rsFilter.run(true, order));
+      const s0 = new URLSearchParams(location.search).get('sort'); if (s0 && s0 !== 'worst') order();
+      // Who has each job, from the live layer: the Status facet and the figures follow the chips.
+      const sync = () => {
+        const L = W.rsLive?.live; if (!L) return;
+        const n: Record<string, number> = { ready: 0, with: 0, waiting: 0 };
+        list.querySelectorAll<HTMLElement>('[data-item]').forEach((row) => {
+          let base = null; try { base = JSON.parse(row.dataset.base || 'null'); } catch { /* keep null */ }
+          const o = L.stateOf(row.dataset.item, { own: base }).own ?? base;
+          const st = statusOf(o);
+          if (row.dataset.fStatus !== st) { row.dataset.fStatus = st; bar?.rsFilter?.refresh(row); }
+          if (st === 'ready') n.ready++; else if (st === 'waiting') n.waiting++; else if (st !== 'done') n.with++;
+        });
+        W.rsKeyNumber?.('q-ready', n.ready, { tone: n.ready ? 'warn' : undefined });
+        W.rsKeyNumber?.('q-with', n.with);
+        W.rsKeyNumber?.('q-wait', n.waiting);
+      };
+      const go = () => {
+        sync();
+        const stop = W.rsLive.live.subscribe('inc:', (e: any) => { if (e.field === 'own') sync(); });
+        D.addEventListener('astro:before-swap', () => stop(), { once: true });
+      };
+      if (W.rsLive) go(); else D.addEventListener('rs:live-ready', go, { once: true });
+    }
+    D.addEventListener('astro:page-load', init);
+  </script>
+</Shell>
+
+<style>
+  .queue { gap: 24px; padding-top: 18px; }
+  .q-l, .q-a { list-style: none; margin: 0; padding: 0; }
+  .q-r, .q-ar { grid-template-columns: 28px minmax(0, 1fr) auto; align-items: start; }
+  .q-g { display: grid; place-items: center; padding-top: 2px; }
+  .q-m { display: grid; gap: 2px; min-width: 0; }
+  .q-m .name { color: inherit; text-decoration: none; }
+  .q-m .name:hover { text-decoration: underline; }
+  .q-p { font: 600 var(--fs-mark)/1 var(--font-mono); padding: 2px 5px; border-radius: 4px; background: var(--surface-3); color: var(--text); }
+  .q-p1 { background: var(--h-fault); color: #fff; }
+  .q-p2 { background: var(--h-fault-soft); color: var(--h-fault-ink); }
+  .q-p3 { background: var(--h-review-soft); color: var(--h-review-ink); }
+  .q-due { color: var(--text-3); }
+  .q-r .end { align-self: center; max-width: min(46vw, 360px); }
+  .q-ar .end { font-size: var(--fs-support); }
+  @media (max-width: 767px) {
+    .q-r, .q-ar { grid-template-columns: 28px minmax(0, 1fr); }
+    .q-r .end, .q-ar .end { grid-column: 2; justify-content: flex-start; max-width: 100%; }
+  }
+</style>

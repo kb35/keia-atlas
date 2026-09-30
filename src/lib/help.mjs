@@ -69,6 +69,10 @@ const PLACES = {
   'tab:schedule': e('Schedule', 'Who is where and doing what: the day, each person\'s week, the month and the year.', 'Select it to open the schedule.'),
   'tab:projects': e('Projects', def('project'), 'Select it to see every project.', 'g:project'),
   'tab:incidents': e('Incidents', def('incident'), 'Select it to see the incidents board.', 'g:incident'),
+  'tab:queue': e('Queue', 'Every open job, worst first, each with who has it, so what is nobody\'s is plain.', 'Select it to open the queue.', 'g:incident'),
+  'tab:support-changes': e('Changes', 'Every planned alteration to something in service: runs of standing rules, rule approvals and normal changes.', 'Select it to see the changes.', 'g:standing-rule'),
+  'tab:rules': e('Standing rules', def('standing-rule'), 'Select it to see every rule, its owner and its runs.', 'g:standing-rule'),
+  'tab:audit-log': e('Audit log', 'Every run of a standing rule with its trace, and every hand-off and priority on a job. Nothing is edited in place.', 'Select it to open the log.', 'g:standing-rule'),
   'tab:playbooks': e('Playbooks', def('playbook'), 'Select it to see the playbooks.', 'g:playbook'),
   'tab:refresh': e('Work plan', 'The plan for replacing devices as they reach the end of their planned life.', 'Select it to see what is due and when.'),
   'tab:budget': e('Budget', 'Planning: the budget, scenarios and the team\'s capacity, by financial year.', 'Select it to open Planning on the Budget view.'),
@@ -105,6 +109,10 @@ const PAGES = {
   'page.schedule': e('Schedule', 'Who is where and doing what. Day shows the offices, Week each person, Month the calendar, and Year the projects.', 'Choose a view in the bar, then a scope: Me, My team or Everyone. Drag work onto a person and day, or use Assign.'),
   'page.projects': e('Projects', def('project'), 'Open a project to see its phase, tasks and spaces. Deploy is where the devices go in.', 'l:projects'),
   'page.incidents': e('Incidents', def('incident'), 'Open one to see the space, the evidence and the next steps from the guide.', 'g:incident'),
+  'page.queue': e('Queue', 'Every open job, worst first, with its With chip and how long it has to be taken; then what standing rules did today.', 'Filter by who has it, or open a job to take it.', 'g:incident'),
+  'page.support-changes': e('Changes', 'Planned alterations to things in service. A standing rule\'s run is a standard change its owner approved once.', 'Open one to see where it stopped, or its card.', 'g:standing-rule'),
+  'page.rules': e('Standing rules', def('standing-rule'), 'Open a rule for its conditions, caps, way back and every run.', 'g:standing-rule'),
+  'page.audit-log': e('Audit log', 'The raw layer behind every How was this done? card: each run\'s trace, line by line, and every hand-off and priority on a job.', 'Filter by kind or rule, or find a run by its number.', 'g:standing-rule'),
   'page.playbooks': e('Playbooks', def('playbook'), 'Open one to see its phases, steps, who does each and the gates.', 'g:playbook'),
   'page.refresh': e('Work plan', 'The plan for replacing devices as they pass their planned life, grouped by office and year.', 'Filter by site or kind, then open a line to see the devices behind it.'),
   'page.budget': e('Planning', 'The budget, scenarios and the team\'s capacity by financial year. The band answers the year in one line and four figures; the views below carry the detail.', 'Pick a year in the filter bar, then Budget, Scenarios or Capacity. Every figure opens the projects and work plan items behind it.'),
@@ -383,10 +391,39 @@ const INTEGRATE = {
   'integrate.inroom': e('In this space', 'The units this project changes in this space and where each stands, then the devices kept as they are.', 'Select a unit to open it in its batch.'),
 };
 
+// ---- Support v2: the job record, standing rules, changes and the audit log (round V5) ---------------------------------
+const SUPPORT_V5 = {
+  'incident.priority-change': e('Change priority', 'The priority was proposed from impact and urgency. A person may change it; the reason they give is kept beside it.', 'Choose P1 to P4, say why in a few words, and select Change.', 'g:incident'),
+  'incident.major': e('Major incident', 'A job so big it runs the urgency rule and names one commander, who is in charge until it is over.', 'Choose the commander (the service owner by default), say why it is major, and select Declare.', 'g:incident'),
+  'incident.held': e('Held at a moment', 'This demo story is held at the moment it began, so it can be played from the start. Times you make here follow on from it.', 'Play it: Take, say what you think it is, run the rule, then Resolve.'),
+  'incident.owner': e('Who has it', 'The With chip says who has this job now and since when, with the one action that moves it on beside it.', 'Press the chip for the hand-off history. Take, Resume or Resolve is the button beside it.', 'l:home'),
+  'incident.clock': e('Response target', 'How long a job may wait for someone to take it. While nobody has it, the clock says when it goes to the service owner.', 'Take it before the time shown, or hand it on with a reason.', 'g:incident'),
+  'incident.facts': e('The unit\'s facts', 'What the systems know about the unit right now: when it was last seen, its switch port, its last change and the booking at stake.', 'Read them before you act. A fault glyph is where to start.', 'g:unit'),
+  'incident.diagnosis': e('What do you think it is?', 'On a P1 or P2 you say what you think first; the suggestion opens after. It keeps the diagnosis with people. The suggestion counts signals, never a percentage.', 'Type your call and select Save my call, or Not sure yet.', 'g:incident'),
+  'incident.do': e('Do', 'The verbs the standing rules declare for this job, each with its owner, its way back and the checks it passes first; then the job\'s own verbs.', 'Take the job, then run a rule or hand it on. A rule runs only where its checks hold.', 'g:standing-rule'),
+  'incident.resolve': e('What fixed it?', 'The one thing closing asks. It goes on the record, so the next person with the same fault starts from it.', 'Write one line and select Resolve.', 'g:captured-fix'),
+  'incident.raw': e('Raw', 'This job\'s entries in the audit log: every run, hand-off and priority, each with its full trace one click away.', 'Select an entry to open its trace in the log.', 'g:standing-rule'),
+  'timeline': e('Timeline', 'Every event on the record, newest first: when, who, what and where it came from. Automatic entries end with How was this done?', 'Filter it by People, Rules, Connectors or Changes.', 'g:done-automatically'),
+  'timeline.filter': e('Show on the timeline', 'All, or only what people did, what standing rules did, what connected systems said, or the changes to the unit and space.', 'Select one; the count says how many of each.'),
+  'how.open': e('How was this done?', 'Opens the card for an automatic action: what it read, what it did, what it ruled out and what it did not check, with the way back its rule declared.', 'Select the words. The full trace is one link away in the audit log.', 'g:done-automatically'),
+  'rule.strip': e('Runs, one square each', 'Every run of this rule, oldest on the left. A calm square read back and matched; a notched square was unable to complete; an outline was put back by a person.', 'Read the words under it for the count. The runs list opens each one.', 'g:standing-rule'),
+  'rule.run': e('Run it myself', 'Runs the rule by hand, to keep the skill. It checks its conditions first and runs only where they hold; if one does not, it says which and touches nothing.', 'Select it and watch the steps.', 'g:standing-rule'),
+  'rule.facts': e('The rule', 'Who owns it, the standard change that approved it, its way back, when it may run and its caps.', 'Nothing to do. Its owner changes it through a new approval.', 'g:standing-rule'),
+  'rule.conditions': e('Checked before every run', 'The conditions the rule checks, in order. The first that does not hold stops the run before it touches anything.', 'Read them to know when it will and will not run.', 'g:standing-rule'),
+  'rule.steps': e('How a run goes', 'Read, write, read back. A write that does not read back as intended is Unable to complete, never done.', 'Nothing to do.', 'g:unable-to-complete'),
+  'rule.runs': e('Runs', 'Every run with its result, what it acted on and its card. Quiet nights with nothing to change are in the strip only.', 'Select How was this done? on any run.', 'g:done-automatically'),
+  'rule.incidents': e('Incidents', 'Jobs this rule raised when it was unable to complete, or that offer it on their Do section.', 'Open one to see who has it.', 'g:incident'),
+  'rule.raw': e('Raw', 'This rule\'s entries in the audit log, each with its trace.', 'Select an entry to open its trace.', 'g:standing-rule'),
+  'change.facts': e('The change', 'What kind of change it is, who owns it, how it was approved, its way back and what it touches.', 'Nothing to do.'),
+  'change.incidents': e('Incidents', 'The incident this change raised, or the incidents that name it.', 'Open one to see who has it.', 'g:incident'),
+  'change.trace': e('The run, step by step', 'The run\'s trace from the audit log: each step, what it called and what came back.', 'Filter it, or open the full trace in the log.', 'g:unable-to-complete'),
+  'queue.auto': e('Done automatically today', 'What standing rules did today, each under a rule someone owns, read back and recorded.', 'Select How was this done? for what it read and did.', 'g:done-automatically'),
+};
+
 // ---- Incident -----------------------------------------------------------------------------------------------------
 const INCIDENT = {
   'incident.number': e('Ticket number', 'The number from the service desk\'s ticketing tool. Keia Atlas matched this ticket to a space and a device.', 'Quote it when you talk to the caller or the vendor.', 'g:incident'),
-  'incident.priority': e('Priority', 'How urgent it is, from P1 (critical) to P4 (low). It sets who looks at it and how fast.', 'Nothing to do. The priority comes from the ticket.', 'g:incident'),
+  'incident.priority': e('Priority', 'How urgent it is, from P1 (critical) to P4 (low), proposed from impact and urgency. The words beside it say why it was proposed.', 'Select it to change it. It asks why, and the reason is kept on the record.', 'g:incident'),
   'incident.state': e('State', 'Where the ticket is: new, in progress, on hold or resolved. On hold always says what it waits on.', 'Read the lifecycle below for the history.', 'g:on-hold'),
   'incident.lifecycle': e('Lifecycle', 'Each state the ticket has been in, with when and who. On hold is a pause, not a step.', 'Point at a step for its note.', 'g:incident'),
   'incident.picture': e('The space', 'The space, drawn to scale, with the device in question lit. Point at anything to find it in the list.', 'Select Space page to open the whole space.', 'l:room'),
@@ -826,6 +863,7 @@ const GUIDE = {
 export const HELP = {
   ...METHOD_PAGES, ...GUIDE,
   ...SHELL, ...PLACES, ...PAGES, ...PARTS, ...FILTER, ...HOME, ...OVERVIEW, ...SCHEDULE, ...INTEGRATE, ...INCIDENT,
+  ...SUPPORT_V5,
   ...ROOM, ...UNIT, ...TEAM_KEYS, ...STANDARDS, ...OTHER, ...PROJECT, ...PLANNING, ...NUMBERS, ...TERMS, ...KNOWN_ISSUES, ...OFFICE3D, ...LOCATIONS, ...SERVICES,
 };
 

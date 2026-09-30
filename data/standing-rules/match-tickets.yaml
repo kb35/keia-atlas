@@ -1,0 +1,33 @@
+# Standing rule: match a new ticket to its space and device and add what the systems know. Demo data (rule F8).
+# The match only adds to the record, so Undo takes it off again.
+id: match-tickets
+name: Match tickets to spaces
+title: Match a new ticket to its space and device, and add the evidence
+owner: priya
+service: av
+approved: { at: "2026-03-02T09:00", change: CHG-150, version: 4 }
+verb: Match {target} to its space
+reversal: { kind: undo, words: "Undo takes the match and the evidence off the ticket." }
+applies_to:
+  trigger: A new ticket arrives from the service desk
+conditions:
+  - The ticket names a space, a booking or a device
+  - The ticket is new and nobody has changed its space by hand
+caps: { per_wave: 50, booked_meeting: never, freeze: never, halt_after: 5 }
+steps:
+  - { kind: read, words: "Read the ticket, the caller's booking and the space names", seconds: 1 }
+  - { kind: write, words: "Add the space, the device and the evidence to the record", seconds: 1 }
+  - { kind: readback, words: "Read back the record and compare it with what was matched", seconds: 1 }
+reads:
+  - The ticket (the service desk tool, through its connector)
+  - Bookings (room booking)
+  - Device management and monitoring
+rules_out:
+  - Two spaces with the same name (it asks a person when there are)
+not_checked:
+  - Whether the caller described the right space (a person confirms when they take it)
+cadence: every new ticket
+runs:
+  - { id: RUN-2290, at: "2026-09-28T07:52", result: done, target: INC0041210, incident: INC0041210, did: "Matched to 3.09 Whooper Swan's video bar and added the evidence", ms: 900 }
+  - { id: RUN-2291, at: "2026-09-28T08:01", result: done, target: INC0041203, incident: INC0041203, did: "Matched to Goldcrest's video bar and added the evidence", ms: 1100 }
+demo: true

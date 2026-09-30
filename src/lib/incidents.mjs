@@ -10,6 +10,8 @@ export const RES_LABEL = { fixed: 'Fixed', workaround: 'Workaround', 'no-fault-f
 export const STATE_ORDER = ['new', 'in-progress', 'on-hold', 'resolved'];
 export const PRIORITY_LABEL = { 1: 'Critical', 2: 'High', 3: 'Moderate', 4: 'Low' };
 export const SOURCE_LABEL = { servicenow: 'ServiceNow', keia_atlas: 'Keia Atlas' };
+// A story the demo plays from the start (UX-V2 flow 4.1) is held at its own moment (keia_atlas.held_at) and says so.
+export const nowOf = (inc) => inc.keia_atlas?.held_at ?? DEMO_NOW;
 
 const ms = (t) => new Date(t).getTime();
 export const minutesBetween = (a, b) => Math.max(0, Math.round((ms(b) - ms(a)) / 60000));
@@ -33,6 +35,7 @@ export const whoName = (h) => (h.by ? PEOPLE.find((p) => p.id === h.by)?.name ??
 // the next state entry (or now). A move from Resolved back to In progress is a reopen.
 export function steps(inc) {
   const list = [];
+  const NOW = nowOf(inc);
   inc.history.forEach((h, i) => {
     if (!h.state) return;
     const prev = list[list.length - 1];
@@ -41,7 +44,7 @@ export function steps(inc) {
   });
   const last = list[list.length - 1];
   if (last && last.state !== 'resolved') last.until = null;
-  for (const s of list) s.minutes = s.state === 'resolved' ? null : minutesBetween(s.at, s.until ?? DEMO_NOW);
+  for (const s of list) s.minutes = s.state === 'resolved' ? null : minutesBetween(s.at, s.until ?? NOW);
   // What is still to come, drawn faint: from New or On hold, work starts or resumes; then it is resolved.
   const ahead = [];
   if (last?.state === 'new' || last?.state === 'on-hold') ahead.push({ state: 'in-progress', label: last.state === 'on-hold' ? 'Back in progress' : 'In progress' });
@@ -91,7 +94,7 @@ export function incidentView(inc) {
     wireNode: key ? `${key}#${nth}` : null, // Wiring's node id for this device
     steps: st, open, closed, resolution: inc.state === 'resolved' ? resolvedStep?.resolution : null,
     reopened: st.list.some((x) => x.reopen),
-    hold, age: minutesBetween(opened, closed ?? DEMO_NOW),
+    hold, age: minutesBetween(opened, closed ?? nowOf(inc)), now: nowOf(inc), held: !!inc.keia_atlas?.held_at,
   };
 }
 

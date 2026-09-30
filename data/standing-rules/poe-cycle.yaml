@@ -1,0 +1,43 @@
+# Standing rule: cycle PoE on the switch port that powers a room device. Demo data (rule F8): the runs, ports and
+# times are made up. A PoE cycle ends where it started (the port on), so it declares no Undo and no Roll back;
+# it is kept safe by its conditions instead: never with a meeting in the space, one device per wave.
+id: poe-cycle
+name: PoE rule
+title: Cycle PoE on the switch port that powers a room device
+owner: declan
+service: network
+approved: { at: "2026-06-02T10:00", change: CHG-180, version: 2 }
+verb: Cycle PoE on {target}
+reversal: { kind: none, words: "Nothing to put back: the port ends as it started, on." }
+applies_to:
+  classes: [video-bar, touch-controller, scheduler-panel, wireless-access-point, camera]
+  symptoms: [meeting_will_not_start, panel_dark]
+  trigger: A room device powered over Ethernet stops answering while its switch port stays up
+conditions:
+  - No meeting in the space now, and none in the next 10 minutes
+  - The switch port is up and the device draws no power, or answers no ping
+  - Not in a change freeze
+  - No other run of this rule on the same switch in the last 30 minutes
+caps: { per_wave: 1, booked_meeting: never, freeze: never, halt_after: 2 }
+steps:
+  - { kind: read, words: "Read the port, its PoE draw and the device's last contact", seconds: 1 }
+  - { kind: write, words: "Turn PoE off on the port, wait 10 s, turn it on", seconds: 12 }
+  - { kind: wait, words: "Wait for the device to start", seconds: 40 }
+  - { kind: readback, words: "Read back: the port draws power and the device answers", seconds: 2 }
+reads:
+  - Switch port state and PoE draw (the room switch's management interface)
+  - The device's last contact (device management)
+  - Bookings for the space (room booking)
+rules_out:
+  - A meeting in the space (none until the next booking)
+  - The switch itself being down (its other ports answer)
+not_checked:
+  - Whether the cable between the switch and the device is damaged (a cycle cannot tell)
+  - Why the device lost power in the first place
+cadence: by hand or from an incident
+runs:
+  - { id: RUN-4102, at: "2026-09-12T10:41", result: done, target: "lon-203-vc01, port GE1/0/5", by: tom, did: "Cycled PoE on port GE1/0/5; the video bar answered after 38 s", ms: 51000 }
+  - { id: RUN-4117, at: "2026-09-19T08:12", result: done, target: "nyc-2010-tc01, port GE1/0/7", by: carlos, did: "Cycled PoE on port GE1/0/7; the touch controller answered after 29 s", ms: 43000 }
+  - { id: RUN-4129, at: "2026-09-24T14:05", result: unable, target: "cph-407-vc01, port GE1/0/4", by: tom, stopped_at: readback, why: "The port drew power again but the video bar did not answer within 90 s. The port is on, as before.", did: "Cycled PoE on port GE1/0/4", ms: 104000 }
+  - { id: RUN-4133, at: "2026-09-26T09:30", result: done, target: "cph-407-vc01, port GE1/0/4", by: tom, did: "Cycled PoE on port GE1/0/4 after the patch lead was replaced; the video bar answered after 41 s", ms: 55000 }
+demo: true
