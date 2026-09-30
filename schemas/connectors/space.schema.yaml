@@ -1,0 +1,34 @@
+# Connected space: a place as another system knows it (a site, building, floor, room, desk or rack), in
+# Keia's shape. Places nest through `parent`, like Brick's Site > Building > Floor > Room.
+# Files live in data/connected/<system>/spaces/<id>.yaml. See docs/connectors/model.md.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/connectors/space
+title: Connected space
+type: object
+additionalProperties: false
+required: [kind, id, name, level, source]
+properties:
+  kind: { const: space }
+  id: { $ref: "common#/$defs/id" }
+  name: { type: string, minLength: 1 }
+  level:
+    description: What sort of place it is. A rack is a place too, because units are mounted in it.
+    enum: [site, building, floor, room, desk, rack]
+  code: { type: string, minLength: 1, description: "The system's short code or room number (DUB, 3.01)." }
+  parent: { $ref: "common#/$defs/id", description: The connected space it sits in. Left out for a site. }
+  status:
+    description: "Keia's space status: planned, being-installed, being-replaced, in-service, closed. Left out when the system's own status does not map cleanly."
+    enum: [planned, being-installed, being-replaced, in-service, closed]
+  status_native: { type: string, minLength: 1 }
+  category_native: { type: string, minLength: 1, description: "The system's own kind or role for the place (Comms room, Meeting room)." }
+  time_zone: { type: string, pattern: "^[A-Za-z_]+(/[A-Za-z0-9_+-]+)*$" }
+  country: { type: string, pattern: "^[A-Z]{2}$" }
+  size_u: { type: integer, minimum: 1, description: "Racks only: height in rack units." }
+  atlas_site: { $ref: "common#/$defs/id", description: "Keia's link to an office: a site id in data/sites. Owned by Keia." }
+  atlas_space: { $ref: "common#/$defs/id", description: "Keia's link to a space: a space id in data/spaces. Owned by Keia." }
+  notes: { $ref: "common#/$defs/notes" }
+  source: { $ref: "common#/$defs/source" }
+  field_sources: { $ref: "common#/$defs/field_sources" }
+  raw: { $ref: "common#/$defs/raw" }
+  raw_redacted: { $ref: "common#/$defs/raw_redacted" }

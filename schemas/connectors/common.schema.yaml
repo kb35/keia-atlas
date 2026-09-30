@@ -1,0 +1,85 @@
+# Connector common parts: the pieces every connected record shares (docs/connectors/model.md).
+#
+# A connected record is what a connector brought in from another system, in Keia's own shape.
+# Every one carries a source mark (which system, which record there, a link back, when it was last
+# synced) and keeps the system's own record aside, in `raw`, so nothing is lost when the mapping changes.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/connectors/common
+title: Connector common parts
+$defs:
+  id:
+    description: A Keia id. Lower case words and digits joined by hyphens. For a connected record it starts with the system (netbox-device-42).
+    type: string
+    pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
+    maxLength: 120
+
+  system:
+    description: The system a value came from, as a short name (netbox, spreadsheet, servicenow). "keia" means a person set it in Keia.
+    type: string
+    pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
+
+  link:
+    description: >-
+      A link back to the record in its own system, for a person to open. Never with a user name, password or
+      token in it: the link is stored in the repository.
+    type: string
+    format: uri
+    pattern: "^https?://[^\\s/@]+(/\\S*)?$"
+    not: { pattern: "[?&]([a-z_]*token|[a-z_]*key|password|secret|sig|signature)=" }
+
+  when:
+    description: A date and time with its zone (2026-09-30T08:15:00Z).
+    type: string
+    format: date-time
+
+  mark:
+    description: Where one value came from. Used in field_sources when a record holds values from more than one system.
+    type: object
+    additionalProperties: false
+    required: [system, synced_at]
+    properties:
+      system: { $ref: "#/$defs/system" }
+      instance: { type: string, minLength: 1, description: "Which copy of the system, when there is more than one (a host name or a file name)." }
+      record_id: { type: string, minLength: 1, description: The record's own id in that system. }
+      url: { $ref: "#/$defs/link" }
+      synced_at: { $ref: "#/$defs/when" }
+
+  source:
+    description: >-
+      The record's source mark: the system that owns it, its id there, a link back, and when Keia last took a
+      changed value from it. Pages show it as a source badge ("NetBox · device 42 · synced 2 min ago").
+    type: object
+    additionalProperties: false
+    required: [system, record_id, synced_at, adapter]
+    properties:
+      system: { $ref: "#/$defs/system" }
+      instance: { type: string, minLength: 1, description: "Which copy of the system (a host name, or the file name for a spreadsheet)." }
+      record_id: { type: string, minLength: 1, description: The record's own id in that system. Keia's id is primary; this is the alias. }
+      url: { $ref: "#/$defs/link" }
+      synced_at: { $ref: "#/$defs/when" }
+      adapter: { $ref: "#/$defs/id", description: The adapter that brought the record in (its manifest id). }
+      adapter_version: { type: string, pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$" }
+
+  field_sources:
+    description: >-
+      A source mark per field, for a value that came from somewhere other than the record's own source
+      (a person in Keia, or a second system). A field not listed here came from `source`.
+    type: object
+    propertyNames: { pattern: "^[a-z][a-z0-9_]*$" }
+    additionalProperties: { $ref: "#/$defs/mark" }
+
+  raw:
+    description: >-
+      The system's own record, exactly as it arrived, kept aside so nothing is lost. Pages may show it under
+      "More from <system>". Fields that looked like secrets were emptied on the way in (raw_redacted).
+    type: object
+
+  raw_redacted:
+    description: Paths in `raw` whose values were emptied because the field looked like a password, token or key.
+    type: array
+    items: { type: string }
+
+  notes:
+    type: array
+    items: { type: string }

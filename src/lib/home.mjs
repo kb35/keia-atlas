@@ -10,6 +10,9 @@ import { groupFor, planDay } from './homecore.mjs';
 import { projects, incidents, spaces, sites, SITE_ORDER, DEMO_TODAY, href, totals, labTests, advisories, commsRooms, phasesOf, OPEN_PHASES } from './data.mjs';
 import { PEOPLE, ROLES, INBOX_SEED, MANAGER_ROLES } from './demo.mjs';
 import { integratePlan, buildModel, batchHref } from './integrate.mjs';
+import { lights, nextGate } from './project-status.mjs';
+import { issues as kiIssues } from './knownissues-view.mjs';
+import { KIND } from './data.mjs';
 
 const TODAY = DEMO_TODAY;
 const TASK_KINDS = 'provision,install,configure,commission,task';
@@ -236,7 +239,252 @@ export function homeData() {
     captions: Object.fromEntries(PEOPLE.map((p) => [p.id, captionFor(p)])),
     next: NEXT,
     projectNames: Object.fromEntries(Object.values(projects).map((p) => [p.id, p.name])),
+    cockpit: cockpitData(),
   };
 }
 export const groupsFor = (id) => groupFor(ITEMS, id, TODAY);
 export { BY_ID as itemById };
+
+// ==== v2: the cockpit (UX-V2 §3, §4.3, §4.4; UI-V2 §3.1) ========================================================
+// Everything Home needs to say who has what, which spaces are not all right, what was done automatically, what
+// changed overnight and, after time away, what happened. Worked out once here; src/lib/homecore.mjs turns it into
+// each role's answer sentence, four figures and lists in the browser, with the live layer's changes on top.
+const DEMO_NOW = '2026-09-28T12:00';
+const OVERNIGHT = '2026-09-27T18:00';
+const AWAY_FROM = '2026-09-14';        // Welcome back: two weeks away, 14 to 28 September
+const HOLD_WORDS = { 'awaiting-caller': 'the caller', 'awaiting-vendor': 'the vendor', 'awaiting-change': 'a change', 'awaiting-parts': 'parts' };
+const STATE_WORD = { 'in-progress': 'Taken', 'on-hold': 'On hold', resolved: 'Resolved' };
+const LOG_WORD = { risk: 'Risk', issue: 'Issue', dependency: 'Dependency', decision: 'Decision' };
+const PHASE_WORD = { plan: 'Plan', design: 'Design', procure: 'Procure', integrate: 'Deploy', handover: 'Hand over' };
+const KIND_WORD = { install: 'Install', commission: 'Commission', provision: 'Provision', configure: 'Configure', survey: 'Survey', network: 'Network work', records: 'Records', handover: 'Hand over', design: 'Design', order: 'Order', task: 'Task' };
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const fmtShort = (d) => { const [, m, dd] = String(d).slice(0, 10).split('-'); return `${+dd} ${MON[+m - 1]}`; };
+// How long a job may stay open before it is past target, by priority (simulated service targets, in hours).
+export const TARGET_H = { 1: 4, 2: 8, 3: 72, 4: 240 };
+const hoursBetween = (a, b) => (Date.parse(b) - Date.parse(a)) / 36e5;
+const firstSentence = (s) => { const t = String(s ?? '').trim(); const m = /^(.+?[.!?])(\s|$)/.exec(t); return (m ? m[1] : t).replace(/\.$/, ''); };
+const incOf = (it) => (it.kind === 'incident' ? incidentByNumber.get(it.id.slice(4)) : null);
+const pName = (id) => P[id]?.name ?? id;
+const pFirst = (id) => (P[id]?.name ?? String(id ?? 'nobody')).split(' ')[0];
+const lower1 = (s) => String(s ?? '').replace(/^./, (c) => c.toLowerCase());
+
+// The standing rule that matches tickets to spaces (quiet automation: a rule with a human owner, never an agent).
+export const MATCH_RULE = { name: 'Match tickets to spaces', owner: 'priya' };
+
+// ---- Who has each piece of work, before any live change ----------------------------------------------------
+// Parked jobs in the demo (UX-V2 §4.4): Liam stopped part way through labelling the IDF 3 panel for the cutover;
+// Aoife stopped part way through commissioning Heron in Juneau.
+export const PARKED_SEED = {
+  'task:T-1605': { by: 'liam', at: `${DEMO_TODAY}T10:14`, park: { where: 'Labelled ports 1 to 8 on the IDF 3 panel', next: 'Label 9 to 12, then check each against the build sheet', question: 'Is port 11 the booking panel? Its label is missing' } },
+  'task:T-1404': { by: 'aoife', at: '2026-09-25T16:40', park: { where: 'Framing fixed; half of the verification run', next: 'Run the far-end checks from another office', question: 'Does the Juneau desk want the old unit kept as a spare?' } },
+};
+function baseOwn(it) {
+  const to = it.who[0] ?? null;
+  const seed = PARKED_SEED[it.id];
+  if (seed && it.status !== 'done') return { s: 'parked', to: seed.by, kind: 'person', at: seed.at, by: seed.by, park: seed.park };
+  if (it.kind === 'incident') {
+    const inc = incOf(it); if (!inc) return null;
+    const last = [...inc.history].reverse().find((h) => h.state);
+    const at = last?.at ?? inc.opened;
+    if (inc.state === 'new') return { s: 'ready', to, kind: 'person', at: inc.opened };
+    if (inc.state === 'in-progress') return { s: 'with', to, kind: 'person', at, by: last?.by ?? to };
+    if (inc.state === 'on-hold') return { s: 'waiting', to, kind: 'person', at, wait: HOLD_WORDS[last?.hold_reason] ?? 'something outside' };
+    return { s: 'done', to, kind: 'person', at };
+  }
+  if (it.kind === 'task' || it.kind === 'lab') {
+    if (it.status === 'todo') return { s: 'ready', to, kind: 'person', at: it.start };
+    if (it.status === 'doing') return { s: 'with', to, kind: 'person', at: it.start, by: to };
+    if (it.status === 'blocked') return { s: 'waiting', to, kind: 'person', at: it.start, wait: lower1(it.blocked ?? 'something outside') };
+    return { s: 'done', to, kind: 'person', at: it.end };
+  }
+  if (it.kind === 'inbox') return it.status === 'todo' ? { s: 'ready', to, kind: 'person', at: it.start } : null;
+  return null;
+}
+export const OWN = Object.fromEntries(ITEMS.map((it) => [it.id, baseOwn(it)]).filter(([, o]) => o));
+
+// The hand-off history each chip opens (newest first), from the ticket's history.
+function historyOf(it) {
+  const inc = incOf(it), out = [];
+  if (inc) for (const h of inc.history) {
+    if (h.source === 'keia_atlas') { out.push({ at: h.at, text: `Matched to its space automatically (${MATCH_RULE.name}, owner ${pFirst(MATCH_RULE.owner)})` }); continue; }
+    if (h.state === 'new') out.push({ at: h.at, text: `Came in${h.person ? ` from ${h.person}` : ''}` });
+    else if (h.state === 'in-progress' && h.by) out.push({ at: h.at, text: `${pName(h.by)} took it` });
+    else if (h.state === 'on-hold') out.push({ at: h.at, text: `${h.by ? `${pName(h.by)}: w` : 'W'}aiting on ${HOLD_WORDS[h.hold_reason] ?? 'something outside'}` });
+    else if (h.state === 'resolved') out.push({ at: h.at, text: `${h.by ? pName(h.by) : 'Someone'} resolved it` });
+  }
+  const seed = PARKED_SEED[it.id];
+  if (seed) out.push({ at: seed.at, text: `${pName(seed.by)} parked it. Next: ${seed.park.next}` });
+  return out.sort((a, b) => b.at.localeCompare(a.at));
+}
+export const HISTORY = Object.fromEntries(ITEMS.map((it) => [it.id, historyOf(it)]).filter(([, h]) => h.length));
+
+// Extras on each open incident: its target and whether it is past it, when it came in, and whether it waits.
+export const INC_EXTRA = Object.fromEntries(ITEMS.filter((it) => it.kind === 'incident').map((it) => {
+  const inc = incOf(it); if (!inc) return [it.id, null];
+  const age = hoursBetween(inc.opened, DEMO_NOW), target = TARGET_H[inc.priority] ?? 72;
+  return [it.id, { opened: inc.opened, target, past: age > target, ageH: Math.round(age), newToday: inc.opened.slice(0, 10) === DEMO_TODAY, hold: inc.state === 'on-hold' }];
+}).filter(([, v]) => v));
+
+// ---- Spaces: which are not all right, from the open jobs on them (the dark cockpit colours nothing else) ------
+// Fault: a P1 to P3 job someone is on or nobody has yet. To review: a P4, or a job waiting on something outside.
+const RANK = { fault: 0, review: 1 };
+export const SPACE_HEALTH = {};
+for (const it of ITEMS.filter((x) => x.kind === 'incident' && x.room)) {
+  const inc = incOf(it); if (!inc || inc.state === 'resolved') continue;
+  const h = inc.priority <= 3 && inc.state !== 'on-hold' ? 'fault' : 'review';
+  const cur = SPACE_HEALTH[it.room];
+  if (!cur || RANK[h] < RANK[cur.h]) SPACE_HEALTH[it.room] = { h, why: firstSentence(inc.short_description), item: it.id, who: it.who[0] ?? null, prio: inc.priority, since: inc.opened };
+}
+// The spaces an office counts as its own (meeting rooms, shared spaces, comms rooms), not desks or home kits.
+const countsAsSpace = (s) => s.site && !['desks', 'kits'].includes(KIND(s));
+export const SITE_HEALTH = Object.fromEntries(SITE_ORDER.map((s) => {
+  const list = Object.values(spaces).filter((x) => x.site === s && countsAsSpace(x)), bad = list.filter((x) => SPACE_HEALTH[x.id]);
+  return [s, { n: list.length, fault: bad.filter((x) => SPACE_HEALTH[x.id].h === 'fault').map((x) => x.id), review: bad.filter((x) => SPACE_HEALTH[x.id].h === 'review').map((x) => x.id) }];
+}));
+
+// ---- Done automatically, and what changed overnight ---------------------------------------------------------
+export const AUTO = [];
+for (const inc of Object.values(incidents)) for (const h of inc.history) {
+  if (h.source !== 'keia_atlas') continue;
+  AUTO.push({ at: h.at, item: `inc:${inc.number}`, site: spaces[inc.subject.room]?.site ?? null, room: inc.subject.room, text: firstSentence(h.note), number: inc.number, href: href(`/incidents/${inc.number.toLowerCase()}/`), rule: MATCH_RULE });
+}
+AUTO.sort((a, b) => b.at.localeCompare(a.at));
+export const CHANGED = [];
+for (const inc of Object.values(incidents)) for (const h of inc.history) {
+  if (h.at < OVERNIGHT || h.at > DEMO_NOW || h.source === 'keia_atlas') continue;
+  const text = h.state === 'new' ? `New: ${inc.short_description}` : h.state ? `${STATE_WORD[h.state] ?? h.state}: ${inc.short_description}` : firstSentence(h.note);
+  CHANGED.push({ at: h.at, site: spaces[inc.subject.room]?.site ?? null, item: `inc:${inc.number}`, text, sub: `${inc.number}${h.by ? ` · ${pName(h.by)}` : h.person ? ` · from ${h.person}` : ''}`, href: href(`/incidents/${inc.number.toLowerCase()}/`) });
+}
+for (const prj of Object.values(projects)) for (const l of prj.log ?? []) {
+  if (!l.raised || l.raised < OVERNIGHT.slice(0, 10)) continue;
+  CHANGED.push({ at: `${l.raised}T08:00`, site: prj.site, project: prj.id, text: `${LOG_WORD[l.kind] ?? 'Note'} raised: ${l.title}`, sub: `${prj.id} ${prj.name} · ${pName(l.owner)}`, href: href(`/projects/${prj.id.toLowerCase()}/`) });
+}
+CHANGED.sort((a, b) => b.at.localeCompare(a.at));
+
+// ---- Knowledge to review: known errors from the manufacturers' feeds that may affect Aigna ------------------------
+export const KNOWLEDGE = kiIssues.filter((i) => i.status === 'open' && i.affects !== 'no').map((i) => ({ title: i.title, sub: `${i.maker} · ${i.affects === 'yes' ? `affects ${i.ex.exposed.length} ${i.ex.exposed.length === 1 ? 'unit' : 'units'}` : 'may affect us'}`, href: href(i.path) }));
+
+// ---- To review, per person: things someone should look at, where nothing is down (UI-V2 §5.2, the notched ring) ----
+const openLogOf = (pid) => Object.values(projects).filter((prj) => prj.phase !== 'closed').flatMap((prj) => (prj.log ?? []).filter((l) => l.status === 'open' && l.owner === pid && ['risk', 'issue'].includes(l.kind)).map((l) => ({ l, prj })));
+function reviewFor(p) {
+  const out = [], office = p.office;
+  const R = (title, sub, to, extra = {}) => out.push({ title, sub, href: to ? href(to) : null, ...extra });
+  const logRows = () => openLogOf(p.id).forEach(({ l, prj }) => R(l.title, `${prj.id} ${prj.name} · ${LOG_WORD[l.kind]}${l.due ? ` · due ${fmtShort(l.due)}` : ''}`, `/projects/${prj.id.toLowerCase()}/`));
+  switch (p.roleId) {
+    case 'tech': {
+      for (const id of SITE_HEALTH[office]?.review ?? []) { const h = SPACE_HEALTH[id]; R(`${roomName(id)}: ${lower1(h.why)}`, `With ${pFirst(h.who)} · P${h.prio}`, `/incidents/${h.item.slice(4).toLowerCase()}/`, { item: h.item }); }
+      const due = dueAt(office);
+      if (due) R(`Replace ${due} ${due === 1 ? 'device' : 'devices'} due this year`, `The work plan · ${sites[office]?.name ?? ''}`, `/refresh/?site=${office}&due=over,now`);
+      break;
+    }
+    case 'delivery': case 'network': case 'innovation': {
+      logRows();
+      if (p.roleId === 'innovation') for (const l of Object.values(labTests).filter((x) => x.status === 'passed')) R(l.title, `${l.id} · passed, waiting for the service owner`, `/lab/#${l.id.toLowerCase()}`);
+      break;
+    }
+    case 'desk': {
+      for (const it of ITEMS.filter((x) => x.kind === 'incident' && INC_EXTRA[x.id]?.hold)) {
+        const d = Math.floor(INC_EXTRA[it.id].ageH / 24);
+        if (d >= 3) R(it.title, `${it.id.slice(4)} · on hold, open ${d} days · with ${pFirst(it.who[0])}`, `/incidents/${it.id.slice(4).toLowerCase()}/`, { item: it.id });
+      }
+      break;
+    }
+    case 'sm-av': case 'sm-infra': {
+      if (p.roleId === 'sm-av') {
+        for (const l of Object.values(labTests).filter((x) => x.status === 'passed')) R(l.title, `${l.id} · passed in the Lab, yours to decide`, `/lab/#${l.id.toLowerCase()}`);
+        for (const k of KNOWLEDGE.slice(0, 3)) out.push({ title: k.title, sub: `Known error · ${k.sub}`, href: k.href });
+      } else for (const prj of Object.values(projects).filter((x) => x.phase !== 'closed' && ['network-refresh', 'infra-refresh'].includes(x.kind))) {
+        const G = nextGate(prj);
+        if (G && !G.signed) R(`${G.phase} gate, ${prj.name}`, `${fmtShort(G.date)} · ${G.signer} signs`, `/projects/${prj.id.toLowerCase()}/`);
+      }
+      break;
+    }
+    case 'pm': case 'programme': {
+      for (const prj of Object.values(projects).filter((x) => x.phase !== 'closed' && (p.roleId === 'programme' || x.owner === p.id))) {
+        const G = nextGate(prj);
+        if (G && !G.signed && Math.round((Date.parse(G.date) - Date.parse(DEMO_TODAY)) / 864e5) <= 14) R(`${G.phase} gate, ${prj.name}`, `${fmtShort(G.date)}${G.late ? ` · ${G.slip} days over` : ''} · ${G.signer} signs`, `/projects/${prj.id.toLowerCase()}/`);
+      }
+      logRows();
+      break;
+    }
+    case 'head': {
+      for (const prj of Object.values(projects).filter((x) => x.phase !== 'closed')) {
+        const L = lights(prj), bad = [L.schedule, L.cost, L.scope].filter((l) => l.state === 'bad');
+        if (bad.length) R(prj.name, bad.map((l) => l.why).join(' '), `/projects/${prj.id.toLowerCase()}/`);
+      }
+      break;
+    }
+    case 'vendor': case 'service-vendor': {
+      for (const prj of (p.projects ?? []).map((x) => projects[x]).filter(Boolean)) for (const s of prj.spaces ?? []) if (s.state === 'snags') R(`${roomName(s.space)}: snags to clear`, `${prj.id} ${prj.name}${s.note ? ` · ${s.note}` : ''}`, '/vendor/');
+      break;
+    }
+    default: {
+      const team = teamOf(p);
+      for (const it of ITEMS.filter((x) => x.kind === 'task' && x.status === 'blocked' && x.who.some((w) => team.includes(w))).slice(0, 8)) out.push({ title: it.title, sub: `${pFirst(it.who[0])} · waiting on ${lower1(it.blocked ?? 'something')}`, href: it.href, item: it.id });
+    }
+  }
+  return out;
+}
+export const REVIEW = Object.fromEntries(PEOPLE.map((p) => [p.id, reviewFor(p)]));
+
+// ---- Welcome back, and the hand over for cover (UX-V2 §4.3) ------------------------------------------------------
+// Who covers whom while they are away: the first colleague in the same role (Marcus covers Aoife).
+export const coverOf = (p) => PEOPLE.find((x) => x.id !== p.id && x.roleId === p.roleId && !x.vendor)?.id ?? null;
+const scopeSites = (p) => (p.roleId === 'tech' ? [p.office] : p.region ? SITE_ORDER.filter((s) => sites[s].region === p.region) : SITE_ORDER);
+function welcomeFor(p) {
+  if (p.vendor || p.roleId === 'head') return null;
+  const inScope = new Set(scopeSites(p)), cover = coverOf(p);
+  const mineOpen = ITEMS.filter((it) => it.who.includes(p.id) && ['incident', 'task', 'lab'].includes(it.kind) && it.status !== 'done' && (it.kind !== 'task' || it.status !== 'todo' || (it.end && it.end <= '2026-10-05')));
+  const open = mineOpen.map((it) => ({ item: it.id, title: it.title, sub: [it.room ? roomName(it.room) : null, it.project].filter(Boolean).join(' · '), to: it.href, park: PARKED_SEED[it.id]?.park ?? null, note: cover && it.kind === 'incident' && it.status !== 'todo' ? `${pFirst(cover)} covered it while you were away` : null }));
+  const handled = Object.values(incidents).filter((inc) => inc.state === 'resolved').map((inc) => ({ inc, res: [...inc.history].reverse().find((h) => h.state === 'resolved') }))
+    .filter(({ inc, res }) => res && res.at.slice(0, 10) >= AWAY_FROM && (inScope.has(spaces[inc.subject.room]?.site) || inc.keia_atlas?.assigned === p.id))
+    .sort((a, b) => b.res.at.localeCompare(a.res.at))
+    .map(({ inc, res }) => ({ title: inc.short_description, sub: `${inc.number} · ${fmtShort(res.at)} · ${pName(res.by ?? inc.keia_atlas?.assigned)}`, to: href(`/incidents/${inc.number.toLowerCase()}/`), note: res.resolution?.notes ? `What fixed it: ${firstSentence(res.resolution.notes)}` : null }));
+  const changed = [];
+  for (const prj of Object.values(projects).filter((x) => x.phase !== 'closed' && (x.owner === p.id || (x.roles ?? []).some((r) => r.person === p.id)))) {
+    for (const h of prj.history ?? []) if (h.ended && h.ended >= AWAY_FROM) {
+      const slip = Math.round((Date.parse(h.ended) - Date.parse(h.planned)) / 864e5);
+      changed.push({ at: h.ended, title: `${PHASE_WORD[h.phase] ?? h.phase} gate passed, ${prj.name}`, sub: `${fmtShort(h.ended)}${slip > 0 ? `, ${slip} ${slip === 1 ? 'day' : 'days'} after plan` : slip < 0 ? `, ${-slip} ${slip === -1 ? 'day' : 'days'} early` : ', on plan'} · signed by ${pName(h.signed_off_by)}`, to: href(`/projects/${prj.id.toLowerCase()}/`) });
+    }
+    for (const l of prj.log ?? []) if (l.raised && l.raised >= AWAY_FROM) changed.push({ at: l.raised, title: `${LOG_WORD[l.kind] ?? 'Note'}: ${l.title}`, sub: `${prj.id} · ${fmtShort(l.raised)} · ${pName(l.owner)}`, to: href(`/projects/${prj.id.toLowerCase()}/`) });
+    for (const c of prj.changes ?? []) if (c.raised && c.raised >= AWAY_FROM) changed.push({ at: c.raised, title: `Change proposed: ${c.title}`, sub: `${prj.id} · ${fmtShort(c.raised)} · ${pName(c.proposed_by)}`, to: href(`/projects/${prj.id.toLowerCase()}/`) });
+  }
+  changed.sort((a, b) => b.at.localeCompare(a.at));
+  // Refreshers: a kind of procedure on your open tasks you have not done in 90 days opens with every step again.
+  const doneBy = Object.values(projects).flatMap((prj) => (prj.tasks ?? []).filter((t) => t.owner === p.id && t.status === 'done').map((t) => ({ kind: t.kind, due: t.due })));
+  const kinds = [...new Set(mineOpen.filter((it) => it.kind === 'task' && it.taskKind).map((it) => it.taskKind))];
+  const refresh = kinds.map((k) => {
+    const last = doneBy.filter((d) => d.kind === k && d.due).map((d) => d.due).sort().pop() ?? null;
+    return { k, last, days: last ? Math.round((Date.parse(DEMO_TODAY) - Date.parse(last)) / 864e5) : null };
+  }).filter((x) => x.days === null || x.days > 90).map((x) => ({ title: `${KIND_WORD[x.k] ?? x.k}: every step shows again`, sub: x.last ? `Last done by you ${fmtShort(x.last)}, ${x.days} days ago` : 'Not done by you in Keia Atlas before' }));
+  const rules = AUTO.filter((a) => a.at.slice(0, 10) >= AWAY_FROM && inScope.has(a.site)).map((a) => ({ title: a.text, sub: `${a.number} · ${fmtShort(a.at)} · under ${a.rule.name}`, to: a.href }));
+  return { cover, from: AWAY_FROM, to: DEMO_TODAY, days: 14, open, handled, changed, refresh, rules };
+}
+export const WELCOME = Object.fromEntries(PEOPLE.map((p) => [p.id, welcomeFor(p)]).filter(([, w]) => w));
+
+// ---- Figures that do not change as you watch: projects and the vendor's contract dates ------------------------
+function extraFor(p) {
+  const own = (prj) => p.roleId === 'programme' || p.roleId === 'head' || prj.owner === p.id;
+  const live = Object.values(projects).filter((prj) => prj.phase !== 'closed' && own(prj));
+  const off = live.filter((prj) => { const L = lights(prj); return [L.schedule, L.cost, L.scope].some((l) => l.state === 'bad'); });
+  const gatesWeek = live.filter((prj) => { const G = nextGate(prj); return G && !G.signed && Math.round((Date.parse(G.date) - Date.parse(DEMO_TODAY)) / 864e5) <= 7; }).length;
+  const late = live.flatMap((prj) => prj.tasks.filter((t) => t.status !== 'done' && t.due && t.due < DEMO_TODAY)).length;
+  const risks = live.flatMap((prj) => (prj.log ?? []).filter((l) => l.kind === 'risk' && l.status === 'open')).length;
+  const vendorPrj = (p.projects ?? []).map((x) => projects[x]).filter(Boolean);
+  return {
+    projects: live.length, onPlan: live.length - off.length, off: off.length, gatesWeek, late, risks,
+    vendorSpaces: vendorPrj.flatMap((x) => x.spaces ?? []).length,
+    vendorLate: vendorPrj.flatMap((x) => x.tasks.filter((t) => t.owner === p.id && t.status !== 'done' && t.due && t.due < DEMO_TODAY)).length,
+  };
+}
+export const EXTRA = Object.fromEntries(PEOPLE.map((p) => [p.id, extraFor(p)]));
+
+/** The cockpit's part of the Home blob. */
+export function cockpitData() {
+  return {
+    now: DEMO_NOW, own: OWN, history: HISTORY, inc: INC_EXTRA, spaceHealth: SPACE_HEALTH, siteHealth: SITE_HEALTH,
+    auto: AUTO.filter((a) => a.at.slice(0, 10) === DEMO_TODAY), changed: CHANGED, knowledge: KNOWLEDGE, review: REVIEW, welcome: WELCOME,
+    targets: TARGET_H, matchRule: MATCH_RULE, extra: EXTRA,
+    offices: SITE_ORDER.filter((s) => sites[s].kind !== 'remote'),
+  };
+}

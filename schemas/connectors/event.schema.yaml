@@ -1,0 +1,25 @@
+# Connected event: something that happened in another system (a device went offline, a ticket changed),
+# in Keia's shape. It maps one to one onto a CloudEvents 1.0 envelope (docs/connectors/model.md):
+#   CloudEvents id = source.record_id, source = the system (and instance), type = type,
+#   subject = subject, time = time, data = data.
+# Files live in data/connected/<system>/events/<id>.yaml.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/connectors/event
+title: Connected event
+type: object
+additionalProperties: false
+required: [kind, id, type, time, source]
+properties:
+  kind: { const: event }
+  id: { $ref: "common#/$defs/id" }
+  type:
+    description: What happened, reverse-DNS style, as CloudEvents asks (io.keia.unit.offline, io.keia.ticket.updated).
+    type: string
+    pattern: "^[a-z0-9]+(\\.[a-z0-9-]+)+$"
+  subject: { $ref: "common#/$defs/id", description: The connected record it is about. }
+  time: { $ref: "common#/$defs/when" }
+  data: { type: object, description: "The event's facts in Keia's words (the new status, the old one)." }
+  source: { $ref: "common#/$defs/source" }
+  raw: { $ref: "common#/$defs/raw" }
+  raw_redacted: { $ref: "common#/$defs/raw_redacted" }

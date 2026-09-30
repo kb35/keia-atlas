@@ -1,0 +1,40 @@
+# Connected unit: one physical device as another system knows it (an asset register, NetBox, a fleet tool),
+# in Keia's shape. Files live in data/connected/<system>/units/<id>.yaml. See docs/connectors/model.md.
+#
+# The core is the set every device source can fill: name, manufacturer, model, serial, asset tag, status,
+# where it is. Anything else the system holds stays in `raw`.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/connectors/unit
+title: Connected unit
+type: object
+additionalProperties: false
+required: [kind, id, name, source]
+properties:
+  kind: { const: unit }
+  id: { $ref: "common#/$defs/id" }
+  name: { type: string, minLength: 1, description: What the system calls the device (a hostname or a label). }
+  manufacturer: { type: string, minLength: 1 }
+  model: { type: string, minLength: 1, description: The model as the system names it. }
+  serial: { type: string, minLength: 1 }
+  asset_tag: { type: string, minLength: 1 }
+  status:
+    description: "Keia's lifecycle status: plan (Ordered), procure (Procured), spare (Spare), deploy (Being installed), manage (In service), retire (Retired). Left out when the system's own status does not map cleanly."
+    enum: [plan, procure, spare, deploy, manage, retire]
+  status_native: { type: string, minLength: 1, description: "The status in the system's own words, shown beside Keia's." }
+  category_native: { type: string, minLength: 1, description: "The system's own kind or role for the device (Video bar, Access switch)." }
+  space: { $ref: "common#/$defs/id", description: The connected space it is in (a space id in data/connected). }
+  position:
+    description: Where it sits in its space, when the system knows (a rack unit and face).
+    type: object
+    additionalProperties: false
+    properties:
+      u: { type: number, minimum: 0 }
+      face: { enum: [front, rear] }
+  firmware: { type: string, minLength: 1 }
+  model_id: { $ref: "common#/$defs/id", description: "Keia's link to the device catalogue: a model id in data/device-models. Owned by Keia: a person may correct it, and the next import keeps their choice." }
+  notes: { $ref: "common#/$defs/notes" }
+  source: { $ref: "common#/$defs/source" }
+  field_sources: { $ref: "common#/$defs/field_sources" }
+  raw: { $ref: "common#/$defs/raw" }
+  raw_redacted: { $ref: "common#/$defs/raw_redacted" }

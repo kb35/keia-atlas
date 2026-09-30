@@ -14,6 +14,7 @@ import { crossCheckIncidents } from './crossrefs-incidents.mjs';
 import { crossCheckKnownIssues } from './crossrefs-knownissues.mjs';
 import { crossCheckFloors } from './crossrefs-floors.mjs';
 import { crossCheckPrivacy } from './crossrefs-privacy.mjs';
+import { crossCheckConnected } from './crossrefs-connected.mjs';
 import path from 'node:path';
 
 
@@ -639,6 +640,7 @@ export function crossCheck(records, root) {
   problems.push(...crossCheckStock(records));
   problems.push(...crossCheckFloors(records));
   problems.push(...crossCheckPrivacy(records));
+  problems.push(...crossCheckConnected(records));
 
   return problems;
 }
