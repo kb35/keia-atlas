@@ -1,0 +1,32 @@
+---
+// The Keia Atlas mark (v11, signed off 30 Sept 2026): one slab with a ring on its right-hand corner, drawn at rest on
+// the server so it shows before any script and stays still with reduced motion. Colours come from the look:
+// --brand-slab (the top), --brand-side, --brand-ring, and --brand-cut (#000 cuts the ring through to what is behind,
+// as in dark mode; #fff keeps the slab whole under a painted ring). `motion` hands it to src/lib/brand-mark.mjs.
+import { SHAPES, REST, frame, ringXY, ringAttrs, r2 } from '../lib/brand-geom.mjs';
+
+interface Props { id: string; class?: string; size?: number; motion?: boolean; label?: string }
+const { id, class: cls = '', size = 32, motion = false, label } = Astro.props;
+const shapeName = size <= 24 ? 'small' : 'v11';
+const S = SHAPES[shapeName];
+const F = frame(S, REST);
+const ring = ringAttrs(F.ring);
+const T = ringXY(F.ring);
+const M = 'maskUnits="userSpaceOnUse" x="-12" y="-12" width="72" height="72"';
+const W = '<rect x="-12" y="-12" width="72" height="72" fill="#fff"/>';
+const inner = `<defs><mask id="${id}g" ${M}>${W}<path class="kg" d="${F.top}" fill="#000" stroke="#000" stroke-width="${r2(S.gap * 2)}" stroke-linejoin="round"/></mask>`
+  + `<mask id="${id}r" ${M}>${W}<g class="krg" transform="${T}"><ellipse class="kre kc" ${ring}/></g></mask></defs>`
+  + `<g class="kb"><path class="ks" d="${F.side}" mask="url(#${id}g)"/><path class="kt" d="${F.top}" mask="url(#${id}r)"/>`
+  + `<g class="krg" transform="${T}"><ellipse class="kre kr" ${ring}/></g></g>`;
+---
+<svg class:list={['kam', cls]} viewBox="0 0 48 48" width={size} height={size}
+  role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : 'true'} focusable="false"
+  data-shape={shapeName} data-keia-mark={motion ? '' : undefined} data-hover={motion ? '' : undefined} set:html={inner} />
+{motion && <script>import '../lib/brand-mark.mjs';</script>}
+<style is:global>
+  .kam { overflow: visible; }
+  .kam .ks { fill: var(--brand-side, #4F392A); }
+  .kam .kt { fill: var(--brand-slab, #624634); }
+  .kam .kr { stroke: var(--brand-ring, #EFE7D8); }
+  .kam .kc { stroke: var(--brand-cut, #fff); }
+</style>
