@@ -70,11 +70,11 @@ Retired on 29 Sept 2026 (decision 0026) and replaced by L7 and L8. Boards, plans
 
 ### L3. Places, then tabs, then detail
 
-The sidebar is a short, fixed list of places. Pages inside a place are tabs across the top, set in `NAV` in `Shell.astro`.
+The sidebar is a short, fixed list of places, in one order for everyone: Home, then one entry per module (Locations, Services, Assets, Support, Projects, Vendors, Team, Knowledge), then Learn and Method below a rule (UX-V2 §2.1). Each module is On, Connected or Off in Settings › Modules (`src/lib/modules.mjs`): an Off module is absent from the sidebar and its pages say so and offer to switch it on; a Connected one shows its source on hover ("from ServiceNow"). Pages inside a place are tabs across the top, set in `NAV` in `Shell.astro`. When a place is renamed its old address stays as a `Moved` page (`/work/` to `/support/`, `/devices/overview/` to `/assets/`), and the client router goes straight to the new one.
 
 - **Why:** a sidebar that never changes is learnt once.
 - **Do:** add a new page as a tab of its place.
-- **Don't:** add a sidebar entry for one page.
+- **Don't:** add a sidebar entry for one page, or grey a module out: Off means gone.
 
 ### L4. Need to know first
 
@@ -94,7 +94,7 @@ Under 768 px the sidebar is a bottom tab bar with More, the band stacks (key num
 
 ### L6. One grid, and a path you can climb
 
-Cards on a page sit on one 12-column grid (`.g12`, spans `.s-3` to `.s-8`) with equal gutters; cards in a row stretch to the same height, so their edges line up. A long list shows its first few rows and a "Show all" (`Section` with `showAll`). Every deep page (a unit, a space, a model, a device type's model) puts its path in the top bar, for example Units / Dublin office / 3.02 Pantry / Pantry signage player, and each step but the last is a link.
+Cards on a page sit on one 12-column grid (`.g12`, spans `.s-3` to `.s-8`) with equal gutters; cards in a row stretch to the same height, so their edges line up. A long list shows its first few rows and a "Show all" (`Section` with `showAll`). Every deep page (a unit, a space, a model, a device type's model) puts its path in the top bar, and each step but the last is a link. On the map the path is the zoom (UX-V2 §2.2): Locations / EMEA / Dublin office / Third floor / 3.09 Whooper Swan / Video bar / LAN 1, worked out from the address (`src/lib/zoom.mjs`), so it reads the same whichever page linked there. Going up it zooms out; `[` zooms out one level and `]` back in to where you were. The floor (`?floor=3`) and the port (`#port-lan-1`) are states of their page and add their own step (`window.rsPath`).
 
 - **Why:** stacked boxes of different sizes push the answer down, and people need to get back up a level in one click.
 - **Do:** pass `crumbs` to `Shell`; a page filled in the browser rewrites `.mast .crumbs` once it knows the unit.

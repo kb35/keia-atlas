@@ -23,13 +23,13 @@ const ONLY = opt('only', '').split(',').filter(Boolean);
 // (summary tiles of one thing), list (a list on its own page may expand in place).
 const PAGES = [
   ['/', 'overview', 'Home'],
-  ['/work/', 'overview', 'Work overview'],
+  ['/support/', 'overview', 'Support overview'],
   ['/work/list/', 'list', 'Work list'],
   ['/locations/', 'overview', 'Locations overview'], ['/locations/offices/', 'list', 'Offices'], ['/locations/emea/', 'overview', 'EMEA'], ['/locations/dub/', 'record', 'Dublin office'], ['/locations/lon/', 'record', 'London office'], ['/locations/emea/home-offices/', 'list', 'Home offices, EMEA'],
   ['/services/', 'overview', 'Services'], ['/services/av/', 'record', 'AV service'], ['/services/network/', 'record', 'Network service'], ['/services/infrastructure/', 'record', 'IT infrastructure service'],
   ['/known-issues/', 'list', 'Known errors'],
   ['/spares/dub/', 'record', 'Dublin IT store'],
-  ['/devices/overview/', 'overview', 'Devices overview'],
+  ['/assets/', 'overview', 'Assets overview'],
   ['/usage/', 'list', 'Space usage'],
   ['/usage/equipment/', 'list', 'Equipment usage'],
   ['/work/schedule/?view=day', 'list', 'Schedule, Day'],
