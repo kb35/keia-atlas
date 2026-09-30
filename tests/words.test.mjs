@@ -14,6 +14,7 @@
 // The page checks run when the site has been built (npm run build) and are skipped otherwise.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { needsDist } from './helpers/dist.mjs';
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,7 +22,6 @@ import { HELP } from '../src/lib/help.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const DIST = join(ROOT, 'dist');
-const built = existsSync(DIST);
 const walk = (d) => readdirSync(d).flatMap((n) => { const p = join(d, n); return statSync(p).isDirectory() ? walk(p) : [p]; });
 const pages = () => walk(DIST).filter((f) => f.endsWith('.html'));
 
@@ -37,7 +37,7 @@ function visible(html) {
   return ent([text, ...attrs].join(' \n '));
 }
 
-test('no page says "profile" or "maker" as a visible word', { skip: !built }, () => {
+test('no page says "profile" or "maker" as a visible word', { skip: needsDist() }, () => {
   const found = [];
   for (const f of pages()) {
     const rel = relative(DIST, f);
@@ -63,7 +63,7 @@ test('no help text says "profile" or "maker"', () => {
   assert.deepEqual(bad, []);
 });
 
-test('the answer under a page title is short enough to read in two lines', { skip: !built }, () => {
+test('the answer under a page title is short enough to read in two lines', { skip: needsDist() }, () => {
   const long = [];
   for (const f of pages()) {
     const html = readFileSync(f, 'utf8');

@@ -4,6 +4,7 @@
 // site has been built, the text of Claire's sections on Home.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { needsDist } from './helpers/dist.mjs';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -64,7 +65,7 @@ test('experience measures are per space or per service, never per person', () =>
   for (const list of Object.values(MEASURES)) for (const m of list) assert.equal(nameIn(`${m.label} ${m.method}`), null, m.label);
 });
 
-test('Claire\'s sections on the built Home name no person beside a number (runs when dist/ exists)', { skip: !existsSync(join(ROOT, 'dist', 'index.html')) }, () => {
+test('Claire\'s sections on the built Home name no person beside a number (runs when dist/ exists)', { skip: needsDist('index.html') }, () => {
   const html = readFileSync(join(ROOT, 'dist', 'index.html'), 'utf8');
   const bad = [];
   for (const sec of ['costs', 'lreview', 'pilot', 'model']) {
