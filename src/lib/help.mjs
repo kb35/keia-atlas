@@ -435,6 +435,7 @@ const UNIT = {
   'unit.history': e('Work and incidents', 'Everything that has happened to this unit and its space, newest first: incidents, tasks, Lab tests of the model, and when it went in or came out.', 'Select a line to open it.'),
   'unit.usage': e('Usage', 'How much this unit is used. The figures are simulated.', 'Select the button to compare it across the fleet.'),
   'unit.connections': e('Connections', 'Each port on this unit, where its cable goes and which cable it is.', 'Use it when you trace a fault or replace the unit.'),
+  'unit.port': e('A port', 'One port on this unit. Choosing it marks its row and adds it to the path: the last level of the zoom.', 'Select it to zoom in to the port. Press [ to zoom back out to the unit.'),
   'unit.network': e('Network', 'The path from this unit to the internet: the floor switch, the core and the firewall.', 'Select a comms room to open it.', 'g:mdf'),
   // Classification, security support and privacy records (docs/rules/data.md F10 and F11).
   'classification.restricted': e('Restricted', 'Facts about Aigna\'s buildings that would help an attacker: floor plans, racks and switch ports, IP plans, the vulnerable-firmware list and default password status. Only people who need them see them, and exports are watermarked and logged.', 'Do not copy it into a ticket, a chat or a slide. Share the link instead.'),

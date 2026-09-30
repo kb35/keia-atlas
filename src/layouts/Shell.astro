@@ -109,7 +109,8 @@ const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 const here = Astro.url.pathname.startsWith(basePath) ? Astro.url.pathname.slice(basePath.length) || '/' : Astro.url.pathname;
 const zoom = zoomTrail(here);
 const PLACE_WORDS = new Set(['Work', 'Devices', ...NAV.map((n) => n.label)]);
-const trail = zoom ?? crumbs.map((c, i) => (i === 0 && c.to && parent && c.label !== parent.label && PLACE_WORDS.has(c.label) ? { label: parent.label, to: parent.to } : c));
+const trail = zoom ?? crumbs.map((c, i) => (i === 0 && c.to && parent && c.label !== parent.label && PLACE_WORDS.has(c.label) ? { label: parent.label, to: parent.to } : c))
+  .filter((c, i, all) => !(i === 0 && all.length > 1 && all[1].label === c.label));   // never "Vendors / Vendors"
 // The spring the zoom rides on (MOTION-V2 --spring-settle: 360 ms, no bounce), as a CSS easing.
 const EASE_SPRING = springEasing({ duration: 360, bounce: 0 });
 // A record page (not a list) is remembered as a recent object for the palette (⌘K, before you type).
@@ -382,7 +383,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
     </nav>
     <span class="spacer"></span>
     <button class="search-btn" type="button" data-help="shell.search" data-open-search aria-label="Search everything (/ or Ctrl K)" title="Search everything"><Icon name="search" size={16} /><span>Search</span><kbd data-search-kbd>Ctrl K</kbd></button>
-    <button class="help-btn" type="button" data-help-toggle data-help="shell.help" data-verb="show-help" data-verb-name="Show help" data-help-src={href('/help/index.json')} aria-pressed="false" aria-label="Help: explain what things are (?)" title="Help: explain what things are (press ? to switch on or off)"><span class="hb-q" aria-hidden="true">?</span></button>
+    <button class="help-btn" type="button" data-help-toggle data-help="shell.help" data-verb="show-help" data-verb-name="Help" data-help-src={href('/help/index.json')} aria-pressed="false" aria-label="Help: explain what things are (?)" title="Help: explain what things are (press ? to switch on or off)"><span class="hb-q" aria-hidden="true">?</span></button>
     <button class="report-btn" type="button" data-help="shell.report" data-open-report data-verb="report" title="Propose an edit, log new firmware or raise an urgent issue about this page"><Icon name="plus" size={16} /><span>Report</span></button>
     <button class="icon-btn mobile-gear" type="button" data-help="shell.mode" data-toggle-mode aria-label="Colour mode: Auto" title="Colour mode: Auto"><span class="m-system"><Icon name="auto" /></span><span class="m-light"><Icon name="sun" /></span><span class="m-dark"><Icon name="moon" /></span></button>
     <button class="icon-btn mobile-gear" type="button" data-help="shell.settings" data-open-settings data-verb="settings" data-verb-name="Settings" aria-label="Settings"><Icon name="gear" /></button>

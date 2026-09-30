@@ -27,7 +27,7 @@ const shown = (el) => { if (!el || !el.isConnected) return null; const r = el.ge
 
 // ---- ] remembers the child you zoomed out of, per window ----
 const KEY = 'rs6-zoom-back';
-const keyOf = (u) => inSite(u) + (/[?&]floor=/.test(u.search) ? u.search : '');
+const keyOf = (u) => inSite(u) + u.search;
 const back = {
   get(u) { try { return (JSON.parse(sessionStorage.getItem(KEY) || '{}'))[keyOf(u)] || null; } catch (_) { return null; } },
   put(parent, child) {
@@ -59,6 +59,28 @@ const applyOrigin = () => {
 
 let pending = null;   // after the swap: the shape on the parent page the child shrinks back into
 
+// A page can hold two elements that stand for the same record (an office's title and its plan), and two equal
+// names stop the move altogether. Keep one, the picture rather than the title. Reduced motion: nothing travels,
+// so no record is named on either page.
+D.addEventListener('astro:before-preparation', (e) => {
+  const load = e.loader;
+  e.loader = async () => {
+    await load();
+    [D, e.newDocument].forEach((root) => {
+      if (!root) return;
+      const els = root.querySelectorAll('[data-vt-here], [data-vt-rec]');
+      if (reduced()) { els.forEach((el) => { el.style.viewTransitionName = 'none'; }); return; }
+      const byName = new Map();
+      els.forEach((el) => { const n = el.style.viewTransitionName; if (n && n !== 'none') byName.set(n, [...(byName.get(n) || []), el]); });
+      byName.forEach((list) => {
+        if (list.length < 2) return;
+        const keep = list.find((el) => !/^H[1-6]$/.test(el.tagName)) || list[0];
+        list.forEach((el) => { if (el !== keep) el.style.viewTransitionName = 'none'; });
+      });
+    });
+  };
+});
+
 D.addEventListener('astro:before-preparation', (e) => {
   W.__rsZoomOrigin = null; pending = null;
   const from = new URL(location.href), to = e.to;
@@ -75,7 +97,8 @@ D.addEventListener('astro:before-preparation', (e) => {
     const nd = e.newDocument;
     if (!nd || reduced()) return;
     // The path: the step that arrives (in) or leaves (out) slides; the rest of the top bar stays.
-    const step = (dir === 'in' ? nd : D).querySelector('.crumbs [aria-current]');
+    // (A unit's page writes its path once its data is in, so its first path is not the one to slide.)
+    const step = dir === 'in' && levelOf(to) === 5 ? null : (dir === 'in' ? nd : D).querySelector('.crumbs [aria-current]');
     if (step) step.style.viewTransitionName = 'crumb-step';
     if (dir === 'in') {
       // A shape on a drawing (a room on the floor plan): a box stands in for it and becomes the next picture.
@@ -159,6 +182,7 @@ W.rsPath = {
   // Add a last step (the current one before it becomes a link to `prevTo`), sliding in from the right.
   push(label, level, prevTo) {
     const nav = crumbs(); if (!nav) return;
+    nav.querySelectorAll('.zp-leaving').forEach((s) => s.__rsDone && s.__rsDone());   // a step still sliding out goes now
     const cur = nav.querySelector('[aria-current]');
     if (cur && prevTo) {
       const a = D.createElement('a'); a.href = prevTo; a.textContent = cur.textContent;
@@ -177,13 +201,14 @@ W.rsPath = {
   pop() {
     const nav = crumbs(); const step = nav && nav.querySelector('.zp-step'); if (!step) return;
     const sep = step.previousElementSibling, prev = sep && sep.previousElementSibling;
-    const finish = () => {
-      step.remove(); if (sep && sep.classList.contains('zp-sep')) sep.remove();
-      if (prev && prev.tagName === 'A') { const s = D.createElement('span'); s.setAttribute('aria-current', 'page'); s.textContent = prev.textContent; if (prev.dataset.zl) s.dataset.zl = prev.dataset.zl; prev.replaceWith(s); }
-    };
+    // The path is right at once (the step before is current again); only the leaving words take a moment.
+    step.classList.replace('zp-step', 'zp-leaving'); step.removeAttribute('aria-current'); step.setAttribute('aria-hidden', 'true');
+    if (prev && prev.tagName === 'A') { const s = D.createElement('span'); s.setAttribute('aria-current', 'page'); s.textContent = prev.textContent; if (prev.dataset.zl) s.dataset.zl = prev.dataset.zl; prev.replaceWith(s); }
+    const finish = step.__rsDone = () => { step.remove(); if (sep && sep.classList.contains('zp-sep')) sep.remove(); };
     const m = M();
     if (m.reduced || !step.animate) { finish(); return; }
-    step.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(16px)' }], { duration: m.exit, easing: 'cubic-bezier(.4, 0, 1, 1)', fill: 'forwards' }).onfinish = finish;
+    const an = step.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(16px)' }], { duration: m.exit, easing: 'cubic-bezier(.4, 0, 1, 1)', fill: 'forwards' });
+    an.onfinish = finish; an.oncancel = finish;
   },
   has() { return !!(crumbs() && crumbs().querySelector('.zp-step')); },
 };

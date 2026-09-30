@@ -44,7 +44,9 @@ export function buildDevices() {
       // path: the incident's own page (decision 0024); tag: the unit it is about (null for the whole room).
       incidents: Object.values(incidents).filter((i) => i.room === s.id).map((i) => ({ number: i.number, title: i.short_description, state: i.state, priority: i.priority, position: i.position ?? null, tag: i.device ?? null, opened: i.opened ?? null, path: incidentPath(i.number) })),
       tasks: Object.values(projects).flatMap((prj) => prj.tasks.filter((t) => t.space === s.id).map((t) => ({ project: prj.id, projectName: prj.name, id: t.id, title: t.title, status: t.status, due: t.due ?? null }))) };
-    siteInfo[s.site] ??= { name: site.name, code: site.code, city: site.city ?? null, tz: site.time_zone ?? null, country: site.country ?? null };
+    siteInfo[s.site] ??= { name: site.name, code: site.code, city: site.city ?? null, tz: site.time_zone ?? null, country: site.country ?? null,
+      // For the unit's path (the zoom, src/lib/zoom.mjs): its region, whether it is an office, and the floors' names.
+      region: site.region ?? null, office: site.kind === 'office', floors: Object.fromEntries((site.floors ?? []).map((f) => [String(f.id), f.name])) };
     for (const p of [...s.positions, ...s.olderKit, ...s.spareKit]) {
       const cls = classes[p.cls];
       const networked = Boolean(cls?.platforms?.dhcp_dns);
