@@ -9,7 +9,8 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import postcss from 'postcss';
 import { A11Y_BOOT, A11Y_KEY, readA11y, a11yAttrs, DEFAULTS } from '../src/lib/a11y.mjs';
-import a11yPlugin, { scopeSelector, scaleSize, scaleFont } from '../tools/postcss-a11y.mjs';
+import a11yPlugin, { scopeSelector, scaleSize, scaleFont, iconSelector, scaleIcon, scaleTracks, scaleNudge } from '../tools/postcss-a11y.mjs';
+import { glyph } from '../src/lib/health.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
@@ -166,8 +167,78 @@ test('text size scales px type and px line heights, and never scales a token twi
   assert.equal(scaleFont('600 var(--fs-body)/1.4 var(--font-sans)'), null);
   assert.equal(scaleFont('inherit'), null);
   const css = read('src/styles/a11y.css');
-  assert.match(css, /:root\[data-text="larger"\] \{ --rs-text: 1\.15; \}/);
-  assert.match(css, /:root\[data-text="largest"\] \{ --rs-text: 1\.3; \}/);
+  assert.match(css, /:root\[data-text="larger"\] \{ --rs-text: 1\.15; --rs-icon: 1\.15; \}/);
+  assert.match(css, /:root\[data-text="largest"\] \{ --rs-text: 1\.3; --rs-icon: 1\.3; \}/);
+});
+
+// Icons follow the text (docs/rules/looks.md T5). A small stand-in for the browser's calc(): the value of a length
+// once its custom properties are known, in px (cqw taken as a wide container, so min() picks the px side).
+function px(value, vars = {}) {
+  let v = value;
+  for (let i = 0; i < 8 && /var\(/.test(v); i++) {
+    v = v.replace(/var\((--[\w-]+)(?:,\s*([^()]*|[^()]*\([^()]*\)[^()]*))?\)/g, (_, k, d) => (k in vars ? String(vars[k]) : (d ?? '0')));
+  }
+  const js = v.replace(/calc\(/g, '(').replace(/\bmin\(/g, 'Math.min(').replace(/\bmax\(/g, 'Math.max(')
+    .replace(/(\d*\.?\d+)cqw/g, '($1*10)').replace(/(\d*\.?\d+)px/g, '$1');
+  assert.match(js, /^[\d\s.+\-*/(),Mathminax]+$/, `can evaluate ${value}`);
+  return Function(`return ${js}`)();
+}
+async function built(css) { return (await postcss([a11yPlugin()]).process(css, { from: undefined })).root; }
+const decl = (root, sel, prop) => { let out = null; root.walkRules((r) => { if (r.selector === sel) r.walkDecls(prop, (d) => { out = d.value; }); }); return out; };
+
+test('icons in a line of text scale with Text size; pictures and drawings keep their size', async () => {
+  for (const s of ['.nav a svg', '.x > svg.y', '.a :global(svg)', '.a svg:hover', 'img']) assert.ok(iconSelector(s), s);
+  for (const s of ['.a .b', '.a svg .c', '.wc-m svg, .x'.split(',')[1]]) assert.ok(!iconSelector(s), s);
+  assert.equal(scaleIcon('14px'), 'calc(14px * var(--rs-icon, 1))');
+  assert.equal(scaleIcon('96px'), null, 'a picture, not an icon');
+  assert.equal(scaleIcon('100%'), null);
+  assert.equal(scaleIcon('calc(var(--hg-px) * 1px * var(--rs-icon, 1))'), null, 'never twice');
+  assert.equal(scaleTracks('16px minmax(0, 1fr)'), 'calc(16px * var(--rs-icon, 1)) minmax(0, 1fr)');
+  assert.equal(scaleTracks('104px minmax(0, 1fr)'), null, 'a label column is sized on its own');
+  assert.equal(scaleNudge('translateY(2px)'), 'translateY(calc(2px * var(--rs-icon, 1)))');
+  const root = await built(`.a svg { width: 14px; height: 14px; }
+    .av { width: 26px; height: 26px; border-radius: 50%; font: 500 10px/1 var(--font-mono); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .btn-i { /* text-size: icon */ width: 34px; height: 34px; }
+    .plan svg { /* text-size: drawing */ width: 12px; }
+    .row .hg { margin-top: 3px; }`);
+  const L = { '--rs-icon': 1.3, '--rs-text': 1.3 };
+  assert.equal(px(decl(root, '.a svg', 'width'), L), 14 * 1.3);
+  assert.equal(px(decl(root, '.av', 'width'), L), 26 * 1.3, 'initials keep room in their circle');
+  assert.equal(decl(root, '.dot', 'width'), '8px', 'a plain dot is left to its comment');
+  assert.equal(px(decl(root, '.btn-i', 'height'), L), 34 * 1.3, 'the hit target grows');
+  assert.equal(decl(root, '.plan svg', 'width'), '12px');
+  assert.equal(px(decl(root, '.row .hg', 'margin-top'), L), 3 * 1.3, 'the glyph stays on its line');
+});
+
+test('at Largest a health glyph beside text is 1.3 times its size, and a floor-map marker is not', async () => {
+  // The glyph's size comes from its --hg-px (HealthGlyph.astro and glyph() write the same markup) and --rs-icon.
+  const g = glyph('fault', { size: 12, title: 'offline' });
+  assert.match(g, /style="--hg-px:12"/);
+  const astro = read('src/components/HealthGlyph.astro');
+  assert.equal((astro.match(/style=\{`--hg-px:\$\{g\.px\}`\}/g) ?? []).length, 2, 'both forms of the Astro part set --hg-px');
+  const base = await built(read('src/styles/base.css'));
+  const w = decl(base, '.hg svg', 'width'), h = decl(base, '.hg svg', 'height');
+  const a11y = read('src/styles/a11y.css');
+  const largest = +/:root\[data-text="largest"\] \{[^}]*--rs-icon: ([\d.]+)/.exec(a11y)[1];
+  for (const size of [12, 16, 24, 40]) {
+    assert.equal(px(w, { '--hg-px': size }), size, `${size} px at Default`);
+    assert.ok(Math.abs(px(w, { '--hg-px': size, '--rs-icon': largest }) - size * 1.3) < 1e-9, `${size} px at Largest is ${size * 1.3}`);
+    assert.equal(px(h, { '--hg-px': size, '--rs-icon': largest }), px(w, { '--hg-px': size, '--rs-icon': largest }), 'square');
+  }
+  // The stroke is set in the 16-unit box, so on screen it grows with the glyph (as a letter's stems do).
+  assert.match(read('src/styles/base.css'), /\.hg \.hg-s \{[^}]*stroke-width: calc\(var\(--hg-stroke\) \* 16 \/ var\(--hg-px, 16\)\)/);
+  // The floor thumbnails: the drawing sets --rs-icon back to 1 on itself, so its glyphs keep the drawing's scale.
+  const fm = read('src/components/FloorMap.astro');
+  const styles = [...fm.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]).join('\n');
+  const map = await built(styles);
+  assert.equal(decl(map, '.fm-t-hits', '--rs-icon'), '1');
+  const marker = decl(map, '.fm-t-hit .hg svg', 'width');
+  // Inside .fm-t-hits, --rs-icon is 1 whatever the Text size; the base rule loses to the drawing's own size.
+  assert.equal(px(marker, { '--rs-icon': 1, '--fm-g': 0.5 }), 12, 'a marker on the plan stays 12 px at Largest');
+  // Other drawings draw their markers inside their own picture (ring.mjs in metres, the 3D hero in WebGL), so no
+  // CSS size reaches them; an svg nested in another svg is never matched by the attribute rules.
+  assert.match(a11y, /:where\(:not\(svg\) > svg\[width="12"\]\) \{ width: calc\(12px \* var\(--rs-icon, 1\)\); \}/);
 });
 
 test('the front door: every loop has pause and play, and nothing plays under reduced motion', () => {

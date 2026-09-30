@@ -1,11 +1,13 @@
 ---
-// Services, Overview: the AV service, the network and IT infrastructure side by side. Overview
-// archetype (page-anatomy.md, D). Each card has the service's light, its owner, its four figures and its three worst
-// items right now; every figure opens the service page with that filter. The figures are simulated live
-// (src/lib/livesim.mjs), the same as the service pages.
-//   band      services running well, units not working, open incidents
-//   main      one card per service
-//   below     what belongs to each service (kinds of kit, each opening the service filtered to it)
+// Services, Overview: the whole service catalogue, answer first. Overview archetype (page-anatomy.md, D).
+//   band      "12 services: 11 within target, Print below target in London" (src/lib/catalogue.mjs catalogueAnswer),
+//             the services within and below target, the events coming up, open incidents
+//   catalogue every service as one card, below target first: its state against its targets, its answer line, its
+//             owner. The nine beyond the live three are capabilities (src/lib/modules.mjs): each card goes while its
+//             capability is off, and the answer is worked out again without it
+//   live      the AV service, the network and IT infrastructure side by side, each with its light, owner, four figures
+//             and three worst items right now (simulated live, src/lib/livesim.mjs, the same as the service pages)
+//   below     what belongs to each live service (kinds of kit, each opening the service filtered to it)
 import Shell from '../../layouts/Shell.astro';
 import PageBand from '../../components/PageBand.astro';
 import Section from '../../components/Section.astro';
@@ -14,14 +16,25 @@ import { href } from '../../lib/data.mjs';
 import { serviceModel, SERVICE_ORDER, SERVICES } from '../../lib/services-view.mjs';
 import { devicesModel } from '../../lib/livemodel.mjs';
 import { PEOPLE } from '../../lib/demo.mjs';
+import { catalogueRows, indexAnswer, placeName } from '../../lib/catalogue-view.mjs';
+import { eventFigures, eventsSummary } from '../../lib/events-view.mjs';
 
 const models = Object.fromEntries(SERVICE_ORDER.map((id) => [id, serviceModel(id)]));
 const openIncidents = devicesModel().incs.length;
+// The catalogue: every service against its targets. The live three read their service levels; the rest roll up from
+// their units (src/lib/catalogue-view.mjs). Always in the catalogue's fixed order; the answer names what is below target.
+const ROWS = catalogueRows({ liveUnits: Object.fromEntries(SERVICE_ORDER.map((id) => [id, models[id].shown.length])), eventsExtra: eventFigures });
+const CARDS = ROWS;
+const ANSWER = indexAnswer(ROWS);
+const within = ROWS.filter((r) => r.within).length, below = ROWS.length - within;
 const NUMBERS = [
-  { id: 'svo-1', n: '–', label: 'Services running well', to: '#services' },
-  { id: 'svo-2', n: '–', label: 'Units not working', to: '#services' },
+  { id: 'svo-in', n: within, label: 'Within target', to: '#catalogue' },
+  { id: 'svo-below', n: below, label: 'Below target', to: '#catalogue', tone: below ? 'warn' : undefined },
+  { n: eventsSummary.upcoming, label: 'Events coming up', to: '/services/events/#upcoming', feature: 'events' },
   { id: 'svo-3', n: openIncidents, label: 'Open incidents', to: '/incidents/?state=new,in-progress,on-hold' },
 ];
+const catJson = JSON.stringify(ROWS.map((r) => ({ id: r.id, name: r.name, within: r.within, below: r.below.map(placeName), cap: r.capability }))).replace(/</g, '\\u003c');
+const WORD = (r) => (r.within ? 'Fine · within target' : `To review · below target${r.below.length ? ` in ${r.below.map(placeName).join(' and ')}` : ''}`);
 // The four figures on each card: the same labels and drill-downs as the service page's band.
 const FIGURES = {
   av: [['Spaces working now', '/rooms/overview/?status=use,free'], ['Units alerting', 'services/av/?status=alert,offline#units'], ['Firmware behind the standard', 'services/av/?fw=1#units', models.av.behind], ['Open incidents', 'services/av/#incidents', models.av.incidents.length]],
@@ -32,16 +45,35 @@ const figureHref = (to) => (to.startsWith('/') ? href(to) : href(`/${to}`));
 const client = {
   base: href('/'),
   services: Object.fromEntries(SERVICE_ORDER.map((id) => [id, { sim: models[id].sim, statics: models[id].statics, incCount: models[id].incidents.length, name: SERVICES[id].name }])),
+  keepBand: true,
 };
 const json = JSON.stringify(client).replace(/</g, '\\u003c');
 const ownerOf = (id) => PEOPLE.find((p) => p.id === SERVICES[id].owner);
 ---
 <Shell title="Services" section="services-overview" crumbs={[{ label: 'Services' }]} about={{ kind: 'page', label: 'Services' }}>
-  <PageBand overline="Services" title="Services" answer={`${openIncidents} open ${openIncidents === 1 ? 'incident' : 'incidents'} across ${SERVICE_ORDER.length} services`} lede="The AV service, the network and IT infrastructure: how each is doing now, who owns it and what to review." sim="live" numbers={NUMBERS}>
+  <PageBand overline="Services" title="Services" answer={ANSWER} lede="Every service the team runs: how each is doing against its targets, who owns it and what to review." sim="live" numbers={NUMBERS}>
     <span slot="overline" class="lv-live" data-lv-live title="A new moment every five seconds, the same in every window"><HealthGlyph state="fine" size={12} quiet class="lv-dot" title="The feed is running" />Live</span>
   </PageBand>
 
   <div class="content svo" data-svo>
+    <section class="sv-cat" id="catalogue" aria-labelledby="cat-h" data-help="services.catalogue">
+      <header class="sv-cat-h"><h2 id="cat-h">Every service</h2><span class="faint">Against its targets this month, in the catalogue's order</span></header>
+      <ul class="sv-cat-g" data-cat>
+        {CARDS.map((r) => (
+          <li data-feature={r.capability ?? undefined} data-cat-id={r.id}>
+            <a class="card sv-cc" href={href(r.path)} data-lift data-state={r.within ? 'fine' : 'review'} data-help="services.catalogue-card" data-help-name={r.name}>
+              <span class="sv-cc-top"><HealthGlyph state={r.within ? 'fine' : 'review'} size={16} word={WORD(r)} quiet={r.within} />{r.live && <span class="sv-cc-live">Live</span>}</span>
+              <b class="sv-cc-n"><span class="svc-dot" data-svc={r.id} aria-hidden="true"></span>{r.name}</b>
+              <span class="sv-cc-l">{r.line}</span>
+              <span class="sv-cc-o">{r.ownedBy ? `${r.ownedBy} · ${r.owner.name}` : r.owner.name}{r.n != null && <> · {r.n.toLocaleString('en-IE')} {r.word}</>}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+      <script type="application/json" data-cat-model set:html={catJson}></script>
+    </section>
+
+    <header class="sv-cat-h sv-live-h"><h2>Live now</h2><span class="faint">AV, the network and IT infrastructure, simulated live</span></header>
     <div class="g12 sv-cards" id="services">
       {SERVICE_ORDER.map((id) => {
         const m = models[id], svc = SERVICES[id], o = ownerOf(id);
@@ -83,7 +115,7 @@ const ownerOf = (id) => PEOPLE.find((p) => p.id === SERVICES[id].owner);
           </div>
         ))}
       </div>
-      <p class="sv-note">The switch inside a space is AV; a switch in a comms room is the network. Printers belong to no service here. Access points are units in the open areas and corridors of each floor.</p>
+      <p class="sv-note">The switch inside a space is AV; a switch in a comms room is the network. Printers belong to Print, and access points to Wi-Fi as well as the network: they are units in the open areas and corridors of each floor.</p>
     </Section>
 
     <p class="sv-note sv-clock"><HealthGlyph state="fine" size={12} quiet class="lv-dot" title="The feed is running" /><span data-clock>Updating</span>. Simulated from each kind of kit and the open incidents, the same in every window. Real feeds replace this with the same shape.</p>
@@ -91,6 +123,17 @@ const ownerOf = (id) => PEOPLE.find((p) => p.id === SERVICES[id].owner);
   </div>
 
   <script>
+    import { catalogueAnswer } from '../../lib/catalogue.mjs';
+    // The answer counts only the services whose capability is on (src/lib/modules.mjs), so it never names one that is off.
+    function answer() {
+      const el = document.querySelector('[data-cat-model]'); if (!el) return;
+      const W = window as any;
+      const rows = JSON.parse(el.textContent || '[]').filter((r: any) => !r.cap || !W.rsFeatureOn || W.rsFeatureOn(r.cap));
+      if (W.rsAnswer) W.rsAnswer(catalogueAnswer(rows));
+      if (W.rsKeyNumber) { const inN = rows.filter((r: any) => r.within).length; W.rsKeyNumber('svo-in', inN); W.rsKeyNumber('svo-below', rows.length - inN, { tone: rows.length - inN ? 'warn' : '' }); }
+    }
+    answer();
+    document.addEventListener('rs:demo-change', answer);
     import { initOverview } from '../../lib/services-client.mjs';
     let stop = () => {};
     function init() {
@@ -104,6 +147,21 @@ const ownerOf = (id) => PEOPLE.find((p) => p.id === SERVICES[id].owner);
 </Shell>
 
 <style>
+  .sv-cat { display: grid; gap: 10px; min-width: 0; }
+  .sv-cat-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+  .sv-cat-h h2 { margin: 0; font-size: var(--fs-h3); }
+  .sv-cat-h .faint { font-size: var(--fs-code); }
+  .sv-live-h { margin-top: 24px; margin-bottom: 10px; }
+  .sv-cat-g { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 12px; }
+  .sv-cat-g > li { min-width: 0; display: grid; }
+  .sv-cc { display: grid; gap: 6px; align-content: start; padding: 14px 16px; color: inherit; text-decoration: none; min-width: 0; }
+  .sv-cc[data-state=review] { border-color: color-mix(in srgb, var(--h-review) 45%, var(--line)); }
+  .sv-cc-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: var(--fs-code); color: var(--text-2); }
+  .sv-cc-live { font: 600 var(--fs-mark)/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+  .sv-cc-n { display: flex; align-items: center; gap: 8px; font-size: var(--fs-h3); font-weight: var(--fw-title); line-height: 1.25; }
+  .sv-cc:hover .sv-cc-n { text-decoration: underline; text-underline-offset: 3px; }
+  .sv-cc-l { font-size: var(--fs-body); line-height: 1.4; color: var(--text); }
+  .sv-cc-o { font-size: var(--fs-code); color: var(--text-3); }
   .lv-live { display: inline-flex; align-items: center; gap: 6px; font: var(--fw-title) var(--fs-mark)/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }
   :global(.lv-paused) :global(.lv-dot) { color: var(--h-off); }
   .sv-cards { align-items: stretch; }

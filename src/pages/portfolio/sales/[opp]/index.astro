@@ -1,0 +1,214 @@
+---
+// One opportunity's design (src/lib/provider-sales.mjs): the spaces, each with its space type and build option; the
+// equipment filled from the space type's standard and the device library; the person's changes; the per-room lists
+// rolled up into the project's bill of materials; and the labour, from the task types and the setup guides.
+//   band    the design in one line, four figures
+//   top     where each line came from (7 cols), beside the draft total (5 cols)
+//   below   the rooms; the project BOM; the labour, with its rates
+// The person can change a quantity or swap a model: the room, the BOM, the labour and the total follow, ticking into
+// place (motion row 57). Those edits are a draft of the next version and stay on this page. Simulated; prices fictional.
+import Shell from '../../../../layouts/Shell.astro';
+import PageBand from '../../../../components/PageBand.astro';
+import SalesFrame from '../../../../components/SalesFrame.astro';
+import SalesThread from '../../../../components/SalesThread.astro';
+import { href } from '../../../../lib/data.mjs';
+import { sales } from '../../../../lib/provider-sales-data.mjs';
+import { money, MARKS, LABOUR_MARKS, TASK_WORDS, hoursWords, slimGuide, modelName, className, guideFor } from '../../../../lib/provider-sales.mjs';
+
+export function getStaticPaths() {
+  return sales().opps.filter((o) => o.hasDesign && o.current).map((o) => ({ params: { opp: o.slug }, props: { o } }));
+}
+const { o } = Astro.props;
+const M = sales();
+const V = o.current;
+const { rooms, bom, labour: lab, quote: q } = V;
+const marks = bom.totals.marks;
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+const answer = `${plural(rooms.length, 'room')}, ${bom.totals.units} units · ${marks.standard} standard, ${marks.library} from the library, ${marks.changed} changed`;
+const NUMBERS = [
+  { n: rooms.length, label: rooms.length === 1 ? 'Room' : 'Rooms', to: '#rooms' },
+  { n: bom.totals.units, label: 'Units', to: '#bom' },
+  { n: hoursWords(lab.totals.hours), label: 'Labour', to: '#labour' },
+  { n: money(Math.round(q.totals.sell)), label: `Version ${V.v} total`, fact: true },
+];
+// Models the person can swap to: the library's priced models of the same class.
+const priced = Object.keys(M.lib.prices);
+const altsFor = (cls: string) => priced.filter((id) => M.lib.models[id]?.class === cls).sort().map((id) => ({ id, name: modelName(M.lib, id), sell: M.lib.prices[id].sell }));
+const classesUsed = [...new Set(rooms.flatMap((r: any) => r.lines.map((l: any) => l.cls)))];
+const MODELS = Object.fromEntries(priced.filter((id) => classesUsed.includes(M.lib.models[id]?.class)).map((id) => [id, {
+  name: modelName(M.lib, id), cls: M.lib.models[id].class, clsName: className(M.lib, M.lib.models[id].class), cost: M.lib.prices[id].cost, sell: M.lib.prices[id].sell, guide: slimGuide(guideFor(M.lib, id)),
+}]));
+const DATA = {
+  v: V.v, status: V.status, baseline: q.totals.sell, cur: M.priceList.currency,
+  L: M.labour, labourChanges: V.labourChanges, allowance: M.priceList.allowance, discount: V.discount,
+  models: MODELS,
+  rooms: rooms.map((r: any) => ({ space: r.space, label: r.label, units: r.units, lines: r.lines.map((l: any) => ({
+    key: l.key, cls: l.cls, clsName: l.clsName, qty: l.qty, model: l.model, item: l.item, name: l.name, id: l.id, cost: l.cost, sell: l.sell,
+    source: l.source, notInLibrary: !!l.notInLibrary, guide: slimGuide(l.guide),
+  })) })),
+};
+const statusWord = V.status === 'draft' ? `Draft version ${V.v}, not sent` : V.status === 'accepted' ? `Version ${V.v}, accepted` : `Version ${V.v}, ${V.status === 'sent' ? 'with the client' : V.status}`;
+const barOf = (k: string) => (bom.totals.units ? (marks[k] / bom.totals.units) * 100 : 0);
+const roleName = (id: string) => M.labour.roles.find((r: any) => r.id === id)?.name ?? id;
+const inScope = !!o.engagementRec?.scope?.kinds?.includes('design');
+---
+<Shell vendorOk title={`${o.title}: design`} section="sales-design" crumbs={[{ label: 'Sales', to: '/portfolio/sales/' }, { label: o.title }]}>
+  <SalesFrame provider={o.provider}>
+    <PageBand overline={`Design · ${o.id}`} title={o.title} answer={answer} lede={`${o.clientName}, ${o.siteName}`} sim heartbeat={false} numbers={NUMBERS} rec={`sl-${o.slug}`}>
+      {o.fictional && <span slot="overline" class="pf-fict">Made-up client</span>}
+    </PageBand>
+
+    <div class="content sl-page" data-sl-design>
+      <SalesThread o={o} here="design" />
+      <script type="application/json" data-sl-json set:html={JSON.stringify(DATA)}></script>
+
+      <div class="g12 top" data-feature="provider-sales">
+        <section class="s-7 card pad sl-marks" aria-labelledby="sl-marks-h" data-help="sales.marks">
+          <h2 id="sl-marks-h" class="sl-h">Where each line came from</h2>
+          <div class="sl-bar" role="img" aria-label={`${marks.standard} units from the standard, ${marks.library} from the library, ${marks.changed} changed`} data-sl-bar>
+            {Object.keys(MARKS).map((k) => <i data-mark={k} style={`width:${barOf(k)}%`}></i>)}
+          </div>
+          <ul class="sl-legend">
+            {Object.entries(MARKS).map(([k, m]: any) => <li data-mark={k}><span class="sl-mark" data-mark={k}>{m.word}</span><b data-tick data-sl-mark-n={k}>{marks[k]}</b><small>{m.long}</small></li>)}
+          </ul>
+          <p class="eg-note">{statusWord}. {o.design.surveyed ? `Surveyed ${o.design.surveyed.slice(8, 10).replace(/^0/, '')} ${new Date(`${o.design.surveyed}T00:00Z`).toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' })}.` : ''} {o.client === 'aigna' ? `The spaces are ${o.clientName}'s own records, shared over the engagement.` : `${o.clientName}'s spaces are named from the survey.`}</p>
+        </section>
+        <aside class="s-5 card pad sl-total" aria-labelledby="sl-total-h" data-help="sales.draft">
+          <h2 id="sl-total-h" class="sl-h">What this design comes to</h2>
+          <dl class="sl-sum">
+            <div><dt>Equipment and sundries</dt><dd data-tick data-sl-t="equipment">{money(q.equipment.sell)}</dd></div>
+            <div><dt>Labour, <span data-sl-t="hours">{hoursWords(lab.totals.hours)}</span></dt><dd data-tick data-sl-t="labour">{money(q.labour.sell)}</dd></div>
+            {q.discount && <div><dt>Discount, {q.discount.pct}% on {q.discount.on}</dt><dd data-tick data-sl-t="discount">{money(-q.discount.amount)}</dd></div>}
+            <div class="sl-sum-t"><dt>Total</dt><dd class="rs-tick" data-tick data-sl-t="total">{money(q.totals.sell)}</dd></div>
+            <div><dt>Margin</dt><dd data-tick data-sl-t="margin">{money(q.totals.margin)} · {q.totals.marginPct.toFixed(1)}%</dd></div>
+          </dl>
+          <p class="eg-note" data-sl-draft-note>The quote for this design is version {V.v}. Change a quantity or a model below to see a draft of the next one.</p>
+          <div class="sl-row">
+            <a class="btn small" href={href(`/portfolio/sales/${o.slug}/quote/`)}>Open the quote</a>
+            <button type="button" class="btn small ghost" data-sl-reset hidden>Undo my changes</button>
+          </div>
+        </aside>
+      </div>
+
+      {!inScope && (
+        <p class="card pad sl-scope" data-feature="provider-sales" data-help="sales.scope">Design proposals are not in the scope of {o.clientName}'s engagement yet. {o.clientName} sets the scope; it would add them before this design can be proposed.</p>
+      )}
+
+      <section class="sec" id="rooms" aria-labelledby="sl-rooms-h" data-feature="provider-sales">
+        <header class="section-head"><h2 id="sl-rooms-h" data-help="sales.rooms">Rooms</h2><span class="aside faint">{plural(rooms.length, 'space')}, each built to its space type</span></header>
+        <div class="sl-rooms">
+          {rooms.map((r: any, ri: number) => (
+            <article class="card sl-room" data-sl-room={ri} data-help="sales.room">
+              <header class="sl-room-h">
+                <h3>{r.label}</h3>
+                <p>{r.typeName}{r.capacity ? `, ${r.capacity}` : ''} · <b>{r.optionName}</b></p>
+                {r.optionWas && <p class="sl-was"><span class="sl-mark" data-mark="changed">Changed</span> Was {r.optionWas}: {r.optionWhy}</p>}
+              </header>
+              <ol class="sl-lines">
+                {r.lines.map((l: any, li: number) => {
+                  const alts = l.model ? altsFor(l.cls) : [];
+                  return (
+                    <li class="sl-line" data-sl-line={li} data-mark={l.source}>
+                      <span class="sl-qty" role="group" aria-label={`Quantity of ${l.name}`}>
+                        <button type="button" class="sl-step" data-sl-step="-1" aria-label={`One fewer ${l.name}`}>−</button>
+                        <b data-tick data-sl-q>{l.qty}</b>
+                        <button type="button" class="sl-step" data-sl-step="1" aria-label={`One more ${l.name}`}>+</button>
+                      </span>
+                      <span class="sl-line-m">
+                        {alts.length > 1 ? (
+                          <select class="sl-swap" data-sl-swap aria-label={`Model for ${l.key.replace(/-/g, ' ')} in ${r.label}`}>
+                            {alts.map((a) => <option value={a.id} selected={a.id === l.model}>{a.name}</option>)}
+                          </select>
+                        ) : <b class="sl-name">{l.name}</b>}
+                        <small>{l.clsName}{l.role ? ` · ${l.role.replace(/:.*$/, '')}` : ''}</small>
+                        {l.source !== 'standard' && <small class="sl-why">{l.was && !l.notInLibrary ? `${l.was}. ` : ''}{l.why}</small>}
+                      </span>
+                      <span class="sl-mark" data-mark={l.source} data-sl-m>{MARKS[l.source].word}</span>
+                    </li>
+                  );
+                })}
+              </ol>
+              {r.removed.length > 0 && <p class="sl-removed">Taken out: {r.removed.map((l: any) => `${l.name}: ${l.why}`).join('; ')}</p>}
+              {r.optional.length > 0 && <p class="sl-optional">Optional in the space type, not included: {r.optional.map((l: any) => l.name).join(', ')}</p>}
+              <footer class="sl-room-f"><span>Units <b data-tick data-sl-ru>{r.units}</b></span><span>Equipment <b data-tick data-sl-rs>{money(r.sell)}</b></span></footer>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section class="sec" id="bom" aria-labelledby="sl-bom-h" data-feature="provider-sales">
+        <header class="section-head"><h2 id="sl-bom-h" data-help="sales.bom">Bill of materials</h2><span class="aside faint">Every room's lines, rolled up by model</span></header>
+        <div class="tablewrap">
+          <table class="to-cards sl-bom">
+            <thead><tr><th>Item</th><th>Qty</th><th>Rooms</th><th>From</th><th class="num-c">Each</th><th class="num-c">Sell</th></tr></thead>
+            <tbody data-sl-bom>
+              {bom.lines.map((l: any) => (
+                <tr data-id={l.id}>
+                  <td><b>{l.name}</b><small>{l.clsName}{l.notInLibrary ? ' · not in the device library yet' : ''}</small></td>
+                  <td data-label="Qty"><b data-tick data-c="qty">{l.qty}</b></td>
+                  <td data-label="Rooms" data-c="rooms">{l.rooms.map((x: any) => `${x.label.split(' ')[0]}${x.qty > 1 ? ` ×${x.qty}` : ''}`).join(', ')}</td>
+                  <td data-label="From" data-c="mark"><span class="sl-mark" data-mark={l.mark}>{MARKS[l.mark].word}</span></td>
+                  <td data-label="Each" class="num-c">{money(l.unitSell)}</td>
+                  <td data-label="Sell" class="num-c"><span data-tick data-c="sell">{money(l.sell)}</span></td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot><tr><td><b>Project total</b></td><td data-label="Qty"><b class="rs-tick" data-tick data-sl-bt="units">{bom.totals.units}</b></td><td data-label="Rooms">{rooms.length}</td><td data-label=""></td><td data-label=""></td><td data-label="Sell" class="num-c"><b class="rs-tick" data-tick data-sl-bt="sell">{money(bom.totals.sell)}</b></td></tr></tfoot>
+          </table>
+        </div>
+        <p class="eg-note">The BOM is the starting point for everything after it: the quote prices it, the statement of work lists it, and once the quote is accepted it becomes each space's install positions in {o.clientName}'s Keia.</p>
+      </section>
+
+      <section class="sec" id="labour" aria-labelledby="sl-lab-h" data-feature="provider-sales">
+        <header class="section-head"><h2 id="sl-lab-h" data-help="sales.labour">Labour</h2><span class="aside faint">From the task types and each model's setup guide</span></header>
+        <div class="g12">
+          <div class="s-5 sl-tasks" data-help="sales.tasks">
+            {lab.byTask.map((t: any) => <div class="sl-task"><span>{t.word}</span><b data-tick data-sl-task={t.task}>{hoursWords(t.hours)}</b></div>)}
+            <p class="eg-note">{M.labour.crew.installers} installers on site: about {lab.days.install} {lab.days.install === 1 ? 'day' : 'days'} to install, {lab.days.configure} to configure and {lab.days.commission} to test.</p>
+          </div>
+          <div class="s-7 card pad" data-help="sales.rates">
+            <h3 class="sl-h3">Rates by role</h3>
+            <table class="sl-rates to-cards">
+              <thead><tr><th>Role</th><th class="num-c">Hours</th><th class="num-c">Cost an hour</th><th class="num-c">Rate an hour</th><th class="num-c">Sell</th></tr></thead>
+              <tbody>
+                {M.labour.roles.map((r: any) => {
+                  const x = lab.byRole.find((b: any) => b.id === r.id);
+                  return (
+                    <tr data-role={r.id}>
+                      <td>{r.name}</td>
+                      <td class="num-c"><span data-tick data-c="hours">{hoursWords(x?.hours ?? 0)}</span></td>
+                      <td class="num-c">{money(r.cost)}</td>
+                      <td class="num-c"><label class="sl-rate"><span class="sr-only">Rate an hour for {r.name}</span><span aria-hidden="true">$</span><input type="number" min="0" step="5" value={r.sell} data-sl-rate={r.id} /></label></td>
+                      <td class="num-c"><span data-tick data-c="sell">{money(x?.sell ?? 0)}</span></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot><tr><td><b>Labour</b></td><td class="num-c"><b data-tick data-sl-lt="hours">{hoursWords(lab.totals.hours)}</b></td><td></td><td></td><td class="num-c"><b data-tick data-sl-lt="sell">{money(lab.totals.sell)}</b></td></tr></tfoot>
+            </table>
+            <p class="eg-note">Change a rate to see what it does to the total. The quote that was sent keeps its own rates.</p>
+          </div>
+        </div>
+        <div class="sl-lab-rooms">
+          {rooms.map((r: any) => {
+            const ts = lab.tasks.filter((t: any) => t.space === r.space);
+            return (
+              <details class="sl-lab-room">
+                <summary><b>{r.label}</b><span data-sl-lr={r.space}>{hoursWords(ts.reduce((n: number, t: any) => n + t.hours, 0))}</span></summary>
+                <ul class="sl-lab-list">
+                  {ts.map((t: any) => <li><span class="sl-mark" data-mark={t.source === 'changed' ? 'changed' : t.source === 'guide' ? 'library' : 'standard'}>{LABOUR_MARKS[t.source].word}</span><span><b>{TASK_WORDS[t.task]} · {t.what}</b><small>{t.basis} · {roleName(t.role)}, {hoursWords(t.hours)}</small></span></li>)}
+                </ul>
+              </details>
+            );
+          })}
+          {lab.tasks.filter((t: any) => t.task === 'manage').map((t: any) => <p class="eg-note">{TASK_WORDS.manage}: {hoursWords(t.hours)}, {t.basis}.</p>)}
+          {lab.gaps.length > 0 && <ul class="sl-gaps">{lab.gaps.map((g: any) => <li><b>{g.room}: {g.what}.</b> {g.why}.</li>)}</ul>}
+        </div>
+      </section>
+    </div>
+  </SalesFrame>
+  <script>
+    import { bootSales } from '../../../../lib/provider-sales-client.mjs';
+    bootSales();
+  </script>
+</Shell>

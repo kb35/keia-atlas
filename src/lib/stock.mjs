@@ -1,8 +1,8 @@
 // Spares and cables, joined with sites, rooms, racks and models, and the house cable standard.
 // Loaded once at build time (the validator has already checked every link, so this trusts the data).
-import { readFileSync, readdirSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import path from 'node:path';
-import { parse } from 'yaml';
+import { loadYaml } from './demo-clock.mjs';
 import { sites, spaces, racks, models, SITE_ORDER, DEMO_TODAY, STAGE_LABEL, modelName, className } from './data.mjs';
 import { isLow, shortBy, countOverdue, daysBetween, endLabel, formatLength, rackNumber } from './cablecore.mjs';
 
@@ -10,7 +10,7 @@ export { SPARE_KIND, COUNT_OVERDUE_DAYS, formatLength, rackNumber, portLabel } f
 
 const load = (folder) => {
   const dir = path.join(process.cwd(), 'data', folder);
-  return Object.fromEntries(readdirSync(dir).filter((n) => n.endsWith('.yaml')).sort().map((n) => [n.slice(0, -5), parse(readFileSync(path.join(dir, n), 'utf8'))]));
+  return Object.fromEntries(readdirSync(dir).filter((n) => n.endsWith('.yaml')).sort().map((n) => [n.slice(0, -5), loadYaml(path.join(dir, n))]));
 };
 
 export const cableStandard = load('standards').cables;

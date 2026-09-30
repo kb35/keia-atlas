@@ -9,7 +9,9 @@
 //      a password, token or key field must be a vault reference).
 //   4. Checks classification (docs/rules/data.md F10): every folder has a default label in the registry,
 //      every x-classification in a schema is one of the four labels, and no folder is Secret.
-//   5. Reports standards coverage (tools/coverage.mjs): every "must" rule whose check names a record field
+//   5. Checks the demo clock's list (docs/rules/data.md F12): every date-like field is on the shift list or marked
+//      fixed in src/lib/demo-clock-core.mjs, so a new folder can neither go stale nor move a real-world fact.
+//   6. Reports standards coverage (tools/coverage.mjs): every "must" rule whose check names a record field
 //      that no record carries. A report, not a failure; docs/rules/gaps.md keeps the current list.
 //
 // Run it with:  npm run validate
@@ -28,6 +30,7 @@ import { crossCheck } from './crossrefs.mjs';
 import { standardsCoverage, coverageLines } from './coverage.mjs';
 import { findSecrets } from './secrets.mjs';
 import { LABELS, KEYWORD, checkRegistry } from '../src/lib/classification.mjs';
+import { dateFieldProblems } from '../src/lib/demo-clock-core.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const YAML_EXT = new Set(['.yaml', '.yml']);
@@ -173,8 +176,8 @@ export async function validate(root = REPO_ROOT) {
   // 3. The data. Files that pass their schema are kept for the cross-reference checks.
   const records = [];
   for (const file of await listFiles(dataDir)) {
-    const [folder, ...rest] = path.relative(dataDir, file).split(path.sep);
-    if (rest.length === 0) {
+    const parts = path.relative(dataDir, file).split(path.sep);
+    if (parts.length < 2) {
       problem(file, 'data files must sit inside a folder under data/, such as data/device-models/');
       continue;
     }
@@ -182,8 +185,16 @@ export async function validate(root = REPO_ROOT) {
       problem(file, 'only .yaml files belong under data/');
       continue;
     }
-    if (!collections.some((c) => c?.folder === folder)) {
-      problem(file, `folder "${folder}" is not listed in schemas/registry.yaml`);
+    // A registered folder may be a path (providers/northlight/sales): the longest one the file sits in wins, so one
+    // organisation's records of different kinds can each have their own schema.
+    const dirs = parts.slice(0, -1);
+    let folder = null;
+    for (let n = dirs.length; n >= 1 && !folder; n -= 1) {
+      const f = dirs.slice(0, n).join('/');
+      if (collections.some((c) => c?.folder === f)) folder = f;
+    }
+    if (!folder) {
+      problem(file, `folder "${dirs[0]}" is not listed in schemas/registry.yaml`);
       continue;
     }
     const check = checkers.get(folder);
@@ -195,6 +206,11 @@ export async function validate(root = REPO_ROOT) {
       for (const f of findSecrets(data, path.relative(dataDir, file).split(path.sep).join('/'))) {
         const node = doc.getIn(f.at, true);
         problem(file, f.message, node?.range ? lineCounter.linePos(node.range[0]).line : undefined);
+      }
+      // Every date is on the demo clock's list: it moves with the demo, or it is a fixed real-world fact.
+      for (const d of dateFieldProblems(path.relative(dataDir, file).split(path.sep).join('/'), data)) {
+        const node = doc.getIn(d.at, true);
+        problem(file, d.message, node?.range ? lineCounter.linePos(node.range[0]).line : undefined);
       }
       if (!check(data)) {
         for (const e of check.errors) problem(file, describe(e), lineOf(e, doc, lineCounter));

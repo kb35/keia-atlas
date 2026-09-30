@@ -1,7 +1,7 @@
 ---
 // The one page template: masthead, left navigation (a bottom tab bar on phones), page band, content.
 import Icon from '../components/Icon.astro';
-import { href } from '../lib/data.mjs';
+import { href, DEMO_TODAY, CLOCK } from '../lib/data.mjs';
 import Settings from '../components/Settings.astro';
 import ViewAs from '../components/ViewAs.astro';
 import Report from '../components/Report.astro';
@@ -21,10 +21,13 @@ import '../styles/motion.css';
 import '../styles/nav.css';
 import '../styles/craft.css';
 import '../styles/a11y.css';
+import '../styles/density.css';
+import '../styles/settings.css';
 import { A11Y_BOOT } from '../lib/a11y.mjs';
 
 import { PEOPLE } from '../lib/demo.mjs';
 import { LINE } from '../lib/brand.mjs';
+import BrandMark from '../components/BrandMark.astro';
 import { MODULES, MODULE_DEFAULTS, CAPABILITIES, resolveFeatures, featureCss } from '../lib/modules.mjs';
 import { zoomTrail } from '../lib/zoom.mjs';
 import { springEasing } from '../lib/spring.mjs';
@@ -42,6 +45,8 @@ const NAV = [
   { id: 'vschedule', label: 'Your schedule', short: 'Schedule', to: '/work/schedule/', icon: 'schedule', vendorOnly: true, vendorOk: true, tabs: [] },
   // A provider's own Keia (docs/service-providers.md): every client it serves, each through its own engagement.
   { id: 'portfolio', label: 'Your clients', short: 'Clients', to: '/portfolio/', icon: 'sites', vendorOnly: true, vendorOk: true, tabs: [], also: ['portfolio-client', 'portfolio-engagement'] },
+  // Winning the work (src/lib/provider-sales.mjs): opportunities, design, quote, statement of work, accepted.
+  { id: 'sales', label: 'Sales', to: '/portfolio/sales/', icon: 'money', vendorOnly: true, vendorOk: true, tabs: [], also: ['sales-design', 'sales-quote', 'sales-sow', 'sales-accept'] },
   // The provider's operations (src/lib/provider-ops.mjs): stock, orders, crews, visit readiness, RAMS and handover packs.
   { id: 'ops', label: 'Operations', short: 'Ops', to: '/portfolio/ops/', icon: 'box', vendorOnly: true, vendorOk: true, tabs: [
     { id: 'ops-stock', label: 'Stock', to: '/portfolio/ops/', vendorOk: true, feature: 'provider-stock' },
@@ -67,7 +72,7 @@ const NAV = [
     { id: 'services-av', label: 'AV', to: '/services/av/' },
     { id: 'services-network', label: 'Network', to: '/services/network/' },
     { id: 'services-infrastructure', label: 'Infrastructure', to: '/services/infrastructure/' },
-  ], also: ['service'] },
+  ], also: ['service', 'services-events'] },
   // Assets (it was Devices; /devices/overview/ moved to /assets/): the units and everything that describes them.
   { id: 'assets', label: 'Assets', to: '/assets/', vendorTo: '/profiles/', icon: 'devices', mobile: true, vendorOk: true, tabs: [
     { id: 'devices-overview', label: 'Overview', to: '/assets/' },
@@ -167,7 +172,7 @@ const aboutThis = about ?? { kind: 'page', label: title ?? 'this page' };
 const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
 ---
 <!doctype html>
-<html lang="en-IE" data-look="studio">
+<html lang="en-IE" data-look="studio" data-demo-today={DEMO_TODAY} data-demo-anchor={CLOCK.rolling ? CLOCK.anchor : undefined}>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -217,7 +222,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
       var list = window.rsStore.get('rs4-changes', []);
       var n = list.reduce(function (m, x) { var k = parseInt(String(x.id).replace(/\D/g, ''), 10) || 0; return Math.max(m, k); }, 40);
       var who = window.rsWho();
-      var item = Object.assign({ id: 'PRO-' + (n + 1), date: new Date().toISOString().slice(0, 10), status: 'review', by: who.name, byRole: who.role }, c);
+      var item = Object.assign({ id: 'PRO-' + (n + 1), date: document.documentElement.dataset.demoToday || new Date().toISOString().slice(0, 10), status: 'review', by: who.name, byRole: who.role }, c);
       list.unshift(item); window.rsStore.put('rs4-changes', list); return item;
     };
     window.rsSetChange = function (id, status) {
@@ -247,10 +252,10 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         else if (r.hasAttribute('data-rs-theme')) { r.removeAttribute('data-theme'); r.removeAttribute('data-rs-theme'); }
         r.setAttribute('data-skin', s);
         r.setAttribute('data-mode', t === 'light' || t === 'dark' ? t : 'system');
-        // Demo controls from Settings: each module On, Connected or Off (src/lib/modules.mjs), and whether agents
-        // are shown. Modules become two word lists on <html>: data-off and data-conn.
+        // Demo controls from Settings: each module On, Connected or Off (src/lib/modules.mjs). The retired Agents
+        // switch (rs4-agents) is cleared: the work is always shown, and agents are named only in how it was done. Modules become two word lists on <html>: data-off and data-conn.
         var ag = 'on', mods = window.RS_MODULES || {}, saved = null;
-        try { ag = localStorage.getItem('rs4-agents') || ag; saved = JSON.parse(localStorage.getItem('rs6-modules') || 'null'); localStorage.removeItem('rs4-stage'); } catch (_) {}
+        try { saved = JSON.parse(localStorage.getItem('rs6-modules') || 'null'); localStorage.removeItem('rs4-stage'); localStorage.removeItem('rs4-agents'); } catch (_) {}
         var off = [], conn = [], full = {};
         saved = saved || window.__rsModMem || null;
         Object.keys(mods).forEach(function (id) {
@@ -364,6 +369,18 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         });
         document.addEventListener('astro:after-swap', function () { if (window.__rsNavDir) document.documentElement.setAttribute('data-nav-dir', window.__rsNavDir); });
         document.addEventListener('astro:page-load', function () { setTimeout(function () { document.documentElement.removeAttribute('data-nav-dir'); }, 700); });
+        // The pinned bars under the top bar: their heights, so anything else that pins sits below them (base.css .sec-tabs).
+        (function () {
+          var R = document.documentElement, ro = window.ResizeObserver ? new ResizeObserver(function () { measure(); }) : null;
+          function h(el) { return el && !el.hidden && el.offsetParent !== null ? Math.round(el.getBoundingClientRect().height) : 0; }
+          function measure() {
+            var t = document.querySelector('.sec-tabs'), v = document.querySelector('.viewas');
+            R.style.setProperty('--tabs-h', h(t) + 'px'); R.style.setProperty('--viewas-h', h(v) + 'px');
+          }
+          function watch() { measure(); if (ro) { ro.disconnect(); ['.sec-tabs', '.viewas'].forEach(function (q) { var el = document.querySelector(q); if (el) ro.observe(el); }); } }
+          document.addEventListener('astro:page-load', watch); window.addEventListener('resize', measure);
+          if (document.readyState !== 'loading') watch(); else document.addEventListener('DOMContentLoaded', watch);
+        })();
         // Rule book, persist: name only the clicked item's drawing, so it flies into the next page's stage.
         document.addEventListener('astro:before-preparation', function (e) {
           var a = e.sourceElement && e.sourceElement.closest ? e.sourceElement.closest('a') : null;
@@ -422,8 +439,8 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="mast">
     <a class="brand" href={href('/')} aria-label="Keia Atlas home" data-help="shell.brand">
-      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect class="tile" x="1.5" y="1.5" width="28" height="28" rx="7" stroke-width="2" /><path class="tick" d="M8.5 16l4.5 4.5 10-10" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
-      <span><b>Keia Atlas</b></span>
+      <span class="mark" transition:persist="keia-mark"><BrandMark id="kam-shell" size={32} motion /></span>
+      <span><b>Keia <span class="kw">Atlas</span></b></span>
     </a>
     <nav class="crumbs" aria-label="Breadcrumb" data-help={zoom ? 'shell.zoom' : 'shell.path'} data-zoom={zoom ? '' : undefined}>
       {trail.map((c, i) => (
@@ -438,7 +455,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
     <button class="help-btn" type="button" data-help-toggle data-help="shell.help" data-verb="show-help" data-verb-name="Help" data-help-src={href('/help/index.json')} aria-pressed="false" aria-label="Help: explain what things are (?)" title="Help: explain what things are (press ? to switch on or off)"><span class="hb-q" aria-hidden="true">?</span></button>
     <button class="report-btn" type="button" data-help="shell.report" data-open-report data-verb="report" title="Propose an edit, log new firmware or raise an urgent issue about this page"><Icon name="plus" size={16} /><span>Report</span></button>
     <button class="icon-btn mobile-gear" type="button" data-help="shell.mode" data-toggle-mode aria-label="Colour mode: Auto" title="Colour mode: Auto"><span class="m-system"><Icon name="auto" /></span><span class="m-light"><Icon name="sun" /></span><span class="m-dark"><Icon name="moon" /></span></button>
-    <button class="icon-btn mobile-gear" type="button" data-help="shell.settings" data-open-settings data-verb="settings" data-verb-name="Settings" aria-label="Settings"><Icon name="gear" /></button>
+    <button class="icon-btn mobile-gear" type="button" data-help="shell.settings" data-open-settings aria-haspopup="dialog" aria-label="Settings"><Icon name="gear" /></button>
   </header>
   <div class="shell">
     <aside class="side" aria-label="Primary">
@@ -468,7 +485,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
             <button class="icon-btn" type="button" data-help="shell.mode" data-toggle-mode aria-label="Colour mode: Auto. Select to change" title="Colour mode: Auto">
               <span class="m-system"><Icon name="auto" /></span><span class="m-light"><Icon name="sun" /></span><span class="m-dark"><Icon name="moon" /></span>
             </button>
-            <button class="icon-btn" type="button" data-help="shell.settings" data-open-settings data-verb="settings" data-verb-name="Settings" aria-label="Settings" title="Settings"><Icon name="gear" /></button>
+            <button class="icon-btn" type="button" data-help="shell.settings" data-open-settings aria-haspopup="dialog" aria-label="Settings" title="Settings"><Icon name="gear" /></button>
           </span>
         </div>
       </div>
@@ -491,8 +508,11 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         <section class="stage-gate module-gate">
           <p class="kind">Module</p>
           <h1>{pageModule.label} is switched off</h1>
-          <p class="lede">{pageModule.what}. This demo has the {pageModule.label} module switched off in Settings.</p>
-          <button class="btn primary" type="button" data-help="shell.module-gate" data-set-module={pageModule.id}>Switch on {pageModule.label}</button>
+          <p class="lede">{pageModule.what}. This demo has the {pageModule.label} module switched off in Organisation settings.</p>
+          <div class="gate-acts">
+            <button class="btn primary" type="button" data-help="shell.module-gate" data-set-module={pageModule.id}>Switch on {pageModule.label}</button>
+            <a class="btn ghost" href={href(`/settings/organisation/#${pageModule.id}`)}>Organisation settings</a>
+          </div>
         </section>
       )}
       {tabs.length > 0 && (
@@ -692,7 +712,9 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
       swap();
       if (reduced) return;
       var h1 = host.getBoundingClientRect().height;
-      if (Math.abs(h1 - h0) > 2) host.animate([{ height: h0 + 'px', overflow: 'hidden' }, { height: h1 + 'px', overflow: 'hidden' }], { duration: M.morph, easing: M.ease });
+      // clip, not hidden: hidden would make the box a scroll container, and a sticky card inside it (the room
+      // drawing beside its Key) would jump to its sticky offset for the length of the move.
+      if (Math.abs(h1 - h0) > 2) host.animate([{ height: h0 + 'px', overflow: 'clip' }, { height: h1 + 'px', overflow: 'clip' }], { duration: M.morph, easing: M.ease });
       var i = 0;
       newP.querySelectorAll('[data-vk]').forEach(function (el) {
         var a = before.get(el.dataset.vk), b; try { b = box(el); } catch (_) { return; }
@@ -750,7 +772,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
       var M = function () { return W.rsMotion ? W.rsMotion() : { reduced: true }; };
       // The line under the top bar (and under the filter bar while it sticks): content above it is out of sight.
       var topLimit = function () {
-        var m = D.querySelector('.mast'), t = m ? m.getBoundingClientRect().bottom : 0;
+        var m = D.querySelector('.mast'), t = m ? m.getBoundingClientRect().bottom : 0, st = D.querySelector('.sec-tabs'); if (st && getComputedStyle(st).position === 'sticky') t = Math.max(t, st.getBoundingClientRect().bottom);
         var fb = D.querySelector('main .fb[data-fb]');
         if (fb && getComputedStyle(fb).position === 'sticky') { var fr = fb.getBoundingClientRect(); if (fr.top <= t + 2) t = Math.max(t, fr.bottom); }
         return t;
@@ -1010,7 +1032,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         var m = W.rsModules(); if (!(id in m) || m[id] === state) return;
         m[id] = state; W.__rsModMem = m;   // kept in memory too, for a browser that blocks storage
         try { localStorage.setItem('rs6-modules', JSON.stringify(m)); } catch (_) {}
-        W.rsChange(applyDemo, synced('modules'), { roots: ['.side', 'main', 'dialog#settings[open] .mods'] });
+        W.rsChange(applyDemo, synced('modules'), { roots: ['.side', 'main'] });
       };
       /* Settings › Modules, capabilities: each On, Connected or Off; off with its module or what it requires. What a
          capability marks (data-feature) collapses or grows in place, the rest slides (rsChange). Pages ask
@@ -1028,7 +1050,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         if (!(id in was)) return;
         c[id] = state; W.__rsFeatMem = c;
         try { localStorage.setItem('rs6-features', JSON.stringify(c)); } catch (_) {}
-        W.rsChange(applyDemo, synced('features'), { roots: ['.side', 'main', 'dialog#settings[open] .mods'] });
+        W.rsChange(applyDemo, synced('features'), { roots: ['.side', 'main'] });
       };
       /* Switch a capability on from a page (its gate, or an action that needs it), with whatever it needs: its module
          and what it requires, in one change. */
@@ -1047,11 +1069,17 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         need(id);
         W.__rsModMem = m; W.__rsFeatMem = fc;
         try { localStorage.setItem('rs6-modules', JSON.stringify(m)); localStorage.setItem('rs6-features', JSON.stringify(fc)); } catch (_) {}
-        W.rsChange(applyDemo, synced('features'), { roots: ['.side', 'main', 'dialog#settings[open] .mods'] });
+        W.rsChange(applyDemo, synced('features'), { roots: ['.side', 'main'] });
       };
-      W.rsSetAgents = function (v) {
-        try { localStorage.setItem('rs4-agents', v); } catch (_) {}
-        W.rsChange(applyDemo, synced('agents'));
+      /* Organisation settings: every module and capability at once (Switch everything on, Reset to defaults, and
+         their Undo), in one change. null puts back the defaults. */
+      W.rsSetOrg = function (mods, feats) {
+        W.__rsModMem = mods; W.__rsFeatMem = feats;
+        try {
+          if (mods) localStorage.setItem('rs6-modules', JSON.stringify(mods)); else localStorage.removeItem('rs6-modules');
+          if (feats) localStorage.setItem('rs6-features', JSON.stringify(feats)); else localStorage.removeItem('rs6-features');
+        } catch (_) {}
+        W.rsChange(applyDemo, synced('features'), { roots: ['.side', 'main'] });
       };
       W.rsPickWho = function (id) {
         if (id === (W.rsWhoId && W.rsWhoId())) return;
@@ -1101,6 +1129,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
   /* The View as ribbon: thin, calm, under the top bar, and still while pages change (it names itself). */
   .viewas { position: sticky; top: calc(var(--mast-h) + env(safe-area-inset-top, 0px)); z-index: 19; display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 4px var(--pad-x); font-size: 13px; color: var(--accent-ink); background: color-mix(in srgb, var(--accent-soft) 70%, var(--surface)); border-bottom: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); view-transition-name: ribbon; }
   .viewas[hidden] { display: none; }
+  .gate-acts { display: flex; flex-wrap: wrap; gap: 10px; }
   .va-eye { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--on-accent); flex: none; }
   .va-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .va-change { margin-left: auto; flex: none; font: 600 12.5px/1 var(--font-sans); padding: 6px 10px; border-radius: var(--pill-radius); border: 0; background: none; color: var(--accent-ink); cursor: pointer; transition: background var(--dur-hover); }

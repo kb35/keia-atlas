@@ -93,3 +93,15 @@ Every installed model with firmware worth attacking (anything networked, and eve
 - **Why:** the GDPR, works councils, the EU Cyber Resilience Act and the UK PSTI rules all ask for these records; keeping them beside the device means they are there when someone asks.
 - **Do:** "Security support ends Jun 2027"; "Counted per room, never per person"; "not legal advice".
 - **Don't:** say a device or Aigna is "compliant", call aggregated counts "anonymous", or invent a manufacturer's support date or contact without marking it as a demo value.
+
+### F12. The demo's dates move with today; real facts never do
+
+The demo's records are written as of one day, the anchor (`demo_anchor` in `data/house-values/`). With `demo_clock: rolling` (Aigna's demo only), each build moves every date inside the demo world forward by the whole weeks between the anchor and the build date, when the data is loaded (`src/lib/demo-clock.mjs`); the YAML files never change. The story stays the same (the 3.09 fault is still "today 07:52", PRJ-14 is on the same step, a warranty still ends in 10 months) and weekdays are kept. Pages rebuilds every Monday at 03:00 UTC, so the live demo stays current. A real organisation leaves `demo_clock` out, and its dates never move.
+
+Which dates move is an allow-list, `DATE_FIELDS` in `src/lib/demo-clock-core.mjs`, per folder and field path: `shift` (a demo date: by whole weeks), `fy` (the year plan's bounds, its quarterly reviews and freezes, and the planning years: by whole financial years, and only once today has crossed into another one), `year` (the work plan's horizon: by calendar years) or `fixed` (a real-world fact, a connector's own record, or when this repository's public files were written). The validator fails any date-like field that is on neither list.
+
+**Registering a new folder.** Add the folder (or `folder/sub-folder`) to `DATE_FIELDS` with the path of every date field: dotted keys, `[]` for any item of a list, `*` for any key of a map and `**` for any path below (`positions[].units[].warranty.ends`, `rooms.*.hearing_loop.tested`). A made-up record's date is `shift`; a date someone outside Aigna published (a release, an end of support, a standard taking effect, a citation) is `fixed`. Then run `npm run validate`: it names any date you missed, with its file and line. A date written in JavaScript for the demo goes through `demoShift()`; a page script that needs today reads `document.documentElement.dataset.demoToday`, never its own clock's date.
+
+- **Why:** a demo that looks three months old reads as abandoned, and a real fact that moved would be a lie.
+- **Do:** check a change with `DEMO_BUILD_DATE=2026-12-28 npm run build` (13 weeks on) as well as the plain build, and read a few pages.
+- **Don't:** move a date by editing the YAML, put a demo date in prose ("on 12 September") where a field could carry it, or mark a real fact `shift` to make a page read better.

@@ -3,6 +3,8 @@
 // The pages to check: every archetype, and the pages most often used at small sizes.
 export const PAGES = [
   ['home', '/'],
+  ['settings', '/settings/'],
+  ['settings-org', '/settings/organisation/'],
   ['support', '/support/'],
   ['work-list', '/work/list/'],
   ['schedule-day', '/work/schedule/?view=day'],
@@ -36,10 +38,13 @@ export const PAGES = [
   // Other places (owned by other helpers; checked with --all)
   ['locations', '/locations/'], ['offices', '/locations/offices/'], ['region', '/locations/emea/'], ['office', '/locations/dub/'], ['office-plain', '/locations/lon/'], ['home-offices', '/locations/emea/home-offices/'],
   ['services', '/services/'], ['service-av', '/services/av/'], ['service-network', '/services/network/'], ['service-infrastructure', '/services/infrastructure/'],
+  ['service-security', '/services/security/'], ['service-print', '/services/print/'], ['service-collaboration', '/services/collaboration/'], ['service-wifi', '/services/wifi/'],
+  ['service-events', '/services/events/'], ['event', '/services/events/evt-03/'], ['event-past', '/services/events/evt-01/'],
   ['spares', '/spares/'], ['store', '/spares/dub/'],
   ['assets', '/assets/', 'other'],
   ['rooms', '/rooms/', 'other'],
   ['room-profiles', '/room-profiles/', 'other'],
+  ['room-profile', '/room-profiles/conference-room-large/', 'other'],   // the size picker and the drawing beside its Key
   ['devices', '/devices/', 'other'],
   ['unit', '/device/?tag=AG-000028', 'other'],
   ['profiles', '/profiles/', 'other'],
@@ -50,6 +55,8 @@ export const PAGES = [
   // Organisations and engagements (docs/service-providers.md): the client's side, and the provider's own (--who sam).
   ['vendor-engagement', '/vendors/northlight/engagement/', 'other'],
   ['portfolio', '/portfolio/', 'other'], ['portfolio-client', '/portfolio/aigna-northlight/', 'other'], ['portfolio-client-fw', '/portfolio/fenwater-northlight/', 'other'], ['portfolio-engagement', '/portfolio/aigna-northlight/engagement/', 'other'],
+  // A provider's sales (--who sam): the pipeline, a design, its quote, the statement of work and the handoff.
+  ['sales', '/portfolio/sales/', 'other'], ['sales-design', '/portfolio/sales/opp-2611/', 'other'], ['sales-quote', '/portfolio/sales/opp-2611/quote/', 'other'], ['sales-sow', '/portfolio/sales/opp-2611/sow/', 'other'], ['sales-accept', '/portfolio/sales/opp-2611/accept/', 'other'], ['sales-accepted', '/portfolio/sales/opp-2602/accept/', 'other'], ['sales-design-fw', '/portfolio/sales/opp-2613/', 'other'],
   // A provider's operations (src/lib/provider-ops.mjs), as Sam Okafor (--who sam).
   ['ops-stock', '/portfolio/ops/', 'other'], ['ops-orders', '/portfolio/ops/orders/', 'other'], ['ops-crews', '/portfolio/ops/crews/', 'other'], ['ops-visits', '/portfolio/ops/visits/', 'other'], ['ops-rams', '/portfolio/ops/rams/', 'other'], ['ops-rams-doc', '/portfolio/ops/rams/nl-2318/', 'other'], ['ops-handover', '/portfolio/ops/handover/', 'other'], ['ops-handover-doc', '/portfolio/ops/handover/ho-nl-2240/', 'other'],
   ['usage', '/usage/', 'other'],

@@ -5,12 +5,11 @@
 // out), never from a class average. The house policy only says when a device is due: install year plus
 // the class's years in service. Hours come from the policy's per-task estimates: deploy tasks for the
 // new unit, retire tasks for the old one. Tasks marked networked_only apply to classes with a network address.
-import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { parse } from 'yaml';
+import { loadYaml } from './demo-clock.mjs';
 import { spaces, sites, classes, models, SITE_ORDER, DEMO_TODAY, className, modelName } from './data.mjs';
 
-export const policy = parse(readFileSync(path.join(process.cwd(), 'data/refresh-policy/aigna.yaml'), 'utf8'));
+export const policy = loadYaml(path.join(process.cwd(), 'data/refresh-policy/aigna.yaml'));
 const YEARS = Object.fromEntries(policy.classes.map((c) => [c.class, c.years]));
 export const lifeOf = (cls) => YEARS[cls];
 const networked = (cls) => Boolean(classes[cls]?.platforms?.dhcp_dns);

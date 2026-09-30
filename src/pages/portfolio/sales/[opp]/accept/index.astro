@@ -1,0 +1,140 @@
+---
+// Accepted: the handoff from the provider's Keia to the client's (docs/service-providers.md, sections 3, 4 and 7;
+// src/lib/provider-sales.mjs, handoff). The design goes over the engagement as a proposal, lands in the client's
+// review queue, becomes a project, and its BOM becomes each space's install positions: the build sheets start there.
+// For a quote with the client, Accept (simulated) flies the design into the client's Keia (motion row 59); for one
+// already accepted, the project it became is linked and the handoff can be played again. Simulated.
+import Shell from '../../../../../layouts/Shell.astro';
+import PageBand from '../../../../../components/PageBand.astro';
+import SalesFrame from '../../../../../components/SalesFrame.astro';
+import SalesThread from '../../../../../components/SalesThread.astro';
+import { href, projects, PHASE_LABEL } from '../../../../../lib/data.mjs';
+import { sales } from '../../../../../lib/provider-sales-data.mjs';
+import { money } from '../../../../../lib/provider-sales.mjs';
+import { dateWords } from '../../../../../lib/vendors.mjs';
+
+export function getStaticPaths() {
+  return sales().opps.filter((o) => o.hasQuote && o.handoff).map((o) => ({ params: { opp: o.slug }, props: { o } }));
+}
+const { o } = Astro.props;
+const M = sales();
+const V = o.current;
+const H = o.handoff;
+const accepted = o.stage === 'accepted';
+const P = o.becomes ? Object.values(projects).find((p: any) => p.id === o.becomes) as any : null;
+// The project an accepted Northlight quote became, to show what this one becomes (Juneau, PRJ-14).
+const example = !P ? M.opps.find((x: any) => x.becomes && x.client === o.client) : null;
+const exP = example ? Object.values(projects).find((p: any) => p.id === example.becomes) as any : null;
+const pl = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`;
+const who = o.contactName ?? `${o.clientName}'s delivery lead`;
+const answer = accepted
+  ? `Accepted ${dateWords(o.accepted)}; it became ${o.becomes}, ${P?.name ?? o.title}, now in ${PHASE_LABEL[P?.phase] ?? 'progress'}`
+  : `Accepting version ${V.v} sends the design to ${o.clientName} as a proposed project`;
+const NUMBERS = [
+  { n: H.project.spaces, label: H.project.spaces === 1 ? 'Space' : 'Spaces', to: '#positions' },
+  { n: H.project.units, label: 'Units to install', to: '#positions' },
+  { n: H.guides.length, label: H.guides.length === 1 ? 'Setup guide' : 'Setup guides', to: '#positions' },
+  { n: money(Math.round(H.project.budget)), label: `Version ${V.v}`, fact: true },
+];
+const sideWord = { provider: o.providerName, client: o.clientName, both: 'Both sides' } as Record<string, string>;
+const found = H.positions.every((p: any) => p.match?.every((m: any) => m.found));
+---
+<Shell vendorOk title={`${o.title}: accepted`} section="sales-accept" crumbs={[{ label: 'Sales', to: '/portfolio/sales/' }, { label: o.title, to: `/portfolio/sales/${o.slug}/` }, { label: accepted ? 'Accepted' : 'Accept' }]}>
+  <SalesFrame provider={o.provider}>
+    <PageBand overline={`${accepted ? 'Accepted' : 'Accept'} · ${o.id}`} title={o.title} answer={answer} lede={`${o.clientName}, ${o.siteName}`} sim heartbeat={false} numbers={NUMBERS}>
+      {o.fictional && <span slot="overline" class="pf-fict">Made-up client</span>}
+    </PageBand>
+
+    <div class="content sl-page" data-sl-accept data-state={accepted ? 'done' : 'ready'}>
+      <SalesThread o={o} here="accept" />
+
+      <section class="sl-hand" aria-label="From Northlight's Keia to the client's" data-feature="provider-sales" data-help="sales.handoff">
+        <article class="card pad sl-hfrom" data-sl-from>
+          <p class="overline">{o.providerName}'s Keia</p>
+          <h2 class="sl-h">The design, version {V.v}</h2>
+          <ul class="sl-hand-rooms">{V.rooms.map((r: any) => <li><b>{r.label}</b><small>{r.optionName} · {r.units} units</small></li>)}</ul>
+          <p class="sl-hand-t"><b>{H.project.units} units</b> · {money(H.project.budget)}</p>
+          <p class="eg-note">Costs, margin and crew notes stay here. Only the design crosses.</p>
+        </article>
+        <div class="sl-hand-mid" aria-hidden="true"><span>over the engagement</span><svg viewBox="0 0 48 12" width="48" height="12"><path d="M0 6h44M38 1l6 5-6 5" fill="none" stroke="currentColor" stroke-width="1.5" /></svg></div>
+        <article class="card pad sl-hto" data-sl-to>
+          <p class="overline">{o.clientName}'s Keia</p>
+          {accepted && P ? (
+            <div class="sl-to-full">
+              <h2 class="sl-h"><a href={href(`/projects/${P.id.toLowerCase()}/`)}>{P.id} · {P.name}</a></h2>
+              <p>Accepted by {o.clientName} on {dateWords(o.accepted)}. Now in {PHASE_LABEL[P.phase]}, with {o.providerName} installing.</p>
+              <ul class="sl-hand-rooms">{H.positions.map((p: any) => <li><b>{p.label}</b><small>{p.match ? `${p.match.filter((m: any) => m.found).length} of ${pl(p.match.length, "position")} in ${o.clientName}'s record` : pl(p.units, "unit")}</small></li>)}</ul>
+              <div class="sl-row"><a class="btn small" href={href(`/projects/${P.id.toLowerCase()}/integrate/`)}>Open its build sheets</a><button type="button" class="btn small ghost" data-sl-replay>Play the handoff again</button></div>
+            </div>
+          ) : (
+            <>
+              <div class="sl-to-empty" data-sl-empty>
+                <h2 class="sl-h">Nothing here yet</h2>
+                <p>Accepted, the design arrives as a proposed project for {who} to review.</p>
+              </div>
+              <div class="sl-to-full" data-sl-full hidden>
+                <p class="sl-status" data-status="review">To review · proposed, waiting for {who}</p>
+                <h2 class="sl-h">{o.title}</h2>
+                <p>A reviewed change in {o.clientName}'s queue: {who} compares it with {o.clientName}'s space types and standards, then accepts it as a project, {o.providerName} engaged as integrator.</p>
+                <ul class="sl-hand-rooms">{H.positions.map((p: any) => <li><b>{p.label}</b><small>{pl(p.units, "install position")} from the BOM</small></li>)}</ul>
+                <p class="eg-note">Simulated: nothing was sent. In a real deployment it crosses signed, and both audit logs keep it.</p>
+              </div>
+            </>
+          )}
+        </article>
+      </section>
+
+      {!accepted && (
+        <div class="sl-row sl-accept-row" data-feature="provider-sales">
+          <button type="button" class="btn primary" data-sl-accept-btn data-help="sales.accept" disabled={!H.inScope}>Accept version {V.v} (simulated)</button>
+          <button type="button" class="btn ghost" data-sl-undo hidden>Undo</button>
+          <span class="faint" data-sl-accept-note>{H.inScope ? `As if ${o.clientName} had signed version ${V.v}.` : `Design proposals are not in ${o.clientName}'s engagement scope yet.`}</span>
+        </div>
+      )}
+
+      <section class="sec" id="steps" aria-labelledby="sl-s-h" data-feature="provider-sales">
+        <header class="section-head"><h2 id="sl-s-h" data-help="sales.steps">How it crosses</h2><span class="aside faint">A reviewed change, never an edit</span></header>
+        <ol class="sl-steps">
+          {H.steps.map((s: any) => <li data-side={s.side}><span class="sl-side">{sideWord[s.side]}</span><span><b>{s.what}</b><small>{s.how}</small></span></li>)}
+        </ol>
+      </section>
+
+      <section class="sec" id="positions" aria-labelledby="sl-p-h" data-feature="provider-sales">
+        <header class="section-head"><h2 id="sl-p-h" data-help="sales.positions">The BOM becomes install positions</h2><span class="aside faint">{accepted ? (found ? `Every line is a position in ${o.clientName}'s record` : 'Matched with the record') : 'What lands in each space\'s install record'}</span></header>
+        <div class="sl-pos">
+          {H.positions.map((p: any, i: number) => (
+            <details class="sl-pos-room" open={i === 0}>
+              <summary><b>{p.label}</b><span>{pl(p.units, "unit")}</span></summary>
+              {p.match ? (
+                <ul class="sl-match">{p.match.map((m: any) => <li data-ok={m.found && m.sameModel ? '1' : '0'}><span>{m.found ? "Fine · in the record" : "Fault · missing"}</span><b>{m.key}</b><small>{m.name}{m.units ? ` · ${m.units} ${m.units === 1 ? 'unit' : 'units'} recorded` : ''}</small></li>)}</ul>
+              ) : (
+                <pre class="sl-yaml"><code>{p.yaml}</code></pre>
+              )}
+            </details>
+          ))}
+        </div>
+        <p class="eg-note">Build sheets start from {H.guides.map((g: any) => `${g.name} (${g.units})`).join(', ')}. On install, the serials and MAC addresses fill these positions and the as-built comes back as a reviewed change.</p>
+      </section>
+
+      {H.gaps.length > 0 && (
+        <section class="sec" id="gaps" aria-labelledby="sl-g-h" data-feature="provider-sales">
+          <header class="section-head"><h2 id="sl-g-h" data-help="sales.gaps">{accepted ? 'Still to settle' : 'Before it can be ordered'}</h2></header>
+          <ul class="sl-gaps">{H.gaps.map((g: string) => <li>{g}</li>)}</ul>
+        </section>
+      )}
+
+      {exP && (
+        <section class="card pad sl-becomes" data-feature="provider-sales" data-help="sales.becomes">
+          <p class="overline">This is what it becomes</p>
+          <h2 class="sl-h"><a href={href(`/projects/${exP.id.toLowerCase()}/`)}>{exP.id} · {exP.name}</a></h2>
+          <p>Northlight's quote for the {example.title} went the same way: accepted on {dateWords(example.accepted)}, it is {o.clientName}'s project now, in {PHASE_LABEL[exP.phase]}. Its install positions came from the BOM, and its build sheets from the setup guides.</p>
+          <div class="sl-row"><a class="btn small" href={href(`/portfolio/sales/${example.slug}/accept/`)}>See that handoff</a><a class="btn small ghost" href={href(`/projects/${exP.id.toLowerCase()}/integrate/`)}>Its build sheets</a></div>
+        </section>
+      )}
+    </div>
+  </SalesFrame>
+  <script>
+    import { bootSales } from '../../../../../lib/provider-sales-client.mjs';
+    bootSales();
+  </script>
+</Shell>

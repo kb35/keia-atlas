@@ -1,0 +1,250 @@
+# Space type: Demo zone
+# Keia Atlas house standard, not from a published guideline (see docs/decisions/0009-house-standard.md). No public
+# guidance covers an executive briefing centre's rooms, so every size, count and choice here is a house choice.
+# Keia part (profile to verification_model): which classes of device belong here.
+# Keia Atlas part: build options, the models each option names, and the outlets.
+
+schema: composite-profile
+
+profile:
+  name: Demo zone
+  space_type: demo-zone
+  version: "1.0"
+  last_updated: "2026-09-30"
+  owner: Keia Atlas maintainers
+  capacity: "8-20 people"
+  purpose: >-
+    A standing room in an executive briefing centre where visitors see products working: a demo
+    bench at two large displays, demo pods with their own outlets for demo kit, and a video bar
+    so remote colleagues can join a demo.
+
+sources:
+  - file: docs/decisions/0009-house-standard.md
+    provides: 'Keia Atlas house standard: why this space type and its kit'
+  - file: data/device-classes/display.yaml
+    provides: Healthy state for the display class
+  - file: data/device-classes/video-bar.yaml
+    provides: Healthy state for the video bar class
+  - file: data/device-classes/touch-controller.yaml
+    provides: Healthy state for the touch controller class
+  - file: data/device-classes/av-extender.yaml
+    provides: Healthy state for the AV extender class
+  - file: data/device-classes/scheduler-panel.yaml
+    provides: Healthy state for the scheduler panel class
+
+equipment_categories:
+  - category: display
+    description: Two large displays at the demo bench
+    object_profile: data/device-classes/display.yaml
+    quantity: "2"
+  - category: video_conferencing
+    description: Video bar that runs meetings, so remote colleagues can join a demo
+    object_profile: data/device-classes/video-bar.yaml
+    quantity: "1"
+  - category: meeting_control
+    description: Touchscreen on the demo bench
+    object_profile: data/device-classes/touch-controller.yaml
+    quantity: "1"
+  - category: signal_extension
+    description: HDBaseT transmitter and receiver for the demo machine at the bench
+    object_profile: data/device-classes/av-extender.yaml
+    quantity: "2"
+  - category: scheduling_panel
+    description: Booking panel at the door
+    object_profile: data/device-classes/scheduler-panel.yaml
+    quantity: "1"
+
+verification_model:
+  platforms_to_check:
+    - platform: keia_atlas
+      check: every required device in the chosen option is recorded in the space and wired
+        as the option says
+    - platform: inventory
+      check: every device has an active record in this space
+    - platform: dhcp_dns
+      check: every networked device has an address reservation and DNS records
+    - platform: device_management
+      check: meeting devices are online, paired and on standard firmware
+    - platform: room_booking
+      check: the room resource exists with the right capacity and is linked to its devices
+
+keia_atlas:
+  standard: house
+  category: connect
+  bookable: true
+  capacity:
+    min: 8
+    max: 20
+  area:
+    sq_ft:
+      min: 646
+      max: 969
+    m2:
+      min: 60
+      max: 90
+  geometry:
+    # The room shell for a floor-level 3D model; basis says where each value comes from.
+    width_m: 6.4
+    depth_m: 12
+    ceiling_m: 2.6
+    display_wall: back
+    door: { wall: left, from_m: 10.9, to_m: 11.8 }
+    data_entry: { via: ceiling, wall: left, at: above the door }
+    containment: [display-track, wall-riser, ceiling-drop, ceiling-basket, table-tray, table-leg, floor-cover, floor-box, floor-duct, floor-void, in-wall]
+    basis:
+      size: chosen
+      ceiling: house-default
+      door: house-default
+      data_entry: house-default
+      containment: house-default
+    notes:
+      - 6.4 × 12 m (76.8 m²), the depth of a facade row; the displays are on a short wall (house choice).
+  options:
+    - id: dual-display
+      name: Dual display, video bar
+      standard: house
+      since: "2026-06-15"
+      summary: "Two 75 in displays with a Poly Studio X72 video bar at the demo bench, the demo machine over HDBaseT, floor boxes with data and power for demo kit, and a booking panel at the door. Lighting scenes come from the building's lighting control; a demo is recorded only in the meeting service, when everyone agrees."
+      equipment:
+        - key: display
+          class: display
+          model: lg-75uh5q-e
+          quantity: 2
+          requirement: required
+          location: display-wall
+          sizes_in: [75]
+        - key: video-bar
+          class: video-bar
+          model: poly-studio-x72
+          quantity: 1
+          requirement: required
+          location: display-wall
+          notes: Under the displays, between them
+        - key: touch-controller
+          class: touch-controller
+          model: poly-tc10
+          quantity: 1
+          requirement: required
+          location: table-top
+        - key: hdbaset-tx
+          class: av-extender
+          model: kramer-ext3-c-xr-t
+          role: 'HDBaseT transmitter: the demo machine at the bench'
+          quantity: 1
+          requirement: required
+          location: below-table
+        - key: hdbaset-rx
+          class: av-extender
+          model: kramer-ext3-poe-xr-r
+          role: HDBaseT receiver at the display wall
+          quantity: 1
+          requirement: required
+          location: behind-display
+        - key: scheduler-panel
+          class: scheduler-panel
+          model: logitech-tap-scheduler
+          quantity: 1
+          requirement: required
+          location: room-entrance
+      infrastructure:
+        - service: power
+          provided_by: it
+          quantity: 6
+          location: behind-display
+          serves: [display 1, HDBaseT receiver, video bar, display 2, spare, spare]
+        - service: power
+          provided_by: it
+          quantity: 2
+          location: below-table
+          serves: [HDBaseT transmitter, spare]
+        - service: data
+          provided_by: it
+          quantity: 6
+          location: behind-display
+          serves: [display 1, video bar, spare, display 2, spare, spare]
+        - service: data
+          provided_by: it
+          quantity: 2
+          location: below-table
+          serves: [touch controller, spare]
+        - service: direct-run
+          provided_by: it
+          quantity: 2
+          location: below-table
+          serves: [HDBaseT link to the display wall, spare]
+          notes: Cable runs straight from the bench floor box to the display wall.
+        - service: data
+          provided_by: it
+          quantity: 4
+          location: floor-box
+          serves: [demo kit, demo kit, demo kit, demo kit]
+          notes: At the demo pods, for the demo kit on show
+        - service: power
+          provided_by: it
+          quantity: 8
+          location: floor-box
+          serves: [demo kit, demo kit, demo kit, demo kit, demo kit, demo kit, demo kit, demo kit]
+        - service: data
+          provided_by: it
+          quantity: 1
+          location: room-entrance
+          serves: [scheduler panel]
+      wiring:
+        - from: video-bar.hdmi-out-1
+          to: display#1.hdmi-in-1
+          cable: hdmi
+        - from: video-bar.hdmi-out-2
+          to: display#2.hdmi-in-1
+          cable: hdmi
+        - from: display#1.lan-1
+          to: outlet:data/behind-display#1
+          cable: cat6
+        - from: video-bar.lan-1
+          to: outlet:data/behind-display#2
+          cable: cat6
+        - from: display#2.lan-1
+          to: outlet:data/behind-display#4
+          cable: cat6
+        - from: touch-controller.lan-1
+          to: outlet:data/below-table#1
+          cable: cat6
+        - from: hdbaset-tx.hdbaset-1
+          to: hdbaset-rx.hdbaset-1
+          cable: cat6a
+          notes: In direct cable run 1, floor box to display wall. The receiver powers the transmitter over this cable.
+        - from: hdbaset-tx.usb-c-1
+          to: laptop
+          cable: usb-c
+          notes: The cable the demo machine plugs into
+        - from: hdbaset-rx.hdmi-out-1
+          to: video-bar.hdmi-in-1
+          cable: hdmi
+        - from: hdbaset-rx.usb-b-1
+          to: video-bar.usb-c-1
+          cable: usb
+          notes: The demo machine's USB through to the video bar, for device mode
+        - from: scheduler-panel.lan-1
+          to: outlet:data/room-entrance#1
+          cable: cat6
+        - from: display#1.power-in
+          to: outlet:power/behind-display#1
+          cable: power
+        - from: hdbaset-rx.power-in
+          to: outlet:power/behind-display#2
+          cable: power
+        - from: video-bar.power-in
+          to: outlet:power/behind-display#3
+          cable: power
+        - from: display#2.power-in
+          to: outlet:power/behind-display#4
+          cable: power
+        - from: hdbaset-tx.power-in
+          to: outlet:power/below-table#1
+          cable: power
+          notes: 'Optional: the transmitter can also run on power from the receiver'
+  notes:
+    - 'Keia Atlas house standard: no public guidance covers an executive briefing centre, so the size and kit are house choices.'
+    - 'The demo kit on show is not built in: it is kept and charged in the control room and brought out for each briefing. The floor-box outlets at the pods are for it.'
+    - 'Lighting control: scenes for demos and video come from the building''s lighting control on a keypad by the door. No device class covers lighting control, so it is not listed as kit (a gap to fill).'
+    - 'Recording: there is no recording kit in the room. A demo is recorded only in the meeting service, when everyone in it agrees (house choice).'
+    - 'Sensing kit (the video bar) needs a privacy record for its site before it is installed.'

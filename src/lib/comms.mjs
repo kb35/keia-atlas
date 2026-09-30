@@ -2,9 +2,9 @@
 // recorded in them: which floors and rooms it serves, its uplinks, its power, how much space and how
 // many ports are used and free, and the PoE budget the vendor states. Nothing is guessed: what the
 // data does not say comes back as null, and the page says "Not recorded".
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { parse } from 'yaml';
+import { loadYaml } from './demo-clock.mjs';
 import { racks, rackGear, spaces, sites, commsRooms, networkPath, KIND, modelName, models, incidents, projects, STAGE_LABEL, href, plural } from './data.mjs';
 import { cablesInRack } from './stock.mjs';
 import { lifeOf } from './refresh.mjs';
@@ -402,5 +402,5 @@ export function standardFor(space) {
 // Typical rack layouts (data/rack-layouts): what a room profile's build option looks like in the rack
 // before any room is built to it. Read here, beside the racks, so the count of real racks stays true.
 const LAYOUTS = path.join(process.cwd(), 'data', 'rack-layouts');
-export const rackLayouts = existsSync(LAYOUTS) ? readdirSync(LAYOUTS).filter((n) => n.endsWith('.yaml')).sort().map((n) => parse(readFileSync(path.join(LAYOUTS, n), 'utf8'))) : [];
+export const rackLayouts = existsSync(LAYOUTS) ? readdirSync(LAYOUTS).filter((n) => n.endsWith('.yaml')).sort().map((n) => loadYaml(path.join(LAYOUTS, n))) : [];
 export const layoutFor = (typeId, optId) => rackLayouts.find((r) => r.space_type === typeId && r.option === optId) ?? null;

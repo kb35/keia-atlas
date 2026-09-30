@@ -1,0 +1,153 @@
+# Space type: Control room (backstage AV)
+# Keia Atlas house standard, not from a published guideline (see docs/decisions/0009-house-standard.md). No public
+# guidance covers an executive briefing centre's rooms, so every size, count and choice here is a house choice.
+# Keia part (profile to verification_model): which classes of device belong here.
+# Keia Atlas part: build options, the models each option names, and the outlets.
+
+schema: composite-profile
+
+profile:
+  name: Control room (backstage AV)
+  space_type: av-control-room
+  version: "1.0"
+  last_updated: "2026-09-30"
+  owner: Keia Atlas maintainers
+  capacity: "1-3 people"
+  purpose: >-
+    The room behind a briefing auditorium: its AV rack (the auditorium's codec, amplifier, AV
+    switch and display transmitters, recorded with the auditorium), an operator's desk with a
+    monitoring display and controller, and the cabinets where demo kit is kept and charged.
+
+sources:
+  - file: docs/decisions/0009-house-standard.md
+    provides: 'Keia Atlas house standard: why this space type and its kit'
+  - file: data/device-classes/display.yaml
+    provides: Healthy state for the display class
+  - file: data/device-classes/touch-controller.yaml
+    provides: Healthy state for the touch controller class
+
+equipment_categories:
+  - category: display
+    description: Monitoring display showing the auditorium's programme and far end
+    object_profile: data/device-classes/display.yaml
+    quantity: "1"
+  - category: meeting_control
+    description: The operator's controller for the auditorium's codec
+    object_profile: data/device-classes/touch-controller.yaml
+    quantity: "1"
+
+verification_model:
+  platforms_to_check:
+    - platform: keia_atlas
+      check: every required device in the chosen option is recorded in the space and wired
+        as the option says
+    - platform: inventory
+      check: every device has an active record in this space
+    - platform: dhcp_dns
+      check: every networked device has an address reservation and DNS records
+    - platform: device_management
+      check: the display and controller are online and on standard firmware
+
+keia_atlas:
+  standard: house
+  category: support
+  bookable: false
+  capacity:
+    min: 1
+    max: 3
+  area:
+    sq_ft:
+      min: 269
+      max: 431
+    m2:
+      min: 25
+      max: 40
+  geometry:
+    # The room shell for a floor-level 3D model; basis says where each value comes from.
+    width_m: 6.4
+    depth_m: 5
+    ceiling_m: 2.6
+    display_wall: back
+    door: { wall: left, from_m: 3.9, to_m: 4.8 }
+    data_entry: { via: ceiling, wall: left, at: above the door }
+    containment: [display-track, wall-riser, ceiling-basket, skirting, desk-tray, desk-leg]
+    basis:
+      size: chosen
+      ceiling: house-default
+      door: house-default
+      data_entry: house-default
+      containment: house-default
+    notes:
+      - 6.4 × 5 m (32 m²), the depth of a facade row; the monitoring display is on the wall shared with the auditorium (house choice).
+  options:
+    - id: operator
+      name: Operator desk and AV rack
+      standard: house
+      since: "2026-06-15"
+      summary: "A 65 in monitoring display and a Poly TC10 for the operator, data and power for the AV rack, and a charging cabinet for the demo kit with its own outlets. The auditorium's codec, amplifier, AV switch and display transmitters stand in the AV rack here but are recorded with the auditorium. Lighting scenes for the auditorium are run from here through the building's lighting control; recording and streaming take the codec's feed here."
+      equipment:
+        - key: display
+          class: display
+          model: samsung-qm65c
+          role: Monitoring display for the auditorium's programme and far end
+          quantity: 1
+          requirement: required
+          location: display-wall
+          sizes_in: [65]
+        - key: touch-controller
+          class: touch-controller
+          model: poly-tc10
+          role: The operator's controller, paired with the auditorium's codec over the network
+          quantity: 1
+          requirement: required
+          location: table-top
+      infrastructure:
+        - service: power
+          provided_by: it
+          quantity: 2
+          location: behind-display
+          serves: [monitoring display, spare]
+        - service: data
+          provided_by: it
+          quantity: 2
+          location: behind-display
+          serves: [monitoring display, spare]
+        - service: data
+          provided_by: it
+          quantity: 2
+          location: wall-below-table
+          serves: [touch controller, spare]
+        - service: power
+          provided_by: it
+          quantity: 2
+          location: wall-below-table
+          serves: [touch controller, spare]
+        - service: data
+          provided_by: it
+          quantity: 4
+          location: wall
+          serves: [demo kit staging, demo kit staging, spare, spare]
+          notes: At the charging cabinet, for setting up and updating demo kit before a briefing
+        - service: power
+          provided_by: it
+          quantity: 8
+          location: wall
+          serves: [charging cabinet, charging cabinet, charging cabinet, charging cabinet, spare, spare, spare, spare]
+      wiring:
+        - from: display.lan-1
+          to: outlet:data/behind-display#1
+          cable: cat6
+        - from: display.power-in
+          to: outlet:power/behind-display#1
+          cable: power
+        - from: touch-controller.lan-1
+          to: outlet:data/wall-below-table#1
+          cable: cat6
+          notes: PoE powers the controller
+  notes:
+    - 'Keia Atlas house standard: no public guidance covers an executive briefing centre, so the size and kit are house choices.'
+    - 'The AV rack: the auditorium''s kit at location data-closet (codec, amplifier, AV switch, display transmitters) stands here. It is recorded with the auditorium, because each device belongs to the room it serves.'
+    - 'The monitoring display shows the auditorium''s programme from the AV rack; that feed is set up per event, so it is not drawn as a cable here.'
+    - 'Demo kit is kept and charged in the charging cabinet here and brought out for each briefing; it is not built in, so it is not listed as kit.'
+    - 'Lighting control and recording or streaming are run from here, but no device class covers either, so neither is listed as kit (a gap to fill).'
+    - 'Nothing here senses people: no camera, microphone or video device, so no privacy record is needed.'
