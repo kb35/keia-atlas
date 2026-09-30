@@ -1,13 +1,18 @@
 ---
 // The employee layout: what someone sees after scanning the QR code on a room's table. The same
 // tokens, fonts and motion as the console, but none of its chrome: no sidebar, no search, no Settings.
-// A slim top bar with the wordmark and the office, the page, and a quiet footer. Light and dark follow
-// the phone (or the choice made in the console on this browser).
+// A slim top bar with the wordmark, the office, the Simulated tag and the "?" Help switch; the page; a quiet
+// footer. Light and dark follow the phone (or the choice made in the console on this browser).
+// Help mode is the console's own (HelpMode.astro, decision 0027): "?" or the switch, dotted outlines, a card.
+// The motion library (window.km) is loaded for GuideReport's chip and the height morph.
 import { ClientRouter } from 'astro:transitions';
 import SimTag from '../components/SimTag.astro';
+import HelpMode from '../components/HelpMode.astro';
 import '../styles/looks/studio.css';
 import '../styles/base.css';
 import '../styles/motion.css';
+import '../styles/craft.css';
+import '../styles/motion-library.css';
 import { href } from '../lib/data.mjs';
 
 interface Props { title: string; office: string; home: string }
@@ -24,48 +29,88 @@ const { title, office, home } = Astro.props;
   <link rel="icon" href={href('/favicon.svg')} type="image/svg+xml" />
   <script is:inline data-astro-rerun>
     (function () {
-      var r = document.documentElement, t = 'system';
+      var r = document.documentElement, t = 'system', hp = 'off';
       try { t = localStorage.getItem('rs4-theme') || t; } catch (_) {}
       if (t === 'light' || t === 'dark') r.setAttribute('data-theme', t); else r.removeAttribute('data-theme');
+      try { hp = sessionStorage.getItem('rs5-help') === 'on' ? 'on' : 'off'; } catch (_) {}
+      r.setAttribute('data-help', hp);
     })();
   </script>
   <ClientRouter />
 </head>
 <body class="guide-body">
   <header class="g-top">
-    <a class="g-brand" href={href(home)} aria-label="Room guide home">
+    <a class="g-brand" href={href(home)} aria-label="Room guide home" data-help="guide.brand">
       <svg class="g-mark" viewBox="0 0 32 32" aria-hidden="true"><rect class="tile" x="1.5" y="1.5" width="28" height="28" rx="7" stroke-width="2" /><path class="tick" d="M8.5 16l4.5 4.5 10-10" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
       <span><b>Room guide</b><small>{office}</small></span>
     </a>
-    <SimTag kind="simulated" />
+    <span class="g-top-r">
+      <SimTag kind="simulated" />
+      <button class="help-btn g-help" type="button" data-help-toggle data-help="shell.help" data-help-src={href('/help/index.json')} aria-pressed="false" aria-label="Help: explain what things are (?)" title="Help: explain what things are"><span class="hb-q" aria-hidden="true">?</span></button>
+    </span>
   </header>
-  <main class="g-main" id="main">
+  <main class="g-main" id="main" data-page-help="page.guide">
     <slot />
   </main>
   <footer class="g-foot">
     <p>Aigna workplace technology · a Keia Atlas demo. Reports and requests stay in this browser.</p>
   </footer>
+  <nav class="nav" hidden aria-hidden="true"><a data-nav="learn" href={href('/learn/')} tabindex="-1">Learn</a></nav>
+  <HelpMode />
   <slot name="end" />
+  <script>
+    import km from '../lib/motion-library.js';
+    (window as any).km = km;
+  </script>
+  <script is:inline data-astro-rerun>
+    /* Health glyphs (M8, as in the Shell): quiet first, then each comes on in turn, once, as it scrolls into view. */
+    (function () {
+      var lights = document.querySelectorAll('.hg:not(.lit)'), n = 0;
+      var gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--stagger')) || 24;
+      var light = function (el) { setTimeout(function () { el.classList.add('lit'); }, 200 + (n++ % 40) * gap); };
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) { lights.forEach(function (el) { el.classList.add('lit'); }); return; }
+      if (!('IntersectionObserver' in window)) { lights.forEach(light); return; }
+      var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { io.unobserve(e.target); light(e.target); } }); }, { threshold: 0.5 });
+      lights.forEach(function (el) { io.observe(el); });
+    })();
+  </script>
 </body>
 </html>
 
 <style is:global>
-  .guide-body { min-height: 100svh; display: grid; grid-template-rows: auto 1fr auto; background: var(--bg); font-size: 16px; }
+  /* The guide's type scale: the console's scale is for a desk; this one is for a phone at arm's length. */
+  :root {
+    --g-fs-support: 15px;   /* support and body text in cards */
+    --g-fs-body: 16px;      /* a step, a row's name, a symptom */
+    --g-fs-lead: 17px;      /* a big button's words */
+    --g-fs-h: 21px;         /* a card's heading, the status */
+    --g-fs-title: clamp(28px, 7vw, 40px);   /* the room's name */
+  }
+  .guide-body { min-height: 100svh; display: grid; grid-template-rows: auto 1fr auto; background: var(--bg); font-size: var(--g-fs-body); }
   .g-top {
     position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 12px;
     padding: max(10px, env(safe-area-inset-top)) 16px 10px; background: color-mix(in srgb, var(--bg) 86%, transparent);
     -webkit-backdrop-filter: saturate(170%) blur(18px); backdrop-filter: saturate(170%) blur(18px);
     border-bottom: 1px solid var(--line); view-transition-name: mast;
   }
+  .g-top-r { display: inline-flex; align-items: center; gap: 10px; flex: none; }
+  .g-help { --mast-line: var(--line-strong); --mast-2: var(--surface); --mast-text: var(--text); width: 40px; height: 40px; }
   .g-brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; min-width: 0; }
   .g-brand:hover { color: var(--text); }
   .g-mark { width: 30px; height: 30px; flex: none; }
   .g-mark .tile { fill: var(--brand-tile, var(--accent)); stroke: var(--ink); }
   .g-mark .tick { stroke: #15161B; }
-  .g-brand b { display: block; font: 700 16px/1.15 var(--font-display); }
-  .g-brand small { display: block; font-size: 13px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .g-brand b { display: block; font: var(--fw-title) var(--g-fs-body)/1.15 var(--font-display); }
+  .g-brand small { display: block; font-size: var(--fs-support); color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .g-main { width: 100%; max-width: 760px; margin: 0 auto; padding: 16px 16px 40px; display: grid; gap: 16px; align-content: start; }
   .g-foot { padding: 20px 16px 28px; text-align: center; }
-  .g-foot p { margin: 0 auto; max-width: 56ch; font-size: 12.5px; color: var(--text-3); }
+  .g-foot p { margin: 0 auto; max-width: 56ch; font-size: var(--fs-support); color: var(--text-3); }
   @media (min-width: 900px) { .g-main { max-width: 1040px; padding: 28px 32px 56px; gap: 20px; } .g-top { padding-inline: 32px; } }
+
+  /* The help card is the console's Peek card (Peek.astro is not on this page). */
+  .peek { position: fixed; z-index: 90; width: min(340px, calc(100vw - 20px)); padding: 12px 14px; border-radius: var(--radius-lg); background: var(--surface); border: var(--border-card); box-shadow: var(--shadow-lg); font: 400 var(--fs-support)/1.45 var(--font-sans); color: var(--text); animation: rs-pop-in var(--dur-pop) var(--ease-settle) both; }
+  .peek.out { animation: rs-pop-out var(--dur-exit) var(--ease-exit) both; pointer-events: none; }
+  .peek-in { display: grid; gap: 6px; }
+  .peek-in em { font-style: normal; font: 500 var(--fs-overline) var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); margin-top: 4px; }
+  @media (prefers-reduced-motion: reduce) { .peek, .peek.out { animation: none; } }
 </style>
