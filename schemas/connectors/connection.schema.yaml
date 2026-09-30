@@ -1,0 +1,47 @@
+# Connected connection (v1, Experimental): something joining two ports, as another system knows it. A cable, or a
+# wireless link that fails like one. Always port to port: the A and B ends name ports, not devices, so a trace from a
+# room's outlet to a switch port runs through ports and connections alone. An end Keia holds no record for (a power
+# feed, a carrier's termination) keeps the system's own words in `native`.
+# Files live in data/connected/<system>/connections/<id>.yaml. See docs/connectors/model.md.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/connectors/connection
+title: Connected connection
+type: object
+additionalProperties: false
+required: [kind, id, type, a, b, source]
+$defs:
+  end:
+    type: object
+    additionalProperties: false
+    anyOf:
+      - { properties: { port: true }, required: [port] }
+      - { properties: { circuit: true }, required: [circuit] }
+      - { properties: { native: true }, required: [native] }
+    properties:
+      port: { $ref: "common#/$defs/id", description: The connected port at this end. }
+      circuit: { $ref: "common#/$defs/id", description: "The connected circuit at this end, when it ends on a carrier's hand-off." }
+      native: { type: string, minLength: 1, description: "What the system says is at this end, when Keia holds no record for it (Power feed DUB-R1-A)." }
+properties:
+  kind: { const: connection }
+  id: { $ref: "common#/$defs/id" }
+  type: { enum: [cable, wireless] }
+  a: { $ref: "#/$defs/end" }
+  b: { $ref: "#/$defs/end" }
+  label: { type: string, minLength: 1, description: The label on the cable. }
+  medium:
+    description: What it is made of, in the words the demo's cable records use. Left out when the system's word does not map.
+    enum: [cat5e, cat6, cat6a, cat7, cat8, fibre-om3, fibre-om4, fibre-om5, fibre-os1, fibre-os2, fibre-mm, fibre-sm, dac, aoc, coax, power, usb, other]
+  medium_native: { type: string, minLength: 1 }
+  length_m: { type: number, minimum: 0 }
+  colour: { type: string, minLength: 1, description: "A colour name, or a hex code (#2196f3) when the system gives one." }
+  bundle: { type: string, minLength: 1, description: The run or bundle it is laid in with others. }
+  description: { type: string, minLength: 1 }
+  status: { $ref: "common#/$defs/status" }
+  status_native: { type: string, minLength: 1 }
+  notes: { $ref: "common#/$defs/notes" }
+  source: { $ref: "common#/$defs/source" }
+  field_sources: { $ref: "common#/$defs/field_sources" }
+  seen: { $ref: "common#/$defs/seen" }
+  raw: { $ref: "common#/$defs/raw" }
+  raw_redacted: { $ref: "common#/$defs/raw_redacted" }

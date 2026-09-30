@@ -1,0 +1,60 @@
+# Connected port (v1, Experimental): a place something plugs in, as another system knows it. One kind for every
+# sort: a switch interface, a patch panel's front or rear port, a console port, a power inlet or a power outlet.
+# A port sits on a unit (a switch) or on a space (a wall plate, a floor box, a rack's power feed).
+# Files live in data/connected/<system>/ports/<id>.yaml. See docs/connectors/model.md.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/connectors/port
+title: Connected port
+type: object
+additionalProperties: false
+required: [kind, id, name, type, source]
+anyOf:
+  - { properties: { unit: true }, required: [unit] }
+  - { properties: { space: true }, required: [space] }
+properties:
+  kind: { const: port }
+  id: { $ref: "common#/$defs/id" }
+  name: { type: string, minLength: 1, description: "The port's name on the unit (GigabitEthernet1/0/12, Port 7, PS1)." }
+  label: { type: string, minLength: 1, description: The label printed on or beside the port. }
+  type:
+    description: >-
+      interface: a network port. front and rear: the two sides of a patch panel port. power: a power inlet (the unit
+      draws power here). console: a console port, on the device or on a console server. outlet: a power outlet on a
+      power strip, or a power feed or socket on a space.
+    enum: [interface, front, rear, power, console, outlet]
+  type_native: { type: string, minLength: 1, description: "The system's own kind or interface type (1000BASE-T, SFP+ 10GE, Console server port)." }
+  unit: { $ref: "common#/$defs/id", description: The connected unit it is on. }
+  space: { $ref: "common#/$defs/id", description: "The connected space it is on, for a port that belongs to a place (a wall plate, a rack's feed)." }
+  description: { type: string, minLength: 1, description: "The description the system holds for the port (Room 3.04 video bar)." }
+  enabled: { type: boolean, description: "Whether the port is switched on (a network port's admin state)." }
+  speed_mbps: { type: integer, minimum: 0 }
+  mac: { $ref: "common#/$defs/mac" }
+  mode:
+    description: "access: one untagged VLAN. tagged: an untagged VLAN and a list of tagged ones. tagged-all: every VLAN, tagged."
+    enum: [access, tagged, tagged-all]
+  untagged_vlan: { $ref: "common#/$defs/id", description: "The native VLAN: a connected network of type vlan." }
+  tagged_vlans:
+    description: The tagged VLANs, as connected networks of type vlan.
+    type: array
+    uniqueItems: true
+    items: { $ref: "common#/$defs/id" }
+  poe:
+    description: Power over Ethernet on the port.
+    type: object
+    additionalProperties: false
+    properties:
+      mode: { enum: [pse, pd], description: "pse: the port gives power (a switch). pd: the port takes power (a video bar)." }
+      type_native: { type: string, minLength: 1, description: "The standard or class in the system's words (802.3at, Type 2)." }
+  lag: { $ref: "common#/$defs/id", description: The connected port of the link aggregation it is a member of. }
+  rear_port: { $ref: "common#/$defs/id", description: "For a front port: the rear port it maps to." }
+  rear_position: { type: integer, minimum: 1 }
+  feed: { enum: [A, B, C], description: "For power: the feed or phase leg (the A or B side of a rack)." }
+  max_draw_w: { type: number, minimum: 0 }
+  allocated_draw_w: { type: number, minimum: 0 }
+  notes: { $ref: "common#/$defs/notes" }
+  source: { $ref: "common#/$defs/source" }
+  field_sources: { $ref: "common#/$defs/field_sources" }
+  seen: { $ref: "common#/$defs/seen" }
+  raw: { $ref: "common#/$defs/raw" }
+  raw_redacted: { $ref: "common#/$defs/raw_redacted" }

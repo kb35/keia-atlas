@@ -56,7 +56,7 @@ test('the schemas refuse a record with no source mark, an unknown status or a li
   assert.ok(validateRecord({ ...t, source: { ...t.source, url: 'https://servicedesk.example.com/x?access_token=abc' } }).length);
   assert.ok(validateRecord({ ...t, source: { ...t.source, url: 'https://admin:pw@servicedesk.example.com/x' } }).length);
   assert.match(validateRecord({ ...t, assignee: 'A Person' }).join('\n'), /unknown field "assignee"/);
-  assert.deepEqual(validateRecord({ kind: 'thing' }), ['kind must be one of space, unit, ticket, event']);
+  assert.deepEqual(validateRecord({ kind: 'thing' }), ['kind must be one of space, contact, unit, network, port, address, connection, circuit, group, ticket, event']);
 });
 
 // ---- The adapter interface ----

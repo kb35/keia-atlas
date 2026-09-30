@@ -1,7 +1,7 @@
 // Secret check for the data validator.
 //
 // An estate repository must never hold a real secret. This walks any parsed YAML
-// value and reports every field whose KEY looks like a secret (password, passwd,
+// value and reports every field whose KEY looks like a secret (password, passwd, a Wi-Fi psk,
 // secret, token, api_key, apikey, private_key, client_secret) unless its VALUE is
 // a vault reference: the name of an entry in the password vault, never the secret.
 //
@@ -12,7 +12,7 @@
 //
 // Empty values, null and true/false pass: none of them can hold a secret.
 
-const SECRET_KEY = /(pass(word|wd)|secret|token|api[-_ ]?key|private[-_ ]?key|client[-_ ]?secret)/i;
+const SECRET_KEY = /(pass(word|wd)|secret|token|api[-_ ]?key|private[-_ ]?key|client[-_ ]?secret|psk|pre[-_ ]?shared)/i;
 const VAULT_REF = /^\s*(vault:\s*\S|from the (password )?vault\b)/i;
 
 // Known harmless fields, each named by file (relative to data/) and path, where * matches

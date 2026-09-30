@@ -1,0 +1,51 @@
+# Connected circuit (v1, Experimental): a service from an outside carrier, as another system knows it. When it
+# fails, the job is to call the carrier with the circuit ID and the account, so those are core fields. Its A and Z
+# terminations say where the carrier's hand-off is.
+# Files live in data/connected/<system>/circuits/<id>.yaml. See docs/connectors/model.md.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/connectors/circuit
+title: Connected circuit
+type: object
+additionalProperties: false
+required: [kind, id, circuit_id, source]
+$defs:
+  termination:
+    type: object
+    additionalProperties: false
+    properties:
+      space: { $ref: "common#/$defs/id", description: The connected space the carrier's hand-off is in. }
+      port: { $ref: "common#/$defs/id", description: The connected port it hands off on. }
+      handoff_native: { type: string, minLength: 1, description: "The hand-off in the system's words (1000BASE-LX, port 1)." }
+      native: { type: string, minLength: 1, description: "What the system says is at this end, when Keia holds no record for it." }
+properties:
+  kind: { const: circuit }
+  id: { $ref: "common#/$defs/id" }
+  circuit_id: { type: string, minLength: 1, description: What you quote to the carrier on the phone. }
+  name: { type: string, minLength: 1 }
+  carrier: { type: string, minLength: 1, description: "The carrier's name (an organisation)." }
+  carrier_contact: { $ref: "common#/$defs/id", description: "The connected contact to call about it (the carrier's NOC)." }
+  account: { type: string, minLength: 1, description: The account number the carrier knows you by. }
+  type_native: { type: string, minLength: 1, description: "The system's own kind of circuit (Internet, MPLS, Dark fibre)." }
+  role: { enum: [primary, backup], description: "Primary or backup, when the site has more than one." }
+  bandwidth_mbps: { type: integer, minimum: 0, description: The committed rate. }
+  sla: { type: string, minLength: 1, description: "The service level in the contract's words (4 h fix, 99.95%)." }
+  terminations:
+    type: object
+    additionalProperties: false
+    properties:
+      a: { $ref: "#/$defs/termination" }
+      z: { $ref: "#/$defs/termination" }
+  installed_on: { $ref: "common#/$defs/day" }
+  contract_ends: { $ref: "common#/$defs/day" }
+  status: { $ref: "common#/$defs/status" }
+  status_native: { type: string, minLength: 1 }
+  description: { type: string, minLength: 1 }
+  team: { $ref: "common#/$defs/team" }
+  contacts: { $ref: "common#/$defs/contacts" }
+  notes: { $ref: "common#/$defs/notes" }
+  source: { $ref: "common#/$defs/source" }
+  field_sources: { $ref: "common#/$defs/field_sources" }
+  seen: { $ref: "common#/$defs/seen" }
+  raw: { $ref: "common#/$defs/raw" }
+  raw_redacted: { $ref: "common#/$defs/raw_redacted" }

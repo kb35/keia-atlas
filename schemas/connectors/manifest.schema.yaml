@@ -1,6 +1,6 @@
 # Connector manifest: what an adapter says it can do, before it does anything (docs/connectors/README.md).
 # Pages and the connect tool read it: an action is offered only if the manifest declares it, and an adapter
-# may fill only the fields it lists. v0 allows read only.
+# may fill only the fields it lists. v0 and v1 allow read only.
 
 $schema: https://json-schema.org/draft/2020-12/schema
 $id: https://kb35.github.io/keia-atlas/schemas/connectors/manifest
@@ -25,7 +25,7 @@ properties:
     description: The kinds of record it brings in, and for each the actions it allows and the fields it fills.
     type: object
     minProperties: 1
-    propertyNames: { enum: [unit, space, ticket, event] }
+    propertyNames: { enum: [unit, space, ticket, event, port, connection, network, address, group, circuit, contact] }
     additionalProperties:
       type: object
       additionalProperties: false
@@ -46,6 +46,15 @@ properties:
           minProperties: 1
           propertyNames: { pattern: "^[a-z][a-z0-9_]*$" }
           additionalProperties: { enum: [source, keia] }
+        observes:
+          description: >-
+            Fields this system sees on the live estate rather than decides (the MAC a DHCP server hands an address
+            to, the VLAN a switch really has on a port). For a matching record from another system, its value is kept
+            in that record's `seen` block, and a difference raises a drift event (io.keia.drift.found). Nothing is
+            overwritten. Each field must also be listed in `fields`.
+          type: array
+          uniqueItems: true
+          items: { type: string, pattern: "^[a-z][a-z0-9_]*$" }
   events:
     description: How it learns about changes.
     type: object

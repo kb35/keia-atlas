@@ -1,13 +1,14 @@
 // Cross-reference checks for connected records (data/connected/, docs/connectors/model.md).
 //
 // The schema checks one file. These look across files: each record sits where its source mark says
-// (data/connected/<system>/<kind>s/<id>.yaml), ids are unique, links between connected records point at
-// records of the right kind, and Keia's links into the catalogue (model_id, atlas_site, atlas_space) point at
-// real models, offices and spaces.
+// (data/connected/<system>/<kind folder>/<id>.yaml), ids are unique, links between connected records point at
+// records of the right kind (the table is LINKS in tools/connectors/kinds.mjs, shared with the importer), and Keia's
+// links into the catalogue (model_id, atlas_site, atlas_space, atlas_vendor) point at real models, offices, spaces
+// and vendors.
 //
 // Each check returns { file, at, message } like the others in crossrefs.mjs.
 
-const FOLDER = { unit: 'units', space: 'spaces', ticket: 'tickets', event: 'events' };
+import { KIND_FOLDER as FOLDER, linksOf, kindWords } from './connectors/kinds.mjs';
 
 export function crossCheckConnected(records) {
   const problems = [];
@@ -20,7 +21,8 @@ export function crossCheckConnected(records) {
   const models = ids('device-models');
   const sites = ids('sites');
   const spaces = ids('spaces');
-  const byKind = { unit: new Set(), space: new Set(), ticket: new Set(), event: new Set() };
+  const vendors = ids('vendors');
+  const kindOf = new Map();
   const seen = new Map();
 
   for (const rec of connected) {
@@ -32,31 +34,27 @@ export function crossCheckConnected(records) {
     }
     if (seen.has(rec.id)) report(rec, ['id'], `id "${rec.id}" is already used by ${seen.get(rec.id)}`);
     else seen.set(rec.id, rec.rel);
-    byKind[d.kind]?.add(rec.id);
+    kindOf.set(rec.id, d.kind);
   }
 
-  const all = new Set(seen.keys());
   for (const rec of connected) {
     const d = rec.data;
+    for (const l of linksOf(d)) {
+      if (!l.kinds.includes(kindOf.get(l.id))) report(rec, l.at, `${l.at.join('.')} "${l.id}" is not ${kindWords(l.kinds)}`);
+    }
     const link = (field, set, what) => {
       if (d[field] !== undefined && !set.has(d[field])) report(rec, [field], `${field} "${d[field]}" is not ${what}`);
     };
-    const connectedSpace = 'a connected space';
-    if (d.kind === 'unit') {
-      link('space', byKind.space, connectedSpace);
-      link('model_id', models, 'a model in data/device-models');
-    }
+    if (d.kind === 'unit') link('model_id', models, 'a model in data/device-models');
     if (d.kind === 'space') {
-      link('parent', byKind.space, connectedSpace);
       if (d.parent === d.id) report(rec, ['parent'], 'a space cannot sit in itself');
       link('atlas_site', sites, 'an office in data/sites');
       link('atlas_space', spaces, 'a space in data/spaces');
     }
-    if (d.kind === 'ticket') {
-      link('space', byKind.space, connectedSpace);
-      link('unit', byKind.unit, 'a connected unit');
-    }
-    if (d.kind === 'event') link('subject', all, 'a connected record');
+    if (d.kind === 'network') link('atlas_site', sites, 'an office in data/sites');
+    if (d.kind === 'contact') link('atlas_vendor', vendors, 'a vendor in data/vendors');
+    if (d.kind === 'port' && d.rear_port === d.id) report(rec, ['rear_port'], 'a port cannot map to itself');
+    if (d.kind === 'connection' && d.a?.port && d.a.port === d.b?.port) report(rec, ['b', 'port'], 'a connection needs two different ports');
   }
   return problems;
 }
