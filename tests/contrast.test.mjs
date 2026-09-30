@@ -55,7 +55,7 @@ test('fails when the two dark blocks drift apart', () => {
 test('fails loudly on color-mix() in a checked token', () => {
   const dir = copyLooks();
   const file = join(dir, 'classic.css');
-  const css = readFileSync(file, 'utf8').replace('--h-fine-soft: #E0F1EC', '--h-fine-soft: color-mix(in srgb, var(--h-fine) 12%, white)');
+  const css = readFileSync(file, 'utf8').replace('--h-fine-soft: #D6F3EC', '--h-fine-soft: color-mix(in srgb, var(--h-fine) 12%, white)');
   writeFileSync(file, css);
   const rows = check({ dir });
   rmSync(dir, { recursive: true, force: true });

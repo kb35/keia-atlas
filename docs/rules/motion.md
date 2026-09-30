@@ -144,7 +144,6 @@ Every control that changes what is on screen uses the same few moves on the same
 | Welcome back, Start the day (4.26) | The handover card's four places come in together a stagger apart; Start the day shrinks the card away while Home grows in (`rsChange`) | `HandoverCard.astro`, `rsChange` |
 | Density (4.25) and Open pages like this here (4.27) | Density: rows and cards ease to their new size together, holding what you were looking at (`rsChange`). Depth: the words change at once and go back after `--dur-linger`; a page opening at a remembered layer lands there with no scroll animation | `SettingsPersonal.astro`, `OpenHere.astro` |
 | A look, or light and dark | One calm cross-fade of the whole page (`--dur-theme`, View Transitions), after the look's fonts have loaded; nothing else moves or eases on its own meanwhile; what you were looking at stays still | `rsTheme(update, skin)` |
-| Density | Rows and cards ease to their new size together; the element under the pointer stays put | `rsSetDensity(v)` |
 
 - **The filter bar's shape depends on its width only.** It is laid out with everything at its widest and again only when its width changes, so no pick and no view switch re-lays it.
 - **Why:** motion that is not cohesive reads as unfinished.
