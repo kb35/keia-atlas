@@ -73,3 +73,23 @@ Floor plans, trays, cable runs and circuits (`data/floors/`, `data/runs/`, `data
 - **Why:** a plan that looks real is easy to mistake for a survey; the label and generic names keep the demo honest and keep real companies' names off made-up faults.
 - **Do:** room sizes from the room profiles, within their area range; "Carrier Two (secondary, north duct)"; bandwidth "Not recorded" unless a house value says otherwise.
 - **Don't:** a real provider's name, a real building's address, or a floor plan without the label.
+
+### F10. Every fact carries a label, and the label decides who sees it
+
+Four labels. **Public**: facts about models (ports, drawings, datasheets, room profiles, makers' known issues). **Internal**: facts about Aigna that staff may see (rooms, units, incidents, projects, budgets). **Restricted**: facts about Aigna's buildings that would help an attacker: floor plans, camera and door-controller positions, IP plans and VLANs, racks and switch ports, the vulnerable-firmware list (units matched to a maker's known issue), who at a vendor can reach Aigna's systems, and whether a unit still has its default password. **Secret**: credentials and break-glass details, which never sit in `data/`, only the name of a vault entry (the secret check in `tools/secrets.mjs`).
+
+Each folder's default label is `classification` in `schemas/registry.yaml`. A field more sensitive than its folder carries `x-classification: Restricted` in its schema (install units' `default_password_changed`, vendors' `people`). Views worked out from several folders are listed in `RESTRICTED_VIEWS` (`src/lib/classification.mjs`). Wherever Restricted content shows, the page shows a small "Restricted: floor plan" label beside it (`src/components/Restricted.astro`).
+
+- **Why:** the model catalogue is open and shared, but a building's plan, addresses and weak spots are a map for an attacker (ISO 19650-5). The label on the schema means each new folder or field is classified when it is made.
+- **Do:** give every new folder a label in the registry; label a new sensitive field in its schema; put the Restricted label beside any new view of Restricted facts. Keep an estate repository private.
+- **Don't:** label a folder Secret (the validator refuses it), or publish a real building's plan, camera positions or addresses, even from a friendly site.
+
+### F11. Sensing devices carry a privacy record; models carry their security support
+
+Every installed camera, microphone, video bar, codec, desk video device and door or CCTV device is covered by exactly one privacy record in `data/privacy/` for its class and site: what it captures, whether it identifies people, purpose, lawful basis, DPIA reference, room notice (and where), retention, the works-council agreement (required where the country has works councils) and the approver. Occupancy is counted per room with a minimum group size; per-person views are off, and turning them on needs a logged decision. The unit page shows the record, and "What Keia logs about users" (linked from About) says what Keia Atlas keeps about its own users.
+
+Every installed model with firmware worth attacking (anything networked, and every camera and microphone) has `security_support`: its firmware line, the end of security updates and the maker's vulnerability contact. A date or page the maker published cites its source in `data/sources/`; anything else says `demo: true` and the page says "Demo value". Units record `default_password_changed` once someone has checked. The unit and model pages warn from 12 months before support ends.
+
+- **Why:** the GDPR, works councils, the EU Cyber Resilience Act and the UK PSTI rules all ask for these records; keeping them beside the device means they are there when someone asks.
+- **Do:** "Security support ends Jun 2027"; "Counted per room, never per person"; "not legal advice".
+- **Don't:** say a device or Aigna is "compliant", call aggregated counts "anonymous", or invent a maker's support date or contact without marking it as a demo value.
