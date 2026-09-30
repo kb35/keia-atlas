@@ -10,7 +10,7 @@ Every move uses a token; nothing types a number. Scripts read the same values fr
 |---|---|---|
 | `--ease-settle` | `cubic-bezier(.22, 1, .36, 1)` | Every CSS move, enter and state change |
 | `--ease-exit` | `cubic-bezier(.4, 0, 1, 1)` | Leaving things accelerate away |
-| `--ease-spring` | a `linear()` curve | The zero-bounce spring's shape, for CSS; run it over `--spring-settle-t` or `--spring-snap-t` |
+| `--ease-spring` | a `linear()` curve | The zero-bounce spring for CSS, written by the Shell from `src/lib/spring.mjs`; pair it with `--spring-settle`, `--spring-snap` or `--dur-zoom` |
 | `--dur-press` | 80 ms | Press feedback |
 | `--dur-hover` | 140 ms | Hover and focus feedback |
 | `--dur-pop` | 200 ms | Menus, peeks, the palette, the How card |
@@ -28,8 +28,8 @@ Every move uses a token; nothing types a number. Scripts read the same values fr
 | `--dur-flow` | 800 ms | Signal flow, only while the person has switched it on |
 | `--stagger` | 24 ms | Between list items, at most 12 |
 | `--pop-scale` | .94 | Where a menu or peek grows from |
-| `--spring-settle` | 360 ms, bounce 0 | Scripted moves: zoom, drag, scrub, chip retarget (settles in `--spring-settle-t`, 530 ms) |
-| `--spring-snap` | 200 ms, bounce 0 | Releasing a drag onto a snap point (settles in `--spring-snap-t`, 295 ms) |
+| `--spring-settle` | 360 ms, bounce 0 | Scripted moves: zoom, drag, scrub, chip retarget; the move is done at 360 ms |
+| `--spring-snap` | 200 ms, bounce 0 | Releasing a drag onto a snap point |
 | `--press-scale` | .97 | A pressed button, chip or card |
 | `--peek-rest` | 200 ms | How long the pointer rests before a peek grows |
 | `--skeleton-max` | 400 ms | The longest a skeleton shows |
@@ -52,10 +52,10 @@ A thing on both views moves and resizes into its new place (persist, `--dur-morp
 
 ### M3. Nothing overshoots, and everything can be interrupted
 
-CSS moves decelerate into place on `--ease-settle`. Scripted and gesture moves use a critically damped spring (`springTo` in `src/lib/spring.mjs`): a spring described by its duration with zero bounce never overshoots, and when it is retargeted mid-flight it keeps its velocity, so a move you interrupt reads as one motion. Nothing scales past 1 on arrival, nothing pulses: stillness means fine, and a fault is told by its shape and word.
+CSS moves decelerate into place on `--ease-settle`. Scripted and gesture moves use a critically damped spring (`spring`, `springEasing` and `retarget` in `src/lib/spring.mjs`): a spring described by its duration with zero bounce never overshoots, and when it is retargeted mid-flight it keeps its velocity, so a move you interrupt reads as one motion. Nothing scales past 1 on arrival, nothing pulses: stillness means fine, and a fault is told by its shape and word.
 
 - **Why:** bounce is noise in a tool used all day; a restart mid-move looks like a glitch.
-- **Do:** `springTo(el, { x, y, s }, { duration: M.springSettle, reduced: M.reduced })` for a scripted move.
+- **Do:** `el.animate(frames, { duration: M.springSettle, easing: M.spring })`, and start a second move from `retarget(state, now)`.
 - **Don't:** a keyframe past 100%, or a bounce value.
 
 ### M4. Inner layers stay inside
@@ -84,10 +84,10 @@ Switching a tab, filter, view or step never moves the page under the pointer. Wr
 
 ### M7. Reduced motion is a second design, not the animations off
 
-With reduced motion on, every meaning survives: travel and zoom become a cross-fade, a state change is instant, the heartbeat still updates its words, and a reduced page reaches its final state sooner than the full one. CSS is covered by `base.css`, `motion.css` and `craft.css`; scripts check `window.rsMotion().reduced` themselves, and `springTo` takes `reduced`. Each row of the table in M13 names its reduced equivalent.
+With reduced motion on, every meaning survives: travel and zoom become a cross-fade, a state change is instant, the heartbeat still updates its words, and a reduced page reaches its final state sooner than the full one. CSS is covered by `base.css`, `motion.css` and `craft.css`; scripts check `window.rsMotion().reduced` themselves. Each row of the table in M13 names its reduced equivalent.
 
 - **Why:** [WCAG 2.2, 2.3.3](https://www.w3.org/WAI/WCAG22/Understanding/animation-from-interactions.html): motion makes some people ill.
-- **Do:** guard every `el.animate()` and `startViewTransition()`: `if (M.reduced) { apply(); return; }`.
+- **Do:** guard every `el.animate()` and `startViewTransition()`: `if (M.reduced) { apply(); return; }`. `node tools/motion-check.mjs --base <dev server>` walks the zoom, the palette, Settings › Modules and a port with reduced motion on and fails on any scripted animation.
 - **Don't:** assume the CSS rule stops script animation. It doesn't.
 
 ### M8. Lights come on in turn
@@ -130,11 +130,13 @@ Every control that changes what is on screen uses the same few moves on the same
 |---|---|---|
 | A menu, list or card opens | It grows from its control (`--pop-scale` to full, `--dur-pop`) and shrinks back to it (`--dur-exit`) | `rsPopIn(el, from)`, `rsPopOut(el, from, done)`; filter lists do it in CSS |
 | You pick an option | Its colour eases and its tick grows, in space that is always kept: no word in the list moves | `FilterBar` options, Sort |
-| A segmented switch | One marker slides to the chosen word (`--dur-morph`) | `rsMarkerWatch(group, '[aria-pressed=true]')` |
-| Filtering a list | Items that stay slide, new ones grow from their centre, leaving ones shrink to theirs, the count eases; the list box eases to its new height | `FilterBar` (`rsEnterEls`, `rsExitEls`, `rsHold`) |
-| Switching a view, scope, step or person | The old view fades out where it was while the new one fades in (from the side you stepped towards for a step); its box eases to the new height | `rsSwapBegin(old)` then `.end(new)`, or `rsSwap(box, redraw, { dir })` |
-| A setting adds, removes or re-orders things (a module, View as) | What leaves shrinks to its centre, what arrives grows, the rest slides; what you were looking at stays still | `rsChange` |
-| A look, or light and dark | One cross-fade of the whole page (`--dur-theme`) after the look's fonts have loaded; nothing else eases meanwhile | `rsTheme(update, skin)` |
+| A segmented switch ("Me, My team, Everyone", "Day, Week, Month, Year", Settings) | One marker slides to the chosen word (`--dur-morph`) | `rsMarkerWatch(group, '[aria-pressed=true]')` |
+| Filtering a list | Items that stay slide, new ones grow from their centre, leaving ones shrink to theirs where they were, the pills in the bar slide aside, the count eases in; the list box eases to its new height | `FilterBar` (`rsEnterEls`, `rsExitEls`, `rsHold`) |
+| Switching a view, scope, step or person | The old view fades out where it was (`--dur-exit`) while the new one fades in (`--dur-enter`, from the side you stepped towards for a step); its box eases to the new height; if you had scrolled into the view, the new one starts at its top, just under the bar | `rsSwapBegin(old)` then `.end(new)`, or `rsSwap(box, redraw, { dir })` |
+| A demo setting adds, removes or re-orders things (a module On, Connected or Off, agents, View as) | What leaves shrinks to its centre, what arrives grows from its centre, the rest (sidebar entries, place tabs, cards) slides; what you were looking at stays still on screen. A change that swaps the whole page (a page from a module that is switched off, the vendor gate) cross-fades the page instead | `rsSetStage(n)`, `rsSetAgents(v)`, `rsPickWho(id)` (all `rsChange`) |
+| Zooming one level along the map (region, office, floor, space, device, port), by a click, the path or `[` and `]` | The clicked shape becomes the next page's picture on the zero-bounce spring (`--dur-zoom`, `--ease-spring` from `src/lib/spring.mjs`); the page behind scales to `--zoom-scale` and fades; the path's new step slides in from the right, and a lost one slides out. A shape on a drawing (a room on the plan) is stood in for by a plain box (`.rs-zoom-proxy`). Two levels at once is the ordinary page move. A second move starts from where the first is (`rsZoom`). Reduced motion: the pages cross-fade; the step is simply there | `src/lib/zoom-client.mjs`, `nav.css` |
+| The palette (⌘K): Find, `>` Do, `?` Ask | Rows are drawn from memory on the keystroke's next frame and never animate while you type; `>` lists the page's own buttons (`data-verb`) and Enter presses the button | `SearchOverlay.astro`, `src/lib/verbs.mjs` |
+| A look, or light and dark | One calm cross-fade of the whole page (`--dur-theme`, View Transitions), after the look's fonts have loaded; nothing else moves or eases on its own meanwhile; what you were looking at stays still | `rsTheme(update, skin)` |
 | Density | Rows and cards ease to their new size together; the element under the pointer stays put | `rsSetDensity(v)` |
 
 - **The filter bar's shape depends on its width only.** It is laid out with everything at its widest and again only when its width changes, so no pick and no view switch re-lays it.

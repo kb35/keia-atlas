@@ -36,7 +36,7 @@ const DARK = flag('dark');
 // The pages to check: every archetype, and the pages most often used at small sizes.
 const PAGES = [
   ['home', '/'],
-  ['work', '/work/'],
+  ['support', '/support/'],
   ['work-list', '/work/list/'],
   ['schedule-day', '/work/schedule/?view=day'],
   ['schedule-week', '/work/schedule/?view=week'],
@@ -68,7 +68,7 @@ const PAGES = [
   ['locations', '/locations/'], ['offices', '/locations/offices/'], ['region', '/locations/emea/'], ['office', '/locations/dub/'], ['office-plain', '/locations/lon/'], ['home-offices', '/locations/emea/home-offices/'],
   ['services', '/services/'], ['service-av', '/services/av/'], ['service-network', '/services/network/'], ['service-infrastructure', '/services/infrastructure/'],
   ['spares', '/spares/'], ['store', '/spares/dub/'],
-  ['devices-overview', '/devices/overview/', 'other'],
+  ['assets', '/assets/', 'other'],
   ['rooms', '/rooms/', 'other'],
   ['room-profiles', '/room-profiles/', 'other'],
   ['devices', '/devices/', 'other'],

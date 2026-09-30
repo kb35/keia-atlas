@@ -1,51 +1,51 @@
-// Zero-bounce springs for scripted moves (MOTION-V2 section 2): zoom, drag, scrub, a chip changing owner.
-// A spring with bounce 0 is critically damped: it never overshoots, and a move that is retargeted mid-flight keeps
-// its velocity, so two hand-offs in a second read as one motion. Described by its perceptual duration (Apple, WWDC23).
-// Web Animations API only; no library. Browser and Node (the maths has no DOM).
+// Springs for scripted moves (MOTION-V2 §2): the zoom, drags, scrubs and a chip that changes twice.
+// A spring described by a duration and zero bounce is a critically damped curve: it never overshoots, and
+// it can be retargeted mid-flight from where it is, at the speed it is going, so an interrupted move still
+// reads as one motion. No library: the curve becomes a CSS `linear()` easing for the Web Animations API
+// and for View Transitions (the Shell writes `--ease-spring` from springEasing at build time).
+//
+//   spring({ duration, bounce, velocity })  progress p(t) from 0 to 1 over `duration` ms, and its speed
+//   springEasing(opts)                       the same curve as a `linear()` easing string
+//   retarget(state, now)                     where a running spring is and how fast, to start the next from
+//
+// `duration` is when the move is done (within a thousandth), so it is the token's value (--dur-zoom 360).
+// `velocity` is the starting speed in progress per millisecond, from retarget(). Plain JavaScript, no imports.
 
-const SETTLE = 9.24; // omega * t at which a critically damped spring is within 0.1% of its target (1.47 durations)
+const SETTLE = 9.23; // ω·t at which a critically damped spring is within 0.1% of its target
 
-// spring({ duration, bounce }) -> { w, settle, at(t), vel(t), easing }. duration in ms; bounce is kept at 0.
-export function spring({ duration = 360, bounce = 0 } = {}) {
-  if (bounce) throw new Error('Atlas springs never bounce (MOTION-V2 section 1, rule 5)');
-  const w = (2 * Math.PI) / duration;
-  const at = (t) => 1 - (1 + w * t) * Math.exp(-w * t);
-  const vel = (t) => w * w * t * Math.exp(-w * t);
-  const settle = Math.round(SETTLE / w);
-  const pts = Array.from({ length: 21 }, (_, i) => (i === 20 ? 1 : +at((i / 20) * settle).toFixed(3)));
-  return { w, settle, at, vel, easing: `linear(${pts.join(', ')})` };
+export function spring({ duration = 360, bounce = 0, velocity = 0 } = {}) {
+  const d = Math.max(1, duration);
+  const b = Math.min(Math.max(bounce, 0), 0.9);
+  const w = SETTLE / d;          // natural frequency, per ms
+  const z = 1 - b;               // damping ratio: 1 is critically damped (no bounce)
+  const v0 = -velocity;          // the offset's starting slope (the offset runs from 1 to 0)
+  let offset, slope;
+  if (z >= 1) {
+    offset = (t) => (1 + (w + v0) * t) * Math.exp(-w * t);
+    slope = (t) => (v0 - (w + v0) * w * t) * Math.exp(-w * t);
+  } else {
+    const wd = w * Math.sqrt(1 - z * z), B = (v0 + z * w) / wd;
+    offset = (t) => Math.exp(-z * w * t) * (Math.cos(wd * t) + B * Math.sin(wd * t));
+    slope = (t) => Math.exp(-z * w * t) * ((B * wd - z * w) * Math.cos(wd * t) - (wd + z * w * B) * Math.sin(wd * t));
+  }
+  return {
+    duration: d,
+    at: (t) => (t >= d ? 1 : 1 - offset(Math.max(0, t))),
+    speed: (t) => (t >= d ? 0 : -slope(Math.max(0, t))),
+  };
 }
 
-// The value at time t of a critically damped move from x0 (with velocity v0, per ms) to x1.
-const pos = (w, x0, x1, v0, t) => x1 + (x0 - x1 + (v0 + w * (x0 - x1)) * t) * Math.exp(-w * t);
-const spd = (w, x0, x1, v0, t) => (v0 - w * (v0 + w * (x0 - x1)) * t) * Math.exp(-w * t);
+export function springEasing(opts = {}, steps = 24) {
+  const s = spring(opts), pts = [];
+  for (let i = 0; i <= steps; i++) pts.push(+s.at((s.duration * i) / steps).toFixed(4));
+  pts[pts.length - 1] = 1;
+  return `linear(${pts.join(', ')})`;
+}
 
-const tf = (v) => `translate(${v.x}px, ${v.y}px) scale(${v.s})`;
-
-// Move an element's transform (x, y in px, s a scale) to `to` on a zero-bounce spring. Called again before it
-// settles, it starts from where the element is now, at the speed it is going (retarget). Reduced motion: at once.
-// Returns the Animation, or null when nothing moved.
-export function springTo(el, to, { duration = 360, reduced = false, from } = {}) {
-  const target = { x: 0, y: 0, s: 1, ...to };
-  const st = el.__spring;
-  if (reduced || !el.animate) { el.__spring = null; el.style.transform = tf(target); return null; }
-  const { w, settle } = spring({ duration });
-  const now = performance.now();
-  let x0 = { x: 0, y: 0, s: 1, ...from }, v0 = { x: 0, y: 0, s: 0 };
-  if (st && !from) {
-    const t = Math.min(now - st.t0, st.settle);
-    for (const k of ['x', 'y', 's']) { x0[k] = pos(st.w, st.x0[k], st.x1[k], st.v0[k], t); v0[k] = spd(st.w, st.x0[k], st.x1[k], st.v0[k], t); }
-    st.anim.cancel();
-  }
-  const frames = [];
-  for (let i = 0; i <= 24; i++) {
-    const t = (i / 24) * settle, v = {};
-    for (const k of ['x', 'y', 's']) v[k] = +pos(w, x0[k], target[k], v0[k], t).toFixed(3);
-    frames.push({ transform: tf(i === 24 ? target : v) });
-  }
-  el.style.willChange = 'transform';
-  const anim = el.animate(frames, { duration: settle, easing: 'linear', fill: 'forwards' });
-  el.__spring = { t0: now, w, settle, x0, x1: target, v0, anim };
-  anim.onfinish = () => { if (el.__spring?.anim === anim) { el.__spring = null; el.style.willChange = ''; } };
-  return anim;
+// A running move: { s: spring(...), t0: its start time }. Returns its progress and speed at `now`, so the next
+// move can start from there (the caller converts both to the new distance).
+export function retarget(state, now) {
+  if (!state || !state.s) return { at: 1, speed: 0 };
+  const t = now - state.t0;
+  return { at: state.s.at(t), speed: state.s.speed(t) };
 }

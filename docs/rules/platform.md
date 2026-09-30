@@ -31,12 +31,12 @@ Report offers Propose an edit, New firmware found or Urgent issue, filled in wit
 Anyone can see Keia Atlas as any role from the menu under their name. Role changes what comes first, never what exists; vendors alone see less.
 
 - **Why:** people learn each other's jobs.
-- **Do:** order by role in `ROLE_NAV`.
+- **Do:** order a role's first screen (Home) and its place tabs by role; the sidebar keeps one order for everyone (L3).
 - **Don't:** build a page only one role can open.
 
 ### P5. Simulated data says so
 
-A page from a module the demo has switched off sets `minStage`; while it is off, the page says what arrives and offers to switch it on. Invented numbers (usage, costs, scenarios) carry the dashed "Simulated" tag, and made-up figures that change as you watch "Simulated live", both from `SimTag` in the band's overline row.
+There are no stages: every page belongs to a module (its place in the sidebar), and while Settings › Modules has that module Off, the page says so and offers to switch it on (`Shell.astro`; `minStage` is retired and ignored). Invented numbers (usage, costs, scenarios) carry the dashed "Simulated" tag, and made-up figures that change as you watch "Simulated live", both from `SimTag` in the band's overline row.
 
 - **Why:** trust depends on knowing what is real.
 - **Do:** label simulated numbers where they appear.

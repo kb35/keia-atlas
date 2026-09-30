@@ -8,29 +8,46 @@
    and shows each as a chip you can remove or change. The same words always give the same answer.
 
    The engine is inlined here from src/lib/search-query.mjs (exports stripped) so the unit tests and
-   the browser run the same code. The index (/search/index.json) loads the first time search opens. */
+   the browser run the same code. The index (/search/index.json) loads the first time search opens.
+
+   Three modes, on the first character (UX-V2 §2.3):
+     words  Find: objects, as above. Before you type, the objects you opened last (rs6-recent-objects).
+     >      Do: the verbs on this page (src/lib/verbs.mjs): each is a button on the page carrying data-verb,
+            listed under its own name, and Enter presses it. The palette never does what the page cannot.
+     ?      Ask: the plain-words parser (Enter opens the search page with its chips), the glossary and the
+            method pages.
+   Rows render from memory on the keystroke's next frame; the first row is under 50 ms (tests/palette.test.mjs). */
 import Icon from './Icon.astro';
 import { href } from '../lib/data.mjs';
 import engineRaw from '../lib/search-query.mjs?raw';
+import verbsRaw from '../lib/verbs.mjs?raw';
+import { IDEAS, METHOD, plain } from '../lib/method.mjs';
 
 const API = ['load', 'parse', 'search', 'alternatives', 'canon', 'removeSpan', 'replaceSpan', 'addToQuery', 'setKind', 'KINDS'];
 const body = engineRaw
   .replace(/^export \{[^}]*\};?\s*$/m, '')
   .split('\n').filter((l) => !/^\s*\/\//.test(l) && l.trim()).map((l) => l.trim()).join('\n');
 const engine = `if(!window.KeiaSearch){(function(){\n${body}\nwindow.KeiaSearch={${API.map((k) => `${k}:${k}`).join(',')}};})();}`;
+// The verbs, the same way (src/lib/verbs.mjs, exports stripped).
+const verbsBody = verbsRaw.replace(/^export \{[^}]*\};?\s*$/m, '').split('\n').filter((l) => !/^\s*\/\//.test(l) && l.trim()).map((l) => l.trim()).join('\n');
+const verbsJs = `if(!window.KeiaVerbs){(function(){\n${verbsBody}\nwindow.KeiaVerbs={VERBS:VERBS,verbRows:verbRows,matchVerbs:matchVerbs,paletteMode:paletteMode};})();}`;
+// Ask mode also offers the method pages (/method/): the method in one screen, then one page per idea.
+const METHOD_PAGES = [{ t: 'The Keia Method', s: plain(METHOD.sentence), u: 'method/' }, ...IDEAS.map((i) => ({ t: plain(i.name), s: plain(i.line), u: `method/${i.slug}/` }))];
+const ASK_EXAMPLES = ['who is on site in APAC', 'EMEA spaces with X52', 'displays older than 7 years', 'what is a known error'];
 const ICONS = { room: 'room', unit: 'barcode', model: 'box', dp: 'devices', rp: 'types', cfg: 'sliders', set: 'sliders', fw: 'chip', prj: 'project', task: 'check', pb: 'playbook',
-  inc: 'alert', lab: 'flask', adv: 'shield', person: 'team', ven: 'kit', site: 'sites', rack: 'rack', plan: 'calendar', spare: 'box', cable: 'wire', svc: 'devices', ki: 'shield', recent: 'refresh', try: 'search' };
+  inc: 'alert', lab: 'flask', adv: 'shield', person: 'team', ven: 'kit', site: 'sites', rack: 'rack', plan: 'calendar', spare: 'box', cable: 'wire', svc: 'devices', ki: 'shield', recent: 'refresh', try: 'search',
+  verb: 'arrow', term: 'book', method: 'decisions', ask: 'search' };
 const EXAMPLES = ['EMEA spaces with X52', 'x52 in Dublin', 'retired codecs', 'setup guides for poly', 'projects at the Dublin office', 'displays older than 7 years', 'who is on site in APAC', 'cafeteria'];
 ---
 <template data-ks-icons>{Object.entries(ICONS).map(([k, n]) => <span data-icon={k}><Icon name={n} size={16} /></span>)}</template>
-<div class="ks" data-ks hidden data-index={href('/search/index.json')} data-page={href('/search/')}>
+<div class="ks" data-ks hidden data-index={href('/search/index.json')} data-page={href('/search/')} data-help-index={href('/help/index.json')} data-method={JSON.stringify(METHOD_PAGES)}>
   <div class="ks-back" data-ks-close></div>
   <div class="ks-panel" role="dialog" aria-modal="true" aria-label="Search Keia Atlas" data-ks-root data-mode="overlay">
     <div class="ks-top">
       <label class="ks-field">
         <Icon name="search" size={20} />
         <span class="sr-only">Search Keia Atlas</span>
-        <input type="text" data-ks-input placeholder="Spaces with an X52 in EMEA, a serial, a person…" autocomplete="off" autocapitalize="off" spellcheck="false"
+        <input type="text" data-ks-input placeholder="Find anything · > to act on this page · ? to ask" autocomplete="off" autocapitalize="off" spellcheck="false"
           role="combobox" aria-expanded="true" aria-controls="ks-results" aria-autocomplete="list" enterkeyhint="search" />
         <button type="button" class="ks-clear" data-ks-clear aria-label="Clear" hidden>×</button>
       </label>
@@ -53,20 +70,23 @@ const EXAMPLES = ['EMEA spaces with X52', 'x52 in Dublin', 'retired codecs', 'se
       </div>
     </div>
     <footer class="ks-foot">
-      <span class="ks-keys"><kbd>↑</kbd><kbd>↓</kbd> move <kbd>↵</kbd> open <kbd data-ks-mod>Ctrl</kbd><kbd>↵</kbd> all results</span>
+      <span class="ks-keys"><kbd>↑</kbd><kbd>↓</kbd> move <kbd>↵</kbd> open <kbd data-ks-mod>Ctrl</kbd><kbd>↵</kbd> all results · <kbd>&gt;</kbd> act <kbd>?</kbd> ask</span>
       <a class="ks-all" data-ks-all href={href('/search/')}>All results</a>
     </footer>
   </div>
 </div>
 
 <script is:inline data-astro-rerun set:html={engine}></script>
+<script is:inline data-astro-rerun set:html={verbsJs}></script>
+<template data-ks-ask-ex>{ASK_EXAMPLES.map((q) => <button type="button" class="ks-ex" data-ks-q={`?${q}`}>{q}</button>)}</template>
 <script is:inline data-astro-rerun>
   (function () {
     /* The shared UI: loading the index, links, recent searches, and binding a search box to results.
        Defined once per visit; everything it touches is looked up in the current page each time. */
     if (!window.rsSearch) {
       var S = window.KeiaSearch;
-      var RECENT = 'rs4-search-recent';
+      var RECENT = 'rs4-search-recent', RECENT_OBJ = 'rs6-recent-objects';
+      var V = window.KeiaVerbs;
       var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
       var reduced = function () { return matchMedia('(prefers-reduced-motion: reduce)').matches; };
       var host = function () { return document.querySelector('[data-ks]'); };
@@ -94,6 +114,25 @@ const EXAMPLES = ['EMEA spaces with X52', 'x52 in Dublin', 'retired codecs', 'se
           add: function (q) { q = String(q || '').trim(); if (q.length < 2) return; var l = lib.recent.get().filter(function (x) { return x.toLowerCase() !== q.toLowerCase(); }); l.unshift(q); try { localStorage.setItem(RECENT, JSON.stringify(l.slice(0, 8))); } catch (_) {} },
           clear: function () { try { localStorage.removeItem(RECENT); } catch (_) {} },
         },
+        // The records you opened last (a space, an incident, a project), newest first, for the palette before you type.
+        objects: {
+          get: function () { try { var v = JSON.parse(localStorage.getItem(RECENT_OBJ) || '[]'); return Array.isArray(v) ? v : []; } catch (_) { return []; } },
+          add: function (o) {
+            if (!o || !o.t || !o.u) return;
+            var l = lib.objects.get().filter(function (x) { return x.u.split('?')[0] !== o.u.split('?')[0]; }); l.unshift(o);
+            try { localStorage.setItem(RECENT_OBJ, JSON.stringify(l.slice(0, 8))); } catch (_) {}
+          },
+        },
+        // The glossary, from the help registry (term:<id> cards), loaded the first time Ask needs it.
+        terms: function () {
+          if (!window.__rsTerms) {
+            var h = host(), src = h && h.getAttribute('data-help-index');
+            window.__rsTerms = src ? fetch(new URL(src, location.href)).then(function (r) { return r.ok ? r.json() : {}; }).then(function (j) {
+              return Object.keys(j).filter(function (k) { return k.indexOf('term:') === 0; }).map(function (k) { return { id: k.slice(5), t: j[k].name, s: j[k].what }; });
+            }).catch(function () { window.__rsTerms = null; return []; }) : Promise.resolve([]);
+          }
+          return window.__rsTerms;
+        },
         // Mark the words you typed inside a title.
         hl: function (text, terms) {
           var out = esc(text);
@@ -118,7 +157,8 @@ const EXAMPLES = ['EMEA spaces with X52', 'x52 in Dublin', 'retired codecs', 'se
         var input = $('[data-ks-input]'), chipsEl = $('[data-ks-chips]'), note = $('[data-ks-note]'), list = $('[data-ks-results]'), empty = $('[data-ks-empty]');
         var facetsEl = $('[data-ks-facets]'), countEl = $('[data-ks-count]'), allLink = root.querySelector('[data-ks-all]') || (root.parentElement && root.parentElement.querySelector('[data-ks-all]'));
         var clearBtn = $('[data-ks-clear]');
-        var I = null, last = null, prevKeys = new Set(), active = -1, expanded = {}, menu = null;
+        var I = null, last = null, prevKeys = new Set(), active = -1, expanded = {}, menu = null, verbs = [], terms = null;
+        var palette = opts.mode === 'overlay' && !!V;
         var per = opts.perGroup || 4;
         var ctl = { root: root, input: input };
 
@@ -153,6 +193,73 @@ const EXAMPLES = ['EMEA spaces with X52', 'x52 in Dublin', 'retired codecs', 'se
           return block('Show', 'kind', F.kind, 21) + block('Region', 'region', F.region) + block('Office', 'site', F.site, 11) + block('Status', 'status', F.status) +
             block('Device kind', 'class', F.class) + block('Make', 'make', F.make) + block('Space type', 'profile', F.profile);
         }
+        // A kind of record (Shell's about.kind) as a search kind, for its icon.
+        var OBJ_KIND = { room: 'room', comms: 'rack', office: 'site', region: 'site', incident: 'inc', project: 'prj', task: 'task', model: 'model', 'known-issue': 'ki', 'maker-case': 'ki', playbook: 'pb', service: 'svc', standard: 'rp', config: 'cfg', profile: 'dp', unit: 'unit', device: 'unit' };
+        function objRow(o, i) {
+          return '<a class="ks-row" role="option" id="' + root.id + '-o' + i + '" data-i="' + i + '" data-key="obj|' + esc(o.u) + '" href="' + esc(o.u) + '">' +
+            '<span class="ks-ic">' + lib.icon(OBJ_KIND[o.k] || 'recent') + '</span><span class="ks-tx"><b>' + esc(o.t) + '</b><small>' + esc(o.s || 'Opened recently') + '</small></span></a>';
+        }
+        function linkRow(it, i, icon) {
+          return '<a class="ks-row" role="option" id="' + root.id + '-o' + i + '" data-i="' + i + '" data-key="' + esc(icon + '|' + it.u) + '" href="' + esc(it.href || lib.url(it.u)) + '">' +
+            '<span class="ks-ic">' + lib.icon(icon) + '</span><span class="ks-tx"><b>' + esc(it.t) + '</b><small>' + esc(it.s || '') + '</small></span></a>';
+        }
+        function group(label, html) { return '<section class="ks-grp" role="group" aria-label="' + esc(label) + '"><header><span class="overline">' + esc(label) + '</span></header>' + html + '</section>'; }
+        // The page's verbs, as the buttons they are (src/lib/verbs.mjs): only what you can see and press now.
+        function pageVerbs() {
+          var seen = function (el) { return el.isConnected && el.getClientRects().length > 0 && !el.disabled && !el.closest('[hidden], [inert], [data-ks]'); };
+          var name = function (el) { return (el.dataset.verbName || el.textContent || el.getAttribute('aria-label') || el.title || '').replace(/\s+/g, ' ').trim(); };
+          var found = [];
+          document.querySelectorAll('[data-verb]').forEach(function (el) { if (seen(el)) found.push({ id: el.dataset.verb, label: name(el), ref: el }); });
+          document.querySelectorAll('main .pb-act a, main .pb-act button').forEach(function (el) { if (seen(el) && !el.hasAttribute('data-verb')) found.push({ id: 'action', label: name(el), ref: el }); });
+          // Zoom out: the path's parent step, under its own name ([ does the same).
+          var ups = document.querySelectorAll('.mast .crumbs a[href]'), up = ups[ups.length - 1];
+          if (up && seen(up)) found.push({ id: 'zoom-out', label: name(up), hint: 'Zoom out one level, or press [', ref: up });
+          var rows = V.verbRows(found);
+          rows.forEach(function (r, i) { r.ref = found.filter(function (f) { return f.id === r.id && f.label.trim().toLowerCase() === r.label.toLowerCase(); })[0].ref; });
+          return rows;
+        }
+        function runDo(q) {
+          if (!verbs.length) verbs = pageVerbs();
+          var rows = V.matchVerbs(verbs, q);
+          chipsEl.innerHTML = ''; chipsEl.hidden = true; empty.hidden = true;
+          note.innerHTML = rows.length ? '' : 'No verb on this page matches. Type > on its own to see them all.'; note.hidden = !!rows.length;
+          list.innerHTML = rows.length ? group('On this page', rows.map(function (r, i) {
+            return '<button type="button" class="ks-row ks-verb" role="option" id="' + root.id + '-o' + i + '" data-i="' + i + '" data-verb-row="' + verbs.indexOf(r) + '">' +
+              '<span class="ks-ic">' + lib.icon('verb') + '</span><span class="ks-tx"><b>' + esc(r.label) + '</b><small>' + esc(r.hint || '') + '</small></span></button>';
+          }).join('')) : '';
+          if (countEl) countEl.textContent = '';
+          setActive(rows.length ? 0 : -1);
+        }
+        function runAsk(q) {
+          var t = q.trim(), html = '', i = 0;
+          empty.hidden = true;
+          if (!t) {
+            chipsEl.innerHTML = ''; chipsEl.hidden = true; note.hidden = true;
+            var ex = document.querySelector('template[data-ks-ask-ex]');
+            list.innerHTML = '<div class="ks-ask-help"><p class="faint">Ask in plain words: what you want back, where, and anything about it. Enter opens the search page with what Keia Atlas understood.</p><div class="ks-try">' + (ex ? ex.innerHTML : '') + '</div></div>';
+            setActive(-1); return;
+          }
+          if (I) {
+            var R = S.search(I, t, {}), P = R.P;
+            chipsEl.innerHTML = P.chips.map(chipHtml).join(''); chipsEl.hidden = !P.chips.length;
+            last = R;
+            html += group('Ask', linkRow({ t: t, s: (R.total ? R.total.toLocaleString('en-IE') + (R.total === 1 ? ' result' : ' results') : 'No results yet') + ' · opens the search page with these chips', href: lib.page(t), u: 'search' }, i++, 'ask'));
+          } else html += '<p class="ks-wait faint">Loading the index…</p>';
+          var words = t.toLowerCase().split(/\s+/).filter(function (w) { return w.length > 2 && !/^(what|who|how|the|and|for|with|is|are|does|mean|means)$/.test(w); });
+          var hit = function (x) { var h = (x.t + ' ' + x.s).toLowerCase(); return words.length && words.some(function (w) { return h.indexOf(w) >= 0; }); };
+          var tl = (terms || []).filter(hit).slice(0, 4);
+          if (tl.length) html += group('In the glossary', tl.map(function (x) { return linkRow({ t: x.t, s: x.s, u: 'learn/#g-' + x.id }, i++, 'term'); }).join(''));
+          var mp = (JSON.parse(host().getAttribute('data-method') || '[]')).filter(hit).slice(0, 3);
+          if (mp.length) html += group('In the method', mp.map(function (x) { return linkRow(x, i++, 'method'); }).join(''));
+          note.hidden = true;
+          list.innerHTML = html;
+          setActive(0);
+        }
+        function runRecentObjects() {
+          var l = lib.objects.get().filter(function (o) { return o.u.split('?')[0] !== location.pathname; }).slice(0, 5);
+          list.innerHTML = l.length ? group('Recently opened', l.map(objRow).join('')) : '';
+          setActive(l.length ? 0 : -1);
+        }
         function setActive(n) {
           var rows = list.querySelectorAll('.ks-row');
           if (!rows.length || n < 0) { active = -1; input.removeAttribute('aria-activedescendant'); rows.forEach(function (r) { r.setAttribute('aria-selected', 'false'); }); return; }
@@ -165,14 +272,19 @@ const EXAMPLES = ['EMEA spaces with X52', 'x52 in Dublin', 'retired codecs', 'se
         }
         function run() {
           var q = input.value;
+          var pm = palette ? V.paletteMode(q) : { mode: 'find', q: q };
           if (clearBtn) clearBtn.hidden = !q;
-          if (allLink) allLink.href = lib.page(q.trim());
-          if (!I) { list.innerHTML = q.trim() ? '<p class="ks-wait faint">Loading the index…</p>' : ''; empty.hidden = !!q.trim(); renderRecent(); return; }
+          if (allLink) allLink.href = lib.page(pm.mode === 'do' ? '' : pm.q.trim());
+          root.setAttribute('data-pmode', pm.mode);
+          if (pm.mode === 'do') { runDo(pm.q); return; }
+          if (pm.mode === 'ask') { if (!terms) lib.terms().then(function (t) { terms = t || []; if (V.paletteMode(input.value).mode === 'ask') run(); }); runAsk(pm.q); return; }
+          if (!I) { list.innerHTML = q.trim() ? '<p class="ks-wait faint">Loading the index…</p>' : ''; empty.hidden = !!q.trim(); renderRecent(); if (!q.trim() && palette) runRecentObjects(); return; }
           var R = S.search(I, q, { facets: !!facetsEl });
           var vendor = document.documentElement.getAttribute('data-who-kind') === 'vendor';
           if (vendor) { R.top = R.top.filter(function (r) { return lib.VENDOR_KINDS[r.it.k]; }); R.groups = R.groups.filter(function (g) { return lib.VENDOR_KINDS[g.k]; }); R.total = R.top.length + R.groups.reduce(function (n, g) { return n + g.total; }, 0); }
           last = R;
           var P = R.P, has = !!q.trim();
+          if (!has && palette) { chipsEl.innerHTML = ''; chipsEl.hidden = true; note.hidden = true; empty.hidden = false; renderRecent(); runRecentObjects(); if (opts.onRun) opts.onRun(q, R); return; }
           empty.hidden = has; if (!has) renderRecent();
           chipsEl.innerHTML = P.chips.map(chipHtml).join('');
           chipsEl.hidden = !P.chips.length;
@@ -210,6 +322,11 @@ const EXAMPLES = ['EMEA spaces with X52', 'x52 in Dublin', 'retired codecs', 'se
         ctl.run = run;
         ctl.set = function (q, focus) { input.value = q; closeMenu(); run(); if (focus !== false) { input.focus(); try { input.setSelectionRange(q.length, q.length); } catch (_) {} } };
         ctl.last = function () { return last; };
+        ctl.fresh = function () { verbs = []; };
+        // The words the chips were read from: in Ask mode, the text after "?" (and a change keeps the "?").
+        var askMode = function () { return palette && V.paletteMode(input.value).mode === 'ask'; };
+        var qv = function () { return askMode() ? V.paletteMode(input.value).q : input.value; };
+        ctl.setQ = function (q) { ctl.set((askMode() ? '?' : '') + q); };
 
         function closeMenu() { if (menu) { menu.remove(); menu = null; } }
         function openMenu(btn, chip) {
@@ -230,13 +347,13 @@ const EXAMPLES = ['EMEA spaces with X52', 'x52 in Dublin', 'retired codecs', 'se
         root.addEventListener('click', function (e) {
           var t = e.target;
           var qb = t.closest('[data-ks-q]'); if (qb) { e.preventDefault(); ctl.set(qb.getAttribute('data-ks-q')); return; }
-          var x = t.closest('[data-chip-x]'); if (x) { var c = last.P.chips[+x.getAttribute('data-chip-x')]; ctl.set(S.removeSpan(input.value, c.span)); return; }
+          var x = t.closest('[data-chip-x]'); if (x) { var c = last.P.chips[+x.getAttribute('data-chip-x')]; ctl.setQ(S.removeSpan(qv(), c.span)); return; }
           var cb = t.closest('[data-chip]'); if (cb) { var ch = last.P.chips[+cb.getAttribute('data-chip')]; if (menu && menu.__chip === ch) closeMenu(); else openMenu(cb, ch); return; }
           if (menu && t.closest('.ks-menu')) {
             var chip = menu.__chip, a = t.closest('[data-alt]');
-            if (a) ctl.set(S.replaceSpan(input.value, chip.core, a.getAttribute('data-alt')));
-            else if (t.closest('[data-alt-words]')) ctl.set(S.replaceSpan(input.value, chip.core, '"' + input.value.slice(chip.core[0], chip.core[1]) + '"'));
-            else if (t.closest('[data-alt-remove]')) ctl.set(S.removeSpan(input.value, chip.span));
+            if (a) ctl.setQ(S.replaceSpan(qv(), chip.core, a.getAttribute('data-alt')));
+            else if (t.closest('[data-alt-words]')) ctl.setQ(S.replaceSpan(qv(), chip.core, '"' + qv().slice(chip.core[0], chip.core[1]) + '"'));
+            else if (t.closest('[data-alt-remove]')) ctl.setQ(S.removeSpan(qv(), chip.span));
             return;
           }
           closeMenu();
@@ -252,7 +369,15 @@ const EXAMPLES = ['EMEA spaces with X52', 'x52 in Dublin', 'retired codecs', 'se
           var more = t.closest('[data-more]'); if (more) { var box = root.querySelector('[data-ks-results]'); window.rsHold(box, function () { expanded[more.getAttribute('data-more')] = true; run(); }); return; }
           if (t.closest('[data-ks-recent-clear]')) { lib.recent.clear(); renderRecent(); return; }
           if (clearBtn && t.closest('[data-ks-clear]')) { ctl.set(''); return; }
-          var rowEl = t.closest('.ks-row'); if (rowEl) { lib.recent.add(input.value); if (opts.onOpen) opts.onOpen(); }
+          var vr = t.closest('[data-verb-row]');
+          if (vr) {
+            // Close the palette, then press the page's own button (a beat later, so this click cannot close what it opens).
+            var ref = verbs[+vr.getAttribute('data-verb-row')] && verbs[+vr.getAttribute('data-verb-row')].ref;
+            if (opts.onOpen) opts.onOpen();
+            if (ref) setTimeout(function () { ref.click(); if (ref.focus) ref.focus({ preventScroll: true }); }, 0);
+            return;
+          }
+          var rowEl = t.closest('.ks-row'); if (rowEl) { if (!palette || V.paletteMode(input.value).mode === 'find') lib.recent.add(input.value); if (opts.onOpen) opts.onOpen(); }
         });
         root.addEventListener('keydown', function (e) {
           if (menu && e.target.closest('.ks-menu')) {
@@ -268,7 +393,11 @@ const EXAMPLES = ['EMEA spaces with X52', 'x52 in Dublin', 'retired codecs', 'se
           else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(active - 1); }
           else if (e.key === 'Enter') {
             e.preventDefault();
-            var q = input.value.trim(); if (!q) return;
+            var q = input.value.trim(), pmode = palette ? V.paletteMode(q) : { mode: 'find', q: q };
+            if (pmode.mode !== 'find' && active >= 0 && rows[active]) { if (opts.onOpen && !rows[active].hasAttribute('data-verb-row')) opts.onOpen(); rows[active].click(); return; }
+            if (pmode.mode === 'do') return;
+            q = pmode.q.trim();
+            if (!q) { if (active >= 0 && rows[active]) { if (opts.onOpen) opts.onOpen(); rows[active].click(); } return; }
             lib.recent.add(q);
             if (e.metaKey || e.ctrlKey || active < 0 || !rows[active]) { if (opts.onSubmit) opts.onSubmit(q); return; }
             if (opts.onOpen) opts.onOpen();
@@ -276,12 +405,18 @@ const EXAMPLES = ['EMEA spaces with X52', 'x52 in Dublin', 'retired codecs', 'se
           }
         });
         var raf = 0;
-        input.addEventListener('input', function () { closeMenu(); expanded = {}; cancelAnimationFrame(raf); raf = requestAnimationFrame(run); });
+        input.addEventListener('input', function () { closeMenu(); expanded = {}; if (!/^\s*>/.test(input.value)) verbs = []; cancelAnimationFrame(raf); raf = requestAnimationFrame(run); });
         lib.ready().then(function (idx) { I = idx; run(); }, function () { list.innerHTML = '<p class="ks-wait faint">Could not load the search index.</p>'; });
         renderRecent();
         return ctl;
       }
     }
+
+    /* This page, if it is a record (Shell's main[data-recent]), joins the recent objects. */
+    (function () {
+      var m = document.querySelector('main[data-recent]'); if (!m) return;
+      try { var o = JSON.parse(m.getAttribute('data-recent')); o.u = location.pathname + location.search; delete o.s; window.rsSearch.objects.add(o); } catch (_) {}
+    })();
 
     /* This page's overlay. */
     var ks = document.querySelector('[data-ks]'); if (!ks) return;
@@ -303,6 +438,7 @@ const EXAMPLES = ['EMEA spaces with X52', 'x52 in Dublin', 'retired codecs', 'se
       ks.hidden = false; ks.classList.remove('ks-out');
       document.documentElement.classList.add('ks-lock');
       if (typeof q === 'string') ctl.input.value = q;
+      ctl.fresh();
       ctl.run(); ctl.input.focus(); ctl.input.select();
     }
     function close(navigating) {
@@ -409,6 +545,10 @@ const EXAMPLES = ['EMEA spaces with X52', 'x52 in Dublin', 'retired codecs', 'se
   .ks-more { display: inline-block; appearance: none; border: 0; background: none; margin: 2px 0 4px 50px; padding: 4px 0; color: var(--accent-ink, var(--accent)); font: 600 12.5px var(--font-sans); cursor: pointer; text-decoration: none; }
   .ks-more:hover { text-decoration: underline; }
   .ks-wait { padding: 18px 12px; margin: 0; }
+  /* Do mode: a verb row is a button; Ask mode's first screen explains itself. */
+  button.ks-row { width: 100%; appearance: none; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
+  .ks-ask-help { display: grid; gap: 12px; padding: 10px 8px 6px; }
+  .ks-ask-help p { margin: 0; font-size: 13px; max-width: 62ch; }
   .ks-empty { display: grid; gap: 16px; padding: 10px 8px 6px; }
   .ks-empty[hidden] { display: none; }
   .ks-empty header { display: flex; justify-content: space-between; align-items: baseline; padding: 0 2px 6px; }

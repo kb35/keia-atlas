@@ -1,12 +1,12 @@
 ---
-// Settings: look, light or dark, and the two demo controls (stage and agents), all on one short screen.
-// Who you're viewing as moved to the switcher under your name, bottom left.
-// Choices are saved in this browser (localStorage keys rs4-skin, rs4-theme, rs4-stage and rs4-agents) and applied
-// by the boot script in the page head before first paint.
+// Settings: look, light or dark, agents, and Modules (each On, Connected or Off: src/lib/modules.mjs), all on one
+// short screen. Who you're viewing as moved to the switcher under your name, bottom left.
+// Choices are saved in this browser (localStorage keys rs4-skin, rs4-theme, rs4-agents and rs6-modules) and
+// applied by the boot script in the page head before first paint.
 // Motion (docs/rules/motion.md, M12): it grows from the button that opened it and shrinks back to it; it keeps
 // one size whatever you pick (every note is laid out in the same place, so nothing below moves); the choice
-// markers slide; the page behind changes in one move (a look cross-fades, a stage or agents grows and shrinks
-// what it adds and removes, View as re-orders the sidebar).
+// markers slide; the page behind changes in one move (a look cross-fades, a module or agents grows and shrinks
+// what it adds and removes, View as changes Home in place).
 const LOOKS = [
   { id: 'studio', name: 'Studio', note: 'Calm and warm. The default.', sw: ['#12110F', '#F6F3EE', '#E27A3A', '#7BC49A'] },
   { id: 'enterprise', name: 'Enterprise', note: 'Dense, slate and blue.', sw: ['#16233A', '#FFFFFF', '#1D5BB8', '#DCA614'] },
@@ -14,7 +14,8 @@ const LOOKS = [
   { id: 'drawing', name: 'Drawing set', note: 'Ink on drafting paper.', sw: ['#111111', '#F3F3EE', '#0B2A4C', '#B8860B'] },
   { id: 'classic', name: 'Playful', note: 'Ink outlines, bold colour.', sw: ['#15161B', '#F3F0E8', '#FFCB2E', '#1E5BFF'] },
 ];
-import { STAGES_DEMO, PEOPLE, TEAMS } from '../lib/demo.mjs';
+import { PEOPLE, TEAMS } from '../lib/demo.mjs';
+import { MODULES, MODULE_STATES } from '../lib/modules.mjs';
 const GROUPS = ['delivery', 'onsite', 'av-it', 'it-infra', 'service-desk', 'leadership', 'vendor'].map((tm) => ({ tm, ps: PEOPLE.filter((p) => p.team === tm) })).filter((g) => g.ps.length);
 const MODES = [
   { id: 'system', name: 'Auto' },
@@ -75,20 +76,18 @@ const MODES = [
         </div>
       </fieldset>
     </div>
-    <fieldset>
-      <legend class="overline">Demo: how far Keia Atlas is switched on</legend>
-      <div class="stages" data-stages>
-        <span class="st-rail" aria-hidden="true"><i class="st-fill"></i></span>
-        <span class="st-ring" aria-hidden="true"></span>
-        {STAGES_DEMO.map((st, i) => (
-          <label class="stage-opt" data-n={st.n} style={`--i:${i}`} title={`${st.name}: ${st.adds}`}><input type="radio" name="stage" value={String(st.n)} /><span class="sn">{st.n}</span></label>
+    <fieldset data-help="shell.modules">
+      <legend class="overline">Modules</legend>
+      <ul class="mods">
+        {MODULES.map((m) => (
+          <li class="mod">
+            <span class="mod-n"><b id={`mod-${m.id}`}>{m.label}</b><small data-mod-note={m.id} data-on={m.what} data-conn={`Connected: from ${m.source}`} data-off="Off: not in the sidebar">{m.what}</small></span>
+            <span class="seg-s" data-seg role="radiogroup" aria-labelledby={`mod-${m.id}`}>
+              {MODULE_STATES.map((st) => (<label><input type="radio" name={`mod-${m.id}`} value={st.id} data-mod={m.id} /><span>{st.label}</span></label>))}
+            </span>
+          </li>
         ))}
-      </div>
-      <div class="notes" aria-live="polite">
-        {STAGES_DEMO.map((st) => (
-          <p class="stage-note" data-stage-note={st.n}><b>{st.n} of 6, {st.name}.</b> {st.adds}{st.real ? '.' : '. Simulated.'} Everything before it is on too.</p>
-        ))}
-      </div>
+      </ul>
     </fieldset>
     <p class="faint">Saved in this browser only. On a computer, switch who you're viewing as from under your name, bottom left.</p>
   </form>
@@ -99,7 +98,7 @@ const MODES = [
     // (a page can have its own #settings, such as a Settings tab, so look for the dialog itself)
     var dlg = document.querySelector('dialog#settings');
     if (!dlg) return;
-    var opener = null, lastStage = null;
+    var opener = null;
     function get(k, d) { try { return localStorage.getItem(k) || d; } catch (_) { return d; } }
     function put(k, v) { try { localStorage.setItem(k, v); } catch (_) {} }
     // The marker on the chosen look: a ring that slides from card to card (and row to row on a phone).
@@ -117,29 +116,23 @@ const MODES = [
         if (window.rsMarker) window.rsMarker(g, function () { var i = g.querySelector('input:checked'); return i && i.closest('label'); });
       });
     }
-    // Stages are cumulative: the rail fills to the chosen stage and each number lights as the fill reaches it.
-    function markStages(st) {
-      var box = dlg.querySelector('[data-stages]'), was = lastStage == null ? st : lastStage;
-      box.style.setProperty('--k', st);
-      dlg.querySelectorAll('.stage-opt').forEach(function (l) {
-        var n = +l.dataset.n, on = n <= st, changed = on !== l.classList.contains('on');
-        l.style.setProperty('--d', changed ? Math.abs(n - was) - (on ? 1 : 0) : 0);
-        l.classList.toggle('on', on);
-      });
-      lastStage = st;
-    }
+    // Each module's line says what it is when On, where it comes from when Connected, and that it is gone when Off.
     function sync() {
-      var s = get('rs4-skin', 'studio'), t = get('rs4-theme', 'system'), st = get('rs4-stage', '6'), ag = get('rs4-agents', 'on');
+      var s = get('rs4-skin', 'studio'), t = get('rs4-theme', 'system'), ag = get('rs4-agents', 'on');
+      var mods = window.rsModules ? window.rsModules() : {};
       dlg.querySelectorAll('input[name=skin]').forEach(function (i) { i.checked = i.value === s; });
       dlg.querySelectorAll('input[name=mode]').forEach(function (i) { i.checked = i.value === t; });
-      dlg.querySelectorAll('input[name=stage]').forEach(function (i) { i.checked = i.value === st; });
       dlg.querySelectorAll('input[name=agents]').forEach(function (i) { i.checked = i.value === ag; });
       var dn = document.documentElement.getAttribute('data-density') || 'comfortable';
       dlg.querySelectorAll('input[name=density]').forEach(function (i) { i.checked = i.value === dn; });
-      dlg.querySelectorAll('[data-stage-note]').forEach(function (p) { p.classList.toggle('on', p.dataset.stageNote === st); });
+      dlg.querySelectorAll('input[data-mod]').forEach(function (i) { i.checked = i.value === (mods[i.dataset.mod] || 'on'); });
+      dlg.querySelectorAll('[data-mod-note]').forEach(function (n) {
+        var v = mods[n.dataset.modNote] || 'on';
+        n.textContent = v === 'connected' ? n.dataset.conn : v === 'off' ? n.dataset.off : n.dataset.on;
+      });
       dlg.querySelectorAll('[data-look-note]').forEach(function (p) { p.classList.toggle('on', p.dataset.lookNote === s); });
       var ws = dlg.querySelector('[data-who-select]'); if (ws) ws.value = window.rsWhoId ? window.rsWhoId() : get('rs4-who', 'aoife');
-      markStages(+st); markLook(); markSegs();
+      markLook(); markSegs();
     }
     // Open beside the button that opened it, top edge fixed, so nothing moves under the pointer as you choose.
     function place() {
@@ -159,7 +152,6 @@ const MODES = [
       if (dlg.open) return;
       if (window.rsPreloadLooks) window.rsPreloadLooks();
       dlg.classList.remove('closing'); dlg.getAnimations().forEach(function (a) { a.cancel(); });
-      lastStage = null;
       dlg.showModal(); sync(); place(); markLook(); markSegs();
       if (window.rsPopIn) window.rsPopIn(dlg, opener);
     }
@@ -173,7 +165,7 @@ const MODES = [
       var i = e.target, v = i.value;
       if (i.name === 'skin') { put('rs4-skin', v); window.rsTheme(function () { window.rsApplyTheme(); }, v); }
       if (i.name === 'mode') { put('rs4-theme', v); window.rsTheme(function () { window.rsApplyTheme(); if (window.rsSyncMode) window.rsSyncMode(); }); }
-      if (i.name === 'stage') window.rsSetStage(v);
+      if (i.dataset.mod) window.rsSetModule(i.dataset.mod, v);
       if (i.name === 'agents') window.rsSetAgents(v);
       if (i.name === 'density' && window.rsSetDensity) window.rsSetDensity(v);
       if (i.name === 'who') window.rsPickWho(v);
@@ -227,18 +219,6 @@ const MODES = [
   .settings .seg-s label:has(input:checked) span { color: var(--text); }
   .settings .seg-s label:focus-within span { outline: 2px solid var(--focus); }
   .settings p { margin: 0; font-size: 12.5px; }
-  /* Stages read as a ladder: a rail that fills to the chosen stage, each number lighting as the fill
-     reaches it (--d, set by the script, counts the steps from the last choice), and one ring that slides. */
-  .settings .stages { --k: 6; display: grid; grid-template-columns: repeat(6, 1fr); position: relative; }
-  .settings .st-rail { position: absolute; left: calc(100% / 12); right: calc(100% / 12); top: 50%; height: 2px; margin-top: -1px; background: var(--line); }
-  .settings .st-fill { position: absolute; inset: 0; background: var(--ink); transform-origin: left center; transform: scaleX(calc((var(--k) - 1) / 5)); transition: transform var(--dur-morph) var(--ease-settle); }
-  .settings .st-ring { position: absolute; top: 50%; left: calc((var(--k) - .5) * 100% / 6); width: 42px; height: 42px; margin: -21px 0 0 -21px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--accent); pointer-events: none; transition: left var(--dur-morph) var(--ease-settle); }
-  .settings .stage-opt { position: relative; display: grid; place-items: center; padding: 5px 0; cursor: pointer; }
-  .settings .sn { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-3); color: var(--text-2); font: 700 13px/1 var(--font-mono); position: relative; transition: background var(--dur-state) var(--ease-settle), color var(--dur-state) var(--ease-settle), transform var(--dur-hover) var(--ease-settle); transition-delay: calc(var(--d, 0) * var(--stagger) * 3), calc(var(--d, 0) * var(--stagger) * 3), 0s; }
-  .settings .stage-opt:hover .sn { transform: scale(1.06); }
-  .settings .stage-opt.on .sn { background: var(--ink); color: var(--on-ink); }
-  .settings .stage-opt:focus-within .sn { outline: 2px solid var(--focus); outline-offset: 5px; }
-  .settings .stage-note { color: var(--text-2); }
   .settings .who-phone { display: none; gap: 6px; }
   .settings .who-phone select { width: 100%; min-width: 0; font: inherit; font-size: 15px; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); }
   /* While the page cross-fades to a new look, the markers in here still slide (motion.css turns other easing off). */

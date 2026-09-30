@@ -104,7 +104,8 @@ export function startLocations(root) {
     const room = kind === 'rack' ? racks[id] : id;
     if (!room) return;
     e.preventDefault();
-    location.href = `${B}rooms/${room}/`;
+    // A zoom: the room's shape on the plan becomes the space's drawing (src/lib/zoom-client.mjs).
+    if (window.rsGo) window.rsGo(`${B}rooms/${room}/`, g); else location.href = `${B}rooms/${room}/`;
   };
   root.addEventListener('click', open);
   root.addEventListener('keydown', open);
