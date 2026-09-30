@@ -70,6 +70,8 @@ Start small. Start with one module. The smallest useful setup is the device cata
 4. **Then the rest, in any order:** floors (a floor file per storey; the room drawings and the 3D model read them), comms rooms and cabling, spares, projects and playbooks, incidents, vendors, planning. Remove the demo's files from any folder you do not use yet; an empty folder is fine.
 5. **Check as you go:** `npm run validate` after every change. It names the file, the line and the rule that failed.
 
+**Already keep devices in a spreadsheet or NetBox?** Bring them in with a connector: `npm run connect -- csv your-devices.csv` shows what would change and writes to `data/connected/` only with `--apply`. See [docs/connectors/](docs/connectors/README.md).
+
 The demo company is Aigna; every occurrence of its name, codes (`DUB`, `NYC`, ...), people and serials is demo data. `grep -ri aigna data/` finds what is left.
 
 ## 5. Validate, test, build

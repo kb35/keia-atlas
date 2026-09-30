@@ -1,0 +1,82 @@
+# Connector manifest: what an adapter says it can do, before it does anything (docs/connectors/README.md).
+# Pages and the connect tool read it: an action is offered only if the manifest declares it, and an adapter
+# may fill only the fields it lists. v0 allows read only.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/connectors/manifest
+title: Connector manifest
+type: object
+additionalProperties: false
+required: [id, name, version, tier, owner, system, reads, objects, events, rate, hosts, credentials]
+properties:
+  id: { $ref: "common#/$defs/id", description: "The adapter's id, used on the command line (npm run connect -- netbox ...)." }
+  name: { type: string, minLength: 1 }
+  description: { type: string }
+  version: { type: string, pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$" }
+  tier:
+    description: "community: anyone may write it, unreviewed, off by default on a production estate. certified: kept by the Keia maintainers, tested against fixtures and a sandbox, with a named owner."
+    enum: [community, certified]
+  owner: { type: string, minLength: 1, description: "Who keeps the adapter working. A team or project, never left empty." }
+  system: { $ref: "common#/$defs/system", description: The system name written into source marks unless the person running it names another. }
+  reads:
+    description: "Where it reads from: file (an export on disk, works offline) or api (a live system, later)."
+    enum: [file, api]
+  objects:
+    description: The kinds of record it brings in, and for each the actions it allows and the fields it fills.
+    type: object
+    minProperties: 1
+    propertyNames: { enum: [unit, space, ticket, event] }
+    additionalProperties:
+      type: object
+      additionalProperties: false
+      required: [actions, fields]
+      properties:
+        actions:
+          description: What the adapter may do with this kind. v0 is read only; write actions come with standing rules.
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { enum: [read] }
+        fields:
+          description: >-
+            Every field the adapter fills, and who owns it (the source of truth). "source": the other system
+            owns it, and each import overwrites it. "keia": Keia owns it; the adapter only suggests a first value,
+            and an import never overwrites a value already in the file.
+          type: object
+          minProperties: 1
+          propertyNames: { pattern: "^[a-z][a-z0-9_]*$" }
+          additionalProperties: { enum: [source, keia] }
+  events:
+    description: How it learns about changes.
+    type: object
+    additionalProperties: false
+    required: [mode]
+    properties:
+      mode:
+        description: "file: a person runs it on a new export. poll or delta: it asks on a schedule. webhook or subscription: the system tells it. Webhook and subscription adapters still reconcile on a schedule."
+        enum: [file, poll, delta, webhook, subscription]
+      every: { type: string, pattern: "^[0-9]+(m|h|d)$", description: "How often it polls or reconciles (15m, 1h, 1d)." }
+  rate:
+    description: "Its budget on the other system's API, shared with every other app the customer runs there."
+    type: object
+    additionalProperties: false
+    required: [requests_per_minute]
+    properties:
+      requests_per_minute: { type: integer, minimum: 0, description: 0 for an adapter that reads a file and calls nothing. }
+      note: { type: string }
+  hosts:
+    description: Every host it may reach (an allow list for outbound traffic). Empty for an adapter that reads a file.
+    type: array
+    uniqueItems: true
+    items: { type: string, pattern: "^[a-z0-9.-]+(:[0-9]+)?$" }
+  credentials:
+    description: The credentials it needs, by vault reference only. Never a value.
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [name, vault, scope]
+      properties:
+        name: { type: string, minLength: 1 }
+        vault: { type: string, pattern: "^vault:\\S+$" }
+        scope: { enum: [read], description: The scope the credential must be limited to. v0 is read only. }

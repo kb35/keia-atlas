@@ -6,6 +6,7 @@ Thank you for looking. Keia Atlas is Apache 2.0, Copyright Red Hat, Inc., create
 
 - Read `docs/rules/README.md`, the rule book on one page. Every rule has a number, a why, a do and a don't. Pull requests are reviewed against it.
 - Read `docs/standards/page-anatomy.md` before touching a page and `docs/standards/new-device.md` before adding a device.
+- Read [docs/connectors/README.md](docs/connectors/README.md) before writing a connector: read only, made-up fixtures, vault references never values, tests that run offline.
 - Look at `docs/decisions/` for why things are the way they are. If you disagree with a decision, open an issue that names it.
 
 ## Proposing a change
