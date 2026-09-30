@@ -75,6 +75,7 @@ const PAGES = [
   ['assets', '/assets/', 'other'],
   ['rooms', '/rooms/', 'other'],
   ['room-profiles', '/room-profiles/', 'other'],
+  ['room-profile', '/room-profiles/conference-room-large/', 'other'],   // the size picker and the drawing beside its Key
   ['devices', '/devices/', 'other'],
   ['unit', '/device/?tag=AG-000028', 'other'],
   ['profiles', '/profiles/', 'other'],
