@@ -1,0 +1,118 @@
+---
+// Choose your modules: each module On, Connected or Off, with the sidebar it makes drawn beside it
+// (FRONT-DOOR section 3). The explorable: switch a module and watch the sidebar entries grow, shrink or slide;
+// nothing reloads. Off means absent, not greyed. The words for each module are the method's table (section 2.7):
+// what it does on its own, and what it adds with the others on. Reduced motion: entries appear and go at once.
+import { SECTIONS, md } from '../../lib/method.mjs';
+const rows = SECTIONS['2.7'].tables[0].rows.map(([name, alone, together], i) => ({ id: `m${i}`, name, alone, together }));
+const STATES = ['On', 'Connected', 'Off'];
+---
+<div class="mw" data-mw data-help="method.modules">
+  <div class="mw-presets">
+    <button type="button" class="btn small ghost" data-mw-preset="first">The smallest useful setup</button>
+    <button type="button" class="btn small ghost" data-mw-preset="all">Everything On</button>
+  </div>
+  <div class="mw-grid">
+    <ul class="mw-mods">
+      {rows.map((r, i) => (
+        <li class="mw-mod" data-mw-mod={r.id} data-state={i === 0 ? 'On' : 'Off'}>
+          <div class="mw-head">
+            <b>{r.name}</b>
+            <div class="mw-seg" role="group" aria-label={`${r.name}: On, Connected or Off`}>
+              {STATES.map((s) => <button type="button" data-mw-set={s} aria-pressed={(i === 0 ? 'On' : 'Off') === s ? 'true' : 'false'}>{s}</button>)}
+            </div>
+          </div>
+          <p class="mw-alone" set:html={md(r.alone)} />
+          <p class="mw-together" set:html={md(r.together)} />
+        </li>
+      ))}
+    </ul>
+    <nav class="mw-side" aria-label="The sidebar these modules make">
+      <p class="mw-over">Sidebar</p>
+      <ul data-mw-side>
+        <li class="mw-entry">Home</li>
+        {rows.map((r, i) => <li class="mw-entry" data-mw-entry={r.id} hidden={i !== 0}>{r.name}<span class="mw-src" hidden>connected</span></li>)}
+      </ul>
+    </nav>
+  </div>
+</div>
+
+<script>
+  import { motion } from '../../lib/motion-read.mjs';
+  function init(root: HTMLElement) {
+    if ((root as any).__mw) return; (root as any).__mw = true;
+    const mods = Array.from(root.querySelectorAll<HTMLElement>('[data-mw-mod]'));
+    const side = root.querySelector<HTMLElement>('[data-mw-side]')!;
+    const entry = (id: string) => side.querySelector<HTMLElement>(`[data-mw-entry="${id}"]`)!;
+    function apply(next: Record<string, string>) {
+      const m = motion();
+      const items = Array.from(side.children) as HTMLElement[];
+      const before = new Map(items.filter((e) => !e.hidden).map((e) => [e, e.getBoundingClientRect().top]));
+      const leaving: HTMLElement[] = [], arriving: HTMLElement[] = [];
+      mods.forEach((mod) => {
+        const id = mod.dataset.mwMod!, s = next[id] ?? mod.dataset.state!;
+        mod.dataset.state = s;
+        mod.querySelectorAll<HTMLButtonElement>('[data-mw-set]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mwSet === s)));
+        const e = entry(id);
+        e.querySelector<HTMLElement>('.mw-src')!.hidden = s !== 'Connected';
+        if (s === 'Off' && !e.hidden) leaving.push(e);
+        if (s !== 'Off' && e.hidden) { e.hidden = false; arriving.push(e); }
+      });
+      // "With the others on" shows once more than one module is On or Connected.
+      const onCount = mods.filter((x) => x.dataset.state !== 'Off').length;
+      root.dataset.together = onCount > 1 ? 'yes' : 'no';
+      if (m.reduced) { leaving.forEach((e) => { e.hidden = true; }); return; }
+      // Leaving entries shrink to their centre where they are, then go; the rest slide to close the gap.
+      leaving.forEach((e) => { e.style.position = 'absolute'; e.style.width = `${e.offsetWidth}px`; });
+      const sr = side.getBoundingClientRect();
+      leaving.forEach((e) => {
+        const t = before.get(e)! - sr.top;
+        e.style.top = `${t}px`;
+        e.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.8)' }], { duration: m.exit, easing: m.exitEase }).onfinish = () => { e.hidden = true; e.style.position = ''; e.style.top = ''; e.style.width = ''; };
+      });
+      items.filter((e) => !e.hidden && !leaving.includes(e) && before.has(e)).forEach((e) => {
+        const dy = before.get(e)! - e.getBoundingClientRect().top;
+        if (Math.abs(dy) > 0.5) e.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: m.morph, easing: m.ease });
+      });
+      arriving.forEach((e) => e.animate([{ opacity: 0, transform: 'scale(.8)' }, { opacity: 1, transform: 'none' }], { duration: m.enter, delay: m.stagger * 2, easing: m.ease, fill: 'backwards' }));
+    }
+    root.addEventListener('click', (ev) => {
+      const b = (ev.target as Element).closest<HTMLButtonElement>('[data-mw-set]');
+      if (b) { apply({ [b.closest<HTMLElement>('[data-mw-mod]')!.dataset.mwMod!]: b.dataset.mwSet! }); return; }
+      const p = (ev.target as Element).closest<HTMLButtonElement>('[data-mw-preset]');
+      if (p) apply(Object.fromEntries(mods.map((x, i) => [x.dataset.mwMod!, p.dataset.mwPreset === 'all' ? 'On' : i === 0 ? 'On' : 'Off'])));
+    });
+    apply({});
+  }
+  const boot = () => document.querySelectorAll<HTMLElement>('[data-mw]').forEach(init);
+  boot();
+  document.addEventListener('astro:page-load', boot);
+</script>
+
+<style>
+  .mw { display: grid; gap: 12px; container: mw / inline-size; }
+  .mw-presets { display: flex; gap: 8px; flex-wrap: wrap; }
+  .mw-grid { display: grid; grid-template-columns: minmax(0, 1fr) 180px; gap: 16px; align-items: start; }
+  .mw-mods { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .mw-mod { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--surface); display: grid; gap: 4px; transition: border-color var(--dur-state) var(--ease-settle), background var(--dur-state) var(--ease-settle); }
+  .mw-mod[data-state="Off"] { background: transparent; }
+  .mw-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .mw-head b { font-size: 13.5px; font-weight: 600; }
+  .mw-seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); }
+  .mw-seg button { font: 550 12px/1 var(--font-sans); color: var(--text-2); background: none; border: 0; border-radius: 999px; min-height: 28px; padding: 0 10px; cursor: pointer; }
+  .mw-seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-strong); }
+  .mw-alone, .mw-together { margin: 0; font-size: 12.5px; color: var(--text-2); }
+  .mw-mod[data-state="Off"] .mw-alone, .mw-mod[data-state="Off"] .mw-together { display: none; }
+  .mw-together { display: none; }
+  .mw[data-together="yes"] .mw-mod:not([data-state="Off"]) .mw-together { display: block; }
+  .mw-side { border: 1px solid var(--line-strong); border-radius: 10px; background: var(--bg); padding: 10px; position: sticky; top: calc(var(--mast-h, 60px) + 16px); }
+  .mw-over { margin: 0 0 6px; font: 500 10.5px/1.3 var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); }
+  .mw-side ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; position: relative; }
+  .mw-entry { font-size: 13px; padding: 6px 8px; border-radius: 6px; background: var(--surface); display: flex; justify-content: space-between; gap: 6px; }
+  .mw-src { font: 500 10.5px/1.6 var(--font-mono); color: var(--quiet, var(--text-3)); }
+  @container mw (max-width: 520px) {
+    .mw-grid { grid-template-columns: minmax(0, 1fr); }
+    .mw-side { position: static; order: -1; }
+    .mw-side ul { grid-auto-flow: row; }
+  }
+</style>

@@ -84,7 +84,7 @@ export function incidentView(inc) {
     inc, space: s, site, pos, unit, role, key, local,
     href: incidentPath(inc.number),
     roomTitle, deviceTitle,
-    title: inc.subject.kind === 'room' ? `${roomTitle}, the whole room` : deviceTitle,
+    title: inc.subject.kind === 'room' ? `${roomTitle}, the whole space` : deviceTitle,
     where: `${roomTitle}, ${site.name}${site.city ? `, ${site.city}` : ''}`,
     model: pos?.model ? modelName(pos.model) : null,
     sceneKey: local,                        // RoomScene's data-sk for this device

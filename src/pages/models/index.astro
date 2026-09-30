@@ -20,7 +20,7 @@ const counts = { all: Object.keys(models).length, standard: 0, older: 0, unused:
 for (const id of Object.keys(models)) counts[kindOf(allFacts[id])]++;
 const makers = [...new Set(Object.values(models).map((m) => m.manufacturer))].sort((a, b) => a.localeCompare(b));
 const slug = (v) => String(v).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-const SORT = { options: [{ value: 'units', label: 'Most units first' }, { value: 'name', label: 'By name' }, { value: 'maker', label: 'By maker' }] };
+const SORT = { options: [{ value: 'units', label: 'Most units first' }, { value: 'name', label: 'By name' }, { value: 'maker', label: 'By manufacturer' }] };
 const fwEnded = Object.keys(models).filter((id) => allFacts[id].fw.tone === 'warn').length;
 const answer = `${fwEnded ? `${plural(fwEnded, 'model')} past manufacturer support` : 'Every model still supported'} · ${counts.older ? `${plural(counts.older, 'older model')} to replace` : 'no older kit'}`;
 const NUMBERS = [
@@ -31,10 +31,10 @@ const NUMBERS = [
 ];
 // Models a configuration is written for: Configurations' "Models covered" opens ?cfg=1 (rule P10).
 const CFG_MODELS = new Set(Object.values(configurations).flatMap((c) => c.models ?? []));
-const TOGGLES = [{ key: 'cfg', label: 'Has a configuration', title: 'Only models a configuration is written for' }];
+const TOGGLES = [{ key: 'cfg', label: 'Has a setup guide', title: 'Only models a setup guide is written for' }];
 const FACETS = [
   { key: 'cls', label: 'Kind', options: order.map((value) => ({ value, label: className(value) })) },
-  { key: 'maker', label: 'Maker', options: makers.map((m) => ({ value: slug(m), label: m })) },
+  { key: 'maker', label: 'Manufacturer', options: makers.map((m) => ({ value: slug(m), label: m })) },
   { key: 'use', label: 'Status', options: [{ value: 'standard', label: 'In use now' }, { value: 'older', label: 'Older kit' }, { value: 'unused', label: 'Not installed' }] },
   { key: 'fw', label: 'Firmware', options: [{ value: 'ok', label: 'Supported' }, { value: 'warn', label: 'Support ended' }, { value: 'off', label: 'Not tracked' }] },
 ];
@@ -44,7 +44,7 @@ const FACETS = [
     <a slot="action" class="btn primary" href={href('/edit/?kind=model')}>New model</a>
   </PageBand>
   <div class="content models">
-    <FilterBar facets={FACETS} toggles={TOGGLES} placeholder="Find a model, maker or class" label="Find a model" noun={['model', 'models']} scope=".content.models" sort={SORT} />
+    <FilterBar facets={FACETS} toggles={TOGGLES} placeholder="Find a model, manufacturer or class" label="Find a model" noun={['model', 'models']} scope=".content.models" sort={SORT} />
     {order.map((c) => (
       <div data-fb-group>
       <Section title={className(c)} id={c} aside={classes[c]?.profile.object_role}>
@@ -64,7 +64,7 @@ const FACETS = [
                   </span>
                   <dl class="mdl-facts">
                     <div><dt>Units</dt><dd class="num">{f.installed ? n(f.installed) : 'None'}</dd></div>
-                    <div><dt>Rooms</dt><dd class="num">{f.rooms.length ? n(f.rooms.length) : 'None'}</dd></div>
+                    <div><dt>Spaces</dt><dd class="num">{f.rooms.length ? n(f.rooms.length) : 'None'}</dd></div>
                     <div><dt>Years in service</dt><dd class="num">{f.years ? f.years.label : (f.retired ? `${f.retired} taken out` : 'None')}</dd></div>
                     <div><dt>Firmware</dt><dd><span class={`fw fw-${f.fw.tone}`} title={f.fw.sub}>{f.fw.label}</span></dd></div>
                   </dl>

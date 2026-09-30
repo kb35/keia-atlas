@@ -1,0 +1,451 @@
+---
+// The front door's hero (UX-V2 section 2.7, MOTION-V2 4.35): the Dublin office's third floor, drawn from the same
+// building model as Atlas (src/lib/floors.mjs), every space a health ring, one of them broken. It is the product, not
+// a picture of it:
+//   load     the rings come on in turn, once; then the one fault breaks; the heartbeat appears last
+//   hover    a peek names the space and its state (focus does the same from the keyboard)
+//   select   the space grows into its own view inside the same frame: every device a ring, the path gains a step
+//   back     the path, "Back to the floor", Escape or [ zoom out
+//   lens     Health or Support: one plan, two answers
+// Anything deeper than one level opens Atlas itself, viewing as Liam, the Dublin technician.
+// The frame is a simulated moment, labelled Simulated: the video bar in 3.09 went offline at 07:52 and is with Liam.
+// Reduced motion: everything is present at once and the zoom is an instant swap.
+import { building } from '../../lib/floors.mjs';
+import { href, modelName } from '../../lib/data.mjs';
+import { ringParts } from '../../lib/ring.mjs';
+import HealthGlyph from '../HealthGlyph.astro';
+
+const SITE = 'dub', FLOOR = '3';
+const STORY = { room: 'dub-3-09', tag: 'AG-000335', since: '07:52', who: 'Liam', whoSince: '08:10', next: '09:00' };
+
+const M = building(SITE);
+const F = M.floors.find((f) => f.id === FLOOR);
+const W = Math.max(...F.outline.map((p) => p[0])), H = Math.max(...F.outline.map((p) => p[1]));
+const pad = 1.2;
+const Y = (y) => H - y;
+const rectAttrs = ([x0, y0, x1, y1]) => ({ x: x0, y: Y(y1), width: x1 - x0, height: y1 - y0 });
+const pts = (P) => P.map(([x, y]) => `${x},${Y(y)}`).join(' ');
+
+const WORDS = {
+  'hdbaset-tx': 'HDBaseT sender', 'hdbaset-rx': 'HDBaseT receiver', 'display-tx': 'Display sender', 'display-rx': 'Display receiver',
+  'display-main': 'Main display', 'display-second': 'Second display', 'ptz-camera': 'PTZ camera', 'usb-hdmi-converter': 'USB to HDMI converter',
+  'poe-injector': 'PoE injector', 'usb-c-adapter': 'USB-C adapter', 'av-switch': 'AV switch', 'desk-video-device': 'Desk video device',
+};
+const posLabel = (p) => {
+  const [, base, n] = p.match(/^(.*?)(?:#(\d+))?$/);
+  const w = WORDS[base] ?? base.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase());
+  return n ? `${w} ${n}` : w;
+};
+const typeLabel = (t) => (t ?? '').replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase());
+
+const rooms = Object.values(M.rooms).filter((r) => r.floor === FLOOR && r.rect).map((r) => {
+  const devices = (r.positions ?? []).flatMap((p) => (p.units ?? []).map((u, i) => ({
+    label: posLabel(p.position) + ((p.units.length > 1) ? ` (${i + 1})` : ''),
+    model: p.model ? modelName(p.model) : null,
+    host: p.hostname ?? null, tag: u.asset_tag,
+    fault: u.asset_tag === STORY.tag,
+  })));
+  const fault = r.id === STORY.room;
+  const name = `${r.number ? `${r.number} ` : ''}${r.name}`;
+  const n = devices.length;
+  const answer = fault
+    ? `Fault: video bar offline since ${STORY.since}. With ${STORY.who} since ${STORY.whoSince}; next booking ${STORY.next}.`
+    : n ? `Fine: ${n === 1 ? 'the one device is' : `all ${n} devices are`} in service.` : 'Fine: no devices are installed in this space.';
+  const peek = fault ? `${name} · Fault · video bar offline since ${STORY.since} · With ${STORY.who}` : `${name} · Fine · ${n === 1 ? '1 device' : `${n} devices`}`;
+  const [x0, y0, x1, y1] = r.rect;
+  return { id: r.id, name, number: r.number ?? '', type: typeLabel(r.space_type), rect: r.rect, cx: (x0 + x1) / 2, cy: Y((y0 + y1) / 2), fault, devices, answer, peek };
+});
+const faults = rooms.filter((r) => r.fault).length;
+const floorAnswer = `${F.name}: ${rooms.length - faults} of ${rooms.length} spaces fine; ${faults === 1 ? '1 fault' : `${faults} faults`}.`;
+const svgRing = (state, cx, cy, r, sw) => ringParts(state, cx, cy, r, sw);
+// The band, as Atlas draws it: what kind of thing, its status, one answer sentence, then up to four figures.
+const fig = (n, one, many = `${one}s`) => ({ n, l: n === 1 ? one : many });
+const floorOver = `Office · ${SITE.toUpperCase()} · ${F.name} · Simulated`;
+const floorFigs = [fig(rooms.length, 'space'), fig(faults, 'fault'), fig(1, 'open job')];
+const roomOver = (r) => `Space · ${r.number || r.name} · ${r.type} · Simulated`;
+const roomFigs = (r) => [fig(r.devices.length, 'device'), fig(r.fault ? 1 : 0, 'fault'), fig(r.fault ? 1 : 0, 'open job')];
+const G = 0.62, SW = 0.2;   // ring radius and stroke on the plan, in metres
+---
+<figure class="hp" data-hp aria-labelledby="hp-cap">
+  <figcaption class="hp-band" id="hp-cap">
+    <div class="hp-band-l">
+      <p class="hp-over" data-hp-over data-floor={floorOver}>{floorOver}</p>
+      <p class="hp-answer-row"><span class="hp-answer" data-hp-answer data-floor={floorAnswer} aria-live="polite">{floorAnswer}</span> <span class="hp-beat" data-hp-beat>checked just now</span></p>
+    </div>
+    <dl class="hp-figs" data-hp-figs data-floor={JSON.stringify(floorFigs)}>
+      {floorFigs.map((f) => <div><dt>{f.l}</dt><dd>{f.n}</dd></div>)}
+    </dl>
+  </figcaption>
+  <div class="hp-head">
+    <nav class="hp-path" aria-label="Where you are on the plan">
+      <a href={href(`/locations/${SITE}/`)} data-as="liam">{M.siteName}</a>
+      <span class="hp-sep" aria-hidden="true">/</span>
+      <button type="button" class="hp-crumb" data-hp-out aria-disabled="true">{F.name}</button>
+      <span class="hp-step" data-hp-step hidden><span class="hp-sep" aria-hidden="true">/</span><span class="hp-here" data-hp-here aria-current="location"></span></span>
+    </nav>
+    <div class="hp-tools">
+      <div class="hp-lens" role="group" aria-label="Lens" data-hp-lens>
+        <span class="hp-lens-mark" aria-hidden="true" data-hp-mark></span>
+        <button type="button" aria-pressed="true" data-lens="health">Health</button>
+        <button type="button" aria-pressed="false" data-lens="support">Support</button>
+      </div>
+    </div>
+  </div>
+  <div class="hp-frame" data-hp-frame data-lens-on="health">
+    <svg class="hp-plan" data-hp-plan viewBox={`${-pad} ${-pad} ${W + pad * 2} ${H + pad * 2}`} data-w={W} data-h={H} data-pad={pad} role="group" aria-label={`${M.siteName}, ${F.name}: ${rooms.length} spaces. Select a space to open it.`}>
+      <g data-hp-g>
+        <polygon class="hp-outline" points={pts(F.outline)} />
+        {F.corridors.map((c) => <rect class="hp-corridor" {...rectAttrs(c.rect)} />)}
+        {F.core.map((c) => <rect class="hp-core" {...rectAttrs(c.rect)} />)}
+        {rooms.map((r, i) => (
+          <g class:list={['hp-rm', { 'is-fault': r.fault }]} data-room={r.id} data-peek={r.peek} role="button" tabindex="0" aria-label={`${r.name}: ${r.fault ? `fault, video bar offline since ${STORY.since}, with ${STORY.who}` : 'fine'}. Open the space.`}>
+            <rect class="hp-rr" {...rectAttrs(r.rect)} rx="0.25" />
+            {r.number && <text class="hp-no" x={r.cx} y={r.cy - 0.95} data-x={r.cx} data-y={r.cy - 0.95} data-tx={r.cx - 1.25} data-ty={r.cy + 0.35}>{r.number}</text>}
+            <g class="hp-g hp-health" style={`--i:${i}`} transform={`translate(0 0.35)`}>
+              {r.fault ? (
+                <>
+                  <g class="hp-was">{svgRing('fine', r.cx, r.cy, G, SW).map(({ tag, attrs }) => tag === 'circle' ? <circle {...attrs} stroke="currentColor" /> : <path {...attrs} stroke="currentColor" />)}</g>
+                  <g class="hp-now">{svgRing('fault', r.cx, r.cy, G, SW).map(({ tag, attrs }) => tag === 'circle' ? <circle {...attrs} stroke={attrs.stroke ?? 'currentColor'} /> : <path {...attrs} stroke="currentColor" />)}</g>
+                </>
+              ) : svgRing('fine', r.cx, r.cy, G, SW).map(({ attrs }) => <circle {...attrs} stroke="currentColor" />)}
+            </g>
+            {r.fault && (
+              <g class="hp-g hp-support" transform="translate(0 0.35)">
+                {svgRing('progress', r.cx, r.cy, G, SW).map(({ attrs }) => <path {...attrs} stroke="currentColor" />)}
+                <text class="hp-count" x={r.cx + G + 0.35} y={r.cy + 0.05}>1</text>
+              </g>
+            )}
+          </g>
+        ))}
+      </g>
+    </svg>
+    <div class="hp-rooms" data-hp-rooms>
+      {rooms.map((r) => (
+        <section class="hp-room" data-room-view={r.id} data-answer={r.answer} data-over={roomOver(r)} data-figs={JSON.stringify(roomFigs(r))} data-fault={r.fault ? '' : undefined} hidden aria-labelledby={`hp-t-${r.id}`}>
+          <div class="hp-room-head">
+            <p class="hp-over">Space · {r.type}</p>
+            <h3 id={`hp-t-${r.id}`} tabindex="-1">{r.name}</h3>
+          </div>
+          {r.devices.length > 0 && (
+            <ul class="hp-devs" aria-label={`Devices in ${r.name}`}>
+              {r.devices.map((d) => (
+                <li>
+                  <a class:list={['hp-dev', { 'is-fault': d.fault }]} href={href(`/device/?tag=${d.tag}`)} data-as="liam">
+                    <HealthGlyph state={d.fault ? 'fault' : 'fine'} quiet={!d.fault} size={d.fault ? 24 : 16} class="lit" label={d.fault ? `Fault: offline since ${STORY.since}` : 'Fine: in service'} />
+                    <span class="hp-dev-t"><b>{d.label}</b><small>{[d.model, d.host].filter(Boolean).join(' · ') || d.tag}</small></span>
+                    {d.fault && <span class="hp-dev-state">Offline since {STORY.since}</span>}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div class="hp-room-foot">
+            <button type="button" class="btn small ghost" data-hp-out>Back to the floor</button>
+            <a class="hp-open" href={href(`/rooms/${r.id}/`)} data-as="liam">Open {r.name} in Atlas</a>
+          </div>
+        </section>
+      ))}
+    </div>
+    <div class="hp-peek" data-hp-peek role="tooltip" id="hp-peek" hidden></div>
+  </div>
+  <details class="hp-key">
+    <summary>Key</summary>
+    <p>
+      <HealthGlyph state="fine" quiet word="Fine" class="lit" />
+      <HealthGlyph state="fault" word="Fault" class="lit" />
+      <HealthGlyph state="progress" word="In progress (Support lens: open jobs)" class="lit" />
+      <span class="hp-fict">{F.fictional}</span>
+    </p>
+  </details>
+</figure>
+<script is:inline>
+  // Before first paint: hide the rings so they can come on in turn (skipped with reduced motion).
+  (function () {
+    var f = document.currentScript && document.currentScript.previousElementSibling;
+    if (f && f.matches('[data-hp]') && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      f.classList.add('hp-boot');
+      setTimeout(function () { f.classList.remove('hp-boot'); }, 3000);
+    }
+  })();
+</script>
+
+<script>
+  import { motion } from '../../lib/motion-read.mjs';
+
+  function init(fig: HTMLElement) {
+    if ((fig as any).__hp) return; (fig as any).__hp = true;
+    const frame = fig.querySelector<HTMLElement>('[data-hp-frame]')!;
+    const plan = fig.querySelector<SVGSVGElement>('[data-hp-plan]')!;
+    const g = plan.querySelector<SVGGElement>('[data-hp-g]')!;
+    const peek = fig.querySelector<HTMLElement>('[data-hp-peek]')!;
+    const answer = fig.querySelector<HTMLElement>('[data-hp-answer]')!;
+    const beat = fig.querySelector<HTMLElement>('[data-hp-beat]')!;
+    const step = fig.querySelector<HTMLElement>('[data-hp-step]')!;
+    const here = fig.querySelector<HTMLElement>('[data-hp-here]')!;
+    const crumb = fig.querySelector<HTMLElement>('.hp-crumb')!;
+    const over = fig.querySelector<HTMLElement>('[data-hp-over]')!;
+    const figs = fig.querySelector<HTMLElement>('[data-hp-figs]')!;
+    // The band follows what is open: the floor's figures, or the space's. Numbers change in place, never count.
+    const setBand = (o: string, a: string, f: string, fault: boolean) => {
+      over.textContent = o; answer.textContent = a; answer.classList.toggle('is-fault', fault);
+      const list = JSON.parse(f) as { n: number; l: string }[];
+      figs.querySelectorAll('div').forEach((d, k) => { d.querySelector('dd')!.textContent = String(list[k]?.n ?? ''); d.querySelector('dt')!.textContent = list[k]?.l ?? ''; });
+    };
+    const rooms = Array.from(fig.querySelectorAll<SVGGElement>('.hp-rm'));
+    let open: string | null = null;
+
+    // ---- Narrow frames: turn the plan a quarter turn so spaces stay big enough to read and tap (as FloorMap does).
+    const W = +plan.dataset.w!, H = +plan.dataset.h!, pad = +plan.dataset.pad!;
+    function turn() {
+      const on = frame.clientWidth > 0 && frame.clientWidth < 520;
+      if (fig.classList.contains('hp-turned') === on && plan.dataset.done) return;
+      plan.dataset.done = '1';
+      fig.classList.toggle('hp-turned', on);
+      plan.setAttribute('viewBox', on ? `${-pad} ${-pad} ${H + pad * 2} ${W + pad * 2}` : `${-pad} ${-pad} ${W + pad * 2} ${H + pad * 2}`);
+      if (on) g.setAttribute('transform', `matrix(0 1 -1 0 ${H} 0)`); else g.removeAttribute('transform');
+      // Turned, a space's number sits above its ring on screen: move it along the plan's x, then keep it upright.
+      g.querySelectorAll<SVGTextElement>('text').forEach((t) => {
+        const d = t.dataset;
+        if (d.tx) { t.setAttribute('x', on ? d.tx! : d.x!); t.setAttribute('y', on ? d.ty! : d.y!); }
+        const x = +(t.getAttribute('x') ?? 0), y = +(t.getAttribute('y') ?? 0);
+        if (on) t.setAttribute('transform', `rotate(-90 ${x} ${y})`); else t.removeAttribute('transform');
+      });
+    }
+    turn();
+    if ('ResizeObserver' in window) new ResizeObserver(() => requestAnimationFrame(turn)).observe(frame);
+
+    // ---- Load: the lights come on in turn, once (M8); then the one fault breaks; the heartbeat last.
+    const m0 = motion();
+    if (fig.classList.contains('hp-boot') && !m0.reduced) {
+      const glyphs = Array.from(fig.querySelectorAll<SVGGElement>('.hp-health'));
+      glyphs.forEach((el, i) => el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: m0.state, delay: i * m0.stagger, easing: m0.ease, fill: 'backwards' }));
+      const after = glyphs.length * m0.stagger + m0.state;
+      fig.querySelectorAll<SVGGElement>('.hp-now').forEach((el) => el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: m0.state, delay: after, easing: m0.ease, fill: 'backwards' }));
+      fig.querySelectorAll<SVGGElement>('.hp-was').forEach((el) => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: m0.state, delay: after, easing: m0.ease, fill: 'backwards' }));
+      beat.animate([{ opacity: 0 }, { opacity: 1 }], { duration: m0.state, delay: after + m0.state, easing: m0.ease, fill: 'backwards' });
+      requestAnimationFrame(() => fig.classList.remove('hp-boot'));
+    } else fig.classList.remove('hp-boot');
+
+    // The heartbeat's words change every 10 s; the change is text, not motion.
+    const t0 = Date.now();
+    const tick = () => {
+      if (!fig.isConnected) return;
+      const s = Math.round((Date.now() - t0) / 10000) * 10;
+      beat.textContent = s < 10 ? 'checked just now' : s < 60 ? `checked ${s} s ago` : `checked ${Math.floor(s / 60)} min ago`;
+      setTimeout(tick, 10000);
+    };
+    setTimeout(tick, 10000);
+
+    // ---- Peek: grows from the space after a short rest, then slides from space to space.
+    let peekTimer = 0, peekOn = false;
+    const place = (room: SVGGElement) => {
+      const fr = frame.getBoundingClientRect(), rr = room.querySelector('rect')!.getBoundingClientRect();
+      peek.textContent = room.dataset.peek ?? '';
+      peek.hidden = false;
+      const pw = peek.offsetWidth, ph = peek.offsetHeight;
+      let x = rr.left - fr.left + rr.width / 2 - pw / 2;
+      x = Math.max(8, Math.min(fr.width - pw - 8, x));
+      let y = rr.top - fr.top - ph - 8;
+      if (y < 8) y = rr.bottom - fr.top + 8;
+      if (y + ph > fr.height - 4) y = Math.max(4, rr.top - fr.top + rr.height / 2 - ph / 2);
+      peek.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+    };
+    const showPeek = (room: SVGGElement, now = false) => {
+      clearTimeout(peekTimer);
+      if (open) return;
+      const go = () => {
+        if (open) return;
+        const m = motion();
+        const first = !peekOn;
+        if (first) peek.classList.add('no-slide');
+        place(room);
+        room.setAttribute('aria-describedby', 'hp-peek');
+        if (first) {
+          peekOn = true;
+          void peek.offsetWidth; peek.classList.remove('no-slide');
+          if (!m.reduced) peek.animate([{ opacity: 0, scale: String(getComputedStyle(document.documentElement).getPropertyValue('--pop-scale').trim() || 0.94) }, { opacity: 1, scale: '1' }], { duration: m.pop, easing: m.ease });
+        }
+      };
+      if (now || peekOn) go(); else peekTimer = window.setTimeout(go, 200);
+    };
+    const hidePeek = () => {
+      clearTimeout(peekTimer);
+      if (!peekOn) return;
+      peekOn = false;
+      rooms.forEach((r) => r.removeAttribute('aria-describedby'));
+      const m = motion();
+      if (m.reduced) { peek.hidden = true; return; }
+      peek.animate([{ opacity: 1 }, { opacity: 0 }], { duration: m.exit, easing: m.exitEase }).onfinish = () => { if (!peekOn) peek.hidden = true; };
+    };
+    rooms.forEach((room) => {
+      room.addEventListener('pointerenter', (e) => { if ((e as PointerEvent).pointerType !== 'touch') showPeek(room); });
+      room.addEventListener('focus', () => showPeek(room, true));
+      room.addEventListener('blur', hidePeek);
+      room.addEventListener('click', () => zoomIn(room));
+      room.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); zoomIn(room); } });
+    });
+    plan.addEventListener('pointerleave', hidePeek);
+
+    // ---- One level of zoom: the space's rectangle becomes the space's own view inside the same frame.
+    const finishAll = () => [frame, plan, ...fig.querySelectorAll<HTMLElement>('[data-room-view]')].forEach((el) => el.getAnimations().forEach((a) => a.finish()));
+    function zoomIn(room: SVGGElement) {
+      if (open) return;
+      finishAll(); hidePeek();
+      const id = room.dataset.room!;
+      const view = fig.querySelector<HTMLElement>(`[data-room-view="${id}"]`)!;
+      const m = motion();
+      const fr = frame.getBoundingClientRect(), rr = room.querySelector('rect')!.getBoundingClientRect();
+      open = id;
+      view.hidden = false;
+      frame.classList.add('is-in');
+      here.textContent = view.querySelector('h3')!.textContent;
+      step.hidden = false;
+      crumb.removeAttribute('aria-disabled');
+      setBand(view.dataset.over!, view.dataset.answer!, view.dataset.figs!, view.hasAttribute('data-fault'));
+      const fr1 = frame.getBoundingClientRect(), vr = view.getBoundingClientRect();
+      if (!m.reduced) {
+        const s = Math.min(8, fr.width / Math.max(rr.width, 1));
+        const ox = rr.left - fr.left + rr.width / 2, oy = rr.top - fr.top + rr.height / 2;
+        plan.style.transformOrigin = `${ox}px ${oy}px`;
+        plan.animate([{ transform: 'none', opacity: 1 }, { transform: `translate(${fr.width / 2 - ox}px, ${fr.height / 2 - oy}px) scale(${s})`, opacity: 0 }], { duration: m.zoom, easing: m.ease });
+        const sv = Math.max(0.05, rr.width / vr.width);
+        const dx = rr.left + rr.width / 2 - (vr.left + vr.width / 2), dy = rr.top + rr.height / 2 - (vr.top + vr.height / 2);
+        view.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${sv})`, opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: m.zoom, easing: m.ease });
+        frame.animate([{ height: `${fr.height}px` }, { height: `${fr1.height}px` }], { duration: m.zoom, easing: m.ease }).onfinish = () => { if (open === id) frame.classList.add('is-settled'); };
+      } else frame.classList.add('is-settled');
+      view.querySelector<HTMLElement>('h3')!.focus({ preventScroll: true });
+    }
+    function zoomOut() {
+      if (!open) return;
+      finishAll();
+      const id = open;
+      const view = fig.querySelector<HTMLElement>(`[data-room-view="${id}"]`)!;
+      const room = rooms.find((r) => r.dataset.room === id)!;
+      const m = motion();
+      const fr = frame.getBoundingClientRect(), vr = view.getBoundingClientRect();
+      open = null;
+      frame.classList.remove('is-in', 'is-settled');
+      step.hidden = true;
+      crumb.setAttribute('aria-disabled', 'true');
+      setBand(over.dataset.floor!, answer.dataset.floor!, figs.dataset.floor!, false);
+      const done = () => { view.hidden = true; view.classList.remove('is-leaving'); };
+      if (m.reduced) { done(); room.focus({ preventScroll: true }); return; }
+      view.classList.add('is-leaving');
+      const fr1 = frame.getBoundingClientRect(), rr = room.querySelector('rect')!.getBoundingClientRect();
+      const s = Math.min(8, fr1.width / Math.max(rr.width, 1));
+      const ox = rr.left - fr1.left + rr.width / 2, oy = rr.top - fr1.top + rr.height / 2;
+      plan.style.transformOrigin = `${ox}px ${oy}px`;
+      plan.animate([{ transform: `translate(${fr1.width / 2 - ox}px, ${fr1.height / 2 - oy}px) scale(${s})`, opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: m.zoom, easing: m.ease });
+      const sv = Math.max(0.05, rr.width / vr.width);
+      const dx = rr.left + rr.width / 2 - (vr.left + vr.width / 2), dy = rr.top + rr.height / 2 - (vr.top + vr.height / 2) + (fr.top - fr1.top);
+      view.animate([{ transform: 'none', opacity: 1 }, { transform: `translate(${dx}px, ${dy}px) scale(${sv})`, opacity: 0 }], { duration: m.exit, easing: m.exitEase }).onfinish = done;
+      frame.animate([{ height: `${fr.height}px` }, { height: `${fr1.height}px` }], { duration: m.zoom, easing: m.ease });
+      room.focus({ preventScroll: true });
+    }
+    fig.querySelectorAll<HTMLElement>('[data-hp-out]').forEach((b) => b.addEventListener('click', zoomOut));
+    fig.addEventListener('keydown', (e) => { if (open && (e.key === 'Escape' || e.key === '[')) { e.preventDefault(); zoomOut(); } });
+
+    // ---- Lens: Health or Support. The marker slides to the chosen word (M12).
+    const lens = fig.querySelector<HTMLElement>('[data-hp-lens]')!;
+    const mark = fig.querySelector<HTMLElement>('[data-hp-mark]')!;
+    const btns = Array.from(lens.querySelectorAll<HTMLButtonElement>('button'));
+    const moveMark = () => {
+      const b = btns.find((x) => x.getAttribute('aria-pressed') === 'true')!;
+      mark.style.width = `${b.offsetWidth}px`;
+      mark.style.transform = `translateX(${b.offsetLeft}px)`;
+    };
+    mark.classList.add('no-slide'); moveMark(); void mark.offsetWidth; mark.classList.remove('no-slide');
+    btns.forEach((b) => b.addEventListener('click', () => {
+      btns.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      frame.dataset.lensOn = b.dataset.lens;
+      moveMark();
+    }));
+  }
+  const boot = () => document.querySelectorAll<HTMLElement>('[data-hp]').forEach(init);
+  boot();
+  document.addEventListener('astro:page-load', boot);
+</script>
+
+<style>
+  .hp { margin: 0; display: grid; gap: 10px; min-width: 0; }
+  .hp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; min-height: 44px; }
+  .hp-path { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; font-size: 13px; color: var(--text-2); }
+  .hp-path a { color: var(--text-2); text-decoration: none; display: inline-flex; align-items: center; min-height: 32px; }
+  .hp-path a:hover { color: var(--text); text-decoration: underline; }
+  .hp-sep { color: var(--text-3); }
+  .hp-crumb { font: inherit; color: var(--text-2); background: none; border: 0; padding: 0; min-height: 32px; cursor: pointer; }
+  .hp-crumb[aria-disabled="true"] { color: var(--text); cursor: default; }
+  .hp-crumb:not([aria-disabled="true"]):hover { color: var(--text); text-decoration: underline; }
+  .hp-step:not([hidden]) { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+  .hp-here { color: var(--text); font-weight: 550; }
+  .hp-tools { display: flex; align-items: center; gap: 12px; }
+  .hp-lens { position: relative; display: inline-flex; padding: 3px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); }
+  .hp-lens button { position: relative; z-index: 1; font: 550 12.5px/1 var(--font-sans); color: var(--text-2); background: none; border: 0; border-radius: 999px; padding: 0 12px; min-height: 30px; cursor: pointer; transition: color var(--dur-hover) var(--ease-settle); }
+  .hp-lens button[aria-pressed="true"] { color: var(--text); }
+  .hp-lens-mark { position: absolute; left: 0; top: 3px; bottom: 3px; border-radius: 999px; background: var(--surface); box-shadow: var(--shadow-xs, none); border: 1px solid var(--line); transition: transform var(--dur-morph) var(--ease-settle), width var(--dur-morph) var(--ease-settle); }
+  .hp-lens-mark.no-slide, .hp-peek.no-slide { transition: none; }
+
+  .hp-frame { position: relative; background: var(--surface); border: var(--border-card); border-radius: var(--radius-lg); padding: 12px; min-width: 0; }
+  .hp-plan { display: block; width: 100%; height: auto; font-family: var(--font-sans); overflow: visible; will-change: auto; }
+  .hp-frame.is-in .hp-plan { position: absolute; left: 12px; top: 12px; width: calc(100% - 24px); pointer-events: none; }
+  .hp-frame.is-settled .hp-plan { visibility: hidden; }
+  .hp-outline { fill: var(--bg); stroke: var(--line-strong); stroke-width: 0.12; }
+  .hp-corridor { fill: var(--surface-2); }
+  .hp-core { fill: var(--surface-3, var(--surface-2)); stroke: var(--line); stroke-width: 0.05; }
+  .hp-rm { cursor: pointer; outline: none; }
+  .hp-rr { fill: var(--surface); stroke: var(--line-strong); stroke-width: 0.1; transition: fill var(--dur-hover) var(--ease-settle), stroke var(--dur-hover) var(--ease-settle); }
+  .hp-rm:hover .hp-rr { fill: var(--surface-2); }
+  .hp-rm:focus-visible .hp-rr { stroke: var(--focus, var(--accent)); stroke-width: 0.3; }
+  .hp-rm.is-fault .hp-rr { fill: var(--h-fault-soft, color-mix(in srgb, var(--red) 12%, var(--surface))); }
+  .hp-no { font-size: 0.78px; font-weight: 550; fill: var(--text-2); text-anchor: middle; dominant-baseline: middle; pointer-events: none; font-variant-numeric: tabular-nums; }
+  .hp-g { color: var(--quiet, var(--text-3)); pointer-events: none; transition: opacity var(--dur-state) var(--ease-settle); }
+  .hp-rm.is-fault .hp-health { color: var(--h-fault, var(--red)); }
+  .hp-rm.is-fault .hp-was { opacity: 0; }
+  .hp-rm.is-fault .hp-was { color: var(--quiet, var(--text-3)); }
+  .hp-support { color: var(--h-progress, var(--blue)); opacity: 0; }
+  .hp-count { font-size: 0.7px; font-weight: 600; fill: var(--h-progress-ink, var(--blue-ink)); dominant-baseline: middle; }
+  .hp-frame[data-lens-on="support"] .hp-health { opacity: 0; }
+  .hp-frame[data-lens-on="support"] .hp-support { opacity: 1; }
+  .hp-frame[data-lens-on="support"] .hp-rm.is-fault .hp-rr { fill: var(--h-progress-soft, color-mix(in srgb, var(--blue) 12%, var(--surface))); }
+  :global(.hp-boot) .hp-health { opacity: 0; }
+  :global(.hp-boot) .hp-beat { opacity: 0; }
+
+  .hp-peek {
+    position: absolute; left: 0; top: 0; z-index: 3; max-width: min(320px, calc(100% - 16px)); pointer-events: none;
+    padding: 8px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line-strong); box-shadow: var(--shadow-md);
+    font-size: 13px; line-height: 1.35; color: var(--text); transition: transform var(--dur-pop) var(--ease-settle);
+  }
+
+  .hp-rooms { min-width: 0; }
+  .hp-room { display: grid; gap: 14px; transform-origin: center; }
+  .hp-room.is-leaving { position: absolute; left: 12px; right: 12px; top: 12px; }
+  .hp-room-head { display: grid; gap: 4px; }
+  .hp-over { margin: 0; font: 500 10.5px/1.2 var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); }
+  .hp-room h3 { font: 600 clamp(20px, 2vw, 24px)/1.15 var(--font-sans); letter-spacing: -.02em; outline: none; }
+  .hp-answer.is-fault { color: var(--h-fault-ink, var(--red-ink)); }
+  .hp-devs { list-style: none; margin: 0; padding: 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; border: 1.5px solid var(--line-strong); border-radius: 12px; background: var(--bg); }
+  .hp-dev { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 10px; min-height: 44px; padding: 8px 10px; border-radius: 8px; color: var(--text); text-decoration: none; transition: background var(--dur-hover) var(--ease-settle); }
+  .hp-dev:hover { background: var(--surface-2); color: var(--text); }
+  .hp-dev.is-fault { background: var(--h-fault-soft, color-mix(in srgb, var(--red) 10%, var(--surface))); }
+  .hp-dev-t { display: grid; min-width: 0; }
+  .hp-dev-t b { font-weight: 550; font-size: 13.5px; }
+  .hp-dev-t small { font-size: 12px; color: var(--text-2); overflow-wrap: anywhere; }
+  .hp-dev-state { grid-column: 2; font-size: 12.5px; font-weight: 550; color: var(--h-fault-ink, var(--red-ink)); }
+  .hp-room-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .hp-open { font-size: 14px; display: inline-flex; align-items: center; min-height: 44px; }
+
+  .hp-band { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; }
+  .hp-band-l { display: grid; gap: 4px; min-width: 0; }
+  .hp-answer-row { margin: 0; font-size: 14.5px; line-height: 1.4; }
+  .hp-answer { color: var(--text); }
+  .hp-figs { margin: 0; display: flex; gap: 24px; }
+  .hp-figs div { display: grid; gap: 2px; }
+  .hp-figs dd { margin: 0; order: -1; font: 600 24px/1 var(--font-sans); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .hp-figs dt { font-size: 13px; color: var(--text-2); }
+  .hp-beat { font: 500 12.5px/1.4 var(--font-mono); color: var(--quiet, var(--text-3)); font-variant-numeric: tabular-nums; }
+  .hp-key { font-size: 12.5px; color: var(--text-2); }
+  .hp-key summary { cursor: pointer; width: max-content; min-height: 32px; display: inline-flex; align-items: center; }
+  .hp-key p { margin: 4px 0 0; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
+  .hp-fict { color: var(--text-3); }
+  @media (prefers-reduced-motion: reduce) { .hp-peek, .hp-lens-mark, .hp-g { transition: none; } }
+</style>

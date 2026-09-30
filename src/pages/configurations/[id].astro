@@ -38,13 +38,13 @@ const NUMBERS = [
   { n: u.configuring, label: u.configuring === 1 ? 'Device to configure' : 'Devices to configure', to: '#in-use' },
   { n: u.drifted, label: u.drifted === 1 ? 'Unit drifted' : 'Units drifted', to: '#in-use', tone: u.drifted ? 'warn' : undefined },
 ];
-const ANSWER = `${u.drifted ? `${u.drifted} ${u.drifted === 1 ? "unit doesn't" : "units don't"} match this configuration` : 'Every unit in use matches it'}${u.configuring ? ` · ${u.configuring} still to configure` : ''}`;
+const ANSWER = `${u.drifted ? `${u.drifted} ${u.drifted === 1 ? "unit doesn't" : "units don't"} match this setup guide` : 'Every unit in use matches it'}${u.configuring ? ` · ${u.configuring} still to configure` : ''}`;
 const pct = (p) => (p.total ? Math.round((p.done / p.total) * 100) : 0);
 const STATE_PILL = { done: 'manage', doing: 'deploy', todo: 'plain', blocked: 'bad' };
 ---
 <Shell vendorOk title={cfg.name} section="configurations" about={{ kind: 'configuration', label: cfg.name, to: `/configurations/${cfg.id}/` }}
-  crumbs={[{ label: 'Configurations', to: '/configurations/' }, { label: f.kind, to: `/configurations/?cls=${f.cls}` }, { label: cfg.name }]}>
-  <PageBand overline="Configuration" title={cfg.name} answer={ANSWER} numbers={NUMBERS} sim>
+  crumbs={[{ label: 'Setup guides', to: '/configurations/' }, { label: f.kind, to: `/configurations/?cls=${f.cls}` }, { label: cfg.name }]}>
+  <PageBand overline="Setup guide" title={cfg.name} answer={ANSWER} numbers={NUMBERS} sim>
     <Fragment slot="overline">
       <a href={href(`/profiles/${f.cls}/`)}>{f.kind}</a>
       <span class="pill info plain" title={cfg.mode}>{cfg.mode.length > 30 ? f.mode : cfg.mode}</span>
@@ -75,7 +75,7 @@ const STATE_PILL = { done: 'manage', doing: 'deploy', todo: 'plain', blocked: 'b
                 {u.now.map((p) => (
                   <li>
                     <a class="cf-prj-a" href={p.integrate}>
-                      <span class="cf-prj-n"><b><span class="mono">{p.id}</span> {p.name}</b><small>{p.site} · {plural(p.rooms.length, 'room')} · {p.total} {p.total === 1 ? 'device' : 'devices'}</small></span>
+                      <span class="cf-prj-n"><b><span class="mono">{p.id}</span> {p.name}</b><small>{p.site} · {plural(p.rooms.length, 'space')} · {p.total} {p.total === 1 ? 'device' : 'devices'}</small></span>
                       <span class="cf-prog" aria-label={`${p.done} of ${p.total} configured`}><span class="cf-prog-bar"><i class="d" style={`width:${pct(p)}%`}></i><i class="g" style={`width:${p.total ? Math.round((p.doing / p.total) * 100) : 0}%`}></i></span><small>{p.done} of {p.total} configured</small></span>
                       <span class="cf-prj-go">Open<Icon name="arrow" size={14} /></span>
                     </a>
@@ -97,7 +97,7 @@ const STATE_PILL = { done: 'manage', doing: 'deploy', todo: 'plain', blocked: 'b
         </section>
       </div>
 
-      <DetailTabs tabs={TABS} label="Configuration">
+      <DetailTabs tabs={TABS} label="Setup guide">
         <ConfigView slot="setup" cfg={cfg} pane="setup" />
         <ConfigView slot="settings" cfg={cfg} pane="settings" />
         <div slot="provisioning" class="pv">
@@ -107,17 +107,17 @@ const STATE_PILL = { done: 'manage', doing: 'deploy', todo: 'plain', blocked: 'b
               <div class="card side-card s-4">
                 <h3>Hostname</h3>
                 <p class="pv-big mono">&lt;site&gt;-&lt;room&gt;-{pv.prefix}NN</p>
-                <p class="muted pv-note">{pv.example ? <>For example <span class="mono">{pv.example}</span>: the site, the room number without its dot, <span class="mono">{pv.prefix}</span> for {f.kind.toLowerCase()}, and the number in the room.</> : <>The site, the room number without its dot, <span class="mono">{pv.prefix}</span> for {f.kind.toLowerCase()}, and the number in the room.</>} Full name: <span class="mono">…aigna.example</span>.</p>
+                <p class="muted pv-note">{pv.example ? <>For example <span class="mono">{pv.example}</span>: the site, the space number without its dot, <span class="mono">{pv.prefix}</span> for {f.kind.toLowerCase()}, and the number in the space.</> : <>The site, the space number without its dot, <span class="mono">{pv.prefix}</span> for {f.kind.toLowerCase()}, and the number in the space.</>} Full name: <span class="mono">…aigna.example</span>.</p>
               </div>
             )}
             <div class="card side-card s-4">
               <h3>Firmware</h3>
               <p class="pv-big mono">{pv.fw?.version ?? f.fwShort ?? 'Not versioned'}</p>
-              <p class="muted pv-note">{pv.fw ? <>The Aigna standard on {pv.fwLine.name}. Check it before configuring; a different version can change menus and defaults.</> : f.fwFull ? <>{f.fwFull}. Check it before configuring.</> : <>No version is named for this configuration.</>}</p>
+              <p class="muted pv-note">{pv.fw ? <>The Aigna standard on {pv.fwLine.name}. Check it before configuring; a different version can change menus and defaults.</> : f.fwFull ? <>{f.fwFull}. Check it before configuring.</> : <>No version is named for this setup guide.</>}</p>
             </div>
             <div class="card side-card s-4">
               <h3>Licence and management</h3>
-              {pv.licence.length ? <p class="pv-note">{pv.licence.join('. ')}.</p> : <p class="muted pv-note">No licence named in this configuration.</p>}
+              {pv.licence.length ? <p class="pv-note">{pv.licence.join('. ')}.</p> : <p class="muted pv-note">No licence named in this setup guide.</p>}
               {cfg.managed_by && <p class="muted pv-note">Managed in: {cfg.managed_by}.</p>}
             </div>
           </div>
@@ -175,7 +175,7 @@ const STATE_PILL = { done: 'manage', doing: 'deploy', todo: 'plain', blocked: 'b
             {u.units.length ? (
               <div class="tablewrap">
                 <table class="iu-t">
-                  <thead><tr><th scope="col">Unit</th><th scope="col">Room</th><th scope="col">Office</th><th scope="col">Model</th><th scope="col">Status</th><th scope="col">Records</th></tr></thead>
+                  <thead><tr><th scope="col">Unit</th><th scope="col">Space</th><th scope="col">Office</th><th scope="col">Model</th><th scope="col">Status</th><th scope="col">Records</th></tr></thead>
                   <tbody data-items>
                     {u.units.map((x) => (
                       <tr class:list={{ drift: x.drift }}>

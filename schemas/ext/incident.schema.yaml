@@ -9,7 +9,7 @@ $id: https://kb35.github.io/keia-atlas/schemas/ext/incident
 title: Incident
 type: object
 additionalProperties: false
-required: [number, opened, short_description, caller, priority, state, assignment_group, subject, history, keia_atlas, demo]
+required: [number, opened, short_description, caller, priority, priority_proposed, state, assignment_group, subject, history, keia_atlas, demo]
 $defs:
   when: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$", description: "Local time at the site, to the minute (2026-09-28T07:58)." }
 properties:
@@ -18,7 +18,22 @@ properties:
   short_description: { type: string }
   description: { type: string }
   caller: { type: string, description: The person who reported it (a made-up name). }
-  priority: { enum: [1, 2, 3, 4], description: "ServiceNow priority: 1 critical, 2 high, 3 moderate, 4 low." }
+  priority: { enum: [1, 2, 3, 4], description: "The priority in force, as ServiceNow holds it: 1 critical, 2 high, 3 moderate, 4 low. It is priority_proposed, or priority_override's priority when a person changed it (checked in tools/crossrefs-incidents.mjs)." }
+  priority_proposed:
+    enum: [1, 2, 3, 4]
+    description: >
+      The priority worked out from impact and urgency when the ticket came in. It is a proposal: a person may
+      change it, and the reason is kept (priority_override).
+  priority_override:
+    description: A person changed the proposed priority. Who, when and why are kept, and the page shows "Changed from P3" with the reason.
+    type: object
+    additionalProperties: false
+    required: [priority, reason, by, at]
+    properties:
+      priority: { enum: [1, 2, 3, 4], description: The priority the person set. It differs from priority_proposed. }
+      reason: { type: string, minLength: 1, description: "Why, in plain words: what the proposal could not know." }
+      by: { type: string, description: A person in the demo team (src/lib/demo.mjs). }
+      at: { $ref: "#/$defs/when" }
   state: { enum: [new, in-progress, on-hold, resolved], description: The ticket's state now. Must equal the last state in history. }
   assignment_group: { type: string }
   subject:

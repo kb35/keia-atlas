@@ -1,0 +1,179 @@
+---
+// Start from the building: the zoom, region to port, six frames with the same device in each (FRONT-DOOR section 3).
+// The explorable: step in or out, or pick a level. Zooming in, the parent grows and dims around the device while the
+// child grows from where the device was; zooming out reverses it. The device never moves in meaning: it is the same
+// record at a different depth. Reduced motion: the frame changes at once. Every frame has a caption, and the list
+// under the picture says all six in words.
+import { building } from '../../lib/floors.mjs';
+
+const M = building('dub');
+const F = M.floors.find((f) => f.id === '3');
+const rooms = Object.values(M.rooms).filter((r) => r.floor === '3' && r.rect);
+// Floor frame: the real Dublin third floor, scaled into 320 x 180.
+const S = 5, OX = 10, OY = 30, FH = 24;
+const fr = ([x0, y0, x1, y1]) => ({ x: OX + x0 * S, y: OY + (FH - y1) * S, width: (x1 - x0) * S, height: (y1 - y0) * S });
+const swan = rooms.find((r) => r.id === 'dub-3-09');
+const sw = fr(swan.rect);
+const swanPt = [sw.x + sw.width / 2, sw.y + sw.height * 0.28];
+
+const FRAMES = [
+  { key: 'region', name: 'Region', caption: 'Europe, Middle East and Africa: each office a point; Dublin holds the device.', pt: [118, 86] },
+  { key: 'office', name: 'Office', caption: 'The Dublin office: the third floor holds the device.', pt: [206, 88] },
+  { key: 'floor', name: 'Floor', caption: 'The third floor, to scale: 3.09 Whooper Swan holds the device.', pt: swanPt },
+  { key: 'space', name: 'Space', caption: '3.09 Whooper Swan: two displays, the video bar under them, the table.', pt: [160, 47] },
+  { key: 'device', name: 'Device', caption: 'The video bar: one unit, with its model, settings and history.', pt: [160, 88] },
+  { key: 'port', name: 'Port', caption: 'Its network port, and the cable to the space\'s switch.', pt: [206, 92] },
+];
+const R = 6;   // the device's ring, the same size in every frame
+const ring = (x, y) => `M${x} ${y - R}a${R} ${R} 0 1 1 -0.01 0`;
+---
+<div class="zs" data-zs data-help="method.zoom">
+  <div class="zs-stage" data-zs-stage>
+    {FRAMES.map((f, i) => (
+      <svg class:list={['zs-frame', { 'is-on': i === 0 }]} data-zs-frame={i} data-px={f.pt[0]} data-py={f.pt[1]} viewBox="0 0 320 180" role="img" aria-label={`${f.name}: ${f.caption}`} aria-hidden={i === 0 ? undefined : 'true'}>
+        {f.key === 'region' && (
+          <g>
+            <path class="zs-land" d="M40 40 C70 20 120 26 150 34 C190 30 240 24 280 42 C290 70 276 110 250 130 C210 150 170 146 140 150 C100 156 60 140 44 118 C30 96 30 60 40 40Z" />
+            {[[150, 70, 'London'], [186, 52, 'Copenhagen'], [168, 108, 'Remote EMEA']].map(([x, y, n]) => (<><circle class="zs-pt" cx={x} cy={y} r="4" /><text class="zs-t" x={Number(x) + 8} y={Number(y) + 4}>{n}</text></>))}
+            <text class="zs-t zs-strong" x="72" y="90">Dublin</text>
+          </g>
+        )}
+        {f.key === 'office' && (
+          <g>
+            <rect class="zs-wall" x="110" y="30" width="100" height="130" />
+            {[0, 1, 2, 3, 4].map((k) => <line class="zs-soft" x1="110" y1={30 + k * 26} x2="210" y2={30 + k * 26} />)}
+            <rect class="zs-hot" x="110" y="82" width="100" height="26" />
+            <text class="zs-t" x="220" y="99">Third floor</text>
+            <line class="zs-soft" x1="90" y1="160" x2="230" y2="160" />
+          </g>
+        )}
+        {f.key === 'floor' && (
+          <g>
+            <polygon class="zs-wall" points={`${OX},${OY} ${OX + 60 * S},${OY} ${OX + 60 * S},${OY + FH * S} ${OX},${OY + FH * S}`} />
+            {F.corridors.map((c) => <rect class="zs-corr" {...fr(c.rect)} />)}
+            {rooms.map((r) => <rect class:list={['zs-room', { 'zs-hot': r.id === 'dub-3-09' }]} {...fr(r.rect)} />)}
+            <text class="zs-t" x={sw.x + sw.width / 2} y={sw.y + sw.height + 12} text-anchor="middle">3.09</text>
+          </g>
+        )}
+        {f.key === 'space' && (
+          <g>
+            <rect class="zs-wall" x="110" y="24" width="100" height="136" rx="2" />
+            <rect class="zs-dev" x="122" y="28" width="34" height="5" rx="1" /><rect class="zs-dev" x="164" y="28" width="34" height="5" rx="1" />
+            <rect class="zs-dev" x="146" y="44" width="28" height="6" rx="3" />
+            <rect class="zs-table" x="138" y="70" width="44" height="72" rx="10" />
+            {[80, 96, 112, 128].map((y) => (<><circle class="zs-chair" cx="130" cy={y} r="4" /><circle class="zs-chair" cx="190" cy={y} r="4" /></>))}
+            <text class="zs-t" x="216" y="36">Displays</text>
+          </g>
+        )}
+        {f.key === 'device' && (
+          <g>
+            <rect class="zs-bar" x="60" y="76" width="200" height="26" rx="13" />
+            <circle class="zs-lens" cx="160" cy="89" r="8" />
+            {[0, 1, 2, 3, 4, 5].map((k) => <line class="zs-grille" x1={80 + k * 8} y1="84" x2={80 + k * 8} y2="94" />)}
+            {[0, 1, 2, 3, 4, 5].map((k) => <line class="zs-grille" x1={200 + k * 8} y1="84" x2={200 + k * 8} y2="94" />)}
+            <text class="zs-t" x="160" y="128" text-anchor="middle">Video bar · Poly Studio X72 · dub-309-vc01</text>
+          </g>
+        )}
+        {f.key === 'port' && (
+          <g>
+            <rect class="zs-bar" x="40" y="70" width="240" height="44" rx="6" />
+            {[['HDMI', 70], ['HDMI', 104], ['USB', 140], ['USB', 168]].map(([n, x]) => (<><rect class="zs-port" x={x} y="84" width="22" height="14" rx="2" /><text class="zs-t zs-s" x={Number(x) + 11} y="126" text-anchor="middle">{n}</text></>))}
+            <rect class="zs-port zs-hot" x="196" y="82" width="20" height="18" rx="2" />
+            <text class="zs-t zs-s zs-strong" x="206" y="126" text-anchor="middle">Network</text>
+            <rect class="zs-port" x="236" y="86" width="16" height="10" rx="5" /><text class="zs-t zs-s" x="244" y="126" text-anchor="middle">Power</text>
+            <path class="zs-cable" d="M206 100 C206 150 290 150 300 170" />
+          </g>
+        )}
+        <path class="zs-ring" d={ring(f.pt[0], f.pt[1])} />
+        <circle class="zs-ring-dot" cx={f.pt[0]} cy={f.pt[1]} r="1.6" />
+      </svg>
+    ))}
+  </div>
+  <p class="zs-cap" data-zs-cap aria-live="polite">{FRAMES[0].name}: {FRAMES[0].caption}</p>
+  <div class="zs-controls">
+    <button type="button" class="btn small ghost" data-zs-step="-1" disabled>Zoom out</button>
+    <div class="zs-levels" role="group" aria-label="Level">
+      {FRAMES.map((f, i) => <button type="button" data-zs-go={i} aria-pressed={i === 0 ? 'true' : 'false'}>{f.name}</button>)}
+    </div>
+    <button type="button" class="btn small" data-zs-step="1">Zoom in</button>
+  </div>
+  <ol class="zs-list">
+    {FRAMES.map((f) => <li><b>{f.name}.</b> {f.caption}</li>)}
+  </ol>
+</div>
+
+<script>
+  import { motion } from '../../lib/motion-read.mjs';
+  function init(root: HTMLElement) {
+    if ((root as any).__zs) return; (root as any).__zs = true;
+    const frames = Array.from(root.querySelectorAll<SVGSVGElement>('[data-zs-frame]'));
+    const cap = root.querySelector<HTMLElement>('[data-zs-cap]')!;
+    const levels = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-zs-go]'));
+    const [outBtn, inBtn] = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-zs-step]'));
+    let cur = 0;
+    const origin = (f: SVGSVGElement) => `${(+f.dataset.px! / 320) * 100}% ${(+f.dataset.py! / 180) * 100}%`;
+    function go(i: number) {
+      if (i === cur || i < 0 || i >= frames.length) return;
+      const m = motion(), a = frames[cur], b = frames[i], deeper = i > cur;
+      frames.forEach((f) => f.getAnimations().forEach((x) => x.finish()));
+      a.classList.remove('is-on'); b.classList.add('is-on');
+      a.setAttribute('aria-hidden', 'true'); b.removeAttribute('aria-hidden');
+      if (!m.reduced) {
+        const oa = origin(a), ob = origin(b);
+        a.classList.add('is-leaving');
+        const out = deeper
+          ? [{ transform: 'none', opacity: 1, transformOrigin: oa }, { transform: 'scale(3)', opacity: 0, transformOrigin: oa }]
+          : [{ transform: 'none', opacity: 1, transformOrigin: ob }, { transform: 'scale(.25)', opacity: 0, transformOrigin: ob }];
+        const inn = deeper
+          ? [{ transform: 'scale(.25)', opacity: 0, transformOrigin: oa }, { transform: 'none', opacity: 1, transformOrigin: oa }]
+          : [{ transform: 'scale(3)', opacity: 0, transformOrigin: ob }, { transform: 'none', opacity: 1, transformOrigin: ob }];
+        a.animate(out, { duration: m.zoom, easing: m.ease }).onfinish = () => a.classList.remove('is-leaving');
+        b.animate(inn, { duration: m.zoom, easing: m.ease });
+      }
+      cur = i;
+      cap.textContent = b.getAttribute('aria-label');
+      levels.forEach((l, k) => l.setAttribute('aria-pressed', String(k === i)));
+      outBtn.disabled = i === 0; inBtn.disabled = i === frames.length - 1;
+    }
+    levels.forEach((l, k) => l.addEventListener('click', () => go(k)));
+    outBtn.addEventListener('click', () => go(cur - 1));
+    inBtn.addEventListener('click', () => go(cur + 1));
+  }
+  const boot = () => document.querySelectorAll<HTMLElement>('[data-zs]').forEach(init);
+  boot();
+  document.addEventListener('astro:page-load', boot);
+</script>
+
+<style>
+  .zs { display: grid; gap: 12px; }
+  .zs-stage { display: grid; overflow: clip; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); }
+  .zs-frame { grid-area: 1 / 1; width: 100%; height: auto; display: block; visibility: hidden; font-family: var(--font-sans); }
+  .zs-frame.is-on, .zs-frame.is-leaving { visibility: visible; }
+  .zs-land { fill: var(--surface-2); stroke: var(--line-strong); stroke-width: 1.2; }
+  .zs-pt { fill: var(--quiet, var(--text-3)); }
+  .zs-t { font-size: 10px; fill: var(--text-2); }
+  .zs-s { font-size: 8.5px; }
+  .zs-strong { fill: var(--text); font-weight: 600; }
+  .zs-wall { fill: var(--surface); stroke: var(--line-strong); stroke-width: 1.2; }
+  .zs-soft { stroke: var(--line-strong); stroke-width: 1; }
+  .zs-corr { fill: var(--surface-2); }
+  .zs-room { fill: var(--surface); stroke: var(--line-strong); stroke-width: .8; }
+  .zs-hot { fill: var(--h-fault-soft, color-mix(in srgb, var(--red) 14%, var(--surface))); stroke: var(--h-fault, var(--red)); stroke-width: 1; }
+  .zs-dev { fill: var(--art-line, var(--text-2)); }
+  .zs-table { fill: var(--surface-2); stroke: var(--line-strong); }
+  .zs-chair { fill: none; stroke: var(--line-strong); }
+  .zs-bar { fill: var(--surface-2); stroke: var(--art-line, var(--text-2)); stroke-width: 1.5; }
+  .zs-lens { fill: var(--art-line, var(--text-2)); }
+  .zs-grille { stroke: var(--line-strong); stroke-width: 2; stroke-linecap: round; }
+  .zs-port { fill: var(--surface); stroke: var(--art-line, var(--text-2)); stroke-width: 1.2; }
+  .zs-cable { fill: none; stroke: var(--c-lan, var(--text-2)); stroke-width: 2.5; stroke-linecap: round; }
+  .zs-ring { fill: none; stroke: var(--h-fault, var(--red)); stroke-width: 2.2; stroke-dasharray: 12.6 6.3; stroke-dashoffset: 3; }
+  .zs-ring-dot { fill: var(--h-fault, var(--red)); }
+  .zs-cap { margin: 0; font-size: 14px; min-height: 2.8em; }
+  .zs-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .zs-levels { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; justify-content: center; }
+  .zs-levels button { font: 550 12.5px/1 var(--font-sans); color: var(--text-2); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; min-height: 32px; padding: 0 12px; cursor: pointer; transition: background var(--dur-hover) var(--ease-settle), color var(--dur-hover) var(--ease-settle); }
+  .zs-levels button[aria-pressed="true"] { background: var(--surface); color: var(--text); border-color: var(--line-strong); }
+  .zs-list { margin: 4px 0 0; padding-left: 20px; font-size: 13px; color: var(--text-2); display: grid; gap: 2px; }
+  .zs-list b { color: var(--text); font-weight: 550; }
+</style>

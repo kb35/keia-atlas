@@ -19,12 +19,12 @@
 // single list at the bottom: the browser build strips that line.
 
 const KINDS = [
-  ['room', 'Rooms', 'Room', 'room', ['room', 'space', 'meeting room', 'meeting space']],
+  ['room', 'Spaces', 'Space', 'room', ['space', 'room', 'meeting room', 'meeting space']],
   ['unit', 'Units', 'Unit', 'barcode', ['unit', 'device', 'installed', 'installed device', 'installed unit', 'equipment', 'hardware', 'asset', 'asset tag', 'serial', 'serial number']],
   ['model', 'Models', 'Model', 'box', ['model', 'product', 'device model']],
-  ['dp', 'Device profiles', 'Device profile', 'devices', ['device profile', 'device class', 'device type', 'type of device', 'kind of device', 'device category']],
-  ['rp', 'Room profiles', 'Room profile', 'types', ['room profile', 'room type', 'type of room', 'kind of room', 'room standard']],
-  ['cfg', 'Configurations', 'Configuration', 'sliders', ['configuration', 'config', 'setup']],
+  ['dp', 'Device types', 'Device type', 'devices', ['device type', 'device profile', 'device class', 'type of device', 'kind of device', 'device category']],
+  ['rp', 'Space types', 'Space type', 'types', ['space type', 'room profile', 'room type', 'type of space', 'type of room', 'kind of space', 'kind of room', 'space standard', 'room standard']],
+  ['cfg', 'Setup guides', 'Setup guide', 'sliders', ['setup guide', 'configuration', 'config', 'setup']],
   ['set', 'Settings', 'Setting', 'sliders', ['setting', 'parameter']],
   ['fw', 'Firmware', 'Firmware', 'chip', ['firmware', 'release', 'software version', 'version', 'software']],
   ['prj', 'Projects', 'Project', 'project', ['project', 'fit out', 'fitout']],
@@ -41,7 +41,7 @@ const KINDS = [
   ['spare', 'Spares', 'Spare', 'box', ['spare', 'spare part', 'stock']],
   ['cable', 'Cables', 'Cable', 'wire', ['cable', 'patch cable', 'patch lead', 'lead', 'cord']],
   ['svc', 'Services', 'Service', 'devices', ['service', 'services', 'av service', 'network service', 'it infrastructure']],
-  ['ki', 'Known issues', 'Known issue', 'shield', ['known issue', 'known issues', 'maker bug', 'bug', 'defect']],
+  ['ki', 'Known errors', 'Known error', 'shield', ['known error', 'known errors', 'known issue', 'known issues', 'manufacturer bug', 'maker bug', 'bug', 'defect']],
 ].map(([code, label, one, icon, words], order) => ({ code, label, one, icon, words, order }));
 const KIND = Object.fromEntries(KINDS.map((k) => [k.code, k]));
 // Kinds with many near-identical items: shown for a filter only when you name them or type words.
@@ -64,7 +64,7 @@ const STATUSES = [
   ['overdue', 'Due for replacement', ['overdue', 'due', 'due for replacement', 'past its life', 'needs replacing', 'ageing', 'aging'], ['overdue']],
   ['open', 'Open', ['open', 'unresolved', 'ongoing'], ['open']],
   ['doing', 'In progress', ['in progress', 'doing', 'underway', 'under way', 'started'], ['doing', 'in-progress', 'testing']],
-  ['blocked', 'Blocked', ['blocked', 'stuck', 'do not install', 'on hold'], ['blocked', 'on-hold', 'do-not-install']],
+  ['blocked', 'Waiting on', ['waiting on', 'blocked', 'stuck', 'do not install', 'on hold'], ['blocked', 'on-hold', 'do-not-install']],
   ['closed', 'Closed', ['closed', 'resolved', 'done', 'finished', 'complete', 'completed', 'fixed'], ['closed', 'resolved', 'done', 'adopted']],
   ['todo', 'To do', ['to do', 'todo', 'not started'], ['todo', 'not-started', 'queued']],
   ['standard', 'In the standard', ['standard', 'in the standard'], ['standard', 'adopted']],
@@ -335,7 +335,7 @@ function nearestCorpusWord(I, w, max) {
 }
 
 // ---------- Parse ----------
-const TYPE_LABEL = { region: 'Region', site: 'Office', model: 'Model', make: 'Maker', class: 'Device kind', status: 'Status', profile: 'Room profile', role: 'Role', floor: 'Floor', age: 'Age', year: 'Installed' };
+const TYPE_LABEL = { region: 'Region', site: 'Office', model: 'Model', make: 'Manufacturer', class: 'Device kind', status: 'Status', profile: 'Space type', role: 'Role', floor: 'Floor', age: 'Age', year: 'Installed' };
 const ORDINAL = { first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8, ninth: 9, tenth: 10, eleventh: 11, twelfth: 12, ground: 0 };
 const PATTERNS = [
   [/\b(?:older than|more than|over|at least|>=?)\s*(\d+(?:\.\d+)?)\s*\+?\s*(?:years?|yrs?|y)(?:\s+old)?\b/g, (m) => ({ type: 'age', op: '>=', n: +m[1] })],

@@ -37,12 +37,12 @@ const NUMBERS = [
 const STEPS = [
   ['A ticket arrives in ServiceNow', 'The service desk works it there, as today.', null],
   ['Keia Atlas reads it', "Through ServiceNow's Table API, or ServiceNow pushes it on change.", 2],
-  ['Matches the room and device', "From the ticket's location, the caller's booking or a named room.", 2],
+  ['Matches the space and device', "From the ticket's location, the caller's booking or a named space.", 2],
   ['Adds evidence', 'From device management, monitoring, the calendar and open project work.', 2],
   ['Writes a work note back', 'Only once someone approves; ServiceNow stays the record.', 4],
 ];
 const findOf = (v) => [v.inc.number, v.inc.short_description, v.inc.caller, v.title, v.roomTitle, v.model, sites[v.space.site].name, sites[v.space.site].city, v.inc.assignment_group, v.inc.keia_atlas.assigned ? person(v.inc.keia_atlas.assigned).name : ''].filter(Boolean).join(' ');
-const SUMMARY = 'Tickets stay in ServiceNow. Keia Atlas matches each to a room or device and adds what it knows.';
+const SUMMARY = 'Tickets stay in ServiceNow. Keia Atlas matches each to a space or device and adds what it knows.';
 const SITE_I = Object.fromEntries(SITE_ORDER.map((id, i) => [id, i]));
 const stateLine = (v) => {
   const last = v.steps.list[v.steps.list.length - 1];
@@ -56,7 +56,7 @@ const stateLine = (v) => {
   <PageBand overline="Work" title="Incidents" rec="dd-incidents" answer={ANSWER} lede={SUMMARY} sim numbers={NUMBERS} />
 
   <div class="content incs">
-    <FilterBar facets={FACETS} placeholder="Find an incident, room or caller" label="Find an incident" noun={['incident', 'incidents']} scope=".content.incs" sort={SORT} />
+    <FilterBar facets={FACETS} placeholder="Find an incident, space or caller" label="Find an incident" noun={['incident', 'incidents']} scope=".content.incs" sort={SORT} />
 
     <div class="board" data-board>
       {cols.map((c) => (
@@ -76,7 +76,7 @@ const stateLine = (v) => {
                   <b class="ic-t">{v.inc.short_description}</b>
                   <span class="ic-what">
                     <span class="ic-gl" aria-hidden="true">{v.pos ? <DeviceGlyph cls={v.pos.cls} /> : <Icon name="room" size={18} />}</span>
-                    <span><span class="ic-dev">{v.title}</span><small>{v.roomTitle === v.title.replace(/, the whole room$/, '') ? '' : `${v.roomTitle}, `}{sites[v.space.site].name}{sites[v.space.site].city ? `, ${sites[v.space.site].city}` : ''}</small></span>
+                    <span><span class="ic-dev">{v.title}</span><small>{v.roomTitle === v.title.replace(/, the whole space$/, '') ? '' : `${v.roomTitle}, `}{sites[v.space.site].name}{sites[v.space.site].city ? `, ${sites[v.space.site].city}` : ''}</small></span>
                   </span>
                   <span class="ic-state">{stateLine(v)}</span>
                 </a>
@@ -93,7 +93,7 @@ const stateLine = (v) => {
     <Section title="How it connects" id="connects" aside="ServiceNow stays the record">
       <ol class="snf">
         {STEPS.map(([h, t, stage], i) => (
-          <li class:list={{ 'snf-sn': i === 0 }}><span class="snf-n mono">{i + 1}</span><b>{h}</b><span>{t}</span>{stage && <span class="stg">Stage {stage}</span>}</li>
+          <li class:list={{ 'snf-sn': i === 0 }}><span class="snf-n mono">{i + 1}</span><b>{h}</b><span>{t}</span>{stage && <span class="stg">Simulated</span>}</li>
         ))}
       </ol>
     </Section>

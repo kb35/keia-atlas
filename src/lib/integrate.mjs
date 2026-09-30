@@ -68,11 +68,11 @@ const SEEN_VIA_HOST = new Set(['microphone', 'camera']);
 
 // The short room test for commissioning, by what is in the room. Kept short on purpose: one line each.
 const TESTS = [
-  { id: 'call', when: (c) => c.has('video-bar') || c.has('codec') || c.has('desk-video-device'), t: 'Test call from another site', how: 'The far end sees the whole table and hears everyone clearly. Call from another site, not the room next door.' },
+  { id: 'call', when: (c) => c.has('video-bar') || c.has('codec') || c.has('desk-video-device'), t: 'Test call from another site', how: 'The far end sees the whole table and hears everyone clearly. Call from another site, not the space next door.' },
   { id: 'display', when: (c) => c.has('display'), t: 'Displays', how: 'The call and shared content show on every display, sharp and the right way up.' },
   { id: 'audio', when: (c) => c.has('microphone') || c.has('video-bar') || c.has('loudspeaker'), t: 'Microphones and speakers', how: 'Even levels from every seat, and no echo at the far end.' },
   { id: 'share', when: (c) => c.has('av-switcher') || c.has('av-extender'), t: 'Sharing a laptop', how: 'A laptop shares by cable at the table, and the picture switches over by itself.' },
-  { id: 'booking', when: (c) => c.has('scheduler-panel'), t: 'Booking panel', how: 'The panel at the door shows today\'s bookings and can book the room.' },
+  { id: 'booking', when: (c) => c.has('scheduler-panel'), t: 'Booking panel', how: 'The panel at the door shows today\'s bookings and can book the space.' },
   { id: 'network', when: (c) => c.has('network-gateway'), t: 'Home network', how: 'The gateway is online and the work network reaches the office.' },
   { id: 'desk', when: (c) => c.has('monitor') || c.has('dock'), t: 'Desk set-up', how: 'One cable to the laptop gives the monitor, charging and the network.' },
   { id: 'print', when: (c) => c.has('printer'), t: 'Test print', how: 'A test page prints from the queue, and scanning to email works.' },
@@ -99,7 +99,7 @@ function ctxFor(u, plan) {
     partner: { host: u.pairs ?? null, name: partner?.name ?? null, compute: null },
     firmware: line || cfg?.firmware ? {
       target: std ? `${line.name} ${std.version}` : null, from: 'The fleet standard, passed by the Lab', checked: cfg?.firmware ?? null,
-      where: line?.managed_in ? line.managed_in.split(/[,;]/)[0].trim() : cfg?.groups.find((g) => /firmware|update/i.test(g.name))?.where ?? 'Where the configuration updates it', advisories: adv,
+      where: line?.managed_in ? line.managed_in.split(/[,;]/)[0].trim() : cfg?.groups.find((g) => /firmware|update/i.test(g.name))?.where ?? 'Where the setup guide updates it', advisories: adv,
     } : null,
   };
 }
@@ -257,7 +257,7 @@ export function integratePlan(project) {
         legacy: p.legacy ? { tag: p.legacy.asset_tag, serial: p.legacy.serial } : null,
         link: p.current ? href(`/device/?tag=${p.current.asset_tag}`) : null,
         tasks: Object.fromEntries(steps.map((s) => [s, task[s] ? { id: task[s].id, title: task[s].title, owner: task[s].owner, status: task[s].status, href: href(`/projects/${P.toLowerCase()}/tasks/${task[s].id.toLowerCase()}/`) } : null]).filter(([, v]) => v)),
-        blocked: Object.fromEntries(steps.map((s) => [s, task[s]?.status === 'blocked' ? (task[s].blocked_by ?? 'Blocked') : null]).filter(([, v]) => v)),
+        blocked: Object.fromEntries(steps.map((s) => [s, task[s]?.status === 'blocked' ? (task[s].blocked_by ?? 'Waiting on something') : null]).filter(([, v]) => v)),
         owner: Object.fromEntries(steps.map((s) => [s, who(s)])),
         vendor: false,
         records,
@@ -284,7 +284,7 @@ export function integratePlan(project) {
     // The room test, and how far it had got.
     const clsHere = new Set(positions.map((x) => x.cls));
     r.tests = TESTS.filter((t) => t.when(clsHere)).map(({ id, t, how }) => ({ id, t, how }));
-    if (!r.tests.length) r.tests = [{ id: 'works', t: 'Everything works', how: 'The room works the way its room profile says.' }];
+    if (!r.tests.length) r.tests = [{ id: 'works', t: 'Everything works', how: 'The space works the way its space type says.' }];
     const ct = taskFor(room.id, 'commission');
     if (ps.state === 'done' || past) { r.tests.forEach((t) => { r.base.tests[t.id] = { r: 'pass' }; }); r.base.signed = ct?.owner ?? lead; }
     else if (ps.state === 'snags') {
@@ -361,7 +361,7 @@ export function integratePlan(project) {
     u.sheet = `${base}${u.batch}/${u.slug}/`;
   }
 
-  const blocked = intTasks.filter((t) => t.status === 'blocked').map((t) => ({ id: t.id, title: t.title, why: t.blocked_by ?? 'Blocked', room: t.space ?? null, owner: t.owner, href: href(`/projects/${P.toLowerCase()}/tasks/${t.id.toLowerCase()}/`) }));
+  const blocked = intTasks.filter((t) => t.status === 'blocked').map((t) => ({ id: t.id, title: t.title, why: t.blocked_by ?? 'Waiting on something', room: t.space ?? null, owner: t.owner, href: href(`/projects/${P.toLowerCase()}/tasks/${t.id.toLowerCase()}/`) }));
   return {
     project: P, name: project.name, kind: project.kind, phaseLabel: PHASE_LABEL.integrate,
     steps: INTEGRATE_STEPS.map((s) => ({ id: s, label: STEP_LABEL[s], done: DONE_WORD[s] })),

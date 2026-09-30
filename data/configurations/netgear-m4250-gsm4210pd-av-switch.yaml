@@ -8,14 +8,14 @@ version: '1.0'
 owner: marco
 updated: '2026-09-28'
 firmware: 13.0.5.26
-summary: The network team sets the M4250 from its own web interface, using the AV UI's Network Profiles to keep each room's AV-over-IP protocol on its own
+summary: The network team sets the M4250 from its own web interface, using the AV UI's Network Profiles to keep each space's AV-over-IP protocol on its own
   VLAN with an IGMP querier, and the switch's PoE budget for its endpoints.
 managed_by: Device web interface
 steps: [Mount the switch under the desk or on the wall and connect the out-of-band management port to the management VLAN., Log in over HTTPS (no password
-    is required on first login) and set the admin password., Set the SNTP server for the switch's clock., 'Apply the Network Profile that matches the room''s
-    AV-over-IP protocol, or leave Default if the room has none.', Assign each port's untagged/tagged/excluded status for that profile and check its IGMP
-    querier is enabled., Set the PoE power allocation for the room's endpoints within the 110 W budget., Leave automatic firmware checks off; update manually
-    once the Lab has passed a release., Run the room's verification.]
+    is required on first login) and set the admin password., Set the SNTP server for the switch's clock., 'Apply the Network Profile that matches the space''s
+    AV-over-IP protocol, or leave Default if the space has none.', Assign each port's untagged/tagged/excluded status for that profile and check its IGMP
+    querier is enabled., Set the PoE power allocation for the space's endpoints within the 110 W budget., Leave automatic firmware checks off; update manually
+    once the Lab has passed a release., Run the space's verification.]
 groups:
 - name: Management access
   where: Device web interface
@@ -32,11 +32,11 @@ groups:
 - name: Network Profiles (AV UI)
   where: Device web interface
   settings:
-  - {derive: on-site, name: Network Profile, path: Configure > Network Profiles, value: 'The room''s AV protocol profile (e.g. Dante, NDI or Kramer AV), Default if the room
+  - {derive: on-site, name: Network Profile, path: Configure > Network Profiles, value: 'The space''s AV protocol profile (e.g. Dante, NDI or Kramer AV), Default if the space
       has none', per_device: true, action: change, layer: room-type, why: Each preconfigured profile carries its own VLAN separation and querier settings
       for that protocol; picking the wrong one can cut a device off from its controller., source: netgear-m4250-av-user-manual}
   - {derive: as-written, name: Port assignment (untagged/tagged/excluded), path: 'Configure > Network Profiles > [profile] > ports', value: AV endpoints untagged on the profile's
-      VLAN; the uplink tagged, per_device: true, action: change, layer: room-type, why: Matches how the room's AV-over-IP protocol expects its VLAN to reach
+      VLAN; the uplink tagged, per_device: true, action: change, layer: room-type, why: Matches how the space's AV-over-IP protocol expects its VLAN to reach
       each device., source: netgear-m4250-av-user-manual}
   - {name: Querier Election Participate, path: 'Configure > Network Profiles > [profile] > Querier', value: 'On', action: verify, layer: profile, why: Already
       on by default for the Default profile; a multicast AV stream needs a querier on its VLAN to keep flowing to every receiver., source: netgear-m4250-av-user-manual}
@@ -45,7 +45,7 @@ groups:
   settings:
   - {derive: as-written, name: PoE port power allocation, path: Configure > Power over Ethernet, value: 'Per the connected device''s power class, within the 110 W total budget',
     per_device: true, action: change, layer: room-type, why: The 8 PoE+ ports share one 110 W budget; setting each port's allocation stops one device starving
-      another when the room is full., source: netgear-m4250-av-user-manual}
+      another when the space is full., source: netgear-m4250-av-user-manual}
 - name: Updates
   where: Device web interface
   settings:

@@ -1,5 +1,5 @@
 ---
-// Propose a change (demo). Keia Atlas's knowledge lives in YAML files under version control, so an edit here
+// Propose an edit (demo). Keia Atlas's knowledge lives in YAML files under version control, so an edit here
 // never changes the data directly: it becomes a proposed change with the file it would write, checked
 // against the rules, and routed to the person who approves that kind of change. In the real system it
 // opens a pull request; approving and merging it rebuilds Keia Atlas. Here proposals stay in this browser.
@@ -34,16 +34,16 @@ const DATA = {
 const TABS = [
   { id: 'project', label: 'New project', intro: 'The playbook gives the phases, the steps and the gates. Each step becomes a task for the person you put in that role.' },
   { id: 'playbook', label: 'Playbook', intro: 'Start from a template, then change what this kind of project needs. Steps are done by a role, not a person, so the playbook outlives the team.' },
-  { id: 'profile', label: 'Device profile', intro: "What a healthy device of this kind looks like on every platform, and where to look first when it isn't. One line per item." },
-  { id: 'model', label: 'New device model', intro: "Only what the vendor's documents state. Anything they don't say is left out and listed as a gap. It goes to the Lab before it can enter a room profile." },
-  { id: 'config', label: 'Configuration setting', intro: "Found a setting that matters while installing or fixing a device? Add it with the reason and where it's documented, so the next person doesn't have to find it again." },
+  { id: 'profile', label: 'Device type', intro: "What a healthy device of this kind looks like on every platform, and where to look first when it isn't. One line per item." },
+  { id: 'model', label: 'New device model', intro: "Only what the vendor's documents state. Anything they don't say is left out and listed as a gap. It goes to the Lab before it can enter a space type." },
+  { id: 'config', label: 'Setup guide setting', intro: "Found a setting that matters while installing or fixing a device? Add it with the reason and where it's documented, so the next person doesn't have to find it again." },
   { id: 'firmware', label: 'Firmware release', intro: "Log a new release from the vendor's notes. It starts in the Lab (or blocked, if an advisory says so); only the service manager makes it the standard. Every device of these models shows it straight away." },
 ];
-const answer = `Nothing changes until it is approved · ${TABS.length} kinds of change to propose`;
+const answer = `Nothing changes until it is approved · ${TABS.length} kinds of edit to propose`;
 DATA.intro = Object.fromEntries(TABS.map((t) => [t.id, t.intro]));
 ---
-<Shell title="Propose a change" section="changes" crumbs={[{ label: 'Changes', to: '/changes/' }, { label: 'Propose a change' }]}>
-  <PageBand overline="Changes" title="Propose a change" answer={answer} lede="It becomes the file it would write, is checked against the same rules as the rest of the data, and goes to the person who approves it." sim />
+<Shell title="Propose an edit" section="changes" crumbs={[{ label: 'Proposals', to: '/changes/' }, { label: 'Propose an edit' }]}>
+  <PageBand overline="Proposals" title="Propose an edit" answer={answer} lede="It becomes the file it would write, is checked against the same rules as the rest of the data, and goes to the person who approves it." sim />
 
   <div class="content">
     <DetailTabs tabs={TABS.map((t) => ({ id: t.id, label: t.label }))} label="What to change" />
@@ -55,7 +55,7 @@ DATA.intro = Object.fromEntries(TABS.map((t) => [t.id, t.intro]));
           <p class="ed-who" data-ed-who></p>
           <p class="ed-k">Checks</p>
           <ul class="ed-checks" data-ed-checks></ul>
-          <button type="button" class="btn primary" data-ed-propose>Propose this change</button>
+          <button type="button" class="btn primary" data-ed-propose>Propose this edit</button>
           <p class="faint ed-note">Signed in as <b data-who-name>Aoife Byrne</b>. Proposals are saved in this browser for the demo.</p>
         </div>
         <div class="ed-file">
@@ -121,14 +121,14 @@ DATA.intro = Object.fromEntries(TABS.map((t) => [t.id, t.intro]));
             field('Playbook', '<select name="pb">' + opts(pbs, new URLSearchParams(location.search).get('pb') || 'av-refresh') + '</select>', 'Templates: every playbook can start a project.') +
             field('Name', '<input name="name" placeholder="London office video bar refresh" />') +
             '<div class="ef-2">' + field('Office', '<select name="site">' + opts(siteOpts, 'lon') + '</select>') + field('Start', '<input type="date" name="start" value="' + today + '" />') + '</div>' +
-            '<fieldset class="ef-set"><legend>Rooms</legend><div data-rooms class="ef-rooms"></div></fieldset>' +
+            '<fieldset class="ef-set"><legend>Spaces</legend><div data-rooms class="ef-rooms"></div></fieldset>' +
             '<fieldset class="ef-set"><legend>People and hours</legend>' + roleRows + '</fieldset>' +
             field('Why', '<textarea name="summary" rows="2" placeholder="What this project is for, in a sentence or two."></textarea>');
         },
         after: function () {
           var fill = function () {
             var s = D.sites[val('site')], box = form.querySelector('[data-rooms]');
-            box.innerHTML = s.rooms.map(function (r) { return '<label class="ef-chk"><input type="checkbox" name="room" value="' + r.id + '" /><span>' + esc(r.name) + '<small>' + esc(r.type) + '</small></span></label>'; }).join('');
+            box.innerHTML = s.rooms.map(function (r) { return '<label class="ef-chk"><input type="checkbox" name="space" value="' + r.id + '" /><span>' + esc(r.name) + '<small>' + esc(r.type) + '</small></span></label>'; }).join('');
           };
           form.querySelector('[name=site]').addEventListener('change', function () { fill(); update(); }); fill();
         },
@@ -142,7 +142,7 @@ DATA.intro = Object.fromEntries(TABS.map((t) => [t.id, t.intro]));
           out.path = 'data/projects/' + id.toLowerCase() + '.yaml'; out.kind = 'new file';
           out.text = '# Proposed ' + today + ' by ' + me().name + '. Tasks for the first two phases come from the ' + pb.name + ' playbook; later phases are added at each gate.\n' + Y(obj);
           out.title = 'New project: ' + obj.name; out.approver = holder('programme');
-          out.checks = [[!!val('name'), 'Has a name'], [rooms.length > 0, 'At least one room'], [!!byRole.pm, 'Has a project manager'], [!!byRole.lead || ['infra-refresh', 'network-refresh'].includes(pb.kind), 'Has a lead engineer'], [tasks.length > 0, tasks.length + ' tasks from the playbook, each with an owner']];
+          out.checks = [[!!val('name'), 'Has a name'], [rooms.length > 0, 'At least one space'], [!!byRole.pm, 'Has a project manager'], [!!byRole.lead || ['infra-refresh', 'network-refresh'].includes(pb.kind), 'Has a lead engineer'], [tasks.length > 0, tasks.length + ' tasks from the playbook, each with an owner']];
         },
       };
 
@@ -241,8 +241,8 @@ DATA.intro = Object.fromEntries(TABS.map((t) => [t.id, t.intro]));
         render: function () {
           var e = D.enums;
           return '' +
-            '<div class="ef-2">' + field('Maker', '<input name="mfr" placeholder="Poly" />') + field('Model', '<input name="model" placeholder="Studio X32" />') + '</div>' +
-            '<div class="ef-2">' + field('Device profile', '<select name="cls">' + opts(Object.keys(D.classes).map(function (k) { return [k, D.classes[k].name]; }), 'video-bar') + '</select>') + field('Part number', '<input name="part" />') + '</div>' +
+            '<div class="ef-2">' + field('Manufacturer', '<input name="mfr" placeholder="Poly" />') + field('Model', '<input name="model" placeholder="Studio X32" />') + '</div>' +
+            '<div class="ef-2">' + field('Device type', '<select name="cls">' + opts(Object.keys(D.classes).map(function (k) { return [k, D.classes[k].name]; }), 'video-bar') + '</select>') + field('Part number', '<input name="part" />') + '</div>' +
             field('Summary', '<textarea name="summary" rows="2"></textarea>') +
             '<div class="ef-3">' + field('Width mm', '<input name="w" type="number" />') + field('Height mm', '<input name="h" type="number" />') + field('Depth mm', '<input name="d" type="number" />') + '</div>' +
             '<fieldset class="ef-set"><legend>Ports</legend><ol class="ef-ports" data-ports></ol><button type="button" class="btn small" data-add-port>Add a port</button></fieldset>' +
@@ -267,7 +267,7 @@ DATA.intro = Object.fromEntries(TABS.map((t) => [t.id, t.intro]));
           out.path = 'data/device-models/' + (id || 'new-model') + '.yaml'; out.kind = 'new file';
           out.text = '# Device model: ' + val('mfr') + ' ' + val('model') + '\n# Proposed ' + today + ' by ' + me().name + '. Facts from ' + (val('src') || '(source needed)') + '\n' + Y(obj);
           out.title = 'New device model: ' + (val('mfr') + ' ' + val('model')).trim(); out.approver = holder('sm-av') + ', after a Lab check by ' + holder('innovation');
-          out.checks = [[!!val('mfr') && !!val('model'), 'Maker and model'], [!D.models[id], D.models[id] ? 'Already in Keia Atlas' : 'Not already in Keia Atlas'], [!!val('src'), 'Has a vendor source'], [ports.length > 0, ports.length + ' ports'], [!!val('summary'), 'Has a summary']];
+          out.checks = [[!!val('mfr') && !!val('model'), 'Manufacturer and model'], [!D.models[id], D.models[id] ? 'Already in Keia Atlas' : 'Not already in Keia Atlas'], [!!val('src'), 'Has a vendor source'], [ports.length > 0, ports.length + ' ports'], [!!val('summary'), 'Has a summary']];
         },
       };
 
@@ -276,7 +276,7 @@ DATA.intro = Object.fromEntries(TABS.map((t) => [t.id, t.intro]));
         render: function () {
           var cfgs = Object.keys(D.configs).map(function (k) { return [k, D.configs[k].name]; });
           return '' +
-            field('Configuration', '<select name="cfg">' + opts(cfgs, 'poly-x-google-meet') + '</select>') +
+            field('Setup guide', '<select name="cfg">' + opts(cfgs, 'poly-x-google-meet') + '</select>') +
             '<div class="ef-2">' + field('Group', '<select name="group"></select>') + field('Setting name, as the device shows it', '<input name="sname" placeholder="Enable Automatic Updates" />') + '</div>' +
             '<div class="ef-2">' + field('Where it is', '<input name="spath" placeholder="General Settings > Device Management" />') + field('Value', '<input name="sval" placeholder="Off" />') + '</div>' +
             field('Why', '<textarea name="why" rows="2" placeholder="What goes wrong without it."></textarea>') +
@@ -304,7 +304,7 @@ DATA.intro = Object.fromEntries(TABS.map((t) => [t.id, t.intro]));
             '<div class="ef-2">' + field('Version', '<input name="ver" placeholder="4.7.1" />') + field('Released', '<input type="date" name="rel" value="' + today + '" />') + '</div>' +
             field('Status', '<select name="status"><option value="lab">In the Lab: test before use</option><option value="blocked">Do not install</option><option value="available">Available, not tested</option></select>') +
             field('What\'s new', '<textarea name="heads" rows="3" placeholder="One line each"></textarea>') +
-            field('Known issues', '<textarea name="issues" rows="2" placeholder="One line each"></textarea>') +
+            field('Known errors', '<textarea name="issues" rows="2" placeholder="One line each"></textarea>') +
             field('Release notes (URL)', '<input name="src" type="url" />');
         },
         build: function () {

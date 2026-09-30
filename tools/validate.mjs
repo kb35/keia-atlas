@@ -7,6 +7,8 @@
 //   3. Walks data/. Every file must sit in a registered folder, be valid YAML,
 //      pass that folder's schema, and hold no literal secret (tools/secrets.mjs:
 //      a password, token or key field must be a vault reference).
+//   4. Checks classification (docs/rules/data.md F10): every folder has a default label in the registry,
+//      every x-classification in a schema is one of the four labels, and no folder is Secret.
 //
 // Run it with:  npm run validate
 // Exit code 0 means everything passed, 1 means at least one problem.
@@ -22,6 +24,7 @@ import addFormats from 'ajv-formats';
 import { parseDocument, LineCounter } from 'yaml';
 import { crossCheck } from './crossrefs.mjs';
 import { findSecrets } from './secrets.mjs';
+import { LABELS, KEYWORD, checkRegistry } from '../src/lib/classification.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const YAML_EXT = new Set(['.yaml', '.yml']);
@@ -117,6 +120,7 @@ export async function validate(root = REPO_ROOT) {
       problem(registryPath, '"collections" must be a list');
       collections = [];
     }
+    for (const m of checkRegistry(collections)) problem(registryPath, m);
   } catch (err) {
     problem(registryPath, `could not read the registry: ${err.message}`, err.line);
     return result();
@@ -125,6 +129,9 @@ export async function validate(root = REPO_ROOT) {
   // 2. The schemas. Add them all first so one schema can $ref another.
   const ajv = new Ajv2020({ allErrors: true, strict: true, allowUnionTypes: true });
   addFormats(ajv);
+  // A field's label (x-classification: Restricted). Ajv's strict mode refuses unknown keywords, so the
+  // label is declared here, and a label that is not one of the four fails the schema.
+  ajv.addKeyword({ keyword: KEYWORD, schemaType: 'string', metaSchema: { enum: LABELS } });
   schemaFiles = (await listFiles(schemasDir)).filter((f) => f.endsWith('.schema.yaml'));
   const idByPath = new Map();
   for (const file of schemaFiles) {

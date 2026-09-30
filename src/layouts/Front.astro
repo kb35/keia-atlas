@@ -1,0 +1,90 @@
+---
+// The front door's layout: the same tokens, fonts and motion as the console, none of its chrome. A slim top bar
+// (the mark, then Method, the demo and the source), the page, and a footer with the licence line and "Talk to us".
+// Light and dark follow the system, or the choice made in the console on this browser.
+import { ClientRouter } from 'astro:transitions';
+import '../styles/looks/studio.css';
+import '../styles/base.css';
+import '../styles/motion.css';
+import { href } from '../lib/data.mjs';
+import { NAME, LINE, LINKS } from '../lib/brand.mjs';
+
+interface Props { title: string; description?: string }
+const { title, description = LINE } = Astro.props;
+---
+<!doctype html>
+<html lang="en-IE" data-look="studio">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>{title}</title>
+  <meta name="description" content={description} />
+  <link rel="icon" href={href('/favicon.svg')} type="image/svg+xml" />
+  <script is:inline data-astro-rerun>
+    (function () {
+      var r = document.documentElement, t = 'system';
+      try { t = localStorage.getItem('rs4-theme') || t; } catch (_) {}
+      if (t === 'light' || t === 'dark') r.setAttribute('data-theme', t); else r.removeAttribute('data-theme');
+      r.setAttribute('data-look', 'studio');
+    })();
+  </script>
+  <ClientRouter />
+</head>
+<body class="fd-body">
+  <a class="sr-only fd-skip" href="#main">Skip to content</a>
+  <header class="fd-top">
+    <a class="fd-brand" href={href('/welcome/')} aria-label={`${NAME}: the front door`}>
+      <svg class="fd-mark" viewBox="0 0 32 32" aria-hidden="true"><rect class="tile" x="1.5" y="1.5" width="28" height="28" rx="7" stroke-width="2" /><path class="tick" d="M8.5 16l4.5 4.5 10-10" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      <b>{NAME}</b>
+    </a>
+    <nav class="fd-nav" aria-label="Front door">
+      <a href={href('/method/')}>Method</a>
+      <a href={href('/')} data-as="liam">Demo</a>
+      <a href={LINKS.source}>Source</a>
+    </nav>
+  </header>
+  <main id="main" class="fd-main">
+    <slot />
+  </main>
+  <footer class="fd-foot">
+    <p>Keia Atlas code: <a href={LINKS.licence}>Apache 2.0</a>. The Keia Method text: <a href={LINKS.ccbysa}>CC BY-SA 4.0</a>. Every company, person, room and incident in the demo is made up.</p>
+    <p>Copyright Red Hat, Inc. Created by Keith Brady. <a href={LINKS.discussions}>Talk to us</a></p>
+  </footer>
+  <script>
+    // "See it in use" and the other demo doors open Atlas as a named person (View as), set just before the page
+    // changes. The console keeps this choice per window (rs5-who) and for the next window (rs4-who).
+    function viewAs(e: Event) {
+      const a = (e.target as Element | null)?.closest?.('a[data-as]') as HTMLAnchorElement | null;
+      if (!a) return;
+      const id = a.dataset.as!;
+      try { sessionStorage.setItem('rs5-who', id); sessionStorage.setItem('rs5-me', id); } catch (_) {}
+      try { localStorage.setItem('rs4-who', id); } catch (_) {}
+    }
+    if (!(window as any).__fdViewAs) { (window as any).__fdViewAs = true; document.addEventListener('click', viewAs, true); }
+  </script>
+</body>
+</html>
+
+<style is:global>
+  .fd-body { min-height: 100svh; display: grid; grid-template-rows: auto 1fr auto; background: var(--bg); color: var(--text); font: 400 14px/1.5 var(--font-sans); }
+  .fd-skip:focus { position: fixed; left: 16px; top: 8px; width: auto; height: auto; clip: auto; padding: 8px 12px; background: var(--surface); z-index: 40; }
+  .fd-top {
+    position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: max(10px, env(safe-area-inset-top)) var(--pad-x) 10px; background: color-mix(in srgb, var(--bg) 88%, transparent);
+    -webkit-backdrop-filter: saturate(170%) blur(18px); backdrop-filter: saturate(170%) blur(18px);
+    border-bottom: 1px solid var(--line); view-transition-name: mast;
+  }
+  .fd-brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; min-height: 44px; }
+  .fd-brand:hover { color: var(--text); }
+  .fd-brand b { font: 600 16px/1 var(--font-sans); letter-spacing: -.01em; }
+  .fd-mark { width: 28px; height: 28px; flex: none; }
+  .fd-mark .tile { fill: var(--brand-tile, var(--accent)); stroke: var(--ink); }
+  .fd-mark .tick { stroke: var(--on-accent, var(--bg)); }
+  .fd-nav { display: flex; gap: 4px; }
+  .fd-nav a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: var(--text-2); text-decoration: none; font-size: 14px; transition: color var(--dur-hover) var(--ease-settle), background var(--dur-hover) var(--ease-settle); }
+  .fd-nav a:hover { color: var(--text); background: var(--surface-2); }
+  .fd-main { width: 100%; max-width: 1240px; margin: 0 auto; padding: 0 var(--pad-x) 48px; container: fd / inline-size; min-width: 0; }
+  .fd-foot { border-top: 1px solid var(--line); padding: 24px var(--pad-x) 32px; display: grid; gap: 6px; }
+  .fd-foot p { margin: 0 auto; width: 100%; max-width: calc(1240px - 2 * var(--pad-x)); font-size: 13px; color: var(--text-2); }
+  @media (max-width: 479px) { .fd-nav a { padding: 0 8px; } .fd-brand b { font-size: 15px; } }
+</style>

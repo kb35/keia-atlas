@@ -1,0 +1,124 @@
+---
+// What Keia logs about users: a plain page, linked from About. In Germany and the Netherlands a tool like Keia can
+// itself count as a monitoring system, so it says what it keeps about the people who use it, what it never keeps,
+// and what the sensing devices in Aigna's rooms pick up (the privacy records, data/privacy/). Overview archetype
+// (docs/standards/page-anatomy.md): the band, then Sections, the answer first.
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import Section from '../../components/Section.astro';
+import { spaces, sites, href, plural } from '../../lib/data.mjs';
+import { loadPrivacy, recordFor, CAPTURE_LABEL } from '../../lib/privacy.mjs';
+import { HANDLING } from '../../lib/classification.mjs';
+
+const records = loadPrivacy();
+const list = Object.entries(records).map(([id, r]) => ({ id, ...r }));
+// Installed sensing units each record covers (spares in a store sense nothing, so they are not counted).
+const covered = Object.fromEntries(list.map((r) => [r.id, 0]));
+for (const s of Object.values(spaces)) for (const p of [...s.positions, ...s.olderKit]) {
+  const r = recordFor(records, p.cls, s.site);
+  if (r) covered[r.id] += p.units.length;
+}
+const totalCovered = Object.values(covered).reduce((a, b) => a + b, 0);
+const minGroup = Math.min(...list.filter((r) => r.occupancy.counted).map((r) => r.occupancy.min_group_size));
+const perPersonOn = list.some((r) => r.occupancy.per_person_views);
+// The answer: the demo keeps nothing about you, and how far the privacy records reach.
+const answer = `This demo keeps nothing about you · ${plural(totalCovered, 'sensing unit')} covered by ${plural(list.length, 'privacy record')}`;
+const NUMBERS = [
+  { n: list.length, label: 'Privacy records', to: '#sensing' },
+  { n: totalCovered, label: 'Sensing units covered', to: '#sensing' },
+  { n: minGroup, label: 'Smallest group counted', fact: true },
+  { n: perPersonOn ? 'On' : 'Off', label: 'Per-person views', fact: true },
+];
+// The settings this demo keeps in your browser, by what they hold (none leaves the browser).
+const BROWSER = [
+  ['Look, theme and stage', 'The look, light or dark, and how much of the product the demo shows.'],
+  ['Who you are viewing as', 'The demo person whose pages you see. Nobody signs in.'],
+  ['Learning progress', 'Which lessons you have finished.'],
+  ['Your demo changes', 'Suggested changes, reports, time off and notes you make while trying the demo.'],
+];
+---
+<Shell title="What Keia logs about users" section="about" crumbs={[{ label: 'About this project', to: '/about/' }, { label: 'What Keia logs about users' }]}>
+  <PageBand overline="About Keia Atlas" title="What Keia logs about users" answer={answer} lede="What Keia Atlas keeps about the people who use it, what it never keeps, and what the devices in Aigna's rooms pick up." numbers={NUMBERS} />
+
+  <div class="content wkl">
+    <Section title="This demo keeps nothing about you" id="demo">
+      <div class="card pad wkl-card">
+        <p>These pages are static files. There is no sign-in, no server of our own and no analytics, so nothing about you is sent anywhere. The choices you make while trying the demo stay in this browser, and clearing the site's data removes them.</p>
+        <ul class="note-list">
+          {BROWSER.map(([k, v]) => <li><b>{k}.</b> {v}</li>)}
+        </ul>
+        <p class="faint">Whoever hosts the pages may keep ordinary web server logs, such as addresses and times. Keia Atlas does not read them.</p>
+      </div>
+    </Section>
+
+    <Section title="When Aigna runs Keia Atlas for its staff" id="deployment">
+      <div class="g12">
+        <div class="card side-card s-6">
+          <h3>What it keeps</h3>
+          <ul class="note-list">
+            <li>Your name, work email and role, from signing in.</li>
+            <li>Each change you make to a record, with when, so a wrong fact can be traced and put back.</li>
+            <li>Approvals you give and notes you add to work and incidents.</li>
+            <li>A priority you change, with your reason, so others can see why.</li>
+          </ul>
+        </div>
+        <div class="card side-card s-6">
+          <h3>What it never keeps</h3>
+          <ul class="note-list">
+            <li>Which pages you open, for how long, or where you click and type.</li>
+            <li>Where you are.</li>
+            <li>Anything a camera or microphone picks up about you. Rooms report a count, never a person.</li>
+            <li>Scores of your emotion, engagement or attention. These are blocked.</li>
+          </ul>
+        </div>
+      </div>
+    </Section>
+
+    <Section title="Sensing devices in Aigna's rooms" id="sensing" aside={`${list.length} records, ${totalCovered} units`}>
+      <p class="wkl-lede">Every camera, microphone, video bar and codec carries a privacy record: what it captures, why, on what legal footing, who was told and how long anything is kept. Each unit's page shows its record.</p>
+      <div class="tablewrap">
+        <table class="to-cards wkl-t">
+          <thead><tr><th scope="col">Record</th><th scope="col">Offices</th><th scope="col">Captures</th><th scope="col">Room notice</th><th scope="col">Works council</th><th scope="col">Units</th></tr></thead>
+          <tbody>
+            {list.map((r) => (
+              <tr>
+                <td><b>{r.name}</b><small class="faint">{r.law}</small></td>
+                <td>{r.covers.sites.map((s) => sites[s]?.name ?? s).join(', ')}</td>
+                <td>{r.captures.map((c) => CAPTURE_LABEL[c] ?? c).join(', ')}</td>
+                <td>{r.notice.posted ? r.notice.where : 'None'}</td>
+                <td>{r.works_council.none ? 'None' : `${r.works_council.body}, ${r.works_council.ref}`}</td>
+                <td class="num">{covered[r.id]}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Section>
+
+    <Section title="Count, never identify" id="occupancy">
+      <div class="card pad wkl-card">
+        <p>Occupancy is counted per room, never per person. A count below {minGroup} people shows as "fewer than {minGroup}", so a small room never shows who was in it. Per-person views are {perPersonOn ? 'on' : 'off'} for Aigna; turning them on would need a logged decision, and it can be switched off again at any time.</p>
+        <p>Room usage on the <a href={href('/usage/')}>Usage</a> pages comes from these counts and from bookings. It never shows meeting titles, organisers or names.</p>
+      </div>
+    </Section>
+
+    <Section title="Who can see what" id="classification">
+      <div class="card pad wkl-card">
+        <p>Every fact carries one of four labels, and the label decides who may see it.</p>
+        <ul class="note-list">
+          {Object.entries(HANDLING).map(([k, v]) => <li><b>{k}.</b> {v}</li>)}
+        </ul>
+        <p class="faint">Floor plans, rack and switch ports, IP plans, the vulnerable-firmware list and default password status are Restricted, and say so where they show.</p>
+      </div>
+    </Section>
+
+    <p class="faint wkl-foot">Aigna and its records are made up for the demo. Keia Atlas helps keep these records; it does not make anyone compliant, and none of this is legal advice. Questions about a real deployment go to its data protection officer.</p>
+  </div>
+</Shell>
+<style is:global>
+  .wkl-card { display: grid; gap: 10px; max-width: 90ch; }
+  .wkl-card p { margin: 0; line-height: 1.6; }
+  .wkl-lede { margin: 0 0 12px; max-width: 80ch; line-height: 1.6; }
+  .wkl-t td small { display: block; margin-top: 2px; font-size: 12px; }
+  .wkl-foot { margin: 0; font-size: 13px; max-width: 80ch; }
+</style>

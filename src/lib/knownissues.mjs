@@ -12,7 +12,7 @@ export const KI_TONE = { open: 'warn', fixed: 'manage', 'wont-fix': 'plain' };
 export const CONFIDENCE = { strong: 'Strong match', possible: 'Possible match' };
 export const AFFECTS = { yes: 'Affects us', maybe: 'May affect us', no: "Doesn't affect us" };
 // A maker case, from Aigna's first draft to the maker's answer. "draft" only ever lives in the live layer.
-export const CASE_STATUS = { draft: 'Being prepared', sent: 'Sent', acknowledged: 'Acknowledged', investigating: 'Maker investigating', published: 'Known issue published', closed: 'Closed' };
+export const CASE_STATUS = { draft: 'Being prepared', sent: 'Sent', acknowledged: 'Acknowledged', investigating: 'Manufacturer investigating', published: 'Known error published', closed: 'Closed' };
 export const CASE_ORDER = ['draft', 'sent', 'acknowledged', 'investigating', 'published', 'closed'];
 // Resolutions that say the ticket was not a fault of the device: they never count towards a match or a repeat.
 export const EXPLAINED = ['duplicate', 'cancelled', 'no-fault-found'];
@@ -54,8 +54,8 @@ export function matchIncident(issue, inc) {
   const symptom = Boolean(inc.symptom && issue.symptoms?.includes(inc.symptom));
   const signs = (issue.signs ?? []).filter((s) => text.includes(s));
   if (!symptom && !signs.length) return null;
-  if (symptom) reasons.push({ ok: true, text: 'Same symptom', title: 'The symptom in the device profile\'s guide is one the maker describes' });
-  if (signs.length) reasons.push({ ok: true, text: `Says "${signs[0]}"`, title: 'Words from the maker\'s description appear in the ticket' });
+  if (symptom) reasons.push({ ok: true, text: 'Same symptom', title: 'The symptom in the device type\'s guide is one the manufacturer describes' });
+  if (signs.length) reasons.push({ ok: true, text: `Says "${signs[0]}"`, title: 'Words from the manufacturer\'s description appear in the ticket' });
   const confidence = fw && symptom && signs.length ? 'strong' : 'possible';
   return { confidence, reasons };
 }
@@ -111,9 +111,9 @@ export function findClusters(incs, { today, matched = new Set(), rule = CLUSTER_
 // What fixing it means for Aigna. release: the fixed_in release in the firmware line, if Keia Atlas tracks it;
 // rollout: a firmware rollout project that already moves units to that version.
 export function fixPlan(issue, { release = null, rollout = null } = {}) {
-  if (issue.status === 'open') return { kind: 'none', text: 'No fix yet. Keep the workaround and watch the feed; Keia Atlas says when the maker publishes one.' };
-  if (issue.status === 'wont-fix') return { kind: 'wont-fix', text: "The maker won't fix it on the affected versions. Keep the workaround, or move past them in the next rollout." };
-  if (release?.status === 'blocked') return { kind: 'blocked', text: `Fixed in ${issue.fixed_in}, which Aigna doesn't install${release.advisory ? ` (${release.advisory})` : ''}. Keep the workaround and ask the maker for the fix on the version you run.` };
+  if (issue.status === 'open') return { kind: 'none', text: 'No fix yet. Keep the workaround and watch the feed; Keia Atlas says when the manufacturer publishes one.' };
+  if (issue.status === 'wont-fix') return { kind: 'wont-fix', text: "The manufacturer won't fix it on the affected versions. Keep the workaround, or move past them in the next rollout." };
+  if (release?.status === 'blocked') return { kind: 'blocked', text: `Fixed in ${issue.fixed_in}, which Aigna doesn't install${release.advisory ? ` (${release.advisory})` : ''}. Keep the workaround and ask the manufacturer for the fix on the version you run.` };
   if (rollout) return { kind: 'rollout', text: `Fixed in ${issue.fixed_in}. ${rollout.id} ${rollout.name} already moves units to it.`, project: rollout.id };
   if (release?.status === 'standard') return { kind: 'standard', text: `Fixed in ${issue.fixed_in}, the standard. Update the exposed units to the standard.` };
   return { kind: 'propose', text: `Fixed in ${issue.fixed_in}. No project moves units to it yet: propose a firmware rollout, which starts with a Lab pass.` };

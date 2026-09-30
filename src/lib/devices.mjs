@@ -4,6 +4,26 @@ import { spaces, sites, classes, models, incidents, incidentPath, projects, labT
   advisoriesFor, configFor, standardFirmware, firmwareFor, modelChoices, networkPath, LOC_LABEL, rackFor, deviceName } from './data.mjs';
 import { activeLinks, describe, CABLE_LABEL } from './wiring.mjs';
 import { usageCard } from './usage.mjs';
+import { firmwareLines, sources, DEMO_TODAY } from './data.mjs';
+import { loadPrivacy, recordFor, privacyRows } from './privacy.mjs';
+import { supportStatus, monthLabel } from './security.mjs';
+import { RESTRICTED_VIEWS } from './classification.mjs';
+
+// A model's security support, shaped for the unit page: the firmware line by name, the end date with its
+// source (or "demo value"), the maker's vulnerability contact, and the warning when support ends within
+// 12 months or has ended.
+export function securityInfo(m) {
+  const ss = m?.security_support;
+  if (!ss) return null;
+  const st = supportStatus(ss, DEMO_TODAY);
+  const src = (id) => (id && sources[id] ? { title: sources[id].title, url: sources[id].url ?? null } : null);
+  return {
+    line: firmwareLines[ss.firmware_line]?.name ?? ss.firmware_line,
+    ends: monthLabel(ss.ends.date), endsDemo: Boolean(ss.ends.demo), endsSrc: src(ss.ends.source),
+    state: st.state, tone: st.tone, chip: st.chip, text: st.text,
+    contact: ss.vulnerability_contact ? { url: ss.vulnerability_contact.url, demo: Boolean(ss.vulnerability_contact.demo), src: src(ss.vulnerability_contact.source) } : null,
+  };
+}
 
 const h = (str) => [...str].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 7);
 const hex = (v) => (v & 255).toString(16).padStart(2, '0').toUpperCase();
@@ -12,6 +32,7 @@ export function buildDevices() {
   const units = [];
   const modelInfo = {};
   const rooms = {}, siteInfo = {};
+  const privacyRecs = loadPrivacy(), privacy = {};
   for (const s of Object.values(spaces)) {
     const site = sites[s.site];
     const fit = new Set(s.fitted ?? []);
@@ -47,9 +68,13 @@ export function buildDevices() {
           config: cfg ? { id: cfg.id, name: cfg.name, version: cfg.version, mode: cfg.mode, perDevice: cfg.groups.flatMap((g) => g.settings.filter((x) => x.per_device).map((x) => ({ group: g.name, name: x.name, value: x.value }))) } : null,
           platforms: ch?.platforms.map((x) => ({ name: x.name, support: x.support })) ?? [],
           status: ch?.status ?? null,
+          sec: securityInfo(models[mid]),
           labs: Object.values(labTests).filter((l) => l.models?.includes(mid)).map((l) => ({ id: l.id, title: l.title, status: l.status, start: l.start ?? null, end: l.end ?? null })),
         };
       }
+      // The privacy record for a sensing unit (camera, microphone, video bar...), by class and site.
+      const pr = recordFor(privacyRecs, models[p.model]?.class ?? p.cls, s.site);
+      if (pr && !privacy[pr.id]) privacy[pr.id] = { name: pr.name, rows: privacyRows(pr), never: pr.never ?? [], notice: pr.notice.text ?? null, law: pr.law, approver: pr.approver };
       for (const u of p.units) {
         const n = h(u.serial);
         units.push({
@@ -60,9 +85,11 @@ export function buildDevices() {
           conn, rack: rackItem ? { name: rack.name, u: rackItem.u, size: rackItem.size } : null,
           platforms: p.spare ? ['inventory'] : Object.keys(cls?.platforms ?? {}),
           usage: usageCard(u.asset_tag),
+          privacy: pr ? pr.id : null,
+          pw: typeof u.default_password_changed === 'boolean' ? u.default_password_changed : null,
         });
       }
     }
   }
-  return { units, models: modelInfo, rooms, sites: siteInfo };
+  return { units, models: modelInfo, rooms, sites: siteInfo, privacy, restricted: RESTRICTED_VIEWS };
 }

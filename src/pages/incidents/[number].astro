@@ -34,6 +34,9 @@ const kiRepeat = kiClusters.find((c) => c.incidents.some((i) => i.number === inc
 const cls = pos ? classes[pos.cls] : null;
 const isRoom = inc.subject.kind === 'room';
 const assigned = inc.keia_atlas.assigned ? person(inc.keia_atlas.assigned) : null;
+// Priority is proposed; a person may change it, and the reason is kept (priority_override).
+const override = inc.priority_override ?? null;
+const overrideBy = override ? person(override.by) : null;
 
 // Units at the same desk or kit as the device (or every unit in the room).
 const prefix = inc.position?.match(/^([a-z]+-\d+\/)/)?.[1] ?? null;
@@ -72,7 +75,7 @@ const advs = pos?.model ? advisoriesFor(pos.model) : [];
 const relatedCount = related.length + roomProjects.length + labs.length + advs.length + openHere.length;
 const TABS = [
   { id: 'wiring', label: 'Wiring' },
-  { id: 'devices', label: prefix ? `Every device in the ${prefix.startsWith('kit') ? 'kit' : 'desk'}` : 'Every device in the room', count: roomPositions.length },
+  { id: 'devices', label: prefix ? `Every device in the ${prefix.startsWith('kit') ? 'kit' : 'desk'}` : 'Every device in the space', count: roomPositions.length },
   { id: 'history', label: 'History', count: around.length },
   { id: 'related', label: 'Related work', count: relatedCount },
   { id: 'ticket', label: 'Ticket details' },
@@ -103,12 +106,13 @@ const incHref = (n) => href(incidentPath(n));
     <Fragment slot="overline">
       <span class="mono ib-no" data-help="incident.number" {...recHere(inc.number)}>{inc.number}</span>
       <span data-help="incident.priority" class={`prio p-${inc.priority}`} title={`Priority ${inc.priority}: ${PRIORITY_LABEL[inc.priority]}`}>P{inc.priority} {PRIORITY_LABEL[inc.priority]}</span>
+      {override && <span class="prio-was" data-help="incident.priority-changed">changed from P{inc.priority_proposed}: {override.reason}</span>}
       <span data-help="incident.state" class={`ist ist-${stateTone[inc.state]}`}>{INC_STATE[inc.state]}{v.reopened && inc.state !== 'resolved' ? ', reopened' : ''}</span>
       {assigned && <span class="ib-who"><span class="av">{assigned.initials}</span>{assigned.name}</span>}
     </Fragment>
     <Fragment slot="lede">
       {isRoom
-        ? <>The whole room: <a href={href(`/rooms/${s.id}/`)}>{v.roomTitle}</a>, {site.name}{site.city ? `, ${site.city}` : ''}.</>
+        ? <>The whole space: <a href={href(`/rooms/${s.id}/`)}>{v.roomTitle}</a>, {site.name}{site.city ? `, ${site.city}` : ''}.</>
         : <><b>{v.deviceTitle}</b>{v.model ? ` (${v.model})` : ''} in <a href={href(`/rooms/${s.id}/`)}>{v.roomTitle}</a>, {site.name}{site.city ? `, ${site.city}` : ''}.</>}
     </Fragment>
   </PageBand>
@@ -138,21 +142,21 @@ const incHref = (n) => href(incidentPath(n));
     </ol>
 
     <div class="g12 top">
-      <section class="card ip-draw s-7 stick" aria-label={isRoom ? 'The room' : `The room, with ${v.deviceTitle} lit`}>
+      <section class="card ip-draw s-7 stick" aria-label={isRoom ? 'The space' : `The space, with ${v.deviceTitle} lit`}>
         <header class="ip-h" data-help="incident.picture">
           <h2>{v.roomTitle}</h2>
-          <span class="faint">{s.type.profile.name} · {isRoom ? 'the whole room' : `${v.role} lit`} · hover to find a device</span>
-          <a class="aside" href={href(`/rooms/${s.id}/`)}>Room page <Icon name="arrow" size={14} /></a>
+          <span class="faint">{s.type.profile.name} · {isRoom ? 'the whole space' : `${v.role} lit`} · hover to find a device</span>
+          <a class="aside" href={href(`/rooms/${s.id}/`)}>Space page <Icon name="arrow" size={14} /></a>
         </header>
         <RoomScene option={s.option} type={s.space_type} fitted={s.fitted} space={s} uid={`inc-${inc.number}`} highlight={sceneKey ? [sceneKey] : []} tone={v.open ? 'bad' : null} />
       </section>
 
-      <SidePanel class={`s-5 ip-side${v.open && worst === 'bad' ? ' rs-radiate' : ''}`} title={isRoom ? 'The whole room' : 'The device'} meta={isRoom ? `${roomPositions.length} devices` : (pos.model ? modelName(pos.model) : className(pos.cls))}>
+      <SidePanel class={`s-5 ip-side${v.open && worst === 'bad' ? ' rs-radiate' : ''}`} title={isRoom ? 'The whole space' : 'The device'} meta={isRoom ? `${roomPositions.length} devices` : (pos.model ? modelName(pos.model) : className(pos.cls))}>
         <div class="ip-body">
         {isRoom ? (
           <header class="dc-head" data-help="incident.device">
-            <span class="dc-art room"><Icon name="room" size={40} /></span>
-            <span class="dc-id"><b>Whole room</b><small>{roomPositions.length} devices · {s.type.profile.name}</small><small class="mono">{s.id}</small></span>
+            <span class="dc-art space"><Icon name="room" size={40} /></span>
+            <span class="dc-id"><b>Whole space</b><small>{roomPositions.length} devices · {s.type.profile.name}</small><small class="mono">{s.id}</small></span>
           </header>
         ) : (
           <header class="dc-head" data-help="incident.device">
@@ -176,20 +180,20 @@ const incHref = (n) => href(incidentPath(n));
         {/* Known issues (decision 0029): proposals only; linking happens on the known issue's page. */}
         {kiMatches.length > 0 && (
           <section class="dc-sec" data-help="incident.known-issue">
-            <h3>Looks like a known issue</h3>
+            <h3>Looks like a known error</h3>
             {kiMatches.map((m) => <p class="dc-sym"><a href={href(m.issue.path)}><span class="mono">{m.issue.ref ?? m.issue.id}</span> {m.issue.title}</a>: {KI_CONF[m.confidence].toLowerCase()}, {m.issue.maker}.{m.issue.workaround ? ` Workaround: ${m.issue.workaround.text}` : ''}</p>)}
           </section>
         )}
         {kiRepeat && (
           <section class="dc-sec" data-help="incident.repeat">
             <h3>Part of a repeat across the fleet</h3>
-            <p class="dc-sym">{kiRepeat.why}, with no known issue. <a href={href(draftForCluster(kiRepeat.key).path)}>The case for the maker</a> · <a href={href('/known-issues/#needs-your-decision')}>Known issues</a></p>
+            <p class="dc-sym">{kiRepeat.why}, with no known error. <a href={href(draftForCluster(kiRepeat.key).path)}>The case for the manufacturer</a> · <a href={href('/known-issues/#needs-your-decision')}>Known errors</a></p>
           </section>
         )}
 
         {isRoom ? (
           <section class="dc-sec">
-            <h3>Devices in the room</h3>
+            <h3>Devices in the space</h3>
             <ul class="dc-health">
               {roomPositions.map((p) => <li><HealthGlyph state={v.open ? 'fault' : 'fine'} size={12} title={v.open ? 'offline' : 'back online'} /><span>{(p.role ?? className(p.cls)).replace(/:.*$/, '')}</span><small>{v.open ? 'Offline' : 'Back online'}</small></li>)}
             </ul>
@@ -217,7 +221,7 @@ const incHref = (n) => href(incidentPath(n));
 
         {inc.keia_atlas.work_note && v.open && (
           <section class="dc-sec dc-note" data-help="incident.worknote" data-min-stage="4" data-note>
-            <h3>Work note for ServiceNow <span class="stg">Stage 4</span></h3>
+            <h3>Work note for ServiceNow <span class="stg">Simulated</span></h3>
             <p class="mono" data-note-text>{inc.keia_atlas.work_note}</p>
             <p class="dc-note-act"><button type="button" class="btn small primary" data-note-send>Approve and add to the ticket</button><span class="faint">Goes on the ticket as a work note from you.</span></p>
             <p class="dc-note-done" data-note-done hidden role="status"><Icon name="check" size={14} /><span>Added to the ticket (demo: nothing was sent).</span><button type="button" class="linkish" data-note-undo>Undo</button></p>
@@ -259,7 +263,7 @@ const incHref = (n) => href(incidentPath(n));
         </div>
 
         <div slot="history">
-          <p class="faint ih-key"><span class="ih-k k-ticket">This ticket</span><span class="ih-k k-incident">Other incidents in the room</span><span class="ih-k k-task">Project work</span><span class="ih-k k-install">The unit</span></p>
+          <p class="faint ih-key"><span class="ih-k k-ticket">This ticket</span><span class="ih-k k-incident">Other incidents in the space</span><span class="ih-k k-task">Project work</span><span class="ih-k k-install">The unit</span></p>
           <ol class="ih" data-history>
             {around.map((r) => (
               <li class:list={['ih-row', `k-${r.kind}`, { same: r.same }]}>
@@ -275,7 +279,7 @@ const incHref = (n) => href(incidentPath(n));
                     </>
                   )}
                   {r.kind === 'incident' && <><a href={incHref(r.other.inc.number)}><b>{r.text}</b></a><small>{r.sub}{r.same ? ' · the same device' : ''}</small></>}
-                  {r.kind === 'task' && <><a href={taskHref(r.prj)}><b>{r.text}</b></a><small>{r.sub} · {r.t.status === 'done' ? 'Done' : r.t.status === 'blocked' ? `Blocked: ${r.t.blocked_by}` : r.t.status === 'doing' ? 'Doing' : 'To do'}</small></>}
+                  {r.kind === 'task' && <><a href={taskHref(r.prj)}><b>{r.text}</b></a><small>{r.sub} · {r.t.status === 'done' ? 'Done' : r.t.status === 'blocked' ? `Waiting on: ${r.t.blocked_by}` : r.t.status === 'doing' ? 'Doing' : 'To do'}</small></>}
                   {r.kind === 'install' && <><b>{r.text}</b><small class="mono">{r.sub}</small></>}
                 </span>
               </li>
@@ -284,21 +288,21 @@ const incHref = (n) => href(incidentPath(n));
         </div>
 
         <div slot="related">
-          {relatedCount === 0 && <p class="ip-empty">No linked work, projects or Lab tests for this room or device. <a href={href('/projects/')}>See every project</a></p>}
+          {relatedCount === 0 && <p class="ip-empty">No linked work, projects or Lab tests for this space or device. <a href={href('/projects/')}>See every project</a></p>}
           <div class="rw-grid">
             {related.map(({ id, f }) => f && (
               <a class="card rw" href={taskHref(f.project)}>
                 <span class="rw-k">Linked task</span>
                 <b><span class="mono">{id}</span> {f.task.title}</b>
                 <small>{f.project.id} {f.project.name}</small>
-                <small class={`rw-st st-${f.task.status}`}>{f.task.status === 'blocked' ? `Blocked: ${f.task.blocked_by}` : f.task.status === 'done' ? 'Done' : f.task.status === 'doing' ? 'Doing' : 'To do'}{f.task.due ? ` · due ${fmtDate(f.task.due, { day: 'numeric', month: 'short' })}` : ''} · {person(f.task.owner).name}</small>
+                <small class={`rw-st st-${f.task.status}`}>{f.task.status === 'blocked' ? `Waiting on: ${f.task.blocked_by}` : f.task.status === 'done' ? 'Done' : f.task.status === 'doing' ? 'Doing' : 'To do'}{f.task.due ? ` · due ${fmtDate(f.task.due, { day: 'numeric', month: 'short' })}` : ''} · {person(f.task.owner).name}</small>
               </a>
             ))}
             {roomProjects.map((p) => {
               const here = p.spaces.find((x) => x.space === s.id);
               return (
                 <a class="card rw" href={href(`/projects/${p.id.toLowerCase()}/`)}>
-                  <span class="rw-k">Project for this room</span>
+                  <span class="rw-k">Project for this space</span>
                   <b>{p.id} {p.name}</b>
                   <small>This room: {here.state.replace(/-/g, ' ')}{here.note ? `. ${here.note}` : ''}</small>
                 </a>
@@ -306,9 +310,9 @@ const incHref = (n) => href(incidentPath(n));
             })}
             {openHere.map((o) => (
               <a class="card rw" href={incHref(o.inc.number)}>
-                <span class="rw-k">Also open in this room</span>
+                <span class="rw-k">Also open in this space</span>
                 <b><span class="mono">{o.inc.number}</span> {o.inc.short_description}</b>
-                <small>P{o.inc.priority} · {INC_STATE[o.inc.state]} · {o.inc.subject.kind === 'room' ? 'Whole room' : o.deviceTitle}</small>
+                <small>P{o.inc.priority} · {INC_STATE[o.inc.state]} · {o.inc.subject.kind === 'room' ? 'Whole space' : o.deviceTitle}</small>
               </a>
             ))}
             {advs.map((a) => (
@@ -337,6 +341,7 @@ const incHref = (n) => href(incidentPath(n));
                 <div><dt>Opened</dt><dd>{when(inc.opened, { year: true })}</dd></div>
                 <div><dt>Caller</dt><dd>{inc.caller}</dd></div>
                 <div><dt>Priority</dt><dd>{inc.priority}, {PRIORITY_LABEL[inc.priority].toLowerCase()}</dd></div>
+                <div><dt>Proposed priority</dt><dd>{inc.priority_proposed}, {PRIORITY_LABEL[inc.priority_proposed].toLowerCase()}{override ? <>. Changed to {override.priority} by {overrideBy?.name ?? override.by}, {when(override.at)}: {override.reason}</> : ', not changed'}</dd></div>
                 <div><dt>State</dt><dd>{INC_STATE[inc.state]}{v.hold ? `: ${v.hold.holdLabel.toLowerCase()}` : ''}</dd></div>
                 <div><dt>Assignment group</dt><dd>{inc.assignment_group}</dd></div>
                 {assigned && <div><dt>Assigned to</dt><dd>{assigned.name}</dd></div>}
@@ -349,7 +354,7 @@ const incHref = (n) => href(incidentPath(n));
             <section class="card pad">
               <h3 class="tk-h">Added by Keia Atlas</h3>
               <dl class="tk">
-                <div><dt>About</dt><dd>{isRoom ? `The whole room, ${v.roomTitle}` : <>{v.deviceTitle}, <span class="mono">{unit.asset_tag}</span></>}</dd></div>
+                <div><dt>About</dt><dd>{isRoom ? `The whole space, ${v.roomTitle}` : <>{v.deviceTitle}, <span class="mono">{unit.asset_tag}</span></>}</dd></div>
                 <div><dt>Where</dt><dd>{v.where}</dd></div>
                 <div><dt>Matched by</dt><dd>{inc.keia_atlas.matched_by}</dd></div>
                 {inc.keia_atlas.symptom && <div><dt>Symptom in the guide</dt><dd>{words(inc.keia_atlas.symptom)}</dd></div>}
@@ -362,10 +367,10 @@ const incHref = (n) => href(incidentPath(n));
             <summary><b>How Keia Atlas and ServiceNow connect</b></summary>
             <ol class="snf">
               <li class="snf-sn"><span class="snf-n mono">1</span><b>A ticket arrives in ServiceNow</b><span>The service desk works it there, as today.</span></li>
-              <li><span class="snf-n mono">2</span><b>Keia Atlas reads it</b><span>Through ServiceNow's Table API every few minutes, or ServiceNow pushes it on change.</span><span class="stg">Stage 2</span></li>
-              <li><span class="snf-n mono">3</span><b>Matches room and device</b><span>From the ticket's location, the caller's booking or a named room.</span><span class="stg">Stage 2</span></li>
-              <li><span class="snf-n mono">4</span><b>Adds evidence</b><span>Device management, monitoring, calendar and open project work.</span><span class="stg">Stage 2</span></li>
-              <li><span class="snf-n mono">5</span><b>Writes a work note back</b><span>Only once someone approves; ServiceNow stays the record.</span><span class="stg">Stage 4</span></li>
+              <li><span class="snf-n mono">2</span><b>Keia Atlas reads it</b><span>Through ServiceNow's Table API every few minutes, or ServiceNow pushes it on change.</span><span class="stg">Simulated</span></li>
+              <li><span class="snf-n mono">3</span><b>Matches space and device</b><span>From the ticket's location, the caller's booking or a named space.</span><span class="stg">Simulated</span></li>
+              <li><span class="snf-n mono">4</span><b>Adds evidence</b><span>Device management, monitoring, calendar and open project work.</span><span class="stg">Simulated</span></li>
+              <li><span class="snf-n mono">5</span><b>Writes a work note back</b><span>Only once someone approves; ServiceNow stays the record.</span><span class="stg">Simulated</span></li>
             </ol>
           </details>
         </div>
@@ -414,6 +419,8 @@ const incHref = (n) => href(incidentPath(n));
 
   .inc-page { padding-top: 18px; gap: 20px; }
   .ib-who { display: inline-flex; align-items: center; gap: 6px; }
+  /* A priority a person changed: the proposal it replaced and why, beside the priority in force. */
+  .prio-was { font-size: 12px; line-height: 1.35; color: var(--text-2); text-transform: none; letter-spacing: 0; white-space: normal; overflow-wrap: anywhere; }
   .ib-who .av { width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; background: var(--surface-3); color: var(--text); font: 700 9px/1 var(--font-mono); letter-spacing: 0; }
 
   /* Lifecycle steps. */

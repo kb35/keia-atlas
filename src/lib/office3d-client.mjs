@@ -14,7 +14,7 @@ const W = window;
 const NARROW = '(max-width: 759px)';
 const STW = { use: 'In use', free: 'Free', problem: 'Problem', closed: 'Closed', comms: 'Comms room', none: 'Not in the live feed' };
 const HW = { ok: 'Healthy', warn: 'Alert', bad: 'Down', idle: 'Not monitored' };
-const KIND = { device: 'Device', 'room-device': 'In the room', outlet: 'Outlet', run: 'Permanent link', riser: 'Riser fibre', 'patch-panel': 'Patch panel', patch: 'Patch cord',
+const KIND = { device: 'Device', 'room-device': 'In the space', outlet: 'Outlet', run: 'Permanent link', riser: 'Riser fibre', 'patch-panel': 'Patch panel', patch: 'Patch cord',
   switch: 'Switch', firewall: 'Firewall', isp: 'Provider\'s box', 'fibre-panel': 'Fibre panel', 'lead-in': 'Lead-in', entry: 'Building entry', circuit: 'Internet circuit', internet: 'Internet' };
 const AP_ALERTS = ['Many clients on one radio', 'Interference on 5 GHz', 'Not reporting to the controller'];
 const CIRCUIT_ALERTS = ['Packet loss above the limit', 'Latency above the limit'];
@@ -110,11 +110,11 @@ export function mount(root) {
     let over = '', title = '', state = '', why = null, extra = '';
     if (k === 'room') {
       const r = byId.room.get(id); const s = roomSt(id);
-      over = r.comms ? 'Comms room' : r.bank ? 'Desks' : 'Room'; title = roomName(r); state = pill(s, STW[s]); why = s === 'problem' ? roomWhy(id) : null;
+      over = r.comms ? 'Comms room' : r.bank ? 'Desks' : 'Space'; title = roomName(r); state = pill(s, STW[s]); why = s === 'problem' ? roomWhy(id) : null;
       facts.push(['Floor', r.f]);
       facts.push(['Data outlets', r.outlets ? `${r.outlets}, ${r.used} with a device` : 'None']);
       if (r.vars.length) facts.push(['How it differs', r.vars.map(esc).join('<br>')]);
-      links.push([`/rooms/${r.id}/${r.comms ? '#rack' : ''}`, r.comms ? 'Open the comms room' : 'Open the room']);
+      links.push([`/rooms/${r.id}/${r.comms ? '#rack' : ''}`, r.comms ? 'Open the comms room' : 'Open the space']);
       const outs = D.runs.filter((x) => x.room === r.id && x.dev);
       if (outs.length) {
         extra = `<h3 class="o3-h">Cables with a device <small>${outs.length}</small></h3><ul class="o3-outs">${outs.slice(0, 10).map((x) => `<li><button type="button" class="o3-link" data-o3-pick="run:${esc(x.id)}">${esc(x.dev)}</button><small>${esc(x.out)}</small></li>`).join('')}</ul>${outs.length > 10 ? `<p class="faint o3-small">And ${outs.length - 10} more: choose one in the model or on the plan.</p>` : ''}`;
@@ -123,14 +123,14 @@ export function mount(root) {
       const a = byId.ap.get(id), s = unitSt(a.tag) ?? 'ok';
       over = 'Access point'; title = a.host; state = pill(s, HW[s]); why = unitWhy(a.tag);
       facts.push(['Model', a.model], ['Floor', a.f], ['Area', a.area === 'town-hall' ? 'Town hall area' : 'Open area'], ['Asset tag', a.tag]);
-      extra = '<p class="faint o3-small">Recorded in the floor file, not yet a unit in a room (floors pilot, open point 1).</p>';
+      extra = '<p class="faint o3-small">Recorded in the floor file, not yet a unit in a space (floors pilot, open point 1).</p>';
     } else if (k === 'run') {
       const r = byId.run.get(id), s = runSt(r);
       over = r.bb ? 'Riser fibre' : 'Cable run'; title = r.id; state = pill(s, r.bb ? 'Healthy' : r.dev ? HW[s] : 'Spare');
       why = r.tag ? unitWhy(r.tag) : null;
       facts.push(['Cable', `${r.type === 'cat6a' ? 'Cat6A' : r.type === 'fibre-om4' ? 'OM4 fibre' : r.type}, ${(D.purposes.find((p) => p.id === r.pur)?.n ?? r.pur).toLowerCase()}`], ['Length', `${r.len} m`], ['Test', r.test === 'pass' ? 'Passed' : r.test ?? 'Not recorded']);
       if (r.out) facts.push(['To', `${esc(byId.room.get(r.room)?.n ?? '')} ${esc(r.out)}${r.dev ? `, ${esc(r.dev)}` : ', spare'}`]);
-      if (r.room) links.push([`/rooms/${r.room}/`, 'Open the room']);
+      if (r.room) links.push([`/rooms/${r.room}/`, 'Open the space']);
     } else if (k === 'rack') {
       const rk = byId.rack.get(id), room = byId.room.get(rk.room), s = roomSt(rk.room);
       over = 'Rack'; title = `${room?.n ?? rk.room}, ${rk.n}`; state = pill(s === 'problem' ? 'bad' : 'ok', s === 'problem' ? 'Problem' : 'Healthy'); why = s === 'problem' ? roomWhy(rk.room) : null;
@@ -167,12 +167,12 @@ export function mount(root) {
   }
   function attentionHtml() {
     const list = problems();
-    if (!list.length) return '<p class="o3-ok">Nothing needs attention right now.</p>';
+    if (!list.length) return '<p class="o3-ok">No faults right now.</p>';
     return `<ul class="o3-att">${list.map((p) => `<li>${light(p.s)}<span><button type="button" class="o3-link" data-o3-pick="${esc(p.sel)}">${esc(p.name)}</button>${p.why ? `<small>${esc(p.why.text)}${p.why.mins ? `, for ${span(p.why.mins)}` : ''}</small>${incLink(p.why.inc)}` : ''}</span></li>`).join('')}</ul>`;
   }
   function restHtml() {
-    return `<p class="o3-intro">Choose a room, rack, access point or cable, in the model or on the plan, to follow its path to the internet hop by hop.</p>
-      <h3 class="o3-h">Needs attention now</h3><div data-o3-att>${attentionHtml()}</div>
+    return `<p class="o3-intro">Choose a space, rack, access point or cable, in the model or on the plan, to follow its path to the internet hop by hop.</p>
+      <h3 class="o3-h">Not working now</h3><div data-o3-att>${attentionHtml()}</div>
       <h3 class="o3-h">The way in</h3><ul class="o3-att">${D.circuits.map((c) => `<li data-h="${esc(c.id)}">${light(unitSt(c.id) ?? 'ok')}<span><button type="button" class="o3-link" data-o3-pick="circuit:${esc(c.id)}">${esc(c.n)}, ${esc(c.prov)}</button><small>${c.role === 'primary' ? 'Primary' : 'Secondary'}, ${esc(D.entries.find((e) => e.id === c.entry)?.n ?? '')}</small></span></li>`).join('')}</ul>
       <h3 class="o3-h">Comms rooms</h3><ul class="o3-att">${D.racks.map((rk) => { const room = byId.room.get(rk.room); return `<li>${light(roomSt(rk.room) === 'problem' ? 'bad' : 'ok')}<span><button type="button" class="o3-link" data-o3-pick="rack:${esc(rk.id)}">${esc(room ? roomName(room) : rk.room)}</button><small>${esc(rk.n)}, floor ${esc(rk.f)}</small></span></li>`; }).join('')}</ul>`;
   }

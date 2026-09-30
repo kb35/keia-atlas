@@ -178,7 +178,7 @@ A live page keeps its sentence current with `window.rsAnswer(text)` from the sam
 
 | Page | Answer |
 |---|---|
-| Home | per role: technician "{Office}: {n} open incidents · {n} jobs today" or "{Office}: {n} spaces, no open incidents · …"; engineers "{n} open tasks, {n} tasks waiting on something · {n} jobs today"; service managers "{n} changes for your approval · {n} open incidents"; project and programme managers "{n} projects, nothing waiting on anyone"; head "All {n} offices running, no open incidents"; service desk "{n} new incidents to take · {n} in progress"; vendors "No snags in your installation · {n} jobs today"; people managers "{n} open tasks in your team, …" |
+| Home | per role: technician "{Office}: {n} open incidents · {n} jobs today" or "{Office}: {n} spaces, no open incidents · …"; engineers "{n} open tasks, {n} tasks waiting on something · {n} jobs today"; service managers "{n} items for your approval · {n} open incidents"; project and programme managers "{n} projects, nothing waiting on anyone"; head "All {n} offices running, no open incidents"; service desk "{n} new incidents to take · {n} in progress"; vendors "No snags in your installation · {n} jobs today"; people managers "{n} open tasks in your team, …" |
 | Locations overview (live) | "{n} spaces not working now · {n} of {n} offices open", or "All {n} spaces working · …" |
 | Region, office (live) | "{n} spaces not working now", or "All {n} spaces working" |
 | Offices | "{n} open incidents across {n} offices · {n} people on site" |
@@ -193,8 +193,8 @@ A live page keeps its sentence current with `window.rsAnswer(text)` from the sam
 | A service (live) | "Within target · all {n} working", or "Past target · {n} offline, {n} alerting" |
 | Incidents | "{n} open, {n} high priority · {n} new, not taken yet" |
 | Incident | "In progress · With {first name} · open for {time}"; "On hold · waiting on {what}"; "New, not taken yet · open for {time}"; "Resolved: {how} · took {time}". Source mark: the ticket system, number and time |
-| Known issues | "{n} to review · {n} known issues affect {n} units" |
-| Known issue | "{n} units run an affected version · fixed in {version}" (or "no fix yet") |
+| Known errors | "{n} to review · {n} known errors affect {n} units" |
+| Known error | "{n} units run an affected version · fixed in {version}" (or "no fix yet") |
 | Manufacturer case | "Waiting on {manufacturer} · investigating" |
 | Work, Work list | "{n} incidents open · no task past due"; "{n} items with nobody yet · {n} items waiting on something" |
 | Schedule | "{n} items need cover · {n} people over-booked in the next 4 weeks" |
@@ -206,11 +206,11 @@ A live page keeps its sentence current with `window.rsAnswer(text)` from the sam
 | Work plan | "{n} devices due by {year} · {n} not yet in a project" |
 | Planning | "{year}: {n} devices due with no project yet · technician hours at {n}%" |
 | Lab | "{n} test waiting for a decision · {n} on the bench" |
-| Changes, Propose a change | "{n} changes to review · {n} sent back for changes"; "Nothing changes until it is approved · {n} kinds of change to propose" |
+| Proposals, Propose an edit | "{n} proposals to review · {n} sent back for changes"; "Nothing changes until it is approved · {n} kinds of edit to propose" |
 | Space types, a space type | "{n} space types · {n} spaces built to them"; "{n} spaces built to it · no open incidents" |
-| Device profiles, a profile | "{n} kinds of device with advisories to review · {n} units in service"; "{n} units in service · {n} advisories to review" |
+| Device types, a device type | "{n} kinds of device with advisories to review · {n} units in service"; "{n} units in service · {n} advisories to review" |
 | Models, a model | "{n} models past manufacturer support · {n} older models to replace"; "{n} units in service · {n} past planned life · firmware {status}" |
-| Configurations, a configuration | "{n} configurations with drift to review · {n} being configured"; "{n} units don't match this configuration · {n} still to configure" |
+| Setup guides, a setup guide | "{n} setup guides with drift to review · {n} being configured"; "{n} units don't match this setup guide · {n} still to configure" |
 | Standards, a standard, cable colours | "{n} of {n} standards in force · {n} new from {date}"; "Version {v}, in force since {date} · {n} rules that must be met" |
 | Playbooks, a playbook | "{n} live projects following {n} of {n} playbooks"; "Version {v} · {n} live projects following it" |
 | IT stores, a store, cables | "{n} stores below minimum · {n} stores due a count"; "{n} models below minimum · {n} spare units"; "{n} spare lines below minimum · {n} patched lines recorded" |

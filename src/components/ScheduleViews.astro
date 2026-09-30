@@ -147,7 +147,7 @@ const KEY = [
       root.setAttribute('data-view', view); root.setAttribute('data-zoom', zoom);
     })();
   </script>
-  <FilterBar facets={FACETS} placeholder="Find a person, project or room" label="Find a person, project or room" noun={['item', 'items']} scope=".content.sch" views={VIEWS} viewsHelp="schedule.views" viewKey="rs5-sch-view" sort={SORT} url={false}>
+  <FilterBar facets={FACETS} placeholder="Find a person, project or space" label="Find a person, project or space" noun={['item', 'items']} scope=".content.sch" views={VIEWS} viewsHelp="schedule.views" viewKey="rs5-sch-view" sort={SORT} url={false}>
     <div class="fb-views sch-scope" data-help="schedule.scope" role="group" aria-label="Whose schedule" data-scope-group>
       <button type="button" class="fb-view sch-who" data-scope="who" aria-pressed="true" hidden><span data-who-label></span><span class="sch-x" aria-hidden="true">×</span></button>
       <button type="button" class="fb-view" data-scope="me" aria-pressed="false">Me</button>
@@ -450,7 +450,7 @@ const KEY = [
           const find = [site.name, site.code, site.city, ...here.map((x) => x.p.name), ...its.map((it) => `${it.title} ${it.project ?? ''} ${it.room ? roomName(it.room) : ''}`)].join(' ');
           const who = (x) => pchip(x.p, x.pl.kind === 'visiting' ? { cls: 'visit', note: x.pl.place && x.pl.place !== s ? roomName(x.pl.place) : '', title: `Visiting from ${whereTag(placeOn(x.p, day, { timeOff: [], holidays: [], items: [] }))}` } : x.pl.kind === 'remote' ? { cls: 'remote', note: 'remote' } : {});
           const workChip = (it) => chip(it, { text: `${it.who.length ? `${person(it.who[0])?.first ?? ''}: ` : 'Nobody: '}${it.title}` });
-          const bookChip = ([room, list]) => `<a class="rchip" data-help="schedule.rchip" href="${esc(P.base)}/rooms/${esc(room)}/" data-peek>${esc(roomName(room))}<template data-peek-body><b>${esc(roomName(room))}</b><small>Booked out for work today</small>${list.map((it) => `<a href="${esc(it.href)}">${esc(it.title)}<small>${esc(it.who.map(nameOf).join(', '))}</small></a>`).join('')}<a href="${esc(P.base)}/rooms/${esc(room)}/">Open the room</a></template></a>`;
+          const bookChip = ([room, list]) => `<a class="rchip" data-help="schedule.rchip" href="${esc(P.base)}/rooms/${esc(room)}/" data-peek>${esc(roomName(room))}<template data-peek-body><b>${esc(roomName(room))}</b><small>Booked out for work today</small>${list.map((it) => `<a href="${esc(it.href)}">${esc(it.title)}<small>${esc(it.who.map(nameOf).join(', '))}</small></a>`).join('')}<a href="${esc(P.base)}/rooms/${esc(room)}/">Open the space</a></template></a>`;
           const col = (label, n, inner, none) => `<div class="sd-col"><h4>${label}${n ? ` <i>${n}</i>` : ''}</h4><div class="chips">${inner || `<span class="faint sd-none">${none}</span>`}</div></div>`;
           rows.push(`<div data-help="schedule.dayrow" class="sd-row card${hol ? ' hol' : ''}${site.remote ? ' remote' : ''}" data-fi data-find="${esc(find)}"${attrs({ region: [r], site: [s], kind: its.map(chipKind), status: its.map((it) => it.status), team: teams })}>`
             + `<div class="sd-site"><b>${site.remote ? `Home offices, ${esc(REGION_WORDS[r])}` : esc(site.name)}</b><small><span class="code">${esc(site.code)}</span>${site.city ? ` ${esc(site.city)}` : ''}</small>`
@@ -458,7 +458,7 @@ const KEY = [
             + (hol ? `<span class="pill warn">Public holiday: ${esc(hol.name)}</span>` : '') + '</div>'
             + col(site.remote ? 'Working from home' : 'On site', here.length, here.map(who).join(''), hol ? 'Closed for the holiday' : 'Nobody')
             + col(site.remote ? 'Work at home offices' : 'Work here', its.length, its.map(workChip).join(''), 'Nothing booked')
-            + col(site.remote ? 'Home offices booked' : 'Rooms booked out', rb.length, rb.map(bookChip).join(''), 'None')
+            + col(site.remote ? 'Home offices booked' : 'Spaces booked out', rb.length, rb.map(bookChip).join(''), 'None')
             + '</div>');
         }
         if (!rows.length) continue;

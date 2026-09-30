@@ -49,7 +49,7 @@ export function serviceNumbers(id, model, snap, statics = {}, incCount = 0) {
     const a = notOnline(rows), off = rows.filter((x) => x.s.st === 'offline').length;
     const fw = rows.filter((x) => x.u.fw).length;
     return [
-      { n: work, tone: '', title: `Of ${r.all} rooms; ${r.problem} with a problem and ${r.closed} closed` },
+      { n: work, tone: '', title: `Of ${r.all} spaces; ${r.problem} with a problem and ${r.closed} closed` },
       { n: a, tone: off ? 'bad' : tone(a, 'warn'), title: `Of ${rows.length} units` },
       { n: fw, tone: tone(fw, 'warn'), title: 'Units running firmware behind the standard' },
       { n: incCount, tone: tone(incCount, 'bad'), title: 'Open incidents on AV kit' },
@@ -349,7 +349,7 @@ export function initOverview(root) {
       if (last[id] !== sig) { last[id] = sig; list.innerHTML = html; }
       card.querySelector('[data-top-none]').hidden = top.length > 0;
       const more = card.querySelector('[data-more]'), extra = n.offline + n.alert;
-      more.textContent = extra ? `See all ${extra} ${extra === 1 ? 'unit' : 'units'} needing attention →` : `Open the ${D.services[id].name} service →`;
+      more.textContent = extra ? `See all ${extra} ${extra === 1 ? 'unit' : 'units'} not working →` : `Open the ${D.services[id].name} service →`;
       more.setAttribute('href', extra ? `${B}services/${id}/?status=alert,offline#units` : `${B}services/${id}/`);
     }
     const fine = ids.filter((id) => lights[id] === 'good').length;

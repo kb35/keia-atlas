@@ -1,0 +1,110 @@
+---
+// Answer first: three frames, each opening from where it was selected (FRONT-DOOR section 3). The band answers
+// "is it all right?"; its figure opens the list it counts; a row opens that record's log. The explorable: select
+// the figure, then a row. Built from the demo's own incidents (made up, like every record in the demo).
+// Reduced motion: each frame appears at once.
+import { incidents, spaces } from '../../lib/data.mjs';
+
+const all = Object.values(incidents);
+const resolved = all.filter((i) => i.state === 'resolved' && i.opened >= '2026-09-01').sort((a, b) => b.opened.localeCompare(a.opened));
+const open = all.filter((i) => i.state !== 'resolved');
+const where = (i) => { const s = spaces[i.room]; return s ? `${s.number ? `${s.number} ` : ''}${s.name}` : i.room; };
+const time = (t) => t.slice(11, 16);
+const day = (t) => new Date(t).toLocaleDateString('en-IE', { day: 'numeric', month: 'short' });
+const SRC = { servicenow: 'service desk', keia_atlas: 'Keia Atlas' };
+---
+<div class="df" data-df data-help="method.drill">
+  <section class="df-frame df-band" aria-label="Layer 1: the answer">
+    <p class="df-over">Service · AV · demo incidents</p>
+    <p class="df-answer">All services within target</p>
+    <div class="df-figs">
+      <button type="button" class="df-fig" data-df-open="list" aria-expanded="false" aria-controls="df-list">
+        <b>{resolved.length}</b><span>resolved since 1 Sept</span>
+      </button>
+      <div class="df-fig df-fact"><b>{open.length}</b><span>open now</span></div>
+    </div>
+  </section>
+  <section class="df-frame" id="df-list" data-df-layer="list" hidden aria-label="Layer 2: the list the figure counts">
+    <p class="df-over">{resolved.length} of {resolved.length} · resolved since 1 Sept</p>
+    <ul class="df-rows">
+      {resolved.map((i, k) => (
+        <li><button type="button" class="df-row" data-df-open={`log-${k}`} aria-expanded="false">
+          <span class="df-no">{i.number}</span>
+          <span class="df-desc">{i.short_description}</span>
+          <span class="df-where">{where(i)} · {day(i.opened)}</span>
+        </button></li>
+      ))}
+    </ul>
+  </section>
+  {resolved.map((i, k) => (
+    <section class="df-frame df-log" data-df-layer={`log-${k}`} hidden aria-label={`Layer 3: the log of ${i.number}`}>
+      <p class="df-over">{i.number} · the record, down to its log</p>
+      <ol class="df-lines">
+        {(i.history ?? []).map((h) => (
+          <li><time>{day(h.at)} {time(h.at)}</time><span>{h.note ?? (h.state ? `State: ${h.state}` : '')}</span><small>{SRC[h.source] ?? h.source}</small></li>
+        ))}
+      </ol>
+    </section>
+  ))}
+  <p class="df-hint" data-df-hint>Select the figure: it opens the list it counts. Then select a row.</p>
+</div>
+
+<script>
+  import { motion, growFrom } from '../../lib/motion-read.mjs';
+  function init(root: HTMLElement) {
+    if ((root as any).__df) return; (root as any).__df = true;
+    const layers = Array.from(root.querySelectorAll<HTMLElement>('[data-df-layer]'));
+    root.addEventListener('click', (e) => {
+      const b = (e.target as Element).closest<HTMLButtonElement>('[data-df-open]');
+      if (!b) return;
+      const id = b.dataset.dfOpen!;
+      const target = layers.find((l) => l.dataset.dfLayer === id)!;
+      const wasOpen = !target.hidden;
+      const logs = layers.filter((l) => l.dataset.dfLayer !== 'list');
+      const rows = Array.from(root.querySelectorAll<HTMLElement>('.df-row'));
+      // A figure opens (or closes) the list; a row opens its log, one log at a time.
+      if (id === 'list' && wasOpen) logs.forEach((l) => { l.hidden = true; });
+      if (id !== 'list') logs.forEach((l) => { l.hidden = true; });
+      rows.forEach((r) => r.setAttribute('aria-expanded', 'false'));
+      target.hidden = wasOpen;
+      b.setAttribute('aria-expanded', String(!wasOpen));
+      if (!wasOpen) growFrom(target, b, motion(), 0.9);
+    });
+  }
+  const boot = () => document.querySelectorAll<HTMLElement>('[data-df]').forEach(init);
+  boot();
+  document.addEventListener('astro:page-load', boot);
+</script>
+
+<style>
+  .df { display: grid; gap: 10px; }
+  .df-frame { border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); padding: 12px 14px; display: grid; gap: 8px; min-width: 0; }
+  .df-band { background: var(--bg); }
+  .df-over { margin: 0; font: 500 10.5px/1.3 var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); }
+  .df-answer { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
+  .df-figs { display: flex; gap: 8px; flex-wrap: wrap; }
+  .df-fig { display: grid; gap: 2px; text-align: left; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--text); font: inherit; min-width: 120px; }
+  button.df-fig { cursor: pointer; border-color: var(--line-strong); transition: background var(--dur-hover) var(--ease-settle); }
+  button.df-fig:hover, button.df-fig[aria-expanded="true"] { background: var(--surface-2); }
+  .df-fig b { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .df-fig span { font-size: 12.5px; color: var(--text-2); }
+  button.df-fig span { color: var(--accent); }
+  .df-fact { border-style: dashed; }
+  .df-rows { list-style: none; margin: 0; padding: 0; display: grid; }
+  .df-row { width: 100%; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 2px 12px; text-align: left; font: inherit; color: var(--text); background: none; border: 0; border-top: 1px solid var(--line); padding: 8px 4px; min-height: 44px; cursor: pointer; border-radius: 4px; transition: background var(--dur-hover) var(--ease-settle); }
+  .df-rows li:first-child .df-row { border-top: 0; }
+  .df-row:hover, .df-row[aria-expanded="true"] { background: var(--surface-2); }
+  .df-no { font: 500 12px/1.4 var(--font-mono); color: var(--text-2); grid-row: 1 / span 2; }
+  .df-desc { font-size: 13.5px; }
+  .df-where { font-size: 12px; color: var(--text-2); }
+  .df-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .df-lines li { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; font-size: 13px; align-items: baseline; }
+  .df-lines time { font: 500 12px/1.4 var(--font-mono); color: var(--text-2); }
+  .df-lines small { font: 500 11px/1.3 var(--font-mono); color: var(--quiet, var(--text-3)); }
+  .df-hint { margin: 0; font-size: 13px; color: var(--text-2); }
+  @container content (max-width: 560px) {
+    .df-row { grid-template-columns: minmax(0, 1fr); }
+    .df-no { grid-row: auto; }
+    .df-lines li { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  }
+</style>

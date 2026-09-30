@@ -18,7 +18,7 @@ export function getStaticPaths() {
   return [...cases, ...draftCases].map((c) => ({ params: { id: c.id.toLowerCase() }, props: { c } }));
 }
 const { c } = Astro.props;
-const maker = c.feed?.maker ?? 'the maker';
+const maker = c.feed?.maker ?? 'the manufacturer';
 const route = c.route;
 const ev = c.ev ?? { units: [], timeline: [], logs: [], versions: c.firmware ?? [], sites: [] };
 const base = { status: c.draft ? 'draft' : c.status, summary: c.summary, ref: c.ref ?? null, known_issue: c.known_issue ?? null };
@@ -33,25 +33,25 @@ const NUMBERS = [
   { n: ev.units.length || (c.incidents?.length ?? 0), label: ev.units.length === 1 ? 'Incident' : 'Incidents', to: ev.units.length ? '#evidence' : undefined },
   { n: ev.sites.length || c.fleetSites || 0, label: (ev.sites.length || c.fleetSites) === 1 ? 'Office' : 'Offices' },
   { n: c.fleetCount ?? c.models.length, label: c.fleetCount != null ? 'Units of the model' : c.models.length === 1 ? 'Model' : 'Models' },
-  sla?.target === 'Next working day' ? { n: 1, label: 'Working day to answer' } : { n: sla ? sla.target : 'None', label: sla ? 'Maker answers within' : 'No service level' },
+  sla?.target === 'Next working day' ? { n: 1, label: 'Working day to answer' } : { n: sla ? sla.target : 'None', label: sla ? 'Manufacturer answers within' : 'No service level' },
 ];
 const WAIT = { sent: 'sent, no answer yet', acknowledged: 'acknowledged', investigating: 'investigating' };
 const answer = base.status === 'draft' ? `Being prepared · not yet sent to ${maker}`
   : base.status === 'closed' ? `Closed · nothing waiting on ${maker}`
-  : base.status === 'published' ? `${maker} published it as a known issue · case still open`
+  : base.status === 'published' ? `${maker} published it as a known error · case still open`
   : `Waiting on ${maker} · ${WAIT[base.status] ?? CASE_STATUS[base.status]}`;
 const STEPS = CASE_ORDER;
 const TO = ['acknowledged', 'investigating', 'published', 'closed'];
 const title = c.draft ? c.title : `${c.id}: ${c.title}`;
 ---
-<Shell title={title} section="known-issues" minStage={2} crumbs={[{ label: 'Work', to: '/work/' }, { label: 'Known issues', to: '/known-issues/' }, { label: 'Maker cases', to: '/known-issues/#maker-cases' }, { label: c.draft ? 'New case' : c.id }]} about={{ kind: 'maker-case', label: title, to: c.path }}>
-  <PageBand overline="Maker case" title={c.title} answer={answer} lede={route.how} stage={4} numbers={NUMBERS}>
+<Shell title={title} section="known-issues" minStage={2} crumbs={[{ label: 'Work', to: '/work/' }, { label: 'Known errors', to: '/known-issues/' }, { label: 'Manufacturer cases', to: '/known-issues/#maker-cases' }, { label: c.draft ? 'New case' : c.id }]} about={{ kind: 'maker-case', label: title, to: c.path }}>
+  <PageBand overline="Manufacturer case" title={c.title} answer={answer} lede={route.how} sim numbers={NUMBERS}>
     <Fragment slot="overline">
       <span class="code" data-help="case.id">{c.draft ? 'New' : c.id}</span>
       <span>{maker}</span>
       <span class={`pill ${c.draft ? 'plain' : 'deploy'}`} data-case-pill data-help="case.status">{CASE_STATUS[base.status]}</span>
     </Fragment>
-    <button slot="action" type="button" class="btn primary" data-case-primary data-help="case.send">{c.draft ? `Send to ${maker}` : "Record the maker's answer"}</button>
+    <button slot="action" type="button" class="btn primary" data-case-primary data-help="case.send">{c.draft ? `Send to ${maker}` : "Record the manufacturer's answer"}</button>
   </PageBand>
 
   <div class="content mc" data-ki-root data-case data-status={base.status}>
@@ -59,7 +59,7 @@ const title = c.draft ? c.title : `${c.id}: ${c.title}`;
     <div class="mc-confirm card" data-case-confirm hidden role="alertdialog" aria-labelledby="mc-confirm-h">
       <div>
         <b id="mc-confirm-h">Send this case to {maker}?</b>
-        <p class="muted">It goes as you, through {route.contract ? `the ${maker} support portal under contract ${route.contract}` : 'the route below'}, with the evidence and the logs ticked below. Simulated: nothing leaves Keia Atlas until stage 4, and even then only when a person sends it.</p>
+        <p class="muted">It goes as you, through {route.contract ? `the ${maker} support portal under contract ${route.contract}` : 'the route below'}, with the evidence and the logs ticked below. Simulated: nothing leaves Keia Atlas, and a real send will still need a person.</p>
       </div>
       <span class="mc-cb">
         <button type="button" class="btn primary small" data-case-send>Send now</button>
@@ -87,7 +87,7 @@ const title = c.draft ? c.title : `${c.id}: ${c.title}`;
           <fieldset class="mc-logs" data-help="case.logs">
             <legend class="overline">Logs to attach</legend>
             {ev.logs.map((l) => <label><input type="checkbox" checked /> {l}</label>)}
-            <small class="faint">Keia Atlas gathers these from device management when the case is sent (stage 4).</small>
+            <small class="faint">Keia Atlas gathers these from device management when the case is sent.</small>
           </fieldset>
         )}
       </section>
@@ -102,13 +102,13 @@ const title = c.draft ? c.title : `${c.id}: ${c.title}`;
             ))}
           </ol>
           <div class="mc-ans" data-case-sentonly hidden={c.draft}>
-            <p class="overline">The maker's answer</p>
+            <p class="overline">The manufacturer's answer</p>
             <span class="mc-row">{TO.map((s) => <button type="button" class="btn small ghost" data-case-to={s} data-help="case.answer">{CASE_STATUS[s]}</button>)}</span>
-            <label class="mc-field"><span>Maker's case number</span><span class="mc-in"><input type="text" data-case-ref placeholder="As the maker gives it" /><button type="button" class="btn small" data-case-refsave>Save</button></span></label>
-            <label class="mc-field"><span>Known issue it became</span><span class="mc-in"><select data-case-ki data-help="case.ki"><option value="">None yet</option>{feedIssues.map((i) => <option value={i.id} data-href={href(i.path)} title={i.title}>{i.ref ?? i.id}</option>)}</select><button type="button" class="btn small" data-case-kisave>Link</button></span></label>
-            <a class="faint" data-case-kilink hidden href="#">Open the known issue</a>
+            <label class="mc-field"><span>Manufacturer's case number</span><span class="mc-in"><input type="text" data-case-ref placeholder="As the manufacturer gives it" /><button type="button" class="btn small" data-case-refsave>Save</button></span></label>
+            <label class="mc-field"><span>Known error it became</span><span class="mc-in"><select data-case-ki data-help="case.ki"><option value="">None yet</option>{feedIssues.map((i) => <option value={i.id} data-href={href(i.path)} title={i.title}>{i.ref ?? i.id}</option>)}</select><button type="button" class="btn small" data-case-kisave>Link</button></span></label>
+            <a class="faint" data-case-kilink hidden href="#">Open the known error</a>
           </div>
-          <p class="faint mc-draftnote" data-case-draftonly hidden={!c.draft}>Once sent, record here what the maker says: its case number, and the known issue it publishes. Keia Atlas links it back to the incidents and the fleet.</p>
+          <p class="faint mc-draftnote" data-case-draftonly hidden={!c.draft}>Once sent, record here what the manufacturer says: its case number, and the known error it publishes. Keia Atlas links it back to the incidents and the fleet.</p>
           <button type="button" class="btn small ghost" data-ki-history data-item={`case:${c.id}`} data-title={title} data-help="ki.history">History</button>
         </div>
       </SidePanel>
@@ -117,10 +117,10 @@ const title = c.draft ? c.title : `${c.id}: ${c.title}`;
     <div class="g12">
       <section class="card side-card s-4" aria-labelledby="mc-why" data-help="case.why">
         <h3 id="mc-why">Why this case</h3>
-        {c.cluster ? <p class="mc-t">The same model and symptom, {c.cluster.why}. The rule: {CLUSTER_RULE.count} or more incidents in {CLUSTER_RULE.days} days, or more than one office, with no known issue that explains them.</p>
-          : c.issueDraft ? <p class="mc-t">Known issue <a href={href(c.issueDraft.path)}>{c.issueDraft.ref ?? c.issueDraft.id}</a> affects our fleet, and there is no case with {maker} about it yet.</p>
+        {c.cluster ? <p class="mc-t">The same model and symptom, {c.cluster.why}. The rule: {CLUSTER_RULE.count} or more incidents in {CLUSTER_RULE.days} days, or more than one office, with no known error that explains them.</p>
+          : c.issueDraft ? <p class="mc-t">Known error <a href={href(c.issueDraft.path)}>{c.issueDraft.ref ?? c.issueDraft.id}</a> affects our fleet, and there is no case with {maker} about it yet.</p>
           : <p class="mc-t">{c.ask ? `Asked for: ${c.ask}` : 'Raised by hand.'}</p>}
-        {c.issue && <p class="mc-t">The maker published it as <a href={href(c.issue.path)}>{c.issue.ref ?? c.issue.id}</a>.</p>}
+        {c.issue && <p class="mc-t">The manufacturer published it as <a href={href(c.issue.path)}>{c.issue.ref ?? c.issue.id}</a>.</p>}
       </section>
       <section class="card side-card s-4" aria-labelledby="mc-con" data-help="case.contract">
         <h3 id="mc-con">Contract and support</h3>
@@ -132,7 +132,7 @@ const title = c.draft ? c.title : `${c.id}: ${c.title}`;
             {route.owner && <div><dt>Relationship</dt><dd>{route.owner.name}</dd></div>}
           </dl>
         ) : <p class="mc-t">{route.how} No contract with {maker} is on record, so there is no service level.</p>}
-        {route.service?.length > 0 && <p class="faint mc-t">{route.service.map((s) => s.name).join(', ')} can also swap faulty units under the maintenance contract while the maker looks.</p>}
+        {route.service?.length > 0 && <p class="faint mc-t">{route.service.map((s) => s.name).join(', ')} can also swap faulty units under the maintenance contract while the manufacturer looks.</p>}
       </section>
       <section class="card side-card s-4" aria-labelledby="mc-who" data-help="case.who">
         <h3 id="mc-who">Who decides</h3>

@@ -59,7 +59,7 @@ export const ROOMS_LITE = Object.fromEntries([...roomIds].map((r) => [r, { name:
 export const CAPTION = {
   // One line each, short enough for the band's line at 1280 wide.
   tech: (p) => `Technician: installs, swaps and first-line fixes at ${sites[p.office]?.name ?? 'the office'}.`,
-  delivery: () => 'Delivery engineer: room designs, commissioning and the next device.',
+  delivery: () => 'Delivery engineer: space designs, commissioning and the next device.',
   network: () => 'Network engineer: ports, VLANs and patching from project and incident tasks.',
   innovation: () => 'Innovation engineer: tests new devices and firmware in the Lab.',
   'sm-av': () => 'Service manager, AV: owns the standard and approves what goes in.',
@@ -119,10 +119,10 @@ export function numbersFor(p) {
       return [
         T(todayN(id), 'Today', dayLink(id), { id: 'today' }),
         T(tasks.length, 'Open tasks', taskTo, { id: 'tasks' }),
-        T(blocked, 'Blocked', listLink({ kind: TASK_KINDS, person: id, status: 'blocked' }), { id: 'blocked', tone: blocked ? 'bad' : undefined }),
+        T(blocked, 'Waiting on', listLink({ kind: TASK_KINDS, person: id, status: 'blocked' }), { id: 'blocked', tone: blocked ? 'bad' : undefined }),
         p.roleId === 'innovation'
           ? T(Object.values(labTests).filter((l) => ['testing', 'queued'].includes(l.status)).length, 'Lab tests under way', '/lab/?status=testing,queued', { id: 'lab' })
-          : T(inst, 'Rooms being installed on your projects', `/rooms/?status=installing${ss.length ? `&site=${ss.join(',')}` : ''}`, { id: 'rooms' }),
+          : T(inst, 'Spaces being installed on your projects', `/rooms/?status=installing${ss.length ? `&site=${ss.join(',')}` : ''}`, { id: 'rooms' }),
       ];
     }
     case 'sm-av': case 'sm-infra': {
@@ -130,7 +130,7 @@ export function numbersFor(p) {
       return [
         T(inboxN(id), 'For your approval', listLink({ kind: 'inbox', person: id }), { id: 'approval', tone: inboxN(id) ? 'warn' : undefined }),
         T(ITEMS.filter((it) => it.kind === 'incident').length, 'Open incidents', `/incidents/?state=${OPEN_INC}`, { id: 'inc' }),
-        T(installing.length, 'Rooms being installed', '/rooms/?status=installing', { id: 'rooms' }),
+        T(installing.length, 'Spaces being installed', '/rooms/?status=installing', { id: 'rooms' }),
         p.roleId === 'sm-av' ? T(passed, 'Lab passes to decide', '/lab/?status=passed', { id: 'lab', tone: passed ? 'warn' : undefined })
           : T(commsRooms.length, 'Comms rooms', '/rooms/?kind=comms', { id: 'comms' }),
       ];
@@ -139,7 +139,7 @@ export function numbersFor(p) {
       const ps = runs(id), bl = blockedOn(ps).length;
       return [
         T(ps.length, 'Your projects', `/projects/?owner=${id}`, { id: 'projects' }),
-        T(bl, 'Blocked on your projects', blockedLink(id), { id: 'blocked', tone: bl ? 'bad' : undefined }),
+        T(bl, 'Waiting on, your projects', blockedLink(id), { id: 'blocked', tone: bl ? 'bad' : undefined }),
         T(tasks.length, 'Your tasks', taskTo, { id: 'tasks' }),
         T(todayN(id), 'Today', dayLink(id), { id: 'today' }),
       ];
@@ -149,13 +149,13 @@ export function numbersFor(p) {
       const blAll = ITEMS.filter((it) => it.kind === 'task' && it.status === 'blocked').length;
       if (p.roleId === 'head') return [
         T(totals.offices, 'Offices', '/locations/', { id: 'sites' }),
-        T(totals.spaces, 'Rooms', '/rooms/', { id: 'rooms' }),
+        T(totals.spaces, 'Spaces', '/rooms/', { id: 'rooms' }),
         T(totals.units, 'Devices', '/devices/', { id: 'devices' }),
         T(ITEMS.filter((it) => it.kind === 'incident').length, 'Open incidents', `/incidents/?state=${OPEN_INC}`, { id: 'inc' }),
       ];
       return [
         T(live.length, 'Live projects', `/projects/?phase=${livePhases.join(',')}`, { id: 'projects' }),
-        T(blAll, 'Blocked tasks', listLink({ kind: TASK_KINDS, status: 'blocked' }), { id: 'blocked', tone: blAll ? 'bad' : undefined }),
+        T(blAll, 'Tasks waiting on something', listLink({ kind: TASK_KINDS, status: 'blocked' }), { id: 'blocked', tone: blAll ? 'bad' : undefined }),
         T(tasks.length, 'Your tasks', taskTo, { id: 'tasks' }),
         T(todayN(id), 'Today', dayLink(id), { id: 'today' }),
       ];
@@ -167,17 +167,17 @@ export function numbersFor(p) {
         T(n('new'), 'New', '/incidents/?state=new', { id: 'new', tone: n('new') ? 'warn' : undefined }),
         T(n('in-progress'), 'In progress', '/incidents/?state=in-progress', { id: 'doing' }),
         T(n('on-hold'), 'On hold', '/incidents/?state=on-hold', { id: 'hold' }),
-        T(inc.filter((i) => !i.matched).length, 'Not matched to a room', undefined, { id: 'unmatched', fact: true }),
+        T(inc.filter((i) => !i.matched).length, 'Not matched to a space', undefined, { id: 'unmatched', fact: true }),
       ];
     }
     case 'vendor': case 'service-vendor': {
       const ps = (p.projects ?? []).map((x) => projects[x]).filter(Boolean);
       const rooms = ps.flatMap((x) => x.spaces ?? []);
       return [
-        T(rooms.length, 'Rooms in your installation', '/vendor/', { id: 'rooms' }),
+        T(rooms.length, 'Spaces in your installation', '/vendor/', { id: 'rooms' }),
         T(tasks.length, 'Your tasks', '/vendor/#tasks', { id: 'tasks' }),
         T(todayN(id), 'Today', dayLink(id), { id: 'today' }),
-        T(rooms.filter((r) => r.state === 'snags').length, 'Rooms with snags', '/vendor/', { id: 'snags' }),
+        T(rooms.filter((r) => r.state === 'snags').length, 'Spaces with snags', '/vendor/', { id: 'snags' }),
       ];
     }
     default: {   // the people managers
@@ -186,7 +186,7 @@ export function numbersFor(p) {
       const onSite = team.filter((w) => ['office', 'visiting'].includes(PLACE[w]?.kind)).length, away = team.filter((w) => PLACE[w]?.kind === 'away').length;
       return [
         T(teamTasks.length, 'Open tasks in your team', listLink({ kind: TASK_KINDS, person: team.join(',') }), { id: 'tasks' }),
-        T(bl, 'Blocked', listLink({ kind: TASK_KINDS, person: team.join(','), status: 'blocked' }), { id: 'blocked', tone: bl ? 'bad' : undefined }),
+        T(bl, 'Waiting on', listLink({ kind: TASK_KINDS, person: team.join(','), status: 'blocked' }), { id: 'blocked', tone: bl ? 'bad' : undefined }),
         T(onSite, 'On site today', '/work/schedule/?view=day&scope=team', { id: 'onsite' }),
         T(away, 'Away today', '/work/schedule/?view=day&scope=team#away', { id: 'away' }),
       ];
@@ -195,7 +195,7 @@ export function numbersFor(p) {
 }
 export const EVERYONE_NUMBERS = [
   T(INBOX_SEED.filter((x) => x.kind === 'urgent' && x.status !== 'done').length, 'Urgent', listLink({ kind: 'inbox', q: 'urgent' }), { id: 'urgent', tone: 'bad' }),
-  T(installing.length, 'Rooms being installed', '/rooms/?status=installing', { id: 'rooms' }),
+  T(installing.length, 'Spaces being installed', '/rooms/?status=installing', { id: 'rooms' }),
   T(ITEMS.filter((it) => it.kind === 'incident').length, 'Open incidents', `/incidents/?state=${OPEN_INC}`, { id: 'inc' }),
   T(Object.keys(projects).length, 'Projects', '/projects/', { id: 'projects' }),
 ];

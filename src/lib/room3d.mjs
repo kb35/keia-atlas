@@ -348,7 +348,7 @@ const LAYOUTS = {
     door(b, 'left', 7.3, 8.8);
     b.anchors.wall = { cx: 5.0, signage: true };
     b.anchors.wallPlate = { x: 6.6, y: 0.02, z: 0.45 };
-    return { W, D, area: 90, chairs: 36, notes: ['Room size varies by site; 10 × 9 m shown', 'Signage display 43 to 85 in, 65 in shown'] };
+    return { W, D, area: 90, chairs: 36, notes: ['Space size varies by site; 10 × 9 m shown', 'Signage display 43 to 85 in, 65 in shown'] };
   },
   pantry(b) { return pantryLike(b, false); },
   'pantry-expanded'(b) { return pantryLike(b, true); },
@@ -368,7 +368,7 @@ const LAYOUTS = {
     door(b, 'left', 1.4, 2.8);
     b.anchors.wall = { cx: 4.95, signage: true, zc: 1.7 };
     b.anchors.wallPlate = { x: 4.95, y: 0.02, z: 0.45 };
-    return { W, D, area: 30, chairs: 4, notes: ['Room size varies by site; 6 × 5 m shown', 'Desk for one or two, lounge seating, signage 65 in shown'] };
+    return { W, D, area: 30, chairs: 4, notes: ['Space size varies by site; 6 × 5 m shown', 'Desk for one or two, lounge seating, signage 65 in shown'] };
   },
   'remote-home'(b) {
     const W = 3.0, D = 2.6;
@@ -467,7 +467,7 @@ const PLATE_FMT = {
   jis: { note: 'Japanese plates, 70 × 120 mm', perPlate: 2, dataPer: [3, 3] },
   as: { note: 'Australian plates, 116 × 76 mm', perPlate: 2, dataPer: [4, 4] },
   eu: { note: 'European frames, 80 mm a socket, 71 mm apart', perPlate: 4, dataPer: [2, 8] },
-  plain: { note: 'plain outlets (a room profile has no country)', perPlate: 4, dataPer: [2, 8] },
+  plain: { note: 'plain outlets (a space type has no country)', perPlate: 4, dataPer: [2, 8] },
 };
 const FMT_BY_COUNTRY = { IE: 'bs', GB: 'bs', SG: 'bs', MT: 'bs', US: 'nema', CA: 'nema', JP: 'jis', AU: 'as', NZ: 'as' };
 const SOCKET_PREF = ['G', 'I', 'K', 'F', 'E', 'B', 'A'];

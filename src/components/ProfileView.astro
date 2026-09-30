@@ -104,7 +104,7 @@ const title = M ? `${C.profile.name}: ${modelName(model)}` : C.profile.name;
 const NUMBERS = [
   { n: units, label: units === 1 ? 'Unit' : 'Units', to: `/devices/?cls=${cls}` },
   { n: stages.manage, label: STAGE_LABEL.manage, to: `/devices/?cls=${cls}&state=service` },
-  { n: types.length, label: types.length === 1 ? 'Room profile' : 'Room profiles', to: '#fleet' },
+  { n: types.length, label: types.length === 1 ? 'Space type' : 'Space types', to: '#fleet' },
   { n: symptoms.length, label: symptoms.length === 1 ? 'Symptom' : 'Symptoms', to: '#troubleshoot' },
 ];
 // The answer: the units of this kind in service, and any advisories to review (for the chosen model, or across the kind).
@@ -113,20 +113,20 @@ const answer = `${plural(model ? mService : stages.manage, 'unit')} in service Â
 const TABS = [
   hasPorts && M && { id: 'ports', label: 'Ports', count: M.ports?.length ?? 0 },
   { id: 'healthy', label: 'What healthy looks like', count: Object.keys(C.platforms).length },
-  { id: 'configuration', label: 'Configuration', count: cfgCount || undefined },
+  { id: 'configuration', label: 'Setup guide', count: cfgCount || undefined },
   { id: 'firmware', label: 'Firmware', count: fwl ? fwl.releases.length : undefined },
   { id: 'troubleshoot', label: 'Troubleshoot', count: symptoms.length },
   { id: 'fleet', label: 'Fleet', count: units },
 ].filter(Boolean);
 ---
-<Shell vendorOk about={{ kind: 'profile', cls, label: title, model: M ? modelName(model) : undefined, to: `/profiles/${cls}/${model ?? ''}` }} title={title} section="profiles" crumbs={M ? [{ label: 'Device profiles', to: '/profiles/' }, { label: C.profile.name, to: `/profiles/${cls}/` }, { label: modelName(model) }] : [{ label: 'Device profiles', to: '/profiles/' }, { label: C.profile.name }]}>
-  <PageBand overline="Device profile" title={C.profile.name} answer={answer} lede={`${roomWords(C.profile.object_role)}.`} numbers={NUMBERS}>
+<Shell vendorOk about={{ kind: 'profile', cls, label: title, model: M ? modelName(model) : undefined, to: `/profiles/${cls}/${model ?? ''}` }} title={title} section="profiles" crumbs={M ? [{ label: 'Device types', to: '/profiles/' }, { label: C.profile.name, to: `/profiles/${cls}/` }, { label: modelName(model) }] : [{ label: 'Device types', to: '/profiles/' }, { label: C.profile.name }]}>
+  <PageBand overline="Device type" title={C.profile.name} answer={answer} lede={`${roomWords(C.profile.object_role)}.`} numbers={NUMBERS}>
     <Fragment slot="overline">
       <span class="code mono">{cls}</span>
       <span>Version {C.profile.version}</span>
       <span>{ids.length ? plural(ids.length, 'model') : 'Model set per project'}</span>
     </Fragment>
-    <button slot="action" type="button" class="btn primary" data-open-report="change">Propose a change</button>
+    <button slot="action" type="button" class="btn primary" data-open-report="change">Propose an edit</button>
   </PageBand>
 
   <div class="content pv-page" data-morph-root>
@@ -198,7 +198,7 @@ const TABS = [
                 ))}
               </section>
             )}
-            {!choice && !advs.length && <p class="muted mb-note" data-k="mb-note">{typesUsing[model] ? 'In the standard: at least one room profile uses it.' : 'Not in any room profile today.'} {facts.length > 1 ? `${facts.filter(([k]) => k !== 'Ports').map(([k, v]) => `${k} ${v}`).join(', ')}.` : ''}</p>}
+            {!choice && !advs.length && <p class="muted mb-note" data-k="mb-note">{typesUsing[model] ? 'In the standard: at least one space type uses it.' : 'Not in any space type today.'} {facts.length > 1 ? `${facts.filter(([k]) => k !== 'Ports').map(([k, v]) => `${k} ${v}`).join(', ')}.` : ''}</p>}
           </div>
         ) : <p class="muted">Each project chooses the model for this kind of device.</p>}
       </SidePanel>
@@ -236,7 +236,7 @@ const TABS = [
         ) : (
           <div class="card empty-card">
             <p class="name">Nothing to configure on {M ? modelName(model) : 'this kind of device'}</p>
-            <p class="muted">It works as it comes, or it is set up through the device it connects to. See <a href={href('/configurations/')}>every configuration</a>.</p>
+            <p class="muted">It works as it comes, or it is set up through the device it connects to. See <a href={href('/configurations/')}>every setup guide</a>.</p>
           </div>
         )}
       </div>
@@ -264,7 +264,7 @@ const TABS = [
                         {r.lab && <a class="tag" href={href(`/lab/#${r.lab.toLowerCase()}`)}>{r.lab}</a>}{r.advisory && <span class="tag">{r.advisory}</span>}</p>
                       {r.aigna && <p class="fwr-note">{r.aigna}</p>}
                       <ul class="fwr-h">{r.headlines.map((h) => <li>{h}</li>)}</ul>
-                      {r.known_issues?.length > 0 && <details><summary>{plural(r.known_issues.length, 'known issue')}</summary><ul>{r.known_issues.map((k) => <li>{k}</li>)}</ul></details>}
+                      {r.known_issues?.length > 0 && <details><summary>{plural(r.known_issues.length, 'known error')}</summary><ul>{r.known_issues.map((k) => <li>{k}</li>)}</ul></details>}
                       {srcLink(r.source) && <a class="cite" href={srcLink(r.source).url} target="_blank" rel="noopener">Release notes</a>}
                     </div>
                   </li>
@@ -283,7 +283,7 @@ const TABS = [
       <div slot="troubleshoot" class="stack" data-k="p-troubleshoot">
         {fwStd?.known_issues?.length > 0 && (
           <section class="card pad">
-            <h3>Known issues in the standard firmware ({fwStd.version})</h3>
+            <h3>Known errors in the standard firmware ({fwStd.version})</h3>
             <ul>{fwStd.known_issues.map((k) => <li>{k}</li>)}</ul>
           </section>
         )}
@@ -322,7 +322,7 @@ const TABS = [
         </div>
         <div class="card side-card s-4">
           <h3>Used in</h3>
-          {types.length > 0 ? <div class="tagwrap">{types.map(([id, t]) => <a class="tag" href={href(`/room-profiles/${id}/`)}>{roomWords(t.profile.name)}</a>)}</div> : <p class="muted">No room profile uses it yet.</p>}
+          {types.length > 0 ? <div class="tagwrap">{types.map(([id, t]) => <a class="tag" href={href(`/room-profiles/${id}/`)}>{roomWords(t.profile.name)}</a>)}</div> : <p class="muted">No space type uses it yet.</p>}
         </div>
         <div class="card side-card s-4">
           <h3>Profile file</h3>

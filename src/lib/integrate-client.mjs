@@ -157,14 +157,14 @@ function start() {
         W.rsKeyNumber('int-needs', mine.length - done, { label: 'To install', tone: mine.length - done ? 'warn' : '' });
         W.rsKeyNumber('int-accept', done, { label: 'Installed' });
         W.rsKeyNumber('int-setup', seen, { label: 'Seen online' });
-        W.rsKeyNumber('int-rooms', new Set(mine.map((u) => u.room)).size, { label: 'Your rooms' });
+        W.rsKeyNumber('int-rooms', new Set(mine.map((u) => u.room)).size, { label: 'Your spaces' });
         return;
       }
       const f = M.figures();
-      W.rsKeyNumber('int-needs', f.needs, { label: 'Need you', tone: f.needs ? 'warn' : '' });
+      W.rsKeyNumber('int-needs', f.needs, { label: 'Ready for you', tone: f.needs ? 'warn' : '' });
       W.rsKeyNumber('int-accept', f.toAccept, { label: 'Checked, to accept', tone: f.toAccept ? 'good' : '' });
       W.rsKeyNumber('int-setup', `${f.setUp}/${f.units}`, { label: 'Units set up' });
-      W.rsKeyNumber('int-rooms', `${f.signed}/${f.rooms}`, { label: 'Rooms signed off' });
+      W.rsKeyNumber('int-rooms', `${f.signed}/${f.rooms}`, { label: 'Spaces signed off' });
     } else if (page === 'batch') {
       const s = M.batchSum(focus);
       const nd = new Set(s.issues.map((z) => z.id)).size;
@@ -225,10 +225,10 @@ function start() {
     const issueUnits = new Set(s.issues.map((z) => z.id)).size;
     const allPass = readyUnits.length === b.units.length && b.units.every((id) => M.U.get(id).steps.every((st) => ['verified', 'done'].includes(M.stepOf(id, st).st)));
     const plural = (n, one, many) => `${n} ${n === 1 ? one : many ?? `${one}s`}`;
-    const msg = !M.seeOn() ? 'Keia Atlas reads back from stage 2. Until then, mark each unit by hand in its detail.'
+    const msg = !M.seeOn() ? 'Keia Atlas reads back once real feeds replace the simulation. Until then, mark each unit by hand in its detail.'
       : allPass ? `All ${b.units.length} pass every check Keia Atlas can run.`
-        : readyUnits.length ? `Passed so far: ${plural(s.ready.length, 'step')} on ${plural(readyUnits.length, 'unit')}.${issueUnits ? ` ${plural(issueUnits, 'unit needs', 'units need')} you first; exceptions are never accepted with the rest.` : ''}`
-          : s.done === b.units.length ? `All ${b.units.length} set up.` : s.done ? `${s.done} of ${b.units.length} set up. The rest gather here as Keia Atlas sees them pass.` : issueUnits ? `${plural(issueUnits, 'unit needs', 'units need')} you before anything here can be accepted.` : 'Nothing checked yet. Apply the profile, or install the units, and Keia Atlas reads them back.';
+        : readyUnits.length ? `Passed so far: ${plural(s.ready.length, 'step')} on ${plural(readyUnits.length, 'unit')}.${issueUnits ? ` ${plural(issueUnits, 'unit is', 'units are')} ready for you first; exceptions are never accepted with the rest.` : ''}`
+          : s.done === b.units.length ? `All ${b.units.length} set up.` : s.done ? `${s.done} of ${b.units.length} set up. The rest gather here as Keia Atlas sees them pass.` : issueUnits ? `${plural(issueUnits, 'unit is', 'units are')} ready for you before anything here can be accepted.` : 'Nothing checked yet. Apply the profile, or install the units, and Keia Atlas reads them back.';
     const btn = readyUnits.length ? `<button type="button" class="btn small primary" data-help="integrate.accept" data-act="accept-units" data-id="${esc(bid)}">${sel.length ? `Accept the ${sel.length} selected` : allPass ? `Accept all ${readyUnits.length}` : `Accept ${plural(s.ready.length, 'step')}`}</button>` : '';
     return `<p class="ua-t">${readyUnits.length ? glyph('verified') : ''}<span>${esc(msg)}</span></p>${btn}${readyUnits.length ? '<span class="ua-keys faint" data-help="integrate.keys">Keys: arrows move, Space selects, A accepts</span>' : ''}`;
   }
@@ -263,7 +263,7 @@ function start() {
       return `<li class="vi" data-k="${esc(u.id)}" data-st="${x.st}"><span class="vi-b">${glyph(done ? (x.st === 'verified' || x.st === 'done' ? x.st : 'doing') : 'todo')}<span><b>${esc(u.short)}</b><small>${esc([u.modelName, u.where].filter(Boolean).join(' · '))}</small><small class="vi-s">${esc(done ? (s.online ? `Seen online on ${u.port}` : x.sub || 'Marked installed') : u.blocked?.install ? `Waiting: ${u.blocked.install}` : '')}</small></span></span>` +
         `<span class="vi-a">${done ? '' : `<button type="button" class="btn small" data-help="integrate.installed" data-act="installed" data-u="${esc(u.id)}"${u.blocked?.install ? ' disabled' : ''}>Installed</button>`}</span>${extra}</li>`;
     }).join('');
-    const bulk = left.length > 1 ? `<button type="button" class="btn small ghost" data-help="integrate.room-installed" data-act="room-installed" data-id="${esc(rid)}">Mark the room installed (${left.length})</button>` : '';
+    const bulk = left.length > 1 ? `<button type="button" class="btn small ghost" data-help="integrate.room-installed" data-act="room-installed" data-id="${esc(rid)}">Mark the space installed (${left.length})</button>` : '';
     return `<ul class="vi-list">${rows}</ul>${bulk}`;
   }
 
@@ -421,12 +421,12 @@ function start() {
     }
     if (act === 'apply') {
       const b = M.B.get(id), via = a.dataset.via;
-      rec(M.item.batch(id), 'applied', false, true, via === 'agent' ? 'Applied the run the configuration agent prepared' : via === 'push' ? `Applied through ${b.via} to all ${b.units.length}` : `Applied by hand in ${b.via}`);
+      rec(M.item.batch(id), 'applied', false, true, via === 'agent' ? 'Applied the run the setup guide agent prepared' : via === 'push' ? `Applied through ${b.via} to all ${b.units.length}` : `Applied by hand in ${b.via}`);
       readBack(id);
       return;
     }
     if (act === 'handoff') {
-      rec(M.item.batch(id), 'handed', false, true, 'Handed to the configuration agent');
+      rec(M.item.batch(id), 'handed', false, true, 'Handed to the setup guide agent');
       later(1500, () => rec(M.item.batch(id), 'prepared', false, true, `Prepared the run for ${M.B.get(id).units.length} units`, 'agent'));
       return;
     }
@@ -447,7 +447,7 @@ function start() {
     if (act === 'room-installed') {
       const r = M.R.get(id);
       const list = r.units.map((x) => M.U.get(x)).filter((u) => u.steps.includes('install') && (mode !== 'vendor' || u.vendor) && !M.us(u.id).installed && !['done', 'verified'].includes(M.stepOf(u.id, 'install').st) && !u.blocked?.install);
-      list.forEach((u, i) => { setU(u.id, 'installed', true, `Marked the room installed (${list.length} units)`); seeOnline(u.id, 1400 + i * 450); });
+      list.forEach((u, i) => { setU(u.id, 'installed', true, `Marked the space installed (${list.length} units)`); seeOnline(u.id, 1400 + i * 450); });
       return;
     }
     if (act === 'test') {
@@ -466,7 +466,7 @@ function start() {
       rec(M.item.room(id), 'signed', M.rs(id).signed, { w: who(), at: nowIso(), n: `all ${r.tests.length} room tests passed` }, `Signed off: all ${r.tests.length} room tests passed`);
       return;
     }
-    if (act === 'sign') { rec(M.item.room(id), 'signed', M.rs(id).signed, { w: who(), at: nowIso() }, 'Signed off the room'); return; }
+    if (act === 'sign') { rec(M.item.room(id), 'signed', M.rs(id).signed, { w: who(), at: nowIso() }, 'Signed off the space'); return; }
   }
   function onSubmit(ev) {
     const f = ev.target.closest && ev.target.closest('[data-act-form]');

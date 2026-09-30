@@ -68,8 +68,8 @@ const planLines = YEARS.flatMap((y) => SITE_ORDER.flatMap((site) => GROUPS.map((
 })));
 const committedLines = lines.filter((l) => l.status === 'committed');
 // Estimated lines: what each scenario on record adds, hidden until it is adopted (a typed scenario adds its own).
-const estimatedLines = scenarios.flatMap((s) => s.plan.flatMap((y) => y.estimated.projects.map((p) => ({ sc: s.id, id: `${s.id}:${p.id}`, year: y.id, n: y.n, status: 'estimated', kind: p.kind, kindLabel: PROJECT_KIND[p.kind] ?? p.kind, site: null, region: p.region, name: p.name, sub: `${s.name} · ${p.units} units in ${p.rooms} rooms, ${p.staff} staff`, eur: p.eur, units: p.units, rooms: p.rooms, to: '#scenarios', where: 'Scenarios' }))));
-const roomWord = (n) => `${n} ${n === 1 ? 'room' : 'rooms'}`;
+const estimatedLines = scenarios.flatMap((s) => s.plan.flatMap((y) => y.estimated.projects.map((p) => ({ sc: s.id, id: `${s.id}:${p.id}`, year: y.id, n: y.n, status: 'estimated', kind: p.kind, kindLabel: PROJECT_KIND[p.kind] ?? p.kind, site: null, region: p.region, name: p.name, sub: `${s.name} · ${p.units} units in ${p.rooms} spaces, ${p.staff} staff`, eur: p.eur, units: p.units, rooms: p.rooms, to: '#scenarios', where: 'Scenarios' }))));
+const roomWord = (n) => `${n} ${n === 1 ? 'space' : 'spaces'}`;
 const unitWord = (n) => `${n} ${n === 1 ? 'unit' : 'units'}`;
 const dueLink = (y, extra = '') => href(`/refresh/?year=${y.n === NOW_FY ? `${NOW_YEAR},${y.n}` : y.n}&project=none${extra}`);
 // The ratio model as it stands today, office by office.
@@ -130,7 +130,7 @@ const scenarioFor = scenarios[0];
             <Section title="By region and office" id={`office-${y.id}`} aside={`${y.label}: every figure opens what is behind it`} help="planning.by-office">
               <div class="tablewrap">
                 <table class="pl-table to-cards">
-                  <thead><tr><th scope="col">Office</th><th scope="col" class="r">Committed</th><th scope="col" class="r">Planned</th><th scope="col" class="r">Estimated</th><th scope="col" class="r">Total</th><th scope="col" class="r">Devices</th><th scope="col" class="r">Rooms</th></tr></thead>
+                  <thead><tr><th scope="col">Office</th><th scope="col" class="r">Committed</th><th scope="col" class="r">Planned</th><th scope="col" class="r">Estimated</th><th scope="col" class="r">Total</th><th scope="col" class="r">Devices</th><th scope="col" class="r">Spaces</th></tr></thead>
                   {REGIONS.map((g) => (
                     <tbody>
                       <tr class="pl-region"><th scope="row"><a href={`?year=${y.id}&region=${g}#budget`}>{regionShort(g)}</a></th>
@@ -266,7 +266,7 @@ const scenarioFor = scenarios[0];
                   <thead><tr><th scope="col">Region and role</th><th scope="col" class="r">People</th><th scope="col" class="r">Available</th><th scope="col" class="r">Needed</th><th scope="col">Gap</th></tr></thead>
                   {REGIONS.map((g) => (
                     <tbody>
-                      <tr class="pl-region"><th scope="row" colspan="5"><a href={`?year=${y.id}&region=${g}#capacity`}>{regionShort(g)}</a> <small class="faint"><span data-v={`estate:${g}:offices`}>{v[`estate:${g}:offices`]}</span> offices · <span data-v={`estate:${g}:rooms`}>{v[`estate:${g}:rooms`]}</span> rooms · <span data-v={`estate:${g}:units`}>{v[`estate:${g}:units`]}</span> units · <span data-v={`estate:${g}:staff`}>{v[`estate:${g}:staff`]}</span> staff and home offices</small></th></tr>
+                      <tr class="pl-region"><th scope="row" colspan="5"><a href={`?year=${y.id}&region=${g}#capacity`}>{regionShort(g)}</a> <small class="faint"><span data-v={`estate:${g}:offices`}>{v[`estate:${g}:offices`]}</span> offices · <span data-v={`estate:${g}:rooms`}>{v[`estate:${g}:rooms`]}</span> spaces · <span data-v={`estate:${g}:units`}>{v[`estate:${g}:units`]}</span> units · <span data-v={`estate:${g}:staff`}>{v[`estate:${g}:staff`]}</span> staff and home offices</small></th></tr>
                       {ROLES.map((r) => (
                         <tr><td>{ROLE_LABEL[r]}</td><td class="num r" data-v={`hours:${r}:${g}:people`}>{v[`hours:${r}:${g}:people`]}</td><td class="num r" data-v={`hours:${r}:${g}:have`}>{v[`hours:${r}:${g}:have`]}</td><td class="num r" data-v={`hours:${r}:${g}:need`}>{v[`hours:${r}:${g}:need`]}</td><td><span class:list={['pl-gap', 'inline', v[`hours:${r}:${g}:gap.tone`]]} data-v={`hours:${r}:${g}:gap`} data-tone-of={`hours:${r}:${g}:gap.tone`}>{v[`hours:${r}:${g}:gap`]}</span></td></tr>
                       ))}
@@ -282,12 +282,12 @@ const scenarioFor = scenarios[0];
       <Section title="The ratio model" id="ratios" aside="House assumptions, so the arithmetic can be followed" help="planning.ratios">
         <div class="g12">
           <div class="card side-card s-7">
-            <h3>Technicians against staff and rooms, today</h3>
+            <h3>Technicians against staff and spaces, today</h3>
             <div class="tablewrap">
               <table class="pl-table to-cards">
-                <thead><tr><th scope="col">Region</th><th scope="col" class="r">Technicians</th><th scope="col" class="r">Staff</th><th scope="col" class="r">Rooms</th><th scope="col" class="r">Staff each</th><th scope="col" class="r">Rooms each</th></tr></thead>
+                <thead><tr><th scope="col">Region</th><th scope="col" class="r">Technicians</th><th scope="col" class="r">Staff</th><th scope="col" class="r">Spaces</th><th scope="col" class="r">Staff each</th><th scope="col" class="r">Spaces each</th></tr></thead>
                 <tbody>
-                  {officesByRegion.map((o) => { const sp = o.techs ? Math.round(o.staff / o.techs) : null, rp = o.techs ? Math.round(o.rooms / o.techs) : null; const ts = target('tech', 'staff'), tr = target('tech', 'room'); return (
+                  {officesByRegion.map((o) => { const sp = o.techs ? Math.round(o.staff / o.techs) : null, rp = o.techs ? Math.round(o.rooms / o.techs) : null; const ts = target('tech', 'staff'), tr = target('tech', 'space'); return (
                     <tr><td>{regionShort(o.g)}<small>{o.sites.map((s) => officeName(s)).join(', ')}</small></td><td class="num r">{o.techs}</td><td class="num r">{o.staff}</td><td class="num r">{o.rooms}</td>
                       <td class="num r"><span class:list={['pl-gap', 'inline', sp != null && sp <= ts ? 'good' : 'warn']}>{sp ?? 'None'}</span><small>target {ts}</small></td>
                       <td class="num r"><span class:list={['pl-gap', 'inline', rp != null && rp <= tr ? 'good' : 'warn']}>{rp ?? 'None'}</span><small>target {tr}</small></td></tr>
@@ -526,7 +526,7 @@ const scenarioFor = scenarios[0];
         if (host) for (const y of res.years) for (const p of y.estimated.projects) {
           const a = document.createElement('a'); a.className = 'row plain pl-line'; a.href = '#scenarios'; a.hidden = true; a.dataset.scLine = s.id; a.dataset.i = '900'; a.dataset.eur = String(p.eur); a.dataset.s = '99'; a.dataset.name = p.name; a.setAttribute('data-help', 'planning.line'); a.dataset.plGoto = 'scenarios';
           a.dataset.find = `${p.name} ${s.name} Estimated ${fyLabel(y.n)}`; a.dataset.fRegion = p.region; a.dataset.fSite = ''; a.dataset.fKind = p.kind; a.dataset.fStatus = 'estimated'; a.dataset.fYear = y.id;
-          a.innerHTML = `<span><span class="name">${esc(p.name)}</span><span class="sub">${esc(s.name)} · ${p.units} units in ${p.rooms} rooms, ${p.staff} staff</span></span><span class="end"><span class="pill plain pl-st st-estimated">Estimated</span><span class="pl-amt num"><b>${esc(money(p.eur))}</b><small>${esc(fyLabel(y.n))} · ${esc(D.kindLabel[p.kind] || p.kind)}</small></span><span class="pl-open faint">Scenario →</span></span>`;
+          a.innerHTML = `<span><span class="name">${esc(p.name)}</span><span class="sub">${esc(s.name)} · ${p.units} units in ${p.rooms} spaces, ${p.staff} staff</span></span><span class="end"><span class="pill plain pl-st st-estimated">Estimated</span><span class="pl-amt num"><b>${esc(money(p.eur))}</b><small>${esc(fyLabel(y.n))} · ${esc(D.kindLabel[p.kind] || p.kind)}</small></span><span class="pl-open faint">Scenario →</span></span>`;
           host.appendChild(a);
         }
         const m = M(); if (!m.reduced && who === (live && live.who())) el.animate([{ opacity: 0, transform: 'scale(.94)' }, { opacity: 1, transform: 'none' }], { duration: m.enter, easing: m.ease });

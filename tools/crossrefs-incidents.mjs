@@ -21,6 +21,19 @@ import path from 'node:path';
 export const LAST_MOMENT = '2026-09-28T23:59';
 export const STATE_LABEL = { new: 'New', 'in-progress': 'In progress', 'on-hold': 'On hold', resolved: 'Resolved' };
 
+// Priority (a proposal a person may change): the priority in force is the override's when there is one,
+// otherwise the proposal; an override changes something and says why, after the ticket was opened and not
+// in the future. Returns [{ at, message }].
+export function checkPriority({ priority, priority_proposed: proposed, priority_override: o, opened }) {
+  const out = [];
+  const effective = o ? o.priority : proposed;
+  if (priority !== effective) out.push({ at: ['priority'], message: o ? `a person changed the priority to ${o.priority}, so priority must be ${o.priority}, not ${priority}` : `priority must equal priority_proposed (${proposed}) unless priority_override says who changed it and why` });
+  if (o && o.priority === proposed) out.push({ at: ['priority_override', 'priority'], message: `the override sets P${o.priority}, which is already the proposal; remove the override` });
+  if (o && opened && o.at < opened) out.push({ at: ['priority_override', 'at'], message: `the change at ${o.at} is before the ticket was opened (${opened})` });
+  if (o && o.at > LAST_MOMENT) out.push({ at: ['priority_override', 'at'], message: `${o.at} is in the future` });
+  return out;
+}
+
 // The lifecycle rules on their own, so tests can call them directly. Returns [{ at, message }], where
 // `at` is the path inside the incident (['history', 3, 'state']).
 export function checkLifecycle({ opened, state, history }) {
@@ -93,6 +106,10 @@ export function crossCheckIncidents(records, { people, taskIds }) {
         report(rec, ['keia_atlas', 'symptom'], `symptom "${d.keia_atlas.symptom}" is not in the ${cls} profile's guide (${Object.keys(classes.get(cls)?.discrimination ?? {}).join(', ') || 'none'})`);
       }
     }
+
+    // Priority is proposed; a person may change it, and the priority in force says which.
+    for (const p of checkPriority(d)) report(rec, p.at, p.message);
+    if (d.priority_override) who(rec, ['priority_override', 'by'], d.priority_override.by);
 
     // The lifecycle.
     for (const p of checkLifecycle(d)) report(rec, p.at, p.message);

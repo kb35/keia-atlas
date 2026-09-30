@@ -113,8 +113,8 @@ export function lights(p) {
   const waiting = ch.filter((c) => c.status === 'proposed'), approved = ch.filter((c) => c.status === 'approved');
   let scope;
   if (waiting.length) scope = { state: 'warn', word: `${plural(waiting.length, 'change request')} waiting`, why: `${waiting[0].title}${waiting.length > 1 ? ` and ${waiting.length - 1} more` : ''}: ${person(waiting[0].approver).name} decides.` };
-  else if (approved.length) scope = { state: 'ok', word: `Changed ${approved.length === 1 ? 'once' : `${approved.length} times`}, approved`, why: `${plural(rooms, 'room')}; ${approved[approved.length - 1].title.toLowerCase()} was approved by ${person(approved[approved.length - 1].approver).name}.` };
-  else scope = { state: 'ok', word: 'As chartered', why: `${plural(rooms, 'room')}, ${PROJECT_KIND[p.kind]?.toLowerCase() ?? p.kind}; no change requests.` };
+  else if (approved.length) scope = { state: 'ok', word: `Changed ${approved.length === 1 ? 'once' : `${approved.length} times`}, approved`, why: `${plural(rooms, 'space')}; ${approved[approved.length - 1].title.toLowerCase()} was approved by ${person(approved[approved.length - 1].approver).name}.` };
+  else scope = { state: 'ok', word: 'As chartered', why: `${plural(rooms, 'space')}, ${PROJECT_KIND[p.kind]?.toLowerCase() ?? p.kind}; no change requests.` };
   return { schedule, cost, scope };
 }
 

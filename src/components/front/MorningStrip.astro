@@ -1,0 +1,146 @@
+---
+// One morning (FRONT-DOOR section 2, screen 3): the worked example as a strip of five steps, each a small card of
+// the kind Atlas shows, each naming the idea it shows. Read in order, it meets all five ideas as they happen.
+// Motion (MOTION-V2 4.34): each step grows in from its centre as the strip scrolls into view, once, --stagger apart;
+// the "With" chip slides from Liam to Network team to Poly (vendor) while the step is hovered or focused, and back.
+// Reduced motion: every step is present at once and the chip's three states are listed as a row.
+import { href, spaces } from '../../lib/data.mjs';
+import HealthGlyph from '../HealthGlyph.astro';
+import { IDEAS } from '../../lib/method.mjs';
+const idea = (n) => IDEAS[n - 1];
+const others = Object.values(spaces).filter((s) => s.site === 'dub').length - 1;
+const CHIPS = ['With Liam · since 08:10', 'With Network team · needs a switch config change', 'With Poly (vendor) · case 48812'];
+---
+<ol class="ms" data-ms>
+  <li class="ms-step">
+    <p class="ms-time"><time>07:52</time></p>
+    <div class="ms-card">
+      <p class="ms-row"><HealthGlyph state="fault" size={16} label="Fault" class="lit" /> <b>Video bar offline</b></p>
+      <p class="ms-sub">3.09 Whooper Swan · Dublin office, third floor</p>
+      <p class="ms-src">from Poly Lens · 07:52</p>
+    </div>
+    <p class="ms-what">The fault is on the plan, in the space where it happened.</p>
+    <a class="ms-idea" href={href(`/method/${idea(1).slug}/`)}>1 · {idea(1).name}</a>
+  </li>
+  <li class="ms-step">
+    <p class="ms-time"><time>07:52</time></p>
+    <div class="ms-card">
+      <dl class="ms-fields">
+        <div><dt>Space</dt><dd>3.09 Whooper Swan</dd></div>
+        <div><dt>Unit</dt><dd>Poly Studio X72</dd></div>
+        <div><dt>Last change</dt><dd>Firmware, 12 days ago</dd></div>
+        <div><dt>Priority</dt><dd>Proposed from the 09:00 booking</dd></div>
+      </dl>
+    </div>
+    <p class="ms-what">The incident arrives filled in. Nobody typed a field.</p>
+    <a class="ms-idea" href={href(`/method/${idea(2).slug}/`)}>2 · {idea(2).name}</a>
+  </li>
+  <li class="ms-step">
+    <p class="ms-time"><time>07:53</time></p>
+    <div class="ms-card">
+      <p class="ms-over">Home · Liam</p>
+      <p class="ms-answer">1 space failing before a booking</p>
+      <p class="ms-sub">{others} other spaces ready · checked 10 s ago</p>
+    </div>
+    <p class="ms-what">Liam's Home shows one line in red. Everything else stays quiet.</p>
+    <a class="ms-idea" href={href(`/method/${idea(3).slug}/`)}>3 · {idea(3).name}</a>
+  </li>
+  <li class="ms-step" data-ms-with tabindex="0" aria-label="08:10. The job moves whole: with Liam, then with Network team, then with Poly (vendor).">
+    <p class="ms-time"><time>08:10</time></p>
+    <div class="ms-card">
+      <span class="ms-chip" aria-hidden="true"><span class="ms-track" data-ms-track>{CHIPS.map((c) => <span class="ms-c">{c}</span>)}</span></span>
+      <ul class="ms-chips-still">{CHIPS.map((c) => <li>{c}</li>)}</ul>
+      <p class="ms-sub">The record under the chip stays the same.</p>
+    </div>
+    <p class="ms-what">One named owner at a time. The job moves with its history, so nobody explains twice.</p>
+    <a class="ms-idea" href={href(`/method/${idea(4).slug}/`)}>4 · {idea(4).name}</a>
+  </li>
+  <li class="ms-step">
+    <p class="ms-time"><time>08:31</time></p>
+    <div class="ms-card">
+      <p class="ms-row"><HealthGlyph state="fine" size={16} label="Fine" class="lit" /> <b>Resolved</b></p>
+      <p class="ms-q">"What fixed it?"</p>
+      <p class="ms-sub">Known error: used on 15 installs, 14 before this fix</p>
+    </div>
+    <p class="ms-what">Closing asks one question. The answer is kept where the next person will look.</p>
+    <a class="ms-idea" href={href(`/method/${idea(5).slug}/`)}>5 · {idea(5).name}</a>
+  </li>
+</ol>
+
+<script>
+  import { motion, onceInView } from '../../lib/motion-read.mjs';
+  function init(ol: HTMLElement) {
+    if ((ol as any).__ms) return; (ol as any).__ms = true;
+    const m = motion();
+    if (!m.reduced) {
+      const steps = Array.from(ol.querySelectorAll<HTMLElement>(':scope > .ms-step'));
+      steps.forEach((s) => { s.style.opacity = '0'; });
+      onceInView(ol, () => {
+        const mm = motion();
+        steps.forEach((s, i) => {
+          s.style.opacity = '';
+          s.animate([{ opacity: 0, transform: 'scale(.94)' }, { opacity: 1, transform: 'none' }], { duration: mm.enter, delay: i * mm.stagger, easing: mm.ease, fill: 'backwards' });
+        });
+      }, 0.15);
+    }
+    // The With chip: Liam, then Network team, then Poly (vendor) while hovered or focused; back on leave.
+    const step = ol.querySelector<HTMLElement>('[data-ms-with]');
+    const track = ol.querySelector<HTMLElement>('[data-ms-track]');
+    if (!step || !track) return;
+    let timers: number[] = [];
+    const show = (i: number) => { track.style.transform = `translateY(${-i * 100}%)`; };
+    const start = () => {
+      timers.forEach(clearTimeout); timers = [];
+      const mm = motion();
+      show(1);
+      timers.push(window.setTimeout(() => show(2), mm.chip + mm.page * 2));
+    };
+    const stop = () => { timers.forEach(clearTimeout); timers = []; show(0); };
+    step.addEventListener('pointerenter', start);
+    step.addEventListener('pointerleave', stop);
+    step.addEventListener('focus', start);
+    step.addEventListener('blur', stop);
+  }
+  const boot = () => document.querySelectorAll<HTMLElement>('[data-ms]').forEach(init);
+  boot();
+  document.addEventListener('astro:page-load', boot);
+</script>
+
+<style>
+  .ms { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; counter-reset: none; }
+  .ms-step { display: grid; grid-template-rows: auto 1fr auto auto; gap: 10px; min-width: 0; transform-origin: center; border-radius: var(--radius-lg); outline-offset: 4px; }
+  .ms-time { margin: 0; font: 500 12.5px/1.4 var(--font-mono); color: var(--text-2); font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 8px; }
+  .ms-time::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .ms-card { background: var(--surface); border: var(--border-card); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 14px 16px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+  .ms-card p { margin: 0; }
+  .ms-row { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+  .ms-row b { font-weight: 550; }
+  .ms-sub { font-size: 13px; color: var(--text-2); }
+  .ms-src { font: 500 11px/1.4 var(--font-mono); color: var(--quiet, var(--text-3)); }
+  .ms-over { font: 500 10.5px/1.2 var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); }
+  .ms-answer { font-size: 14.5px; font-weight: 550; color: var(--h-fault-ink, var(--red-ink)); }
+  .ms-q { font-size: 14px; font-weight: 550; }
+  .ms-fields { margin: 0; display: grid; gap: 6px; }
+  .ms-fields div { display: grid; gap: 1px; }
+  .ms-fields dt { font-size: 12px; color: var(--text-3); }
+  .ms-fields dd { margin: 0; font-size: 13.5px; font-weight: 550; }
+  .ms-chip { display: block; height: 28px; overflow: hidden; border-radius: 999px; background: var(--h-progress-soft, var(--blue-soft)); color: var(--h-progress-ink, var(--blue-ink)); }
+  .ms-track { display: block; transition: transform var(--dur-chip, 320ms) var(--ease-settle); }
+  .ms-c { display: block; height: 28px; line-height: 28px; padding: 0 12px; font-size: 12.5px; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ms-chips-still { display: none; list-style: none; margin: 0; padding: 0; gap: 4px; }
+  .ms-chips-still li { font-size: 12.5px; font-weight: 550; padding: 4px 10px; border-radius: 999px; background: var(--h-progress-soft, var(--blue-soft)); color: var(--h-progress-ink, var(--blue-ink)); }
+  .ms-what { margin: 0; font-size: 14px; color: var(--text); }
+  .ms-idea { font-size: 13px; font-weight: 550; display: inline-flex; align-items: center; min-height: 32px; }
+  @container fd (max-width: 1099px) { .ms { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @container fd (max-width: 759px) {
+    .ms { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+    .ms-step { grid-template-columns: 56px minmax(0, 1fr); grid-template-rows: auto; column-gap: 12px; row-gap: 8px; }
+    .ms-time { grid-row: 1 / span 3; align-items: flex-start; padding-top: 14px; }
+    .ms-time::after { display: none; }
+    .ms-card, .ms-what, .ms-idea { grid-column: 2; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ms-chip { display: none; }
+    .ms-chips-still { display: grid; }
+  }
+</style>

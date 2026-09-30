@@ -1,0 +1,107 @@
+---
+// Own it, hand it on: the "With" chip in four states over a record that never changes (FRONT-DOOR section 3).
+// The explorable: hand the job on, or pick a state. The chip slides along one line to its new words; the record
+// under it stays still. At "Done automatically", "How was this done?" grows from the chip.
+// Reduced motion: the chip's words change at once.
+const STATES = [
+  { id: 'you', chip: 'With you · since 08:10', who: 'A colleague', note: 'You took it. You keep it until the person is back working, or hand it on as a whole.' },
+  { id: 'team', chip: 'With Network team · needs a switch config change', who: 'A team', note: 'Handed on with why. The team sees the evidence, the history and the space.' },
+  { id: 'vendor', chip: 'With Poly (vendor) · case 48812', who: 'A vendor', note: 'A peer in the same record, access scoped to this job and ending when it closes. The contract\'s clock is visible to both sides.' },
+  { id: 'rule', chip: 'Done automatically under the DNS rule (owner: Niamh)', who: 'A rule someone owns', note: 'Routine work handed to a standing rule a named person approved once.' },
+];
+---
+<div class="wd" data-wd data-help="method.with">
+  <div class="wd-chipline">
+    <span class="wd-chip" data-wd-chip data-state="you" aria-live="polite"><span class="wd-av" aria-hidden="true"></span><span class="wd-text" data-wd-text>{STATES[0].chip}</span></span>
+  </div>
+  <article class="wd-record" aria-label="The record, which stays the same">
+    <p class="wd-over">Incident · 3.09 Whooper Swan · opened 07:52</p>
+    <p class="wd-title">Video bar cannot be reached by its name</p>
+    <ul class="wd-hist">
+      <li><time>07:52</time> Opened from the fleet tool alert; space, unit and last change filled in</li>
+      <li><time>08:10</time> The unit answers on its address, not on its name</li>
+      <li><time>08:14</time> The DNS record holds an old address; the build sheet has the right one</li>
+    </ul>
+  </article>
+  <div class="wd-how" data-wd-how hidden>
+    <p class="wd-over">How was this done?</p>
+    <dl>
+      <div><dt>Rule</dt><dd>DNS rule, owner Niamh, approved once</dd></div>
+      <div><dt>Read</dt><dd>The build sheet: the address this unit should have</dd></div>
+      <div><dt>Did</dt><dd>Updated the DNS record to match, then read it back</dd></div>
+      <div><dt>Undo</dt><dd>Roll back restores the record as it was</dd></div>
+    </dl>
+  </div>
+  <p class="wd-note" data-wd-note>{STATES[0].note}</p>
+  <div class="wd-controls">
+    <div class="wd-states" role="group" aria-label="Who holds the job">
+      {STATES.map((s, i) => <button type="button" data-wd-go={i} aria-pressed={i === 0 ? 'true' : 'false'}>{s.who}</button>)}
+    </div>
+    <button type="button" class="btn small" data-wd-next>Hand it on</button>
+  </div>
+  <script type="application/json" data-wd-states set:html={JSON.stringify(STATES)} />
+</div>
+
+<script>
+  import { motion, growFrom } from '../../lib/motion-read.mjs';
+  function init(root: HTMLElement) {
+    if ((root as any).__wd) return; (root as any).__wd = true;
+    const S = JSON.parse(root.querySelector('[data-wd-states]')!.textContent!);
+    const chip = root.querySelector<HTMLElement>('[data-wd-chip]')!;
+    const text = root.querySelector<HTMLElement>('[data-wd-text]')!;
+    const note = root.querySelector<HTMLElement>('[data-wd-note]')!;
+    const how = root.querySelector<HTMLElement>('[data-wd-how]')!;
+    const btns = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-wd-go]'));
+    const next = root.querySelector<HTMLButtonElement>('[data-wd-next]')!;
+    let cur = 0;
+    function go(i: number) {
+      if (i === cur) return;
+      const m = motion(), fwd = i > cur;
+      text.getAnimations().forEach((a) => a.finish());
+      const swap = () => {
+        text.textContent = S[i].chip; chip.dataset.state = S[i].id; note.textContent = S[i].note;
+        how.hidden = S[i].id !== 'rule';
+        if (!how.hidden) growFrom(how, chip, m);
+      };
+      if (m.reduced) swap();
+      else {
+        const d = fwd ? 1 : -1;
+        text.animate([{ transform: 'none', opacity: 1 }, { transform: `translateX(${-16 * d}px)`, opacity: 0 }], { duration: m.exit, easing: m.exitEase }).onfinish = () => {
+          swap();
+          text.animate([{ transform: `translateX(${16 * d}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: m.chip, easing: m.ease });
+        };
+      }
+      cur = i;
+      btns.forEach((b, k) => b.setAttribute('aria-pressed', String(k === i)));
+      next.textContent = i === S.length - 1 ? 'Start again' : 'Hand it on';
+    }
+    btns.forEach((b, k) => b.addEventListener('click', () => go(k)));
+    next.addEventListener('click', () => go(cur === S.length - 1 ? 0 : cur + 1));
+  }
+  const boot = () => document.querySelectorAll<HTMLElement>('[data-wd]').forEach(init);
+  boot();
+  document.addEventListener('astro:page-load', boot);
+</script>
+
+<style>
+  .wd { display: grid; gap: 12px; }
+  .wd-chipline { min-height: 32px; display: flex; }
+  .wd-chip { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; min-height: 28px; padding: 3px 12px 3px 4px; border-radius: 999px; background: var(--h-progress-soft, var(--blue-soft)); color: var(--h-progress-ink, var(--blue-ink)); font-size: 12.5px; font-weight: 550; overflow: hidden; transition: background var(--dur-state) var(--ease-settle), color var(--dur-state) var(--ease-settle), box-shadow var(--dur-state) var(--ease-settle); }
+  .wd-chip[data-state="rule"] { background: transparent; color: var(--text-2); box-shadow: inset 0 0 0 1px var(--quiet, var(--line-strong)); }
+  .wd-av { width: 20px; height: 20px; border-radius: 50%; background: var(--surface); box-shadow: inset 0 0 0 1.5px currentColor; flex: none; }
+  .wd-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .wd-record, .wd-how { border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); padding: 12px 14px; display: grid; gap: 6px; }
+  .wd-over { margin: 0; font: 500 10.5px/1.3 var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); }
+  .wd-title { margin: 0; font-size: 15px; font-weight: 600; }
+  .wd-hist { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; color: var(--text-2); }
+  .wd-hist time { font: 500 12px/1.4 var(--font-mono); color: var(--text-3); margin-right: 8px; }
+  .wd-how dl { margin: 0; display: grid; gap: 4px; }
+  .wd-how dl div { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 10px; font-size: 13px; }
+  .wd-how dt { color: var(--text-2); }
+  .wd-how dd { margin: 0; }
+  .wd-note { margin: 0; font-size: 13.5px; min-height: 2.8em; }
+  .wd-controls { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .wd-states { display: flex; flex-wrap: wrap; gap: 4px; }
+  .wd-states button { font: 550 12.5px/1 var(--font-sans); color: var(--text-2); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; min-height: 32px; padding: 0 12px; cursor: pointer; }
+  .wd-states button[aria-pressed="true"] { background: var(--surface); color: var(--text); border-color: var(--line-strong); }
+</style>

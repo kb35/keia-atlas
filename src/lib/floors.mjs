@@ -25,7 +25,7 @@ import path from 'node:path';
 import { parse } from 'yaml';
 import { buildRoom, outletPlates, parseEnd, devKey } from './room3d.mjs';
 
-export const FICTION = 'Fictional floor plan: room sizes from the room profiles; layout, trays and cable lengths made up for the demo.';
+export const FICTION = 'Fictional floor plan: space sizes from the space types; layout, trays and cable lengths made up for the demo.';
 export const U_M = 0.04445;              // one rack unit
 export const RACK_BASE_M = 0.1;          // plinth and castors under U1
 export const SLACK = { rack: 3, outlet: 0.3 };   // house: service loop at the panel, spare at the outlet
@@ -513,7 +513,7 @@ export function trace(M, ref) {
     const tag = position.units.find((u) => !u.legacy)?.asset_tag ?? null;
     hops.push({ kind: 'device', id: `${room.id}/${position.position}`, label: `${room.name}, ${position.position.replace('/', ' ').replace(/-/g, ' ').replace(/#/, ' ')}`, hostname: position.hostname ?? null, model: position.model ?? null, floor: room.floor, health: tag });
     const w = wiringToOutlet(room, position.position);
-    if (!w) return { ref, hops, complete: false, reason: 'No network cable from this device in the room wiring' };
+    if (!w) return { ref, hops, complete: false, reason: 'No network cable from this device in the space wiring' };
     for (const h of w.hops) if (!h.to.startsWith('outlet:') && h.to !== position.position.split('/').pop()) hops.push({ kind: 'room-device', id: `${room.id}/${h.to}`, label: `${room.name} ${h.to.replace(/-/g, ' ').replace(/#/, ' ')}`, via: h.l.cable, health: tagOf(room, h.to) });
     const o = room.outlets.find((x) => x.id === w.outlet);
     hops.push(outletHop(room, o, w.hops[w.hops.length - 1]?.l?.cable));

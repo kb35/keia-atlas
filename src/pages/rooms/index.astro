@@ -33,10 +33,10 @@ const FACETS = [
   { key: 'site', label: 'Office', options: SITE_ORDER.map((sid) => ({ value: sid, label: sites[sid].name, sub: sites[sid].kind === 'remote' ? 'Home offices' : sites[sid].city })) },
   { key: 'kind', label: 'Kind', options: Object.entries(KIND_LABEL).map(([value, label]) => ({ value, label })) },
   { key: 'status', label: 'Status', options: Object.entries(STATUS).map(([value, label]) => ({ value, label })) },
-  { key: 'type', label: 'Room profile', options: Object.entries(spaceTypes).sort((a, b) => a[1].profile.name.localeCompare(b[1].profile.name)).map(([value, t]) => ({ value, label: t.profile.name })) },
+  { key: 'type', label: 'Space type', options: Object.entries(spaceTypes).sort((a, b) => a[1].profile.name.localeCompare(b[1].profile.name)).map(([value, t]) => ({ value, label: t.profile.name })) },
 ];
 const SORT = { options: [
-  { value: 'site', label: 'By office' }, { value: 'name', label: 'By name' }, { value: 'type', label: 'By room profile' },
+  { value: 'site', label: 'By office' }, { value: 'name', label: 'By name' }, { value: 'type', label: 'By space type' },
   { value: 'status', label: 'Being installed first' }, { value: 'issues', label: 'Incidents first' },
 ] };
 const VIEWS = [{ value: 'cards', label: 'Cards', show: '[data-grid]' }, { value: 'list', label: 'List', show: '[data-list]' }];
@@ -53,12 +53,12 @@ const SITES = Object.fromEntries(SITE_ORDER.map((sid) => {
   return [sid, { name: s.name, where: s.kind === 'remote' ? `Home offices, ${({ amer: 'Americas', emea: 'EMEA', apac: 'APAC' })[s.region] ?? 'worldwide'}` : `${s.city}, ${countryName(s.country)}`, power: s.mains ? `${s.mains.volts} V, ${s.mains.hz} Hz, plug ${s.mains.plugs?.join(', ')}` : null, tz: s.time_zone ?? null, tech: tech ? `${tech.name}, on-site technician` : null, floors: s.floors?.length ?? 0 }];
 }));
 ---
-<Shell title="Rooms" section="rooms" crumbs={[{ label: 'Rooms' }]}>
-  <PageBand overline="Directory" title="Rooms" rec="dd-rooms" answer={ANSWER} lede="Every room at every site. Hover a filter to open it; the list changes as you pick." numbers={NUMBERS} />
+<Shell title="Spaces" section="rooms" crumbs={[{ label: 'Spaces' }]}>
+  <PageBand overline="Directory" title="Spaces" rec="dd-rooms" answer={ANSWER} lede="Every space at every site. Hover a filter to open it; the list changes as you pick." numbers={NUMBERS} />
 
-  <div class="content rooms">
+  <div class="content spaces">
     <RoomPlanSprite />
-    <FilterBar facets={FACETS} toggles={[{ key: 'issues', label: 'Open incidents', title: 'Only rooms with an open incident' }]} placeholder="Find a room, number or office" label="Find a room" noun={['room', 'rooms']} scope=".content.rooms" views={VIEWS} viewKey="rs4-rooms-view" sort={SORT} />
+    <FilterBar facets={FACETS} toggles={[{ key: 'issues', label: 'Open incidents', title: 'Only spaces with an open incident' }]} placeholder="Find a space, number or office" label="Find a space" noun={['space', 'spaces']} scope=".content.rooms" views={VIEWS} viewKey="rs4-rooms-view" sort={SORT} />
 
     <section class="site-card card" hidden data-site-card aria-live="polite"></section>
 
@@ -87,7 +87,7 @@ const SITES = Object.fromEntries(SITE_ORDER.map((sid) => {
     <div class="rlist-wrap card" data-list hidden>
       <table class="rlist">
         <thead><tr>
-          {[['number', 'No.'], ['name', 'Room'], ['typeName', 'Room profile'], ['siteName', 'Office'], ['floor', 'Floor'], ['devices', 'Devices'], ['status', 'Status'], ['issues', 'Signals']].map(([k, l]) => <th scope="col" aria-sort="none"><button type="button" data-sortcol={k}>{l}<i aria-hidden="true"></i></button></th>)}
+          {[['number', 'No.'], ['name', 'Space'], ['typeName', 'Space type'], ['siteName', 'Office'], ['floor', 'Floor'], ['devices', 'Devices'], ['status', 'Status'], ['issues', 'Signals']].map(([k, l]) => <th scope="col" aria-sort="none"><button type="button" data-sortcol={k}>{l}<i aria-hidden="true"></i></button></th>)}
         </tr></thead>
         <tbody>
           {rooms.map((s, i) => {
@@ -112,7 +112,7 @@ const SITES = Object.fromEntries(SITE_ORDER.map((sid) => {
         </tbody>
       </table>
     </div>
-    <EmptyState text="No rooms match these filters." />
+    <EmptyState text="No spaces match these filters." />
   </div>
 
   <script is:inline data-astro-rerun define:vars={{ R, SITES }} slot="end">
@@ -151,7 +151,7 @@ const SITES = Object.fromEntries(SITE_ORDER.map((sid) => {
       });
       // Sort: the bar's Sort pill, or a column heading in the list (a second click turns it round).
       bar.addEventListener('fb:sort', function (e) { sort = e.detail.value; dir = 1; bar.rsFilter.run(true, reorder); });
-      var LABEL = { number: 'By number', typeName: 'By room profile', siteName: 'By office', floor: 'By floor', devices: 'By devices', status: 'Being installed first', issues: 'Incidents first', name: 'By name' };
+      var LABEL = { number: 'By number', typeName: 'By space type', siteName: 'By office', floor: 'By floor', devices: 'By devices', status: 'Being installed first', issues: 'Incidents first', name: 'By name' };
       document.querySelectorAll('[data-sortcol]').forEach(function (b) {
         b.addEventListener('click', function () {
           var k = b.dataset.sortcol; if (sort === k) dir = -dir; else { sort = k; dir = 1; }

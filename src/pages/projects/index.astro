@@ -25,7 +25,7 @@ const FACETS = [
   { key: 'owner', label: 'Run by', options: owners.map((value) => ({ value, label: person(value).name })) },
 ];
 const SORT = { options: [
-  { value: 'id', label: 'By project number' }, { value: 'due', label: 'By due date' }, { value: 'phase', label: 'By phase' }, { value: 'blocked', label: 'Blocked first' },
+  { value: 'id', label: 'By project number' }, { value: 'due', label: 'By due date' }, { value: 'phase', label: 'By phase' }, { value: 'blocked', label: 'Waiting on first' },
 ] };
 const VIEWS = [{ value: 'cards', label: 'Cards', show: '[data-grid]' }, { value: 'list', label: 'List', show: '[data-list]' }];
 const findText = (p) => [p.id, p.name, p.summary, KIND[p.kind], sites[p.site].name, PHASE_LABEL[p.phase], person(p.owner).name, playbooks[p.playbook]?.name].filter(Boolean).join(' ');
@@ -38,7 +38,7 @@ const ANSWER = `${open.length} open projects · ${pastTarget ? `${pastTarget} pa
 const NUMBERS = [
   { n: open.length, label: 'Open projects', to: `?phase=${[...new Set(open.map((p) => p.phase))].join(',')}` },
   { n: list.filter((p) => p.phase === 'integrate').length, label: 'In Deploy', to: '?phase=integrate' },
-  { n: blocked, label: 'Blocked tasks', to: '/work/list/?kind=provision,install,configure,commission,task&status=blocked', tone: blocked ? 'bad' : undefined },
+  { n: blocked, label: 'Tasks waiting on something', to: '/work/list/?kind=provision,install,configure,commission,task&status=blocked', tone: blocked ? 'bad' : undefined },
 ];
 const attrs = (p) => ({
   'data-fi': '', 'data-find': findText(p), 'data-f-region': regionOf(p), 'data-f-site': p.site, 'data-f-kind': p.kind, 'data-f-phase': p.phase, 'data-f-owner': p.owner,
@@ -74,7 +74,7 @@ const taskLabel = (p) => ['done', 'doing', 'blocked', 'todo'].map((st) => `${cou
             <span class="task-bar" role="img" aria-label={taskLabel(p)}>
               {['done', 'doing', 'blocked', 'todo'].map((st) => count(p, st) > 0 && <i class={`tb-${st}`} style={`flex:${count(p, st)}`}></i>)}
             </span>
-            <span class="faint">{plural(p.tasks.length, 'task')}{count(p, 'blocked') ? <>, <b class="pc-blocked">{count(p, 'blocked')} blocked</b></> : ''}</span>
+            <span class="faint">{plural(p.tasks.length, 'task')}{count(p, 'blocked') ? <>, <b class="pc-blocked">{count(p, 'blocked')} waiting</b></> : ''}</span>
             <span class="avatars">{(p.roles ?? []).map((r) => r.person).map((w) => <span class="av" title={person(w).name}>{person(w).initials}</span>)}</span>
           </span>
         </a>
@@ -88,7 +88,7 @@ const taskLabel = (p) => ['done', 'doing', 'blocked', 'todo'].map((st) => `${cou
             <span class="sub">{KIND[p.kind]} · {sites[p.site].name} · run by {person(p.owner).name} · due {fmtDate(p.target)}</span>
           </span>
           <span class="end">
-            <span class="faint">{plural(p.tasks.length, 'task')}{count(p, 'blocked') ? `, ${count(p, 'blocked')} blocked` : ''}</span>
+            <span class="faint">{plural(p.tasks.length, 'task')}{count(p, 'blocked') ? `, ${count(p, 'blocked')} waiting` : ''}</span>
             <span class="pc-lights" role="img" aria-label={lightsLabel(p)}>{lightsOf(p).map(([k, l]) => <span title={`${k}: ${l.word}. ${l.why}`}><i class="hg-m" data-state={l.state} aria-hidden="true"></i></span>)}</span>
             <span class:list={['pill', p.phase === 'closed' ? 'plain' : p.phase === 'integrate' ? 'deploy' : 'plan']}>{PHASE_LABEL[p.phase]}</span>
           </span>

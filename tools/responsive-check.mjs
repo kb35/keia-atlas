@@ -78,6 +78,12 @@ const PAGES = [
   ['vendors', '/vendors/', 'other'],
   ['usage', '/usage/', 'other'],
   ['learn', '/learn/', 'other'],
+  // The front door and the method pages
+  ['welcome', '/welcome/'],
+  ['method', '/method/'], ['method-building', '/method/start-from-the-building/'], ['method-capture', '/method/capture-dont-ask/'],
+  ['method-answer', '/method/answer-first/'], ['method-own', '/method/own-it-hand-it-on/'], ['method-learn', '/method/learn-as-you-go/'],
+  ['method-problems', '/method/problems/'], ['method-modules', '/method/modules/'], ['method-work', '/method/how-the-work-gets-done/'],
+  ['method-trust', '/method/trust/'], ['method-words', '/method/words/'],
 ];
 
 async function loadPlaywright() {

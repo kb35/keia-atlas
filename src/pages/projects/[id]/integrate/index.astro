@@ -29,14 +29,14 @@ const PHASE = PHASE_LABEL.integrate;
 const siteIds = SITE_ORDER.filter((s) => plan.units.some((u) => u.site === s));
 const kinds = [...new Set(plan.units.map((u) => u.cls))].map((c) => ({ value: c, label: className(c) })).sort((a, b) => a.label.localeCompare(b.label));
 const STATUS = [
-  { value: 'needs', label: 'Needs you' }, { value: 'accept', label: 'Checked, to accept' }, { value: 'test', label: 'Ready for the room test' },
+  { value: 'needs', label: 'Ready for you' }, { value: 'accept', label: 'Checked, to accept' }, { value: 'test', label: 'Ready for the room test' },
   { value: 'doing', label: 'Under way' }, { value: 'todo', label: 'To do' }, { value: 'done', label: 'Done' },
 ];
 const FACETS = [
   ...(siteIds.length > 1 ? [{ key: 'site', label: 'Office', options: siteIds.map((value) => ({ value, label: sites[value].name })) }] : []),
   { key: 'kind', label: 'Kind', options: kinds },
   { key: 'status', label: 'Status', options: STATUS },
-  { key: 'room', label: 'Room', options: plan.rooms.map((r) => ({ value: r.id, label: r.name, sub: siteIds.length > 1 ? r.siteName : undefined })) },
+  { key: 'room', label: 'Space', options: plan.rooms.map((r) => ({ value: r.id, label: r.name, sub: siteIds.length > 1 ? r.siteName : undefined })) },
 ];
 const next = plan.batches.find((b) => M.batchSum(b.id).status !== 'done') ?? plan.batches[0];
 const intTasks = p.tasks.filter((t) => t.phase === 'integrate');
@@ -48,10 +48,10 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many ?? `${one}s`}`;
   crumbs={[{ label: 'Projects', to: '/projects/' }, { label: p.name, to: home }, { label: PHASE }]}>
   <PageBand overline={`Project ${p.id}`} title={PHASE} sim="live" answer={`${F.setUp} of ${F.units} units set up · ${F.needs ? `${F.needs} waiting on you` : 'nothing waiting on you'}`}
     numbers={[
-      { n: F.needs, label: 'Need you', to: '#needs', tone: F.needs ? 'warn' : undefined, id: 'int-needs' },
+      { n: F.needs, label: 'Ready for you', to: '#needs', tone: F.needs ? 'warn' : undefined, id: 'int-needs' },
       { n: F.toAccept, label: 'Checked, to accept', to: '#checked', tone: F.toAccept ? 'good' : undefined, id: 'int-accept' },
       { n: `${F.setUp}/${F.units}`, label: 'Units set up', fact: true, id: 'int-setup' },
-      { n: `${F.signed}/${F.rooms}`, label: 'Rooms signed off', to: '?view=rooms&status=done', id: 'int-rooms' },
+      { n: `${F.signed}/${F.rooms}`, label: 'Spaces signed off', to: '?view=rooms&status=done', id: 'int-rooms' },
     ]}>
     <Fragment slot="overline">
       <span>{sites[p.site].name}</span>
@@ -62,9 +62,9 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many ?? `${one}s`}`;
   </PageBand>
 
   <div class="content integrate iv" data-int data-page="overview">
-    <FilterBar facets={FACETS} placeholder="Find a unit, hostname or room" label="Find a unit" noun={['batch', 'batches']} scope=".content.integrate"
-      views={[{ value: 'batches', label: 'Batches', show: '[data-view-batches]', noun: ['batch', 'batches'] }, { value: 'rooms', label: 'Rooms', show: '[data-view-rooms]', noun: ['room', 'rooms'] }]}
-      viewsHelp="integrate.views" sort={{ options: [{ value: 'order', label: 'By work order' }, { value: 'needs', label: 'Needs you first' }, { value: 'name', label: 'By name' }] }} />
+    <FilterBar facets={FACETS} placeholder="Find a unit, hostname or space" label="Find a unit" noun={['batch', 'batches']} scope=".content.integrate"
+      views={[{ value: 'batches', label: 'Batches', show: '[data-view-batches]', noun: ['batch', 'batches'] }, { value: 'rooms', label: 'Spaces', show: '[data-view-rooms]', noun: ['space', 'spaces'] }]}
+      viewsHelp="integrate.views" sort={{ options: [{ value: 'order', label: 'By work order' }, { value: 'needs', label: 'Ready for you first' }, { value: 'name', label: 'By name' }] }} />
     <LiveBar page={`integrate:${p.id}`} />
 
     <p class="iv-vendor" data-vendor-only data-help="integrate.vendor">Viewing as <b data-vendor-name></b>. Only your installs show: select Installed when a unit is mounted, connected and powered on, and Keia Atlas confirms it when it comes online.</p>
@@ -72,7 +72,7 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many ?? `${one}s`}`;
 
     <div class="g12 iv-top" id="needs" data-engineer-only>
       <section class="card iv-box s-7" aria-labelledby="iv-needs-h">
-        <header class="iv-h" data-help="integrate.needs"><h2 id="iv-needs-h">Needs you</h2><span class="faint">Only the exceptions. Everything else, Keia Atlas checks.</span></header>
+        <header class="iv-h" data-help="integrate.needs"><h2 id="iv-needs-h">Ready for you</h2><span class="faint">Only the exceptions. Everything else, Keia Atlas checks.</span></header>
         <div data-slot="needs" set:html={needsHtml(M)} />
       </section>
       <section class="card iv-box s-5" id="checked" aria-labelledby="iv-ready-h">
@@ -95,7 +95,7 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many ?? `${one}s`}`;
                 <span class="iv-n num" aria-hidden="true">{b.n}</span>
                 <span class="iv-bt"><b data-vt-rec={`int-${b.id}`}>{b.title}</b><small>{b.touched ? `Re-check: ${b.units.length === 1 ? 'it pairs' : 'they pair'} with the new ${plan.batches.find((x) => !x.touched && x.rooms.some((r) => b.rooms.includes(r)))?.noun ?? 'units'}` : b.cfg ? `${b.cfg.name} ${b.cfg.version}` : 'Nothing to set: provision and install'}</small></span>
               </header>
-              <p class="iv-via faint">{b.via ? `Set once through ${b.via}` : `${plural(b.rooms.length, 'room')}`}{b.models.length > 1 ? ` · ${b.models.join(', ')}` : ''}</p>
+              <p class="iv-via faint">{b.via ? `Set once through ${b.via}` : `${plural(b.rooms.length, 'space')}`}{b.models.length > 1 ? ` · ${b.models.join(', ')}` : ''}</p>
               <div class="iv-meters" data-slot="meters" data-b={b.id} set:html={metersHtml(M, b.id)} />
               <footer class="iv-foot" data-slot="bfoot" data-b={b.id} set:html={batchFootHtml(M, b.id)} />
             </a>
@@ -122,7 +122,7 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many ?? `${one}s`}`;
               <div class="iv-vi" data-vendor-only data-slot="vinstall" data-r={r.id}></div>
               <footer class="iv-rf">
                 <span data-slot="rfoot" data-r={r.id} data-engineer-only set:html={roomFootHtml(M, r.id)} />
-                <a class="btn small" href={roomHref(plan, r.id)} data-engineer-only>Open the room</a>
+                <a class="btn small" href={roomHref(plan, r.id)} data-engineer-only>Open the space</a>
               </footer>
             </article>
           );
@@ -133,7 +133,7 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many ?? `${one}s`}`;
 
     {keptByRoom.length > 0 && (
       <Section title="Kept as they are" help="integrate.kept" aside={`${plan.kept.length} devices`} data-engineer-only>
-        <p class="iv-note muted">This project changes {plan.scope.map((c) => className(c).toLowerCase()).join(' and ')}s and re-checks what pairs with them. Everything else in each room stays, and the room test covers it.</p>
+        <p class="iv-note muted">This project changes {plan.scope.map((c) => className(c).toLowerCase()).join(' and ')}s and re-checks what pairs with them. Everything else in each space stays, and the room test covers it.</p>
         <div class="g12">
           {keptByRoom.map(({ r, kept }) => (
             <div class="card side-card s-4">
@@ -162,16 +162,16 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many ?? `${one}s`}`;
     <Section title={`How ${PHASE} works`} help="integrate.how" data-engineer-only>
       <div class="g12">
         <div class="card side-card s-4">
-          <h3>Batches, not rooms</h3>
-          <p class="muted iv-p">Units that share a configuration are set up together: the shared profile once, then only what differs per unit (its name and address). Batches run in the order an engineer works: network, room system, what pairs with it, then the rest.</p>
+          <h3>Batches, not spaces</h3>
+          <p class="muted iv-p">Units that share a setup guide are set up together: the shared profile once, then only what differs per unit (its name and address). Batches run in the order an engineer works: network, room system, what pairs with it, then the rest.</p>
         </div>
         <div class="card side-card s-4">
           <h3>Checked, not ticked</h3>
           <p class="muted iv-p">Keia Atlas checks what it can see: the records in the systems, the unit online on its switch port, the settings read back. What passes waits for one Accept, recorded with who, when and what passed. Exceptions stay out of it until someone fixes them.</p>
         </div>
         <div class="card side-card s-4">
-          <h3>Rooms and installers</h3>
-          <p class="muted iv-p">Commissioning is room by room: a short room test once every unit is set up, and "All passed" signs the room off. A vendor sees only their installs, one action per unit. Every change is live between windows, with History and Undo.</p>
+          <h3>Spaces and installers</h3>
+          <p class="muted iv-p">Commissioning is space by space: a short room test once every unit is set up, and "All passed" signs the space off. A vendor sees only their installs, one action per unit. Every change is live between windows, with History and Undo.</p>
         </div>
       </div>
     </Section>

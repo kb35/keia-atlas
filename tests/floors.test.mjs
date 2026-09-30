@@ -99,7 +99,7 @@ test('every networked device, access point and live outlet in every office reach
       for (const o of r.outlets) if (!spare.has(o.key) && !trace(B, o.key)?.complete) stuck.push(o.key);
       for (const p of r.positions ?? []) {
         const T = trace(B, `${r.id}/${p.position}`);
-        if (T && !T.complete && T.reason !== 'No network cable from this device in the room wiring') stuck.push(`${r.id}/${p.position}: ${T.reason}`);
+        if (T && !T.complete && T.reason !== 'No network cable from this device in the space wiring') stuck.push(`${r.id}/${p.position}: ${T.reason}`);
       }
     }
     for (const a of B.aps) if (!trace(B, a.hostname)?.complete) stuck.push(a.id);

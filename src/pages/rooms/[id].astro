@@ -27,6 +27,8 @@ import RoomQR from '../../components/RoomQR.astro';
 import GuideLive from '../../components/GuideLive.astro';
 import { GUIDE_KINDS } from '../../lib/guide.mjs';
 import { base } from '../../lib/data.mjs';
+import Restricted from '../../components/Restricted.astro';
+
 
 export function getStaticPaths() {
   return Object.keys(spaces).map((id) => ({ params: { id } }));
@@ -92,7 +94,7 @@ const incLine = (v) => {
   return `${v.inc.state === 'new' ? 'New' : 'In progress'}, opened ${when(v.inc.opened, { time: false })}`;
 };
 // The band (Record archetype, docs/standards/page-anatomy.md): the kind of room, its status, and four figures.
-const KIND_ONE = { meeting: 'Meeting room', small: 'Room', shared: 'Shared room', desks: 'Desks', kits: 'Home office kits', comms: 'Comms room' };
+const KIND_ONE = { meeting: 'Meeting room', small: 'Space', shared: 'Shared space', desks: 'Desks', kits: 'Home office kits', comms: 'Comms room' };
 const status = replacing.length ? ['deploy', 'Being replaced'] : x.stages.deploy ? ['deploy', 'Being installed'] : (x.stages.plan || x.stages.procure) && !x.stages.manage ? ['plan', 'Planned'] : ['manage', 'In service'];
 const openCount = roomInc.filter((v) => v.open).length;
 const profileTo = `/room-profiles/${x.space_type}/#${x.option.id}`;
@@ -102,7 +104,7 @@ const NUMBERS = store ? [
   { n: store.consumables.length, label: 'Counted stock lines', to: `/spares/${x.site}/#counted` },
   { n: openCount, label: openCount === 1 ? 'Open incident' : 'Open incidents', to: '#incidents', tone: openCount ? 'bad' : undefined },
 ] : isComms ? [
-  { n: cf.serves.roomCount, label: cf.serves.roomCount === 1 ? 'Room served' : 'Rooms served', to: cf.serves.roomCount ? '#rooms-served' : undefined },
+  { n: cf.serves.roomCount, label: cf.serves.roomCount === 1 ? 'Space served' : 'Spaces served', to: cf.serves.roomCount ? '#rooms-served' : undefined },
   cf.ports?.known ? { n: cf.ports.total - cf.ports.used, label: 'Free access ports', to: '#patching' } : null,
   cf.rackSpace ? { n: `${cf.rackSpace.free}U`, label: 'Free rack space', to: '#rack' } : null,
   { n: openCount, label: openCount === 1 ? 'Open incident' : 'Open incidents', to: '#incidents', tone: openCount ? 'bad' : undefined },
@@ -122,17 +124,17 @@ const ANSWER = lead
   ? `${lead.inc.short_description}${leadWith ? ` · With ${leadWith}` : ''}${openCount > 1 ? ` · ${openCount - 1} more open` : ''}`
   : store ? (store.lowRules.length ? `${plural(store.lowRules.length, 'model')} below minimum · no open incidents` : 'Every model at or above its minimum · no open incidents')
   : isComms ? `${std?.text ?? 'Not checked against the standard'} · no open incidents`
-  : missing.length ? `${plural(missing.length, 'required device')} missing against its profile`
+  : missing.length ? `${plural(missing.length, 'required device')} missing against its space type`
   : replacing.length ? 'Kit being replaced · no open incidents'
   : x.stages.deploy ? `Being installed · ${plural(x.stages.deploy, 'unit')} still going in`
   : unitCount ? `All ${plural(unitCount, 'unit')} in service · no open incidents` : 'No tracked devices · no open incidents';
 const kiTitles = JSON.stringify(Object.fromEntries(knownIssues.map((i) => [i.id, i.title])));
 const deskWord =kind === 'kits' ? 'kit' : 'desk';
 ---
-<Shell about={{ kind: kind === 'comms' ? 'comms' : 'room', label: `${title}, ${site.name}`, to: `/rooms/${x.id}/` }} title={title} section="rooms" crumbs={[{ label: 'Rooms', to: '/rooms/' }, { label: site.name, to: `/rooms/?site=${x.site}` }, { label: title }]}>
-  <PageBand overline={KIND_ONE[kind] ?? 'Room'} title={title} answer={ANSWER} heartbeat numbers={NUMBERS}>
+<Shell about={{ kind: kind === 'comms' ? 'comms' : 'room', label: `${title}, ${site.name}`, to: `/rooms/${x.id}/` }} title={title} section="rooms" crumbs={[{ label: 'Spaces', to: '/rooms/' }, { label: site.name, to: `/rooms/?site=${x.site}` }, { label: title }]}>
+  <PageBand overline={KIND_ONE[kind] ?? 'Space'} title={title} answer={ANSWER} heartbeat numbers={NUMBERS}>
     <Fragment slot="overline">
-      <a class="code" data-help="room.site" href={href(`/rooms/?site=${x.site}`)} style="text-decoration:none" title={`Every room at ${site.name}`}>{site.code}</a>
+      <a class="code" data-help="room.site" href={href(`/rooms/?site=${x.site}`)} style="text-decoration:none" title={`Every space at ${site.name}`}>{site.code}</a>
       <span>{site.name}{floor ? ` · ${floor.name}` : ''}</span>
       <span class={`pill ${status[0]}`} data-help="room.status">{status[1]}</span>
       {std && <span class={`pill ${std.tone}`} data-help="room.standard">{std.text}</span>}
@@ -148,6 +150,7 @@ const deskWord =kind === 'kits' ? 'kit' : 'desk';
     {isComms && (
       <>
         {cf.racks.length > 0 ? (
+          <p class="rm-cls"><Restricted view="rack" /></p>
           <div id="rack">{cf.racks.map((r, i) => <RackView rack={r} space={x} uid={`rm-${r.id}`} patching="patching" rec={i === 0 ? recHere(x.id) : {}} />)}</div>
         ) : <p class="card pad muted" {...recHere(x.id)}>No rack is recorded for this comms room yet.</p>}
         <CommsSummary facts={cf} size={size} />
@@ -269,13 +272,13 @@ const deskWord =kind === 'kits' ? 'kit' : 'desk';
     <div class="g12">
       <div class:list={['card side-card ri-card s-4', { 'rs-radiate': openCount > 0 }]} id="incidents">
         <h3 data-help="room.incidents">Incidents</h3>
-        {roomInc.length === 0 ? <p class="muted" style="margin:0;font-size:13.5px">No incidents recorded for this room.</p> : (
+        {roomInc.length === 0 ? <p class="muted" style="margin:0;font-size:13.5px">No incidents recorded for this space.</p> : (
           <ul class="ri-list">
             {roomInc.map((v) => (
               <li>
                 <a class:list={['ri', { past: !v.open }]} href={href(v.href)}>
                   <span class={`ri-p p-${v.inc.priority}`}>P{v.inc.priority}</span>
-                  <span class="ri-t"><b>{v.inc.short_description}</b><small>{v.inc.number} · {v.inc.subject.kind === 'room' ? 'Whole room' : v.role}</small><small class={`ri-s s-${v.inc.state}`}>{incLine(v)}</small></span>
+                  <span class="ri-t"><b>{v.inc.short_description}</b><small>{v.inc.number} · {v.inc.subject.kind === 'room' ? 'Whole space' : v.role}</small><small class={`ri-s s-${v.inc.state}`}>{incLine(v)}</small></span>
                 </a>
               </li>
             ))}
@@ -307,19 +310,19 @@ const deskWord =kind === 'kits' ? 'kit' : 'desk';
     </div>
 
     {GUIDE_KINDS.includes(kind) && (
-      <Section title="Room guide and QR" id="room-guide" help="room.guide" aside="What people in the room see">
+      <Section title="Room guide and QR" id="room-guide" help="room.guide" aside="What people in the space see">
         <div class="rg" data-guide-host="room" data-room={x.id} data-base={base}>
           <div class="rg-qr card pad" data-help="room.guide-qr">
             <RoomQR room={x.id} label={title} size={132} />
             <div class="rg-qr-t">
-              <p>The code on the table opens this room's guide: how to start a meeting and share a screen, and a two-tap way to report a problem or ask for something.</p>
+              <p>The code on the table opens this space's guide: how to start a meeting and share a screen, and a two-tap way to report a problem or ask for something.</p>
               <p class="rg-links"><a href={href(`/guide/${x.id}/`)}>Open the guide</a><a href={href(`/guide/${x.id}/card/`)}>Print the table card</a></p>
             </div>
           </div>
           <div class="rg-sent card pad" data-help="room.guide-sent">
             <h3>Sent from the guide</h3>
             <ul class="rg-list" data-guide-sent></ul>
-            <p class="faint rg-none" data-guide-none>Nothing sent from this room's guide yet. Reports appear here, on the Incidents board and on Home as they arrive.</p>
+            <p class="faint rg-none" data-guide-none>Nothing sent from this space's guide yet. Reports appear here, on the Incidents board and on Home as they arrive.</p>
           </div>
         </div>
         <GuideLive />
@@ -327,18 +330,19 @@ const deskWord =kind === 'kits' ? 'kit' : 'desk';
     )}
     {isComms && (
       <Section title="Sized for what it serves" id="sizing" help="room.sizing">
-        <span slot="aside" class="faint">{plural(size.rooms, 'room')}{size.workspaces ? `, ${size.workspaces} desks` : ''}{size.videoRooms ? `, ${plural(size.videoRooms, 'video room')}` : ''} · <a href={href(`/room-profiles/${x.space_type}/#sizing`)}>How a comms room is sized</a></span>
+        <span slot="aside" class="faint">{plural(size.rooms, 'space')}{size.workspaces ? `, ${size.workspaces} desks` : ''}{size.videoRooms ? `, ${plural(size.videoRooms, 'video room')}` : ''} · <a href={href(`/room-profiles/${x.space_type}/#sizing`)}>How a comms room is sized</a></span>
         <CommsSizing size={size} />
       </Section>
     )}
     {isComms && cf.cables.length > 0 && (
       <Section title="Patching" id="patching" help="room.patching">
         <span slot="aside" class="faint">{cableTotal(cf.cables)} cables in {cf.cables.length} runs, coloured by the <a href={href('/standards/cables/')}>house cable standard</a> · <a href={href(`/cables/?site=${x.site}`)}>All cables at {site.name}</a></span>
+        <p class="rm-cls"><Restricted view="rack" /></p>
         <RackPatching facts={cf} />
       </Section>
     )}
     {x.option.infrastructure?.length > 0 && (
-      <Section title="Outlets" help="room.outlets" aside={repeated ? `Per ${deskWord}` : 'For this room'}>
+      <Section title="Outlets" help="room.outlets" aside={repeated ? `Per ${deskWord}` : 'For this space'}>
         <div class="tablewrap">
           <table>
             <thead><tr><th scope="col">Service</th><th scope="col">Where</th><th scope="col">How many</th><th scope="col">Serves</th><th scope="col">Provided by</th></tr></thead>
@@ -359,7 +363,7 @@ const deskWord =kind === 'kits' ? 'kit' : 'desk';
     )}
     <Wiring option={x.option} fitted={x.fitted} note={repeated ? `The same at every ${deskWord}.` : x.fitted.length ? 'Includes the optional kit fitted here.' : ''} />
     {isComms && cf.serves.roomCount > 0 && (
-      <Section title="Rooms it serves" id="rooms-served" aside={plural(cf.serves.roomCount, 'room')}>
+      <Section title="Spaces it serves" id="rooms-served" aside={plural(cf.serves.roomCount, 'space')}>
         <CommsServes facts={cf} />
       </Section>
     )}

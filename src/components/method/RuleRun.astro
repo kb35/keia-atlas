@@ -1,0 +1,104 @@
+---
+// How the work gets done: a standing rule's card and one run of it, step by step (FRONT-DOOR section 3). The
+// explorable: point at or select a step to light it and read what the method says about it; choose how the read
+// back went to see the two endings. A rule that fails is a record, not a mystery. Reduced motion: no travel,
+// the lit step changes at once.
+import { SECTIONS, md, plain } from '../../lib/method.mjs';
+const rows = Object.fromEntries(SECTIONS['2.8'].tables[0].rows.map(([k, v]) => [plain(k), v]));
+const STEPS = [
+  { id: 'read', t: 'Read the build sheet', rule: 'Read freely, write narrowly' },
+  { id: 'caps', t: 'Check the caps and the window', rule: 'Reversible runs, irreversible asks' },
+  { id: 'write', t: 'Update the DNS record', rule: 'A rule has a named owner' },
+  { id: 'back', t: 'Read it back and compare', rule: 'Checked by reading back' },
+  { id: 'end', t: '', rule: 'Undo, Roll back, or ask' },
+  { id: 'log', t: 'One line, one card, one log', rule: 'One line, one card, one log' },
+];
+for (const s of STEPS) if (!rows[s.rule]) throw new Error(`RuleRun: no row "${s.rule}" in section 2.8`);
+---
+<div class="rr" data-rr data-end="ok" data-help="method.rule"><div class="rr-in">
+  <article class="rr-card" aria-label="The standing rule">
+    <p class="rr-over">Standing rule</p>
+    <p class="rr-name">DNS rule</p>
+    <dl>
+      <div><dt>Owner</dt><dd>Niamh; told on every run</dd></div>
+      <div><dt>May do</dt><dd>Update a DNS record to match the build sheet</dd></div>
+      <div><dt>Caps</dt><dd>A few devices per wave; never in a booked meeting or a freeze; halt on failures</dd></div>
+      <div><dt>Undo</dt><dd>Roll back to the record as it was</dd></div>
+    </dl>
+  </article>
+  <div class="rr-run">
+    <div class="rr-ends" role="group" aria-label="How the read back went">
+      <button type="button" data-rr-end="ok" aria-pressed="true">Reads back as intended</button>
+      <button type="button" data-rr-end="no" aria-pressed="false">Does not read back</button>
+    </div>
+    <ol class="rr-steps">
+      {STEPS.map((s, i) => (
+        <li><button type="button" class="rr-step" data-rr-step={s.id} aria-pressed={i === 0 ? 'true' : 'false'}>
+          <span class="rr-n">{i + 1}</span>
+          {s.id === 'end' ? <span><span class="rr-ok">Done automatically under the DNS rule (owner: Niamh)</span><span class="rr-no">Unable to complete, rolled back</span></span> : <span>{s.t}</span>}
+        </button></li>
+      ))}
+    </ol>
+    <div class="rr-explain" aria-live="polite">
+      {STEPS.map((s, i) => (
+        <p data-rr-say={s.id} hidden={i !== 0}><b>{s.rule}.</b> <span set:html={md(rows[s.rule])} /></p>
+      ))}
+    </div>
+  </div>
+</div></div>
+
+<script>
+  import { motion } from '../../lib/motion-read.mjs';
+  function init(root: HTMLElement) {
+    if ((root as any).__rr) return; (root as any).__rr = true;
+    const steps = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-rr-step]'));
+    const says = Array.from(root.querySelectorAll<HTMLElement>('[data-rr-say]'));
+    const light = (id: string) => {
+      steps.forEach((s) => s.setAttribute('aria-pressed', String(s.dataset.rrStep === id)));
+      says.forEach((p) => {
+        const on = p.dataset.rrSay === id;
+        if (on && p.hidden) { p.hidden = false; const m = motion(); if (!m.reduced) p.animate([{ opacity: 0 }, { opacity: 1 }], { duration: m.state, easing: m.ease }); }
+        else if (!on) p.hidden = true;
+      });
+    };
+    steps.forEach((s) => {
+      s.addEventListener('pointerenter', () => light(s.dataset.rrStep!));
+      s.addEventListener('focus', () => light(s.dataset.rrStep!));
+      s.addEventListener('click', () => light(s.dataset.rrStep!));
+    });
+    root.querySelectorAll<HTMLButtonElement>('[data-rr-end]').forEach((b) => b.addEventListener('click', () => {
+      root.dataset.end = b.dataset.rrEnd;
+      root.querySelectorAll('[data-rr-end]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      light('end');
+    }));
+  }
+  const boot = () => document.querySelectorAll<HTMLElement>('[data-rr]').forEach(init);
+  boot();
+  document.addEventListener('astro:page-load', boot);
+</script>
+
+<style>
+  .rr { container: rr / inline-size; }
+  .rr-in { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; align-items: start; }
+  .rr-card { border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); padding: 12px 14px; display: grid; gap: 6px; }
+  .rr-over { margin: 0; font: 500 10.5px/1.3 var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); }
+  .rr-name { margin: 0; font-size: 16px; font-weight: 600; }
+  .rr-card dl { margin: 0; display: grid; gap: 6px; }
+  .rr-card dl div { display: grid; gap: 1px; }
+  .rr-card dt { font-size: 12px; color: var(--text-3); }
+  .rr-card dd { margin: 0; font-size: 13px; }
+  .rr-run { display: grid; gap: 10px; min-width: 0; }
+  .rr-ends { display: flex; gap: 4px; flex-wrap: wrap; }
+  .rr-ends button { font: 550 12.5px/1 var(--font-sans); color: var(--text-2); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; min-height: 32px; padding: 0 12px; cursor: pointer; }
+  .rr-ends button[aria-pressed="true"] { background: var(--surface); color: var(--text); border-color: var(--line-strong); }
+  .rr-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .rr-step { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; font: inherit; font-size: 13.5px; color: var(--text-2); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-height: 44px; cursor: pointer; transition: background var(--dur-state) var(--ease-settle), color var(--dur-state) var(--ease-settle), border-color var(--dur-state) var(--ease-settle); }
+  .rr-step[aria-pressed="true"] { color: var(--text); border-color: var(--line-strong); background: var(--surface-2); }
+  .rr-n { font: 500 12px/1 var(--font-mono); color: var(--text-3); width: 16px; flex: none; }
+  .rr-no { display: none; color: var(--h-fault-ink, var(--red-ink)); }
+  .rr[data-end="no"] .rr-ok { display: none; }
+  .rr[data-end="no"] .rr-no { display: inline; }
+  .rr-explain { min-height: 5.5em; }
+  .rr-explain p { margin: 0; font-size: 13.5px; }
+  @container rr (max-width: 600px) { .rr-in { grid-template-columns: minmax(0, 1fr); } }
+</style>

@@ -56,11 +56,11 @@ export function resolve(key, st, ctx) {
     case 'compute-host':
       return partner?.compute
         ? { val: partner.compute, from: `The compute system in ${roomLabel}` }
-        : missing(`The compute system this pairs with is not recorded in ${roomLabel}. Add it to the room's install record; its hostname is the device name.`);
-    case 'room-name': return { val: roomLabel, from: 'The room\'s number and name' };
+        : missing(`The compute system this pairs with is not recorded in ${roomLabel}. Add it to the space's install record; its hostname is the device name.`);
+    case 'room-name': return { val: roomLabel, from: 'The space\'s number and name' };
     case 'calendar': return {
       val: fill(house.calendar.name, V), alt: { label: 'Resource address', val: fill(house.calendar.address, V) },
-      from: 'The house calendar naming, from the room',
+      from: 'The house calendar naming, from the space',
     };
     case 'time-zone': return site.time_zone ? { val: site.time_zone, from: `The site's time zone (${site.name})` } : missing(`No time zone is recorded for ${site.name}.`);
     case 'country': return site.countryName ? { val: site.countryName, from: `The site's country (${site.name})` } : missing(`No country is recorded for ${site.name}.`);
@@ -88,7 +88,7 @@ export function resolve(key, st, ctx) {
         : missing(`Nothing it pairs with is recorded in ${roomLabel}.`);
     case 'management': {
       const p = platformFor(platforms, st, ctx.group);
-      if (!p) return missing('No management platform is recorded for this configuration.');
+      if (!p) return missing('No management platform is recorded for this setup guide.');
       const where = fill(p.group, V);
       return /policy level/i.test(st?.name ?? '')
         ? { val: where, note: `${p.group_label} in ${p.name}.`, from: `The house values for ${p.name}` }
@@ -100,7 +100,7 @@ export function resolve(key, st, ctx) {
     }
     case 'office-hours': return missing(`${site.name}'s opening and closing times are not recorded.`);
     case 'on-site': return missing('Decided or measured on site, during setup or commissioning, so it is not recorded before. Note it on the unit afterwards.');
-    case 'as-written': return { val: st?.value ?? '', from: 'The configuration: the same instruction on every unit' };
+    case 'as-written': return { val: st?.value ?? '', from: 'The setup guide: the same instruction on every unit' };
     default: return missing('This setting has no value template yet.');
   }
 }
@@ -142,8 +142,8 @@ export function buildSheet(ctx) {
     const ck = { step: 'provision', rec: 'assetbox' };
     row(g, { t: 'Asset tag', act: 'verify', ck, ...(unit.tag ? { val: unit.tag, from: 'The install record' } : nr('No asset tag yet. It goes on when the unit is received.')) });
     row(g, { t: 'Serial number', act: 'verify', ck, ...(unit.serial ? { val: unit.serial, from: 'The install record' } : nr('Not recorded yet. Read it from the label when the unit arrives.')) });
-    row(g, { t: 'Model', act: 'verify', ck, per: false, ...(unit.modelName ? { val: unit.modelName, from: 'The room profile' } : nr('No model is recorded for this position.')) });
-    row(g, { t: 'Location', act: 'change', ck, val: `${site.name}, ${roomLabel}`, from: 'The room' });
+    row(g, { t: 'Model', act: 'verify', ck, per: false, ...(unit.modelName ? { val: unit.modelName, from: 'The space type' } : nr('No model is recorded for this position.')) });
+    row(g, { t: 'Location', act: 'change', ck, val: `${site.name}, ${roomLabel}`, from: 'The space' });
   }
   // 2. DHCP and DNS: its name and address, before it is plugged in.
   if (has('infodns')) {
@@ -200,7 +200,7 @@ export function buildSheet(ctx) {
       const base = { t: st.name, act: st.action, ck: calCk, path: wherePath(where, st.path), pattern: st.derive ? st.value : null };
       if (st.derive) row(g, { ...base, per: !['time-server-1', 'time-server-2', 'time-servers', 'domain', 'as-written', 'dns-servers'].includes(st.derive), ...resolve(st.derive, st, { ...ctx, group: cg }) });
       else if (st.per_device) row(g, { ...base, per: true, ...nr('This setting differs per unit but has no value template yet.'), pattern: st.value });
-      else row(g, { ...base, per: false, val: st.value, from: 'The configuration, the same on every unit' });
+      else row(g, { ...base, per: false, val: st.value, from: 'The setup guide, the same on every unit' });
     }
   }
 

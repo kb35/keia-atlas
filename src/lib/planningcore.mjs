@@ -171,7 +171,7 @@ export function applyChange(years, c, ctx) {
     if (!y) return `${fyLabel(n)} is outside the plan.`;
     let moved = 0;
     for (const site of Object.keys(y.planned.byOffice)) moved += next ? moveShare(y, next, site, c.percent / 100) : 0;
-    return next ? `${moved} replacements move from ${fyLabel(n)} to ${fyLabel(n + 1)}, the lowest-scored rooms first.` : `${fyLabel(n)} is the last plan year; nothing to move into.`;
+    return next ? `${moved} replacements move from ${fyLabel(n)} to ${fyLabel(n + 1)}, the lowest-scored spaces first.` : `${fyLabel(n)} is the last plan year; nothing to move into.`;
   }
   if (c.op === 'early') {
     const n = fyNum(c.year), y = yearAt(years, n);
@@ -204,7 +204,7 @@ export function applyChange(years, c, ctx) {
       o.classes[avg] = (o.classes[avg] ?? 0) + m; o.rooms += Math.round(size.rooms * fo.refresh_share);
       ctx.siteRegion[`new:${c.city.toLowerCase()}`] = c.region;
     }
-    return `A ${size.name.toLowerCase()} office in ${c.city}: ${size.rooms} rooms, ${size.units} units and ${size.staff} staff from ${fyLabel(n)}; its first replacements fall in ${fyLabel(n + fo.refresh_after)}.`;
+    return `A ${size.name.toLowerCase()} office in ${c.city}: ${size.rooms} spaces, ${size.units} units and ${size.staff} staff from ${fyLabel(n)}; its first replacements fall in ${fyLabel(n + fo.refresh_after)}.`;
   }
   return 'Unknown change.';
 }
