@@ -41,9 +41,9 @@ export const chipKind = (it) => (it.kind === 'task' ? (STEPS.includes(it.taskKin
 export const KIND_WORDS = {
   provision: 'Provision', install: 'Install', configure: 'Configure', commission: 'Commission', task: 'Other project work',
   visit: 'Site visit', incident: 'Incident', lab: 'Lab test', refresh: 'Work plan', 'time-off': 'Time off', plan: 'Planning',
-  inbox: 'Report', holiday: 'Public holiday', phase: 'Phase end', check: 'Room check',
+  inbox: 'Report', holiday: 'Public holiday', phase: 'Phase end', check: 'Room check', event: 'Client event',
 };
-export const KIND_ORDER = ['incident', 'provision', 'install', 'configure', 'commission', 'visit', 'check', 'task', 'lab', 'refresh', 'inbox', 'plan', 'phase', 'holiday', 'time-off'];
+export const KIND_ORDER = ['incident', 'provision', 'install', 'configure', 'commission', 'visit', 'event', 'check', 'task', 'lab', 'refresh', 'inbox', 'plan', 'phase', 'holiday', 'time-off'];
 export const kindRank = (k) => { const i = KIND_ORDER.indexOf(k); return i < 0 ? 99 : i; };
 
 // ---- Where someone is -------------------------------------------------------------------------

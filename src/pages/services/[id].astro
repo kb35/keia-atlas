@@ -1,11 +1,15 @@
 ---
-// /services/av/, /services/network/ and /services/infrastructure/: one service, whole. The page is _Service.astro.
+// /services/<id>/: one service, whole. The live three (AV, Network, IT infrastructure) are _Service.astro; the rest of
+// the catalogue (src/lib/catalogue.mjs) is _Catalogue.astro. Events and experience centres has its own folder
+// (/services/events/, with a page per event).
 import Service from './_Service.astro';
+import Catalogue from './_Catalogue.astro';
 import { SERVICE_ORDER } from '../../lib/services.mjs';
+import { NEW_SERVICES } from '../../lib/catalogue.mjs';
 
 export function getStaticPaths() {
-  return SERVICE_ORDER.map((id) => ({ params: { id } }));
+  return [...SERVICE_ORDER, ...NEW_SERVICES.filter((id) => id !== 'events')].map((id) => ({ params: { id } }));
 }
 const { id } = Astro.params;
 ---
-<Service id={id} />
+{SERVICE_ORDER.includes(id) ? <Service id={id} /> : <Catalogue id={id} />}

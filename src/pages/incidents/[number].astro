@@ -44,6 +44,8 @@ import { answerFor, bookingWords, impactLine, handoffs } from '../../lib/inciden
 import { matchesForIncident, clusters as kiClusters, draftForCluster, CONFIDENCE as KI_CONF } from '../../lib/knownissues-view.mjs';
 // On call (the overlooked items, #6): who answers out of hours in this office's region now, in the band.
 import { onCallForSite } from '../../lib/oncall-view.mjs';
+// Live event priority (src/lib/events.mjs): an incident in an event room during an event is P1, "live client briefing".
+import { liveIncident } from '../../lib/events-view.mjs';
 
 export function getStaticPaths() {
   return Object.keys(incidents).map((number) => ({ params: { number } }));
@@ -114,6 +116,7 @@ const IMPACT = inc.state === 'resolved'
   ? (booking ? impactLine({ spaceNumber: s.number, spaceName: s.name, booking, resolvedAt }) : `${RES_LABEL[v.resolution?.code] ?? 'Closed'} · took ${spoken(v.age)}`)
   : null;
 const runState = raised ? { result: raised.run.result, at: raised.run.at, back: rolledBack(raised.rule, raised.run), rule: { name: raised.rule.name } } : null;
+const LIVE = liveIncident(inc.number);
 const ANSWER = answerFor({ own, resolved: resolvedAt ? { at: resolvedAt } : null, impact: IMPACT, booking, reason: inc.priority_reason, run: runState, major: inc.major, raisedBy: raised?.rule.name }, PEOPLE_MAP);
 
 const NUMBERS = [
@@ -182,6 +185,7 @@ const PAGE = {
   <PageBand overline="Incident" title={inc.short_description} answer={ANSWER} source={SOURCE} numbers={NUMBERS} sim>
     <Fragment slot="overline">
       <span class="mono ib-no" data-help="incident.number" {...recHere(inc.number)}>{inc.number}</span>
+      {LIVE && <a class="pill ib-live" href={href(LIVE.to)} data-feature="events" data-help="incident.live-event" title={`Opened in an event room while ${LIVE.eventTitle} was running, so it is P1`}>P1 · {LIVE.reason}, {LIVE.event}</a>}
       <span class="prio-w" data-prio-host>
         <button type="button" class={`prio-b p-${inc.priority}${inc.major ? ' is-major' : ''}`} data-prio-open data-help="incident.priority" aria-haspopup="dialog" aria-expanded="false" title={`Priority ${inc.priority}: ${PRIORITY_LABEL[inc.priority]}. Change it, with a reason`}>
           <b data-prio-n>P{inc.priority}</b>
@@ -1034,4 +1038,7 @@ const PAGE = {
     .do-go { width: 100%; justify-content: center; min-height: 44px; }
     .prio-why { max-width: 52vw; }
   }
+  /* Live event priority: the pill says why this is P1 and opens the event (src/lib/events.mjs). */
+  .ib-live { text-decoration: none; background: var(--h-fault-soft, var(--red-soft)); color: var(--h-fault-ink, var(--red-ink)); border-color: transparent; font-weight: 600; }
+  .ib-live:hover { text-decoration: underline; text-underline-offset: 2px; }
 </style>
