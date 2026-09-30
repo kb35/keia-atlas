@@ -16,7 +16,7 @@
 # package.json needs Node >= 22.12; the node:22 image tracks the latest 22.x LTS.
 # Pinned by digest (multi-arch index) so builds are repeatable; Dependabot keeps it fresh.
 # Tag: node:22-alpine
-FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS build
+FROM node:26-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2eee500cfd9e80 AS build
 WORKDIR /app
 ENV ASTRO_TELEMETRY_DISABLED=1 \
     CI=true
