@@ -1,0 +1,122 @@
+/* Keia Atlas v2 craft layer: the type scale, the spacing rhythm, density, and the interaction layer
+   (UI-V2 sections 4, 7 and 10; MOTION-V2 section 4). Loaded after base.css and motion.css. Kept apart from
+   base.css so the shared file stays as it was; every value here is a token or comes from one.
+   The script half (press, lists appearing, skeletons, toasts, density) is src/components/Motion.astro. */
+
+/* ---------- Type scale (UI-V2 section 4) ----------
+   Pages size text with these, never a number. The look tokens (--name-size, --h2-size ...) stay the source,
+   so every look keeps its own scale; Studio's values are in the comments. */
+:root {
+  --fs-overline: var(--overline-size, 10.5px);  /* overline: the kind of thing, a status, a source mark */
+  --fs-mark: 11px;                               /* a source badge, a count in a tab, a tiny label (Mono) */
+  --fs-code: 12.5px;                             /* code, serial, time; a chip; the heartbeat */
+  --fs-support: var(--support-size, 13px);       /* support text, a figure's label */
+  --fs-body: 14px;                               /* body */
+  --fs-name: var(--name-size, 14px);             /* a row's or card's name */
+  --fs-lede: 14.5px;                             /* the answer sentence */
+  --fs-h2: var(--h2-size, 15px);                 /* a section heading */
+  --fs-h3: 15px;                                 /* a card's or block's own heading (Studio's h2 size, in every look) */
+  --fs-figure: var(--big-num, 30px);             /* a figure, tabular */
+  --fs-title: var(--title-size, 30px);           /* the page title */
+  --fw-title: var(--weight-display, 600);        /* titles, headings, figures: nothing bolder */
+  --fw-name: var(--weight-name, 550);            /* names, chips, labels that must stand out */
+
+  /* Spacing rhythm (UI-V2 section 1): section gap 24, card padding 20/22, row 12/16. */
+  --gap-section: 24px;
+  --pad-card-y: 20px; --pad-card-x: 22px;
+  --pad-row-y: 12px;  --pad-row-x: 16px;
+}
+/* Density (UI-V2 section 7): Compact steps names, body and support down one size and tightens rows and cards.
+   Set before first paint as html[data-density] (Shell.astro); changed smoothly by rsSetDensity (Motion.astro). */
+:root[data-density="compact"] {
+  --name-size: 13px; --support-size: 12px; --fs-body: 13px; --big-num: 26px;
+  --pad-card-y: 14px; --pad-card-x: 16px;
+  --pad-row-y: 8px;   --pad-row-x: 14px;
+}
+
+/* ---------- The rhythm on the shared surfaces ----------
+   Written with :root[data-look] so they hold in every look (a look's own rules have that weight too). */
+:root[data-look] .content { gap: var(--gap-section); }
+:root[data-look] .stack, :root[data-look] .cols { gap: var(--gap-section); }
+:root[data-look] .card.pad, :root[data-look] .side-card { padding: var(--pad-card-y) var(--pad-card-x); }
+:root[data-look] .row { padding: var(--pad-row-y) var(--pad-row-x); }
+.section-head h2 { font-size: var(--fs-h2); font-weight: var(--fw-title); }
+.row .name { font-weight: var(--fw-name); }
+.row .sub { font-size: var(--fs-support); }
+.band-stats dd { font-weight: var(--fw-title); font-size: var(--fs-figure); font-variant-numeric: tabular-nums; }
+.stat b { font-weight: var(--fw-title); }
+.kv dd, .facts dd { font-weight: var(--fw-name); }
+.facts dd { font-size: var(--fs-body); }
+.pill, .tag { font-weight: var(--fw-name); }
+.code { font-weight: 500; font-size: var(--fs-code); }
+/* Nothing bolder than a title (UI-V2 section 10, Type): bold words inside text take the title weight. */
+b, strong { font-weight: var(--fw-title); }
+th { font-weight: 500; }
+@media (max-width: 900px) { .band-stats dd { font-size: calc(var(--fs-figure) * .8); } }
+
+/* ---------- 4.1 Hover ----------
+   Background eases to --surface-2 in --dur-hover; on touch screens there is no hover, so none is drawn. */
+a.row, .list > a, a.card, a.site-card, a.tag, .icon-btn, .btn, .tabs a, .tabs button, .dt-tab, .sec-to {
+  transition: background-color var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle), color var(--dur-hover) var(--ease-settle), box-shadow var(--dur-hover) var(--ease-settle), transform var(--dur-press) var(--ease-settle);
+}
+@media (hover: hover) {
+  a.row:hover, .list > a:hover, a.card:hover, a.site-card:hover { background-color: var(--surface-2); }
+  /* A card is found by its surface, not by lifting off the page (v2: nothing moves on hover). */
+  a.site-card:hover, a.card:hover { transform: none; box-shadow: var(--shadow-sm); }
+}
+
+/* ---------- 4.2 Press ----------
+   Motion.astro adds .rs-pressed on pointer down: a button, chip or card scales to --press-scale in --dur-press
+   (a wide row scales so its edges move no more than 6 px); on release it eases back. A primary button also
+   darkens. Reduced motion: no scale; it darkens at once. */
+.rs-pressed { transform: var(--press-base, translate(0)) scale(var(--press-s, var(--press-scale))) !important; transition: transform var(--dur-press) var(--ease-settle), background-color var(--dur-hover) var(--ease-settle) !important; }
+.rs-released { transition: transform var(--dur-press) var(--ease-settle), background-color var(--dur-hover) var(--ease-settle) !important; }
+.btn.primary:active { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn:not(.primary):active, a.row:active, .list > a:active, a.card:active { background-color: var(--surface-3); }
+@media (prefers-reduced-motion: reduce) {
+  .rs-pressed { transform: none !important; }
+}
+
+/* ---------- 4.3 Focus ----------
+   The ring appears at once, never animated, never clipped by a card's rounded box and never under a sticky bar
+   (WCAG 2.4.11): focus moves scroll the page with room for the top bar and a stuck filter bar. */
+html { scroll-padding-top: calc(var(--mast-h, 60px) + var(--fb-h, 0px) + 16px); }
+@media (max-width: 767px) { html { scroll-padding-bottom: 80px; } }
+.list > :focus-visible, .tablewrap :focus-visible, .dt-list :focus-visible { outline-offset: -2px; }
+a.card:focus-visible, a.site-card:focus-visible, .card :focus-visible { outline-offset: 2px; }
+
+/* ---------- 4.12 Loading: a skeleton, at its final size, still ----------
+   rsFill(box, fill) in Motion.astro shows it only when content takes longer than --skeleton-skip, and never
+   longer than --skeleton-max; then the content cross-fades in over --dur-state. The wash never shimmers. */
+.skel { position: relative; }
+.skel.skel-on > * { visibility: hidden; }
+.skel.skel-on::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: repeating-linear-gradient(to bottom, var(--surface-2) 0 14px, transparent 14px 26px); pointer-events: none; }
+.skel-line { display: block; height: 12px; border-radius: 6px; background: var(--surface-2); }
+.skel-line + .skel-line { margin-top: 10px; }
+.skel-line.short { width: 40%; } .skel-line.mid { width: 70%; }
+
+/* ---------- 4.23 Toasts ----------
+   One at a time, from the bottom (--dur-enter), stays --toast-stay (paused while pointed at or focused) or until
+   dismissed, then leaves downward (--dur-exit on --ease-exit). A second one replaces the first in place.
+   window.rsToast(text, { action, onAction }) in Motion.astro. */
+.rs-toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); z-index: 95; display: flex; align-items: center; gap: 12px; max-width: min(560px, calc(100vw - 32px)); padding: 10px 10px 10px 16px; border-radius: var(--radius-lg); background: var(--ink); color: var(--on-ink); box-shadow: var(--shadow-lg); font: 500 var(--fs-body)/1.4 var(--font-sans); transform: translateX(-50%); }
+.rs-toast[hidden] { display: none; }
+.rs-toast .rs-toast-t { min-width: 0; }
+.rs-toast .btn { flex: none; padding: 6px 12px; font-size: var(--fs-support); color: var(--on-ink); border-color: color-mix(in srgb, var(--on-ink) 40%, transparent); background: transparent; }
+.rs-toast .btn:hover { background: color-mix(in srgb, var(--on-ink) 14%, transparent); color: var(--on-ink); }
+.rs-toast .rs-toast-x { flex: none; width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: var(--radius); background: none; color: color-mix(in srgb, var(--on-ink) 70%, transparent); cursor: pointer; font-size: 18px; line-height: 1; }
+.rs-toast .rs-toast-x:hover { color: var(--on-ink); background: color-mix(in srgb, var(--on-ink) 12%, transparent); }
+@media (max-width: 767px) { .rs-toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); } }
+
+/* ---------- Empty states (UI-V2 section 10, States) ----------
+   One sentence and one action where the list would be, in the page's own words: a quiet dashed box. */
+.empty { gap: 10px; padding: 32px 20px; }
+.empty p { font-size: var(--fs-body); color: var(--text-2); max-width: 52ch; }
+
+/* ---------- Reduced motion ----------
+   base.css already stops CSS animation and transition; the scripts in Motion.astro check rsMotion().reduced. */
+@media (prefers-reduced-motion: reduce) {
+  .rs-toast { animation: none !important; }
+}
+
+@media print { .rs-toast { display: none !important; } }

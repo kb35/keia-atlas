@@ -79,10 +79,24 @@ const where = place ?? title ?? 'the list';
       };
       sec.__saApply = apply;
       btn.addEventListener('click', function () {
-        var y0 = btn.getBoundingClientRect().top;
+        var y0 = btn.getBoundingClientRect().top, opening = !sec.classList.contains('sa-open');
+        var M = window.rsMotion ? window.rsMotion() : { reduced: true };
+        var was = opening ? Array.prototype.filter.call(box.children, function (el) { return el.classList.contains('sa-x'); }) : [];
+        var h0 = box.getBoundingClientRect().height;
         sec.classList.toggle('sa-open');
         apply();
-        // Keep the button where the pointer is: showing fewer would otherwise pull the page up under it.
+        if (opening) {
+          // MOTION-V2 4.4: the box eases to its new height and the new rows enter, --stagger apart, up to 12;
+          // the rest arrive together. The button below moves down with the box, away from nothing it covers.
+          if (M.reduced || !box.animate) return;
+          var h1 = box.getBoundingClientRect().height;
+          if (h1 - h0 > 2 && box.tagName !== 'TBODY') box.animate([{ height: h0 + 'px', overflow: 'clip' }, { height: h1 + 'px', overflow: 'clip' }], { duration: M.morph, easing: M.ease });
+          was.forEach(function (el, i) {
+            el.animate([{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'none' }], { duration: M.enter, delay: M.delay + Math.min(i, 12) * M.stagger, easing: M.ease, fill: 'backwards' });
+          });
+          return;
+        }
+        // Showing fewer: the button stays where the pointer is (M6), so the page does not pull up under it.
         var dy = btn.getBoundingClientRect().top - y0;
         if (Math.abs(dy) > 1) window.scrollBy(0, dy);
       });
@@ -141,7 +155,7 @@ const where = place ?? title ?? 'the list';
   .sec { min-width: 0; }
   .sec > .sec-all { margin-top: 12px; }
   /* The drill-down link: a quiet link, not a button, so it reads as "go there" (rule P10). */
-  .sec-to { display: inline-flex; align-items: center; gap: 6px; width: fit-content; font-weight: 600; font-size: 14px; text-decoration: none; }
+  .sec-to { display: inline-flex; align-items: center; gap: 6px; width: fit-content; font-weight: 600; font-size: var(--fs-body); text-decoration: none; }
   .sec-to:hover { text-decoration: underline; text-underline-offset: 3px; }
   .sec-to[hidden] { display: none; }
   .sec > .sec-to { margin-top: 12px; }

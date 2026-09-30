@@ -1,0 +1,146 @@
+---
+/* Motion: the script half of the interaction layer (MOTION-V2 section 4; styles in src/styles/craft.css).
+   One part in the Shell, on every page. It adds:
+     press        4.2   a button, chip or card scales to --press-scale while pressed (a wide row by at most 6 px
+                        each side), and eases back on release
+     lists        M13   a list that appears with the page makes one quiet stagger, once
+     rsFill       4.12  a skeleton at the final size while content takes longer than --skeleton-skip, then the
+                        content cross-fades in
+     rsToast      4.23  one toast at a time: rises, stays, leaves; a second replaces the first in place
+     rsSetDensity 4.25  Comfortable or Compact: rows and cards ease to their new size together
+   Reduced motion: every one of them changes at once (M7). Input never waits: each adds a class or starts an
+   animation after the new state is painted. */
+---
+<div class="rs-toast" role="status" aria-live="polite" hidden data-rs-toast><span class="rs-toast-t" data-rs-toast-t></span><button type="button" class="btn small" data-rs-toast-act hidden></button><button type="button" class="rs-toast-x" data-rs-toast-x aria-label="Dismiss">×</button></div>
+
+<script is:inline data-astro-rerun>
+  (function () {
+    var W = window, D = document;
+    var M = function () { return W.rsMotion ? W.rsMotion() : { reduced: matchMedia('(prefers-reduced-motion: reduce)').matches, enter: 440, exit: 240, state: 300, press: 80, stagger: 24, delay: 24, ease: 'cubic-bezier(.22,1,.36,1)', exitEase: 'cubic-bezier(.4,0,1,1)', skeletonSkip: 100, skeletonMax: 400, toast: 4000 }; };
+
+    /* ---------- Lists that appear: one quiet stagger, once (runs on every page arrival) ----------
+       The first 12 items in view rise 4 px into place --stagger apart; the rest are simply there. Filtering,
+       sorting and live changes never replay it (they have their own moves, M12 and M10). */
+    (function listsIn() {
+      var m = M(); if (m.reduced) return;
+      var main = D.querySelector('main'); if (!main || !Element.prototype.animate) return;
+      var vh = innerHeight, n = 0, seen = new Set();
+      main.querySelectorAll('.list, .grid-cards, [data-items], [data-stagger]').forEach(function (box) {
+        if (n >= 12 || box.closest('[hidden], .peek, [data-no-stagger]')) return;
+        Array.prototype.forEach.call(box.children, function (el) {
+          if (n >= 12 || seen.has(el) || el.matches('template, script, style, .empty, [hidden]')) return;
+          seen.add(el);
+          var r = el.getBoundingClientRect();
+          if (!r.height || r.top > vh || r.bottom < 0) return;
+          el.animate([{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'none' }], { duration: m.enter, delay: m.delay + n * m.stagger, easing: m.ease, fill: 'backwards' });
+          n++;
+        });
+      });
+    })();
+
+    if (W.__rsMotionHook) return;
+    W.__rsMotionHook = true;
+
+    /* ---------- 4.2 Press ---------- */
+    var SEL = 'a[href], button, summary, [role="button"], [data-peek], label.chip, label.lchip';
+    var NOT = '[role="tab"], .dt-tab, .sec-tabs a, .nav a, .crumbs a, [draggable="true"], [data-no-press], [disabled], [aria-disabled="true"]';
+    var cur = null, relT = 0;
+    var release = function () {
+      if (!cur) return;
+      var el = cur, m = M(); cur = null;
+      el.classList.remove('rs-pressed'); el.classList.add('rs-released');
+      clearTimeout(relT);
+      relT = setTimeout(function () { el.classList.remove('rs-released'); el.style.removeProperty('--press-s'); el.style.removeProperty('--press-base'); }, m.press + 40);
+    };
+    D.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0 || !e.target.closest) return;
+      var el = e.target.closest(SEL);
+      if (!el || el.matches(NOT) || el.closest('svg') || !el.closest('main, .peek, .rs-toast, .report')) return;
+      var m = M(); if (m.reduced) return;   // reduced motion: the :active colour alone (craft.css)
+      var cs = getComputedStyle(el); if (cs.display === 'inline' || cs.display === 'contents') return;
+      var r = el.getBoundingClientRect(); if (!r.width || !r.height) return;
+      release();
+      var base = parseFloat(getComputedStyle(D.documentElement).getPropertyValue('--press-scale')) || 0.97;
+      el.style.setProperty('--press-s', Math.max(base, 1 - 12 / r.width).toFixed(4));
+      if (cs.transform && cs.transform !== 'none') el.style.setProperty('--press-base', cs.transform);
+      el.classList.add('rs-pressed'); cur = el;
+    }, { passive: true });
+    ['pointerup', 'pointercancel', 'dragstart', 'blur'].forEach(function (ev) { W.addEventListener(ev, release, true); });
+    D.addEventListener('pointerout', function (e) { if (cur && e.target === cur && !cur.contains(e.relatedTarget)) release(); }, true);
+    D.addEventListener('astro:before-swap', function () { cur = null; });
+
+    /* ---------- 4.12 Loading ----------
+       rsFill(box, fill): fill() fills the box (it may return a promise). Content ready within --skeleton-skip
+       shows at once; otherwise the box shows its skeleton (.skel-on, the box keeps its final size) until the
+       content is there, then the content cross-fades in over --dur-state. */
+    W.rsFill = function (box, fill) {
+      var m = M(), skel = false;
+      box.classList.add('skel'); box.setAttribute('aria-busy', 'true');
+      var t = setTimeout(function () { skel = true; box.classList.add('skel-on'); }, m.skeletonSkip);
+      var done = function () {
+        clearTimeout(t); box.removeAttribute('aria-busy'); box.classList.remove('skel-on');
+        if (skel && !m.reduced && box.animate) box.animate([{ opacity: 0 }, { opacity: 1 }], { duration: m.state, easing: m.ease });
+      };
+      var r; try { r = fill(); } catch (e) { done(); throw e; }
+      if (r && r.then) return r.then(function (v) { done(); return v; }, function (e) { done(); throw e; });
+      done(); return r;
+    };
+
+    /* ---------- 4.23 Toasts ----------
+       rsToast(text, { action: 'Undo', onAction: fn, stay: ms }). Returns { close }. A toast only repeats
+       what the page already shows; it never carries information of its own. */
+    var tt = 0, shown = false;
+    var toastEl = function () { return D.querySelector('[data-rs-toast]'); };
+    var hide = function (now) {
+      var el = toastEl(); clearTimeout(tt); if (!el || el.hidden) { shown = false; return; }
+      var m = M(); shown = false;
+      if (now || m.reduced || !el.animate) { el.hidden = true; return; }
+      el.style.pointerEvents = 'none';
+      el.animate([{ opacity: 1, transform: 'translateX(-50%)' }, { opacity: 0, transform: 'translate(-50%, 16px)' }], { duration: m.exit, easing: m.exitEase || m.ease, fill: 'forwards' }).onfinish = function (ev) {
+        if (!shown) el.hidden = true; el.style.pointerEvents = ''; if (ev && ev.target) ev.target.cancel();
+      };
+    };
+    var arm = function (stay) {
+      var el = toastEl(); clearTimeout(tt);
+      if (el.matches(':hover, :focus-within')) return;   // paused while pointed at or focused (WCAG 2.2.1)
+      tt = setTimeout(function () { hide(); }, stay);
+    };
+    W.rsToast = function (text, o) {
+      o = o || {};
+      var el = toastEl(); if (!el) return { close: function () {} };
+      var m = M(), stay = o.stay || m.toast, act = el.querySelector('[data-rs-toast-act]'), t = el.querySelector('[data-rs-toast-t]');
+      var was = shown && !el.hidden;
+      var apply = function () {
+        t.textContent = text;
+        act.hidden = !o.action; act.textContent = o.action || '';
+        act.onclick = o.action ? function () { hide(); if (o.onAction) o.onAction(); } : null;
+      };
+      el.getAnimations().forEach(function (a) { a.cancel(); });
+      el.style.pointerEvents = ''; el.hidden = false; shown = true;
+      if (was && !m.reduced && t.animate) {
+        // A second toast replaces the first in place: the words cross-fade, the toast stays where it is.
+        t.animate([{ opacity: 1 }, { opacity: 0 }], { duration: m.exit / 2, easing: m.exitEase || m.ease }).onfinish = function () { apply(); t.animate([{ opacity: 0 }, { opacity: 1 }], { duration: m.state, easing: m.ease }); };
+      } else {
+        apply();
+        if (!m.reduced && el.animate) el.animate([{ opacity: 0, transform: 'translate(-50%, 16px)' }, { opacity: 1, transform: 'translateX(-50%)' }], { duration: m.enter, easing: m.ease });
+      }
+      el.__stay = stay; arm(stay);
+      return { close: function () { hide(); } };
+    };
+    D.addEventListener('click', function (e) { if (e.target.closest && e.target.closest('[data-rs-toast-x]')) hide(); });
+    D.addEventListener('pointerleave', function (e) { var el = toastEl(); if (el && e.target === el && shown) arm(el.__stay || M().toast); }, true);
+    D.addEventListener('focusout', function (e) { var el = toastEl(); if (el && shown && el.contains(e.target) && !el.contains(e.relatedTarget)) arm(el.__stay || M().toast); });
+    D.addEventListener('pointerenter', function (e) { var el = toastEl(); if (el && e.target === el) clearTimeout(tt); }, true);
+    D.addEventListener('keydown', function (e) { if (e.key === 'Escape' && shown) hide(); });
+    D.addEventListener('astro:before-swap', function () { hide(true); });
+
+    /* ---------- 4.25 Density ----------
+       Comfortable or Compact, kept in this browser (rs6-density) and applied before first paint by the Shell.
+       Changing it is one rsChange: what you were looking at stays still, the rest eases to its new place. */
+    W.rsSetDensity = function (v) {
+      try { localStorage.setItem('rs6-density', v); } catch (_) {}
+      var apply = function () { if (W.rsApplyTheme) W.rsApplyTheme(); };
+      if (W.rsChange) W.rsChange(apply); else apply();
+    };
+  })();
+</script>

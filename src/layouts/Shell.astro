@@ -5,6 +5,7 @@ import { href } from '../lib/data.mjs';
 import Settings from '../components/Settings.astro';
 import Report from '../components/Report.astro';
 import Peek from '../components/Peek.astro';
+import Motion from '../components/Motion.astro';
 import HelpMode from '../components/HelpMode.astro';
 import SearchOverlay from '../components/SearchOverlay.astro';
 import { ClientRouter } from 'astro:transitions';
@@ -15,6 +16,7 @@ import '../styles/looks/drawing.css';
 import '../styles/looks/contrast.css';
 import '../styles/base.css';
 import '../styles/motion.css';
+import '../styles/craft.css';
 
 import { PEOPLE, STAGES_DEMO, TEAMS } from '../lib/demo.mjs';
 import { LINE } from '../lib/brand.mjs';
@@ -194,6 +196,9 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         var st = '6', ag = 'on';
         try { st = localStorage.getItem('rs4-stage') || st; ag = localStorage.getItem('rs4-agents') || ag; } catch (_) {}
         r.setAttribute('data-stage', st); r.setAttribute('data-agents', ag);
+        // Density (UI-V2 section 7): Comfortable, or Compact (the default in Enterprise). Changed with rsSetDensity.
+        var dn = null; try { dn = localStorage.getItem('rs6-density'); } catch (_) {}
+        r.setAttribute('data-density', dn === 'compact' || dn === 'comfortable' ? dn : m.look === 'enterprise' ? 'compact' : 'comfortable');
         // Help mode (the ? switch): kept per window (session storage), and put back after every page swap.
         var hp = 'off'; try { hp = sessionStorage.getItem('rs5-help') === 'on' ? 'on' : 'off'; } catch (_) {}
         r.setAttribute('data-help', hp);
@@ -496,6 +501,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
   <Settings />
   <Report about={aboutThis} />
   <Peek />
+  <Motion />
   <HelpMode />
   <SearchOverlay />
   <slot name="end" />

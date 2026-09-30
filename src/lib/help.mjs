@@ -33,6 +33,7 @@ const SHELL = {
   'shell.report': e('Report', def('report'), 'Select it to propose an edit, log new firmware or raise an urgent issue about the page you are on. It goes to the person who owns it.', 'l:report'),
   'shell.mode': e('Colour mode', 'Switches between light and dark. Auto follows your computer until you choose.', 'Select it to flip between light and dark.'),
   'shell.settings': e('Settings', 'The look of Keia Atlas, light or dark, how much is switched on and whether agents show. Saved in this browser only.', 'Select it to open Settings.', 'l:stages'),
+  'settings.density': e('Density', 'How close together rows and cards sit. Comfortable gives each row more room; Compact fits more on the screen with slightly smaller text.', 'Choose one. The page eases to its new size and keeps your place. Saved in this browser only.'),
   'shell.account': e('Viewing as', 'Who this window is showing Keia Atlas as. The home page, the order of the sidebar and who your changes are recorded as follow it.', 'Select it to view as another role. Nobody is signed in for real: this is a demo, and each window keeps its own person.', 'g:view-as'),
   'shell.viewas': e('View as', def('view-as'), 'Pick a role, or type a role, place or team to find one.', 'g:view-as'),
   'shell.viewas-everyone': e('Everyone (overview)', 'Not a person: every role\'s first screen at once, for seeing the whole picture. A change made here is recorded as the demo admin.', 'Select it to see every role together.', 'g:view-as'),
