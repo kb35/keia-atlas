@@ -1,0 +1,165 @@
+---
+// A partner's job page (UI-V2 §3.6, UX-V2 §4.2; BUILD-PLAN V7 H2). The same record shape as any job, opened by the
+// partner the job was handed to, through the one link they were sent:
+//   band     the job, the one contract clock both sides see, the access it gives
+//   top      the unit (its drawing and facts) with the Restricted slots kept in place and saying why (7 cols), beside
+//            what the job lets them open and when that ends (5 cols)
+//   below    the job: who has it (the With chip, with the clock), why, both states (Aigna's and their own tool's),
+//            the timeline, then Hand back
+// Aigna staff see the page as the partner does, with a line saying so. A partner from another company sees only that
+// the job is not theirs. The job and its times are simulated (src/lib/vendors.mjs).
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import SidePanel from '../../../components/SidePanel.astro';
+import Section from '../../../components/Section.astro';
+import DeviceArt from '../../../components/DeviceArt.astro';
+import HealthGlyph from '../../../components/HealthGlyph.astro';
+import WithChip from '../../../components/WithChip.astro';
+import SourceMark from '../../../components/SourceMark.astro';
+import { vendors, spaces, sites, modelName, className, href } from '../../../lib/data.mjs';
+import { PEOPLE, person } from '../../../lib/demo.mjs';
+import { JOBS, NOW, contractClock, accessOf, NOT_SHARED, whenWords, atWords, dateWords, spanWords } from '../../../lib/vendors.mjs';
+
+export function getStaticPaths() {
+  return JOBS.map((j) => ({ params: { id: j.id.toLowerCase() } }));
+}
+const { id } = Astro.params;
+const j = JOBS.find((x) => x.id.toLowerCase() === id);
+const V = vendors[j.vendor];
+const clock = contractClock(j), access = accessOf(j);
+const S = spaces[j.space], site = sites[j.site];
+const pos = j.position ? S?.positions.find((p) => p.position === j.position || p.position.startsWith(`${j.position}#`)) : null;
+const spaceName = S ? `${S.number ? `${S.number} ` : ''}${S.name}` : j.space;
+const FIRST = Object.fromEntries(PEOPLE.map((p) => [p.id, p.name.split(' ')[0]]));
+const KIND = { incident: 'Incident', snag: 'Snag', install: 'Install', survey: 'Site survey', design: 'Design review' };
+const own = j.state === 'done' ? { s: 'done', to: j.vendor, kind: 'vendor', name: V.name, at: j.closedAt }
+  : j.state === 'waiting' ? { s: 'waiting', to: j.vendor, kind: 'vendor', name: V.name, wait: j.wait, at: j.waitFrom }
+  : { s: 'with', to: j.vendor, kind: 'vendor', name: V.name, why: j.why, clock: clock.due ? whenWords(clock.due) : undefined, at: j.handedAt };
+const keiaWord = j.state === 'done' ? 'Done' : j.state === 'waiting' ? `Waiting on: ${j.wait}` : `With ${V.name}`;
+const NUMBERS = [
+  { n: clock.due ? whenWords(clock.due) : '–', label: j.sla.kind === 'response' ? 'Response due' : 'Due', fact: true },
+  { n: clock.left == null ? '–' : spanWords(clock.left), label: clock.closed ? (clock.past ? 'Closed past the clock by' : 'Closed with time left') : clock.past ? 'Past the clock by' : clock.paused ? 'Left when it paused' : 'Left on the clock', fact: true, tone: clock.past && !clock.closed ? 'bad' : undefined },
+  { n: access.scope.length, label: access.open ? 'Things you can open' : 'Access ended', fact: true },
+];
+const whoCss = PEOPLE.filter((p) => p.vendor).map((p) => `:root[data-who="${p.id}"] .vj-denied{display:${p.vendor === j.vendor ? 'none' : 'grid'}}:root[data-who="${p.id}"] .vj-body{display:${p.vendor === j.vendor ? 'grid' : 'none'}}${p.vendor === j.vendor ? '' : `:root[data-who="${p.id}"] main .band.pb{display:none}`}`).join('');
+const history = [...(j.history ?? [])].reverse();
+const handedByName = person(j.handedBy)?.name ?? j.handedBy;
+---
+<Shell vendorOk title={`${j.id} ${j.title}`} section="vendor-job" crumbs={[{ label: 'Home', to: '/' }, { label: j.id }]} about={{ kind: 'job', label: `${j.id} ${j.title}`, to: `/vendor/jobs/${id}/` }}>
+  <PageBand overline={`Job · ${KIND[j.kind]}`} title={j.title} answer={clock.text} lede={`${spaceName}, ${site?.name ?? ''}. Handed to ${V.name} by ${handedByName}.`} sim numbers={NUMBERS} source={{ from: j.native.from, ref: j.native.ref, at: '11:58' }}>
+    <span slot="overline" class="mono vj-id">{j.id}</span>
+    <button slot="action" type="button" class="btn primary" data-hand-back data-to={FIRST[j.handedBy] ?? 'Aigna'} disabled={j.state === 'done'}>Hand back</button>
+  </PageBand>
+
+  <div class="content vj">
+    <section class="vj-denied card pad" aria-label="Not your job">
+      <h2>This job is not handed to your company</h2>
+      <p class="faint">A partner opens only the jobs handed to them. Your jobs are on your Home.</p>
+      <a class="btn small" href={href('/')}>Go to your Home</a>
+    </section>
+
+    <div class="vj-body">
+      <p class="vj-staff faint" data-staff-only>You are Aigna staff: this is the job as {V.name} sees it, through the link they were sent.</p>
+      <div class="g12 top">
+        <section class="card pad s-7 vj-pic" aria-label="What the job is about" data-help="vendorjob.picture">
+          <div class="vj-unit">
+            <span class="vj-art">{pos?.model ? <DeviceArt model={pos.model} cls={pos.cls} /> : <span class="faint">No single unit on this job</span>}</span>
+            <dl class="vj-facts">
+              <div><dt>Space</dt><dd>{spaceName}, {site?.name}</dd></div>
+              {pos && <div><dt>Unit</dt><dd>{pos.role ?? className(pos.cls)}{pos.model && <> · <a href={href(`/models/${pos.model}/`)}>{modelName(pos.model)}</a></>}</dd></div>}
+              {pos?.current && <div><dt>Serial</dt><dd class="mono">{pos.current.serial}</dd></div>}
+              {pos?.current && <div><dt>Asset tag</dt><dd class="mono">{pos.current.asset_tag}</dd></div>}
+              <div class="vj-r"><dt>IP address and switch port</dt><dd>Not shared with partners</dd></div>
+              <div class="vj-r"><dt>Who booked the space</dt><dd>Not shared with partners</dd></div>
+            </dl>
+          </div>
+          <div class="vj-slot" data-help="vendorjob.restricted"><b>Floor plan</b><span>Not shared with partners. The job needs the space, not the floor.</span></div>
+        </section>
+        <SidePanel class="s-5" title="Your access on this job" meta={access.open ? 'Open' : 'Ended'} help="vendorjob.access">
+          <div class="vj-side">
+            <ul class="vj-can">{access.words.map((w) => <li><HealthGlyph state="fine" size={12} quiet /> <span>{w.charAt(0).toUpperCase() + w.slice(1)}</span></li>)}</ul>
+            <p class="vj-ends"><b>{access.ends}</b></p>
+            <h3 class="vj-sub">Not shared</h3>
+            <ul class="vj-not">{NOT_SHARED.map((n) => <li><span>{n.what}</span><small>{n.why}</small></li>)}</ul>
+            <p class="faint vj-log">Everything you open is logged in Aigna's vendor access register. Sign-in is through your own company's account.</p>
+          </div>
+        </SidePanel>
+      </div>
+
+      <Section title="The job" id="job" help="vendorjob.job">
+        <div class="card pad vj-job">
+          <p class="vj-chip"><WithChip own={own} /></p>
+          <dl class="vj-dl">
+            <div><dt>Why</dt><dd>{j.why}</dd></div>
+            <div><dt>The contract clock</dt><dd><span class:list={['vj-clk', { past: clock.past && !clock.closed }]}>{clock.text}</span><small>{j.sla.what}, from {V.contract.ref}. The same clock on both sides; waiting on Aigna stops it.</small></dd></div>
+            <div><dt>Status</dt><dd>{keiaWord} <span class="vj-native">· {j.native.from}: {j.native.status}</span> <SourceMark from={j.native.from} ref={j.native.ref} at="11:58" /></dd></div>
+            <div><dt>Handed over</dt><dd>{atWords(j.handedAt)}, by {handedByName}</dd></div>
+          </dl>
+        </div>
+      </Section>
+
+      <Section title="Timeline" id="timeline" aside={history.length ? `${history.length} ${history.length === 1 ? 'entry' : 'entries'}` : undefined} help="vendorjob.timeline">
+        {history.length ? (
+          <ol class="vj-tl">{history.map((h) => <li><span class="mono">{whenWords(h.at, NOW)}</span><span>{h.text}</span></li>)}</ol>
+        ) : <p class="faint">Nothing recorded on this job yet beyond the hand-off.</p>}
+      </Section>
+    </div>
+    <div class="km-toast-host" data-toast-host></div>
+  </div>
+
+  <script is:inline data-astro-rerun slot="end">
+    (function () {
+      var b = document.querySelector('[data-hand-back]'); if (!b || b.__hb) return; b.__hb = true;
+      b.addEventListener('click', function () {
+        var host = document.querySelector('[data-toast-host]'), text = 'Handed back to ' + b.dataset.to + ' to check. Nothing was saved: the demo keeps no partner changes.';
+        if (window.km && host) window.km.toast(host, text);
+      });
+    })();
+  </script>
+</Shell>
+<style is:global set:html={whoCss}></style>
+<style is:global>
+  .vj-denied { display: none; gap: 10px; justify-items: start; }
+  .vj-denied h2 { margin: 0; font-size: var(--fs-h3); }
+  .vj-body { display: grid; gap: 24px; min-width: 0; }
+  :root[data-who-kind="vendor"] [data-staff-only] { display: none !important; }
+</style>
+<style>
+  .vj-id { font-size: var(--fs-mark); color: var(--text-3); }
+  .vj-staff { margin: 0; font-size: var(--fs-code); }
+  .vj-pic { display: grid; gap: 16px; }
+  .vj-unit { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px 24px; align-items: center; }
+  .vj-art { display: grid; place-items: center; min-height: 140px; padding: 12px; border-radius: var(--radius); background: var(--surface-2); color: var(--text-2); }
+  .vj-art :global(svg) { max-width: 100%; max-height: 160px; }
+  .vj-facts, .vj-dl { margin: 0; display: grid; gap: 8px; font-size: var(--fs-support); }
+  .vj-facts div, .vj-dl div { display: grid; gap: 2px; }
+  .vj-facts dt, .vj-dl dt { font-size: var(--fs-code); color: var(--text-3); }
+  .vj-facts dd, .vj-dl dd { margin: 0; display: grid; gap: 2px; }
+  .vj-dl dd { display: block; }
+  .vj-dl dd small { display: block; font-size: var(--fs-code); color: var(--text-3); margin-top: 2px; }
+  .vj-r dd { color: var(--text-3); font-style: italic; }
+  .vj-slot { display: grid; gap: 4px; padding: 16px; border-radius: var(--radius); border: 1px dashed var(--line-strong); background: repeating-linear-gradient(135deg, var(--surface) 0 10px, var(--surface-2) 10px 20px); font-size: var(--fs-support); }
+  .vj-slot span { color: var(--text-2); }
+  .vj-side { display: grid; gap: 10px; }
+  .vj-can, .vj-not { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: var(--fs-support); }
+  .vj-can li { display: flex; gap: 8px; align-items: center; }
+  .vj-not li { display: grid; gap: 1px; padding-top: 6px; border-top: 1px solid var(--line); }
+  .vj-not small { font-size: var(--fs-code); color: var(--text-3); }
+  .vj-ends { margin: 0; font-size: var(--fs-support); }
+  .vj-sub { margin: 6px 0 0; font: 600 var(--overline-size, 11px)/1.2 var(--font-sans); letter-spacing: var(--overline-track, .06em); text-transform: var(--overline-case, uppercase); color: var(--text-3); }
+  .vj-log { margin: 0; font-size: var(--fs-code); }
+  .vj-job { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .vj-chip { margin: 0; min-width: 0; max-width: 100%; display: flex; }
+  .vj-dl .srcm { white-space: normal; height: auto; min-height: 20px; padding-block: 3px; line-height: 1.3; }
+  .vj-clk { font: 500 var(--fs-code)/1.4 var(--font-mono); }
+  .vj-clk.past { color: var(--h-fault-ink); }
+  .vj-native { color: var(--text-2); }
+  .vj-tl { list-style: none; margin: 0; padding: 0; display: grid; }
+  .vj-tl li { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); font-size: var(--fs-support); }
+  .vj-tl li:first-child { border-top: 0; }
+  .vj-tl .mono { font-size: var(--fs-code); color: var(--text-3); }
+  @container content (max-width: 559px) {
+    .vj-unit { grid-template-columns: minmax(0, 1fr); }
+    .vj-tl li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  }
+</style>

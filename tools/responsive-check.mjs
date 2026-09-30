@@ -75,7 +75,7 @@ const PAGES = [
   ['profiles', '/profiles/', 'other'],
   ['models', '/models/', 'other'],
   ['team', '/team/', 'other'],
-  ['vendors', '/vendors/', 'other'],
+  ['vendors', '/vendors/', 'other'], ['vendor-record', '/vendors/keystone/', 'other'], ['vendors-access', '/vendors/access/', 'other'], ['vendor-job', '/vendor/jobs/inc0041214/', 'other'],
   ['usage', '/usage/', 'other'],
   ['learn', '/learn/', 'other'],
   // The front door and the method pages

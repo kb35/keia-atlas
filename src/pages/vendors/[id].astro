@@ -1,0 +1,191 @@
+---
+// A vendor's record (UI-V2 §2: the one page shape; BUILD-PLAN V7 H2; BLUEPRINT 6.3). Record archetype:
+//   band     the vendor, the answer ("2 jobs with them · 1 past the contract clock"), four figures
+//   top      the offices they cover as small multiples, their jobs in place (7 cols), beside the contract (5 cols):
+//            its clock (term, end date, days left), its service levels, what it covers, the Aigna contact
+//   tiles    performance against the contract, measured from the records with no manual reporting
+//   below    the jobs with them, each with the one contract clock and the access it gives; access open now; the
+//            paperwork (data processing agreement, security assessment); the raw record
+// The jobs, clocks, grants and figures are simulated (src/lib/vendors.mjs); the contracts are data/vendors.
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import SidePanel from '../../components/SidePanel.astro';
+import Section from '../../components/Section.astro';
+import SmallMultiples from '../../components/SmallMultiples.astro';
+import FigureTile from '../../components/FigureTile.astro';
+import HealthGlyph from '../../components/HealthGlyph.astro';
+import WithChip from '../../components/WithChip.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import SourceMark from '../../components/SourceMark.astro';
+import { vendors, sites, spaces, SITE_ORDER, VENDOR_KIND, modelName, href, plural } from '../../lib/data.mjs';
+import { building } from '../../lib/floors.mjs';
+import { PEOPLE, person } from '../../lib/demo.mjs';
+import { JOBS, NOW, contractClock, accessOf, accessRegister, performance, contractLeft, papersOf, whenWords, atWords, dateWords, daysBetween } from '../../lib/vendors.mjs';
+
+export function getStaticPaths() {
+  return Object.keys(vendors).map((id) => ({ params: { id } }));
+}
+const { id } = Astro.params;
+const V = vendors[id];
+const C = V.contract;
+const FIRST = Object.fromEntries(PEOPLE.map((p) => [p.id, p.name.split(' ')[0]]));
+const spaceWords = (sid) => { const s = spaces[sid]; return s ? `${s.number ? `${s.number} ` : ''}${s.name}` : sid; };
+const siteWords = (sid) => sites[spaces[sid]?.site]?.name ?? '';
+const jobs = JOBS.filter((j) => j.vendor === id).map((j) => ({ ...j, clock: contractClock(j), access: accessOf(j) }))
+  .sort((a, b) => (a.state === 'done') - (b.state === 'done') || Number(b.clock.past) - Number(a.clock.past) || (a.clock.left ?? 9e9) - (b.clock.left ?? 9e9));
+const open = jobs.filter((j) => j.state !== 'done');
+const past = open.filter((j) => j.clock.past);
+const R = accessRegister(JOBS.filter((j) => j.vendor === id));
+const L = contractLeft(C);
+const P = performance(id, V.kind, V.record);
+const papers = papersOf(id);
+const total = daysBetween(C.start, C.end), gone = Math.max(0, Math.min(total, daysBetween(C.start, NOW)));
+const stateOf = (j) => (j.state === 'done' ? 'fine' : j.clock.past ? 'fault' : j.state === 'waiting' ? 'review' : 'progress');
+const ownOf = (j) => (j.state === 'done' ? { s: 'done', to: id, kind: 'vendor', name: V.name, at: j.closedAt }
+  : j.state === 'waiting' ? { s: 'waiting', to: id, kind: 'vendor', name: V.name, wait: j.wait, at: j.waitFrom }
+  : { s: 'with', to: id, kind: 'vendor', name: V.name, why: j.why, clock: j.clock.due ? whenWords(j.clock.due) : undefined, at: j.handedAt });
+
+// Coverage: the offices the contract covers, one small plan each at one scale, their jobs lit in place.
+const covered = (V.sites?.length ? V.sites : SITE_ORDER.filter((s) => V.regions.includes(sites[s].region))).filter((s) => sites[s]?.kind !== 'remote' && building(s)?.floors?.length);
+const health = Object.fromEntries(open.map((j) => [j.space, { h: j.clock.past ? 'fault' : 'review', why: `${j.id} ${j.title}`, who: null }]));
+const cards = covered.map((s) => {
+  const fl = building(s).floors;
+  const withJob = fl.find((f) => open.some((j) => j.space.startsWith(`${s}-${f.id}-`)));
+  const n = open.filter((j) => j.site === s).length;
+  return { key: s, site: s, floor: (withJob ?? fl[0]).id, title: sites[s].name.replace(/ office$/, ''), to: `/vendors/access/?vendor=${id}&site=${s}`, figure: n ? plural(n, 'job') : 'No jobs' };
+});
+const answer = !open.length ? `No jobs with ${V.name} · contract ${L.state === 'fine' ? 'in force' : L.words.toLowerCase()}`
+  : `${plural(open.length, 'job')} with them · ${past.length ? `${past.length} past the contract clock` : 'none past the contract clock'}`;
+const NUMBERS = [
+  { n: open.length, label: 'Jobs with them', to: '#jobs' },
+  { n: past.length, label: 'Past the clock', to: '#jobs', tone: past.length ? 'bad' : undefined },
+  { n: L.left < 0 ? 'Ended' : L.left, label: L.left < 0 ? 'Contract' : 'Days left on the contract', fact: true, tone: L.state === 'review' ? 'warn' : L.state === 'fault' ? 'bad' : undefined },
+  { n: R.open, label: 'Access open now', to: `/vendors/access/?vendor=${id}&status=open` },
+];
+const PERF_FMT = { '%': '%', n: '', x: 'x', d: 'd' };
+const raw = JSON.stringify({ id: V.id, name: V.name, kind: V.kind, regions: V.regions, sites: V.sites ?? null, owner: V.owner, contract: C, record: V.record ?? null }, null, 2);
+---
+<Shell title={V.name} section="vendor-record" crumbs={[{ label: 'Vendors', to: '/vendors/' }, { label: V.name }]} about={{ kind: 'vendor', label: V.name, to: `/vendors/${id}/` }}>
+  <PageBand overline={`Vendor · ${VENDOR_KIND[V.kind]}`} title={V.name} rec={`vd-${id}`} answer={answer} lede={V.summary} sim numbers={NUMBERS}>
+    <span slot="overline" class="mono vr-ref">{C.ref}</span>
+  </PageBand>
+
+  <div class="content vrec">
+    <div class="g12 top">
+      <section class="card pad s-7 vrec-cov" aria-labelledby="cov-h" data-help="vendors.coverage">
+        <header class="vrec-h"><h2 id="cov-h">Where they work</h2><span class="faint">{plural(covered.length, 'office')} under the contract · a job lights its space</span></header>
+        {cards.length ? <SmallMultiples cards={cards} health={health} people={FIRST} min={180} label={`The offices ${V.name} covers`} /> : <p class="faint">Not tied to named offices.</p>}
+      </section>
+      <SidePanel class="s-5" title="The contract" meta={C.ref} sticky help="vendors.contract">
+        <div class="vrec-side">
+          <div class="vrec-clock" data-help="vendors.contract-clock">
+            <p class="vrec-term"><span>{dateWords(C.start)} to {dateWords(C.end)}</span><HealthGlyph state={L.state} size={16} word={L.state === 'fine' ? 'In force' : L.state === 'review' ? 'To review' : 'Ended'} quiet={L.state === 'fine'} /></p>
+            <span class="vrec-bar" role="img" aria-label={`${Math.round((gone / total) * 100)}% of the term gone`}><i style={`width:${(gone / total) * 100}%`}></i></span>
+            <p class="faint">{L.words}</p>
+          </div>
+          <h3 class="vrec-sub">Service levels</h3>
+          <ul class="vrec-sla">{C.sla.map((s) => <li><span>{s.what}</span><b>{s.target}</b></li>)}</ul>
+          <h3 class="vrec-sub">Covers</h3>
+          <ul class="vrec-list">{C.scope.map((x) => <li>{x}</li>)}</ul>
+          {C.excludes && <><h3 class="vrec-sub">Does not cover</h3><ul class="vrec-list faint">{C.excludes.map((x) => <li>{x}</li>)}</ul></>}
+          {C.covers_models && <p class="vrec-models">{C.covers_models.map((m) => <a class="tag" href={href(`/models/${m}/`)}>{modelName(m)}</a>)}</p>}
+          <p class="vrec-who">Managed at Aigna by <a href={href(`/team/?p=${V.owner}`)}>{person(V.owner).name}</a>{V.people?.length ? <> · Partner staff: {V.people.map((p) => person(p).name).join(', ')}</> : null}</p>
+        </div>
+      </SidePanel>
+    </div>
+
+    <section class="vrec-perf" aria-labelledby="perf-h" data-help="vendors.performance">
+      <header class="vrec-h"><h2 id="perf-h">Performance against the contract</h2><span class="faint">last 12 months · measured from the job records, no manual reporting</span></header>
+      <div class="g12">
+        {P.map((m) => (
+          <FigureTile class={P.length === 4 ? 's-3' : 's-4'} id={m.id} label={m.label} value={m.words} spark={m.series} span="12 months" fmt={PERF_FMT[m.unit]} state={m.state === 'off' ? 'fine' : m.state} word="To review" source={{ from: 'Job records', at: '08:00' }} help="vendors.perf-figure" />
+        ))}
+      </div>
+    </section>
+
+    <Section title="Jobs with them" id="jobs" aside={`${open.length} open · ${jobs.length - open.length} closed recently`} help="vendors.jobs">
+      {jobs.length ? (
+        <ol class="vrec-jobs">
+          {jobs.map((j) => (
+            <li class="vrec-j" data-help="vendors.job">
+              <span class="vrec-g"><HealthGlyph state={stateOf(j)} size={16} title={j.state === 'done' ? 'Closed' : j.clock.past ? 'Past the contract clock' : j.state === 'waiting' ? 'Waiting on the client' : 'With the vendor'} /></span>
+              <span class="vrec-jb">
+                <a href={href(`/vendor/jobs/${j.id.toLowerCase()}/`)}><span class="mono">{j.id}</span> {j.title}</a>
+                <small>{spaceWords(j.space)}, {siteWords(j.space)} · handed over by {FIRST[j.handedBy] ?? j.handedBy}, {atWords(j.handedAt)}</small>
+                <span class={`vrec-clk${j.clock.past && !j.clock.closed ? ' past' : ''}`}>{j.clock.text} · {j.sla.what}</span>
+                <small class="vrec-both">{j.state === 'done' ? 'Done' : j.state === 'waiting' ? `Waiting on: ${j.wait}` : 'With the vendor'} · <span>{j.native.from}: {j.native.status}</span> <SourceMark from={j.native.from} ref={j.native.ref} at="11:58" /></small>
+                <small class="faint">{j.access.line}</small>
+              </span>
+              <span class="vrec-chip"><WithChip own={ownOf(j)} /></span>
+            </li>
+          ))}
+        </ol>
+      ) : <EmptyState text={`Nothing has been handed to ${V.name} yet. A job handed to them shows here with its clock.`} />}
+      <p class="vrec-note">One clock for both sides, worked out from the job's own times and the contract's service level. Waiting on Aigna stops it for both, with the same reason.</p>
+    </Section>
+
+    <div class="g12">
+      <section class="card side-card s-6" id="access" data-help="vendors.access">
+        <h3>Access open now</h3>
+        <p class="vrec-big"><b class="num">{R.open}</b> <span>{R.open === 1 ? 'grant' : 'grants'}, each tied to a job · <b class="num">{R.standing}</b> standing</span></p>
+        <ul class="vrec-grants">
+          {R.rows.filter((r) => r.open).map((r) => <li><span class="mono">{r.job}</span> <span>{spaceWords(r.space)}: {r.scope.join(', ')}</span><small>since {atWords(r.from)} · ends when the job closes</small></li>)}
+        </ul>
+        <a class="hp-more" href={href(`/vendors/access/?vendor=${id}`)}>See all {R.rows.length} in the access register <span aria-hidden="true">→</span></a>
+      </section>
+      <section class="card side-card s-6" id="papers" data-help="vendors.papers">
+        <h3>Before they are let in</h3>
+        <ul class="vrec-papers">{papers.map((x) => <li><HealthGlyph state={x.state} size={16} quiet={x.state === 'fine'} /><span><b>{x.what}</b><small>{x.words}</small></span></li>)}</ul>
+        <p class="vrec-note">No access goes live without a data processing agreement and a security assessment. Access follows the contract's scope.</p>
+      </section>
+    </div>
+
+    <Section title="Raw" id="raw" help="vendors.raw">
+      <details class="vrec-rawd"><summary>Show the record as data</summary><pre class="vrec-raw">{raw}</pre></details>
+      <p class="vrec-note">The record as data/vendors/{id}.yaml holds it. The jobs, clocks and performance above are simulated.</p>
+    </Section>
+  </div>
+</Shell>
+
+<style>
+  .vr-ref { font-size: var(--fs-mark); color: var(--text-3); }
+  .vrec-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 12px; }
+  .vrec-h h2 { margin: 0; font-size: var(--fs-h3); }
+  .vrec-h .faint { font-size: var(--fs-code); }
+  .vrec-perf { display: grid; min-width: 0; }
+  .vrec-side { display: grid; gap: 8px; }
+  .vrec-clock { display: grid; gap: 6px; }
+  .vrec-clock p { margin: 0; font-size: var(--fs-support); }
+  .vrec-term { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; align-items: center; }
+  .vrec-bar { display: block; height: 6px; border-radius: 99px; background: var(--surface-3); overflow: hidden; }
+  .vrec-bar i { display: block; height: 100%; background: var(--text-3); }
+  .vrec-sub { margin: 8px 0 0; font: 600 var(--overline-size, 11px)/1.2 var(--font-sans); letter-spacing: var(--overline-track, .06em); text-transform: var(--overline-case, uppercase); color: var(--text-3); }
+  .vrec-sla, .vrec-list, .vrec-grants, .vrec-papers { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: var(--fs-support); }
+  .vrec-sla li { display: flex; justify-content: space-between; gap: 12px; padding-top: 4px; border-top: 1px solid var(--line); }
+  .vrec-sla li:first-child { border-top: 0; padding-top: 0; }
+  .vrec-list li::before { content: "· "; color: var(--text-3); }
+  .vrec-models { margin: 4px 0 0; display: flex; flex-wrap: wrap; gap: 4px; }
+  .vrec-who { margin: 8px 0 0; padding-top: 8px; border-top: 1px solid var(--line); font-size: var(--fs-code); color: var(--text-2); }
+  .vrec-jobs { list-style: none; margin: 0; padding: 0; display: grid; }
+  .vrec-j { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: 4px 12px; align-items: start; padding: 12px 0; border-top: 1px solid var(--line); container: vrj / inline-size; }
+  .vrec-j:first-child { border-top: 0; padding-top: 0; }
+  .vrec-g { padding-top: 2px; line-height: 0; }
+  .vrec-jb { display: grid; gap: 3px; min-width: 0; }
+  .vrec-jb a { font-size: var(--fs-body); font-weight: var(--fw-name, 550); color: var(--text); text-decoration: none; }
+  .vrec-jb a:hover { text-decoration: underline; text-underline-offset: 2px; }
+  .vrec-jb .mono { font-size: var(--fs-code); color: var(--text-3); margin-right: 4px; }
+  .vrec-jb small { font-size: var(--fs-code); color: var(--text-2); line-height: 1.45; }
+  .vrec-both span { color: var(--text-2); }
+  .vrec-clk { font: 500 var(--fs-code)/1.4 var(--font-mono); font-variant-numeric: tabular-nums; }
+  .vrec-clk.past { color: var(--h-fault-ink); }
+  .vrec-chip { min-width: 0; max-width: 320px; }
+  @container vrj (max-width: 560px) { .vrec-j { grid-template-columns: 16px minmax(0, 1fr); } .vrec-chip { grid-column: 2; max-width: 100%; } }
+  .vrec-note { margin: 10px 0 0; font-size: var(--fs-code); line-height: 1.5; color: var(--text-3); max-width: 78ch; }
+  .vrec-big { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: baseline; font-size: var(--fs-support); color: var(--text-2); }
+  .vrec-big b { font: var(--fw-title) 20px/1 var(--font-sans); color: var(--text); }
+  .vrec-grants li { display: grid; gap: 1px; padding-top: 6px; border-top: 1px solid var(--line); }
+  .vrec-grants small, .vrec-papers small { display: block; font-size: var(--fs-code); color: var(--text-3); }
+  .vrec-papers li { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 10px; align-items: start; }
+  .vrec-rawd summary { cursor: pointer; font-size: var(--fs-support); color: var(--text-2); margin-bottom: 8px; }
+  .vrec-raw { margin: 0; padding: 14px 16px; border-radius: var(--radius); background: var(--surface-2); font: 400 var(--fs-code)/1.5 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+</style>
