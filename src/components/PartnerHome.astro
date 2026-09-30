@@ -1,0 +1,88 @@
+---
+/* PartnerHome: a partner's Home (UI-V2 §3.6, UX-V2 §4.2 steps 3 and 4): the jobs handed to their company, worst first,
+   each with the one contract clock both sides see and the access the job gives; then their contract with Aigna and
+   their access. Nothing else: no floor plan, no other spaces, nothing Restricted (the job page keeps those slots in
+   place and says why). One block per partner person; the page shows only the viewer's (View as).
+   The jobs, clocks and grants are simulated (src/lib/vendors.mjs), fixed at the demo's now, 28 Sept 12:00. */
+import HealthGlyph from './HealthGlyph.astro';
+import WithChip from './WithChip.astro';
+import { href, spaces, sites, vendors as VENDORS } from '../lib/data.mjs';
+import { PEOPLE, person } from '../lib/demo.mjs';
+import { partnerBand, contractLeft, papersOf, accessRegister, JOBS, whenWords, NOW } from '../lib/vendors.mjs';
+const partners = PEOPLE.filter((p) => p.vendor);
+const spaceWords = (id: string) => { const s = spaces[id]; return s ? `${s.number ? `${s.number} ` : ''}${s.name}, ${sites[s.site]?.name?.replace(/ office$/, '') ?? ''}` : id; };
+const stateOf = (j: any) => (j.clock.past ? 'fault' : j.state === 'waiting' ? 'review' : 'progress');
+const ownOf = (j: any, V: any) => (j.state === 'waiting'
+  ? { s: 'waiting', to: j.vendor, kind: 'vendor', name: V.name, wait: j.wait, at: j.waitFrom }
+  : { s: 'with', to: j.vendor, kind: 'vendor', name: V.name, why: j.why, clock: j.clock.due ? whenWords(j.clock.due, NOW) : undefined, at: j.handedAt });
+const css = partners.map((p) => `:root[data-who="${p.id}"] [data-partner-for="${p.id}"]{display:grid}`).join('');
+const blocks = partners.map((p) => {
+  const V = VENDORS[p.vendor], B = partnerBand(p.id), L = contractLeft(V.contract), R = accessRegister(JOBS.filter((j) => j.person === p.id));
+  return { p, V, B, L, R, papers: papersOf(p.vendor), owner: person(V.owner) };
+});
+---
+<section class="ck card pt-home" data-sec="partner" id="partner" aria-labelledby="h-partner" hidden>
+  <header class="ck-h"><h2 id="h-partner" data-help="home.partner">With you</h2><span class="ck-n faint">jobs handed to your company, worst first</span></header>
+  {blocks.map(({ p, V, B, L, R, papers, owner }) => (
+    <div class="pt-b" data-partner-for={p.id}>
+      <ol class="pt-jobs">
+        {B.jobs.map((j: any) => (
+          <li class="pt-j" data-help="home.partner-job">
+            <span class="pt-g"><HealthGlyph state={stateOf(j)} size={16} title={j.clock.past ? 'Past the contract clock' : j.state === 'waiting' ? 'Waiting on the client' : 'With your company'} /></span>
+            <span class="pt-body">
+              <a class="pt-t" href={href(`/vendor/jobs/${j.id.toLowerCase()}/`)}><span class="mono">{j.id}</span> {j.title}</a>
+              <small class="pt-where">{spaceWords(j.space)}</small>
+              <span class={`pt-clock${j.clock.past ? ' past' : ''}`} data-help="home.partner-clock">{j.clock.text}</span>
+              <small class="pt-access">{j.access.line}</small>
+            </span>
+            <span class="pt-chip"><WithChip own={ownOf(j, V)} /></span>
+          </li>
+        ))}
+      </ol>
+      {!B.jobs.length && <p class="ck-p">Nothing handed to your company right now. A job handed to you arrives here with its clock.</p>}
+      <div class="g12 pt-cards">
+        <article class="s-6 pt-card" data-help="home.partner-contract">
+          <h3>Your contract with Aigna</h3>
+          <ul class="pt-sla">{V.contract.sla.map((s: any) => <li><span>{s.what}</span><b>{s.target}</b></li>)}</ul>
+          <p class="pt-line"><HealthGlyph state={L.state} size={12} quiet={L.state === 'fine'} /> <span>{V.contract.ref} · {L.words}</span></p>
+          <p class="pt-line faint">Your contact at Aigna: {owner.name}</p>
+        </article>
+        <article class="s-6 pt-card" data-help="home.partner-access">
+          <h3>Your access</h3>
+          <p class="pt-big"><b class="num">{B.spaces}</b> <span>{B.spaces === 1 ? 'space' : 'spaces'} you can open today · <b class="num">{R.standing}</b> standing grants</span></p>
+          <p class="pt-line">Each job opens its own space, unit and build sheet, and closes them when it closes. Everything you open is logged.</p>
+          <ul class="pt-papers">{papers.map((x: any) => <li><HealthGlyph state={x.state} size={12} quiet={x.state === 'fine'} /> <span>{x.what}: {x.words}</span></li>)}</ul>
+        </article>
+      </div>
+    </div>
+  ))}
+</section>
+
+<style is:global set:html={css}></style>
+<style is:global>
+  .pt-b { display: none; gap: 14px; }
+  .pt-jobs { list-style: none; margin: 0 calc(-1 * var(--card-px, 22px)); padding: 0; display: grid; }
+  .pt-j { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: 4px 12px; align-items: start; padding: var(--row-py, 12px) var(--card-px, 22px); border-top: 1px solid var(--line); container: ptj / inline-size; }
+  .pt-j:first-child { border-top: 0; }
+  .pt-g { padding-top: 2px; line-height: 0; }
+  .pt-body { display: grid; gap: 3px; min-width: 0; }
+  .pt-t { font-size: var(--name-size, 14px); font-weight: var(--weight-name, 550); color: var(--text); text-decoration: none; line-height: 1.35; }
+  .pt-t:hover { color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
+  .pt-t .mono { font-size: var(--fs-code); color: var(--text-3); margin-right: 4px; }
+  .pt-where, .pt-access { font-size: var(--support-size, 13px); color: var(--text-2); line-height: 1.4; }
+  .pt-access { color: var(--text-3); }
+  .pt-clock { font: 500 var(--fs-code)/1.4 var(--font-mono); color: var(--text); font-variant-numeric: tabular-nums; }
+  .pt-clock.past { color: var(--h-fault-ink); }
+  .pt-chip { min-width: 0; max-width: 380px; }
+  @container ptj (max-width: 560px) { .pt-j { grid-template-columns: 16px minmax(0, 1fr); } .pt-chip { grid-column: 2; max-width: 100%; } }
+  .pt-cards { align-items: stretch; }
+  .pt-card { display: grid; align-content: start; gap: 8px; padding: 14px 16px; border-radius: var(--radius); border: 1px solid var(--line); min-width: 0; }
+  .pt-card h3 { margin: 0; font-size: var(--fs-body); font-weight: 600; }
+  .pt-sla, .pt-papers { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: var(--support-size, 13px); }
+  .pt-sla li { display: flex; justify-content: space-between; gap: 12px; padding-top: 4px; border-top: 1px solid var(--line); }
+  .pt-sla li:first-child { border-top: 0; padding-top: 0; }
+  .pt-papers li, .pt-line { display: flex; gap: 6px; align-items: baseline; }
+  .pt-line { margin: 0; font-size: var(--support-size, 13px); color: var(--text-2); }
+  .pt-big { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; font-size: var(--fs-body); color: var(--text-2); }
+  .pt-big b { font: var(--fw-title) 20px/1 var(--font-sans); color: var(--text); }
+</style>

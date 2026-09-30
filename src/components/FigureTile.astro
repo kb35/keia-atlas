@@ -1,0 +1,65 @@
+---
+/* FigureTile: one figure as a card (UI-V2 §8.2): the label, the number (tabular), a sparkline of the last 30 days (or 12
+   months, or the last 12 runs), and a line that says what it counts, its target, and where it came from and when
+   (SourceMark). Used on a service page (experience figures), a vendor record (performance) and leadership (costs).
+   Cards in a row share a height; put them in a .g12 with class="s-3" (four in a row).
+   Props:  label   what the figure is ("Meetings that started on time")
+           value   the figure, already in words ("97%", "1 h 12 min")
+           spark   the series, oldest first (numbers); optional
+           span    what the sparkline covers ("30 days", "12 months"); for its tooltip
+           fmt     how to write a point in the tooltip: '%', 'min', 'eur', 'x' or nothing
+           state   fine, review or fault: marks the sparkline's last point (not Fine only); `word` says it beside a glyph
+           word    a short word beside the glyph when not fine ("Past target")
+           sub     one line under the figure: what it counts, or the target
+           source  { from, at? } for the SourceMark; never left off a borrowed figure. The page's band says Simulated
+           to      the list it counts (P10); makes the whole tile a link
+           id      a hook for scripts that change the figure in place (data-ft)
+           help    a help key
+   Motion: none. A figure changes in place (M9); the sparkline is redrawn, never animated. */
+import SourceMark from './SourceMark.astro';
+import HealthGlyph from './HealthGlyph.astro';
+import { sparkSvg } from '../lib/spark.mjs';
+import { href } from '../lib/data.mjs';
+interface Props { label: string; value: string; spark?: number[]; span?: string; fmt?: string; state?: string; word?: string; sub?: string; source?: { from: string; at?: string; sim?: boolean }; to?: string; id?: string; help?: string; class?: string }
+const { label, value, spark = [], span = '30 days', fmt = '', state = 'fine', word, sub, source, to, id, help = 'figure.tile', class: cls } = Astro.props;
+const F: Record<string, (x: number) => string> = {
+  '%': (x) => `${x >= 99 ? x.toFixed(2) : Math.round(x)}%`,
+  min: (x) => { const t = Math.round(x), h = Math.floor(t / 60), m = t % 60; return h ? `${h} h ${m} min` : `${m} min`; },
+  eur: (x) => `€${Math.round(x).toLocaleString('en-IE')}`,
+  x: (x) => x.toFixed(1),
+  d: (x) => `${x} days`,
+};
+const svg = sparkSvg(spark, { state, fmt: F[fmt] ?? ((x: number) => (Number.isInteger(x) ? String(x) : x.toFixed(1))), span });
+const Tag = to ? 'a' : 'div';
+const link = to ? (to.startsWith('/') ? href(to) : to) : undefined;
+---
+<Tag class:list={['card', 'ft', cls, { 'ft-link': to }]} href={link} data-ft={id} data-help={help} data-help-name={label}>
+  <span class="ft-l">{label}</span>
+  <span class="ft-v">
+    <b class="ft-n num" data-ft-n>{value}</b>
+    {svg && <span class="ft-s" data-ft-s set:html={svg} />}
+  </span>
+  {state !== 'fine' && word && <span class="ft-w"><HealthGlyph state={state} size={12} word={word} /></span>}
+  {sub && <span class="ft-sub" data-ft-sub>{sub}</span>}
+  {source && <span class="ft-src"><SourceMark from={source.from} at={source.at} /></span>}
+</Tag>
+
+<style is:global>
+  .ft { display: grid; align-content: start; grid-template-rows: auto auto auto 1fr auto; gap: 6px; padding: 16px 18px; min-width: 0; color: inherit; text-decoration: none; }
+  .ft-link { transition: background var(--dur-hover) var(--ease-settle); }
+  .ft-link:hover { background: var(--surface-2); color: inherit; }
+  .ft-link:hover .ft-l { text-decoration: underline; text-underline-offset: 2px; }
+  .ft-l { font-size: var(--fs-code); line-height: 1.3; color: var(--text-2); }
+  .ft-v { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 6px 10px; min-width: 0; }
+  .ft-n { font: var(--fw-title) var(--fs-figure, 28px)/1 var(--font-sans); letter-spacing: -.02em; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ft-s { flex: none; display: inline-flex; padding-bottom: 3px; }
+  .spk { display: block; overflow: visible; }
+  .spk path { fill: none; stroke: var(--svc, var(--quiet)); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+  .spk-dot { stroke: none; }
+  .spk-dot[data-state=review] { fill: var(--h-review); }
+  .spk-dot[data-state=fault] { fill: var(--h-fault); }
+  .ft-w { font-size: var(--fs-code); }
+  .ft-sub { font-size: var(--fs-code); line-height: 1.4; color: var(--text-3); }
+  .ft-src { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+  .ft-src .srcm { max-width: 100%; height: auto; min-height: 20px; padding-block: 3px; white-space: normal; line-height: 1.3; }
+</style>

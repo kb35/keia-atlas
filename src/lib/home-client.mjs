@@ -110,7 +110,7 @@ function band(model, me, viewer, fresh) {
     const aEl = li.querySelector('a');
     if (aEl && f.to) { aEl.setAttribute('href', link(f.to)); const b = aEl.querySelector('b'); if (f.to.charAt(0) === '/') b.setAttribute('data-vt-rec', `dd${f.to.split('?')[0].replace(/[^a-z0-9]+/gi, '-').replace(/-$/, '')}`); else b.removeAttribute('data-vt-rec'); }
     li.setAttribute('data-help-name', f.label);
-    W.rsKeyNumber?.(`k${i}`, f.n, { label: f.label, tone: f.tone || '' });
+    W.rsKeyNumber?.(`k${i}`, f.n, { label: f.label, tone: f.tone || '', spark: f.spark || '', title: f.title || '' });
   });
   for (let i = figs.length; i < 4; i++) { const li = D.querySelector(`.kn-i[data-kn="k${i}"]`); if (li) li.hidden = true; }
   const act = D.querySelector('[data-home-action]');

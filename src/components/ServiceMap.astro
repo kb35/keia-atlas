@@ -1,0 +1,148 @@
+---
+/* ServiceMap: a service drawn as the chain it runs on, lit by health (UI-V2 §3.7). Each node is a group of the service's
+   kit (video bars and cameras, screens, control and booking...), with its health glyph and its count; the connectors
+   the figures come from are nodes too, each with its source mark. What the service depends on sits at the start of the
+   chain and links to its own service.
+   The health is the page's own: a node takes the worst state of the units it groups, counted from the unit dots the
+   page shows (data-f-kind, data-st), so it follows the filter bar and the live feed. Nothing moves; a glyph changes
+   state in place (--dur-state), once.
+   Props:  svc    av, network or infrastructure
+           kinds  the kinds the page has ([{ k, label, n }])
+           systems the connectors the service reads from (names) */
+import HealthGlyph from './HealthGlyph.astro';
+import SourceMark from './SourceMark.astro';
+import { href } from '../lib/data.mjs';
+interface Props { svc: string; kinds: { k: string; label: string; n: number }[]; systems: string[] }
+const { svc, kinds, systems } = Astro.props;
+// The chain per service: what it needs first, then its kit in the order signals pass through it, then what it gives.
+const CHAIN: Record<string, { before?: { label: string; to: string; sub: string }; groups: { label: string; kinds: string[] }[]; after: { label: string; sub: string } }> = {
+  av: {
+    before: { label: 'Network', to: '/services/network/', sub: 'Switch ports and Wi-Fi' },
+    groups: [
+      { label: 'Video and cameras', kinds: ['video-bar', 'codec', 'desk-video-device', 'camera'] },
+      { label: 'Screens', kinds: ['display', 'monitor', 'signage-player'] },
+      { label: 'Audio', kinds: ['microphone', 'loudspeaker', 'amplifier'] },
+      { label: 'Control and booking', kinds: ['touch-controller', 'scheduler-panel'] },
+      { label: 'Switching and cabling', kinds: ['av-switcher', 'av-extender', 'network-switch', 'dock', 'adapter'] },
+    ],
+    after: { label: 'Meetings', sub: 'Google Meet, Teams and Zoom' },
+  },
+  network: {
+    groups: [
+      { label: 'Internet circuits', kinds: ['circuit'] },
+      { label: 'Firewalls and gateways', kinds: ['gateway'] },
+      { label: 'Switches', kinds: ['switch'] },
+      { label: 'Wi-Fi', kinds: ['ap', 'wifi'] },
+      { label: 'Home gateways', kinds: ['home-gateway'] },
+    ],
+    after: { label: 'Offices and homes online', sub: 'AV and every desk run on it' },
+  },
+  infrastructure: {
+    groups: [
+      { label: 'Power', kinds: ['ups', 'pdu'] },
+      { label: 'Links', kinds: ['link'] },
+      { label: 'Out-of-band access', kinds: ['oob'] },
+    ],
+    after: { label: 'Comms rooms', sub: 'The network runs in them' },
+  },
+};
+const C = CHAIN[svc] ?? { groups: [], after: { label: '', sub: '' } };
+const have = new Set(kinds.map((x) => x.k));
+const used = new Set(C.groups.flatMap((g) => g.kinds));
+const groups = [
+  ...C.groups.filter((g) => g.kinds.some((k) => have.has(k))),
+  ...(kinds.some((x) => !used.has(x.k)) ? [{ label: 'Other kit', kinds: kinds.filter((x) => !used.has(x.k)).map((x) => x.k) }] : []),
+].map((g) => ({ ...g, n: kinds.filter((x) => g.kinds.includes(x.k)).reduce((a, x) => a + x.n, 0) }));
+const connectors = [...systems, 'ServiceNow'];
+---
+<section class="card smap svc-accent" id="map" aria-labelledby="smap-h" data-smap data-help="services.map">
+  <header class="smap-top"><h2 id="smap-h">Service map</h2><span class="faint">Lit by health, following the filters</span></header>
+  <ol class="smap-chain" aria-label="What the service runs on, in order">
+    {C.before && (
+      <li class="smap-n smap-dep">
+        <a href={href(C.before.to)}><HealthGlyph state="fine" size={16} quiet title="Its own service page says how it is" /><span><b>{C.before.label}</b><small>{C.before.sub} · its own service</small></span></a>
+      </li>
+    )}
+    {groups.map((g) => (
+      <li class="smap-n" data-smap-kinds={g.kinds.join(' ')}>
+        <a href={`?kind=${g.kinds.filter((k) => have.has(k)).join(',')}#units`}><HealthGlyph state="fine" size={16} quiet /><span><b>{g.label}</b><small data-smap-c>{g.n.toLocaleString('en-IE')} working</small></span></a>
+      </li>
+    ))}
+    <li class="smap-n smap-out"><span class="smap-x"><span class="smap-end" aria-hidden="true"></span><span><b>{C.after.label}</b><small>{C.after.sub}</small></span></span></li>
+  </ol>
+  <div class="smap-conn">
+    <span class="smap-cl">Connectors</span>
+    <ul aria-label="Where the figures come from">
+      {connectors.map((s) => <li><HealthGlyph state="fine" size={12} quiet title="Reporting" /><SourceMark from={s} synced="checked every 5 s" /></li>)}
+    </ul>
+  </div>
+</section>
+
+<script>
+  import { setGlyph } from '../lib/health.mjs';
+  // Each node takes the worst state of the unit dots it groups that the filters show: Fault when one is offline, To
+  // review when one alerts, else Fine. Counted again when the feed or the filters change, at most once a frame.
+  function init() {
+    const map = document.querySelector<HTMLElement>('[data-smap]');
+    const box = document.querySelector<HTMLElement>('[data-rows="units"]');
+    if (!map || !box || (map as any).__smap) return;
+    (map as any).__smap = true;
+    const nodes = [...map.querySelectorAll<HTMLElement>('[data-smap-kinds]')].map((el) => ({ el, kinds: new Set((el.dataset.smapKinds || '').split(' ')), g: el.querySelector<HTMLElement>('.hg'), c: el.querySelector<HTMLElement>('[data-smap-c]') }));
+    let queued = false;
+    const paint = () => {
+      queued = false;
+      const n = nodes.map(() => ({ online: 0, alert: 0, offline: 0 }));
+      box.querySelectorAll<HTMLElement>('[data-fi][data-f-kind]').forEach((d) => {
+        if (d.classList.contains('fb-out') || d.hidden) return;
+        const st = d.dataset.st as 'online' | 'alert' | 'offline'; if (!st) return;
+        nodes.forEach((x, i) => { if (x.kinds.has(d.dataset.fKind || '')) n[i][st]++; });
+      });
+      nodes.forEach((x, i) => {
+        const t = n[i], all = t.online + t.alert + t.offline;
+        const state = t.offline ? 'fault' : t.alert ? 'review' : 'fine';
+        if (x.g) { setGlyph(x.g, state); x.g.classList.toggle('hg-quiet', state === 'fine'); }
+        if (x.c) x.c.textContent = !all ? 'None match the filters' : [t.offline && `${t.offline} offline`, t.alert && `${t.alert} alerting`, `${t.online.toLocaleString('en-IE')} working`].filter(Boolean).join(' · ');
+        x.el.dataset.state = state;
+      });
+    };
+    const soon = () => { if (!queued) { queued = true; requestAnimationFrame(paint); } };
+    const mo = new MutationObserver(soon);
+    mo.observe(box, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-st', 'class', 'hidden'] });
+    soon();
+    document.addEventListener('astro:before-swap', () => mo.disconnect(), { once: true });
+  }
+  document.addEventListener('astro:page-load', init);
+</script>
+
+<style is:global>
+  .smap { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 16px 20px 18px; min-width: 0; }
+  .smap-conn .srcm { white-space: normal; height: auto; min-height: 20px; padding-block: 3px; line-height: 1.3; }
+  .smap-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+  .smap-top h2 { margin: 0; font-size: var(--fs-h3); }
+  .smap-top .faint { font-size: var(--fs-code); }
+  .smap-chain { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0; }
+  .smap-n { position: relative; min-width: 0; padding-right: 14px; }
+  /* The line between two nodes, in the service's colour, through the middle of the glyphs. */
+  .smap-n:not(:last-child)::after { content: ""; position: absolute; top: 13px; left: 26px; right: 2px; height: 2px; border-radius: 1px; background: color-mix(in srgb, var(--svc, var(--quiet)) 55%, transparent); }
+  .smap-n > a, .smap-x { position: relative; z-index: 1; display: grid; justify-items: start; gap: 6px; padding: 6px 8px; margin-left: -8px; border-radius: var(--radius); color: inherit; text-decoration: none; transition: background var(--dur-hover) var(--ease-settle); }
+  .smap-n > a:hover { background: var(--surface-2); }
+  .smap-n > a:hover b { text-decoration: underline; text-underline-offset: 2px; }
+  .smap-n > a > span, .smap-x > span:last-child { display: grid; gap: 2px; min-width: 0; }
+  .smap-n b { font-size: var(--fs-body); line-height: 1.25; }
+  .smap-n small { font-size: var(--fs-code); line-height: 1.35; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .smap-n[data-state=fault] small { color: var(--h-fault-ink); }
+  .smap-n[data-state=review] small { color: var(--h-review-ink); }
+  .smap-end { width: 16px; height: 16px; border-radius: 4px; border: 2px solid color-mix(in srgb, var(--svc, var(--quiet)) 70%, transparent); background: var(--surface); }
+  .smap-dep small { color: var(--text-3); }
+  .smap-conn { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-top: 12px; border-top: var(--border-rule, 1px solid var(--line)); }
+  .smap-cl { font: 600 var(--overline-size, 11px)/1.2 var(--font-sans); letter-spacing: var(--overline-track, .06em); text-transform: var(--overline-case, uppercase); color: var(--text-3); }
+  .smap-conn ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+  .smap-conn li { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+  /* Narrow: the chain reads down the page, the line runs between the glyphs. */
+  @container content (max-width: 759px) {
+    .smap-chain { grid-auto-flow: row; grid-auto-columns: auto; gap: 2px; }
+    .smap-n { padding-right: 0; }
+    .smap-n:not(:last-child)::after { top: 26px; bottom: -6px; left: 7px; right: auto; width: 2px; height: auto; }
+    .smap-n > a, .smap-x { grid-template-columns: auto minmax(0, 1fr); align-items: start; justify-items: stretch; gap: 2px 10px; }
+  }
+</style>

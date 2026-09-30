@@ -1,0 +1,88 @@
+---
+// The vendor access register (CONNECT-SCAN 7.3 rules 3 and 8, UX-V2 §4.2 step 5; BUILD-PLAN V7 H2). A List page: every
+// grant a partner has had, each tied to one job, with its scope, when it started and when it ended. There is no
+// standing access: a grant starts with the hand-off and ends when the job closes. Everything opened under a grant is
+// logged and can be exported. The grants are simulated (src/lib/vendors.mjs).
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import HealthGlyph from '../../components/HealthGlyph.astro';
+import { vendors, sites, spaces, SITE_ORDER, href } from '../../lib/data.mjs';
+import { person, REGION_SHORT } from '../../lib/demo.mjs';
+import { JOBS, accessRegister, whenWords, dateWords } from '../../lib/vendors.mjs';
+
+const R = accessRegister(JOBS);
+const KIND = { incident: 'Incident', snag: 'Snag', install: 'Install', survey: 'Survey', design: 'Design' };
+const spaceWords = (sid) => { const s = spaces[sid]; return s ? `${s.number ? `${s.number} ` : ''}${s.name}` : sid; };
+const at = (t) => `${dateWords(t)}, ${whenWords(t, t)}`;
+const usedSites = SITE_ORDER.filter((s) => R.rows.some((r) => r.site === s));
+const usedVendors = Object.values(vendors).filter((v) => R.rows.some((r) => r.vendor === v.id));
+const FACETS = [
+  { key: 'region', label: 'Region', options: ['amer', 'emea', 'apac'].map((r) => ({ value: r, label: REGION_SHORT[r] })) },
+  { key: 'site', label: 'Office', options: usedSites.map((s) => ({ value: s, label: sites[s].name, sub: sites[s].city })) },
+  { key: 'kind', label: 'Kind', options: Object.entries(KIND).map(([value, label]) => ({ value, label })) },
+  { key: 'status', label: 'Status', options: [{ value: 'open', label: 'Open' }, { value: 'ended', label: 'Ended' }] },
+  { key: 'vendor', label: 'Vendor', options: usedVendors.map((v) => ({ value: v.id, label: v.name })) },
+];
+const SORT = { options: [{ value: 'new', label: 'Newest first' }, { value: 'open', label: 'Open first' }] };
+const ROWS = R.rows.map((r, i) => ({ ...r, i, v: vendors[r.vendor], who: person(r.person) }));
+const answer = `${R.open} open ${R.open === 1 ? 'grant' : 'grants'}, each tied to a job · no standing access`;
+const NUMBERS = [
+  { n: R.open, label: 'Open now', to: '?status=open' },
+  { n: R.ended, label: 'Ended with their job', to: '?status=ended' },
+  { n: R.standing, label: 'Standing grants', fact: true },
+  { n: usedVendors.length, label: 'Vendors', to: '/vendors/' },
+];
+---
+<Shell title="Vendor access register" section="vendors-access" crumbs={[{ label: 'Vendors', to: '/vendors/' }, { label: 'Access register' }]}>
+  <PageBand overline="Register" title="Vendor access register" answer={answer} lede="Every grant a partner has had: what it opened, for which job, from when to when." sim numbers={NUMBERS} />
+
+  <div class="content vacc">
+    <FilterBar facets={FACETS} placeholder="Find a job, vendor or space" label="Find a grant" noun={['grant', 'grants']} scope=".content.vacc" sort={SORT} />
+
+    <div class="card vacc-t">
+      <table class="to-cards vacc-tbl">
+        <thead><tr><th>Grant</th><th>Vendor and person</th><th>Opens</th><th>From</th><th>Until</th></tr></thead>
+        <tbody data-rows>
+          {ROWS.map((r) => (
+            <tr data-fi data-i={r.i} data-open={r.open ? '1' : '0'} data-find={`${r.job} ${r.v.name} ${r.who.name} ${spaceWords(r.space)} ${r.reason}`} data-f-region={sites[r.site]?.region} data-f-site={r.site} data-f-kind={r.kind} data-f-status={r.open ? 'open' : 'ended'} data-f-vendor={r.vendor}>
+              <td data-label=""><span class="vacc-g"><HealthGlyph state={r.open ? 'progress' : 'off'} size={16} word={r.open ? 'Open' : 'Ended'} /></span><a href={href(`/vendor/jobs/${r.job.toLowerCase()}/`)}><span class="mono">{r.job}</span> {r.reason}</a></td>
+              <td data-label="Vendor"><a href={href(`/vendors/${r.vendor}/`)}>{r.v.name}</a><small>{r.who.name}, partner staff</small></td>
+              <td data-label="Opens">{spaceWords(r.space)}, {sites[r.site]?.name.replace(/ office$/, '')}<small>{r.scope.join(', ')}</small></td>
+              <td data-label="From" class="num">{at(r.from)}</td>
+              <td data-label="Until" class="num">{r.to ? at(r.to) : <span>When the job closes</span>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <EmptyState text="No grants match these filters." />
+    <p class="vacc-note">Sign-in is through each partner's own company account, with two-step sign-in. Everything opened under a grant is logged with who, what and when, and the whole register can be exported or a grant ended early by the vendor's owner at Aigna. Never shared with a partner: floor plans, other spaces, IP addresses and switch ports.</p>
+  </div>
+
+  <script is:inline data-astro-rerun slot="end">
+    (function () {
+      var bar = document.querySelector('.content.vacc [data-fb]'), body = document.querySelector('.content.vacc [data-rows]');
+      if (!bar || !body || body.__vacc) return; body.__vacc = true;
+      var rows = Array.prototype.slice.call(body.children);
+      function reorder(by) {
+        rows.slice().sort(function (a, b) { return (by === 'open' ? (+b.dataset.open) - (+a.dataset.open) : 0) || (+a.dataset.i) - (+b.dataset.i); })
+          .forEach(function (r) { body.appendChild(r); });
+      }
+      bar.addEventListener('fb:sort', function (e) { bar.rsFilter.run(true, function () { reorder(e.detail.value); }); });
+      var s0 = bar.rsFilter ? bar.rsFilter.sort() : null; if (s0 && s0 !== 'new') reorder(s0);
+    })();
+  </script>
+</Shell>
+
+<style>
+  .vacc-t { padding: 4px 18px; }
+  .vacc-tbl { width: 100%; }
+  .vacc-tbl td { vertical-align: top; }
+  .vacc-tbl td small { display: block; font-size: var(--fs-code); color: var(--text-3); line-height: 1.4; }
+  .vacc-tbl a { color: inherit; }
+  .vacc-tbl .mono { font-size: var(--fs-code); color: var(--text-3); margin-right: 4px; }
+  .vacc-g { display: block; margin-bottom: 4px; font-size: var(--fs-code); }
+  .vacc-note { margin: 0; font-size: var(--fs-code); line-height: 1.5; color: var(--text-3); max-width: 80ch; }
+</style>

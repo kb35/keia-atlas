@@ -128,8 +128,8 @@ export const LAYOUT = {
   desk: { summary: ['ready', 'queue', 'work', 'estate'], record: ['quiet', 'tasks'] },
   owner: { summary: ['ready', 'approval', 'work', 'estate'], record: ['quiet', 'tasks', 'firmware', 'lab'] },
   pm: { summary: ['ready', 'projects', 'work'], record: ['quiet', 'tasks', 'gates', 'blocked'] },
-  lead: { summary: ['estate', 'work', 'projects'], record: ['quiet', 'stuck', 'regions', 'across'] },
-  vendor: { summary: ['ready', 'work', 'install'], record: ['tasks', 'vnext'] },
+  lead: { summary: ['estate', 'costs', 'lreview'], record: ['pilot', 'model', 'projects', 'quiet', 'stuck', 'regions', 'across'] },
+  vendor: { summary: ['partner', 'install'], record: ['tasks', 'vnext'] },
   manager: { summary: ['ready', 'team', 'work'], record: ['quiet', 'tasks'] },
   everyone: { summary: ['estate', 'work', 'projects'], record: ['quiet', 'stuck', 'regions', 'across'] },
 };
@@ -212,14 +212,26 @@ export function cockpit(H, ownOf, who) {
       figures = [F('gates', X.gatesWeek ?? 0, 'Gates this week', '#review'), F('late', X.late ?? 0, 'Past due tasks', '#blocked', { tone: X.late ? 'bad' : '' }), F('waiting', num('blocked'), 'Waiting on', '#blocked'), F('risks', X.risks ?? 0, 'Open risks', '#review')];
       answer = `${X.onPlan ?? 0} of ${plural(X.projects ?? 0, 'project')} on plan · ${X.gatesWeek ? `${plural(X.gatesWeek, 'gate')} this week` : 'no gate this week'}`;
       break;
-    case 'lead': case 'everyone':
+    case 'lead':
+      // Leadership (UX-V2 §4.7): experience and cost, each with its sparkline and its source; nothing per person.
+      if (C.lead) { figures = C.lead.figures.map((f) => F(f.id, f.n, f.label, f.to, { spark: f.spark, title: f.title })); answer = C.lead.answer; break; }
+      // falls through without the leadership figures
+    case 'everyone':
       figures = [F('spaces', `${estate.n - estate.fault} of ${estate.n}`, 'Spaces working', '/rooms/'), F('inc', incs.length, 'Open incidents', `/incidents/?state=${H.openInc}`), F('past', past, 'Past target', `/incidents/?state=${H.openInc}`, { tone: past ? 'bad' : '' }), F('off', X.off ?? 0, 'Projects off plan', '#review')];
       answer = `${estate.fault ? `${plural(estate.fault, 'space')} with a fault across ${C.offices.length} offices` : `All ${C.offices.length} offices running`} · ${past ? `${past} past target` : 'every job within target'}`;
       break;
-    case 'vendor':
+    case 'vendor': {
+      // A partner (UI-V2 §3.6): the jobs handed to their company and the one contract clock (src/lib/vendors.mjs).
+      const P = C.partner?.[who];
+      if (P) {
+        figures = [F('with', P.withYou, 'With you', '#partner'), F('waiting', P.waiting, 'Waiting on the client', '#partner'), F('late', P.past, 'Past the clock', '#partner', { tone: P.past ? 'bad' : '' }), F('spaces', P.spaces, 'Spaces you can open today', '#partner')];
+        answer = P.answer;
+        break;
+      }
       figures = [F('with', withYou.length, 'With you', '#with'), F('waiting', withYou.filter((it) => own(it).s === 'waiting').length, 'Waiting on the client', '#with'), F('late', X.vendorLate ?? 0, 'Past the date', '#with', { tone: X.vendorLate ? 'bad' : '' }), F('spaces', X.vendorSpaces ?? 0, 'Spaces you can open', '/vendor/')];
       answer = `${plural(withYou.length, 'job')} with you · ${X.vendorLate ? `${X.vendorLate} past the date` : 'none past the date'}`;
       break;
+    }
     default:
       figures = N.map((n) => F(n.id, n.n, n.label, n.to, { tone: n.tone ?? '' }));
       answer = `${num('tasks')} open tasks in your team · ${num('blocked') ? `${num('blocked')} waiting on something` : 'nothing waiting on anyone'}`;
