@@ -51,7 +51,7 @@ export function mountVlanForm() {
     const cell = root.querySelector(`.swp-port[data-port="${p.slug}"]`);
     if (cell && p.state === 'active') {
       cell.style.setProperty('--vl', VL.includes(n.native) ? `var(--vl-${n.native})` : 'var(--text)');
-      const v = cell.querySelector('.swp-v'); if (v && p.mode !== 'trunk') v.textContent = String(n.native);
+      const v = cell.querySelector('.swp-v'); if (v && v.firstChild && p.mode !== 'trunk' && n.changed) v.firstChild.nodeValue = String(n.native);
       cell.classList.toggle('is-sim', n.changed);
       const chk = n.changed ? checkOf(p, n) : { ok: p.ok };
       const g = cell.querySelector('.swp-g'); if (g) g.hidden = chk.ok !== false;
@@ -97,6 +97,7 @@ export function mountVlanForm() {
     $('[data-vf-ap-why]').textContent = I.approval.level === 'go' ? 'It is recorded as done (simulated).' : 'It is recorded as proposed until then; nothing changes on the port.';
     $('[data-vf-err]').hidden = true;
     $('[data-vf-done]').hidden = true;
+    $('[data-vf-now]').hidden = false;
     box.querySelector('[data-vf]').hidden = false;
     box.hidden = false;
     planLine();
@@ -133,13 +134,14 @@ export function mountVlanForm() {
     const peers = cur.impact?.peers ?? [];
     const at = new Date(ev?.at ?? Date.now()).toLocaleTimeString('en-IE', { hour: '2-digit', minute: '2-digit' });
     $('[data-vf-done]').innerHTML =
-      `<p><b>${goes ? 'Recorded as done' : 'Recorded as proposed'}</b>, ${esc(at)} <span class="sim-t is-sim">Simulated</span></p>` +
+      `<p><b>${goes ? 'Recorded as done' : 'Recorded as proposed'}</b>, ${esc(at)}</p>` +
       `<p>${esc(D.sw)} ${esc(cur.word)}${peers.length ? ` and ${esc(list(peers.map((x) => `${x.word} on ${x.sw}`)))}` : ''}: ${esc(vl(n.seen ?? n.native))} to <b>${esc(vl(v))}</b>. Reason: ${esc(why)}.</p>` +
       (goes
-        ? `<p>In a live setup the ${esc(D.platformShort)} connector would set the port on ${esc(D.platform)}, then read it back to confirm the VLAN took. Here nothing was sent to a switch.</p>`
+        ? `<p>In a live setup the ${esc(D.platformShort)} connector would set the port, then read it back to confirm the VLAN took. Here nothing was sent to a switch.</p>`
         : `<p>${esc(cur.impact.approval.words)}. Nothing changes on the port until then; once approved, the ${esc(D.platformShort)} connector would set it and read it back.</p>`) +
       '<p><button type="button" class="btn small" data-vf-history>History and Undo</button> <button type="button" class="btn small ghost" data-vf-close>Close</button></p>';
     box.querySelector('[data-vf]').hidden = true;
+    $('[data-vf-now]').hidden = true;
     $('[data-vf-done]').hidden = false;
     paint(cur);
     $('[data-vf-done]').querySelector('[data-vf-history]').focus();
