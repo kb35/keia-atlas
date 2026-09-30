@@ -34,6 +34,15 @@ const { title, office, home } = Astro.props;
       if (t === 'light' || t === 'dark') r.setAttribute('data-theme', t); else r.removeAttribute('data-theme');
       try { hp = sessionStorage.getItem('rs5-help') === 'on' ? 'on' : 'off'; } catch (_) {}
       r.setAttribute('data-help', hp);
+      /* Reduced motion (M7), as in the Shell: the site's own switch, else the system's. */
+      window.rsReducedNow = window.rsReducedNow || function () {
+        var m = r.getAttribute('data-motion'), o = r.getAttribute('data-reduced');
+        if (m === 'off' || m === 'reduced') return true;
+        if (m === 'full' || m === 'on') return false;
+        if (o === 'true') return true;
+        if (o === 'false') return false;
+        return matchMedia('(prefers-reduced-motion: reduce)').matches;
+      };
     })();
   </script>
   <ClientRouter />
@@ -60,7 +69,9 @@ const { title, office, home } = Astro.props;
   <slot name="end" />
   <script>
     import km from '../lib/motion-library.js';
+    import { wirePage } from '../lib/motion-wire.js';
     (window as any).km = km;
+    wirePage(km);
   </script>
   <script is:inline data-astro-rerun>
     /* Health glyphs (M8, as in the Shell): quiet first, then each comes on in turn, once, as it scrolls into view. */
@@ -68,7 +79,7 @@ const { title, office, home } = Astro.props;
       var lights = document.querySelectorAll('.hg:not(.lit)'), n = 0;
       var gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--stagger')) || 24;
       var light = function (el) { setTimeout(function () { el.classList.add('lit'); }, 200 + (n++ % 40) * gap); };
-      if (matchMedia('(prefers-reduced-motion: reduce)').matches) { lights.forEach(function (el) { el.classList.add('lit'); }); return; }
+      if ((window.rsReducedNow ? window.rsReducedNow() : matchMedia('(prefers-reduced-motion: reduce)').matches)) { lights.forEach(function (el) { el.classList.add('lit'); }); return; }
       if (!('IntersectionObserver' in window)) { lights.forEach(light); return; }
       var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { io.unobserve(e.target); light(e.target); } }); }, { threshold: 0.5 });
       lights.forEach(function (el) { io.observe(el); });
