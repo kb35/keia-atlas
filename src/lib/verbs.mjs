@@ -3,6 +3,9 @@
 // see right now under the button's own name, then presses that button. So the palette can never do anything
 // the page cannot do by clicking, and every verb has the same name as its button (UI-V2 §10).
 //
+// A verb marked data-verb-always is listed even while its button is out of sight (the quick menu's links to the
+// Settings pages, which are closed until the gear is pressed): pressing it follows the link.
+//
 // A page's one band action (PageBand's action slot) is a verb too without marking it, under its own name.
 // VERBS names the verbs the method defines, with the words people might type for each, so ">hand" finds
 // "Hand to" and ">problem" finds "Report". Plain JavaScript with no imports: the browser (inlined by
@@ -21,7 +24,9 @@ const VERBS = [
   { id: 'view-as', name: 'View as', hint: 'See Keia Atlas as another role', words: ['view as', 'role', 'person', 'switch person', 'who'] },
   { id: 'show-help', name: 'Show help', hint: 'Explain what things are: ? on or off', words: ['help', 'explain', 'what is'] },
   { id: 'zoom-out', name: 'Zoom out', hint: 'Up one level of the path: [', words: ['zoom out', 'up', 'back up', 'parent'] },
-  { id: 'settings', name: 'Settings', hint: 'Look, light or dark, modules', words: ['settings', 'look', 'dark', 'light', 'modules', 'theme'] },
+  { id: 'settings', name: 'Open settings', hint: 'Look, light or dark, density and the demo', words: ['settings', 'preferences', 'look', 'dark', 'light', 'theme', 'density'] },
+  { id: 'settings-a11y', name: 'Accessibility settings', hint: 'Motion, text size, contrast and links', words: ['accessibility', 'a11y', 'motion', 'text size', 'contrast', 'settings'] },
+  { id: 'settings-org', name: 'Organisation settings', hint: 'Modules and capabilities, for everyone', words: ['organisation', 'organization', 'modules', 'capabilities', 'admin', 'settings'] },
   { id: 'action', name: 'Page action', hint: 'This page\'s main action', words: [] },
 ];
 const VERB = Object.fromEntries(VERBS.map((v) => [v.id, v]));

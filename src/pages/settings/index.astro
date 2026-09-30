@@ -1,0 +1,145 @@
+---
+// Settings (Keith, 30 Sept 2026: "way too much in that one settings button"). The full page behind the quick menu:
+// your own settings in short sections, each a heading and a list of rows (a name, one line of what it does, the
+// control), with a find box over all of them. A list of the sections on the left (a grid of them at the top on a
+// phone) jumps to each; /settings/#accessibility and the others open there.
+// Organisation settings (modules and capabilities) are an admin's and affect everyone, so they have their own page,
+// /settings/organisation/; this page only links to it, with their counts.
+// Motion: the sections settle as they come into view (km-settle); a look or a mode cross-fades the page; the
+// markers slide; the section list's marker follows where you are. Reduced motion: all at once.
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import Section from '../../components/Section.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import Icon from '../../components/Icon.astro';
+import SettingsPersonal from '../../components/SettingsPersonal.astro';
+import SettingsA11y from '../../components/SettingsA11y.astro';
+import SettingsDemo from '../../components/SettingsDemo.astro';
+import { href } from '../../lib/data.mjs';
+import { SECTIONS } from '../../lib/settings.mjs';
+import { MODULES, CAPABILITIES } from '../../lib/modules.mjs';
+const ABOUT = [
+  { to: '/about/', name: 'About this project', what: 'What Keia Atlas is, how it is built and why' },
+  { to: '/about/what-keia-logs/', name: 'What Keia logs about users', what: 'Nothing about you leaves this browser' },
+  { to: '/about/#decisions', name: 'Decisions', what: 'The decision records behind the design' },
+  { to: '/welcome/', name: 'Welcome page', what: 'The front door of the demo' },
+];
+---
+<Shell title="Settings" section="settings" crumbs={[{ label: 'Settings' }]}>
+  <PageBand overline="Settings" title="Settings" answer="Studio look · light or dark by your device · default text" lede="How Keia Atlas looks, moves and reads for you. Saved in this browser only." />
+  <div class="content st-page">
+    <FilterBar placeholder="Find a setting" label="Find a setting" noun={['setting', 'settings']} scope=".st-page" />
+    <div class="st-layout">
+      <nav class="st-nav" aria-label="Settings sections" data-st-nav>
+        {SECTIONS.map((s) => (
+          <a href={`#${s.id}`} data-st-to={s.id}><Icon name={s.icon} size={16} /><span>{s.label}</span></a>
+        ))}
+      </nav>
+      <div class="st-body">
+        <Section title="You" id="you" data-fb-group>
+          <SettingsPersonal />
+        </Section>
+        <Section title="Accessibility" id="accessibility" data-fb-group>
+          <SettingsA11y />
+        </Section>
+        <Section title="Organisation" id="organisation" data-fb-group aside="Affects everyone">
+          <ul class="card st-list">
+            <li class="st-item st-link" data-fi data-find="organisation modules capabilities admin everyone connected sources on off">
+              <a href={href('/settings/organisation/')} data-help="shell.modules">
+                <span class="st-item-t"><b>Modules and capabilities</b><small data-org-sum>{MODULES.length} modules and {CAPABILITIES.length} capabilities, each on, connected or off.</small></span>
+                <span aria-hidden="true">›</span>
+              </a>
+            </li>
+          </ul>
+        </Section>
+        <Section title="Demo" id="demo" data-fb-group>
+          <p class="st-lede"><span class="st-demo-tag">Demo only</span> Only here because this is a demo.</p>
+          <SettingsDemo />
+        </Section>
+        <Section title="About" id="about" data-fb-group>
+          <ul class="card st-list">
+            <li class="st-item" data-fi data-find="saved browser storage privacy local clear data">
+              <div class="st-item-t"><b>Saved in this browser</b><small>Nothing is sent anywhere</small></div>
+            </li>
+            {ABOUT.map((a) => (
+              <li class="st-item st-link" data-fi data-find={`${a.name} ${a.what}`.toLowerCase()}>
+                <a href={href(a.to)}><span class="st-item-t"><b>{a.name}</b><small>{a.what}</small></span><span aria-hidden="true">›</span></a>
+              </li>
+            ))}
+          </ul>
+        </Section>
+        <EmptyState text="No setting matches." action="Clear the search" />
+      </div>
+    </div>
+  </div>
+</Shell>
+
+<script is:inline data-astro-rerun>
+  (function () {
+    var nav = document.querySelector('[data-st-nav]'); if (!nav || nav.__st) return; nav.__st = true;
+    var W = window, D = document;
+    var links = Array.prototype.slice.call(nav.querySelectorAll('[data-st-to]'));
+    var secs = links.map(function (a) { return D.getElementById(a.dataset.stTo); });
+    // Where you are: the last section whose heading is in the top third of the window (the first one at the top).
+    function here() {
+      var lim = Math.max((W.rsTopLimit ? W.rsTopLimit() : 64) + 24, innerHeight * 0.35), cur = secs[0];
+      secs.forEach(function (s) { if (s && s.getClientRects().length && s.getBoundingClientRect().top <= lim) cur = s; });
+      if (innerHeight + scrollY >= D.documentElement.scrollHeight - 4) { var last = secs.filter(function (s) { return s && s.getClientRects().length; }).pop(); if (last) cur = last; }
+      links.forEach(function (a) { if (cur && a.dataset.stTo === cur.id) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current'); });
+    }
+    var tick = false;
+    var onScroll = function () { if (!nav.isConnected) { removeEventListener('scroll', onScroll); return; } if (tick) return; tick = true; requestAnimationFrame(function () { tick = false; here(); }); };
+    addEventListener('scroll', onScroll, { passive: true });
+    // A section the find box has emptied leaves the list too.
+    D.addEventListener('fb:change', function () { if (!nav.isConnected) return; links.forEach(function (a, i) { a.classList.toggle('st-gone', !!secs[i] && secs[i].classList.contains('fb-out')); }); here(); });
+    // The band's answer: your look, light or dark, and text size, as they are now.
+    var LOOK = { studio: 'Studio', enterprise: 'Enterprise', contrast: 'High contrast', drawing: 'Drawing set', classic: 'Playful' };
+    var MODE = { system: 'light or dark by your device', light: 'light', dark: 'dark' };
+    var TEXT = { 'default': 'default text', larger: 'larger text', largest: 'largest text' };
+    var answer = function () {
+      if (!nav.isConnected || !W.rsAnswer) return;
+      var g = function (k, d) { try { return localStorage.getItem(k) || d; } catch (_) { return d; } };
+      var a = W.rsA11y ? W.rsA11y() : { text: 'default' };
+      W.rsAnswer((LOOK[g('rs4-skin', 'studio')] || 'Studio') + ' look · ' + (MODE[g('rs4-theme', 'system')] || MODE.system) + ' · ' + (TEXT[a.text] || TEXT['default']));
+    };
+    ['rs:settings-change', 'rs:a11y', 'rs:demo-change'].forEach(function (ev) { D.addEventListener(ev, function () { setTimeout(answer, 0); }); });
+    D.addEventListener('astro:page-load', answer, { once: true });
+    D.addEventListener('change', function (e) { if (nav.isConnected && e.target && /^(st-skin|st-mode|a11y-text|a11y-contrast)$/.test(e.target.name)) setTimeout(answer, 0); });
+    // The Organisation row counts what is on now.
+    W.rsOrgSummary = function () {
+      var el = D.querySelector('[data-org-sum]'); if (!el || !W.rsModules) return;
+      var m = W.rsModules(), f = W.rsFeatures(), ids = Object.keys(m), fids = Object.keys(f);
+      var mo = ids.filter(function (k) { return m[k] !== 'off'; }).length, fo = fids.filter(function (k) { return f[k] !== 'off'; }).length;
+      el.textContent = mo + ' of ' + ids.length + ' modules on, ' + fo + ' of ' + fids.length + ' capabilities on.';
+    };
+    D.addEventListener('rs:demo-change', function () { if (nav.isConnected) W.rsOrgSummary(); });
+    if (D.readyState === 'loading') D.addEventListener('DOMContentLoaded', function () { W.rsOrgSummary(); }, { once: true }); else W.rsOrgSummary();
+    here();
+    // An address with #accessibility lands after this script: mark it once the page has scrolled there.
+    addEventListener('hashchange', here);
+    setTimeout(here, 350);
+  })();
+</script>
+
+<style>
+  .st-layout { display: grid; grid-template-columns: 200px minmax(0, 760px); gap: 40px; align-items: start; }
+  .st-nav { position: sticky; top: calc(var(--mast-h, 56px) + var(--fb-h, 0px) + 20px); display: grid; gap: 2px; }
+  .st-nav a { position: relative; display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 8px 12px; border-radius: var(--radius); color: var(--text-2); text-decoration: none; font: 550 var(--fs-body, 14px)/1.25 var(--font-sans); transition: background var(--dur-hover) var(--ease-settle), color var(--dur-state) var(--ease-settle), opacity var(--dur-state) var(--ease-settle); }
+  .st-nav a:hover { background: var(--surface-2); color: var(--text); }
+  .st-nav a[aria-current] { background: var(--accent-soft); color: var(--accent-ink); }
+  .st-nav a.st-gone { opacity: .4; }
+  .st-body { display: grid; gap: 40px; min-width: 0; }
+  .st-body :global(.sec) { scroll-margin-top: calc(var(--mast-h, 56px) + var(--fb-h, 0px) + 20px); }
+  .st-body :global(.section-head) { margin-bottom: 12px; }
+  .st-lede { margin: 0 0 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; font-size: var(--fs-support, 13px); color: var(--text-2); }
+  /* A phone or a narrow window: the sections as a grid at the top, three across, every name whole. */
+  @media (max-width: 899px) {
+    .st-layout { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+    .st-nav { position: static; grid-template-columns: repeat(auto-fill, minmax(min(100%, 7.6em), 1fr)); font-size: 13px; gap: 6px; padding: 4px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-2); }
+    .st-nav a { justify-content: center; gap: 6px; min-height: 44px; padding: 8px 6px; font-size: 13px; white-space: nowrap; }
+    .st-nav a :global(svg) { display: none; }
+    .st-nav a[aria-current] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, .12), 0 0 0 1px var(--line); }
+    .st-body { gap: 32px; }
+  }
+</style>

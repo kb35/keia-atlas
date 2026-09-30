@@ -21,6 +21,8 @@ import '../styles/motion.css';
 import '../styles/nav.css';
 import '../styles/craft.css';
 import '../styles/a11y.css';
+import '../styles/density.css';
+import '../styles/settings.css';
 import { A11Y_BOOT } from '../lib/a11y.mjs';
 
 import { PEOPLE } from '../lib/demo.mjs';
@@ -249,10 +251,10 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         else if (r.hasAttribute('data-rs-theme')) { r.removeAttribute('data-theme'); r.removeAttribute('data-rs-theme'); }
         r.setAttribute('data-skin', s);
         r.setAttribute('data-mode', t === 'light' || t === 'dark' ? t : 'system');
-        // Demo controls from Settings: each module On, Connected or Off (src/lib/modules.mjs), and whether agents
-        // are shown. Modules become two word lists on <html>: data-off and data-conn.
+        // Demo controls from Settings: each module On, Connected or Off (src/lib/modules.mjs). The retired Agents
+        // switch (rs4-agents) is cleared: the work is always shown, and agents are named only in how it was done. Modules become two word lists on <html>: data-off and data-conn.
         var ag = 'on', mods = window.RS_MODULES || {}, saved = null;
-        try { ag = localStorage.getItem('rs4-agents') || ag; saved = JSON.parse(localStorage.getItem('rs6-modules') || 'null'); localStorage.removeItem('rs4-stage'); } catch (_) {}
+        try { saved = JSON.parse(localStorage.getItem('rs6-modules') || 'null'); localStorage.removeItem('rs4-stage'); localStorage.removeItem('rs4-agents'); } catch (_) {}
         var off = [], conn = [], full = {};
         saved = saved || window.__rsModMem || null;
         Object.keys(mods).forEach(function (id) {
@@ -452,7 +454,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
     <button class="help-btn" type="button" data-help-toggle data-help="shell.help" data-verb="show-help" data-verb-name="Help" data-help-src={href('/help/index.json')} aria-pressed="false" aria-label="Help: explain what things are (?)" title="Help: explain what things are (press ? to switch on or off)"><span class="hb-q" aria-hidden="true">?</span></button>
     <button class="report-btn" type="button" data-help="shell.report" data-open-report data-verb="report" title="Propose an edit, log new firmware or raise an urgent issue about this page"><Icon name="plus" size={16} /><span>Report</span></button>
     <button class="icon-btn mobile-gear" type="button" data-help="shell.mode" data-toggle-mode aria-label="Colour mode: Auto" title="Colour mode: Auto"><span class="m-system"><Icon name="auto" /></span><span class="m-light"><Icon name="sun" /></span><span class="m-dark"><Icon name="moon" /></span></button>
-    <button class="icon-btn mobile-gear" type="button" data-help="shell.settings" data-open-settings data-verb="settings" data-verb-name="Settings" aria-label="Settings"><Icon name="gear" /></button>
+    <button class="icon-btn mobile-gear" type="button" data-help="shell.settings" data-open-settings aria-haspopup="dialog" aria-label="Settings"><Icon name="gear" /></button>
   </header>
   <div class="shell">
     <aside class="side" aria-label="Primary">
@@ -482,7 +484,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
             <button class="icon-btn" type="button" data-help="shell.mode" data-toggle-mode aria-label="Colour mode: Auto. Select to change" title="Colour mode: Auto">
               <span class="m-system"><Icon name="auto" /></span><span class="m-light"><Icon name="sun" /></span><span class="m-dark"><Icon name="moon" /></span>
             </button>
-            <button class="icon-btn" type="button" data-help="shell.settings" data-open-settings data-verb="settings" data-verb-name="Settings" aria-label="Settings" title="Settings"><Icon name="gear" /></button>
+            <button class="icon-btn" type="button" data-help="shell.settings" data-open-settings aria-haspopup="dialog" aria-label="Settings" title="Settings"><Icon name="gear" /></button>
           </span>
         </div>
       </div>
@@ -505,8 +507,11 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         <section class="stage-gate module-gate">
           <p class="kind">Module</p>
           <h1>{pageModule.label} is switched off</h1>
-          <p class="lede">{pageModule.what}. This demo has the {pageModule.label} module switched off in Settings.</p>
-          <button class="btn primary" type="button" data-help="shell.module-gate" data-set-module={pageModule.id}>Switch on {pageModule.label}</button>
+          <p class="lede">{pageModule.what}. This demo has the {pageModule.label} module switched off in Organisation settings.</p>
+          <div class="gate-acts">
+            <button class="btn primary" type="button" data-help="shell.module-gate" data-set-module={pageModule.id}>Switch on {pageModule.label}</button>
+            <a class="btn ghost" href={href(`/settings/organisation/#${pageModule.id}`)}>Organisation settings</a>
+          </div>
         </section>
       )}
       {tabs.length > 0 && (
@@ -1026,7 +1031,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         var m = W.rsModules(); if (!(id in m) || m[id] === state) return;
         m[id] = state; W.__rsModMem = m;   // kept in memory too, for a browser that blocks storage
         try { localStorage.setItem('rs6-modules', JSON.stringify(m)); } catch (_) {}
-        W.rsChange(applyDemo, synced('modules'), { roots: ['.side', 'main', 'dialog#settings[open] .mods'] });
+        W.rsChange(applyDemo, synced('modules'), { roots: ['.side', 'main'] });
       };
       /* Settings › Modules, capabilities: each On, Connected or Off; off with its module or what it requires. What a
          capability marks (data-feature) collapses or grows in place, the rest slides (rsChange). Pages ask
@@ -1044,7 +1049,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         if (!(id in was)) return;
         c[id] = state; W.__rsFeatMem = c;
         try { localStorage.setItem('rs6-features', JSON.stringify(c)); } catch (_) {}
-        W.rsChange(applyDemo, synced('features'), { roots: ['.side', 'main', 'dialog#settings[open] .mods'] });
+        W.rsChange(applyDemo, synced('features'), { roots: ['.side', 'main'] });
       };
       /* Switch a capability on from a page (its gate, or an action that needs it), with whatever it needs: its module
          and what it requires, in one change. */
@@ -1063,11 +1068,17 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         need(id);
         W.__rsModMem = m; W.__rsFeatMem = fc;
         try { localStorage.setItem('rs6-modules', JSON.stringify(m)); localStorage.setItem('rs6-features', JSON.stringify(fc)); } catch (_) {}
-        W.rsChange(applyDemo, synced('features'), { roots: ['.side', 'main', 'dialog#settings[open] .mods'] });
+        W.rsChange(applyDemo, synced('features'), { roots: ['.side', 'main'] });
       };
-      W.rsSetAgents = function (v) {
-        try { localStorage.setItem('rs4-agents', v); } catch (_) {}
-        W.rsChange(applyDemo, synced('agents'));
+      /* Organisation settings: every module and capability at once (Switch everything on, Reset to defaults, and
+         their Undo), in one change. null puts back the defaults. */
+      W.rsSetOrg = function (mods, feats) {
+        W.__rsModMem = mods; W.__rsFeatMem = feats;
+        try {
+          if (mods) localStorage.setItem('rs6-modules', JSON.stringify(mods)); else localStorage.removeItem('rs6-modules');
+          if (feats) localStorage.setItem('rs6-features', JSON.stringify(feats)); else localStorage.removeItem('rs6-features');
+        } catch (_) {}
+        W.rsChange(applyDemo, synced('features'), { roots: ['.side', 'main'] });
       };
       W.rsPickWho = function (id) {
         if (id === (W.rsWhoId && W.rsWhoId())) return;
@@ -1117,6 +1128,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
   /* The View as ribbon: thin, calm, under the top bar, and still while pages change (it names itself). */
   .viewas { position: sticky; top: calc(var(--mast-h) + env(safe-area-inset-top, 0px)); z-index: 19; display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 4px var(--pad-x); font-size: 13px; color: var(--accent-ink); background: color-mix(in srgb, var(--accent-soft) 70%, var(--surface)); border-bottom: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); view-transition-name: ribbon; }
   .viewas[hidden] { display: none; }
+  .gate-acts { display: flex; flex-wrap: wrap; gap: 10px; }
   .va-eye { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--on-accent); flex: none; }
   .va-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .va-change { margin-left: auto; flex: none; font: 600 12.5px/1 var(--font-sans); padding: 6px 10px; border-radius: var(--pill-radius); border: 0; background: none; color: var(--accent-ink); cursor: pointer; transition: background var(--dur-hover); }

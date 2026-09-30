@@ -102,12 +102,21 @@ const FLOWS = [
     await key(page, 'Enter'); await settle(page, 500);
     await key(page, 'Escape'); await settle(page, 300);
   }],
-  ['modules', '/vendors/', async (page) => {
-    const gear = page.locator('[data-open-settings]:visible').first();
-    await gear.click(); await settle(page, 400);
-    await page.locator('input[name="mod-vendors"][value="off"]').evaluate((i) => i.closest('label').click()); await settle(page);
-    await page.locator('input[name="mod-vendors"][value="on"]').evaluate((i) => i.closest('label').click()); await settle(page);
+  // The quick menu (the gear): it opens, a look and a mode change, text size steps, and Escape closes it.
+  ['quick-menu', '/vendors/', async (page) => {
+    await page.locator('[data-open-settings]:visible').first().click(); await settle(page, 400);
+    await page.locator('dialog#settings input[name="qm-skin"][value="enterprise"]').evaluate((i) => i.closest('label').click()); await settle(page);
+    await page.locator('dialog#settings input[name="qm-mode"][value="dark"]').evaluate((i) => i.closest('label').click()); await settle(page);
+    await page.click('dialog#settings [data-text-step="1"]'); await settle(page);
+    await page.click('dialog#settings [data-text-step="-1"]'); await settle(page);
     await key(page, 'Escape'); await settle(page, 400);
+  }],
+  // Organisation settings: a module off and on again; its sidebar entry leaves and comes back through rsChange.
+  ['modules', '/settings/organisation/', async (page) => {
+    await page.locator('[data-mod-sw="vendors"]').evaluate((i) => i.closest('label').click()); await settle(page);
+    await page.locator('[data-mod-sw="vendors"]').evaluate((i) => i.closest('label').click()); await settle(page);
+    await page.locator('input[name="mod-support"][value="on"]').evaluate((i) => i.closest('label').click()); await settle(page);
+    await page.locator('input[name="mod-support"][value="connected"]').evaluate((i) => i.closest('label').click()); await settle(page);
   }],
   ['deliver', '/projects/prj-14/integrate/', async (page) => {
     // Deliver by: each way regroups the same units (km.regroup); One at a time's Next slides the next in (km.slide).
@@ -117,15 +126,33 @@ const FLOWS = [
     }
   }],
   // A capability off and on again (src/lib/modules.mjs): what it marks collapses and grows back through rsChange.
-  ['capability', '/rooms/dub-4-01/', async (page) => {
-    const gear = page.locator('[data-open-settings]:visible').first();
-    await gear.click(); await settle(page, 400);
-    for (const [id, v] of [['licences', 'off'], ['licences', 'on'], ['maintenance', 'off'], ['meeting-quality', 'off'], ['out-of-service', 'off'], ['out-of-service', 'on'], ['maintenance', 'on'], ['meeting-quality', 'connected']]) {
-      await page.locator(`input[name="cap-${id}"][value="${v}"]`).evaluate((i) => i.closest('label').click()); await settle(page);
+  ['capability', '/settings/organisation/', async (page) => {
+    await page.click('[data-mod-card="assets"] details > summary'); await settle(page);
+    await page.click('[data-mod-card="projects"] details > summary'); await settle(page);
+    for (const id of ['licences', 'licences', 'maintenance', 'maintenance']) {
+      await page.locator(`[data-cap-sw="${id}"]`).evaluate((i) => i.closest('label').click()); await settle(page);
     }
-    await page.locator('input[name="mod-assets"][value="off"]').evaluate((i) => i.closest('label').click()); await settle(page);
-    await page.locator('input[name="mod-assets"][value="on"]').evaluate((i) => i.closest('label').click()); await settle(page);
-    await key(page, 'Escape'); await settle(page, 400);
+    await page.locator('input[name="cap-config-backups"][value="on"]').evaluate((i) => i.closest('label').click()); await settle(page);
+    await page.locator('input[name="cap-config-backups"][value="connected"]').evaluate((i) => i.closest('label').click()); await settle(page);
+    await page.locator('[data-mod-sw="assets"]').evaluate((i) => i.closest('label').click()); await settle(page);
+    await page.locator('[data-mod-sw="assets"]').evaluate((i) => i.closest('label').click()); await settle(page);
+    await page.click('[data-org-all]'); await settle(page);
+    await page.click('[data-org-reset]'); await settle(page);
+  }],
+  // View as: the sheet opens from the account button, finds a person, and choosing folds it away.
+  ['view-as', '/', async (page) => {
+    await page.locator('[data-acct-menu]:visible, [data-open-settings]:visible').first().click(); await settle(page, 500);
+    if (!(await page.evaluate(() => document.querySelector('dialog[data-vp]').open))) { await page.click('dialog#settings [data-open-viewas]'); await settle(page, 500); }
+    await page.keyboard.type('liam'); await settle(page, 300);
+    await key(page, 'Enter'); await settle(page, 900);
+  }],
+  // The Settings page: a section from the list, a density change and a find.
+  ['settings-page', '/settings/', async (page) => {
+    await page.click('[data-st-to="accessibility"]'); await settle(page);
+    await page.locator('input[name="st-density"][value="compact"]').evaluate((i) => i.closest('label').click()); await settle(page);
+    await page.locator('input[name="st-density"][value="comfortable"]').evaluate((i) => i.closest('label').click()); await settle(page);
+    await page.fill('[data-fb-q]', 'motion'); await settle(page);
+    await page.fill('[data-fb-q]', ''); await settle(page);
   }],
   ['port', '/rooms/dub-3-09/', async (page) => {
     await page.locator('main a[href*="device/?tag="]:visible').first().click();

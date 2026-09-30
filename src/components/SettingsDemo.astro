@@ -1,0 +1,69 @@
+---
+/* Settings › Demo (/settings/#demo): the controls that exist only because this is a demo. Who you view as (Change
+   opens View as), the time-away switch (Anna back from two weeks' leave), and Reset the demo.
+   Storage: View as is the Shell's (rs5-who per window, rs4-who for the next window); time away is rs6-leave and
+   rs6-welcomed. Reset the demo removes every demo key this browser holds and keeps what is yours (src/lib/settings.mjs,
+   demoResetKeys), in one change the page makes in place (rsChange), with Undo for a few seconds (rule P7). */
+import { PERSONAL_KEYS } from '../lib/settings.mjs';
+---
+<ul class="card st-list" data-st-demo>
+  <li class="st-item" data-fi data-find="view as who person role demo switch change" data-help="shell.account">
+    <div class="st-who">
+      <span class="avatar" aria-hidden="true" data-who-initials>AB</span>
+      <span class="st-who-t"><small>Viewing as</small><b data-who-name>Anna Byrne</b><small data-who-role>AV and IT delivery engineer</small></span>
+    </div>
+    <button type="button" class="btn small" data-open-viewas data-help="shell.viewas-change">Change</button>
+  </li>
+  <li class="st-item" data-fi data-find="time away leave back welcome anna marcus cover demo" data-help="settings.leave">
+    <label class="st-item-t" for="st-leave"><b>Time away</b></label>
+    <label class="st-switch"><input type="checkbox" role="switch" id="st-leave" name="leave" data-leave aria-describedby="st-leave-d" /><span class="sw" aria-hidden="true"></span></label>
+    <small class="st-sub" id="st-leave-d">Anna is back from two weeks' leave</small>
+  </li>
+  <li class="st-item" data-fi data-find="reset demo start again fresh clear changes">
+    <div class="st-item-t"><b>Reset the demo</b><small>Every demo change and person, as new</small></div>
+    <button type="button" class="btn small ghost" data-demo-reset>Reset</button>
+  </li>
+</ul>
+
+<script is:inline data-astro-rerun define:vars={{ KEEP: PERSONAL_KEYS }}>
+  (function () {
+    var box = document.querySelector('[data-st-demo]'); if (!box || box.__st) return; box.__st = true;
+    var W = window, D = document;
+    // demoResetKeys (src/lib/settings.mjs), the same rule: rs keys, less what is yours and how you like lists shown.
+    var toReset = function (keys) { return keys.filter(function (k) { return /^rs\d?-/.test(k) && KEEP.indexOf(k) < 0 && !/-view$/.test(k); }); };
+    function sync() {
+      var on = false; try { on = localStorage.getItem('rs6-leave') === 'on'; } catch (_) {}
+      var lv = box.querySelector('[data-leave]'); if (lv) lv.checked = on;
+    }
+    box.addEventListener('change', function (e) {
+      var i = e.target;
+      if (i.name !== 'leave') return;
+      try { if (i.checked) { localStorage.setItem('rs6-leave', 'on'); localStorage.removeItem('rs6-welcomed'); } else localStorage.removeItem('rs6-leave'); } catch (_) {}
+      D.dispatchEvent(new CustomEvent('rs:leave', { detail: { on: i.checked } }));
+    });
+    // One change of the whole demo, and its way back.
+    var apply = function (local, session) {
+      W.rsChange(function () {
+        var keys = []; try { for (var n = 0; n < localStorage.length; n++) keys.push(localStorage.key(n)); } catch (_) {}
+        toReset(keys).forEach(function (k) { try { localStorage.removeItem(k); } catch (_) {} });
+        Object.keys(local || {}).forEach(function (k) { try { localStorage.setItem(k, local[k]); } catch (_) {} });
+        ['rs5-who', 'rs5-me'].forEach(function (k) { try { if (session && session[k] != null) sessionStorage.setItem(k, session[k]); else sessionStorage.removeItem(k); } catch (_) {} });
+        W.__rsModMem = null; W.__rsFeatMem = null; W.__vpRecent = null;
+        if (W.rsStore) W.rsStore.mem = {};
+        W.rsApplyTheme();
+      }, function () { if (W.rsSyncDemo) W.rsSyncDemo(); D.dispatchEvent(new CustomEvent('rs:demo-change', { detail: { what: 'reset' } })); });
+      sync();
+    };
+    box.querySelector('[data-demo-reset]').addEventListener('click', function () {
+      var local = {}, session = {};
+      try { for (var n = 0; n < localStorage.length; n++) { var k = localStorage.key(n); if (toReset([k]).length) local[k] = localStorage.getItem(k); } } catch (_) {}
+      ['rs5-who', 'rs5-me'].forEach(function (k) { try { session[k] = sessionStorage.getItem(k); } catch (_) {} });
+      apply(null, null);
+      if (W.rsToast) W.rsToast('The demo is as new. Your look and accessibility stay.', { action: 'Undo', onAction: function () { apply(local, session); } });
+    });
+    D.addEventListener('rs:demo-change', function () { if (box.isConnected) sync(); });
+    // (on a first visit the Shell's helpers, rsModules, rsMarker and the rest, are defined after this script)
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { sync(); }, { once: true }); else sync();
+  })();
+</script>
+
