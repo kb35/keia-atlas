@@ -10,7 +10,7 @@ import FilterBar from '../../components/FilterBar.astro';
 import EmptyState from '../../components/EmptyState.astro';
 import DeviceArt from '../../components/DeviceArt.astro';
 import ConfigScript from '../../components/ConfigScript.astro';
-import { configurations, models, href } from '../../lib/data.mjs';
+import { configurations, models, href, plural } from '../../lib/data.mjs';
 import { useOf, factsOf, STATUS_LABEL, FW_KIND } from './_use.mjs';
 
 const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -38,6 +38,7 @@ const NUMBERS = [
   { n: nNow, label: 'Being configured', to: '?status=configuring' },
   { n: nDrift, label: 'With drift', to: '?status=drift', tone: nDrift ? 'warn' : undefined },
 ];
+const answer = `${nDrift ? `${plural(nDrift, 'configuration')} with drift to review` : `All ${cfgs.length} configurations match what is installed`} · ${nNow} being configured`;
 const attrs = ({ c, f, u }) => ({
   'data-fi': '', 'data-id': c.id,
   'data-find': `${c.name} ${f.kind} ${c.mode} ${f.maker} ${c.models.map((m) => models[m].model).join(' ')} ${c.groups.flatMap((g) => g.settings.map((s) => s.name)).join(' ')}`,
@@ -46,7 +47,7 @@ const attrs = ({ c, f, u }) => ({
 const firstNow = (u) => u.now[0];
 ---
 <Shell vendorOk title="Configurations" section="configurations" crumbs={[{ label: 'Devices', to: '/profiles/' }, { label: 'Configurations' }]}>
-  <PageBand overline="Catalogue" title="Configurations" lede="The standard set-up for each model. Configuring happens in a project's Deploy page." numbers={NUMBERS} sim>
+  <PageBand overline="Catalogue" title="Configurations" answer={answer} lede="The standard set-up for each model. Configuring happens in a project's Deploy page." numbers={NUMBERS} sim>
     <button slot="action" type="button" class="btn primary" data-open-report="change">Propose a change</button>
   </PageBand>
 

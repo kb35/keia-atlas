@@ -35,6 +35,8 @@ const where = D.rooms.length === 1 ? `${D.rooms[0].number ? `${D.rooms[0].number
 const intStep = t.phase === 'integrate' ? ({ provision: 'provision', install: 'install', configure: 'configure', commission: 'commission', records: 'provision' })[t.kind] : null;
 const intLink = intStep && phasesOf(p).includes('integrate') ? `${href(`${home}integrate/`)}${t.space ? `?room=${t.space}` : ''}#open=${intStep}` : null;
 const late = t.status !== 'done' && days != null && days < 0;
+const dueLine = days == null ? 'no due date' : days < 0 ? `${plural(-days, 'day')} past due` : days === 0 ? 'due today' : `due in ${plural(days, 'day')}`;
+const answer = t.status === 'done' ? `Done · ${plural(D.steps.length, 'step')} complete` : `${t.status === 'blocked' ? 'Waiting on something' : TASK_STATUS[t.status]} · ${dueLine}`;
 const NUMBERS = [
   { n: t.due ? fmtDate(t.due, { day: 'numeric', month: 'short' }) : '–', label: dueWord, fact: true, tone: late ? 'bad' : undefined },
   { n: `${t.hours ?? '–'} h`, label: 'Estimate', fact: true },
@@ -46,7 +48,7 @@ const owners = (['infra-refresh', 'network-refresh'].includes(pbk?.kind) ? ['pro
 const snCfg = { project: p.id, task: t.id, title: t.title, pb: pbk?.id ?? '', pbName: pbk?.name ?? '', path: pbk ? `data/playbooks/${pbk.id}.yaml` : `data/projects/${p.id.toLowerCase()}.yaml`, kind: pbk ? 'playbook' : 'project', approver: owners.map((x) => `${x.name}, ${x.role}`).join(' with '), names: owners.map((x) => x.name).join(' and '), steps: D.steps, changes: href('/changes/') };
 ---
 <Shell title={`${t.id} ${t.title}`} section="projects" minStage={3} vendorOk={isVendor} about={{ kind: 'task', label: `${t.id} ${t.title}` }} crumbs={[{ label: 'Projects', to: '/projects/' }, { label: p.name, to: `/projects/${p.id.toLowerCase()}/` }, { label: t.id }]}>
-  <PageBand overline={`Task ${t.id}`} title={t.title} numbers={NUMBERS} sim rec={t.id}>
+  <PageBand overline={`Task ${t.id}`} title={t.title} answer={answer} numbers={NUMBERS} sim rec={t.id}>
     <Fragment slot="overline">
       <span>{D.kindLabel} · {PHASE_LABEL[t.phase] ?? ''} phase</span>
       <a href={href(home)}>{p.id} {p.name}</a>

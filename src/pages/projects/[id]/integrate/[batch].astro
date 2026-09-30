@@ -32,11 +32,15 @@ const hasHost = units.some((u) => u.networked);
 const hasPair = units.some((u) => u.pairs);
 const nIssues = new Set(sum.issues.map((z) => z.id)).size;
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many ?? `${one}s`}`;
+const answer = nIssues ? `${plural(nIssues, 'unit')} to review · ${sum.done} of ${sum.total} set up`
+  : sum.ready.length ? `${plural(sum.ready.length, 'unit')} checked, ready to accept · ${sum.done} of ${sum.total} set up`
+  : sum.done === sum.total ? `All ${plural(sum.total, 'unit')} set up · nothing to review`
+  : `${sum.done} of ${plural(sum.total, 'unit')} set up · nothing to review`;
 const lede = b.touched ? 'Already in the rooms: re-check each one against the new units.' : b.cfg ? `${b.cfg.name} ${b.cfg.version}: the shared setup once, then only what differs per unit.` : 'Nothing to set on these: provision and install, then the room test.';
 ---
 <Shell title={`${b.title}: ${p.name}`} section="projects" minStage={3} vendorOk about={{ kind: 'project', label: `${p.id} ${p.name}, ${b.title}`, to: `${home}integrate/${bid}/` }}
   crumbs={[{ label: 'Projects', to: '/projects/' }, { label: p.name, to: home }, { label: PHASE, to: `${home}integrate/` }, { label: b.title }]}>
-  <PageBand overline={`Batch ${b.n} of ${plan.batches.length} · Project ${p.id}`} title={b.title} lede={lede} sim="live" rec={`int-${bid}`}
+  <PageBand overline={`Batch ${b.n} of ${plan.batches.length} · Project ${p.id}`} title={b.title} answer={answer} lede={lede} sim="live" rec={`int-${bid}`}
     numbers={[
       { n: nIssues, label: 'Need you', to: '#needs', tone: nIssues ? 'warn' : undefined, id: 'int-needs' },
       { n: sum.ready.length, label: 'Checked, to accept', to: '#units', tone: sum.ready.length ? 'good' : undefined, id: 'int-accept' },

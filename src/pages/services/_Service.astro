@@ -15,6 +15,7 @@ import FilterBar from '../../components/FilterBar.astro';
 import EmptyState from '../../components/EmptyState.astro';
 import LiveSide from '../../components/LiveSide.astro';
 import Section from '../../components/Section.astro';
+import HealthGlyph from '../../components/HealthGlyph.astro';
 import { REGION_LABEL, href } from '../../lib/data.mjs';
 import { serviceModel, KIND_LABEL_OF } from '../../lib/services-view.mjs';
 import { PEOPLE } from '../../lib/demo.mjs';
@@ -57,6 +58,8 @@ const unitLink = (u) => href(u.to ?? `/device/?tag=${u.id}`);
 const find = (u, s) => `${u.n} ${u.rn} ${s.name} ${s.city ?? ''} ${u.id} ${u.m ?? ''} ${KIND_LABEL_OF(u.k)}`;
 const client = { ...m.sim, base: href('/'), statics: m.statics, incCount: m.incidents.length, kinds: Object.fromEntries(m.kinds.map((x) => [x.k, x.label])) };
 const json = JSON.stringify(client).replace(/</g, '\\u003c');
+// The answer, from the open incidents until the live feed takes over (services-client.mjs paintNumbers).
+const ANSWER = m.incidents.length ? `${m.incidents.length} open ${m.incidents.length === 1 ? 'incident' : 'incidents'} on this service` : 'No open incidents on this service';
 const PRI = { 1: 'Critical', 2: 'High', 3: 'Moderate', 4: 'Low' };
 const ROLE_TO = (p) => href(`/team/?p=${p.id}`);
 const nOwners = m.owners.length;
@@ -67,8 +70,8 @@ const blurb = {
 }[id];
 ---
 <Shell title={svc.title} section={`services-${id}`} crumbs={[{ label: 'Services', to: '/services/' }, { label: svc.name }]} about={{ kind: 'page', label: svc.title }}>
-  <PageBand overline="Service" title={svc.title} rec={`svc-${id}`} lede={svc.lede} sim="live" numbers={NUMBERS}>
-    <span slot="overline" class="lv-live" data-lv-live title="A new moment every five seconds, the same in every window"><span class="lv-dot" aria-hidden="true"></span>Live</span>
+  <PageBand overline="Service" title={svc.title} rec={`svc-${id}`} answer={ANSWER} lede={svc.lede} sim="live" numbers={NUMBERS}>
+    <span slot="overline" class="lv-live" data-lv-live title="A new moment every five seconds, the same in every window"><HealthGlyph state="fine" size={12} quiet class="lv-dot" title="The feed is running" />Live</span>
     <a slot="overline" class="pill plain sv-owner" href={href(`/team/?p=${svc.owner}`)} data-help="services.owner">Owner: {owner.name}</a>
     <span slot="overline" class="sv-light" data-sv-light data-l="none" data-help="services.light" title="Red when several are offline or one in ten has a fault, amber for any fault, green when all is well"></span>
   </PageBand>
@@ -294,10 +297,11 @@ const blurb = {
   .content.svc.lv-page { container: lvpage content / inline-size; }
   .sv-light { display: inline-flex; align-items: center; gap: 6px; font: 700 12.5px/1 var(--font-sans); color: var(--text-2); }
   .sv-light:empty { display: none; }
-  .sv-light :global(.sv-lt), :global(.sv-lt) { width: 10px; height: 10px; border-radius: 50%; background: var(--grey); flex: none; transition: background-color var(--dur-state) var(--ease-settle); }
-  .sv-light :global(.sv-lt[data-l=good]) { background: var(--green); }
-  .sv-light :global(.sv-lt[data-l=warn]) { background: var(--amber); }
-  .sv-light :global(.sv-lt[data-l=bad]) { background: var(--red); }
+  /* The service's light is the health glyph's shape (base.css masks), with its word beside it. */
+  .sv-light :global(.sv-lt), :global(.sv-lt) { width: 12px; height: 12px; background: var(--h-off); flex: none; -webkit-mask: var(--hg-mask-off) center / contain no-repeat; mask: var(--hg-mask-off) center / contain no-repeat; transition: background-color var(--dur-state) var(--ease-settle); }
+  .sv-light :global(.sv-lt[data-l=good]) { background: var(--h-fine); -webkit-mask-image: var(--hg-mask-fine); mask-image: var(--hg-mask-fine); }
+  .sv-light :global(.sv-lt[data-l=warn]) { background: var(--h-review); -webkit-mask-image: var(--hg-mask-review); mask-image: var(--hg-mask-review); }
+  .sv-light :global(.sv-lt[data-l=bad]) { background: var(--h-fault); -webkit-mask-image: var(--hg-mask-fault); mask-image: var(--hg-mask-fault); }
   .sv-owner { text-decoration: none; }
   .sv-owner:hover { text-decoration: underline; text-underline-offset: 2px; }
 

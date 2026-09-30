@@ -35,12 +35,17 @@ const NUMBERS = [
   { n: c.fleetCount ?? c.models.length, label: c.fleetCount != null ? 'Units of the model' : c.models.length === 1 ? 'Model' : 'Models' },
   sla?.target === 'Next working day' ? { n: 1, label: 'Working day to answer' } : { n: sla ? sla.target : 'None', label: sla ? 'Maker answers within' : 'No service level' },
 ];
+const WAIT = { sent: 'sent, no answer yet', acknowledged: 'acknowledged', investigating: 'investigating' };
+const answer = base.status === 'draft' ? `Being prepared · not yet sent to ${maker}`
+  : base.status === 'closed' ? `Closed · nothing waiting on ${maker}`
+  : base.status === 'published' ? `${maker} published it as a known issue · case still open`
+  : `Waiting on ${maker} · ${WAIT[base.status] ?? CASE_STATUS[base.status]}`;
 const STEPS = CASE_ORDER;
 const TO = ['acknowledged', 'investigating', 'published', 'closed'];
 const title = c.draft ? c.title : `${c.id}: ${c.title}`;
 ---
 <Shell title={title} section="known-issues" minStage={2} crumbs={[{ label: 'Work', to: '/work/' }, { label: 'Known issues', to: '/known-issues/' }, { label: 'Maker cases', to: '/known-issues/#maker-cases' }, { label: c.draft ? 'New case' : c.id }]} about={{ kind: 'maker-case', label: title, to: c.path }}>
-  <PageBand overline="Maker case" title={c.title} lede={route.how} stage={4} numbers={NUMBERS}>
+  <PageBand overline="Maker case" title={c.title} answer={answer} lede={route.how} stage={4} numbers={NUMBERS}>
     <Fragment slot="overline">
       <span class="code" data-help="case.id">{c.draft ? 'New' : c.id}</span>
       <span>{maker}</span>

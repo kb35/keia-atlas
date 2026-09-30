@@ -16,6 +16,8 @@ import DetailTabs from '../../components/DetailTabs.astro';
 import FloorMap from '../../components/FloorMap.astro';
 import RoomPlanSprite from '../../components/RoomPlanSprite.astro';
 import GuideLive from '../../components/GuideLive.astro';
+import HealthGlyph from '../../components/HealthGlyph.astro';
+import HealthKey from '../../components/HealthKey.astro';
 import { href, countryName, plural, fmtDate, KIND, PHASES, PHASE_LABEL, PROJECT_KIND, VENDOR_KIND, DEMO_TODAY } from '../../lib/data.mjs';
 import { WORK_KIND } from '../../lib/work.mjs';
 import { office, liveModelFor, REGION_SHORT, ROLE_WORD, LIGHT_WORD, OPEN_Q, roomTitle, INC_WORD } from '../../lib/locations.mjs';
@@ -75,9 +77,13 @@ const FACTS = [
   ['3D model', M ? 'Modelled: every floor, comms room, cable run and circuit' : 'Not modelled yet'],
 ];
 const json = JSON.stringify({ ...liveModelFor([o.id]), base: href('/') }).replace(/</g, '\\u003c');
+// The answer (UI-V2 §3.2): spaces not working first. Written from the open incidents here; the live feed then keeps it
+// current (locations-client.mjs, from the same simulation as the plan).
+const incSpaces = new Set(o.inc.map((v) => v.space.id)).size;
+const ANSWER = incSpaces ? `${plural(incSpaces, 'space')} not working now` : `All spaces working · no open incidents`;
 ---
 <Shell title={s.name} section="office" crumbs={[{ label: 'Locations', to: '/locations/' }, { label: REGION_SHORT[s.region], to: `/locations/${s.region}/` }, { label: s.name }]} about={{ kind: 'office', label: s.name, to: `/locations/${o.id}/` }}>
-  <PageBand overline="Office" title={s.name} sim="live" numbers={NUMBERS} rec={`loc-${o.id}`}>
+  <PageBand overline="Office" title={s.name} answer={ANSWER} sim="live" numbers={NUMBERS} rec={`loc-${o.id}`}>
     <Fragment slot="overline">
       <span class="code">{s.code}</span>
       <a href={href(`/locations/${s.region}/`)} data-help="loc.region">{REGION_SHORT[s.region]}</a>
@@ -88,7 +94,7 @@ const json = JSON.stringify({ ...liveModelFor([o.id]), base: href('/') }).replac
       : <span slot="action" class="ob-no3d faint" data-help="loc.3d">3D model: not modelled yet</span>}
   </PageBand>
 
-  <div class="content ofc" data-loc="office" data-loc-racks={JSON.stringify(racks)}>
+  <div class="content ofc" data-loc="office" data-loc-racks={JSON.stringify(racks)} data-loc-answer data-cockpit>
     <RoomPlanSprite />
     <div class="g12 top">
       <section class="card s-7 stick ofc-map" aria-label="Floors" {...recHere(`loc-${o.id}`)} data-help="loc.floor">
@@ -112,13 +118,14 @@ const json = JSON.stringify({ ...liveModelFor([o.id]), base: href('/') }).replac
           </div>
         )}
         <p class="ofc-key" aria-label="Key"><span><i data-st="use"></i>In use</span><span><i data-st="free"></i>Free</span><span><i data-st="problem"></i>Problem</span><span><i data-st="closed"></i>Closed</span></p>
+        <HealthKey only={['fine', 'fault', 'stale']} />
       </section>
 
       <SidePanel class="s-5" title="Today" meta={today} id="today" help="loc.today">
         <div class="td">
           <ul class="td-lights" data-help="loc.lights">
             {o.lights.map((l) => (
-              <li><a href={l.to.startsWith('#') ? l.to : href(l.to)}><i class="hl" data-state={l.tone} aria-hidden="true"></i><b>{l.label}</b><span>{l.text}</span></a></li>
+              <li><a href={l.to.startsWith('#') ? l.to : href(l.to)}><HealthGlyph state={l.tone} size={12} title={l.text} /><b>{l.label}</b><span>{l.text}</span></a></li>
             ))}
           </ul>
           <div>
@@ -133,7 +140,7 @@ const json = JSON.stringify({ ...liveModelFor([o.id]), base: href('/') }).replac
             <h3 class="td-h">Needs attention</h3>
             <ul class="td-att" data-loc-att></ul>
             <ul class="td-att">
-              {attention.map((a) => <li><a href={href(a.to)}><i class="hl" data-state={a.tone} aria-hidden="true"></i><span>{a.text}</span><small>{a.sub}</small></a></li>)}
+              {attention.map((a) => <li><a href={href(a.to)}><HealthGlyph state={a.tone} size={12} title={a.text} /><span>{a.text}</span><small>{a.sub}</small></a></li>)}
             </ul>
             {!attention.length && <p class="faint td-none" data-loc-att-none>Nothing needs attention right now.</p>}
           </div>
@@ -155,7 +162,7 @@ const json = JSON.stringify({ ...liveModelFor([o.id]), base: href('/') }).replac
         <h3>Comms rooms</h3>
         {o.comms.length ? (
           <ul class="tl">
-            {o.comms.map((c) => <li><a href={href(`/rooms/${c.space.id}/`)}><b>{c.title}</b></a><small><i class="hl" data-state={c.verdict.tone} aria-hidden="true"></i> {c.verdict.text}</small></li>)}
+            {o.comms.map((c) => <li><a href={href(`/rooms/${c.space.id}/`)}><b>{c.title}</b></a><small><HealthGlyph state={c.verdict.tone} size={12} title={c.verdict.text} /> {c.verdict.text}</small></li>)}
           </ul>
         ) : <p class="faint">Not recorded.</p>}
         <a class="tl-all" href="#comms">Racks and sizing ↓</a>
@@ -295,7 +302,7 @@ const json = JSON.stringify({ ...liveModelFor([o.id]), base: href('/') }).replac
 <style>
   .ofc { display: grid; gap: var(--gutter); }
   .ob-tz { font-variant-numeric: tabular-nums; }
-  .ob-open[data-open="1"] { color: var(--green-ink, var(--green)); font-weight: 650; }
+  .ob-open[data-open="1"] { color: var(--text); font-weight: 650; } /* the dark cockpit: open is fine, so not coloured */
   .ob-no3d { font-size: 13px; align-self: center; }
   .ofc-map { padding: 14px 16px; display: grid; gap: 10px; }
   .ofc-note { margin: 0; font-size: 13px; }
@@ -305,20 +312,19 @@ const json = JSON.stringify({ ...liveModelFor([o.id]), base: href('/') }).replac
   .ofc-chip { display: inline-flex; gap: 6px; align-items: baseline; padding: 5px 9px; border-radius: 6px; font-size: 12.5px; color: var(--ink); text-decoration: none; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); transition: background var(--dur-state) var(--ease-settle), box-shadow var(--dur-state) var(--ease-settle); }
   .ofc-chip .mono { color: var(--text-2); font-size: 11px; }
   .ofc-chip:hover { box-shadow: inset 0 0 0 1.5px var(--accent); }
-  .ofc-chip[data-st=use] { background: color-mix(in srgb, var(--blue) 18%, var(--bg)); }
-  .ofc-chip[data-st=free] { background: color-mix(in srgb, var(--green) 14%, var(--bg)); }
-  .ofc-chip[data-st=problem] { background: color-mix(in srgb, var(--red) 18%, var(--bg)); box-shadow: inset 0 0 0 1.5px var(--red); }
+  .ofc-chip[data-st=use] { background: var(--surface-3); }
+  .ofc-chip[data-st=free] { background: var(--bg); }
+  .ofc-chip[data-st=problem] { background: var(--h-fault-soft); box-shadow: inset 0 0 0 1.5px var(--h-fault); }
   .ofc-key { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; font-size: 12px; color: var(--text-2); }
   .ofc-key span { display: inline-flex; align-items: center; gap: 6px; }
   .ofc-key i { width: 12px; height: 12px; border-radius: 3px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-strong); }
-  .ofc-key i[data-st=use] { background: color-mix(in srgb, var(--blue) 30%, var(--bg)); }
-  .ofc-key i[data-st=free] { background: color-mix(in srgb, var(--green) 22%, var(--bg)); }
-  .ofc-key i[data-st=problem] { background: color-mix(in srgb, var(--red) 30%, var(--bg)); box-shadow: inset 0 0 0 1.5px var(--red); }
+  .ofc-key i[data-st=use] { background: var(--surface-3); }
+  .ofc-key i[data-st=free] { background: var(--bg); }
+  .ofc-key i[data-st=problem] { background: var(--h-fault-soft); box-shadow: inset 0 0 0 1.5px var(--h-fault); }
   .td { display: grid; gap: 16px; }
   .td-h { margin: 0 0 8px; font-size: 13px; text-transform: none; }
   .td-lights, .td-people, .td-att { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
   .td-lights a, .td-att :global(a) { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; align-items: center; color: var(--ink); text-decoration: none; font-size: 13.5px; padding: 6px 8px; border-radius: 8px; transition: background var(--dur-state) var(--ease-settle); }
-  .td-att :global(.hl) { width: 10px; height: 10px; }
   .td-lights a { grid-template-columns: auto 110px minmax(0, 1fr); }
   .td-lights span { color: var(--text-2); font-size: 13px; }
   .td-att + .td-att { margin-top: 6px; }
@@ -337,7 +343,6 @@ const json = JSON.stringify({ ...liveModelFor([o.id]), base: href('/') }).replac
   .tl a:hover { text-decoration: underline; }
   .tl b { font-weight: 650; font-size: 13.5px; }
   .tl small { color: var(--text-2); font-size: 12.5px; display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
-  .tl .hl { width: 9px; height: 9px; }
   .tl-bad { color: var(--red-ink); }
   .tl-all { margin-top: auto; font-size: 13px; font-weight: 600; }
   .side-card p.faint { margin: 0; font-size: 13px; }

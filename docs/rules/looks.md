@@ -20,17 +20,33 @@ Studio (default: warm, one burnt-orange accent), Enterprise (dense, slate and de
 
 Text passes WCAG AA (4.5 to 1) on its surfaces in every look and mode; large text and controls 3 to 1. Status is never colour alone.
 
+`node tools/contrast-check.mjs` checks the health palette in every look, light and dark. It runs in `npm run build` and `npm test`.
+
 - **Why:** [WCAG 2.2, contrast (minimum)](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html).
 - **Do:** use `--text-2` and `--text-3` for quieter text.
 - **Don't:** lower text opacity to make it quieter.
 
 ### T4. Colour has jobs
 
-The accent marks where you are, focus and the main action. Green is healthy, amber needs attention, red is a fault, blue in progress, violet planning, grey off or unknown. Cables and ports use signal colours.
+Health has six states, each with one shape from the HealthGlyph set and a word beside it: Fine, To review, Fault, Not reporting (the fault colour, dashed), In progress, Planned, Off. Shape carries the state; colour backs it up.
+
+Each state has three tokens in every look and mode:
+
+- `--h-<state>`: the fill, for glyphs and chart marks. At least 3 to 1 on `--bg` and `--surface`.
+- `--h-<state>-ink`: the words. At least 4.5 to 1 on `--bg`, `--surface` and its own soft.
+- `--h-<state>-soft`: a light tint for backgrounds.
+
+The states are `fine`, `review`, `fault`, `progress`, `planned` and `off`.
+
+Dark cockpit: on Home, region and office pages a Fine glyph is drawn in `--quiet`, so nothing fine is coloured. Red at more than glyph size is only for a P1 or major incident, a safety matter or a live event at risk, and it leaves when that is over.
+
+The accent marks where you are, focus and the one action. It never means health. Cables and ports use signal colours, never health colours.
+
+The old families (`--green`, `--amber`, `--red`, `--blue`, `--violet`, `--grey`) are now aliases of the health tokens. They are retiring from components: use `--h-*` in new work.
 
 - **Why:** when a colour means one thing, people read it without thinking.
-- **Do:** pair each status colour with its word.
-- **Don't:** use the accent for status, or red for decoration.
+- **Do:** pair each glyph with its word, and use the ink token for any text.
+- **Don't:** use the accent for health, a fill token for text, or red for decoration.
 
 ## No accent bars on rounded boxes
 A coloured stripe down one edge of a box with rounded corners curves around the corners and looks off. Don't use `border-left` or an `inset` left shadow as an accent on anything rounded. Show state with a thin tinted outline (`box-shadow: inset 0 0 0 1px color-mix(in srgb, <colour> 55%, transparent)`), a soft tinted background, or a small dot or icon. Straight table rows may keep a straight edge.

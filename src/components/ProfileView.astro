@@ -107,6 +107,9 @@ const NUMBERS = [
   { n: types.length, label: types.length === 1 ? 'Room profile' : 'Room profiles', to: '#fleet' },
   { n: symptoms.length, label: symptoms.length === 1 ? 'Symptom' : 'Symptoms', to: '#troubleshoot' },
 ];
+// The answer: the units of this kind in service, and any advisories to review (for the chosen model, or across the kind).
+const advOpen = model ? advs : [...new Set(ids.flatMap((id) => advisoriesFor(id)))];
+const answer = `${plural(model ? mService : stages.manage, 'unit')} in service · ${advOpen.length ? `${plural(advOpen.length, 'advisory', 'advisories')} to review` : 'no advisories to review'}`;
 const TABS = [
   hasPorts && M && { id: 'ports', label: 'Ports', count: M.ports?.length ?? 0 },
   { id: 'healthy', label: 'What healthy looks like', count: Object.keys(C.platforms).length },
@@ -117,7 +120,7 @@ const TABS = [
 ].filter(Boolean);
 ---
 <Shell vendorOk about={{ kind: 'profile', cls, label: title, model: M ? modelName(model) : undefined, to: `/profiles/${cls}/${model ?? ''}` }} title={title} section="profiles" crumbs={M ? [{ label: 'Device profiles', to: '/profiles/' }, { label: C.profile.name, to: `/profiles/${cls}/` }, { label: modelName(model) }] : [{ label: 'Device profiles', to: '/profiles/' }, { label: C.profile.name }]}>
-  <PageBand overline="Device profile" title={C.profile.name} lede={`${roomWords(C.profile.object_role)}.`} numbers={NUMBERS}>
+  <PageBand overline="Device profile" title={C.profile.name} answer={answer} lede={`${roomWords(C.profile.object_role)}.`} numbers={NUMBERS}>
     <Fragment slot="overline">
       <span class="code mono">{cls}</span>
       <span>Version {C.profile.version}</span>

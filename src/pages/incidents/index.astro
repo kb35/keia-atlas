@@ -26,6 +26,9 @@ const FACETS = [
 const SORT = { options: [{ value: 'urgent', label: 'Most urgent first' }, { value: 'oldest', label: 'Oldest first' }, { value: 'site', label: 'By office' }] };
 // Each figure filters the board to what it counts (rule P10); Home and the Work overview link here the same way.
 const OPEN_STATES = STATE_ORDER.filter((s) => s !== 'resolved').join(',');
+// The answer: the urgent ones first, then what is new and not yet taken.
+const hi = open.filter((v) => v.inc.priority <= 2).length, fresh = open.filter((v) => v.inc.state === 'new').length;
+const ANSWER = !open.length ? 'No open incidents' : `${open.length} open${hi ? `, ${hi} high priority` : ''} · ${fresh ? `${fresh} new, not taken yet` : 'every one has an owner'}`;
 const NUMBERS = [
   { n: open.length, label: 'Open', to: `?state=${OPEN_STATES}` },
   { n: open.filter((v) => v.inc.priority <= 2).length, label: 'High priority', to: `?state=${OPEN_STATES}&prio=1,2`, tone: open.some((v) => v.inc.priority <= 2) ? 'bad' : undefined },
@@ -50,7 +53,7 @@ const stateLine = (v) => {
 };
 ---
 <Shell title="Incidents" section="incidents" minStage={2} crumbs={[{ label: 'Incidents' }]}>
-  <PageBand overline="Work" title="Incidents" rec="dd-incidents" lede={SUMMARY} sim numbers={NUMBERS} />
+  <PageBand overline="Work" title="Incidents" rec="dd-incidents" answer={ANSWER} lede={SUMMARY} sim numbers={NUMBERS} />
 
   <div class="content incs">
     <FilterBar facets={FACETS} placeholder="Find an incident, room or caller" label="Find an incident" noun={['incident', 'incidents']} scope=".content.incs" sort={SORT} />

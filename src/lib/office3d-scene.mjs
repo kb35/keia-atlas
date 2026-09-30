@@ -369,7 +369,7 @@ export function createScene(host, D, hooks) {
   }
   const glowPhase = () => (0.5 - 0.5 * Math.cos((performance.now() / (motion().pulse || 2400)) * Math.PI * 2));
   function pulse() {
-    const still = motion().reduced, p = still ? 0.6 : glowPhase();
+    const still = true, p = still ? 0.6 : glowPhase(); // the fault pulse is retired (MOTION-V2 §2): rings are drawn still
     for (const ring of rings.values()) {
       setBase(ring.mat, still ? 0.9 : 0.35 + 0.6 * p);
       for (const m of ring.mats ?? []) if (m.emissive) m.emissive.copy(ring.mat.color).multiplyScalar(still ? 0.25 : 0.1 + 0.4 * p);
@@ -456,11 +456,11 @@ export function createScene(host, D, hooks) {
   function frame(now) {
     pending = false; if (!alive) return;
     const moving = stepTween(now);
-    if (rings.size && !motion().reduced) pulse();
+    if (rings.size) pulse();
     renderer.render(scene, camera);
     placeLabels();
     if (moving) requestRender();
-    else if (rings.size && !motion().reduced && onScreen && !document.hidden) { clearTimeout(pulseTimer); pulseTimer = setTimeout(requestRender, 50); }
+    // No loop: with the pulse retired, a still scene draws only when something changes.
   }
   controls.addEventListener('change', requestRender);
   const v3 = new Vector3();

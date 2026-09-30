@@ -13,7 +13,7 @@ import Section from '../../../components/Section.astro';
 import EmptyState from '../../../components/EmptyState.astro';
 import DeviceCell from '../_DeviceCell.astro';
 import Signals from '../_Signals.astro';
-import { href, sites, modelName, fmtDate, SITE_ORDER, REGION_LABEL } from '../../../lib/data.mjs';
+import { href, sites, modelName, fmtDate, SITE_ORDER, REGION_LABEL, plural } from '../../../lib/data.mjs';
 import { REGION_SHORT } from '../../../lib/demo.mjs';
 import { equipment, EQUIP_KIND, SOURCE, PANEL_LIFE, roomUse } from '../../../lib/usage.mjs';
 import { incByDevice, failed, failing, isHome, WHERE } from '../_engineer.mjs';
@@ -86,6 +86,7 @@ const TOGGLES = [
   { key: 'failed', label: 'Failed calls', title: 'Only video devices whose calls keep failing' },
 ];
 const SORT = { options: [{ value: 'flagged', label: 'Flagged first' }, { value: 'issues', label: 'Incidents first' }, { value: 'use', label: 'Busiest first' }, { value: 'site', label: 'By office' }, { value: 'name', label: 'By name' }] };
+const answer = `${withInc ? `${plural(withInc, 'device')} with an open incident` : 'No device with an open incident'} · ${flaggedAll ? `${flaggedAll} flagged to review` : 'nothing flagged'}`;
 const NUMBERS = [
   { n: flaggedAll, label: 'Flagged', to: '?status=flagged', tone: flaggedAll ? 'warn' : undefined },
   { n: withInc, label: 'With open incidents', to: '?issues=1', tone: withInc ? 'bad' : undefined },
@@ -100,7 +101,7 @@ const perMax = Math.max(...rollup.map((x) => x.per ?? 0));
 const HOURS24 = Array.from({ length: 24 }, (_, i) => i);
 ---
 <Shell title="Equipment usage" section="equipment-usage" minStage={2} crumbs={[{ label: 'Devices', to: '/profiles/' }, { label: 'Usage' }]}>
-  <PageBand overline="Fleet" title="Equipment usage" lede="How hard the kit is worked, and what is worn out early, barely used or left running for nobody." sim numbers={NUMBERS} />
+  <PageBand overline="Fleet" title="Equipment usage" answer={answer} lede="How hard the kit is worked, and what is worn out early, barely used or left running for nobody." sim numbers={NUMBERS} />
 
   <div class="content eu" data-eu>
     <FilterBar facets={FACETS} toggles={TOGGLES} placeholder="Find a device, room or office" label="Find a device" noun={['device', 'devices']} scope=".content.eu" sort={SORT} />

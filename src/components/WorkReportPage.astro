@@ -6,14 +6,14 @@
 import Shell from '../layouts/Shell.astro';
 import Icon from './Icon.astro';
 import PageBand from './PageBand.astro';
-import { href, fmtDate } from '../lib/data.mjs';
+import { href, fmtDate, plural } from '../lib/data.mjs';
 import { reportMarkdown } from '../lib/report.mjs';
 
 const { report: r, backTo, backLabel, crumbs, about, projectId, extra = null } = Astro.props;
 // A project report also carries its charter, the three lights, the log, changes to scope and lessons learned.
 const X = extra;
 const short = (d) => fmtDate(d, { day: 'numeric', month: 'short' });
-const LIGHT = { ok: 'Green', warn: 'Amber', bad: 'Red', off: 'Grey' };
+const LIGHT = { ok: 'Fine', warn: 'To review', bad: 'Past target', off: 'Not set' };
 let mdExtra = '';
 if (X) {
   const L = [['Schedule', X.lights.schedule], ['Cost', X.lights.cost], ['Scope', X.lights.scope]];
@@ -24,10 +24,13 @@ if (X) {
   if (X.changes.length) mdExtra += `\n## Changes to scope\n\n${X.changes.map((c) => `- **${c.id} ${c.title}** (${c.statusLabel.toLowerCase()}${c.decided ? ` ${short(c.decided)}` : ''}, approver ${c.approverName}${c.effect ? `, ${c.effect}` : ''})${c.why ? `: ${c.why}` : ''}`).join('\n')}\n`;
   if (X.lessons.length) mdExtra += `\n## Lessons learned\n\n${X.lessons.map((x) => `- "${x.fix}" (${x.task.id}, ${x.owner.name}${x.inPlaybook ? `; in the playbook since ${short(x.inPlaybook.date)}` : ''})`).join('\n')}\n`;
 }
+// The answer: done or not, and whether anything differed from the plan.
+const differed = r.deviations.length ? `${plural(r.deviations.length, 'difference')} from the plan` : 'no differences from the plan';
+const answer = r.complete ? `Complete · ${differed}` : r.taskCount ? `${r.doneCount} of ${r.taskCount} tasks done · ${differed}` : `Not closed yet · ${differed}`;
 const md = reportMarkdown(r).replace(/\n## Who\n/, `${mdExtra}\n## Who\n`);
 ---
 <Shell title={r.title} section="projects" minStage={3} crumbs={crumbs} about={about}>
-  <PageBand overline="Work report" title={r.title} sim lede="The record of the work: what was done, who, which devices, the evidence, what differed and who signed it off.">
+  <PageBand overline="Work report" title={r.title} sim answer={answer} lede="The record of the work: what was done, who, which devices, the evidence, what differed and who signed it off.">
     <Fragment slot="overline"><span class={`pill ${r.complete ? 'manage' : 'deploy'}`}>{r.status}</span></Fragment>
     <button slot="action" type="button" class="btn primary" data-rp-print><Icon name="book" size={16} />Print</button>
   </PageBand>
@@ -73,7 +76,7 @@ const md = reportMarkdown(r).replace(/\n## Who\n/, `${mdExtra}\n## Who\n`);
         <section class="rp-sec">
           <h3>Status {X.closed ? 'at close' : 'now'}</h3>
           <ul class="rp-lights">
-            {[['Schedule', X.lights.schedule], ['Cost', X.lights.cost], ['Scope', X.lights.scope]].map(([k, l]) => <li><i class="hl" data-state={l.state}></i><b>{k}: {l.word}</b><span>{LIGHT[l.state]}. {l.why}</span></li>)}
+            {[['Schedule', X.lights.schedule], ['Cost', X.lights.cost], ['Scope', X.lights.scope]].map(([k, l]) => <li><i class="hg-m" data-state={l.state} aria-hidden="true"></i><b>{k}: {l.word}</b><span>{LIGHT[l.state]}. {l.why}</span></li>)}
           </ul>
         </section>
       )}
@@ -255,7 +258,7 @@ const md = reportMarkdown(r).replace(/\n## Who\n/, `${mdExtra}\n## Who\n`);
     .rp-title { font-size: 22pt; } .rp-brand, .rp-foot, .rp-when, .rp-t small, .rp-line span, .rp-line i, .rp-count { color: #444 !important; }
     .rp-pill { border: 1px solid #000; }
     .rp-sec h3 { border-bottom-color: #000; }
-    .rp-lights .hl { background: #fff !important; border: 1.5px solid #000; box-shadow: none !important; animation: none !important; }
+    .rp-lights .hg-m { background: #000 !important; }
     .rp-sec, .rp-t tr, .rp-line { break-inside: avoid; }
     .rp-scroll { overflow: visible; }
     .rp-t { font-size: 9.5pt; } .rp-t th, .rp-t td { border-bottom: 1px solid #999 !important; }

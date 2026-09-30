@@ -31,11 +31,14 @@ const NUMBERS = [
   { n: inc.length, label: 'Open incidents', to: `/incidents/?region=${region}&${OPEN_Q}`, tone: inc.length ? 'bad' as const : undefined },
 ];
 const json = JSON.stringify({ ...liveModelFor(sitesHere), base: href('/') }).replace(/</g, '\\u003c');
+// The answer: spaces not working first (from open incidents until the live feed takes over, locations-client.mjs).
+const incSpaces = new Set(inc.map((v) => v.space.id)).size;
+const ANSWER = incSpaces ? `${plural(incSpaces, 'space')} not working now · ${plural(OFFICES.length, 'office')}` : `All spaces working across ${plural(OFFICES.length, 'office')}`;
 ---
 <Shell title={REGION_SHORT[region]} section="region" crumbs={[{ label: 'Locations', to: '/locations/' }, { label: REGION_SHORT[region] }]} about={{ kind: 'region', label: REGION_SHORT[region], to: `/locations/${region}/` }}>
-  <PageBand overline="Region" title={REGION_LABEL[region]} lede={`${plural(OFFICES.length, 'office')} and ${plural(homes.rooms.length, 'home office')}.`} sim="live" numbers={NUMBERS} rec={`rg-${region}`} />
+  <PageBand overline="Region" title={REGION_LABEL[region]} answer={ANSWER} lede={`${plural(OFFICES.length, 'office')} and ${plural(homes.rooms.length, 'home office')}.`} sim="live" numbers={NUMBERS} rec={`rg-${region}`} />
 
-  <div class="content rgn" data-loc="region">
+  <div class="content rgn" data-loc="region" data-loc-answer data-cockpit>
     <div class="rg-grid" id="offices">
       {OFFICES.map((o) => <OfficeCard o={o} />)}
       <a class="card rg-home" href={href(`/locations/${region}/home-offices/`)} data-vt-rec={`ho-${region}`} data-help="loc.homes">

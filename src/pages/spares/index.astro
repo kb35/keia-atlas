@@ -16,6 +16,7 @@ const REGION = { amer: 'Americas', emea: 'EMEA', apac: 'APAC' };
 const floorName = (st) => sites[st.site].floors?.find((f) => f.id === st.floor)?.name ?? `Floor ${st.floor}`;
 const lowCount = stores.filter((s) => s.low > 0).length;
 const overdue = stores.filter((s) => s.overdue).length;
+const answer = `${lowCount ? `${plural(lowCount, 'store')} below minimum` : 'Every store at or above its minimum'} · ${overdue ? `${plural(overdue, 'store')} due a count` : 'every count current'}`;
 const STATUS = { ok: 'Stocked', low: 'Below minimum' };
 const stateOf = (st) => (st.low > 0 ? 'low' : 'ok');
 const classes = [...new Set(spareUnits.map((u) => u.cls))].sort((a, b) => className(a).localeCompare(className(b)));
@@ -49,7 +50,7 @@ const S = stores.map((st, i) => {
 const R = S.map(({ st, i }) => ({ id: st.id, i, name: st.siteName, low: st.low, units: st.units.length, counted: st.lastCounted }));
 ---
 <Shell title="IT stores" section="spares" crumbs={[{ label: 'Devices', to: '/profiles/' }, { label: 'IT stores' }]}>
-  <PageBand overline="Stock" title="IT stores" lede="Each office's storage room: the spare units on its shelves, the counted stock, and the least to keep." sim numbers={NUMBERS} />
+  <PageBand overline="Stock" title="IT stores" answer={answer} lede="Each office's storage room: the spare units on its shelves, the counted stock, and the least to keep." sim numbers={NUMBERS} />
 
   <div class="content stores">
     <FilterBar facets={FACETS} toggles={TOGGLES} placeholder="Find a store, model or serial" label="Find a store" noun={['store', 'stores']} scope=".content.stores" views={VIEWS} viewKey="rs4-stores-view" sort={SORT} />

@@ -11,6 +11,7 @@ import Section from '../../../../components/Section.astro';
 import EmptyState from '../../../../components/EmptyState.astro';
 import LiveBar from '../../../../components/LiveBar.astro';
 import IntegrateLive from '../../../../components/IntegrateLive.astro';
+import HealthGlyph from '../../../../components/HealthGlyph.astro';
 import { projects, sites, PHASE_LABEL, TASK_STATUS, SITE_ORDER, phasesOf, fmtDate, DEMO_TODAY, href, className } from '../../../../lib/data.mjs';
 import { integratePlan, buildModel, batchHref, roomHref } from '../../../../lib/integrate.mjs';
 import { metersHtml, batchFootHtml, roomFootHtml, roomChipsHtml, needsHtml, readyHtml } from '../../../../lib/integrate-view.mjs';
@@ -45,7 +46,7 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many ?? `${one}s`}`;
 ---
 <Shell title={`${PHASE}: ${p.name}`} section="projects" minStage={3} vendorOk about={{ kind: 'project', label: `${p.id} ${p.name}, ${PHASE}`, to: `${home}integrate/` }}
   crumbs={[{ label: 'Projects', to: '/projects/' }, { label: p.name, to: home }, { label: PHASE }]}>
-  <PageBand overline={`Project ${p.id}`} title={PHASE} sim="live"
+  <PageBand overline={`Project ${p.id}`} title={PHASE} sim="live" answer={`${F.setUp} of ${F.units} units set up · ${F.needs ? `${F.needs} waiting on you` : 'nothing waiting on you'}`}
     numbers={[
       { n: F.needs, label: 'Need you', to: '#needs', tone: F.needs ? 'warn' : undefined, id: 'int-needs' },
       { n: F.toAccept, label: 'Checked, to accept', to: '#checked', tone: F.toAccept ? 'good' : undefined, id: 'int-accept' },
@@ -149,7 +150,7 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many ?? `${one}s`}`;
         {intTasks.map((t) => (
           <a class="row plain iv-task" href={href(`${home}tasks/${t.id.toLowerCase()}/`)}>
             <span>
-              <span class="name"><i class="hl" data-state={{ done: 'ok', doing: 'warn', blocked: 'bad', todo: 'off' }[t.status]}></i> {t.title}</span>
+              <span class="name"><HealthGlyph state={{ done: 'fine', doing: 'progress', blocked: 'review', todo: 'planned' }[t.status]} size={12} title={TASK_STATUS[t.status]} /> {t.title}</span>
               <span class="sub">{t.id} · {person(t.owner).name}{t.blocked_by ? ` · ${t.blocked_by}` : ''}</span>
             </span>
             <span class="end"><span class:list={['faint', { late: late(t) }]}>{t.due ? `Due ${fmtDate(t.due, { day: 'numeric', month: 'short' })}` : ''}</span><span class:list={['pill', { manage: t.status === 'done', deploy: t.status === 'doing', bad: t.status === 'blocked' }]}>{TASK_STATUS[t.status]}</span></span>

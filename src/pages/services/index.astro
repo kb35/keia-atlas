@@ -9,6 +9,7 @@
 import Shell from '../../layouts/Shell.astro';
 import PageBand from '../../components/PageBand.astro';
 import Section from '../../components/Section.astro';
+import HealthGlyph from '../../components/HealthGlyph.astro';
 import { href } from '../../lib/data.mjs';
 import { serviceModel, SERVICE_ORDER, SERVICES } from '../../lib/services-view.mjs';
 import { devicesModel } from '../../lib/livemodel.mjs';
@@ -36,8 +37,8 @@ const json = JSON.stringify(client).replace(/</g, '\\u003c');
 const ownerOf = (id) => PEOPLE.find((p) => p.id === SERVICES[id].owner);
 ---
 <Shell title="Services" section="services-overview" crumbs={[{ label: 'Services' }]} about={{ kind: 'page', label: 'Services' }}>
-  <PageBand overline="Services" title="Services" lede="The AV service, the network and IT infrastructure: how each is doing now, who owns it and what to review." sim="live" numbers={NUMBERS}>
-    <span slot="overline" class="lv-live" data-lv-live title="A new moment every five seconds, the same in every window"><span class="lv-dot" aria-hidden="true"></span>Live</span>
+  <PageBand overline="Services" title="Services" answer={`${openIncidents} open ${openIncidents === 1 ? 'incident' : 'incidents'} across ${SERVICE_ORDER.length} services`} lede="The AV service, the network and IT infrastructure: how each is doing now, who owns it and what to review." sim="live" numbers={NUMBERS}>
+    <span slot="overline" class="lv-live" data-lv-live title="A new moment every five seconds, the same in every window"><HealthGlyph state="fine" size={12} quiet class="lv-dot" title="The feed is running" />Live</span>
   </PageBand>
 
   <div class="content svo" data-svo>
@@ -85,7 +86,7 @@ const ownerOf = (id) => PEOPLE.find((p) => p.id === SERVICES[id].owner);
       <p class="sv-note">The switch inside a room is AV; a switch in a comms room is the network. Printers belong to no service here. Access points are units in the open areas and corridors of each floor.</p>
     </Section>
 
-    <p class="sv-note sv-clock"><span class="lv-dot" aria-hidden="true"></span><span data-clock>Updating</span>. Simulated from each kind of kit and the open incidents, the same in every window. Real feeds replace this with the same shape.</p>
+    <p class="sv-note sv-clock"><HealthGlyph state="fine" size={12} quiet class="lv-dot" title="The feed is running" /><span data-clock>Updating</span>. Simulated from each kind of kit and the open incidents, the same in every window. Real feeds replace this with the same shape.</p>
     <script type="application/json" data-lv-model set:html={json}></script>
   </div>
 
@@ -103,10 +104,8 @@ const ownerOf = (id) => PEOPLE.find((p) => p.id === SERVICES[id].owner);
 </Shell>
 
 <style>
-  .lv-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex: none; animation: pulse var(--dur-pulse) ease-in-out infinite; --accent: var(--green); }
-  .lv-live { display: inline-flex; align-items: center; gap: 6px; font: 700 11px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--green-ink); }
-  :global(.lv-paused) .lv-dot { animation: none; background: var(--grey); }
-  @media (prefers-reduced-motion: reduce) { .lv-dot { animation: none; } }
+  .lv-live { display: inline-flex; align-items: center; gap: 6px; font: 700 11px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }
+  :global(.lv-paused) :global(.lv-dot) { color: var(--h-off); }
   .sv-cards { align-items: stretch; }
   .sv-card { padding: 20px 22px; display: grid; gap: 14px; align-content: start; min-width: 0; container: svcard / inline-size; }
   .sv-ch { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
@@ -115,10 +114,13 @@ const ownerOf = (id) => PEOPLE.find((p) => p.id === SERVICES[id].owner);
   .sv-ch h2 a:hover { text-decoration: underline; text-underline-offset: 3px; }
   .sv-light { display: inline-flex; align-items: center; gap: 6px; font: 700 12.5px/1 var(--font-sans); color: var(--text-2); }
   .sv-light:empty { display: none; }
-  .sv-light :global(.sv-lt) { width: 10px; height: 10px; border-radius: 50%; background: var(--grey); flex: none; transition: background-color var(--dur-state) var(--ease-settle); }
-  .sv-light :global(.sv-lt[data-l=good]) { background: var(--green); }
-  .sv-light :global(.sv-lt[data-l=warn]) { background: var(--amber); }
-  .sv-light :global(.sv-lt[data-l=bad]) { background: var(--red); }
+  /* The service's light is the health glyph's shape (base.css masks), with its word beside it. */
+  .sv-light :global(.sv-lt), :global(.sv-lt) { width: 12px; height: 12px; background: var(--h-off); flex: none; -webkit-mask: var(--hg-mask-off) center / contain no-repeat; mask: var(--hg-mask-off) center / contain no-repeat; transition: background-color var(--dur-state) var(--ease-settle); }
+  .sv-light :global(.sv-lt[data-l=good]) { background: var(--h-fine); -webkit-mask-image: var(--hg-mask-fine); mask-image: var(--hg-mask-fine); }
+  .sv-light :global(.sv-lt[data-l=warn]) { background: var(--h-review); -webkit-mask-image: var(--hg-mask-review); mask-image: var(--hg-mask-review); }
+  .sv-light :global(.sv-lt[data-l=bad]) { background: var(--h-fault); -webkit-mask-image: var(--hg-mask-fault); mask-image: var(--hg-mask-fault); }
+  /* An overview colours nothing that is fine (the dark cockpit). */
+  .sv-light :global(.sv-lt[data-l=good]) { background: var(--quiet); }
   .sv-own { margin: 0; font-size: 13.5px; color: var(--text-2); }
   .sv-own a { color: var(--accent-ink); font-weight: 650; }
   .sv-figs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -131,10 +133,10 @@ const ownerOf = (id) => PEOPLE.find((p) => p.id === SERVICES[id].owner);
   .sv-topbox { display: grid; gap: 6px; }
   .sv-topbox h3 { margin: 0; font: 700 var(--overline-size)/1.2 var(--font-sans); letter-spacing: var(--overline-track); text-transform: var(--overline-case); color: var(--text-3); }
   .sv-toplist { list-style: none; margin: 0; padding: 0; display: grid; }
-  .sv-toplist :global(.sv-top) { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 4px 10px; align-items: start; padding: 8px 0; border-top: var(--border-rule); }
+  .sv-toplist :global(.sv-top) { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 4px 10px; align-items: start; padding: 8px 0; border-top: var(--border-rule); }
   .sv-toplist :global(.sv-top:first-child) { border-top: 0; }
-  .sv-toplist :global(.sv-top > i) { width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; background: var(--red); }
-  .sv-toplist :global(.sv-top > i[data-r="1"]), .sv-toplist :global(.sv-top > i[data-r="2"]) { background: var(--amber); }
+  .sv-toplist :global(.sv-top > i) { width: 12px; height: 12px; margin-top: 4px; background: var(--h-fault); -webkit-mask: var(--hg-mask-fault) center / contain no-repeat; mask: var(--hg-mask-fault) center / contain no-repeat; }
+  .sv-toplist :global(.sv-top > i[data-r="1"]), .sv-toplist :global(.sv-top > i[data-r="2"]) { background: var(--h-review); -webkit-mask-image: var(--hg-mask-review); mask-image: var(--hg-mask-review); }
   .sv-toplist :global(.sv-top > span) { min-width: 0; display: grid; gap: 1px; }
   .sv-toplist :global(.sv-top a) { color: inherit; font-weight: 650; font-size: 13.5px; line-height: 1.3; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sv-toplist :global(.sv-top a:hover) { text-decoration: underline; text-underline-offset: 2px; }

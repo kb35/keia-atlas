@@ -10,7 +10,7 @@ import Section from '../../components/Section.astro';
 import Icon from '../../components/Icon.astro';
 import Figure from './_Figure.astro';
 import { recHere } from '../../lib/vt.mjs';
-import { href, fmtDate, plural } from '../../lib/data.mjs';
+import { href, fmtDate, plural, DEMO_TODAY } from '../../lib/data.mjs';
 import { houseStandards, byId, AREA_LABEL, AREA_GLYPH, KIND_LABEL } from './_lib.mjs';
 import { cableStandard, colours } from '../../lib/stock.mjs';
 
@@ -21,6 +21,7 @@ const { s } = Astro.props;
 const refOf = Object.fromEntries(s.refs.map((r) => [r.id, r]));
 const short = (name) => name.split(/,\s/)[0];
 const should = s.counts.rules - s.counts.must;
+const answer = `Version ${s.version}, ${s.effective > DEMO_TODAY ? 'in force from' : 'in force since'} ${fmtDate(s.effective)} · ${plural(s.counts.must, 'rule')} that must be met`;
 const NUMBERS = (s.figures ?? []).map((f) => ({ n: f.n, label: f.label }));
 const musts = s.sections.map((sec) => ({ sec, rules: sec.rules.filter((r) => r.level === 'must') })).filter((g) => g.rules.length);
 const related = (s.related ?? []).map((id) => byId[id]).filter(Boolean);
@@ -31,7 +32,7 @@ const coded = cableStandard.purposes.filter((p) => p.coded !== false);
 ---
 <Shell vendorOk title={s.name} section="standards" about={{ kind: 'standard', label: s.name, to: `/standards/${s.id}/` }}
   crumbs={[{ label: 'Standards', to: '/standards/' }, ...(AREA_LABEL[s.area] === s.name ? [] : [{ label: AREA_LABEL[s.area], to: `/standards/?area=${s.area}` }]), { label: s.name }]}>
-  <PageBand overline="Standard" title={s.name} lede={s.summary} numbers={NUMBERS} rec={s.id}>
+  <PageBand overline="Standard" title={s.name} answer={answer} lede={s.summary} numbers={NUMBERS} rec={s.id}>
     <Fragment slot="overline">
       <a href={href(`/standards/?area=${s.area}`)}>{AREA_LABEL[s.area]}</a>
       <span>Version {s.version}</span>

@@ -189,7 +189,9 @@ export function initService(root) {
       lastN[key] = String(x.n);
     });
     firstNumbers = false;
-    const l = lightOf(tally(model, snap)), el = document.querySelector('[data-sv-light]');
+    const nt = tally(model, snap), l = lightOf(nt), el = document.querySelector('[data-sv-light]');
+    const bad = nt.offline + nt.alert;
+    if (W.rsAnswer) W.rsAnswer(!nt.all ? 'Nothing reporting on this service yet' : !bad ? `Within target · all ${nt.all.toLocaleString('en-IE')} working` : `${l === 'bad' ? 'Past target' : 'Within target'} · ${nt.offline} offline, ${nt.alert} alerting`);
     if (el && el.dataset.l !== l) { el.dataset.l = l; el.innerHTML = lightHtml(l); }
   }
 
@@ -351,6 +353,10 @@ export function initOverview(root) {
       more.setAttribute('href', extra ? `${B}services/${id}/?status=alert,offline#units` : `${B}services/${id}/`);
     }
     const fine = ids.filter((id) => lights[id] === 'good').length;
+    const past = ids.filter((id) => lights[id] === 'bad').length, review = ids.filter((id) => lights[id] === 'warn').length;
+    const svc = (n) => `${n} ${n === 1 ? 'service' : 'services'}`;
+    const parts = [past && `${svc(past)} past target`, review && `${svc(review)} to review`, fine && `${fine} within target`].filter(Boolean);
+    if (W_.rsAnswer) W_.rsAnswer(fine === ids.length ? `All ${ids.length} services within target` : parts.join(' · '));
     if (W_.rsKeyNumber) {
       const put = (key, v, tone) => { W_.rsKeyNumber(key, v, { tone }); if (!firstNumbers && last[key] !== String(v) && W_.rsMarkChanged) W_.rsMarkChanged(document.querySelector(`.kn-i[data-kn="${key}"]`)); last[key] = String(v); };
       put('svo-1', fine, fine < ids.length ? 'warn' : 'good');

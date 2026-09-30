@@ -9,6 +9,7 @@ import DeviceGlyph from '../../components/DeviceGlyph.astro';
 import FilterBar from '../../components/FilterBar.astro';
 import PageBand from '../../components/PageBand.astro';
 import EmptyState from '../../components/EmptyState.astro';
+import HealthGlyph from '../../components/HealthGlyph.astro';
 // A device with an open incident radiates red, the same signal as its room on the Rooms page.
 const openInc = Object.values(incidents).filter((i) => i.state !== 'resolved');
 const bad = (s, p) => openInc.some((i) => i.room === s.id && i.position === p.position);
@@ -21,7 +22,7 @@ const byModel = {}, noModel = [];
 for (const r of ALL) { if (r.p.model) (byModel[r.p.model] ??= []).push(r); else noModel.push(r); }
 const mids = Object.keys(byModel).sort((a, b) => byModel[b].length - byModel[a].length);
 const total = ALL.length;
-const LIGHT = { manage: 'ok', deploy: 'warn', retire: 'warn', plan: 'off', procure: 'off', spare: 'off' };
+const LIGHT = { manage: 'fine', deploy: 'progress', retire: 'progress', plan: 'planned', procure: 'planned', spare: 'off' };
 // Filters for the finder: what state a device is in, and its region.
 const stateOf = (p, u) => (p.spare ? 'spare' : p.older ? 'older' : p.legacy ? 'replacing' : u?.stage === 'deploy' ? 'installing' : u?.stage === 'retire' ? 'replacing' : ['plan', 'procure'].includes(u?.stage) ? 'planned' : 'service');
 const regionOf = (s) => sites[s.site]?.region ?? 'none';
@@ -41,6 +42,8 @@ const FACETS = [
 const VIEWS = [{ value: 'site', label: 'Where it is', show: '.dtree' }, { value: 'model', label: 'What it is', show: '.dkinds' }];
 // Sort re-orders the groups: offices, or in the model view the kinds and the models in each.
 const SORT = { options: [{ value: 'site', label: 'By office' }, { value: 'name', label: 'By name' }, { value: 'count', label: 'Most units first' }] };
+const withInc = ALL.filter((r) => bad(r.s, r.p)).length;
+const ANSWER = `${withInc ? `${withInc} ${withInc === 1 ? 'unit has' : 'units have'} an open incident` : 'No unit has an open incident'} · ${nState('installing')} being installed`;
 const NUMBERS = [
   { n: total, label: 'Units', fact: true },
   { n: nState('installing'), label: 'Being installed', to: '?state=installing' },
@@ -50,7 +53,7 @@ const NUMBERS = [
 const facetAttrs = (s, p, u) => ({ 'data-f-region': regionOf(s), 'data-f-site': s.site, 'data-f-type': s.space_type, 'data-f-cls': p.cls, 'data-f-state': stateOf(p, u) });
 ---
 <Shell title="Units" section="devices" crumbs={[{ label: 'Units' }]}>
-  <PageBand overline="Directory" title="Units" rec="dd-devices" lede="One row for each position in a room: its current unit, or the one on order. Spare units are in each office's IT store." numbers={NUMBERS} />
+  <PageBand overline="Directory" title="Units" rec="dd-devices" answer={ANSWER} lede="One row for each position in a room: its current unit, or the one on order. Spare units are in each office's IT store." numbers={NUMBERS} />
   <div class="content devs">
     <FilterBar facets={FACETS} placeholder="Find a unit, hostname or serial" label="Find a unit" noun={['unit', 'units']} scope=".devs" views={VIEWS} viewKey="rs4-units-view" sort={SORT} />
 
@@ -77,7 +80,7 @@ const facetAttrs = (s, p, u) => ({ 'data-f-region': regionOf(s), 'data-f-site': 
                       <a href={unit ? href(`/device/?tag=${unit.asset_tag}`) : href(`/rooms/${s.id}/`)} class:list={['dline', { 'rs-radiate': bad(s, p) }]}>
                         <span class="dg"><DeviceGlyph cls={p.cls} size={26} /></span>
                         <span class="dn"><b>{deviceName(s, p)}</b><small>{p.model ? modelName(p.model) : 'Model set per project'}{p.hostname ? ` · ${p.hostname}` : ''}</small></span>
-                        <i class="hl" data-state={LIGHT[unit?.stage ?? 'plan']} title={DEVICE_STATUS[unit?.stage ?? 'plan']}></i>
+                        <HealthGlyph state={bad(s, p) ? 'fault' : LIGHT[unit?.stage ?? 'plan']} size={12} title={bad(s, p) ? 'an open incident' : DEVICE_STATUS[unit?.stage ?? 'plan']} />
                       </a>
                     </li>
                   ))}
@@ -105,7 +108,7 @@ const facetAttrs = (s, p, u) => ({ 'data-f-region': regionOf(s), 'data-f-site': 
                 <ul class="um-list">
                   {byModel[id].map(({ s, p, unit }) => (
                     <li class:list={{ alert: bad(s, p) }} data-fi data-find={`${deviceName(s, p, { site: true })} ${sites[s.site].city ?? ''} ${s.type.profile.name} ${unit?.serial ?? ''} ${unit?.asset_tag ?? ''} ${modelName(id)} ${className(p.cls)} ${p.hostname ?? ''} ${s.number ?? ''}`} {...facetAttrs(s, p, unit)}>
-                      <a href={unit ? href(`/device/?tag=${unit.asset_tag}`) : href(`/rooms/${s.id}/`)} class:list={['dline', { 'rs-radiate': bad(s, p) }]}><span class="dn"><b>{deviceName(s, p, { site: true })}</b><small class="mono">{unit ? `${unit.serial} · ${unit.asset_tag}` : 'On order'}</small></span><i class="hl" data-state={LIGHT[unit?.stage ?? 'plan']} title={UNIT_STATUS[unit?.stage ?? 'plan']}></i></a>
+                      <a href={unit ? href(`/device/?tag=${unit.asset_tag}`) : href(`/rooms/${s.id}/`)} class:list={['dline', { 'rs-radiate': bad(s, p) }]}><span class="dn"><b>{deviceName(s, p, { site: true })}</b><small class="mono">{unit ? `${unit.serial} · ${unit.asset_tag}` : 'On order'}</small></span><HealthGlyph state={bad(s, p) ? 'fault' : LIGHT[unit?.stage ?? 'plan']} size={12} title={bad(s, p) ? 'an open incident' : UNIT_STATUS[unit?.stage ?? 'plan']} /></a>
                     </li>
                   ))}
                 </ul>
@@ -128,7 +131,7 @@ const facetAttrs = (s, p, u) => ({ 'data-f-region': regionOf(s), 'data-f-site': 
               <ul class="um-list">
                 {noModel.map(({ s, p, unit }) => (
                   <li class:list={{ alert: bad(s, p) }} data-fi data-find={`${deviceName(s, p, { site: true })} ${sites[s.site].city ?? ''} ${s.type.profile.name} ${unit?.serial ?? ''} ${unit?.asset_tag ?? ''} ${className(p.cls)} ${s.number ?? ''}`} {...facetAttrs(s, p, unit)}>
-                    <a href={unit ? href(`/device/?tag=${unit.asset_tag}`) : href(`/rooms/${s.id}/`)} class:list={['dline', { 'rs-radiate': bad(s, p) }]}><span class="dn"><b>{deviceName(s, p, { site: true })}</b><small class="mono">{unit ? `${unit.serial} · ${unit.asset_tag}` : 'On order'}</small></span><i class="hl" data-state={LIGHT[unit?.stage ?? 'plan']} title={UNIT_STATUS[unit?.stage ?? 'plan']}></i></a>
+                    <a href={unit ? href(`/device/?tag=${unit.asset_tag}`) : href(`/rooms/${s.id}/`)} class:list={['dline', { 'rs-radiate': bad(s, p) }]}><span class="dn"><b>{deviceName(s, p, { site: true })}</b><small class="mono">{unit ? `${unit.serial} · ${unit.asset_tag}` : 'On order'}</small></span><HealthGlyph state={bad(s, p) ? 'fault' : LIGHT[unit?.stage ?? 'plan']} size={12} title={bad(s, p) ? 'an open incident' : UNIT_STATUS[unit?.stage ?? 'plan']} /></a>
                   </li>
                 ))}
               </ul>
@@ -187,8 +190,7 @@ const facetAttrs = (s, p, u) => ({ 'data-f-region': regionOf(s), 'data-f-site': 
   </script>
 </Shell>
 <style is:global>
-  .droom li.alert > .dline, .um-list li.alert > .dline { background: color-mix(in srgb, var(--red) 8%, var(--surface)); }
-  .droom li.alert .hl, .um-list li.alert .hl { background: var(--red); }
+  .droom li.alert > .dline, .um-list li.alert > .dline { background: var(--h-fault-soft); }
   .unit-model { overflow: hidden; }
   .unit-model > summary { cursor: pointer; list-style: none; display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 8px 14px 8px 8px; }
   .unit-model > summary::-webkit-details-marker { display: none; }

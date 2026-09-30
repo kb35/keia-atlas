@@ -16,7 +16,7 @@ import FilterBar from '../../../components/FilterBar.astro';
 import Section from '../../../components/Section.astro';
 import EmptyState from '../../../components/EmptyState.astro';
 import LiveBar from '../../../components/LiveBar.astro';
-import { href, sites, SITE_ORDER, REGION_LABEL, PROJECT_KIND } from '../../../lib/data.mjs';
+import { href, sites, SITE_ORDER, REGION_LABEL, PROJECT_KIND, plural } from '../../../lib/data.mjs';
 import { person } from '../../../lib/demo.mjs';
 import { YEARS, NOW_FY, baseline, ctx, totals, scenarios, lines, pipeline, officeName, officeFacts, ratios, headcount, budget, hoursPerPerson, inProjectCount, team, siteRegion, CLASS } from '../../../lib/planning.mjs';
 import { ROLES, ROLE_LABEL, ROLE_ONE, REGIONS, REGION_NAME, fyLabel, fySpan, groupOf, bauHours } from '../../../lib/planningcore.mjs';
@@ -58,6 +58,7 @@ const NUMBERS = [
 ];
 // The lines behind every figure: every (year, office, kind) has a row, so an adopted scenario can move money into a
 // year and office that had none; empty rows stay hidden.
+const answer = `${NOW.label}: ${t0.units ? `${plural(t0.units, 'device')} due with no project yet` : 'every device due is in a project'} · technician hours at ${t0.hours.tech.pct}%`;
 const lineAt = new Map(lines.map((l) => [l.id, l]));
 const planKey = (yid, site, group) => `${yid}:${site}:${group}`;
 const GROUPS = [['av', 'refresh'], ['network', 'infra-refresh']];
@@ -84,7 +85,7 @@ const DATA = { years: YEARS, nowFy: NOW_FY, nowYear: NOW_YEAR, baseline, ctx, sc
 const scenarioFor = scenarios[0];
 ---
 <Shell title="Planning" section="planning" minStage={3} crumbs={[{ label: 'Work', to: '/work/' }, { label: 'Planning' }]} about={{ kind: 'page', label: 'Planning', to: '/work/planning/' }}>
-  <PageBand overline="Planning" title="Planning" sim numbers={NUMBERS}>
+  <PageBand overline="Planning" title="Planning" answer={answer} sim numbers={NUMBERS}>
     <Fragment slot="overline"><span class="pill plain pl-year-pill" data-pl-yearpill>{NOW.label} · {NOW.span}</span></Fragment>
     <Fragment slot="lede"><span data-pl-lede>{ledeFor(t0, NOW.n, NOW_FY)}</span></Fragment>
   </PageBand>

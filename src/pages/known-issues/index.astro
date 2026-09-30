@@ -9,7 +9,7 @@ import FilterBar from '../../components/FilterBar.astro';
 import Section from '../../components/Section.astro';
 import EmptyState from '../../components/EmptyState.astro';
 import LiveBar from '../../components/LiveBar.astro';
-import { SITE_ORDER, sites, modelName, href, fmtDate, INC_STATE as INC_STATE_LABEL } from '../../lib/data.mjs';
+import { SITE_ORDER, sites, modelName, href, fmtDate, plural, INC_STATE as INC_STATE_LABEL } from '../../lib/data.mjs';
 import { when } from '../../lib/incidents.mjs';
 import { issues, feeds, matches, clusters, cases, counts, draftForCluster, siteName, person, KI_STATUS, KI_TONE, AFFECTS, CONFIDENCE, CASE_STATUS } from '../../lib/knownissues-view.mjs';
 
@@ -29,6 +29,7 @@ const NUMBERS = [
 ];
 
 // ---- The filter bar ----
+const answer = `${counts.decisions ? `${counts.decisions} to review` : 'Nothing to review'} · ${counts.affecting ? `${plural(counts.affecting, 'known issue')} ${counts.affecting === 1 ? 'affects' : 'affect'} ${plural(counts.exposedUnits, 'unit')}` : 'none affect our units'}`;
 const usedModels = [...new Set(issues.flatMap((it) => it.models))].sort((a, b) => modelName(a).localeCompare(modelName(b)));
 const FACETS = [
   { key: 'site', label: 'Office', options: SITE_ORDER.filter((s) => issues.some((it) => exSites(it).includes(s))).map((s) => ({ value: s, label: sites[s].name, sub: sites[s].kind === 'remote' ? 'Home offices' : sites[s].city })) },
@@ -62,7 +63,7 @@ for (const m of matches) {
 const confTone = { strong: 'bad', possible: 'warn' };
 ---
 <Shell title="Known issues" section="known-issues" minStage={2} crumbs={[{ label: 'Work', to: '/work/' }, { label: 'Incidents', to: '/incidents/' }, { label: 'Known issues' }]}>
-  <PageBand overline="Maker feeds" title="Known issues" lede="What makers publish about their firmware, matched to our units and incidents." stage={2} numbers={NUMBERS} />
+  <PageBand overline="Maker feeds" title="Known issues" answer={answer} lede="What makers publish about their firmware, matched to our units and incidents." stage={2} numbers={NUMBERS} />
 
   <div class="content known-issues" data-ki-root>
     <FilterBar facets={FACETS} placeholder="Find a known issue, reference or model" label="Find a known issue" noun={['known issue', 'known issues']} scope="[data-ki-scope]" views={VIEWS} viewKey="rs5-ki-view" sort={SORT} />

@@ -1,32 +1,45 @@
 ---
 /* PageBand: the top of every page (docs/rules/layout.md, L1 and L9; docs/standards/page-anatomy.md).
    One short band, about 100 px tall at 1440 wide:
-     left   overline row (the kind of thing, then any status, then a SimTag), the title, one line
+     left   overline row (the kind of thing, then any status, then a SimTag and the source mark), the title,
+            the answer sentence ending with the heartbeat ("checked 40 s ago")
      right  KeyNumbers (3 or 4 figures, each may link), then one primary action
-   Props:  overline  the kind of thing: "Room", "Unit", "Project PRJ-09", "Catalogue" (not an audience or a count)
+   Props:  overline  the kind of thing: "Space", "Unit", "Project PRJ-09", "Catalogue" (not an audience or a count)
            title     the page title (h1; it morphs into the next page's title)
-           lede      one line; longer text is cut with an ellipsis, so keep it to one line
+           answer    the one-line answer to "is it all right?" (UI-V2 §8.1; every page has one). Plain words, at
+                     most 25, no retired word. A script changes it with window.rsAnswer(text).
+           lede      what the page is, in one line. With `answer` it joins the answer line's tooltip; without,
+                     it is shown in the answer's place (pages not yet given an answer)
+           heartbeat "checked N s ago" at the end of the answer, from the demo feed (Heartbeat.astro). On by
+                     default when `sim` is set (the page reads the feed); true, false, or { window } in seconds
+           source    where a connected record comes from: { from, ref?, at?, to?, stale? } (SourceMark.astro)
            sim       true when the figures are made up ("Simulated"); "live" when they are made up and change
                      as you watch ("Simulated live")
-           stage     the adoption stage this page arrives at ("Stage n")
            numbers   optional shortcut for the numbers slot: [{ n, label, to?, tone? }] (each may have an `id`, so a
                      script can change it: window.rsKeyNumber(id, value), see KeyNumbers)
            rec       the record this page is, for the shared element that flies in from the list or the
                      schedule (recHere in src/lib/vt.mjs). The title takes the name, so a card or chip
                      marked data-vt-rec="<same id>" flies into the title, and back again.
    Slots:  overline  more overline items after the kind (a site code, a status pill)
-           lede      the line, when it needs a link (instead of the lede prop)
+           answer    the answer, when it needs a link or a glyph (instead of the answer prop)
+           lede      the line, when it needs a link (instead of the lede prop; shown only without an answer)
            numbers   KeyNumbers, or anything the same height
            action    one primary button (.btn.primary). Never a button under the lede.
    The band names itself `band` for page transitions, so between two pages that both have one it stays
    in place and only its words change (motion.css, M5). */
 import KeyNumbers from './KeyNumbers.astro';
 import SimTag from './SimTag.astro';
+import Heartbeat from './Heartbeat.astro';
+import SourceMark from './SourceMark.astro';
 import { recHere } from '../lib/vt.mjs';
 interface Num { n: string | number; label: string; to?: string; tone?: 'bad' | 'warn' | 'good'; id?: string }
-interface Props { overline: string; title: string; lede?: string; sim?: boolean | 'live'; stage?: number; numbers?: Num[]; rec?: string }
-const { overline, title, lede, sim = false, stage, numbers, rec } = Astro.props;
-const hasLede = !!lede || Astro.slots.has('lede');
+interface Source { from: string; ref?: string; at?: string; to?: string; synced?: string; stale?: boolean; native?: string }
+interface Props { overline: string; title: string; answer?: string; lede?: string; heartbeat?: boolean | { window?: number }; source?: Source; sim?: boolean | 'live'; numbers?: Num[]; rec?: string }
+const { overline, title, answer, lede, heartbeat, source, sim = false, numbers, rec } = Astro.props;
+const hasAnswer = !!answer || Astro.slots.has('answer');
+const hasLede = hasAnswer || !!lede || Astro.slots.has('lede');
+const hb = heartbeat ?? !!sim;
+const hbWindow = typeof hb === 'object' ? hb.window : undefined;
 const hasSide = Astro.slots.has('numbers') || Astro.slots.has('action') || (numbers?.length ?? 0) > 0;
 ---
 <section class="band pb" aria-labelledby="pb-title">
@@ -34,11 +47,16 @@ const hasSide = Astro.slots.has('numbers') || Astro.slots.has('action') || (numb
     <p class="pb-over">
       <span class="overline">{overline}</span>
       <slot name="overline" />
-      {stage && <SimTag kind={`stage:${stage}`} />}
       {sim && <SimTag kind={sim === 'live' ? 'live' : 'simulated'} />}
+      {source && <SourceMark {...source} />}
     </p>
     <h1 id="pb-title" {...(rec ? recHere(rec) : {})}>{title}</h1>
-    {hasLede && <p class="pb-lede" title={lede}>{lede ?? <slot name="lede" />}</p>}
+    {hasLede && (
+      <p class:list={['pb-lede', { 'pb-answer': hasAnswer }]} title={hasAnswer ? [answer, lede].filter(Boolean).join('\n') || undefined : lede} data-help={hasAnswer ? 'band.answer' : undefined}>
+        <span class="pb-a" data-pb-answer>{hasAnswer ? (answer ?? <slot name="answer" />) : (lede ?? <slot name="lede" />)}</span>
+        {hb && <span class="pb-hb"><span class="pb-sep" aria-hidden="true">·</span><Heartbeat window={hbWindow} /></span>}
+      </p>
+    )}
   </div>
   {hasSide && (
     <div class="pb-side">
@@ -57,7 +75,11 @@ const hasSide = Astro.slots.has('numbers') || Astro.slots.has('action') || (numb
   .pb-over .pill { padding: 3px 8px; font-size: 11.5px; }
   .pb-over .code { padding: 3px 6px; font-size: 11px; }
   .band.pb h1 { font-size: min(var(--title-size), 30px); line-height: 1.12; overflow-wrap: anywhere; }
-  .pb-lede { margin: 4px 0 0; font-size: 14px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pb-lede { display: flex; align-items: baseline; gap: 0 8px; min-width: 0; margin: 4px 0 0; font-size: 14.5px; line-height: 1.4; color: var(--text-2); }
+  .pb-a { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pb-answer .pb-a { color: var(--text); }
+  .pb-hb { display: inline-flex; align-items: baseline; gap: 8px; flex: none; }
+  .pb-sep { color: var(--quiet); }
   .pb-side { display: flex; align-items: center; gap: 12px 20px; }
   .pb-act { display: flex; gap: 8px; }
   .pb-act .btn { white-space: nowrap; }
@@ -72,9 +94,20 @@ const hasSide = Astro.slots.has('numbers') || Astro.slots.has('action') || (numb
   }
   @container main (max-width: 599px) {
     .band.pb { padding: 12px var(--pad-x) 14px; }
-    .pb-lede { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .pb-lede { flex-wrap: wrap; }
+    .pb-a { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .pb-hb .pb-sep { display: none; }
     .pb-side { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
     .pb-act { display: flex; }
     .pb-act .btn { flex: 1; justify-content: center; }
   }
 </style>
+
+<script>
+  // window.rsAnswer(text): a live page changes its answer sentence in place when what it answers changes (M9:
+  // the words change, nothing moves).
+  (window as any).rsAnswer = (text: string) => {
+    const el = document.querySelector<HTMLElement>('[data-pb-answer]');
+    if (el && el.textContent !== text) { el.textContent = text; const p = el.closest('p'); if (p && !p.title) p.title = text; }
+  };
+</script>

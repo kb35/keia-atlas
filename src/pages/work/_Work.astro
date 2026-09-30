@@ -26,7 +26,7 @@ import Icon from '../../components/Icon.astro';
 import { work, WORK_STATUS } from '../../lib/work.mjs';
 import { schedule } from '../../lib/schedule.mjs';
 import { placeOn, STEPS } from '../../lib/schedulecore.mjs';
-import { projects, sites, spaces, SITE_ORDER, DEMO_TODAY, STEP_LABEL, href, fmtDate } from '../../lib/data.mjs';
+import { projects, sites, spaces, SITE_ORDER, DEMO_TODAY, STEP_LABEL, href, fmtDate, plural } from '../../lib/data.mjs';
 import { PEOPLE, ROLES } from '../../lib/demo.mjs';
 
 interface Props { list?: boolean }
@@ -150,6 +150,14 @@ const NUMBERS = isList ? [
   { n: openIncidents, label: 'Open incidents', to: '/incidents/?state=new,in-progress,on-hold' },
   { n: onSite, label: 'On site today', to: '/work/schedule/?view=day&scope=all' },
 ];
+// The answers. The list leads with work nobody has and work waiting on something; the overview with open
+// incidents and project tasks past their due date.
+const nobody = items.filter((it) => !it.who.length).length, waitingOn = items.filter((it) => it.status === 'blocked').length;
+const pastDue = items.filter((it) => it.when.tone === 'late').length;
+const listAnswer = nobody || waitingOn
+  ? [nobody && `${plural(nobody, 'item')} with nobody yet`, waitingOn && `${plural(waitingOn, 'item')} waiting on something`].filter(Boolean).join(' · ')
+  : `${plural(items.length, 'open item')}, all with someone · none waiting on anything`;
+const overviewAnswer = `${plural(openIncidents, 'incident')} open · ${pastDue ? `${plural(pastDue, 'task')} past due` : 'no task past due'}`;
 // A drill-down into the Work list: the kind and role it counts (the page script adds the bar's other filters).
 const listTo = (q = {}) => { const u = new URLSearchParams(Object.entries(q).filter(([, v]) => v)); return href(`/work/list/${u.toString() ? `?${u}` : ''}`); };
 
@@ -189,8 +197,8 @@ const whoLine = (who) => (who.length === 1 ? P[who[0]]?.role ?? '' : who.length 
 ---
 <Shell title={isList ? 'Work list' : 'Work overview'} section="overview" crumbs={isList ? [{ label: 'Work', to: '/work/' }, { label: 'Work list' }] : [{ label: 'Work', to: '/work/' }, { label: 'Overview' }]} about={{ kind: 'page', label: isList ? 'Work list' : 'Work overview' }}>
   {isList
-    ? <PageBand overline="Work" title="Work list" rec="dd-work-list" lede={`${today}: every piece of open work. Narrow it by role, kind, office or person.`} sim numbers={NUMBERS} />
-    : <PageBand overline="Work" title="Overview" lede={`${today}: every piece of open work, who has it and where.`} sim numbers={NUMBERS} />}
+    ? <PageBand overline="Work" title="Work list" rec="dd-work-list" answer={listAnswer} lede={`${today}: every piece of open work. Narrow it by role, kind, office or person.`} sim numbers={NUMBERS} />
+    : <PageBand overline="Work" title="Overview" answer={overviewAnswer} lede={`${today}: every piece of open work, who has it and where.`} sim numbers={NUMBERS} />}
 
   <div class:list={['content ov', { 'ov-is-list': isList }]} data-ov>
     <FilterBar facets={FACETS} placeholder="Find a task, person or room" label="Find work" noun={['open item', 'open items']} scope=".content.ov" sort={SORT} />

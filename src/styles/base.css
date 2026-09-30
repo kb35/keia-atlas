@@ -172,6 +172,7 @@ main { min-width: 0; container: main / inline-size; }
 .band .meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13.5px; color: var(--text-2); margin-bottom: 10px; }
 .band h1 { font-size: var(--title-size); line-height: 1.1; view-transition-name: hero; }
 .band .lede { margin: 10px 0 0; color: var(--text-2); font-size: 15px; max-width: 72ch; }
+.band .lede.band-answer { margin-top: 6px; color: var(--text); font-size: 14.5px; }
 .band .actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .band-row { display: flex; gap: 20px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
 .content { padding: 28px var(--pad-x) 64px; display: grid; gap: 28px; container: content / inline-size; }
@@ -253,13 +254,62 @@ a.row:hover { background: var(--surface-2); color: inherit; }
 .pill.plain::before { display: none; }
 .pill.manage { background: var(--green-soft); color: var(--green-ink); }
 .pill.deploy { background: var(--blue-soft); color: var(--blue-ink); }
-.pill.deploy::before { animation: blink var(--dur-blink) ease-in-out infinite; }
 .pill.retire { background: var(--amber-soft); color: var(--amber-ink); }
 .pill.procure, .pill.plan { background: var(--violet-soft); color: var(--violet-ink); }
 .pill.warn { background: var(--amber-soft); color: var(--amber-ink); }
 .pill.bad { background: var(--red-soft); color: var(--red-ink); }
 .pill.spare { background: var(--blue-soft); color: var(--blue-ink); }
 .pill.info { background: var(--blue-soft); color: var(--blue-ink); }
+
+/* ---------- Health glyphs (UI-V2 §6; HealthGlyph.astro, src/lib/health.mjs) ----------
+   A ring whose shape carries the state; the word beside it; colour from the --h-* tokens only. Stroke 2 px at
+   every size (3 px in High contrast); planned and off are the thin ring. .hg-quiet (or any glyph inside
+   [data-cockpit]) draws Fine in --quiet: the dark cockpit on Home, region and office pages. */
+:root {
+  --hg-stroke: 2; --hg-thin: 1;
+  --hg-mask-fine: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='2.4'%3E%3Ccircle cx='8' cy='8' r='6'/%3E%3C/svg%3E");
+  --hg-mask-review: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='2.4'%3E%3Cpath d='M13.438 5.464A6 6 0 1 1 8.523 2.023'/%3E%3C/svg%3E");
+  --hg-mask-fault: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='2.4'%3E%3Cpath d='M11.000 2.804A6 6 0 0 1 11.000 13.196'/%3E%3Cpath d='M5.000 13.196A6 6 0 0 1 5.000 2.804'/%3E%3Ccircle fill='black' stroke='none' cx='8' cy='8' r='1.5'/%3E%3C/svg%3E");
+  --hg-mask-stale: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='2.4'%3E%3Ccircle cx='8' cy='8' r='6' stroke-dasharray='2.4 2.3'/%3E%3C/svg%3E");
+  --hg-mask-progress: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='2.4'%3E%3Cpath d='M14.000 8.000A6 6 0 1 1 8.000 2.000'/%3E%3C/svg%3E");
+  --hg-mask-planned: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='2.4'%3E%3Ccircle stroke-width='1.4' cx='8' cy='8' r='6'/%3E%3C/svg%3E");
+  --hg-mask-off: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='2.4'%3E%3Ccircle stroke-width='1.4' cx='8' cy='8' r='6'/%3E%3Cline stroke-width='1.4' x1='2.804' y1='5' x2='13.196' y2='11'/%3E%3C/svg%3E");
+}
+:root[data-contrast="high"] { --hg-stroke: 3; --hg-thin: 1.5; }
+.hg { display: inline-flex; align-items: center; gap: 6px; flex: none; vertical-align: middle; line-height: 1; color: var(--h-off); }
+.hg svg { display: block; flex: none; overflow: visible; }
+.hg .hg-s { fill: none; stroke: currentColor; stroke-width: calc(var(--hg-stroke) * 16 / var(--hg-px, 16)); stroke-linecap: butt; }
+.hg .hg-thin { stroke-width: calc(var(--hg-thin) * 16 / var(--hg-px, 16)); }
+.hg .hg-dot { fill: currentColor; stroke: none; }
+.hg-w { font-size: 13px; font-weight: 550; color: var(--h-off-ink); white-space: nowrap; }
+.hg[data-size="12"] .hg-w { font-size: 12.5px; }
+.hg[data-state="fine"] { color: var(--h-fine); } .hg[data-state="fine"] .hg-w { color: var(--h-fine-ink); }
+.hg[data-state="review"] { color: var(--h-review); } .hg[data-state="review"] .hg-w { color: var(--h-review-ink); }
+.hg[data-state="fault"], .hg[data-state="stale"] { color: var(--h-fault); } .hg[data-state="fault"] .hg-w, .hg[data-state="stale"] .hg-w { color: var(--h-fault-ink); }
+.hg[data-state="progress"] { color: var(--h-progress); } .hg[data-state="progress"] .hg-w { color: var(--h-progress-ink); }
+.hg[data-state="planned"] { color: var(--h-planned); } .hg[data-state="planned"] .hg-w { color: var(--h-planned-ink); }
+.hg-quiet[data-state="fine"], [data-cockpit] .hg[data-state="fine"] { color: var(--quiet); }
+.hg-quiet[data-state="fine"] .hg-w, [data-cockpit] .hg[data-state="fine"] .hg-w { color: var(--text-2); }
+
+/* A pill's mark is the same glyph, drawn by a mask in the pill's ink colour (its word is the pill's text). */
+.pill::before { width: 12px; height: 12px; border-radius: 0; opacity: 1; -webkit-mask: var(--hg-mask-off) center / contain no-repeat; mask: var(--hg-mask-off) center / contain no-repeat; }
+.pill.manage::before { -webkit-mask-image: var(--hg-mask-fine); mask-image: var(--hg-mask-fine); }
+.pill.deploy::before, .pill.spare::before, .pill.info::before { -webkit-mask-image: var(--hg-mask-progress); mask-image: var(--hg-mask-progress); }
+.pill.retire::before, .pill.warn::before { -webkit-mask-image: var(--hg-mask-review); mask-image: var(--hg-mask-review); }
+.pill.procure::before, .pill.plan::before { -webkit-mask-image: var(--hg-mask-planned); mask-image: var(--hg-mask-planned); }
+.pill.bad::before { -webkit-mask-image: var(--hg-mask-fault); mask-image: var(--hg-mask-fault); }
+[data-cockpit] .pill.manage { background: var(--surface-2); color: var(--text-2); }
+/* .hg-m: the same glyph drawn by CSS alone, for inline scripts that cannot import src/lib/health.mjs. They set
+   data-state (the six states, or the older ok, warn, bad, off) and the shape and colour follow. Put the word beside it. */
+.hg-m { display: inline-block; flex: none; width: 12px; height: 12px; vertical-align: middle; background: var(--h-off); -webkit-mask: var(--hg-mask-off) center / contain no-repeat; mask: var(--hg-mask-off) center / contain no-repeat; transition: background-color var(--dur-state) var(--ease-settle); }
+.hg-m[data-state="fine"], .hg-m[data-state="ok"], .hg-m[data-state="good"] { background: var(--h-fine); -webkit-mask-image: var(--hg-mask-fine); mask-image: var(--hg-mask-fine); }
+.hg-m[data-state="review"], .hg-m[data-state="warn"] { background: var(--h-review); -webkit-mask-image: var(--hg-mask-review); mask-image: var(--hg-mask-review); }
+.hg-m[data-state="fault"], .hg-m[data-state="bad"] { background: var(--h-fault); -webkit-mask-image: var(--hg-mask-fault); mask-image: var(--hg-mask-fault); }
+.hg-m[data-state="stale"] { background: var(--h-fault); -webkit-mask-image: var(--hg-mask-stale); mask-image: var(--hg-mask-stale); }
+.hg-m[data-state="progress"] { background: var(--h-progress); -webkit-mask-image: var(--hg-mask-progress); mask-image: var(--hg-mask-progress); }
+.hg-m[data-state="planned"] { background: var(--h-planned); -webkit-mask-image: var(--hg-mask-planned); mask-image: var(--hg-mask-planned); }
+.hg-m.hg-quiet[data-state="fine"], .hg-m.hg-quiet[data-state="ok"], [data-cockpit] .hg-m[data-state="fine"], [data-cockpit] .hg-m[data-state="ok"] { background: var(--quiet); }
+@media (prefers-reduced-motion: reduce) { .hg-m { transition: none; } }
 .tag { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; padding: 4px 10px; border-radius: var(--pill-radius); background: var(--surface-2); color: var(--text-2); text-decoration: none; white-space: nowrap; }
 a.tag:hover { background: var(--surface-3); color: var(--text); }
 .btn { display: inline-flex; align-items: center; gap: 8px; font: 500 15px/1 var(--font-sans); padding: 11px 20px; border-radius: var(--btn-radius); border: 1px solid var(--accent); color: var(--accent); background: transparent; text-decoration: none; cursor: pointer; transition: transform var(--dur-fast) var(--ease-out), background var(--dur-fast); }
@@ -279,7 +329,7 @@ a.tag:hover { background: var(--surface-3); color: var(--text); }
 .bar .manage { background: var(--green); } .bar .deploy { background: var(--blue); } .bar .retire { background: var(--amber); } .bar .plan, .bar .procure { background: var(--violet); }
 .banner { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 18px; align-items: center; padding: 22px 24px; }
 .banner .badge { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font: 700 22px/1 var(--font-display); }
-.banner .badge.deploy { background: var(--blue-soft); color: var(--blue-ink); animation: pulse var(--dur-pulse) ease-in-out infinite; }
+.banner .badge.deploy { background: var(--blue-soft); color: var(--blue-ink); }
 .banner .badge.retire { background: var(--amber-soft); color: var(--amber-ink); }
 .banner .badge.manage { background: var(--green-soft); color: var(--green-ink); }
 .banner h2 { font-size: 24px; }

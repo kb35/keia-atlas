@@ -1,0 +1,73 @@
+---
+/* Heartbeat: "checked 40 s ago", the proof a quiet page is alive (UI-V2 §8.6; src/lib/heartbeat.mjs).
+   Used at the end of PageBand's answer sentence on every page that reads a feed, and large on a wall.
+   Text only, Mono 12.5 in --quiet; the words change every 10 s and nothing moves. When the feed has been silent
+   for longer than `window` seconds it reads "Not reporting since 08:12" in fault ink with a dashed underline and
+   the dashed (Not reporting) glyph, and the page gets data-stale: a stale feed counts as a fault.
+   Props:  window  seconds of silence before the feed counts as not reporting (default 90: three missed checks)
+           feed    what is being checked, for the tooltip (default "the demo feed")
+           large   the wall size
+   Demo: ?feed=off on any address switches the simulated feed off (it went quiet 5 minutes ago); ?feed=on puts it
+   back. Scripts: window.rsSetFeed('off' | 'on'). */
+import HealthGlyph from './HealthGlyph.astro';
+import { WINDOW_S } from '../lib/heartbeat.mjs';
+interface Props { window?: number; feed?: string; large?: boolean }
+const { window: win = WINDOW_S, feed = 'the demo feed', large = false } = Astro.props;
+---
+<span class:list={['hb', { 'hb-large': large }]} data-hb data-hb-window={win} data-help="heartbeat" title={`When ${feed} last checked in`}>
+  <HealthGlyph state="stale" size={12} class="hb-g" title={`${feed} is not reporting`} />
+  <span class="hb-t" data-hb-text>checked just now</span>
+</span>
+
+<script>
+  import { beat, lastCheck, parseFeed, FEED_KEY, TICK_EVERY } from '../lib/heartbeat.mjs';
+  const W = window as any;
+  const read = () => { try { return parseFeed(localStorage.getItem(FEED_KEY)); } catch { return { on: true } as { on: boolean; since?: number }; } };
+  function setFeed(v: 'on' | 'off') {
+    try {
+      if (v === 'on') localStorage.removeItem(FEED_KEY);
+      else if (read().on) localStorage.setItem(FEED_KEY, `off:${Date.now() - 5 * 60e3}`);
+    } catch { /* storage blocked: the feed stays on */ }
+    tick();
+  }
+  function fromAddress() {
+    const f = new URLSearchParams(location.search).get('feed');
+    if (f === 'off' || f === 'on') setFeed(f);
+  }
+  function tick() {
+    const now = Date.now(), feed = read();
+    const at = lastCheck(now, feed.on ? null : feed.since);
+    let stale = false;
+    document.querySelectorAll<HTMLElement>('[data-hb]').forEach((el) => {
+      const b = beat(now, at, +(el.dataset.hbWindow || 90));
+      const t = el.querySelector('[data-hb-text]');
+      if (t && t.textContent !== b.text) t.textContent = b.text;
+      el.classList.toggle('is-stale', b.stale);
+      el.classList.add('on');
+      stale = stale || b.stale;
+    });
+    const r = document.documentElement;
+    if (stale !== r.hasAttribute('data-stale')) {
+      r.toggleAttribute('data-stale', stale);
+      document.dispatchEvent(new CustomEvent('rs:feed', { detail: { stale } }));
+    }
+  }
+  W.rsSetFeed = setFeed;
+  fromAddress(); tick();
+  setInterval(tick, TICK_EVERY);
+  document.addEventListener('astro:page-load', () => { fromAddress(); tick(); });
+  addEventListener('storage', (e) => { if (e.key === FEED_KEY) tick(); });
+</script>
+
+<style is:global>
+  .hb { display: inline-flex; align-items: center; gap: 5px; font: 500 12.5px/1.4 var(--font-mono); color: var(--quiet); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .hb .hb-g { display: none; }
+  /* The heartbeat shows last, after the glyphs have come on (M8); reduced motion shows it at once. */
+  .hb:not(.on) { visibility: hidden; }
+  .hb.on { animation: rs-fade-in var(--dur-state) var(--ease-settle) var(--dur-pop) both; }
+  .hb.is-stale { color: var(--h-fault-ink); }
+  .hb.is-stale .hb-g { display: inline-flex; }
+  .hb.is-stale .hb-t { text-decoration: underline dashed 1px; text-underline-offset: 3px; }
+  .hb-large { font-size: 24px; gap: 10px; }
+  @media (prefers-reduced-motion: reduce) { .hb.on { animation: none; } }
+</style>
