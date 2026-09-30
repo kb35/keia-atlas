@@ -1,0 +1,407 @@
+---
+// The front door's hero (FRONT-DOOR-V2 sections 2 and 3): the product, four levels deep, and the zoom that joins
+// them. Building (the Dublin office as a model, from src/lib/floors.mjs), floor (the third floor, every space a
+// ring, one broken), space (3.09 Whooper Swan) and device (the video bar, the same product drawing, DeviceArt).
+//
+// Two ways to draw it, one story:
+//   3D    on a wide screen that draws WebGL, src/lib/hero3d.mjs builds the office in three.js after first paint and
+//         plays one cinematic sequence (MOTION-V2 4.36): a slow dolly over the building, the fourth floor lifting
+//         away, the rings coming on in turn, one breaking once, then the camera easing into the space. The visitor
+//         can drag a little, point at a space, click one, or use the level strip; the device level is the product
+//         drawing over the scene.
+//   2D    the first frame everywhere, and the whole hero on a phone: an isometric SVG of the same building
+//         (src/lib/iso.mjs), the floor, the real room drawing (src/lib/room3d.mjs) and the device, joined by a
+//         continuous zoom on the settle spring, each parent scaling up around the point its child lives at.
+// Reduced motion: the final frame, still; every level a click away and changing at once.
+import { building } from '../../lib/floors.mjs';
+import { isoBuilding, isoFloor, fit, iso } from '../../lib/iso.mjs';
+import { buildRoom, render } from '../../lib/room3d.mjs';
+import { roomItems } from '../../lib/scene.mjs';
+import { ringParts } from '../../lib/ring.mjs';
+import { spaces, sites, models } from '../../lib/data.mjs';
+import RoomShot from './RoomShot.astro';
+import DeviceArt from '../DeviceArt.astro';
+
+const SITE = 'dub', FLOOR = '3', ROOM = 'dub-3-09', DEVICE = 'video-bar';
+const STORY = { since: '07:52', who: 'Liam', whoSince: '08:10', next: '09:00', model: 'Poly Studio X72', host: 'dub-309-vc01' };
+const VW = 960, VH = 600;
+
+// ---- Building and floor, in isometric.
+const M = building(SITE);
+const F = M.floors.find((f) => f.id === FLOOR);
+const roomsOf = (fid) => Object.values(M.rooms).filter((r) => r.floor === fid && r.rect);
+const B = isoBuilding(M, { gap: 8, h: 1.1 });
+const fb = fit(B.prims, { width: VW, height: VH, pad: 60 });
+const FL = isoFloor(F, roomsOf(FLOOR), { h: 1.1 });
+const ff = fit(FL.prims, { width: VW, height: VH, pad: 46 });
+const swan = FL.rings.find((r) => r.room.id === ROOM);
+const floorCentre = fb.T(iso(30, 12, FL.z));
+const swanTop = ff.T(swan.top);
+const nRooms = Object.values(M.rooms).filter((r) => r.rect).length;
+
+// ---- The space: the real drawing of 3.09.
+const space = spaces[ROOM];
+const items = roomItems(space.option, { fitted: space.fitted, space });
+const RM = buildRoom(space.space_type, space.option, items, { plugs: sites[SITE].mains?.plugs ?? null, country: space.country ?? sites[SITE].country ?? null, fitted: space.fitted, models });
+const R = render(RM, { width: 900, pad: 12, aspect: 1.6 });
+const roomH = VH - 40, roomW = Math.round((roomH * R.width) / R.height), roomX = Math.round((VW - roomW) / 2), roomY = 20;
+const bar = R.marks.find((m) => m.sk === DEVICE);
+const barAt = [roomX + ((bar.bb.x0 + bar.bb.x1) / 2) * (roomW / R.width), roomY + ((bar.bb.y0 + bar.bb.y1) / 2) * (roomH / R.height)];
+const barW = (bar.bb.x1 - bar.bb.x0) * (roomW / R.width);
+
+// ---- The device: the product drawing, 320 x 180 art units, drawn at three quarters of the stage.
+const ART = { s: 0.75, x: 120, y: 40 };
+const art = (x, y) => [ART.x + x * 3 * ART.s, ART.y + (30 + y * 3) * ART.s];
+const devAt = art(160, 62);
+
+// ---- How far each level zooms into the next (clamped so a leaving layer never grows past what a GPU draws well).
+const clamp = (v) => Math.max(1.5, Math.min(5, v));
+const S = [clamp(ff.k / fb.k), clamp(roomW / ((5.2 + 6.6) * 0.866 * ff.k)), clamp((294 * 3 * ART.s) / barW)];
+const hot = [floorCentre, swanTop, barAt];
+
+// ---- What the 3D scene needs, inline (no fetch): each floor, every room, the story's devices where they sit.
+const r2 = (v) => Math.round(v * 100) / 100;
+const peekOf = (r) => { const n = (r.positions ?? []).reduce((k, p) => k + (p.units?.length ?? 0), 0); return r.id === ROOM ? `Fault · video bar offline since ${STORY.since} · With ${STORY.who}` : `Fine · ${n === 1 ? '1 device' : `${n} devices`}`; };
+const DEV_WORDS = { 'display#1': 'Display 1', 'display#2': 'Display 2', 'video-bar': 'Video bar', 'touch-controller': 'Touch controller', 'scheduler-panel': 'Scheduler panel' };
+const nudge = (o) => { const [x, y, z] = o.at; return o.surface === 'back' ? [x - 0.45, y, z] : o.surface === 'floor' ? [x, y, z + 0.45] : o.surface === 'left' ? [x, y + 0.35, z] : [x, y, z]; };
+const D3 = {
+  floors: M.floors.map((f) => ({ id: f.id, name: f.name, level: f.level_m, outline: f.outline, core: f.core.map((c) => ({ r: c.rect.map(r2), flat: !!c.circulation || c.kind === 'lift-lobby' })), corr: f.corridors.map((c) => c.rect.map(r2)), areas: f.areas.map((a) => a.rect.map(r2)) })),
+  rooms: Object.values(M.rooms).filter((r) => r.rect).map((r) => ({ id: r.id, no: r.number ?? '', n: `${r.number ? `${r.number} ` : ''}${r.name}`, f: r.floor, r: r.rect.map(r2), h: 1, peek: peekOf(r) })),
+  story: { room: ROOM, floor: FLOOR, devices: M.rooms[ROOM].outlets.filter((o) => DEV_WORDS[o.dev]).map((o) => ({ key: o.dev, label: DEV_WORDS[o.dev], at: nudge(o).map(r2), fault: o.dev === DEVICE })) },
+};
+
+const LEVELS = [
+  { id: 'building', word: 'Building', cap: `The Dublin office: two floors, ${nRooms} spaces, every one a ring.` },
+  { id: 'floor', word: 'Floor', cap: `Third floor: ${roomsOf(FLOOR).length - 1} of ${roomsOf(FLOOR).length} spaces fine. One fault: 3.09 Whooper Swan.` },
+  { id: 'space', word: 'Space', cap: `3.09 Whooper Swan: two displays, the video bar under them. Offline since ${STORY.since}.` },
+  { id: 'device', word: 'Device', cap: `The video bar, ${STORY.model}: with ${STORY.who} since ${STORY.whoSince}, next booking ${STORY.next}.` },
+];
+const ring = (state, [cx, cy], r, sw) => ringParts(state, cx, cy, r, sw);
+const rb = Math.max(3.4, 0.42 * fb.k), rf = Math.max(5, 0.5 * ff.k);
+const P = (t, pts) => t.pts(pts);
+---
+<div class="hz" data-hz>
+  <div class="hz-stage" data-hz-stage role="group" tabindex="0" aria-label="The demo office, four levels deep: building, floor, space, device. Press ] to go deeper and [ to come back, or use the level buttons.">
+    <div class="hz-light" aria-hidden="true"></div>
+    <div class="hz-3d" data-hz-3d aria-hidden="true"></div>
+    <script type="application/json" data-hz-data set:html={JSON.stringify(D3)} />
+
+    <!-- Building -->
+    <div class="hz-layer" data-hz-layer data-hx={hot[0][0]} data-hy={hot[0][1]} data-s={S[0].toFixed(3)} data-cap={LEVELS[0].cap}>
+      <svg class="hz-svg" viewBox={`0 0 ${VW} ${VH}`} aria-hidden="true">
+        <defs><filter id="hz-shadow" x="-20%" y="-40%" width="140%" height="200%"><feGaussianBlur stdDeviation="14" /></filter></defs>
+        <polygon class="hz-ground" points={P(fb, B.ground.map(([x, y]) => [x, y + 2.2]))} filter="url(#hz-shadow)" />
+        {B.prims.map((p) => <polygon class:list={['hz-p', `hz-${p.kind}`, { 'is-fault': p.room?.id === ROOM }]} points={P(fb, p.pts)} />)}
+        {B.rings.map((r) => {
+          const fault = r.room.id === ROOM, at = fb.T(r.at);
+          return <g class:list={['hz-ring', { 'is-fault': fault }]}>{ring(fault ? 'fault' : 'fine', at, fault ? rb * 1.35 : rb, fault ? 1.5 : 1.1).map(({ tag, attrs }) => tag === 'circle' ? <circle {...attrs} stroke={attrs.stroke ?? 'currentColor'} /> : <path {...attrs} stroke="currentColor" />)}</g>;
+        })}
+        {B.floors.map((f) => { const at = fb.T(f.label); return <text class="hz-floor-name" x={at[0] - 8} y={at[1] + 4}>{f.F.name}</text>; })}
+      </svg>
+    </div>
+
+    <!-- Floor -->
+    <div class="hz-layer is-off" data-hz-layer data-hx={hot[1][0]} data-hy={hot[1][1]} data-s={S[1].toFixed(3)} data-cap={LEVELS[1].cap}>
+      <svg class="hz-svg" viewBox={`0 0 ${VW} ${VH}`} aria-hidden="true">
+        <polygon class="hz-ground" points={P(ff, FL.prims[2].pts.map(([x, y]) => [x, y + 2.6]))} filter="url(#hz-shadow)" />
+        {FL.prims.map((p) => <polygon class:list={['hz-p', `hz-${p.kind}`, { 'is-fault': p.room?.id === ROOM }]} points={P(ff, p.pts)} />)}
+        {FL.rings.map((r) => {
+          const fault = r.room.id === ROOM, at = ff.T(r.at), top = ff.T(r.top);
+          const wide = (r.room.rect[2] - r.room.rect[0]) * (r.room.rect[3] - r.room.rect[1]) > 9;
+          return (<>
+            {wide && r.room.number && <text class="hz-no" x={top[0]} y={top[1] + rf + 12}>{r.room.number}</text>}
+            <g class:list={['hz-ring', { 'is-fault': fault }]}>{ring(fault ? 'fault' : 'fine', at, fault ? rf * 1.3 : rf, fault ? 2 : 1.6).map(({ tag, attrs }) => tag === 'circle' ? <circle {...attrs} stroke={attrs.stroke ?? 'currentColor'} /> : <path {...attrs} stroke="currentColor" />)}</g>
+          </>);
+        })}
+      </svg>
+      <div class="hz-tag is-fault" data-hz-tag data-x={hot[1][0]} data-y={hot[1][1] - rf * 2.2}><b>3.09 Whooper Swan</b><span>Fault: video bar offline since {STORY.since}</span></div>
+    </div>
+
+    <!-- Space -->
+    <div class="hz-layer is-off" data-hz-layer data-hx={hot[2][0]} data-hy={hot[2][1]} data-s={S[2].toFixed(3)} data-cap={LEVELS[2].cap}>
+      <svg class="hz-svg" viewBox={`0 0 ${VW} ${VH}`} aria-hidden="true">
+        <RoomShot R={R} label={`3.09 Whooper Swan, drawn to scale`} x={roomX} y={roomY} width={roomW} height={roomH} />
+        <g class="hz-ring is-fault">{ring('fault', [barAt[0], barAt[1] - 30], 11, 2.4).map(({ tag, attrs }) => tag === 'circle' ? <circle {...attrs} stroke={attrs.stroke ?? 'currentColor'} /> : <path {...attrs} stroke="currentColor" />)}</g>
+      </svg>
+      <div class="hz-tag is-fault" data-hz-tag data-x={barAt[0]} data-y={barAt[1] - 48}><b>Video bar</b><span>{STORY.model} · offline since {STORY.since}</span></div>
+    </div>
+
+    <!-- Device -->
+    <div class="hz-layer is-off" data-hz-layer data-hx={devAt[0]} data-hy={devAt[1]} data-s="4" data-cap={LEVELS[3].cap}>
+      <div class="hz-veil" aria-hidden="true"></div>
+      <svg class="hz-svg" viewBox={`0 0 ${VW} ${VH}`} aria-hidden="true">
+        <g transform={`translate(${ART.x} ${ART.y}) scale(${ART.s})`}><DeviceArt model="poly-studio-x72" label={`${STORY.model}, the video bar`} /></g>
+        <g class="hz-ring is-fault">{ring('fault', devAt, 13, 2.6).map(({ tag, attrs }) => tag === 'circle' ? <circle {...attrs} stroke={attrs.stroke ?? 'currentColor'} /> : <path {...attrs} stroke="currentColor" />)}</g>
+        <text class="hz-dev-sub" x={VW / 2} y={art(160, 118)[1] + 34}>{STORY.host} · firmware 4.6.1, changed 12 days ago · booked {STORY.next}, 8 people</text>
+      </svg>
+      <div class="hz-tag is-fault" data-hz-tag data-x={devAt[0]} data-y={devAt[1] - 22}><b>{STORY.model}</b><span>Offline since {STORY.since} · With {STORY.who} since {STORY.whoSince}</span></div>
+    </div>
+
+    <!-- Words over the 3D scene: the space under the pointer, and the story's tag once the ring has broken. -->
+    <div class="hz-tag hz-hover" data-hz-hover hidden><b data-hz-hover-name></b><span data-hz-hover-state></span></div>
+    <div class="hz-tag is-fault hz-story" data-hz-story hidden><b data-hz-story-name>3.09 Whooper Swan</b><span data-hz-story-state>Fault: video bar offline since {STORY.since}</span></div>
+  </div>
+
+  <div class="hz-foot">
+    <p class="hz-cap"><span data-hz-cap aria-live="polite">{LEVELS[0].cap}</span> <span class="hz-beat" data-hz-beat hidden>checked just now</span></p>
+    <div class="hz-levels" role="group" aria-label="Level" data-hz-levels>
+      <span class="hz-mark" aria-hidden="true" data-hz-mark></span>
+      {LEVELS.map((l, i) => <button type="button" data-hz-go={i} aria-pressed={i === 0 ? 'true' : 'false'}>{l.word}</button>)}
+    </div>
+  </div>
+</div>
+
+<script>
+  import { motion } from '../../lib/motion-read.mjs';
+  import { springEasing } from '../../lib/spring.mjs';
+
+  const VW = 960, VH = 600, STORY_DEVICE = { name: 'Video bar · Poly Studio X72', state: 'Fault: offline since 07:52 · With Liam since 08:10' };
+  // A duration token in ms. The build writes "760ms" as ".76s", so the unit is read, not assumed.
+  const ms = (cs: CSSStyleDeclaration, name: string, d: number) => { const v = cs.getPropertyValue(name).trim(), n = parseFloat(v); return Number.isNaN(n) ? d : /ms$/.test(v) ? n : /s$/.test(v) ? n * 1000 : n; };
+  const settleEasing = (fallback: string, o: { duration: number; bounce: number }) => {
+    try { if (CSS.supports('animation-timing-function', 'linear(0, 1)')) return springEasing(o); } catch (_) { /* fall through */ }
+    return fallback;
+  };
+  // Read what the layer shows now (its animated matrix and opacity), drop the move in flight, and start one move
+  // from there to `to`, so a zoom interrupted twice still reads as one motion.
+  const retarget = (el: HTMLElement, to: { transform: string; opacity: number }, opts: KeyframeAnimationOptions) => {
+    const cs = getComputedStyle(el);
+    const from = { transform: cs.transform, opacity: cs.opacity };
+    el.getAnimations().forEach((a) => a.cancel());
+    return el.animate([from, { transform: to.transform, opacity: String(to.opacity) }], { fill: 'forwards', ...opts });
+  };
+  const hasGL = () => { try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch { return false; } };
+
+  function init(root: HTMLElement) {
+    if ((root as any).__hz) return; (root as any).__hz = true;
+    const stage = root.querySelector<HTMLElement>('[data-hz-stage]')!;
+    const layers = Array.from(root.querySelectorAll<HTMLElement>('[data-hz-layer]'));
+    const cap = root.querySelector<HTMLElement>('[data-hz-cap]')!;
+    const beat = root.querySelector<HTMLElement>('[data-hz-beat]')!;
+    const btns = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-hz-go]'));
+    const mark = root.querySelector<HTMLElement>('[data-hz-mark]')!;
+    const S = layers.map((l) => +l.dataset.s! || 4);
+    const hot = layers.map((l) => [+l.dataset.hx!, +l.dataset.hy!]);
+    const cs = getComputedStyle(root);
+    const dur = ms(cs, '--dur-hero', 760), hold = ms(cs, '--dur-hero-hold', 700);
+    let cur = 0, timers: number[] = [], auto = true;
+
+    // A point in the drawing (viewBox units) as pixels inside the stage: the drawing is fitted, centred (meet).
+    const px = ([x, y]: number[]) => {
+      const w = stage.clientWidth, h = stage.clientHeight, k = Math.min(w / VW, h / VH);
+      return [(w - VW * k) / 2 + x * k, (h - VH * k) / 2 + y * k];
+    };
+    // Where layer i sits while level L is shown. Every transform is about the origin, so a move retargeted mid-flight
+    // interpolates one matrix into the next with no jump.
+    const target = (i: number, L: number) => {
+      if (i === L) return { transform: 'none', opacity: 1 };
+      if (i < L) { const [x, y] = px(hot[i]); return { transform: `translate(${x}px, ${y}px) scale(${S[i]}) translate(${-x}px, ${-y}px)`, opacity: 0 }; }
+      const [x, y] = px(hot[i - 1]), cx = stage.clientWidth / 2, cy = stage.clientHeight / 2;
+      return { transform: `translate(${x}px, ${y}px) scale(${1 / S[i - 1]}) translate(${-cx}px, ${-cy}px)`, opacity: 0 };
+    };
+    const apply = (el: HTMLElement, t: { transform: string; opacity: number }) => { el.getAnimations().forEach((a) => a.cancel()); el.style.transform = t.transform; el.style.opacity = String(t.opacity); };
+    const placeTags = () => root.querySelectorAll<HTMLElement>('[data-hz-tag]').forEach((t) => { const [x, y] = px([+t.dataset.x!, +t.dataset.y!]); t.style.left = `${x}px`; t.style.top = `${y}px`; });
+    const setStrip = (L: number, words?: string) => {
+      btns.forEach((b, k) => b.setAttribute('aria-pressed', String(k === L)));
+      const b = btns[L]; mark.style.width = `${b.offsetWidth}px`; mark.style.transform = `translateX(${b.offsetLeft}px)`;
+      cap.textContent = words ?? layers[L].dataset.cap ?? '';
+      stage.classList.toggle('at-end', L === layers.length - 1);
+    };
+    // The heartbeat: words that change every 10 s, no motion.
+    let t0 = 0;
+    const tick = () => { if (!root.isConnected || !t0) return; const s = Math.round((Date.now() - t0) / 10000) * 10; beat.textContent = s < 10 ? 'checked just now' : s < 60 ? `checked ${s} s ago` : `checked ${Math.floor(s / 60)} min ago`; setTimeout(tick, 10000); };
+    const startBeat = () => { if (t0) return; t0 = Date.now(); beat.hidden = false; setTimeout(tick, 10000); };
+
+    // ---- 2D: the zoom between the drawn layers.
+    function go2d(L: number, animate = true) {
+      if (L < 0 || L >= layers.length || L === cur) return;
+      const from = cur; cur = L;
+      const m = motion();
+      const ease = settleEasing(m.ease, { duration: dur, bounce: 0 });
+      layers.forEach((el, i) => {
+        const t = target(i, L);
+        const moving = animate && !m.reduced && (i === from || i === L || el.getAnimations().length > 0);
+        el.classList.toggle('is-off', !(i === L || moving));
+        el.setAttribute('aria-hidden', String(i !== L));
+        if (!moving) { apply(el, t); return; }
+        retarget(el, t, { duration: dur, easing: ease }).onfinish = () => { if (cur === L) { apply(el, t); el.classList.toggle('is-off', i !== L); } };
+      });
+      if (L >= 1) startBeat();
+      setStrip(L);
+    }
+    const stop = () => { auto = false; timers.forEach(clearTimeout); timers = []; };
+    const run2d = () => {
+      if (!auto || motion().reduced) return;
+      const step = dur + hold;
+      [1, 2, 3].forEach((L, k) => timers.push(window.setTimeout(() => { if (auto) go2d(L); }, hold + k * step)));
+    };
+
+    layers.forEach((el, i) => apply(el, target(i, 0)));
+    placeTags(); setStrip(0);
+    mark.classList.add('no-slide'); void mark.offsetWidth; mark.classList.remove('no-slide');
+    if ('ResizeObserver' in window) new ResizeObserver(() => { layers.forEach((el, i) => { if (!el.getAnimations().length) apply(el, target(i, cur)); }); placeTags(); setStrip(cur); }).observe(stage);
+
+    // ---- 3D: the office in three.js, loaded after first paint on a wide screen that draws WebGL.
+    const host = root.querySelector<HTMLElement>('[data-hz-3d]')!;
+    const hover = root.querySelector<HTMLElement>('[data-hz-hover]')!, hoverName = root.querySelector<HTMLElement>('[data-hz-hover-name]')!, hoverState = root.querySelector<HTMLElement>('[data-hz-hover-state]')!;
+    const storyTag = root.querySelector<HTMLElement>('[data-hz-story]')!, storyName = root.querySelector<HTMLElement>('[data-hz-story-name]')!, storyState = root.querySelector<HTMLElement>('[data-hz-story-state]')!;
+    const wide = stage.clientWidth >= 700;
+    const saveData = (navigator as any).connection?.saveData === true;
+    let hero: any = null, hoverAt: (() => number[] | null) | null = null, storyOn = false;
+    const place = (el: HTMLElement, p: number[] | null, dy = -14) => { if (!p) { el.hidden = true; return; } el.hidden = false; el.style.left = `${Math.round(p[0])}px`; el.style.top = `${Math.round(p[1] + dy)}px`; };
+    const words3d = ['3.09 Whooper Swan', 'Fault: video bar offline since 07:52'];
+    const use3d = wide && !saveData && hasGL();
+
+    // The device level in 3D: the product drawing over the scene, fading in; the scene stays behind it.
+    let over = false;
+    const overlay = (on: boolean) => {
+      if (on === over) return; over = on;
+      const m = motion(), el = layers[3];
+      el.classList.remove('is-off'); el.setAttribute('aria-hidden', String(!on));
+      el.style.transform = 'none';
+      if (m.reduced) { el.style.opacity = on ? '1' : '0'; if (!on) el.classList.add('is-off'); return; }
+      el.getAnimations().forEach((a) => a.cancel());
+      el.animate([{ opacity: on ? 0 : 1 }, { opacity: on ? 1 : 0 }], { duration: m.morph, easing: m.ease, fill: 'forwards' }).onfinish = () => { el.style.opacity = on ? '1' : '0'; if (!on) el.classList.add('is-off'); };
+    };
+    function go3d(L: number) {
+      if (L === 3) { cur = 3; overlay(true); host.classList.add('is-under'); setStrip(3); return; }
+      overlay(false); host.classList.remove('is-under');
+      cur = L; hero.go(L); setStrip(L); startBeat();
+    }
+    const go = (L: number) => (hero ? go3d(L) : go2d(L));
+
+    async function mount3d() {
+      const { mountHero } = await import('../../lib/hero3d.mjs');
+      const D = JSON.parse(root.querySelector<HTMLElement>('[data-hz-data]')!.textContent || '{}');
+      if (!root.isConnected) return;
+      const h = mountHero(host, D, {
+        onReady() {
+          hero = h; host.classList.add('is-on');
+          // The drawn first frame gives way to the model; the drawn levels stay for the device overlay only.
+          const m = motion();
+          layers.forEach((el, i) => { if (i < 3) { el.setAttribute('aria-hidden', 'true'); if (m.reduced) { el.classList.add('is-off'); } else el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: m.morph, easing: m.ease, fill: 'forwards' }).onfinish = () => el.classList.add('is-off'); } });
+          layers[3].classList.add('is-off'); layers[3].style.opacity = '0';
+          stop();
+          const start = () => { if (h.level() === 0 && !storyOn) h.run(); };
+          if ('IntersectionObserver' in window) { const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); start(); } }, { threshold: 0.4 }); io.observe(stage); } else start();
+        },
+        onLevel(i: number, room?: any) {
+          if (over) return;
+          cur = i;
+          if (room && room.id !== D.story.room) setStrip(2, `${room.n}: ${room.peek.replace(' · ', ', ').toLowerCase()}.`); else setStrip(i);
+          if (i >= 1) startBeat();
+        },
+        onBeat() { storyOn = true; startBeat(); },
+        onHover(o: any) { hoverAt = o ? o.at : null; if (o) { hoverName.textContent = o.room.n; hoverState.textContent = o.room.peek; } else hover.hidden = true; h.requestRender(); },
+        onPick(_room: any, goThere: () => void) { stop(); overlay(false); goThere(); },
+        onTouch() { stop(); },
+        onFrame() {
+          if (hoverAt && (hover.hidden || true)) place(hover, hoverAt());
+          if (!storyOn) return;
+          const dev = h.deviceAt();
+          if (dev) { storyName.textContent = STORY_DEVICE.name; storyState.textContent = STORY_DEVICE.state; place(storyTag, dev, -16); }
+          else { storyName.textContent = words3d[0]; storyState.textContent = words3d[1]; place(storyTag, h.storyAt(), -18); }
+        },
+      });
+    }
+
+    btns.forEach((b, k) => b.addEventListener('click', () => { stop(); go(k); }));
+    stage.addEventListener('click', () => { if (hero) return; stop(); if (cur < layers.length - 1) go2d(cur + 1); });
+    root.addEventListener('keydown', (e) => {
+      if (e.key === ']') { e.preventDefault(); stop(); if (cur < 3) go(cur + 1); }
+      else if (e.key === '[' || e.key === 'Escape') { if (cur === 0) return; e.preventDefault(); stop(); go(cur - 1); }
+    });
+    stage.addEventListener('pointerdown', () => { if (!hero) stop(); }, { passive: true });
+    // Light and dark: the scene reads its colours again when the page's look changes.
+    matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => hero?.recolour());
+    new MutationObserver(() => hero?.recolour()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-look'] });
+
+    if (use3d) {
+      const kick = () => { mount3d().catch(() => { if (!hero) run2dInView(); }); };
+      if ('requestIdleCallback' in window) (window as any).requestIdleCallback(kick, { timeout: 1200 }); else setTimeout(kick, 300);
+    } else run2dInView();
+    function run2dInView() {
+      if ('IntersectionObserver' in window) { const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); run2d(); } }, { threshold: 0.4 }); io.observe(stage); } else run2d();
+    }
+  }
+  const boot = () => document.querySelectorAll<HTMLElement>('[data-hz]').forEach(init);
+  boot();
+  document.addEventListener('astro:page-load', boot);
+</script>
+
+<style>
+  .hz {
+    --dur-hero: 760ms; --dur-hero-hold: 700ms; --dur-hero-move: 1800ms; --dur-hero-lift: 1400ms;
+    --hz-bg: #EFE9DF; --hz-light: #FFFDF9; --hz-glow: rgba(226, 122, 58, .16);
+    --hz-slab-top: #E4DCCF; --hz-slab-east: #C8BEAE; --hz-slab-north: #D6CCBC; --hz-corr: #DBD2C3; --hz-core: #CFC5B5; --hz-area: #E0D8CA;
+    --hz-top: #FBF9F5; --hz-east: #D3CABB; --hz-north: #E5DED2; --hz-edge: rgba(28, 26, 23, .16); --hz-ground: rgba(40, 30, 15, .32);
+    display: grid; gap: 14px; min-width: 0;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .hz {
+    --hz-bg: #15130F; --hz-light: #2B2621; --hz-glow: rgba(238, 138, 78, .12);
+    --hz-slab-top: #2A2621; --hz-slab-east: #121110; --hz-slab-north: #1A1815; --hz-corr: #322E28; --hz-core: #221F1B; --hz-area: #2E2A24;
+    --hz-top: #4A453E; --hz-east: #221F1B; --hz-north: #2E2A25; --hz-edge: rgba(255, 235, 210, .09); --hz-ground: rgba(0, 0, 0, .7);
+  } }
+  :root[data-theme="dark"] .hz {
+    --hz-bg: #15130F; --hz-light: #2B2621; --hz-glow: rgba(238, 138, 78, .12);
+    --hz-slab-top: #2A2621; --hz-slab-east: #121110; --hz-slab-north: #1A1815; --hz-corr: #322E28; --hz-core: #221F1B; --hz-area: #2E2A24;
+    --hz-top: #4A453E; --hz-east: #221F1B; --hz-north: #2E2A25; --hz-edge: rgba(255, 235, 210, .09); --hz-ground: rgba(0, 0, 0, .7);
+  }
+
+  .hz-stage {
+    position: relative; height: clamp(380px, 62vh, 620px); overflow: clip; border-radius: 22px; background: var(--hz-bg); cursor: zoom-in; outline: none;
+    box-shadow: inset 0 0 0 1px var(--hairline);
+  }
+  .hz-stage.at-end { cursor: default; }
+  .hz-stage:focus-visible { box-shadow: inset 0 0 0 1px var(--hairline), 0 0 0 3px var(--focus); }
+  .hz-light { position: absolute; inset: 0; pointer-events: none; background:
+    radial-gradient(90% 70% at 28% 8%, var(--hz-light) 0%, transparent 62%),
+    radial-gradient(60% 46% at 78% 100%, var(--hz-glow) 0%, transparent 70%); }
+  .hz-3d { position: absolute; inset: 0; opacity: 0; transition: opacity var(--dur-morph) var(--ease-settle); cursor: default; }
+  .hz-3d.is-on { opacity: 1; }
+  .hz-3d.is-under { filter: blur(6px); opacity: .55; transition: opacity var(--dur-morph) var(--ease-settle), filter var(--dur-morph) var(--ease-settle); }
+  .hz-3d :global(.hz-canvas) { position: absolute; inset: 0; width: 100% !important; height: 100% !important; display: block; touch-action: pan-y; }
+  .hz-layer { position: absolute; inset: 0; transform-origin: 0 0; will-change: transform, opacity; }
+  .hz-layer.is-off { visibility: hidden; }
+  .hz-veil { position: absolute; inset: 0; background: color-mix(in srgb, var(--hz-bg) 78%, transparent); }
+  .hz-svg { display: block; width: 100%; height: 100%; font-family: var(--font-sans); position: relative; }
+  .hz-ground { fill: var(--hz-ground); }
+  .hz-p { stroke: var(--hz-edge); stroke-width: .8; stroke-linejoin: round; }
+  .hz-slab-top { fill: var(--hz-slab-top); } .hz-slab-east { fill: var(--hz-slab-east); } .hz-slab-north { fill: var(--hz-slab-north); }
+  .hz-corr { fill: var(--hz-corr); stroke: none; } .hz-core { fill: var(--hz-core); stroke: none; }
+  .hz-room-top { fill: var(--hz-top); } .hz-room-east { fill: var(--hz-east); } .hz-room-north { fill: var(--hz-north); }
+  .hz-room-top.is-fault { fill: color-mix(in srgb, var(--h-fault, var(--red)) 22%, var(--hz-top)); }
+  .hz-room-east.is-fault { fill: color-mix(in srgb, var(--h-fault, var(--red)) 18%, var(--hz-east)); }
+  .hz-room-north.is-fault { fill: color-mix(in srgb, var(--h-fault, var(--red)) 18%, var(--hz-north)); }
+  .hz-ring { color: var(--quiet, var(--text-3)); }
+  .hz-ring.is-fault { color: var(--h-fault, var(--red)); }
+  .hz-floor-name { font-size: 14px; font-weight: 550; fill: var(--text-3); text-anchor: end; }
+  .hz-no { font-size: 9px; font-weight: 550; fill: var(--text-3); text-anchor: middle; font-variant-numeric: tabular-nums; }
+  .hz-dev-sub { font-size: 15px; fill: var(--text-2); text-anchor: middle; }
+  .hz-tag {
+    position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); display: grid; gap: 1px; padding: 8px 12px; border-radius: 10px;
+    background: var(--surface); border: 1px solid var(--line-strong); box-shadow: var(--shadow-md); white-space: nowrap; pointer-events: none;
+    font-size: 12.5px; line-height: 1.35; color: var(--text); z-index: 2;
+  }
+  .hz-tag b { font-weight: 600; }
+  .hz-tag span { color: var(--text-2); }
+  .hz-tag.is-fault b::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--h-fault, var(--red)); margin-right: 7px; vertical-align: -1px; }
+  .hz-hover b::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--quiet, var(--text-3)); margin-right: 7px; vertical-align: -1px; }
+  .hz-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; }
+  .hz-cap { margin: 0; font-size: 14.5px; line-height: 1.4; color: var(--text-2); min-width: 0; flex: 1 1 320px; }
+  .hz-beat { font: 500 12.5px/1.4 var(--font-mono); color: var(--quiet, var(--text-3)); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .hz-levels { position: relative; display: inline-flex; padding: 3px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); flex: none; }
+  .hz-levels button { position: relative; z-index: 1; font: 550 13px/1 var(--font-sans); color: var(--text-2); background: none; border: 0; border-radius: 999px; padding: 0 14px; min-height: 34px; cursor: pointer; transition: color var(--dur-hover) var(--ease-settle); }
+  .hz-levels button[aria-pressed="true"] { color: var(--text); }
+  .hz-levels button:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+  .hz-mark { position: absolute; left: 0; top: 3px; bottom: 3px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line-strong); transition: transform var(--dur-morph) var(--ease-settle), width var(--dur-morph) var(--ease-settle); }
+  .hz-mark.no-slide { transition: none; }
+  @container fd (max-width: 699px) {
+    .hz-stage { height: auto; aspect-ratio: 4 / 3; border-radius: 16px; }
+    .hz-tag { font-size: 11px; padding: 5px 8px; }
+    .hz-dev-sub { display: none; }
+    .hz-levels { width: 100%; }
+    .hz-levels button { flex: 1; padding: 0 6px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .hz-mark, .hz-levels button, .hz-3d { transition: none; } }
+</style>
