@@ -1,0 +1,60 @@
+# Demo playbook. Aigna's own way of working; not taken from any real company.
+id: infra-refresh
+name: Comms room refresh
+kind: infra-refresh
+version: "1.3"
+intensity: medium
+weeks: { min: 12, max: 18 }
+summary: Replace switches, UPS or patching in one comms room (an MDF or IDF). The network work is the project; the AV risk is every room device that moves to a new port.
+when: Use for switch, UPS or patching refreshes in one comms room. Every AV device on the affected floors is re-verified after the cutover. For the network across a whole site, use the Network refresh playbook.
+changes:
+  - { date: "2026-09-29", change: "Renamed from Infrastructure refresh. Work across a whole site now has its own Network refresh playbook." }
+  - { date: "2026-09-29", change: "Install and Commission merged into one Deploy phase, with Provision, Install, Configure and Commission steps for each device (decision 0025)." }
+  - { date: "2026-09-11", change: "Export the switch's port descriptions before the port audit.", from: PRJ-16 }
+phases:
+  - phase: plan
+    weeks: "1 to 2"
+    steps:
+      - { title: "Find the switches past vendor support", role: network, output: List of switches due }
+      - { title: "Choose the model from the infrastructure standard", role: sm-infra }
+      - { title: "Pick a change window, usually a weekend", role: pm }
+      - { title: "Raise the change request", role: pm, long_lead: true }
+    gate: { by: [sm-infra], checks: [Scope and window agreed, Change request raised] }
+  - phase: design
+    weeks: "2 to 3"
+    steps:
+      - { title: "Port audit: what is on each port, its VLAN and power draw", role: network, output: Port audit }
+      - { title: "Port map from old switch to new", role: network, output: Port map }
+      - { title: "List every AV device affected and how to check it", role: delivery, output: AV re-verification list }
+      - { title: "Rack elevation, power and UPS check", role: network, output: Rack elevation }
+      - { title: "Rollback plan", role: network }
+    gate: { by: [sm-infra], checks: [Port map and rollback plan approved, AV devices listed] }
+  - phase: procure
+    weeks: "3 to 6"
+    steps:
+      - { title: "Order switches, optics and patch leads", role: pm, long_lead: true }
+      - { title: "Pre-stage the configuration in the Lab", role: network }
+      - { title: "Label every port before the cutover", role: tech }
+    gate: { by: [pm], checks: [Everything received and pre-staged] }
+  - phase: integrate
+    weeks: One weekend, then 1
+    steps:
+      - { title: "When a vendor racks the equipment: record serial and MAC for each unit, with a label photo", role: vendor, note: Through the vendor portal, step: provision }
+      - { title: Freeze changes on the affected floors, role: pm, step: install }
+      - { title: Cut over port by port from the map, role: network, step: install }
+      - { title: Roll back if the checks fail, role: network, step: install }
+      - { title: Load the pre-staged configuration and verify each port against the map, role: network, step: configure }
+      - { title: Re-verify every AV room on the list, role: delivery, step: commission }
+      - { title: Check monitoring sees every device, role: network, step: commission }
+    gate: { by: [network, sm-infra], checks: [Every port moved and up, Every device back and monitored] }
+  - phase: handover
+    weeks: "1"
+    steps:
+      - { title: "Update the as-built rack and port records", role: network, output: As-built records }
+      - { title: "Retire the old switches", role: pm }
+    gate: { by: [sm-infra], checks: [Records match the racks] }
+  - phase: closed
+    weeks: "-"
+    steps:
+      - { title: "Feed what was learned back into this playbook", role: pm }
+    gate: { by: [programme], checks: [Lessons captured] }

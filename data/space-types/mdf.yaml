@@ -1,0 +1,65 @@
+# Space type: Main comms room (MDF)
+# Keia Atlas house standard, not from a published guideline. See docs/decisions/0021.
+# Keia part (profile to verification_model): which classes of device belong here.
+# Keia Atlas part: build options, the models each option names. The rack layout is in data/racks/.
+
+schema: composite-profile
+
+profile:
+  name: Main comms room (MDF)
+  space_type: mdf
+  version: "1.0"
+  last_updated: "2026-09-29"
+  owner: Keia Atlas maintainers
+  purpose: >-
+    The main distribution frame: where the internet circuit arrives, the firewall and core switch
+    live, and every floor's comms room connects back to. One per site.
+
+sources:
+  - file: data/device-classes/network-gateway.yaml
+    provides: Healthy state for the firewall and router class
+  - file: data/device-classes/network-switch.yaml
+    provides: Healthy state for the switch class
+
+equipment_categories:
+  - category: edge
+    description: Firewall and router at the internet edge
+    object_profile: data/device-classes/network-gateway.yaml
+    quantity: "2"
+  - category: switching
+    description: Core switches, and access switches for the floor the MDF is on
+    object_profile: data/device-classes/network-switch.yaml
+    quantity: "3"
+
+verification_model:
+  platforms_to_check:
+    - platform: keia_atlas
+      check: every device in the rack is recorded at its rack position and patched as the port map says
+    - platform: inventory
+      check: every device has an active record in this room
+    - platform: monitoring
+      check: the internet circuit, firewall and core switches report healthy
+
+keia_atlas:
+  standard: house
+  category: infrastructure
+  bookable: false
+  # UniFi is the house standard for the IT network from 29 Sept 2026 (decision 0028). The earlier Cisco and
+  # Palo Alto build stays as an option so the rooms built to it stay recorded; they move to UniFi at refresh.
+  options:
+    - id: unifi
+      name: UniFi
+      since: "2026-09-29"
+      summary: "Two UniFi Enterprise Firewalls in Shadow Mode (they also run the UniFi Network application), two UniFi Pro Aggregation core switches, a UniFi Pro Max 48 PoE access switch for the floor, an out-of-band console server and cellular router, fibre and copper patching, on a UPS with power strips on two feeds."
+      equipment:
+        - { key: firewall, role: Gateway and firewall, class: network-gateway, model: unifi-efg, quantity: 2, requirement: required, location: data-closet }
+        - { key: core-switch, role: Core switch, class: network-switch, model: unifi-usw-pro-aggregation, quantity: 2, requirement: required, location: data-closet }
+        - { key: access-switch, role: Access switch, class: network-switch, model: unifi-usw-pro-max-48-poe, quantity: 1, requirement: required, location: data-closet }
+    - id: standard
+      name: Cisco and Palo Alto (older)
+      superseded_by: unifi
+      summary: "The earlier build: two Palo Alto firewalls in a pair, two Cisco core switches, the floor's access switches, a wireless controller, an out-of-band console server and cellular router, fibre and copper patching, on a UPS with power strips on two feeds. Rooms built to it move to UniFi when their network kit is refreshed."
+      equipment:
+        - { key: firewall, role: Firewall, class: network-gateway, quantity: 2, requirement: required, location: data-closet }
+        - { key: core-switch, role: Core switch, class: network-switch, quantity: 2, requirement: required, location: data-closet }
+        - { key: access-switch, role: Access switch, class: network-switch, quantity: 1, requirement: required, location: data-closet }

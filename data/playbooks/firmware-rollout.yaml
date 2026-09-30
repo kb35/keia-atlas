@@ -1,0 +1,46 @@
+# Demo playbook. Aigna's own way of working; not taken from any real company.
+id: firmware-rollout
+name: Firmware rollout
+kind: firmware-rollout
+version: "1.0"
+intensity: medium
+weeks: { min: 4, max: 10 }
+summary: "Move every unit of a model to a new firmware version, safely: pass it in the Lab, try it in a few pilot rooms, then update the rest in waves by site."
+when: "Use when the Lab has a release that could become the standard, or when a security fix has to reach every unit. There is no design phase: the Lab test is the design. Read the advisories for the models first, and never roll out a version an advisory says not to install."
+changes:
+  - { date: "2026-09-29", change: "First version." }
+phases:
+  - phase: plan
+    weeks: "2 to 4"
+    steps:
+      - { title: "Read the release notes and the advisories for every model that runs this firmware", role: delivery, output: Known issues list }
+      - { title: "Lab pass: every check on every model, including a rollback", role: innovation, output: Lab result, note: Nothing goes to a room before this passes }
+      - { title: "Decide whether the version becomes the standard", role: sm-av }
+      - { title: "Count the units per site and choose the pilot rooms, one of each room type", role: delivery, output: Pilot rooms and waves }
+      - { title: "Pick the waves by site and avoid busy weeks and change freezes", role: pm, output: Wave plan }
+    gate: { by: [sm-av], checks: [Lab test passed, Version approved as the standard, Pilot rooms and waves agreed] }
+  - phase: integrate
+    weeks: "2 to 6"
+    steps:
+      - { title: "Put the target version in the configuration, and check updates are still off in device management", role: delivery, step: provision }
+      - { title: "Tell each site the day and time of its wave", role: pm, step: provision }
+      - { title: "Update the pilot rooms and leave them a week", role: tech, step: install }
+      - { title: "Update each wave, one site at a time", role: tech, step: install }
+      - { title: "Update remotely where device management can do it, and on site where it cannot", role: delivery, step: install }
+      - { title: "Check each unit's settings survived the update, and fix any that did not", role: delivery, step: configure }
+      - { title: "Run the room verification for every pilot room, and for a sample in each wave", role: delivery, step: commission }
+      - { title: "Check the points the advisories name, such as the camera after a reboot", role: delivery, step: commission }
+      - { title: "Read the pilot report and decide whether to continue, pause or roll back", role: sm-av, step: commission }
+      - { title: "Roll back a room if it fails, and raise an incident for the fault", role: tech, step: commission }
+    gate: { by: [delivery, sm-av], checks: [Pilot rooms passed, Every wave updated, Every unit reports the target version] }
+  - phase: handover
+    weeks: "1"
+    steps:
+      - { title: "Set the firmware line's standard version and update the model pages", role: sm-av, output: New standard }
+      - { title: "Tell the service desk what changed and which symptoms to expect", role: pm, output: Handover note }
+    gate: { by: [sm-av], checks: [The standard matches what is in the rooms] }
+  - phase: closed
+    weeks: "-"
+    steps:
+      - { title: "Feed what was learned back into this playbook and the model pages", role: pm }
+    gate: { by: [programme], checks: [Lessons captured] }

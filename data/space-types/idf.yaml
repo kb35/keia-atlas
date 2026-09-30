@@ -1,0 +1,65 @@
+# Space type: Floor comms room (IDF)
+# Keia Atlas house standard, not from a published guideline. See docs/decisions/0021.
+# Keia part (profile to verification_model): which classes of device belong here.
+# Keia Atlas part: build options, the models each option names. The rack layout is in data/racks/.
+
+schema: composite-profile
+
+profile:
+  name: Floor comms room (IDF)
+  space_type: idf
+  version: "1.0"
+  last_updated: "2026-09-29"
+  owner: Keia Atlas maintainers
+  purpose: >-
+    An intermediate distribution frame: the comms room on each floor where every data outlet on
+    the floor is patched to a switch, and the switches connect back to the MDF over fibre.
+
+sources:
+  - file: data/device-classes/network-switch.yaml
+    provides: Healthy state for the switch class
+  - file: data/device-classes/codec.yaml
+    provides: Healthy state for a codec kept in the comms room
+
+equipment_categories:
+  - category: switching
+    description: Access switches with power over Ethernet, and a switch for AV devices
+    object_profile: data/device-classes/network-switch.yaml
+    quantity: "3"
+  - category: av_rack
+    description: A large room's codec, when it is kept in the comms room rather than the room
+    object_profile: data/device-classes/codec.yaml
+    quantity: "0 to 1"
+
+verification_model:
+  platforms_to_check:
+    - platform: keia_atlas
+      check: every device in the rack is recorded at its rack position and patched as the port map says
+    - platform: inventory
+      check: every device has an active record in this room
+    - platform: monitoring
+      check: the switches and their uplinks to the MDF report healthy
+
+keia_atlas:
+  standard: house
+  category: infrastructure
+  bookable: false
+  # UniFi is the house standard for the IT network from 29 Sept 2026 (decision 0028). The earlier Cisco
+  # build stays as an option so the rooms built to it stay recorded; they move to UniFi at refresh.
+  options:
+    - id: unifi
+      name: UniFi
+      since: "2026-09-29"
+      summary: "The floor's patch panels and UniFi Pro Max 48 PoE access switches (as many as the floor's outlets need) with 10G fibre back to the MDF, the Netgear AV switch for Dante and Q-SYS, an out-of-band console server, and room for a large room's codec, on a UPS."
+      equipment:
+        - { key: access-switch, role: Access switch, class: network-switch, model: unifi-usw-pro-max-48-poe, quantity: tbd, requirement: required, location: data-closet }
+        - { key: av-switch, role: AV switch, class: network-switch, model: netgear-m4250-gsm4210pd, quantity: 1, requirement: required, location: data-closet }
+        - { key: codec, role: Codec for a large room, class: codec, model: poly-g62, quantity: 1, requirement: optional, location: data-closet }
+    - id: standard
+      name: Cisco (older)
+      superseded_by: unifi
+      summary: "The earlier build: the floor's patch panels and Cisco access switches, a fibre link back to the MDF, an out-of-band console server, and room for a large room's codec, on a UPS. Rooms built to it move to UniFi when their switches are refreshed."
+      equipment:
+        - { key: access-switch, role: Access switch, class: network-switch, quantity: 2, requirement: required, location: data-closet }
+        - { key: av-switch, role: AV switch, class: network-switch, model: netgear-m4250-gsm4210pd, quantity: 1, requirement: required, location: data-closet }
+        - { key: codec, role: Codec for a large room, class: codec, model: poly-g62, quantity: 1, requirement: optional, location: data-closet }

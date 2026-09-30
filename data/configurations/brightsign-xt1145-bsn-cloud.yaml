@@ -1,0 +1,54 @@
+# Configuration: XT1145 signage player, BSN.cloud managed. Setting names, menu paths and defaults are the vendor's (cited per setting);
+# the values and reasons are Aigna's (demo). Researched from vendor documents, Sept 2026.
+id: brightsign-xt1145-bsn-cloud
+name: XT1145 signage player, BSN.cloud managed
+models: [brightsign-xt1145]
+mode: BSN.cloud managed, Local DWS for on-site diagnostics
+version: '1.0'
+owner: sofia
+updated: '2026-09-28'
+firmware: 9.1.151
+summary: Aigna registers every BrightSign player in BSN.cloud and sets its network and time from BrightAuthor:Connected. The Local DWS stays reachable
+  for on-site diagnostics, locked behind its own password, and OS updates are applied manually once the Lab has passed them.
+managed_by: BrightSign BSN.cloud
+steps: [Patch into the room's PoE+ AV port; the player takes its reserved address., 'Enable the Local DWS in BrightAuthor:Connected and set its password
+    before the player leaves the bench.', Register the player's serial number in BSN.cloud and assign it to the room's device group., 'Set the Network tab''s
+    time zone, DHCP and 802.1x settings, or let the group''s setup file apply them.', Check the OS build is the current production release and that no automatic
+    update is scheduled., Run the room's verification.]
+groups:
+- name: BSN.cloud registration
+  where: BSN.cloud
+  settings:
+  - {derive: hostname, name: Device Name, value: The hostname, per_device: true, action: change, layer: naming-network, why: 'Matches DNS, device management and monitoring,
+      so one name finds the player everywhere.', source: brightsign-controlbsncloud}
+  - {name: Setup file network configuration, value: Use current device settings, action: verify, layer: profile, why: Keeps the player's own certificates
+      and network settings intact instead of overwriting them from a generic group setup file., source: brightsign-controlbsncloud}
+- name: Network (BrightAuthor:Connected)
+  where: BrightAuthor:Connected > Network tab
+  settings:
+  - {derive: dhcp-reservation, name: DHCP enabled, value: 'On, address fixed by a DHCP reservation rather than a static entry here', action: verify, layer: naming-network, why: 'Aigna''s
+      network team reserves the address by MAC in DHCP, so a change to the reservation doesn''t need a site visit.', source: brightsign-network-tab}
+  - {derive: dns-servers, name: DNS1 / DNS2, value: The site's DNS servers, action: verify, layer: naming-network, why: 'Handed out by DHCP; only checked here, not set by hand.',
+    source: brightsign-network-tab}
+  - {derive: time-zone, name: Time zone, path: Network tab > Time zone, value: The site's time zone, per_device: true, action: change, layer: country, why: 'BSN.cloud schedules
+      (content dayparting, OS updates) run in the player''s local time.', source: brightsign-network-tab}
+  - {name: Enable 802.1x authentication, path: Network tab > Enable 802.1x authentication, value: 'Off', action: verify, layer: naming-network, why: Aigna's
+      AV ports authenticate devices at the switch instead., source: brightsign-network-tab}
+- name: Local DWS (on-site diagnostics)
+  where: Device web interface (Local DWS)
+  settings:
+  - {name: Enable Local Diagnostic Web Server, path: 'BrightAuthor:Connected > player settings > Enable Local Diagnostic Web Server', value: 'On', action: change,
+    layer: profile, why: Lets an on-site technician reach the player's own diagnostics page without going through BSN.cloud., source: brightsign-diagnostic-web-server}
+  - {derive: vault-site, name: Set Password, path: Local DWS > Control tab > Set Password, value: 'From the password vault, per site', per_device: true, action: change, layer: profile,
+    why: 'The DWS ships with the admin account but no password; the vendor requires 8+ characters with upper, lower, number and symbol, and Aigna takes
+      it from the site vault rather than leaving it open.', source: brightsign-local-dws-access}
+- name: Updates
+  where: Local DWS
+  settings:
+  - {name: BrightSignOS Update, path: Local DWS > Advanced tab > BrightSignOS Update (production/beta/custom), value: 'Production, applied manually after
+      the Lab passes it', action: change, layer: profile, why: There is no scheduled/automatic update toggle documented for this tab; Aigna applies a
+      release by hand once the Lab has passed it., source: brightsign-diagnostic-web-server}
+gaps: ['BSN.cloud''s own device-group console isn''t publicly documented beyond registration and ''use current device settings''; the day-to-day network
+    and time fields are set from BrightAuthor:Connected''s Network tab instead, which pairs with BSN.cloud.', 'No documented hostname/domain field on the
+    player itself, only Device Name in BSN.cloud and the Network tab''s DHCP/DNS fields.', No documented scheduled/automatic OS update toggle; only the
+    Local DWS's manual production/beta/custom selector.]

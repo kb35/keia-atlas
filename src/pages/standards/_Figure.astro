@@ -1,0 +1,179 @@
+---
+// A drawing for one section of a standard (data/standards/*.yaml, `figure`). Each is drawn from the section's own
+// table where it has one, so the drawing and the table never disagree. Colours come from the theme tokens, so the
+// drawings follow light, dark and every look. No motion: they are diagrams.
+interface Props { kind: string; table?: { columns: string[]; rows: string[][] } }
+const { kind, table } = Astro.props;
+const rows = table?.rows ?? [];
+const num = (t) => parseFloat(String(t).replace(/,/g, ''));
+
+// Viewing distance: each size's farthest seat for general (6x) and detailed (4x) content, on a metre scale.
+const vd = rows.map((r) => ({ size: r[0].replace(' inch', '"'), h: num(r[1]), far: num(r[2]), near: num(r[3]) }));
+const VD_MAX = Math.ceil(Math.max(0, ...vd.map((d) => d.far)));
+const vdX = (m) => 64 + (m / VD_MAX) * 300;
+
+// Rack sizing: ports and PoE from the worked example's first rows, then the headroom.
+const need = rows.slice(0, 4).map((r) => ({ what: r[0], ports: num(r[2]) || 0, watts: (() => { const all = [...String(r[3]).matchAll(/([\d,]+) W/g)]; return all.length ? num(all[all.length - 1][1]) : 0; })() }));
+const portsNeed = need.reduce((n, x) => n + x.ports, 0);
+const portsHead = Math.ceil(portsNeed * 1.25);
+const switches = Math.ceil(portsHead / 48);
+const portsInstalled = switches * 48;
+const wattsNeed = need.reduce((n, x) => n + x.watts, 0);
+const wattsHead = Math.round(wattsNeed * 1.2);
+const SEG = ['var(--blue)', 'var(--green)', 'var(--violet)', 'var(--amber)'];
+const rsX = (v, max) => 20 + (v / max) * 360;
+
+// VLAN map: each VLAN by what it may reach.
+const reachOf = (t) => (/not routed/i.test(t) ? 'room' : /internet/i.test(t) ? 'internet' : 'services');
+const vlans = rows.map((r) => ({ id: r[0], name: r[1], reach: reachOf(r[3]) }));
+const GROUPS = [
+  { id: 'internet', label: 'Reaches the internet', tone: 'blue' },
+  { id: 'services', label: 'Reaches only its own services', tone: 'violet' },
+  { id: 'room', label: 'Stays in the room', tone: 'green' },
+];
+
+// Wi-Fi grid: a 30 by 20 m floor, 12 px a metre.
+const M = 12, FX = 16, FY = 14;
+const at = (x, y) => [FX + x * M, FY + y * M];
+const APS = [[6, 5], [18, 5], [6, 15], [18, 15]];
+const ROOM_AP = [26.5, 3.5];
+const COMMS = [27.5, 17];
+---
+{kind === 'display-height' && (
+  <figure class="stdf" data-help="std.figure" data-help-name="Mounting height">
+    <svg viewBox="0 0 400 270" role="img" aria-labelledby="stdf-dh-t">
+      <title id="stdf-dh-t">Side view of a meeting room wall: the display's bottom edge at 1,000 mm, a seated person's eyes at about 1,200 mm, and signage centred at 1,500 mm for people standing.</title>
+      <line x1="20" y1="250" x2="390" y2="250" class="f-floor" />
+      <line x1="60" y1="20" x2="60" y2="250" class="f-wall" />
+      <rect x="60" y="69" width="9" height="81" rx="1.5" class="f-dev" />
+      <rect x="60" y="150" width="14" height="8" rx="3" class="f-bar" />
+      <rect x="180" y="176" width="130" height="5" rx="2" class="f-furn" /><line x1="300" y1="181" x2="300" y2="250" class="f-furn-l" />
+      <circle cx="330" cy="123" r="11" class="f-person" />
+      <path d="M330 134v66h-26v50M330 150l-24 24" class="f-person-l" />
+      <rect x="318" y="202" width="30" height="5" rx="2" class="f-furn" /><line x1="344" y1="207" x2="344" y2="250" class="f-furn-l" />
+      <line x1="75" y1="130" x2="318" y2="130" class="f-eye" />
+      <line x1="75" y1="100" x2="380" y2="100" class="f-eye alt" />
+      <line x1="36" y1="250" x2="36" y2="150" class="f-dim" /><line x1="30" y1="150" x2="42" y2="150" class="f-dim" /><line x1="30" y1="250" x2="42" y2="250" class="f-dim" />
+      <text x="28" y="200" class="f-t" text-anchor="middle" transform="rotate(-90 28 200)">1,000 mm</text>
+      <text x="200" y="124" class="f-t" text-anchor="middle">Seated eyes, about 1,200 mm</text>
+      <text x="230" y="94" class="f-t f-t2" text-anchor="middle">Signage centre, 1,500 mm (standing)</text>
+      <text x="80" y="64" class="f-t f-t2">Display</text>
+      <text x="80" y="170" class="f-t f-t2">Camera or video bar</text>
+      <text x="245" y="196" class="f-t f-t3" text-anchor="middle">Table</text>
+    </svg>
+    <figcaption class="faint">The bottom edge at 1,000 mm puts the far end's faces near a seated person's eye line, just above the camera.</figcaption>
+  </figure>
+)}
+
+{kind === 'viewing-distance' && vd.length > 0 && (
+  <figure class="stdf" data-help="std.figure" data-help-name="Viewing distance">
+    <svg viewBox={`0 0 400 ${46 + vd.length * 34}`} role="img" aria-labelledby="stdf-vd-t">
+      <title id="stdf-vd-t">{`The farthest seat for each display size: ${vd.map((d) => `${d.size} ${d.near} m for detailed content and ${d.far} m for general content`).join('; ')}.`}</title>
+      {Array.from({ length: VD_MAX + 1 }, (_, m) => (
+        <g><line x1={vdX(m)} y1="14" x2={vdX(m)} y2={22 + vd.length * 34} class="f-grid" /><text x={vdX(m)} y={36 + vd.length * 34} class="f-t f-t3" text-anchor="middle">{m} m</text></g>
+      ))}
+      {vd.map((d, i) => (
+        <g>
+          <text x="56" y={36 + i * 34} class="f-t" text-anchor="end">{d.size}</text>
+          <rect x={vdX(0)} y={24 + i * 34} width={vdX(d.far) - vdX(0)} height="16" rx="4" class="f-bar-far" />
+          <rect x={vdX(0)} y={24 + i * 34} width={vdX(d.near) - vdX(0)} height="16" rx="4" class="f-bar-near" />
+          <text x={vdX(d.far) + 5} y={36 + i * 34} class="f-t f-t2">{d.far} m</text>
+        </g>
+      ))}
+    </svg>
+    <figcaption class="stdf-key"><span><i class="k-near"></i>Detailed content (4x image height)</span><span><i class="k-far"></i>General content (6x image height)</span></figcaption>
+  </figure>
+)}
+
+{kind === 'wifi-grid' && (
+  <figure class="stdf" data-help="std.figure" data-help-name="Access point grid">
+    <svg viewBox="0 0 392 292" role="img" aria-labelledby="stdf-wg-t">
+      <defs><clipPath id="stdf-floor"><rect x={FX} y={FY} width={30 * M} height={20 * M} rx="4" /></clipPath></defs>
+      <title id="stdf-wg-t">A 30 by 20 metre floor: four access points on a grid over the open office, about 12 metres apart, one in the large meeting room, and a Cat6A run from the comms room to each.</title>
+      <rect x={FX} y={FY} width={30 * M} height={20 * M} rx="4" class="f-plan" />
+      <rect {...{ x: at(23, 0)[0], y: at(23, 0)[1], width: 7 * M, height: 9 * M }} class="f-room" />
+      <rect {...{ x: at(25, 16)[0], y: at(25, 16)[1], width: 5 * M, height: 4 * M }} class="f-room comms" />
+      <g clip-path="url(#stdf-floor)">{APS.map(([x, y]) => <circle cx={at(x, y)[0]} cy={at(x, y)[1]} r={7.5 * M} class="f-cell" />)}</g>
+      {[...APS, ROOM_AP].map(([x, y]) => <path d={`M${at(...COMMS)[0]} ${at(...COMMS)[1]} L${at(x, y)[0]} ${at(COMMS[0], COMMS[1])[1]} L${at(x, y)[0]} ${at(x, y)[1]}`} class="f-run" />)}
+      {[...APS, ROOM_AP].map(([x, y]) => <g><circle cx={at(x, y)[0]} cy={at(x, y)[1]} r="7" class="f-ap" /><circle cx={at(x, y)[0]} cy={at(x, y)[1]} r="2.2" class="f-ap-dot" /></g>)}
+      <text x={at(26.5, 0)[0]} y={at(0, 7.2)[1]} class="f-t f-t2" text-anchor="middle">Meeting room</text>
+      <text x={at(26.5, 0)[0]} y={at(0, 8.4)[1]} class="f-t f-t3" text-anchor="middle">14 seats</text>
+      <text x={at(27.5, 0)[0]} y={at(0, 18.4)[1]} class="f-t f-t2" text-anchor="middle">Comms</text>
+      <text x={at(0.8, 0)[0]} y={at(0, 1.6)[1]} class="f-t f-t2">Open office, 460 m²: 4 access points</text>
+      <line x1={at(6, 0)[0]} y1={FY + 20 * M + 12} x2={at(18, 0)[0]} y2={FY + 20 * M + 12} class="f-dim" /><line x1={at(6, 0)[0]} y1={FY + 20 * M + 7} x2={at(6, 0)[0]} y2={FY + 20 * M + 17} class="f-dim" /><line x1={at(18, 0)[0]} y1={FY + 20 * M + 7} x2={at(18, 0)[0]} y2={FY + 20 * M + 17} class="f-dim" />
+      <text x={at(12, 0)[0]} y={FY + 20 * M + 30} class="f-t f-t3" text-anchor="middle">12 m between access points</text>
+    </svg>
+    <figcaption class="stdf-key"><span><i class="k-ap"></i>Access point</span><span><i class="k-cell"></i>Its cell</span><span><i class="k-run"></i>One Cat6A run</span></figcaption>
+  </figure>
+)}
+
+{kind === 'rack-sizing' && need.length > 0 && (
+  <figure class="stdf" data-help="std.figure" data-help-name="Rack sizing">
+    <svg viewBox="0 0 400 160" role="img" aria-labelledby="stdf-rs-t">
+      <title id="stdf-rs-t">{`Ports: ${portsNeed} needed, ${portsHead} with 25 percent headroom, ${portsInstalled} installed on ${switches} 48-port switches. PoE: ${wattsNeed} W needed, ${wattsHead} W with 20 percent headroom.`}</title>
+      <text x="20" y="18" class="f-t">Switch ports</text>
+      {(() => { let x = 0; return need.map((n, i) => { const w = (n.ports / portsInstalled) * 360; const r = <rect x={20 + x} y="26" width={Math.max(0, w - 1)} height="22" class="f-seg" style={`fill:${SEG[i]}`} />; x += w; return r; }); })()}
+      <rect x={rsX(portsNeed, portsInstalled)} y="26" width={rsX(portsHead, portsInstalled) - rsX(portsNeed, portsInstalled)} height="22" class="f-head" />
+      <rect x="20" y="26" width="360" height="22" rx="3" class="f-cap" />
+      <text x="20" y="64" class="f-t f-t2">{portsNeed} needed</text>
+      <text x={rsX(portsHead, portsInstalled)} y="18" class="f-t f-t2" text-anchor="end">{portsHead} with headroom</text>
+      <text x="380" y="64" class="f-t f-t2" text-anchor="end">{portsInstalled} installed</text>
+      <text x="20" y="100" class="f-t">PoE budget</text>
+      {(() => { let x = 0; return need.map((n, i) => { const w = (n.watts / wattsHead) * 360; const r = <rect x={20 + x} y="108" width={Math.max(0, w - (n.watts ? 1 : 0))} height="22" class="f-seg" style={`fill:${SEG[i]}`} />; x += w; return r; }); })()}
+      <rect x={rsX(wattsNeed, wattsHead)} y="108" width={rsX(wattsHead, wattsHead) - rsX(wattsNeed, wattsHead)} height="22" class="f-head" />
+      <rect x="20" y="108" width="360" height="22" rx="3" class="f-cap" />
+      <text x="20" y="146" class="f-t f-t2">{wattsNeed.toLocaleString('en-IE')} W needed</text>
+      <text x="380" y="146" class="f-t f-t2" text-anchor="end">{wattsHead.toLocaleString('en-IE')} W to plan for</text>
+    </svg>
+    <figcaption class="stdf-key">{need.map((n, i) => <span><i style={`background:${SEG[i]}`}></i>{n.what}</span>)}<span><i class="k-head"></i>Headroom</span></figcaption>
+  </figure>
+)}
+
+{kind === 'vlan-map' && vlans.length > 0 && (
+  <figure class="stdf stdf-vlan" data-help="std.figure" data-help-name="VLAN map">
+    {GROUPS.map((g) => (
+      <div class={`vg vg-${g.tone}`}>
+        <p class="overline">{g.label}</p>
+        <ul>{vlans.filter((v) => v.reach === g.id).map((v) => <li><b class="mono">{v.id}</b><span>{v.name}</span></li>)}</ul>
+      </div>
+    ))}
+  </figure>
+)}
+
+<style>
+  .stdf { margin: 0; display: grid; gap: 10px; justify-items: center; }
+  .stdf svg { width: 100%; max-width: 540px; height: auto; display: block; }
+  .stdf figcaption { font-size: 13px; text-align: center; max-width: 60ch; }
+  .f-floor { stroke: var(--text-2); stroke-width: 2; }
+  .f-wall { stroke: var(--text-3); stroke-width: 2; stroke-dasharray: 3 3; }
+  .f-dev { fill: var(--text); }
+  .f-bar { fill: var(--text-2); }
+  .f-furn { fill: var(--surface-3, var(--line)); } .f-furn-l { stroke: var(--line); stroke-width: 3; }
+  .f-person { fill: none; stroke: var(--text-2); stroke-width: 2; } .f-person-l { fill: none; stroke: var(--text-2); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .f-eye { stroke: var(--blue); stroke-width: 1.6; stroke-dasharray: 5 4; } .f-eye.alt { stroke: var(--violet); }
+  .f-dim { stroke: var(--text-3); stroke-width: 1.2; }
+  .f-t { font: 600 12px var(--font-sans); fill: var(--text); } .f-t2 { fill: var(--text-2); font-weight: 500; } .f-t3 { fill: var(--text-3); font-weight: 500; }
+  .f-grid { stroke: var(--line); stroke-width: 1; }
+  .f-bar-far { fill: var(--blue-soft); stroke: var(--blue); stroke-width: 1; } .f-bar-near { fill: var(--blue); }
+  .f-plan { fill: var(--surface-2); stroke: var(--text-3); stroke-width: 1.5; }
+  .f-room { fill: var(--surface); stroke: var(--text-3); stroke-width: 1.2; } .f-room.comms { fill: var(--surface-2); stroke-dasharray: 3 2; }
+  .f-cell { fill: color-mix(in srgb, var(--blue) 6%, transparent); stroke: var(--blue); stroke-width: 1; stroke-dasharray: 4 3; }
+  .f-run { fill: none; stroke: var(--green); stroke-width: 1.4; stroke-linejoin: round; opacity: .8; }
+  .f-ap { fill: var(--surface); stroke: var(--blue); stroke-width: 2; } .f-ap-dot { fill: var(--blue); }
+  .f-seg { stroke: none; } .f-head { fill: var(--amber-soft); stroke: var(--amber); stroke-width: 1; stroke-dasharray: 3 2; } .f-cap { fill: none; stroke: var(--text-3); stroke-width: 1.2; }
+  .stdf-key { display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: center; }
+  .stdf-key span { display: inline-flex; align-items: center; gap: 7px; }
+  .stdf-key i { width: 16px; height: 10px; border-radius: 3px; display: inline-block; }
+  .k-near { background: var(--blue); } .k-far { background: var(--blue-soft); box-shadow: inset 0 0 0 1px var(--blue); }
+  .k-ap { background: var(--surface); box-shadow: inset 0 0 0 2px var(--blue); border-radius: 50% !important; width: 12px !important; height: 12px !important; }
+  .k-cell { background: color-mix(in srgb, var(--blue) 12%, transparent); box-shadow: inset 0 0 0 1px var(--blue); }
+  .k-run { height: 3px !important; background: var(--green); }
+  .k-head { background: var(--amber-soft); box-shadow: inset 0 0 0 1px var(--amber); }
+  .stdf-vlan { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; justify-items: stretch; gap: 12px; }
+  .vg { border-radius: var(--radius); padding: 12px 14px; background: var(--surface-2); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vg) 55%, transparent); }
+  .vg-blue { --vg: var(--blue); } .vg-violet { --vg: var(--violet); } .vg-green { --vg: var(--green); }
+  .vg ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .vg li { display: inline-flex; align-items: baseline; gap: 6px; padding: 5px 9px; border-radius: var(--pill-radius); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); font-size: 13px; }
+  .vg li b { font-size: 12px; color: var(--text-2); }
+  @container content (max-width: 699px) { .stdf-vlan { grid-template-columns: minmax(0, 1fr); } }
+</style>

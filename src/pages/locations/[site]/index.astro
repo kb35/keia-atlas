@@ -1,0 +1,17 @@
+---
+// /locations/<office>/ and /locations/<region>/: one address space for both (an office is "dub", a region "emea"),
+// so each page is its own component (_Office.astro, _Region.astro).
+import Office from '../_Office.astro';
+import Region from '../_Region.astro';
+import { OFFICE_IDS, REGIONS } from '../../../lib/locations.mjs';
+
+export function getStaticPaths() {
+  return [
+    ...OFFICE_IDS.map((site) => ({ params: { site }, props: { kind: 'office' } })),
+    ...REGIONS.map((site) => ({ params: { site }, props: { kind: 'region' } })),
+  ];
+}
+const { site } = Astro.params;
+const { kind } = Astro.props;
+---
+{kind === 'office' ? <Office site={site} /> : <Region region={site} />}

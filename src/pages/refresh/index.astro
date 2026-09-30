@@ -1,0 +1,331 @@
+---
+// The work plan (it was the refresh plan; the /refresh/ address still works). A year-by-year record of
+// every device from 2000, and what is due for replacement in the plan years ahead. Years in service
+// come from each unit's own install date, never a class average.
+// Anatomy (docs/standards/page-anatomy.md, archetype C): band, filter bar, the chart, the due list, then a
+// year in detail and the policy. The year is a facet of the bar; the chart's columns are that facet too, so
+// picking a column filters the due list and opens that year below. The page scrolls; nothing scrolls inside.
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import Section from '../../components/Section.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import DeviceGlyph from '../../components/DeviceGlyph.astro';
+import ModelTable from '../../components/ModelTable.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import { policy, fmtHours, siteOrder, timeline, byModelRows, rowName, facts, fmtYears, NOW_YEAR, historyFrom } from '../../lib/refresh.mjs';
+import { sites, sources, className, plural, href, deviceName, fmtDate, DEMO_TODAY, KIND, KIND_LABEL, REGION_LABEL } from '../../lib/data.mjs';
+import { projectOf } from '../../lib/planning.mjs';
+
+const TASK = { provision: 'Provision', configure: 'Configure', install: 'Install', commission: 'Commission', decommission: 'Decommission' };
+const byYears = [...policy.classes].sort((a, b) => a.years - b.years || className(a.class).localeCompare(className(b.class)));
+const maxIn = Math.max(...timeline.map((t) => t.installed.length));
+const maxDue = Math.max(...timeline.map((t) => t.due.length));
+const maxBar = Math.max(maxIn, maxDue);
+// Bar heights use a square-root scale so the early years stay visible next to the big install years.
+const hPct = (v) => (v ? Math.max(4, Math.sqrt(v / maxBar) * 100) : 0);
+const n = (v) => v.toLocaleString('en-IE');
+const oldest = facts.oldest;
+// The due list holds every device due in any year; the bar and the chart narrow it.
+const dueAll = timeline.flatMap((t) => t.due.map((r) => ({ r, year: t.year })));
+const dueState = (r) => (r.due < NOW_YEAR ? 'over' : r.due === NOW_YEAR ? 'now' : 'soon');
+const dueRowsAll = dueAll.map((d) => d.r);
+const kindsHere = [...new Set(dueRowsAll.map((r) => KIND(r.space)))];
+const FACETS = [
+  { key: 'region', label: 'Region', options: ['amer', 'emea', 'apac'].filter((g) => dueRowsAll.some((r) => sites[r.space.site].region === g)).map((value) => ({ value, label: REGION_LABEL[value].replace('Europe, Middle East and Africa', 'EMEA') })) },
+  { key: 'site', label: 'Office', options: siteOrder.filter((sid) => dueRowsAll.some((r) => r.space.site === sid)).map((value) => ({ value, label: sites[value].name, sub: sites[value].kind === 'remote' ? 'Home offices' : sites[value].city })) },
+  { key: 'kind', label: 'Kind', options: Object.entries(KIND_LABEL).filter(([value]) => kindsHere.includes(value)).map(([value, label]) => ({ value, label })) },
+  { key: 'due', label: 'Status', options: [{ value: 'over', label: 'Past its year' }, { value: 'now', label: `Due in ${NOW_YEAR}` }, { value: 'soon', label: 'Due later' }] },
+  { key: 'cls', label: 'Device class', options: [...new Set(dueRowsAll.map((r) => r.cls))].sort((a, b) => className(a).localeCompare(className(b))).map((value) => ({ value, label: className(value) })) },
+  // Planning's "Planned" figures count the devices no project has yet; its links land here with ?project=none.
+  { key: 'project', label: 'Project', options: [{ value: 'in', label: 'In a project already' }, { value: 'none', label: 'Not yet in a project' }] },
+  { key: 'year', label: 'Year', options: timeline.map((t) => ({ value: String(t.year), label: String(t.year), sub: t.current ? 'Due now, and today' : t.future ? 'Plan year' : undefined })) },
+];
+const SORT = { options: [{ value: 'due', label: 'By year due' }, { value: 'site', label: 'By site' }, { value: 'age', label: 'Longest in service first' }] };
+const SUMMARY = `Every device on record since ${historyFrom}, and what is due for replacement.`;
+const NUMBERS = [
+  { n: facts.inService, label: 'In service', fact: true },
+  { n: facts.retired, label: `Taken out since ${historyFrom}`, fact: true },
+  { n: facts.olderThanPolicy, label: `Due by ${NOW_YEAR}`, to: '?due=over,now', tone: 'warn' },
+];
+const last = timeline[timeline.length - 1].year;
+---
+<Shell title="Work plan" section="refresh" crumbs={[{ label: 'Work', to: '/work/' }, { label: 'Planning', to: '/work/planning/' }, { label: 'Work plan' }]}>
+  <PageBand overline="Planning" title="Work plan" rec="dd-refresh" lede={SUMMARY} sim numbers={NUMBERS} />
+
+  <div class="content wp">
+    <FilterBar facets={FACETS} placeholder="Find a device, model or site" label="Find a device due for replacement" noun={['device', 'devices']} scope=".content.wp" sort={SORT} />
+
+    <section class="card wp-chart-card" aria-labelledby="wp-h">
+      <div class="wp-chart-head">
+        <h2 id="wp-h" title={`Second line under each year: devices in service at the end of that year. Bar heights use a square-root scale so small years stay visible. Today is ${fmtDate(DEMO_TODAY)}; ${NOW_YEAR} shows both what went in and what is due now.`}>{historyFrom} to {last}</h2>
+        <span class="faint wp-chart-hint">Pick a year to filter the list and open it below. Pick more than one to compare.</span>
+        <ul class="wp-legend" aria-label="Key">
+          <li><i class="k k-in"></i>Installed, in service</li>
+          <li><i class="k k-gone"></i>Installed, since taken out</li>
+          <li><i class="k k-due"></i>Due for replacement</li>
+          <li class="faint">Figure under a year: in service at year end</li>
+        </ul>
+      </div>
+      <div class="wp-chart" role="group" aria-label="Year" data-fb-facet="year" style={`--cols:${timeline.length}`}>
+        {timeline.map((t) => (
+          <button type="button" class:list={['wp-col', { future: t.future, now: t.current }]} data-fopt data-v={String(t.year)} data-label={String(t.year)} aria-pressed="false"
+            title={`${t.year}: ${t.installed.length} installed${t.takenOut.length ? `, ${t.takenOut.length} taken out` : ''}${t.due.length ? `, ${t.due.length} due for replacement` : ''}`}>
+            <span class="wp-num">{t.installed.length > 0 && <b class="n-in">{n(t.installed.length)}</b>}{t.due.length > 0 && <b class="n-due">{n(t.due.length)}</b>}{!t.installed.length && !t.due.length && <b class="n-none">0</b>}</span>
+            <span class="wp-bars" aria-hidden="true">
+              <i class="wp-in" style={`height:${hPct(t.installed.length)}%`}><b style={`height:${t.installed.length ? (t.gone / t.installed.length) * 100 : 0}%`}></b></i>
+              <i class="wp-due" style={`height:${hPct(t.due.length)}%`}></i>
+            </span>
+            <span class="wp-y">{t.year}</span>
+            <span class="wp-s">{t.inService === null ? '' : n(t.inService)}</span>
+          </button>
+        ))}
+      </div>
+    </section>
+
+    <Section title="Replacement due list" id="due" aside={`${plural(dueAll.length, 'device')} due in all`} showAll={10}>
+      <div class="tablewrap">
+        <table class="wp-table to-cards">
+          <thead><tr><th scope="col">Device</th><th scope="col">Model</th><th scope="col">Installed</th><th scope="col" class="r">Years in service</th><th scope="col" class="r">Due</th></tr></thead>
+          <tbody data-items>
+            {dueAll.map(({ r, year }, i) => { const prj = projectOf(r); return (
+              <tr data-fi data-i={i} data-y={year} data-s={siteOrder.indexOf(r.space.site)} data-age={r.dated ? r.yearsIn : 0}
+                data-find={`${deviceName(r.space, r.position, { site: true })} ${rowName({ model: r.model, cls: r.cls })} ${className(r.cls)} ${sites[r.space.site].name} ${r.unit.asset_tag ?? ''} ${prj ? prj.id : ''}`}
+                data-f-region={sites[r.space.site].region} data-f-site={r.space.site} data-f-kind={KIND(r.space)} data-f-cls={r.cls} data-f-due={dueState(r)} data-f-year={String(year)} data-f-project={prj ? 'in' : 'none'}>
+                <td><a href={href(`/device/?tag=${r.unit.asset_tag}`)} class="wp-dev"><span class="dg"><DeviceGlyph cls={r.cls} size={26} /></span><span><b>{deviceName(r.space, r.position)}</b><small>{sites[r.space.site].name}{r.older ? ' · older kit' : ''}{prj ? ` · in ${prj.id}` : ''}</small></span></a></td>
+                <td>{r.model ? <a href={href(`/models/${r.model}/`)}>{rowName({ model: r.model, cls: r.cls })}</a> : <span class="faint">Set per project</span>}</td>
+                <td class="num">{r.installed ? fmtDate(r.installed) : 'Not yet installed'}</td>
+                <td class="num r"><b>{r.dated ? fmtYears(r.yearsIn) : 'New'}</b><small class="faint"> of {r.life} planned</small></td>
+                <td class="num r"><span class:list={['wp-pill', r.due < NOW_YEAR ? 'late' : r.due === NOW_YEAR ? 'now' : 'soon']}>{r.due < NOW_YEAR ? `${NOW_YEAR - r.due} y over` : r.due}</span></td>
+              </tr>
+            ); })}
+          </tbody>
+        </table>
+      </div>
+      <EmptyState text="No devices are due in the years and filters chosen." />
+    </Section>
+
+    <Section title="A year in detail" id="year" aside="The year picked in the chart">
+      <div class="wp-years" data-year-host>
+        {timeline.map((t) => {
+          const dueRows = byModelRows(t.due);
+          const inRows = byModelRows(t.installed);
+          const outRows = byModelRows(t.takenOut);
+          const b = t.bucket;
+          const bySite = b ? siteOrder.filter((s) => b.bySite[s]) : [];
+          return (
+            <div class="wp-panel" data-year-panel={String(t.year)} hidden={!t.current}>
+              <header class="wp-ph">
+                <h3 class="wp-year">{t.year}{t.current ? <small>Due now: {NOW_YEAR} or earlier</small> : t.future ? <small>Plan year</small> : <small>Record</small>}</h3>
+                <dl class="wp-stats">
+                  <div><dd class="num">{n(t.installed.length)}</dd><dt>Installed</dt></div>
+                  <div><dd class="num">{n(t.takenOut.length)}</dd><dt>Taken out</dt></div>
+                  {t.inService !== null && <div><dd class="num">{n(t.inService)}</dd><dt>In service at year end</dt></div>}
+                  {b && <div><dd class="num wp-warn">{n(t.due.length)}</dd><dt>{t.year === NOW_YEAR ? 'Due now' : 'Due'}</dt></div>}
+                  {b && t.due.length > 0 && <div><dd class="num">{fmtHours(b.low)}<small> to {fmtHours(b.high)}</small></dd><dt>Engineering hours</dt></div>}
+                </dl>
+                {b && t.due.length > 0 && <p class="faint wp-where">{plural(t.due.length, 'device')} in {plural(b.spaces.size, 'room')}{bySite.length ? `: ${bySite.map((s) => `${sites[s].code} ${b.bySite[s]}`).join(' · ')}` : ''}</p>}
+              </header>
+              <div class="g12">
+                {(!t.future) && (
+                  <div class="card side-card s-6">
+                    <div class="section-head"><h3>Installed in {t.year}</h3><span class="aside faint">{t.installed.length ? `${t.stillIn} still in service, ${t.gone} taken out` : ''}</span></div>
+                    {inRows.length ? <ModelTable rows={inRows} note="years" /> : <p class="muted wp-empty">Nothing on record was installed this year.</p>}
+                  </div>
+                )}
+                {(!t.future) && (
+                  <div class="card side-card s-6">
+                    <div class="section-head"><h3>Taken out in {t.year}</h3></div>
+                    {outRows.length ? <ModelTable rows={outRows} note="years" /> : <p class="muted wp-empty">Nothing on record was taken out this year.</p>}
+                  </div>
+                )}
+                {t.future && b && dueRows.length > 0 && (
+                  <div class="card side-card s-12">
+                    <div class="section-head"><h3>Models to replace in {t.year}</h3></div>
+                    <ModelTable rows={dueRows} note="years" />
+                  </div>
+                )}
+                {t.future && b && t.due.length === 0 && <p class="muted wp-empty s-12">Nothing falls due in {t.year}.</p>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Section>
+
+    <Section title="How the plan is set" id="policy">
+      <div class="g12">
+        <div class="card side-card s-4">
+          <h3>Replace after</h3>
+          <p class="muted wp-note">House policy for the plan, chosen for this example. It sets the due year; a unit's years in service always come from its own install date.</p>
+          <dl class="kv">{byYears.slice(0, 8).map((c) => <div><dt>{className(c.class)}</dt><dd class="num">{c.years} y</dd></div>)}</dl>
+          {byYears.length > 8 && <details class="wp-details"><summary>The other {byYears.length - 8} classes</summary>
+            <dl class="kv wp-more-kv">{byYears.slice(8).map((c) => <div><dt>{className(c.class)}</dt><dd class="num">{c.years} y</dd></div>)}</dl>
+          </details>}
+        </div>
+        <div class="card side-card s-4">
+          <h3>Hours per device</h3>
+          <dl class="kv">
+            {policy.tasks.map((t) => <div><dt>{TASK[t.task]}{t.networked_only && <span class="faint wp-sm"> (networked)</span>}</dt><dd class="num">{t.low === t.high ? fmtHours(t.low) : `${fmtHours(t.low)} to ${fmtHours(t.high)}`} h</dd></div>)}
+          </dl>
+          {policy.sources.map((s) => sources[s.source]?.url && <p class="wp-src"><a href={sources[s.source].url}>{sources[s.source].title}</a><br /><span class="faint">{s.provides}</span></p>)}
+        </div>
+        {oldest && (
+          <div class="card side-card s-4">
+            <h3>Longest in service</h3>
+            <p class="wp-oldest"><a href={href(`/device/?tag=${oldest.unit.asset_tag}`)}><b>{deviceName(oldest.space, oldest.position, { site: true })}</b></a></p>
+            <p class="muted wp-note">Installed {fmtDate(oldest.installed)}, so {fmtYears(oldest.yearsIn)} in service against {oldest.life} planned.</p>
+          </div>
+        )}
+      </div>
+    </Section>
+  </div>
+
+  <script is:inline data-astro-rerun define:vars={{ NOW_YEAR }}>
+    (function () {
+      var bar = document.querySelector('[data-fb]'), host = document.querySelector('[data-year-host]');
+      if (!bar || !host) return;
+      var cols = Array.prototype.slice.call(document.querySelectorAll('.wp-chart [data-fopt]'));
+      var panels = Array.prototype.slice.call(host.querySelectorAll('[data-year-panel]'));
+      var last = null;
+      // The year to open below: the column you touched last, else the only one chosen, else this year.
+      cols.forEach(function (c) { c.addEventListener('click', function () { last = c.dataset.v; }); });
+      var want = function () {
+        var sel = bar.rsFilter ? bar.rsFilter.get('year') : [];
+        if (!sel.length) return String(NOW_YEAR);
+        return last && sel.indexOf(last) >= 0 ? last : sel[sel.length - 1];
+      };
+      var shown = function () { return panels.filter(function (p) { return !p.hidden; })[0]; };
+      function show(animate) {
+        var y = want();
+        cols.forEach(function (c) { c.classList.toggle('focus', c.dataset.v === y); });
+        var cur = shown(), next = panels.filter(function (p) { return p.dataset.yearPanel === y; })[0];
+        if (!next || cur === next) return;
+        var swap = function () { if (cur) cur.hidden = true; next.hidden = false; };
+        var M = window.rsMotion ? window.rsMotion() : { reduced: true };
+        var held = function () { if (window.rsHold) window.rsHold(host, swap); else swap(); };
+        if (animate && cur && !M.reduced) {
+          if (window.rsMorphPanels) window.rsMorphPanels(cur, next, held); else held();
+          next.animate([{ opacity: 0 }, { opacity: 1 }], { duration: M.enter, easing: M.ease });
+        } else held();
+      }
+      bar.addEventListener('fb:change', function () { show(true); });
+      if (bar.rsFilter) show(false);
+
+      // Sort: the due list re-orders inside the bar's run, so rows slide into place.
+      var body = document.querySelector('#due [data-items]');
+      var num = function (el, k) { return +el.dataset[k] || 0; };
+      var order = function () {
+        var rows = Array.prototype.slice.call(body.children), v = bar.rsFilter ? bar.rsFilter.sort() : 'due';
+        rows.sort(function (a, b) {
+          var c = 0;
+          if (v === 'site') c = num(a, 's') - num(b, 's');
+          else if (v === 'age') c = num(b, 'age') - num(a, 'age');
+          else c = num(a, 'y') - num(b, 'y');
+          return c || num(a, 'i') - num(b, 'i');
+        });
+        rows.forEach(function (r) { body.appendChild(r); });
+      };
+      bar.addEventListener('fb:sort', function () { bar.rsFilter.run(true, order); });
+      var s0 = new URLSearchParams(location.search).get('sort');
+      if (s0 && s0 !== 'due') order();
+
+      // "Show all" on a model table inside a year.
+      document.querySelectorAll('[data-more-btn]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var table = b.parentElement.querySelector('table'), open = b.getAttribute('data-open') === '1';
+          var go = function () {
+            table.querySelectorAll('tr[data-more]').forEach(function (r) { r.hidden = open; });
+            b.setAttribute('data-open', open ? '0' : '1');
+            b.textContent = open ? 'Show all ' + b.getAttribute('data-n') : 'Show fewer';
+          };
+          if (window.rsHold) window.rsHold(host, go); else go();
+        });
+      });
+    })();
+  </script>
+</Shell>
+<style is:global>
+  .wp-warn { color: var(--amber-ink, var(--amber)); }
+  .content.wp { gap: 20px; padding-top: 18px; }
+  .wp-chart-card { padding: 16px 18px 12px; }
+  .wp-chart-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 22px; margin-bottom: 14px; }
+  .wp-chart-head h2 { font-size: 16px; margin: 0; }
+  .wp-chart-hint { font-size: 12.5px; }
+  .wp-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 0 auto; padding: 0; list-style: none; font-size: 12px; color: var(--text-2); }
+  .wp-legend li { display: inline-flex; align-items: center; gap: 6px; }
+  .wp-legend .k { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+  .k-in { background: var(--accent); } .k-gone { background: var(--grey, #9aa0a6); } .k-due { background: var(--amber); }
+  .wp-chart { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: 2px; align-items: end; padding-top: 12px; }
+  .wp-col { appearance: none; font: inherit; color: inherit; background: none; border: 0; border-radius: 8px; padding: 2px 0 3px; cursor: pointer; display: grid; grid-template-rows: 26px 96px auto auto; justify-items: center; min-width: 0; transition: background var(--dur-state) var(--ease-settle), box-shadow var(--dur-state) var(--ease-settle); }
+  .wp-col:hover { background: color-mix(in srgb, var(--text) 5%, transparent); }
+  .wp-col.focus { box-shadow: inset 0 0 0 1px var(--line-strong); }
+  .wp-col[aria-pressed="true"] { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+  .wp-col:focus-visible { outline: 2px solid var(--focus, var(--accent)); outline-offset: 1px; }
+  .wp-col.now { position: relative; }
+  .wp-col.now::before { content: 'Today'; position: absolute; top: -2px; left: 50%; transform: translate(-50%, -100%); font: 700 9px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+  .wp-col.future .wp-y { color: var(--text-3); }
+  .wp-num { display: grid; align-content: end; justify-items: center; line-height: 1.05; font: 600 9.5px/1.05 var(--font-mono); }
+  .wp-num b { font-weight: 600; }
+  .n-in { color: var(--accent-ink, var(--accent)); } .n-due { color: var(--amber-ink, var(--amber)); } .n-none { color: var(--text-3); opacity: .5; }
+  .wp-bars { width: 100%; height: 96px; display: flex; align-items: flex-end; justify-content: center; gap: 1px; border-bottom: 1px solid var(--line-strong); padding: 0 2px; box-sizing: border-box; }
+  .wp-bars i { display: flex; flex-direction: column-reverse; width: 46%; max-width: 13px; border-radius: 3px 3px 0 0; min-height: 0; transition: height var(--dur-morph) var(--ease-settle); }
+  .wp-in { background: var(--accent); overflow: hidden; }
+  .wp-in b { display: block; width: 100%; background: var(--grey, #9aa0a6); }
+  .wp-due { background: var(--amber); }
+  .wp-y { font: 700 10.5px/1.3 var(--font-mono); margin-top: 3px; letter-spacing: -.02em; }
+  .wp-s { font: 500 9.5px/1.2 var(--font-mono); color: var(--text-3); min-height: 11px; }
+
+  .wp-panel[hidden] { display: none; }
+  .wp-ph { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 28px; padding: 0 0 14px; }
+  .wp-year { font: var(--weight-display, 800) 24px/1 var(--font-display); margin: 0; display: grid; gap: 4px; }
+  .wp-year small { font: 600 11px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+  .wp-stats { display: flex; flex-wrap: wrap; gap: 8px 26px; margin: 0; }
+  .wp-stats div { display: grid; gap: 2px; }
+  .wp-stats dt { font-size: 12px; color: var(--text-3); order: 2; }
+  .wp-stats dd { margin: 0; font: 800 20px/1 var(--font-sans); letter-spacing: -.02em; }
+  .wp-stats dd small { font: 400 13px/1 var(--font-sans); color: var(--text-3); }
+  .wp-where { flex-basis: 100%; margin: 0; font-size: 13px; }
+  .wp-panel .side-card h3 { font-size: 15px; }
+  .wp-panel .section-head { margin-bottom: 0; }
+  .g12 > .s-12 { grid-column: span 12; }
+  .wp-empty { margin: 0; font-size: 13.5px; }
+  .wp-note { margin: 0; font-size: 13px; }
+  .wp-sm { font-size: 12px; }
+  .wp-src { margin: 0; font-size: 13px; }
+  .wp-oldest { margin: 0; font-size: 14px; }
+  .wp-table { width: 100%; font-size: 13px; }
+  .wp-table th.r, .wp-table td.r { text-align: right; }
+  .wp-table td small { display: block; }
+  .wp-table td:first-child small { font-size: 11.5px; color: var(--text-3); }
+  .wp-dev { display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; }
+  .wp-dev b { display: block; font-weight: 600; }
+  .wp-table a { color: inherit; text-decoration: none; }
+  .wp-table a:hover b, .wp-table a:hover { text-decoration: underline; }
+  .wp-table td { padding-top: 6px; padding-bottom: 6px; }
+  .wp-dev .dg { color: var(--text-2); flex: none; }
+  .wp-table tr[hidden] { display: none; }
+  .wp-pill { display: inline-block; font: 700 11px/1 var(--font-mono); padding: 4px 7px; border-radius: 999px; }
+  .wp-pill.late { background: var(--red-soft, #fbe3e0); color: var(--red-ink, #9a2318); }
+  .wp-pill.now { background: var(--yellow-soft); color: var(--yellow-ink); }
+  .wp-pill.soon { background: var(--surface-2); color: var(--text-2); }
+  .wp-more { display: block; width: 100%; padding: 10px; border: 0; border-top: 1px solid var(--line); background: var(--surface-2); font: 600 13px/1 var(--font-sans); color: var(--accent-ink, var(--accent)); cursor: pointer; }
+  .wp-details summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--accent-ink, var(--accent)); }
+  .wp-more-kv { margin-top: 10px; }
+  /* Responsive (L10), never a sideways scroll: the years wrap into two lines of 16 under 1000 px of content,
+     four lines of 8 on a phone; the due list becomes one card per device under 700 px. */
+  @container content (max-width: 999px) { .wp-chart { grid-template-columns: repeat(16, minmax(0, 1fr)); row-gap: 16px; } .wp-legend { margin-left: 0; } }
+  @container content (max-width: 559px) {
+    .wp-chart { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+    .wp-col { grid-template-rows: 24px 64px auto auto; }
+    .wp-bars { height: 64px; }
+    .wp-stats { gap: 8px 18px; }
+  }
+  @container content (max-width: 699px) {
+    .wp-table.to-cards td:nth-child(1) { order: 0; flex: 1 1 60%; }
+    .wp-table.to-cards td:nth-child(5) { order: 1; flex: none; }
+    .wp-table.to-cards td:nth-child(2) { order: 2; flex: 1 1 100%; padding-left: 36px; }
+    .wp-table.to-cards td:nth-child(3) { order: 3; padding-left: 36px; }
+    .wp-table.to-cards td:nth-child(4) { order: 4; }
+    table.wp-table.to-cards td:is(:nth-child(2), :nth-child(5))[data-label]::before { content: none; }
+  }
+</style>

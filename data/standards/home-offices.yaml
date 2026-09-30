@@ -1,0 +1,131 @@
+# House standard: home and remote offices. Made up for the demo. No laptops or phones: only the kit Aigna provides at the desk.
+id: home-offices
+name: Home offices
+area: home-offices
+order: 10
+version: "1.0"
+effective: "2026-03-01"
+owner: Service manager, IT infrastructure
+summary: A home desk gets one cable to the laptop, a centrally managed gateway with its own work network, and a screen set up for a healthy working posture.
+intro: >-
+  A home office is a small site with one person in it. The kit is shipped ready, the gateway is adopted into Aigna's
+  console before it leaves the store, and the person plugs in three cables. Remote support replaces the site visit, so the
+  rules are about what can be seen and fixed from a distance.
+scope:
+  - The monitor, dock or USB-C hub and home network gateway that Aigna provides for a remote worker.
+  - "Not in scope: laptops, phones and the person's own home network beyond the gateway."
+related: [network, wifi]
+applies_to:
+  classes: [network-gateway, monitor, dock]
+  models: [unifi-express-7, dell-p2726deb, dell-u2724d]
+  configurations: [unifi-express-7-remote-gateway, dell-pro-p-conferencing-hub, dell-u2724d-secondary-monitor]
+  space_types: [remote-home]
+figures:
+  - { n: 1, label: Cable to the laptop }
+  - { n: "0", label: Site visits to set up }
+  - { n: "Own VLAN", label: For the work kit }
+  - { n: "Eye level", label: Top of the screen }
+sections:
+  - id: kit
+    title: The kit
+    rules:
+      - id: from-profile
+        level: must
+        rule: Ship the home office kit from the remote and home room profile, with each unit recorded against the person's home site in Keia Atlas before it ships.
+        why: Remote support needs to know exactly what is on the desk, and returns need the serial numbers.
+        check: Keia Atlas shows the person's home site with every unit in the profile, serials recorded.
+        house: true
+      - id: one-cable
+        level: must
+        rule: Connect the laptop with one USB-C cable that carries picture, network, camera and charging through the monitor or dock.
+        why: One cable is what people actually plug in every morning; three cables become one missing cable.
+        check: Plug in a laptop; picture, wired network and charging all work from the one cable.
+        house: true
+  - id: network
+    title: The home network gateway
+    rules:
+      - id: pre-adopt
+        level: must
+        rule: Adopt the gateway into Aigna's UniFi console under an Aigna account before it ships, never with a local-only login.
+        why: The network team can see, update and fix it from day one without asking the person for a password.
+        check: The gateway shows adopted and online in Site Manager within an hour of being plugged in.
+        house: true
+        sources: [unifi-adoption]
+      - id: behind-isp
+        level: must
+        rule: Connect the gateway's WAN port to the home internet router with a cable, and connect the dock or monitor to its LAN port with a cable.
+        why: A wired path is the most reliable way to join calls; Wi-Fi is the fallback.
+        check: The console shows the WAN link up and the dock on the LAN port.
+        house: true
+      - id: own-network
+        level: must
+        rule: Give the work kit its own network (VLAN) and Wi-Fi on the gateway, separate from the household's devices.
+        why: Keeps work traffic away from the household's devices, and lets the network team manage it without touching the family's network.
+        check: The console shows the work network with only the person's kit on it.
+        house: true
+        sources: [unifi-vlans]
+      - id: updates
+        level: must
+        rule: Keep automatic updates off and roll out the release the Lab has passed, outside working hours in the person's time zone.
+        why: An update during a call drops the call; people in three regions work at different hours.
+        check: The console shows the gateway on the fleet standard firmware.
+        house: true
+        sources: [unifi-updates]
+  - id: desk
+    title: The desk and screen
+    rules:
+      - id: screen-height
+        level: should
+        rule: Set the monitor so its top edge is at or slightly below eye level, about an arm's length away, square to the window rather than facing it.
+        why: Cuts neck strain and glare; display screen equipment rules ask employers to check workstation setup.
+        check: The person completes the workstation self-assessment with the setup photo.
+        sources: [hse-dse, eu-dse]
+      - id: camera
+        level: should
+        rule: Use the monitor's built-in camera at the top of the screen, with light on the person's face, not behind them.
+        why: Eye contact on calls, and a face people can see.
+        check: A test call during the remote setup session.
+        house: true
+      - id: surge
+        level: should
+        rule: Supply a surge-protected power strip with the kit and plug the gateway, monitor and dock into it.
+        why: Home wiring varies, and a surge takes out the monitor and the gateway together.
+        check: Included in the shipping list.
+        house: true
+references:
+  - id: unifi-adoption
+    name: UniFi device adoption, UniFi Help Center
+    publisher: Ubiquiti
+    kind: vendor
+    summary: How a UniFi device is adopted into a console so it is managed centrally.
+    source: unifi-device-adoption
+    checked: "2026-09-29"
+  - id: unifi-vlans
+    name: "Creating Virtual Networks (VLANs), UniFi Help Center"
+    publisher: Ubiquiti
+    kind: vendor
+    summary: How a separate network with its own VLAN and Wi-Fi is created on a UniFi gateway.
+    source: unifi-vlan-creating-virtual-networks
+    checked: "2026-09-29"
+  - id: unifi-updates
+    name: UniFi updates and release channels, UniFi Help Center
+    publisher: Ubiquiti
+    kind: vendor
+    summary: How updates are controlled from the console, including turning automatic updates off.
+    source: unifi-updates-control-plane
+    checked: "2026-09-29"
+  - id: hse-dse
+    name: "Working safely with display screen equipment (DSE), Health and Safety Executive"
+    publisher: HSE (United Kingdom)
+    kind: guide
+    summary: Guidance on workstation assessments for people who use screens, including home workers, and on screen height, distance and glare.
+    url: https://www.hse.gov.uk/msd/dse/
+    checked: "2026-09-29"
+  - id: eu-dse
+    name: Council Directive 90/270/EEC on display screen equipment
+    publisher: European Union
+    kind: regulation
+    summary: The European minimum requirements for work with display screens, including workstation analysis and screen, keyboard and environment requirements.
+    url: https://osha.europa.eu/en/legislation/directives/5
+    checked: "2026-09-29"
+demo: true

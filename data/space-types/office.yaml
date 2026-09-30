@@ -1,0 +1,146 @@
+# Space type: Private office
+# Based on public industry guidance (data/sources/room-guidance.yaml, decision 0006); house assumptions say so.
+# Keia part (profile to verification_model): which classes of device belong here.
+# Keia Atlas part: build options, the models each option names, and the outlets.
+
+schema: composite-profile
+
+profile:
+  name: Private office
+  space_type: office
+  version: "2.0"
+  last_updated: "2026-09-30"
+  owner: Keia Atlas maintainers
+  capacity: "1-3 people"
+  purpose: >-
+    An enclosed office for focused work, either assigned to one person or bookable.
+
+sources:
+  - file: data/sources/room-guidance.yaml
+    provides: 'Public guidance for this space type: size, capacity, display size, kit class and outlets'
+  - file: data/device-classes/scheduler-panel.yaml
+    provides: Healthy state for the scheduler panel class
+  - file: data/device-classes/monitor.yaml
+    provides: Healthy state for the monitor class
+
+equipment_categories:
+  - category: scheduling_panel
+    description: Booking panel at the door
+    object_profile: data/device-classes/scheduler-panel.yaml
+    quantity: "1"
+    notes: Optional in every build of this space type
+  - category: desk_display
+    description: Desk monitor with dock and camera
+    object_profile: data/device-classes/monitor.yaml
+    quantity: "2"
+
+verification_model:
+  platforms_to_check:
+    - platform: keia_atlas
+      check: every required device in the chosen option is recorded in the space and wired
+        as the option says
+    - platform: inventory
+      check: every device has an active record in this space
+    - platform: dhcp_dns
+      check: every networked device has an address reservation and DNS records
+    - platform: device_management
+      check: meeting devices are online, paired and on standard firmware
+
+keia_atlas:
+  standard: industry
+  guideline: tia-568-cabling
+  category: focus
+  capacity:
+    min: 1
+    max: 3
+  area:
+    sq_ft: 120
+    m2: 11.14
+  geometry:
+    # The room shell for a floor-level 3D model; basis says where each value comes from.
+    width_m: 3.66
+    depth_m: 3.05
+    ceiling_m: 2.6
+    display_wall: none
+    door: { wall: back, from_m: 2.66, to_m: 3.54 }
+    data_entry: { via: ceiling, wall: back, at: above the door }
+    containment: [ceiling-basket, skirting, desk-tray, desk-leg, floor-cover]
+    basis:
+      size: chosen
+      ceiling: house-default
+      door: house-default
+      data_entry: house-default
+      containment: house-default
+    notes:
+      - 12 x 10 ft (house assumption).
+  options:
+    - id: standard
+      name: Standard
+      clients:
+        - macos
+        - windows
+      summary: A 34 inch monitor with camera and dock, optionally a second 27 inch.
+      equipment:
+        - key: monitor
+          class: monitor
+          model: dell-p3426web
+          role: 34 inch monitor
+          quantity: 1
+          requirement: required
+          location: table-top
+          notes: '34 inch, built-in camera and dock: video, network and 90 W charging'
+        - key: monitor-second
+          class: monitor
+          model: dell-p2726deb
+          role: Second monitor, 27 inch
+          quantity: 1
+          requirement: optional
+          location: table-top
+        - key: scheduler-panel
+          class: scheduler-panel
+          model: logitech-tap-scheduler
+          quantity: 1
+          requirement: optional
+          location: room-entrance
+      infrastructure:
+        - service: power
+          provided_by: facilities
+          quantity: 4
+          location: wall-below-table
+          serves: [monitor, spare, spare, spare]
+        - service: data
+          provided_by: it
+          quantity: 2
+          location: wall-below-table
+          serves: [monitor, spare]
+          notes: Only one is patched to a switch port.
+        - service: data
+          provided_by: it
+          quantity: 1
+          location: room-entrance
+          serves: [scheduler panel (optional)]
+      wiring:
+        - from: monitor.usb-c-1
+          to: laptop
+          cable: usb-c
+          notes: 'One cable: picture, network and charging'
+        - from: monitor.lan-1
+          to: outlet:data/wall-below-table#1
+          cable: cat6
+        - from: monitor.power-in
+          to: outlet:power/wall-below-table#1
+          cable: power
+        - from: monitor-second.usb-c-1
+          to: laptop
+          cable: usb-c
+          when: monitor-second
+        - from: monitor-second.power-in
+          to: outlet:power/wall-below-table#2
+          cable: power
+          when: monitor-second
+        - from: scheduler-panel.lan-1
+          to: outlet:data/room-entrance#1
+          cable: cat6
+  notes:
+    - A private office for one, with room for two visitors (house assumption).
+    - 'Outlets: two data outlets at the desk wall (TIA-568).'

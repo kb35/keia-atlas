@@ -1,0 +1,111 @@
+# Space type: Print room
+# Based on public industry guidance (data/sources/room-guidance.yaml, decision 0006); house assumptions say so.
+# Keia part (profile to verification_model): which classes of device belong here.
+# Keia Atlas part: build options, the models each option names, and the outlets.
+
+schema: composite-profile
+
+profile:
+  name: Print room
+  space_type: copy-print-room
+  version: "2.0"
+  last_updated: "2026-09-30"
+  owner: Keia Atlas maintainers
+  purpose: >-
+    A tucked-away room for printing, copying and scanning.
+
+sources:
+  - file: data/sources/room-guidance.yaml
+    provides: 'Public guidance for this space type: size, capacity, display size, kit class and outlets'
+  - file: data/device-classes/printer.yaml
+    provides: Healthy state for the printer class
+
+equipment_categories:
+  - category: printing
+    description: Networked multifunction printer
+    object_profile: data/device-classes/printer.yaml
+    quantity: "1"
+
+verification_model:
+  platforms_to_check:
+    - platform: keia_atlas
+      check: every required device in the chosen option is recorded in the space and wired
+        as the option says
+    - platform: inventory
+      check: every device has an active record in this space
+    - platform: dhcp_dns
+      check: every networked device has an address reservation and DNS records
+    - platform: device_management
+      check: meeting devices are online, paired and on standard firmware
+
+keia_atlas:
+  standard: industry
+  guideline: tia-568-cabling
+  category: support
+  area:
+    sq_ft: 80
+    m2: 7
+  geometry:
+    # The room shell for a floor-level 3D model; basis says where each value comes from.
+    width_m: 2.8
+    depth_m: 2.5
+    ceiling_m: 2.6
+    display_wall: none
+    door: { wall: left, from_m: 1.52, to_m: 2.4 }
+    data_entry: { via: ceiling, wall: left, at: above the door }
+    containment: [ceiling-basket, skirting]
+    basis:
+      size: chosen
+      ceiling: house-default
+      door: house-default
+      data_entry: house-default
+      containment: house-default
+    notes:
+      - 9 x 8 ft, room for the printer, its feeder and a counter (house assumption).
+  options:
+    - id: compact
+      name: Compact
+      summary: Low-volume colour printer, no A3.
+      equipment:
+        - key: printer
+          class: printer
+          model: canon-ir-adv-c259
+          quantity: 1
+          requirement: required
+          location: tbd
+      infrastructure: &id001
+        - service: power
+          provided_by: it
+          quantity: 4
+          location: wall
+          height_mm: { min: 406, max: 610 }
+          serves: [printer, spare, spare, spare]
+          notes: About 40 to 60 cm above the floor
+        - service: data
+          provided_by: it
+          quantity: 2
+          location: wall
+          height_mm: { min: 406, max: 610 }
+          serves: [printer, spare]
+          notes: About 40 to 60 cm above the floor
+      wiring:
+        - from: printer.lan-1
+          to: outlet:data/wall#1
+          cable: cat6
+    - id: heavy-duty
+      name: Heavy duty
+      summary: High-volume colour printer with A3.
+      equipment:
+        - key: printer
+          class: printer
+          model: canon-imageforce-c5150
+          quantity: 1
+          requirement: required
+          location: tbd
+      infrastructure: *id001
+      wiring:
+        - from: printer.lan-1
+          to: outlet:data/wall#1
+          cable: cat6
+  notes:
+    - 'Outlets: two data outlets at the printer (TIA-568), one spare (house assumption).'

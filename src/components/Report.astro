@@ -1,0 +1,161 @@
+---
+// Report: the one way to tell the team something from any page (decision 0022).
+// Three kinds, each preloaded with what the page is about:
+//   Suggest a change   - a value or a step in the knowledge is wrong or missing
+//   New firmware found - a unit arrived with, or updated itself to, a version the standard doesn't list
+//   Urgent issue       - something unforeseen is blocking an install or a room
+// Demo: saved in this browser (localStorage "rs4-inbox") and shown on the service manager's home.
+import Icon from './Icon.astro';
+import { PEOPLE } from '../lib/demo.mjs';
+const { about } = Astro.props;
+const OWNERS = Object.fromEntries(PEOPLE.filter((p) => ['sm-av', 'sm-infra'].includes(p.roleId)).map((p) => [p.roleId, { id: p.id, name: p.name, role: p.role }]));
+---
+<dialog class="report" id="rs-report" aria-labelledby="report-title" data-about={JSON.stringify(about)}>
+  <form method="dialog" data-report-form>
+    <header>
+      <div>
+        <p class="overline">Report</p>
+        <h2 id="report-title">Tell the team</h2>
+        <p class="report-about"><Icon name="tag" size={14} /><span>About <b data-about-label>{about.label}</b></span></p>
+      </div>
+      <button class="icon-btn" value="close" aria-label="Close"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+    </header>
+
+    <div class="report-kinds" role="radiogroup" aria-label="What kind of report">
+      <label class="rk"><input type="radio" name="kind" value="urgent" /><span class="rk-ic urgent"><Icon name="alert" size={20} /></span><span><b>Urgent issue</b><small>Something unforeseen is blocking an install or a room</small></span></label>
+      <label class="rk"><input type="radio" name="kind" value="firmware" /><span class="rk-ic fw"><Icon name="chip" size={20} /></span><span><b>New firmware found</b><small>A unit has a version the standard doesn't list</small></span></label>
+      <label class="rk"><input type="radio" name="kind" value="change" checked /><span class="rk-ic chg"><Icon name="edit" size={20} /></span><span><b>Suggest a change</b><small>A setting, step or fact here is wrong or missing</small></span></label>
+    </div>
+
+    <div class="report-fields">
+      <fieldset data-for="change">
+        <label>What should change<input name="what" placeholder="e.g. Time Server on the Studio X" /></label>
+        <div class="two"><label>It says now<input name="now" /></label><label>It should say<input name="should" /></label></div>
+        <label>Why<textarea name="why" rows="3" placeholder="What you saw, and where. One or two sentences is plenty."></textarea></label>
+      </fieldset>
+      <fieldset data-for="firmware" hidden>
+        <div class="two"><label>Device or model<input name="model" /></label><label>Version on the unit<input name="version" placeholder="e.g. 4.7.1-468120" /></label></div>
+        <label>How it got there<select name="how"><option>Arrived from the factory with it</option><option>Updated itself</option><option>Someone updated it</option><option>Not sure</option></select></label>
+        <label>Is it working?<select name="works"><option>Works as the standard expects</option><option>Something is different or broken</option><option>Not tested yet</option></select></label>
+        <label>Notes<textarea name="notes" rows="3" placeholder="What differs from the configuration? Settings missing, renamed or moved?"></textarea></label>
+        <p class="report-hint"><b>Until it's decided:</b> don't update or roll back the unit. Configure what matches the configuration, note anything that doesn't, and carry on with the next room. The Lab tests the version and the service manager decides whether it becomes the standard.</p>
+      </fieldset>
+      <fieldset data-for="urgent" hidden>
+        <label>What happened<textarea name="happened" rows="3" placeholder="One sentence: what you expected and what you saw."></textarea></label>
+        <div class="two"><label>Is it blocking the work?<select name="blocks"><option>Yes, I can't continue</option><option>Partly, I've worked round it</option><option>No, but it needs fixing</option></select></label><label>Photo<input type="file" name="photo" accept="image/*" /></label></div>
+      </fieldset>
+    </div>
+
+    <p class="report-to"><Icon name="inbox" size={16} /><span>Goes to <b data-report-to>{OWNERS['sm-av'].name}</b>, <span data-report-to-role>{OWNERS['sm-av'].role}</span>. <span data-report-when>Reviewed within five working days.</span></span></p>
+    <footer>
+      <a class="btn ghost" href="#" data-report-editor>Open the full editor</a>
+      <button class="btn primary" type="submit" value="send" data-report-send>Send</button>
+    </footer>
+  </form>
+</dialog>
+<div class="toast" role="status" aria-live="polite" hidden data-toast><span data-toast-text></span><button type="button" class="btn ghost" data-toast-undo>Undo</button></div>
+
+<script is:inline data-astro-rerun define:vars={{ OWNERS }}>
+  (function () {
+    var dlg = document.getElementById('rs-report'); if (!dlg) return;
+    var form = dlg.querySelector('[data-report-form]');
+    var about = {}; try { about = JSON.parse(dlg.dataset.about || '{}'); } catch (_) {}
+    var get = function (k, d) { try { return JSON.parse(localStorage.getItem(k) || d); } catch (_) { return JSON.parse(d); } };
+    var put = function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
+    var network = /network|comms|mdf|idf|switch|rack/i.test((about.kind || '') + ' ' + (about.label || ''));
+    var owner = network ? OWNERS['sm-infra'] : OWNERS['sm-av'];
+    function kind() { var i = form.querySelector('input[name=kind]:checked'); return i ? i.value : 'change'; }
+    function sync() {
+      var k = kind();
+      form.querySelectorAll('fieldset[data-for]').forEach(function (f) { f.hidden = f.dataset.for !== k; });
+      dlg.querySelector('[data-report-to]').textContent = owner.name;
+      dlg.querySelector('[data-report-to-role]').textContent = owner.role;
+      dlg.querySelector('[data-report-when]').textContent = k === 'urgent' ? 'Arrives as urgent on their home, straight away.' : 'Reviewed within five working days.';
+      dlg.querySelector('[data-report-send]').textContent = k === 'urgent' ? 'Send as urgent' : 'Send';
+      dlg.classList.toggle('is-urgent', k === 'urgent');
+    }
+    form.addEventListener('change', sync);
+    var base = document.querySelector('link[rel=icon]');
+    var root = base ? base.getAttribute('href').replace(/favicon\.svg$/, '') : '/';
+    dlg.querySelector('[data-report-editor]').setAttribute('href', root + 'edit/' + (about.cls ? '?kind=profile&cls=' + encodeURIComponent(about.cls) : ''));
+    // Opened from the masthead button or any [data-open-report="kind"] on the page (even ones drawn later).
+    window.rsOpenReport = function (k, extra) {
+      if (k) { var r = form.querySelector('input[name=kind][value=' + k + ']'); if (r) r.checked = true; }
+      var m = form.querySelector('input[name=model]'); if (m && !m.value) m.value = (extra && extra.model) || about.model || about.label || '';
+      if (extra && extra.what) { var w = form.querySelector('input[name=what]'); if (w) w.value = extra.what; }
+      if (extra && extra.now) { var n = form.querySelector('input[name=now]'); if (n) n.value = extra.now; }
+      sync(); dlg.showModal();
+    };
+    if (!window.__rsReportHook) {
+      window.__rsReportHook = true;
+      document.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-open-report]'); if (!b || !window.rsOpenReport) return;
+        e.preventDefault();
+        window.rsOpenReport(b.dataset.openReport || '', { model: b.dataset.reportModel, what: b.dataset.reportWhat, now: b.dataset.reportNow });
+      });
+    }
+    dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
+    var toast = document.querySelector('[data-toast]'), timer;
+    form.addEventListener('submit', function (e) {
+      var sub = e.submitter; if (!sub || sub.value !== 'send') return;
+      var fd = new FormData(form), fields = {};
+      fd.forEach(function (v, k) { if (k !== 'kind' && typeof v === 'string' && v.trim()) fields[k] = v.trim(); });
+      var who = window.rsActorId ? window.rsActorId() : window.rsWhoId ? window.rsWhoId() : 'aoife';
+      var list = get('rs4-inbox', '[]');
+      var item = { id: 'RPT-' + String(100 + list.length + 1), kind: kind(), about: about, page: location.pathname, fields: fields, by: who, to: owner.id, at: new Date().toISOString(), status: 'new' };
+      list.unshift(item); put('rs4-inbox', list);
+      form.reset(); form.querySelector('input[value=change]').checked = true;
+      toast.querySelector('[data-toast-text]').textContent = (item.kind === 'urgent' ? 'Urgent issue sent to ' : 'Sent to ') + owner.name;
+      toast.hidden = false; toast.classList.remove('out'); clearTimeout(timer);
+      timer = setTimeout(function () { toast.classList.add('out'); setTimeout(function () { toast.hidden = true; }, window.rsMotion ? window.rsMotion().exit : 240); }, 5000);
+      toast.querySelector('[data-toast-undo]').onclick = function () {
+        put('rs4-inbox', get('rs4-inbox', '[]').filter(function (x) { return x.id !== item.id; }));
+        toast.hidden = true; document.dispatchEvent(new CustomEvent('rs:inbox'));
+      };
+      document.dispatchEvent(new CustomEvent('rs:inbox'));
+    });
+    sync();
+  })();
+</script>
+
+<style is:global>
+  .report { margin: 0 0 0 auto; height: 100vh; max-height: 100vh; width: min(460px, 100vw); padding: 0; border: 0; border-left: var(--border-card); background: var(--surface); color: var(--text); box-shadow: var(--shadow-lg); }
+  .report::backdrop { background: color-mix(in srgb, #000 35%, transparent); backdrop-filter: blur(3px); }
+  .report[open] { animation: rs-drawer-in var(--dur-page) var(--ease-settle) both; }
+  @keyframes rs-drawer-in { from { transform: translateX(40px); opacity: 0; } }
+  .report form { display: grid; grid-template-rows: auto auto 1fr auto auto; gap: 16px; height: 100%; padding: 22px 22px 18px; box-sizing: border-box; }
+  .report header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .report h2 { font-size: 24px; margin: 2px 0 6px; }
+  .report-about { display: flex; gap: 6px; align-items: center; margin: 0; font-size: 13.5px; color: var(--text-2); }
+  .report-kinds { display: grid; gap: 8px; }
+  .rk { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer; transition: border-color var(--dur-state), background var(--dur-state), transform var(--dur-state) var(--ease-settle); }
+  .rk:hover { transform: translateX(-2px); background: var(--surface-2); }
+  .rk input { position: absolute; opacity: 0; pointer-events: none; }
+  .rk:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+  .rk:has(input[value=urgent]:checked) { border-color: var(--red, #d33); background: var(--red-soft); }
+  .rk:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .rk b { display: block; font-size: 14.5px; }
+  .rk small { display: block; font-size: 12.5px; color: var(--text-2); }
+  .rk-ic { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: var(--surface-3); }
+  .rk-ic.urgent { background: var(--red-soft); color: var(--red-ink); }
+  .rk-ic.fw { background: var(--yellow-soft); color: var(--yellow-ink); }
+  .rk-ic.chg { background: var(--accent-soft); color: var(--accent-ink); }
+  .report-fields { overflow: auto; min-height: 0; }
+  .report fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 12px; animation: rise var(--dur-enter) var(--ease-settle); }
+  .report fieldset[hidden] { display: none; }
+  .report label { display: grid; gap: 5px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+  .report input:not([type=radio]), .report textarea, .report select { font: 400 14.5px/1.4 var(--font-sans); color: var(--text); background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 9px 11px; width: 100%; box-sizing: border-box; }
+  .report input:focus, .report textarea:focus, .report select:focus { outline: 2px solid var(--focus); outline-offset: 0; border-color: transparent; }
+  .report .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .report-hint { margin: 0; font-size: 12.5px; color: var(--text-2); padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--yellow, #e0a100) 55%, transparent); background: var(--surface-2); border-radius: 0 var(--radius) var(--radius) 0; }
+  .report-to { display: flex; gap: 8px; align-items: flex-start; margin: 0; font-size: 13px; color: var(--text-2); padding: 10px 12px; border-radius: var(--radius); background: var(--surface-2); }
+  .report.is-urgent .report-to { background: var(--red-soft); color: var(--red-ink); }
+  .report footer { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+  .report.is-urgent [data-report-send] { background: var(--red); border-color: var(--red); color: #fff; }
+  .toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 60; display: flex; gap: 14px; align-items: center; padding: 10px 12px 10px 18px; border-radius: var(--pill-radius); background: var(--ink); color: var(--on-ink); box-shadow: var(--shadow-lg); font-weight: 600; animation: rs-toast-in var(--dur-enter) var(--ease-settle); }
+  .toast .btn { color: var(--on-ink); border-color: color-mix(in srgb, var(--on-ink) 40%, transparent); padding: 4px 12px; }
+  .toast.out { transition: opacity var(--dur-exit) var(--ease-settle), transform var(--dur-exit) var(--ease-settle); opacity: 0; transform: translate(-50%, 12px); }
+  @keyframes rs-toast-in { from { opacity: 0; transform: translate(-50%, 20px); } }
+  @media (max-width: 760px) { .report { width: 100vw; } .toast { bottom: 84px; } .report .two { grid-template-columns: 1fr; } }
+  @media (prefers-reduced-motion: reduce) { .report[open], .toast, .report fieldset { animation: none; } }
+</style>

@@ -1,0 +1,64 @@
+# The house ratio model: how many people the service needs for the staff, offices, rooms and units it looks
+# after, and what a new office adds. Every figure here is a house assumption for the demo, chosen so the
+# arithmetic is easy to follow. The published benchmarks that exist are named under `benchmarks` so someone
+# with access can check them; none of them feeds the arithmetic.
+id: ratios
+kind: ratios
+name: House ratio model for people, offices and rooms
+demo: true
+
+# Plannable hours a person has in a year.
+hours:
+  per_day: 6            # the Schedule's figure: six plannable hours in a working day
+  working_days: 220     # working days after public holidays
+  leave_days: 25        # paid days off (the Schedule's allowance)
+  # 195 days at 6 hours: 1,170 plannable hours a person a year
+
+# Upkeep and first-line work, in hours a year, by what is looked after. This is the work that is not in a
+# project or the work plan: checks, first-line fixes, requests, moves, firmware and records.
+support:
+  tech:     { per_room: 8, per_unit: 1, per_staff: 0.5, per_kit: 3 }
+  delivery: { per_room: 1.5, per_unit: 0.25, per_staff: 0, per_kit: 0.5 }
+  network:  { per_room: 0.5, per_unit: 0.1, per_staff: 0.1, per_kit: 0.5 }
+  pm:       { per_room: 0, per_unit: 0, per_staff: 0, per_kit: 0 }
+
+# Who does each work-plan task (the refresh policy's tasks), so refresh hours land on the right role.
+refresh_roles: { provision: delivery, configure: delivery, install: tech, commission: delivery, decommission: tech }
+
+# Ratios the head of the service plans to. "per" is what one person of the role looks after.
+targets:
+  - { role: tech, per: staff, n: 250, note: "One on-site technician for every 250 staff at an office." }
+  - { role: tech, per: room, n: 30, note: "One on-site technician for every 30 rooms with technology in them." }
+  - { role: delivery, per: room, n: 70, note: "One delivery engineer for every 70 rooms, across a region." }
+  - { role: network, per: office, n: 6, note: "One network engineer for every 6 offices." }
+
+# What a new office looks like, from the offices on record (rooms and units from data/spaces and data/installs;
+# staff from headcount.yaml). Sizes are the three that exist.
+office_sizes:
+  S: { name: Small, rooms: 7, desks: 8, staff: 25, units: 25, like: jnu }
+  M: { name: Medium, rooms: 14, desks: 30, staff: 110, units: 105, like: mel }
+  L: { name: Large, rooms: 28, desks: 63, staff: 220, units: 190, like: dub }
+
+# What a fit-out costs and takes, per unit installed, from the fit-out on record (PRJ-14: 25 units, 596 role
+# hours, USD 410,000 all in) rounded to house figures. Cost is euros per unit for kit, cabling, the rack and
+# the vendor's work; hours are the team's own.
+fit_out:
+  cost_per_unit: 9000
+  hours_per_unit: { pm: 6, delivery: 8, tech: 5, network: 2 }
+  # A new office's units start falling due for replacement this many years after it opens.
+  refresh_after: 5
+  refresh_share: 0.6
+
+benchmarks:
+  - body: Gartner, IT Key Metrics Data
+    what: IT staff as a share of all staff, by industry and by IT function.
+    note: Covers the whole of IT with endpoints included, and is paywalled. Keia Atlas does not cover endpoints, so it is not used.
+  - body: Avasant (Computer Economics), IT Staffing Ratios
+    what: Users and devices supported per end-user support person.
+    note: Endpoint support, paywalled. Named for comparison only.
+  - body: HDI, Support Center Practices and Salary Report
+    what: Tickets and users per service desk analyst.
+    note: Service desk, not on-site AV and IT. Named for comparison only.
+  - body: AVIXA
+    what: No published ratio of AV support staff to rooms was found.
+    note: The room and unit figures above are house assumptions.

@@ -1,0 +1,75 @@
+# Device class: Camera
+# A Keia object profile: what a healthy device of this class looks like on every
+# platform that knows about it. Specific models are in data/device-models/ (step 3).
+
+schema: object-profile
+
+profile:
+  name: Camera
+  object_role: 'Separate camera for a space: a PTZ camera for a codec, or a whiteboard camera'
+  version: "1.0"
+  last_updated: "2026-09-27"
+  owner: Keia Atlas maintainers
+
+sources:
+  - file: data/sources/room-guidance.yaml
+    provides: Which space types use this class of device, and where it goes
+
+platforms:
+  keia_atlas:
+    required_fields:
+      - space
+      - model
+      - serial
+      - lifecycle_state
+      - expected_firmware
+    healthy_indicators:
+      - recorded in the space its space type expects
+      - every port wired as the space type says
+  inventory:
+    required_fields:
+      - asset_tag
+      - serial
+      - model
+      - space
+      - status
+    healthy_indicators:
+      - status is active
+      - space matches where the device is installed
+  device_management:
+    required_fields:
+      - device_name
+      - serial
+      - firmware_version
+    healthy_indicators:
+      - online in the vendor's device management service
+      - firmware at the fleet standard for the model
+      - settings match the configuration profile for the model
+    firmware_expectations: Set per model by its configuration profile
+
+consistency:
+  - check: serial match
+    compare:
+      - keia_atlas.serial
+      - inventory.serial
+  - check: space match
+    compare:
+      - keia_atlas.space
+      - inventory.space
+  - check: firmware match
+    compare:
+      - device_management.firmware_version
+      - keia_atlas.expected_firmware
+
+discrimination:
+  no_camera_image:
+    likely_causes:
+      - no power or PoE
+      - cable or converter fault
+      - not selected as a source
+    first_check: keia_atlas
+
+not_applicable:
+  - dhcp_dns
+  - room_booking
+  - monitoring

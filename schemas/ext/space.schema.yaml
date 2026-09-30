@@ -1,0 +1,128 @@
+# Space: one real space at a site, built to one option of one space type.
+# Files live in data/spaces/<site>/ and the file name is the space id,
+# which starts with the site id (for example nyc-21-04.yaml).
+#
+# `count` is for identical repeated units, like a bank of 40 flex desks.
+# Installed devices and wiring come from the space type option in step 4.4.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/space
+title: Space
+type: object
+additionalProperties: false
+required: [site, name, space_type, option]
+properties:
+  site:
+    description: Site id (a file in data/sites/).
+    type: string
+    pattern: "^[a-z0-9]+$"
+  floor:
+    description: Floor id from the site. Left out for the remote site.
+    type: string
+  number:
+    description: Room number as signed on the door, floor first (for example 21.04).
+    type: string
+    pattern: "^[0-9]{1,3}\\.[0-9]{2}$"
+  name: { type: string, minLength: 1 }
+  space_type:
+    description: Space type id (a file in data/space-types/).
+    type: string
+    pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
+  option:
+    description: Id of the build option within that space type.
+    type: string
+    pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
+  town:
+    description: "Home offices only: the town or city the home office is in. Never an address."
+    type: string
+    minLength: 1
+  country:
+    description: "Home offices only: ISO 3166-1 two-letter country code, which decides the plug."
+    type: string
+    pattern: "^[A-Z]{2}$"
+  near:
+    description: "Home offices only: the nearest office (a site id), where the person goes on office days and where support comes from."
+    type: string
+    pattern: "^[a-z]{3}$"
+  count:
+    description: How many identical units this entry stands for (desks in a bank). Default 1. Each home office is its own room (decision 0025).
+    type: integer
+    minimum: 1
+  notes:
+    type: array
+    items: { type: string }
+  geometry:
+    description: >-
+      How this real room differs from its profile, and where it sits on its floor.
+      Only what differs is recorded; everything left out comes from the profile. The room's own frame is the room
+      drawing's: x along the display wall, y away from it, metres. Made up for the demo where the site is (rule F9).
+    type: object
+    additionalProperties: false
+    required: [on_floor]
+    properties:
+      on_floor:
+        description: Where the room's frame starts on the floor plan (x east, y north, metres from the outline's south-west corner) and its turn, anticlockwise.
+        type: object
+        additionalProperties: false
+        required: [x_m, y_m, turn_deg]
+        properties:
+          x_m: { type: number }
+          y_m: { type: number }
+          turn_deg: { enum: [0, 90, 180, 270] }
+      size_m:
+        description: The real size where it differs from the profile (the layout stretches to fit). Required for a desk bank and a comms room, which have no room-sized profile.
+        type: object
+        additionalProperties: false
+        required: [width, depth]
+        properties:
+          width: { type: number, exclusiveMinimum: 0 }
+          depth: { type: number, exclusiveMinimum: 0 }
+      ceiling_m: { type: number, exclusiveMinimum: 0 }
+      mirror: { description: "Built the other way round: the profile's left wall is on the right.", type: boolean }
+      door:
+        description: The door, where it is not where the profile puts it. Walls are the room's own (back is the display wall).
+        type: object
+        additionalProperties: false
+        required: [wall, from_m, to_m]
+        properties:
+          wall: { enum: [back, front, left, right] }
+          from_m: { type: number, minimum: 0 }
+          to_m: { type: number, minimum: 0 }
+      display_wall: { enum: [back, none] }
+      data_entry:
+        description: Where the data comes in, when it is not above the door (a desk bank's feed from the ceiling).
+        type: object
+        additionalProperties: false
+        required: [via, wall]
+        properties:
+          via: { enum: [ceiling, floor] }
+          wall: { enum: [back, front, left, right] }
+          at_m: { type: number, minimum: 0 }
+      served_by: { description: The comms room (a space id) when it is not the floor's own.,  type: string, pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
+      benches:
+        description: "Desk banks only: each bench is a back-to-back run, half its desks each side of the spine, from its corner in the bank's frame. Desks are numbered bench by bench."
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [x_m, y_m, desks]
+          properties:
+            x_m: { type: number }
+            y_m: { type: number }
+            desks: { type: integer, minimum: 2, multipleOf: 2 }
+      odd:
+        description: What is odd about the room. A column or a cut-out corner is a box in the room's frame; a glass wall is a wall with no plates.
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [kind]
+          properties:
+            kind: { enum: [column, corner, window-wall] }
+            x_m: { type: number }
+            y_m: { type: number }
+            w_m: { type: number, exclusiveMinimum: 0 }
+            d_m: { type: number, exclusiveMinimum: 0 }
+            wall: { enum: [back, front, left, right] }
+            note: { type: string }
+      notes: { type: array, items: { type: string } }

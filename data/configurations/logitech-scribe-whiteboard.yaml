@@ -1,0 +1,43 @@
+# Configuration: Scribe whiteboard camera for Google Meet. Setting names, menu paths and defaults are the vendor's (cited per setting);
+# the values and reasons are Aigna's (demo). Researched from vendor documents, Sept 2026.
+id: logitech-scribe-whiteboard
+name: Scribe whiteboard camera for Google Meet
+models: [logitech-scribe]
+mode: USB content camera, via its Power Injector and Dongle Transceiver, to the room's Google Meet ChromeOS compute system
+version: '1.0'
+owner: sofia
+updated: '2026-09-28'
+firmware: Scribe camera software 1.4+ (Google Meet's Whiteboard Camera option needs at least this)
+summary: Scribe has no network interface or web page of its own; its category cable runs from the camera through the kit's inline Power Injector to a USB
+  Dongle Transceiver that plugs into the room's ChromeOS Google Meet compute system, where it's picked up as the Whiteboard Camera. All configuration (whiteboard
+  boundaries, firmware) goes through Logitech Sync, reached from that same computer.
+managed_by: Logitech Sync App (run from the room's compute system); the Google Meet touch controller for day-to-day use
+steps:
+- Mount the camera on its arm above the whiteboard and run its category cable down to the inline Power Injector.
+- Power the injector from a mains socket and run its second category cable to the Dongle Transceiver.
+- Plug the Dongle Transceiver's USB-A cable into the room's ChromeOS compute system.
+- On first power-up, let auto-calibration find the whiteboard's corners; check them from the Sync App's Video tab and adjust with Edit Boundaries if the
+  frame is off.
+- Confirm the camera shows Scribe firmware 1.4 or later so the Whiteboard Camera option appears in Google Meet.
+- "In a test call, on the room's Google Meet touch controller choose More Options > Present > Whiteboard Camera."
+groups:
+- name: Whiteboard framing
+  where: Logitech Sync App (desktop, connected to the room's compute system) > Video tab
+  settings:
+  - {derive: on-site, name: Edit Boundaries, path: Video > Edit Boundaries, value: The four corners dragged to match this room's whiteboard, per_device: true, action: change,
+    layer: room-type, why: 'Auto-calibration on first use gets close, but every whiteboard is a different size and distance from the camera, so Aigna
+      always checks and adjusts it by hand.', source: logitech-scribe-whiteboard-framing}
+- name: Firmware
+  where: Logitech Sync Portal
+  settings:
+  - {name: Firmware version, value: 1.4 or later, action: verify, layer: profile, why: Google's Whiteboard Camera option in Meet only appears once Scribe
+      is on 1.4 or later; older units need a manual firmware update first., source: logitech-scribe-google-meet-hardware-setup}
+  - {name: Firmware update, path: Inventory > Room > Update, value: 'Manually scheduled, after the Lab passes it', action: verify, layer: profile, why: 'Sync
+      Portal has no automatic-update toggle to turn off; updates are already manually scheduled, matching Aigna''s Lab-first policy.', source: logitech-sync-schedule-firmware-update}
+gaps: ['Scribe only works with a ChromeOS Google Meet compute system, not Android; Aigna should not plan to use it in a room whose compute system is
+    Android-based.', 'The physical Share Button built into the Scribe kit is explicitly not supported with Google Meet, even though it''s used to confirm
+    auto-calibration in Logitech''s general (non-Google-Meet) workflow; how a Google Meet room is meant to confirm calibration without it isn''t documented.',
+  'Manual whiteboard boundary calibration needs the local Sync desktop app connected to a computer; it isn''t available from Sync Portal or in Appliance
+    Mode, so a laptop may need to be borrowed for it in an all-in-one ChromeOS room.', 'No PoE class, standard or power draw is documented for the camera
+    or its Power Injector; only that the kit''s injector powers it over the category cable (see the device model).', 'The datasheet and the Logitech Hub
+    spec page disagree on the camera''s depth (593 mm vs 573 mm), already flagged in the device model.']

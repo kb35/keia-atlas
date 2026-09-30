@@ -1,0 +1,181 @@
+# Configuration: Samsung QMC commercial display, for meeting rooms and signage.
+# Setting names and menu paths are the vendor's (user manual BN81-24537A-12, 18 Sept 2026, cited per setting);
+# the values and reasons are Aigna's (demo). The manual states no factory defaults, so none are given.
+# Anything marked unconfirmed is not in the manual or has not been tried on a real unit.
+id: samsung-qmc-display
+name: QMC display for meeting rooms and signage
+models: [samsung-qm65c, samsung-qm85c]
+mode: Networked, VXT managed, controlled by the room system
+version: "1.0"
+owner: sofia
+updated: "2026-09-29"
+firmware: "Tizen 7.0"
+requires:
+  - "A wired data outlet behind the display on the Displays and signage VLAN (31), with a DHCP reservation"
+  - "A Samsung VXT account and licence for the site"
+  - "The site's NTP servers handed out by DHCP"
+managed_by: "The display's own menu for first setup, then Samsung VXT"
+summary: "Aigna wires every QMC to the network, sets its clock from NTP, turns its own energy saving and auto power off features off, and lets the room system and a daily timer decide when it is on. It is named, reachable for MDC control and SNMP, locked, and managed in Samsung VXT."
+menus: [Home, "Settings: Picture", Sound, Network, System, Support]
+steps:
+  - Mount the display, patch its LAN port to the room's display outlet, connect HDMI from the video bar or player, then power on.
+  - "Set the clock from NTP and the time zone first: the timers depend on it."
+  - Change the PIN, then set the network name, power control and energy saving.
+  - "Set the timers, inputs and CEC for the room type, then MDC, remote management and SNMP."
+  - Update to the Lab's release, register in VXT, then lock the menus last.
+  - Export the settings to USB with Clone Product and import them on the next display of the same model.
+setup:
+  - id: preflight
+    title: Pre-flight
+    critical: true
+    detail: "Confirm the display outlet is live on VLAN 31 with a DHCP reservation for the display's MAC address, and that a VXT licence is free. Have the site's PIN from the vault."
+  - id: connect
+    title: Connect LAN, HDMI, then power
+    critical: true
+    after: [preflight]
+    why_order: "The display should find its reserved address on first boot, so the network cable goes in before the power."
+    detail: "LAN to the display outlet, HDMI 1 to the video bar (meeting rooms) or the signage player (signage)."
+    source: samsung-qmc-user-manual
+  - id: clock
+    title: Set the clock from NTP
+    critical: true
+    path: Settings > System > Time > NTP Settings
+    after: [connect]
+    why_order: "NTP needs the network; the On and Off timers need the clock (the manual says to set the clock before the timers)."
+    detail: Server from DHCP (the site's NTP servers) and the site's time zone. Check DST follows the zone.
+    source: samsung-qmc-user-manual
+  - id: pin
+    title: Change the PIN
+    critical: true
+    path: Settings > System > Change PIN
+    after: [connect]
+    why_order: "Every lock and reset later asks for the PIN, so it is changed before anything is locked."
+    detail: The site's six-digit PIN from the vault. The manual does not state the default PIN.
+    source: samsung-qmc-user-manual
+  - id: name
+    title: Name the display
+    path: Settings > Network > Device Name
+    detail: "The hostname, for example dub-305-dsp01."
+    source: samsung-qmc-user-manual
+  - id: power
+    title: Power control and energy saving
+    critical: true
+    path: Settings > System > Power Control, then Power and Energy Saving
+    after: [clock]
+    why_order: "Remote Configuration keeps the network alive in standby, which the timers and fleet management rely on."
+    detail: "Remote Configuration on, Auto Power On on, Max. Power Saving off, Energy Saving Solution off, No Signal Power Off off, Auto Power Off off."
+    source: samsung-qmc-user-manual
+  - id: timers
+    title: On and Off timers and holidays
+    path: Home > Settings > On/Off Timer
+    after: [clock]
+    why_order: The timers run on the display's clock, which must be right first.
+    detail: "On Timer 1 Mon to Fri at the office's opening time, source HDMI 1. Off Timer 1 every day at the office's closing time plus one hour. Holidays from the country's public holiday list."
+    source: samsung-qmc-user-manual
+  - id: inputs
+    title: Inputs and CEC
+    path: Settings > System > Auto Source Switching; Settings > System > General > Anynet+ (HDMI-CEC)
+    detail: "Meeting rooms: Auto Source Switching on with HDMI 1 as the primary source and Primary Source Recovery on, Anynet+ on. Signage: Auto Source Switching off, Anynet+ off."
+    source: samsung-qmc-user-manual
+  - id: control
+    title: MDC, remote management and SNMP
+    path: Home > Settings > ID Settings; Settings > System > Security
+    detail: "Device ID 1 and PC Connection Cable RJ-45 (LAN). Remote Management Allow. SNMP Settings with the site's monitoring credentials."
+    source: samsung-qmc-user-manual
+  - id: firmware
+    title: Update to the Lab's release
+    path: Settings > Support > Software Update > Update Now
+    after: [clock]
+    why_order: Updates are checked against the display's clock and network.
+    detail: Install the release the Lab has passed, from USB or the network. Do not update to a newer release than the Lab's.
+    source: samsung-qmc-user-manual
+  - id: vxt
+    title: Register in Samsung VXT
+    after: [name, firmware]
+    why_order: "The display registers under its name and reports its firmware, so both must be final first."
+    detail: "Add the display to the site's VXT workspace under its hostname and put it in the room's group. The QMC user manual does not describe VXT enrolment; follow VXT's own guide."
+    unconfirmed: true
+    source: samsung-qm65c-product-page
+  - id: locks
+    title: Lock the menus and buttons
+    critical: true
+    path: Settings > System > Security
+    after: [pin, power, timers, inputs, control, vxt]
+    why_order: "Safety Lock blocks the remote and the menus, so it is the last thing set on the display."
+    detail: "Safety Lock on, Button Lock on, USB Lock on. The room system and VXT still reach the display over the network."
+    source: samsung-qmc-user-manual
+  - id: clone
+    title: Export the settings for the next display
+    path: Home > Settings > Clone Product > Export to External Storage
+    after: [locks]
+    why_order: The export must hold the finished settings.
+    detail: "Import on each further display of the same model, then set only its Device Name and check the timers. The clone file is kept with the configuration, not on a desk."
+    source: samsung-qmc-user-manual
+  - id: verify
+    title: Verify
+    after: [clone]
+    why_order: The check is of the finished display.
+    detail: "Turn the display off and on from the room system and from VXT; start a call and check the display wakes on the video bar (meeting rooms); read its status over SNMP."
+groups:
+  - name: Time
+    where: Settings > System > Time
+    settings:
+      - { derive: time-servers-zone, action: change, name: NTP Settings, path: "Settings > System > Time > NTP Settings", value: "The site's NTP servers (from DHCP) and the site's time zone", per_device: true, layer: country, why: "Timers, logs and VXT schedules only line up when the clock is right; a display clock set by hand drifts.", source: samsung-qmc-user-manual }
+      - { action: verify, name: DST, path: "Settings > System > Time > DST", value: "Follows the time zone", layer: country, why: "A timer an hour out twice a year is the most common timer complaint.", source: samsung-qmc-user-manual }
+      - { action: leave, name: Power On Delay, path: "Settings > System > Time > Power On Delay", value: "Not used", layer: profile, why: "Only needed to stagger a video wall's start.", source: samsung-qmc-user-manual }
+  - name: Power control
+    where: Settings > System > Power Control
+    settings:
+      - { action: change, name: Remote Configuration, path: "Settings > System > Power Control > Remote Configuration", value: "On", layer: profile, why: "Keeps the network connection alive when the display is off, so the room system, MDC and VXT can turn it on and see it.", source: samsung-qmc-user-manual }
+      - { action: change, name: Auto Power On, path: "Settings > System > Power Control > Auto Power On", value: "On", layer: profile, why: "After a power cut the display comes back on by itself; the room system or the Off Timer then turns it off.", source: samsung-qmc-user-manual }
+      - { action: change, name: Max. Power Saving, path: "Settings > System > Power Control > Max. Power Saving", value: "Off", layer: profile, unconfirmed: true, why: "A deeper power saving state can drop the network in standby; Aigna saves energy with the timer and the room system instead.", source: samsung-qmc-user-manual }
+      - { action: leave, name: Standby Control, path: "Settings > System > Power Control > Standby Control", value: "Samsung's default", layer: profile, why: "Not needed once No Signal Power Off and Auto Power Off are off.", source: samsung-qmc-user-manual }
+      - { action: leave, name: Power Button, path: "Settings > System > Power Control > Power Button", value: "Samsung's default", layer: profile, why: "The remote is kept by IT; people use the room system.", source: samsung-qmc-user-manual }
+  - name: Energy saving
+    where: Settings > System > Power and Energy Saving
+    settings:
+      - { action: change, name: Energy Saving Solution, path: "Settings > System > Power and Energy Saving > Energy Saving Solution", value: "Off", layer: profile, why: "It dims the backlight, which makes the far end and shared content look dull and changes the video bar's picture as it adjusts. Aigna saves far more energy by turning the display off when the room is empty.", source: samsung-qmc-user-manual }
+      - { action: change, name: Backlight Optimisation, path: "Settings > System > Power and Energy Saving > Backlight Optimisation", value: "Off in meeting rooms; on for signage near windows", layer: room-type, why: "In a meeting room a brightness that follows the light fights the camera's exposure; signage by a window needs to brighten in daylight.", source: samsung-qmc-user-manual }
+      - { action: change, name: No Signal Power Off, path: "Settings > System > Power and Energy Saving > No Signal Power Off", value: "Off", layer: profile, why: "When the video bar sleeps, the display would switch itself off and may not wake for the next meeting, which people report as no picture. The room system and the timer decide when it is off.", source: samsung-qmc-user-manual }
+      - { action: change, name: Auto Power Off, path: "Settings > System > Power and Energy Saving > Auto Power Off", value: "Off", layer: profile, why: "Nobody presses the remote in a meeting room or on signage, so an idle timer would turn a working display off in the middle of the day.", source: samsung-qmc-user-manual }
+      - { action: leave, name: Backlight Schedule, path: "Settings > System > Power and Energy Saving > Backlight Schedule", value: "Not used", layer: profile, why: "The On and Off timers do the job.", source: samsung-qmc-user-manual }
+  - name: On/Off Timer
+    where: Home > Settings > On/Off Timer
+    settings:
+      - { derive: office-hours, action: change, name: On Timer 1, path: "Home > Settings > On/Off Timer > On Timer", value: "Mon~Fri at the office's opening time, Source HDMI 1", per_device: true, layer: country, why: "Signage is on when people arrive; a meeting room display is ready and on the right input for the first meeting.", source: samsung-qmc-user-manual }
+      - { derive: office-hours, action: change, name: Off Timer 1, path: "Home > Settings > On/Off Timer > Off Timer", value: "Everyday at the office's closing time plus one hour", per_device: true, layer: country, why: "A backstop: if the room system misses a power off, the display still goes off overnight, which is where the energy saving comes from.", source: samsung-qmc-user-manual }
+      - { derive: holidays, action: change, name: Holiday Management, path: "Home > Settings > On/Off Timer > Holiday Management", value: "The country's public holidays, applied to the timers", layer: country, why: "The display stays off on days the office is closed.", source: samsung-qmc-user-manual }
+  - name: Inputs and CEC
+    where: Settings > System
+    settings:
+      - { action: change, name: Auto Source Switching, path: "Settings > System > Auto Source Switching", value: "Meeting rooms on, Primary Source HDMI 1, Primary Source Recovery on; signage off", layer: room-type, why: "In a meeting room the display returns to the video bar after someone plugs in directly; signage must never leave its player's input.", source: samsung-qmc-user-manual }
+      - { action: change, name: Anynet+ (HDMI-CEC), path: "Settings > System > General > Anynet+ (HDMI-CEC)", value: "On in video bar rooms; off for signage and rooms with a control system", layer: room-type, why: "The video bar wakes the display and selects its input over CEC; elsewhere CEC from a player or laptop would switch the display unexpectedly.", source: samsung-qmc-user-manual }
+      - { action: leave, name: HDMI Hot Plug, path: "Settings > System > General > HDMI Hot Plug", value: "Samsung's default", layer: profile, why: "No Aigna source needs it changed.", source: samsung-qmc-user-manual }
+  - name: Network and control
+    where: Settings > Network and Home > Settings > ID Settings
+    settings:
+      - { derive: hostname, action: change, name: Device Name, path: "Settings > Network > Device Name", value: "The hostname", per_device: true, layer: naming-network, why: "One name finds the display in DNS, VXT, monitoring and Keia Atlas.", source: samsung-qmc-user-manual }
+      - { derive: dhcp-reservation, action: verify, name: IP Settings, path: "Settings > Network > Open Network Settings > IP Settings", value: "Automatic (DHCP), the address fixed by a reservation", layer: naming-network, why: "The network team can change the address centrally without a site visit.", source: samsung-qmc-user-manual }
+      - { action: change, name: Device ID, path: "Home > Settings > ID Settings > Device ID", value: "1, PC Connection Cable RJ-45 (LAN)", layer: profile, why: "MDC commands from the room system address the display by ID over the network.", source: samsung-qmc-user-manual }
+      - { action: change, name: Remote Management, path: "Settings > System > Security > Remote Management", value: "Allow", layer: profile, why: "Lets the room system and VXT send power, input and status commands over the network.", source: samsung-qmc-user-manual }
+      - { derive: vault-monitoring, action: change, name: SNMP Settings, path: "Settings > System > Security > Secured Protocol > SNMP Settings", value: "The site's monitoring credentials from the vault", per_device: true, layer: naming-network, why: "Monitoring reads the display's status and raises an alert when it stops answering.", source: samsung-qmc-user-manual }
+      - { action: verify, name: Wired 802.1x Connection, path: "Settings > System > Security > Wired 802.1x Connection", value: "Off", layer: naming-network, why: "Aigna authenticates display ports by MAC address at the switch.", source: samsung-qmc-user-manual }
+      - { action: leave, name: Server Network Settings, path: "Settings > Network > Server Network Settings", value: "Not used", layer: profile, why: "MagicINFO is not used; Samsung points MagicINFO 8 users to VXT.", source: samsung-vxt-magicinfo-eol }
+  - name: Security and locks
+    where: Settings > System > Security
+    settings:
+      - { derive: vault-site, action: change, name: Change PIN, path: "Settings > System > Change PIN", value: "The site's PIN from the vault", per_device: true, layer: profile, why: "A default PIN is the same on every display and is on the internet.", source: samsung-qmc-user-manual }
+      - { action: change, name: Safety Lock On, path: "Settings > System > Security > Safety Lock On", value: "On", layer: profile, why: "Stops the remote and the menus changing a setting in a public room; the room system and VXT still work.", source: samsung-qmc-user-manual }
+      - { action: change, name: Button Lock, path: "Settings > System > Security > Button Lock", value: "On", layer: profile, why: "The buttons on the display are within reach on signage and in rooms.", source: samsung-qmc-user-manual }
+      - { action: change, name: USB Lock, path: "Settings > System > Security > USB Lock", value: "On", layer: profile, why: "No content or updates from a stick someone plugs in.", source: samsung-qmc-user-manual }
+  - name: Updates
+    where: Settings > Support
+    settings:
+      - { action: change, name: Software Update, path: "Settings > Support > Software Update > Update Now", value: "The Lab's release, applied by hand or from VXT", layer: profile, why: "Updates can change menus and defaults; the Lab finds that first.", source: samsung-qmc-user-manual }
+gaps:
+  - "The user manual states no factory defaults for these settings, so every Set or Verify is written as the value Aigna wants, not a change from a known default."
+  - "The manual does not describe enrolling in Samsung VXT; the product page names VXT for remote device management. The VXT step is marked unconfirmed."
+  - "No automatic update setting is documented, only Update Now."
+  - "The manual documents MDC over RS232C and LAN but does not state the TCP port; third-party control drivers use 1515."
+  - "SNMP is confirmed (ID and password), but its version and MIB are not stated."
+  - "Max. Power Saving's effect on the network in standby is not stated; the value is marked unconfirmed until tried on a unit."

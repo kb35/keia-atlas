@@ -1,0 +1,103 @@
+# Strict JSON Schema copy of Keia's object-profile schema.
+#
+# Original: vendor/keia/schemas/content/object-profile.schema.yaml.
+# Keia's schema lists "platform_name" and "symptom" as fields, but its own
+# example uses them as the map keys (platforms.inventory, discrimination.device_unreachable).
+# This copy follows the example; the drift test knows about that mapping.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/keia/object-profile
+$comment: "keia-schema-version: 1.0"
+title: Keia object profile (strict copy)
+description: What a healthy single object of one class looks like, across every platform that knows about it.
+type: object
+additionalProperties: false
+required: [schema, profile, sources, platforms, consistency, discrimination, not_applicable]
+properties:
+  schema:
+    const: object-profile
+
+  profile:
+    type: object
+    additionalProperties: false
+    required: [name, object_role, version, last_updated, owner]
+    properties:
+      name: { type: string, minLength: 1 }
+      object_role: { type: string, minLength: 1 }
+      naming_prefixes:
+        type: array
+        items: { type: string }
+      version: { type: string, minLength: 1 }
+      last_updated: { type: string, format: date }
+      owner: { type: string, minLength: 1 }
+
+  sources:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [file, provides]
+      properties:
+        file: { type: string, minLength: 1 }
+        provides: { type: string, minLength: 1 }
+
+  platforms:
+    description: Keia rule, at least one platform. Keyed by platform name.
+    type: object
+    minProperties: 1
+    propertyNames: { pattern: "^[a-z0-9_]+$" }
+    additionalProperties:
+      type: object
+      additionalProperties: false
+      required: [required_fields, healthy_indicators]
+      properties:
+        required_fields:
+          type: array
+          minItems: 1
+          items: { type: string }
+        healthy_indicators:
+          type: array
+          minItems: 1
+          items:
+            anyOf:
+              - { type: string }
+              - { type: object }
+        naming_convention: { type: string }
+        firmware_expectations: { type: [string, object] }
+        mode_variants: { type: [array, object] }
+
+  consistency:
+    description: Keia rule, at least one consistency check.
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [check, compare]
+      properties:
+        check: { type: string, minLength: 1 }
+        compare:
+          type: array
+          minItems: 2
+          items: { type: string, pattern: "^[a-z0-9_]+\\.[a-z0-9_.]+$" }
+
+  discrimination:
+    description: Keia rule, at least one entry. Keyed by symptom.
+    type: object
+    minProperties: 1
+    propertyNames: { pattern: "^[a-z0-9_]+$" }
+    additionalProperties:
+      type: object
+      additionalProperties: false
+      required: [likely_causes, first_check]
+      properties:
+        likely_causes:
+          type: array
+          minItems: 1
+          items: { type: string }
+        first_check: { type: string, minLength: 1 }
+
+  not_applicable:
+    type: array
+    items: { type: string }

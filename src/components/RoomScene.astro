@@ -1,0 +1,482 @@
+---
+// The room drawn to scale (src/lib/room3d.mjs): a cut-away view from the front right corner, the
+// display wall at the back. Furniture and devices sit where the room profile puts them, at their real
+// sizes; the ruler along the front edge is in metres. Outlets are the real plates, floor boxes and desk
+// modules, to scale, lettered A, B, C, with their sockets (the site's plug type) and data jacks
+// (coloured by signal) on the face.
+//
+// One rule for markers: a solid marker is something you can see in the room, a dashed one something
+// hidden (behind the display, under the table, behind storage, outside the door). A hidden thing is
+// drawn where it really is, under what hides it, with a faint dashed outline; its marker sits just
+// outside, with a short leader line. "See behind" fades what hides them; "Cables" draws every cable
+// along the room's containment (src/lib/cableroute.mjs, rule R7): from the port it really leaves, in
+// its lane along the track, trunking, tray or duct, to the port it plugs into, coloured by signal, with
+// each plate's feed back to where the data comes in above the door. Pointing at a cable lights its
+// whole route and both ends; pointing at a plate lights the devices plugged into it; pointing at a
+// device lights its plate and ports.
+//
+// highlight: scene keys (data-sk: "video-bar", "display#2") to light the way hovering does, and keep lit
+// when the pointer leaves. An incident page uses it to show the affected device; tone "bad" makes the glow red.
+//
+// pair: the record layout (room profile and room pages). The drawing sits in its own card beside the
+// "side" slot (the Key, as a SidePanel), and is only as wide as the room needs: every room is drawn at
+// the same number of pixels a metre (PX_PER_M), so a small office is drawn small and a boardroom
+// large, until the cap: at most 58% of the width and never taller than 60% of the window. With less
+// room (a container query) the side panel goes under the drawing. rec: attributes for the picture card
+// (recHere from src/lib/vt.mjs).
+import { roomItems } from '../lib/scene.mjs';
+import { buildRoom, render, layoutLabels, HOUSE_OUTLET_Z } from '../lib/room3d.mjs';
+import { routeCables, cableWords, itemName, commsRoomOf } from '../lib/cableroute.mjs';
+import { sites, models, className, spaces } from '../lib/data.mjs';
+const { option, type, fitted = null, space = null, uid = option.id, summary = null, highlight = [], tone = null, pair = false, rec = {}, help = null, label = 'The room' } = Astro.props;
+const items = roomItems(option, { fitted, space });
+const site = space ? sites[space.site] : null;
+const plugs = site?.mains?.plugs ?? null;
+const country = space?.country ?? site?.country ?? null;
+// A room profile shows every optional item, so its cables and plates count them all as fitted.
+const fitList = fitted ?? option.equipment.filter((e) => e.requirement === 'optional').map((e) => e.key);
+const M = buildRoom(type, option, items, { plugs, country, fitted: fitList, models });
+const R = render(M, { width: 760, pad: 12 });
+const PX_PER_M = 80, MIN_W = 440;
+const natW = Math.max(MIN_W, Math.round((R.width * PX_PER_M) / R.k));
+// A small drawing keeps its labels and numbers readable: they grow as the drawing shrinks.
+const tsN = Math.min(1.7, Math.max(1, (R.width / natW) * 0.72));
+const ts = tsN.toFixed(3);
+const labels = layoutLabels(R, pair ? tsN : 1);
+const aspect = (R.width / R.height).toFixed(3);
+const Pair = pair ? 'div' : Fragment, Grid = pair ? 'div' : Fragment, Card = pair ? 'section' : Fragment;
+const room = M.room;
+const PL = M.plates;
+const groups = PL.groups.filter((g) => g.at);
+const plateOf = new Map(groups.map((g) => [g.sk, g]));
+const pins = new Set(highlight.filter((k) => items.some((it) => it.key === k)));
+const pinHid = items.some((it) => pins.has(it.key) && it.hidden);
+const pinCls = (sk) => (sk && pins.has(sk) ? ' hit pin' : '');
+const byKey = new Map(items.map((it) => [it.key, it]));
+const nameOf = (k) => (k === 'laptop' ? 'Laptop' : k === 'home-router' ? 'Home router' : plateOf.get(k) ? `Plate ${plateOf.get(k).id}` : byKey.get(k)?.label ?? k);
+// Which plates each device plugs into, and which devices each plate feeds (for hover).
+const relOf = new Map();
+const addRel = (a, b) => { if (!relOf.has(a)) relOf.set(a, new Set()); relOf.get(a).add(b); };
+for (const g of groups) for (const d of g.devs) if (byKey.has(d)) { addRel(g.sk, d); addRel(d, g.sk); }
+const rel = (sk) => (relOf.has(sk) ? [...relOf.get(sk)].join(' ') : undefined);
+// Morph keys: the same kind of thing in two build options moves from one drawing to the other.
+const seen = {};
+const vk = new Map(items.map((it) => [it.key, `${it.e.class}-${(seen[it.e.class] = (seen[it.e.class] ?? 0) + 1)}`]));
+for (const g of groups) vk.set(g.sk, `plate-${g.loc}-${g.part}`);
+const part = {};
+const vkOf = (s) => (s.sk && vk.get(s.sk) ? `${vk.get(s.sk)}-${(part[s.sk] = (part[s.sk] ?? 0) + 1)}` : undefined);
+// Words for plates and ports.
+const socketWord = PL.socket ? `Type ${PL.socket}` : 'plain';
+const count = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+const portLine = (p) => `${p.svc === 'power' ? 'Power' : p.svc === 'data' ? 'Data' : 'Direct run'} ${p.n}: ${p.dev ? nameOf(p.dev) : p.name === 'spare' ? 'spare' : p.name}${p.optional ? ' (only in bigger builds)' : ''}`;
+const plateSummary = (g) => [g.power.length && count(g.power.length, `${socketWord} socket`), g.data.length && count(g.data.length, 'data port'), g.runs.length && count(g.runs.length, 'direct run')].filter(Boolean).join(', ');
+const plateTitle = (g) => `Plate ${g.id}: ${g.name} ${g.where}. ${plateSummary(g)}.\n${[...g.ports, ...g.runs].map(portLine).join('\n')}`;
+const titleOf = (s) => (s.pl ? plateTitle(s.pl) : s.it ? `${s.it.no}. ${s.it.label}${s.it.model ? `, ${s.it.model}` : ''}${s.inches ? ` (${s.inches} in shown)` : ''} · ${s.outside ? 'outside the door' : s.it.where}` : s.label ?? null);
+// Cables: every one the option lists, routed along the room's containment (src/lib/cableroute.mjs).
+const home = type === 'remote-home';
+const RT = routeCables(M, option, fitList, { models, project: R.project, cacheKey: `${type}/${option.id}/${fitList.join(',')}/${PL.fmt}/${PL.socket}` });
+const CAB = { 'usb-c': 'USB-C', usb: 'USB', thunderbolt: 'Thunderbolt', cat6: 'Cat 6', cat6a: 'Cat 6A', hdmi: 'HDMI', displayport: 'DisplayPort', power: 'Power', 'poly-mic': 'Microphone', audio: 'Audio', speaker: 'Speaker', proprietary: 'Vendor cable' };
+const eqName = (k) => { const e = option.equipment.find((x) => x.key === k); return (e?.role?.split(/[:,]/)[0] ?? className(e?.class ?? k)).toLowerCase(); };
+const wordName = (k, closet) => (closet ? eqName(k) : byKey.get(k) ? itemName(byKey.get(k)) : nameOf(k));
+const P = (p) => R.project(...p);
+// A path through projected points with small rounded corners, the same radius everywhere, so a bundle
+// turns a corner as one.
+const roundPath = (pts, rad = 2.6) => {
+  const q = pts.map(P).filter((p, i, a) => i === 0 || Math.hypot(p[0] - a[i - 1][0], p[1] - a[i - 1][1]) > 0.05);
+  if (q.length < 2) return '';
+  let d = `M${q[0][0]} ${q[0][1]}`;
+  for (let i = 1; i < q.length - 1; i++) {
+    const [a, b, c] = [q[i - 1], q[i], q[i + 1]];
+    const l1 = Math.hypot(b[0] - a[0], b[1] - a[1]), l2 = Math.hypot(c[0] - b[0], c[1] - b[1]), r = Math.min(rad, l1 / 2, l2 / 2);
+    const p1 = [b[0] - ((b[0] - a[0]) / l1) * r, b[1] - ((b[1] - a[1]) / l1) * r], p2 = [b[0] + ((c[0] - b[0]) / l2) * r, b[1] + ((c[1] - b[1]) / l2) * r];
+    d += ` L${p1[0].toFixed(1)} ${p1[1].toFixed(1)} Q${b[0]} ${b[1]} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+  }
+  return `${d} L${q.at(-1)[0]} ${q.at(-1)[1]}`;
+};
+const routed = RT.cables.filter((c) => c.pts && c.pts.length > 1);
+// The stretches of a cable under the floor (the floor duct), drawn dashed: you would not see them.
+const underFloor = (pts) => {
+  const out = []; let cur = null;
+  for (let i = 1; i < pts.length; i++) {
+    const u = pts[i - 1][2] < -0.001 && pts[i][2] < -0.001;
+    if (!cur || cur.u !== u) { cur = { u, pts: [pts[i - 1]] }; out.push(cur); }
+    cur.pts.push(pts[i]);
+  }
+  return out.map((s) => ({ u: s.u, d: roundPath(s.pts) }));
+};
+const cables = routed.filter((c) => !c.feed).map((c) => ({ ...c, d: roundPath(c.pts), parts: underFloor(c.pts),A: P(c.pts[0]), B: c.endB.entry || c.endB.closet ? null : P(c.pts.at(-1)), title: `${CAB[c.cable] ?? c.cable}: ${cableWords(c, { nameOf: wordName, models, option })}` }));
+const feeds = routed.filter((c) => c.feed).map((c) => ({ ...c, d: roundPath(c.pts), title: cableWords(c, { nameOf: wordName, models, option }) }));
+// The containment the cables run in: trunking you can see as a pale channel; containment hidden in
+// the floor, the ceiling or behind the display as a dashed outline.
+const band = (r) => {
+  const e = (p, ax, v) => { const q = [...p]; q[ax] += v; return q; };
+  const a = e(r.a, r.ax, -r.pad), b = e(r.b, r.ax, r.pad);
+  return [e(a, r.off, -r.half), e(b, r.off, -r.half), e(b, r.off, r.half), e(a, r.off, r.half)].map((p) => P(p).join(',')).join(' ');
+};
+const BAND_WORD = { track: 'Track behind the display', riser: 'Wall riser, up to the track', drop: 'Ceiling drop, from the track to the ceiling', ceiling: 'Ceiling basket', skirt: 'Skirting trunking', cover: 'Floor cable cover', duct: 'Floor duct, in the floor', box: 'Floor box', tray: 'Tray under the table', dtray: 'Tray under the desk', leg: 'Up the table leg', dleg: 'Down the desk leg', pass: 'Through the wall behind the table', side: 'Trunking behind the sideboard', void: 'Floor void', wallv: 'Inside the wall' };
+const bands = RT.bands.filter((r) => !r.feedOnly).map((r) => ({ ...r, pts: band(r), title: BAND_WORD[r.kind] ?? r.kind }));
+const comms = space ? commsRoomOf(space, Object.values(spaces)) : null;
+const entry = RT.entry ? { at: P(RT.entry.p), title: `Where the data comes in: above the door, from ${comms ? `${comms.name} ${comms.number}${comms.floor !== space.floor ? `, on floor ${comms.floor}` : ''}` : space ? 'the comms room (not yet recorded for this site)' : "the floor's comms room"}` } : null;
+const hasHidden = labels.some((l) => l.hid || l.behind);
+const hasCables = cables.length > 0;
+const areaNote = room.open ? `${room.area} m² per workstation (the drawing shows ${room.W.toFixed(1)} × ${room.D.toFixed(1)} m of floor)` : room.area ? `${room.W.toFixed(2)} × ${room.D.toFixed(2)} m, ${room.area} m²` : `${room.W.toFixed(2)} × ${room.D.toFixed(2)} m`;
+const usesHouseZ = groups.some((g) => g.houseZ);
+const kinds = new Set(groups.map((g) => g.kind));
+const onPlates = kinds.has('wall') || kinds.has('ceiling');
+const plateParts = [
+  onPlates && `${PL.note}${usesHouseZ ? `, ${Math.round(HOUSE_OUTLET_Z * 1000)} mm up to the centre (house default; the profile gives no height)` : ''}`,
+  kinds.has('floor') && 'floor boxes with a 300 mm lid',
+  kinds.has('desk') && 'a desk module, 52 mm a socket (house default)',
+].filter(Boolean);
+const plateNote = groups.length ? ` · Outlets: ${PL.socket ? `Type ${plugs.join(', ')} sockets; ` : ''}${plateParts.join('; ')}` : '';
+const markTitle = (l) => (l.pl ? `Plate ${l.pl.id}: ${l.pl.name} ${l.pl.where}` : `${l.it.no}. ${l.it.label}${l.hid ? `, ${l.it.where.toLowerCase()}` : ''}`);
+---
+<Pair {...(pair ? { class: 'scene-pair', style: `--scene-w:${natW}px;--scene-ar:${aspect}` } : {})}>
+<Grid {...(pair ? { class: 'sp-grid' } : {})}>
+<Card {...(pair ? { class: 'card scene-card', 'aria-label': label, ...(help ? { 'data-help': help } : {}), ...rec } : {})}>
+<div class:list={['scene-wrap', { focus: pins.size > 0, 'focus-hid': pinHid, 'show-cables': home && hasCables, 'cables-default': home, [`tone-${tone}`]: tone && pins.size > 0 }]} data-scene-root data-uid={uid} data-pin={pins.size ? [...pins].join(' ') : undefined} style={pair ? `--ts:${ts}` : undefined}>
+  <div class="scene-box">
+    <div class="scene-tools" role="group" aria-label="Show in the drawing">
+      {hasHidden && <button type="button" class="lchip" data-layer="xray" aria-pressed="false"><span class="lc-ic xr"></span>See behind</button>}
+      {hasCables && <button type="button" class="lchip" data-layer="cables" aria-pressed={home ? 'true' : 'false'} title="Every cable, coloured by signal. Point at a plate or a device to follow its own."><span class="lc-ic rn"></span>Cables</button>}
+    </div>
+    <svg class="scene" viewBox={`0 0 ${R.width} ${R.height}`} role="img" aria-label={`Drawing of the room to scale, ${areaNote}, with ${items.length} devices and ${count(groups.length, 'outlet plate')}`}>
+      {R.shapes.map((s) => s.pts ? <polygon points={s.pts} class={`sh ${s.cls}`} /> : <path d={s.d} class={`sh ${s.cls}`} />)}
+      {R.drawn.map((d) => {
+        const s = d.s;
+        const cls = [s.pl ? 'pl' : s.it ? 'it' : 'fx', `m-${s.mat}`, (s.hid || s.pl?.hid) && 'hid', s.opt && 'opt', s.occ && 'occ', s.ghost && 'ghost', s.outside && 'outside', s.ceiling && 'ceil'].filter(Boolean).join(' ') + pinCls(s.sk);
+        const t = titleOf(s);
+        return (
+          <g class={cls} data-sk={s.sk} data-rel={s.sk ? rel(s.sk) : undefined} data-vk={vkOf(s)}>
+            {t && <title>{t}</title>}
+            {d.fs.map((f) => <polygon points={f.pts} class={f.top ? 'ft' : 'fs'} style={f.top ? undefined : `--k:${f.k}%`} />)}
+            {d.dec.map((x) => x.port
+              ? <polygon points={x.pts} class={`dc d-${x.mat} pt${x.port.svc === 'power' ? ' pt-power' : ''}${x.port.dev ? ' used' : ''}`} data-dev={x.port.dev} />
+              : <polygon points={x.pts} class={`dc d-${x.mat}`} />)}
+          </g>
+        );
+      })}
+      {R.dims.map((d) => (
+        <g class="dim"><line x1={d.a[0]} y1={d.a[1]} x2={d.b[0]} y2={d.b[1]} /><circle cx={d.a[0]} cy={d.a[1]} r="2.5" /><circle cx={d.b[0]} cy={d.b[1]} r="2.5" /><text x={(d.a[0] + d.b[0]) / 2 + (d.side === 'left' ? -10 : 8)} y={(d.a[1] + d.b[1]) / 2 + 4} text-anchor={d.side === 'left' ? 'end' : 'start'}>{d.label}</text></g>
+      ))}
+      <g class="ghosts" aria-hidden="true">
+        {R.marks.filter((m) => m.hid || labels.find((l) => l.sk === m.sk)?.behind).map((m) => {
+          const pts = m.hull.map((p) => p.join(',')).join(' ');
+          return <g class="ghost-ol" data-sk={m.sk}><polygon points={pts} class="go-halo" /><polygon points={pts} class="go-line" /></g>;
+        })}
+      </g>
+      <g class="cable-layer">
+        {bands.map((r) => <polygon points={r.pts} class={`tk tk-${r.kind}${r.hid ? ' tk-hid' : ''}`} data-run={r.id}><title>{r.title}</title></polygon>)}
+        {feeds.map((f) => <path d={f.d} class="feed" data-for={f.a} data-cab={f.id}><title>{f.title}</title></path>)}
+        {cables.map((c) => (
+          <g class={`cab sig-${c.sig}${pins.has(c.a) || pins.has(c.b) ? ' hit' : ''}`} data-a={c.a} data-b={c.b} data-cab={c.id} data-runs={c.runs.join(' ')} tabindex="-1">
+            <title>{c.title}</title>
+            <path d={c.d} class="cab-hit" />{c.parts.map((p) => <path d={p.d} class={p.u ? 'cab-line cab-under' : 'cab-line'} />)}<path d={c.d} class="cab-flow" />
+            <circle class="cab-end" cx={c.A[0]} cy={c.A[1]} r="2.2" />{c.B && <circle class="cab-end" cx={c.B[0]} cy={c.B[1]} r="2.2" />}
+          </g>
+        ))}
+        {entry && <g class="entry"><title>{entry.title}</title><circle cx={entry.at[0]} cy={entry.at[1]} r="5.5" /><path d={`M${entry.at[0] - 2.6} ${entry.at[1]} h5.2 M${entry.at[0] + 0.6} ${entry.at[1] - 2.2} l2 2.2 l-2 2.2`} /></g>}
+      </g>
+      <g class="ruler" aria-hidden="true">
+        {[R.widthDim, R.depthDim].map((d, i) => (
+          <g class="rdim">
+            <line x1={d.a[0]} y1={d.a[1]} x2={d.b[0]} y2={d.b[1]} />
+            <circle cx={d.a[0]} cy={d.a[1]} r="2.2" /><circle cx={d.b[0]} cy={d.b[1]} r="2.2" />
+            <text x={i ? (d.a[0] + d.b[0]) / 2 + 10 : d.a[0] + (d.b[0] - d.a[0]) * 0.78} y={i ? (d.a[1] + d.b[1]) / 2 + 4 : d.a[1] + (d.b[1] - d.a[1]) * 0.78 + 20} text-anchor={i ? 'start' : 'middle'}>{d.label}</text>
+          </g>
+        ))}
+        <g class="sbar">
+          {R.scale.segs.map((s) => <polygon points={s.pts} class={s.fill ? 'on' : 'off'} />)}
+          {R.scale.labels.map((l) => <text x={l.at[0]} y={l.at[1] + 14} text-anchor="middle">{l.t}</text>)}
+        </g>
+      </g>
+      <g class="marks">
+        {labels.filter((l) => l.lead).map((l) => (
+          <g class:list={['lead', { hid: l.hid, opt: l.it?.optional, hit: pins.has(l.sk), pin: pins.has(l.sk) }]} data-sk={l.sk} aria-hidden="true">
+            <line x1={l.lead.x1} y1={l.lead.y1} x2={l.lead.x2} y2={l.lead.y2} /><circle cx={l.lead.x1} cy={l.lead.y1} r="2.2" />
+          </g>
+        ))}
+        {labels.map((l) => l.pl ? (
+          <g class:list={['no', 'tag', { hid: l.hid }]} data-sk={l.sk} data-rel={rel(l.sk)} data-vk={`tag-${vk.get(l.sk)}`}>
+            <title>{plateTitle(l.pl)}</title>
+            <rect x={l.x - l.r * 0.95} y={l.y - l.r * 0.85} width={l.r * 1.9} height={l.r * 1.7} rx={l.r * 0.3} /><text x={l.x} y={l.y + 1} text-anchor="middle">{l.pl.id}</text>
+          </g>
+        ) : (
+          <g class:list={['no', { hid: l.hid, opt: l.it.optional, hit: pins.has(l.sk), pin: pins.has(l.sk) }]} data-sk={l.sk} data-rel={rel(l.sk)} data-vk={`no-${vk.get(l.sk)}`}>
+            <title>{markTitle(l)}</title>
+            <circle cx={l.x} cy={l.y} r="13" /><text x={l.x} y={l.y + 1} text-anchor="middle">{l.it.no}</text>
+          </g>
+        ))}
+      </g>
+    </svg>
+  </div>
+  <p class="scene-cap">{summary && <span class="sc-sum">{summary} </span>}<b>Drawn to scale</b> · {areaNote}{room.chairs ? ` · ${room.chairs} ${room.chairs === 1 ? 'seat' : 'seats'}` : ''}{plateNote}{room.notes.length ? ` · ${room.notes.join(' · ')}` : ''}</p>
+</div>
+</Card>
+{pair && <slot name="side" />}
+</Grid>
+</Pair>
+
+<script is:inline data-astro-rerun>
+  (function () {
+    if (window.__rsSceneHook) return;
+    window.__rsSceneHook = true;
+    var rootOf = function (el) {
+      var r = el.closest('[data-scene-root]'); if (r) return r;
+      var k = el.closest('[data-key-for]');
+      var uid = el.dataset.sceneUid || (k && k.dataset.keyFor);
+      return uid ? document.querySelector('[data-scene-root][data-uid="' + uid + '"]') : null;
+    };
+    var keyOf = function (root) { return root ? document.querySelector('[data-key-for="' + root.dataset.uid + '"]') : null; };
+    function reset(root) {
+      if (!root) return;
+      root.classList.remove('focus', 'focus-hid');
+      root.querySelectorAll('.hit').forEach(function (x) { x.classList.remove('hit'); });
+      var k = keyOf(root); if (k) k.querySelectorAll('.hit').forEach(function (x) { x.classList.remove('hit'); });
+    }
+    // Leaving a hover goes back to what the page pinned (data-pin), or to nothing.
+    function clear(root) {
+      reset(root);
+      if (root && root.dataset.pin) light(root, root.dataset.pin.split(' '), null, true);
+    }
+    // Light a thing, what it plugs into (or what plugs into it), their ports and the cables between.
+    function light(root, sks, cab, keep) {
+      if (!keep) reset(root); if (!root || !sks.length) return;
+      var any = false, k = keyOf(root), all = sks.slice();
+      sks.forEach(function (sk) {
+        var src = root.querySelector('[data-sk="' + CSS.escape(sk) + '"][data-rel]') || (k && k.querySelector('[data-sk="' + CSS.escape(sk) + '"][data-rel]'));
+        if (src && !cab) src.dataset.rel.split(' ').forEach(function (r) { if (all.indexOf(r) < 0) all.push(r); });
+      });
+      all.forEach(function (sk) {
+        var e = CSS.escape(sk);
+        root.querySelectorAll('[data-sk="' + e + '"]').forEach(function (h) { any = true; h.classList.add('hit'); if (h.classList.contains('hid')) root.classList.add('focus-hid'); });
+        if (k) k.querySelectorAll('[data-sk="' + e + '"], .pt[data-dev="' + e + '"]').forEach(function (x) { x.classList.add('hit'); });
+        root.querySelectorAll('.pt[data-dev="' + e + '"]').forEach(function (p) { p.classList.add('hit'); });
+      });
+      sks.forEach(function (sk) {
+        var e = CSS.escape(sk);
+        if (!cab) root.querySelectorAll('.cab[data-a="' + e + '"], .cab[data-b="' + e + '"], .feed[data-for="' + e + '"]').forEach(function (c) { any = true; c.classList.add('hit'); });
+      });
+      if (cab) {
+        // A cable: its whole route (the containment it runs in) and both ends, and its row in the Key.
+        cab.classList.add('hit'); any = true;
+        (cab.dataset.runs || '').split(' ').forEach(function (id) { if (id) root.querySelectorAll('.tk[data-run="' + CSS.escape(id) + '"]').forEach(function (t) { t.classList.add('hit'); }); });
+        if (k) k.querySelectorAll('.rk-cab[data-cab="' + CSS.escape(cab.dataset.cab) + '"]').forEach(function (x) { x.classList.add('hit'); });
+      }
+      if (any) root.classList.add('focus');
+    }
+    // A cable in the drawing, or its row in the Key.
+    function cableOf(el) {
+      var c = el.closest('.cab[data-cab], .feed[data-cab]');
+      if (c) return { root: rootOf(c), el: c };
+      var row = el.closest('.rk-cab[data-cab]'); if (!row) return null;
+      var root = rootOf(row);
+      var cab = root && root.querySelector('[data-cab="' + CSS.escape(row.dataset.cab) + '"]');
+      return cab ? { root: root, el: cab } : null;
+    }
+    document.addEventListener('mouseover', function (e) {
+      if (!e.target.closest) return;
+      var c = cableOf(e.target);
+      if (c) { light(c.root, c.el.dataset.a ? [c.el.dataset.a, c.el.dataset.b] : [c.el.dataset.for], c.el); return; }
+      var t = e.target.closest('[data-sk]'); if (!t) return;
+      if (!t.closest('[data-scene-root]') && !t.closest('[data-key-for]')) return;
+      light(rootOf(t), [t.dataset.sk]);
+    });
+    document.addEventListener('mouseout', function (e) {
+      if (!e.target.closest) return;
+      var t = e.target.closest('[data-sk], .cab, .feed[data-cab], .rk-cab'); if (!t) return;
+      var to = e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('[data-sk], .cab, .feed[data-cab], .rk-cab');
+      if (to && to === t) return;
+      if (to && t.dataset.sk && to.dataset.sk === t.dataset.sk) return;
+      clear(rootOf(t));
+    });
+    document.addEventListener('focusin', function (e) {
+      if (!e.target.closest) return;
+      var c = e.target.closest('.rk-cab[data-cab]') && cableOf(e.target);
+      if (c) { light(c.root, c.el.dataset.a ? [c.el.dataset.a, c.el.dataset.b] : [c.el.dataset.for], c.el); return; }
+      var t = e.target.closest('.rk-row[data-sk]'); if (t) light(rootOf(t), [t.dataset.sk]);
+    });
+    document.addEventListener('focusout', function (e) { var t = e.target.closest && e.target.closest('.rk-row[data-sk], .rk-cab'); if (t) clear(rootOf(t)); });
+    // Layer chips: hover to preview, click to keep.
+    var layer = function (b) { return b.closest('[data-scene-root]'); };
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest && e.target.closest('.lchip[data-layer]'); if (!b) return;
+      var on = b.getAttribute('aria-pressed') !== 'true';
+      b.setAttribute('aria-pressed', String(on)); layer(b).classList.toggle('show-' + b.dataset.layer, on);
+      // Showing the cables opens their list in the Key too.
+      var kk = keyOf(layer(b)), list = kk && kk.querySelector('details.rk-cables');
+      if (b.dataset.layer === 'cables' && list && on) list.open = true;
+    });
+    document.addEventListener('mouseover', function (e) {
+      var b = e.target.closest && e.target.closest('.lchip[data-layer]'); if (b) layer(b).classList.add('prev-' + b.dataset.layer);
+    });
+    document.addEventListener('mouseout', function (e) {
+      var b = e.target.closest && e.target.closest('.lchip[data-layer]'); if (b) layer(b).classList.remove('prev-' + b.dataset.layer);
+    });
+  })();
+</script>
+
+<style is:global>
+  .scene-wrap { position: relative; display: grid; gap: 8px; min-height: 0;
+    --sc-wall: #ECE6DA; --sc-wall-2: #E2DACB; --sc-cut: #9C9384; --sc-floor: #D8D0C0; --sc-slab: #B9AF9C; --sc-line: rgba(28,26,23,.28); --sc-edge: rgba(28,26,23,.30);
+    --sc-dev: #2A2B31; --sc-bezel: #17181C; --sc-table: #C9A77A; --sc-wood: #B8976D; --sc-chair: #5C6474; --sc-chair-2: #464C59; --sc-base: #3A3E47;
+    --sc-sofa: #7F8C8A; --sc-counter: #DAD3C6; --sc-stone: #EFEBE3; --sc-door: #C8B596; --sc-board: #FBFBF8; --sc-leaf: #5E8C5A; --sc-pot: #B7704A;
+    --sc-app: #C9CDD2; --sc-printer: #E6E6E2; --sc-ceil: #F4F2EE; --sc-screen: #14161C; --sc-lit: #2C4A7E;
+    --sc-plate: #FCFBF8; --sc-plate-edge: rgba(28,26,23,.55); --sc-lid: #A7A298; --sc-well: #5B5750; --sc-hole: #24252A;
+    --sc-run: #8A857C; --sc-ghost: #DCD5C7; --sc-ghost-line: rgba(28,26,23,.55); --sc-trunk: #F7F5F0; --sc-trunk-edge: rgba(28,26,23,.42); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .scene-wrap { --sc-wall: #34312B; --sc-wall-2: #2C2A25; --sc-cut: #57524A; --sc-floor: #3E3A33; --sc-slab: #24221E; --sc-line: rgba(255,255,255,.22); --sc-edge: rgba(0,0,0,.45); --sc-dev: #0F1013; --sc-bezel: #08090B; --sc-table: #8C744F; --sc-wood: #7A6446; --sc-chair: #6B7384; --sc-chair-2: #555C6A; --sc-base: #2A2D34; --sc-sofa: #5C6866; --sc-counter: #5A554D; --sc-stone: #6E685E; --sc-door: #6B5E48; --sc-board: #D8D6CF; --sc-leaf: #4A7447; --sc-pot: #8E5638; --sc-app: #7C8085; --sc-printer: #A9A9A4; --sc-ceil: #CFCBC2; --sc-ghost: #4A463F; --sc-plate: #E9E6DF; --sc-plate-edge: rgba(0,0,0,.6); --sc-lid: #77736B; --sc-well: #2A2825; --sc-ghost-line: rgba(255,255,255,.6); --sc-run: #A29B90; --sc-trunk: #56524B; --sc-trunk-edge: rgba(255,255,255,.35); } }
+  :root[data-theme="dark"] .scene-wrap { --sc-wall: #34312B; --sc-wall-2: #2C2A25; --sc-cut: #57524A; --sc-floor: #3E3A33; --sc-slab: #24221E; --sc-line: rgba(255,255,255,.22); --sc-edge: rgba(0,0,0,.45); --sc-dev: #0F1013; --sc-bezel: #08090B; --sc-table: #8C744F; --sc-wood: #7A6446; --sc-chair: #6B7384; --sc-chair-2: #555C6A; --sc-base: #2A2D34; --sc-sofa: #5C6866; --sc-counter: #5A554D; --sc-stone: #6E685E; --sc-door: #6B5E48; --sc-board: #D8D6CF; --sc-leaf: #4A7447; --sc-pot: #8E5638; --sc-app: #7C8085; --sc-printer: #A9A9A4; --sc-ceil: #CFCBC2; --sc-ghost: #4A463F; --sc-plate: #E9E6DF; --sc-plate-edge: rgba(0,0,0,.6); --sc-lid: #77736B; --sc-well: #2A2825; --sc-ghost-line: rgba(255,255,255,.6); --sc-run: #A29B90; --sc-trunk: #56524B; --sc-trunk-edge: rgba(255,255,255,.35); }
+  :root[data-contrast="high"] .scene-wrap { --sc-edge: rgba(0,0,0,.75); --sc-line: rgba(0,0,0,.6); }
+  .scene-box { position: relative; min-height: 0; display: grid; place-items: center; border-radius: var(--radius-lg); background: color-mix(in srgb, var(--surface-2) 55%, transparent); border: var(--border-card); overflow: hidden; }
+  :root[data-look="classic"] .scene-box { border: 2px solid var(--ink); }
+  .scene { width: 100%; height: auto; max-height: var(--scene-max, none); display: block; }
+  /* The record layout: the drawing as wide as the room needs (to scale with every other room), capped
+     at 58% of the width and 60% of the window's height, the side panel taking the rest. */
+  .scene-pair { container: scenepair / inline-size; }
+  .sp-grid { display: grid; gap: 20px; align-items: start;
+    grid-template-columns: min(var(--scene-w), 58%, calc(60svh * var(--scene-ar) + 28px)) minmax(0, 1fr); }
+  .scene-card { padding: 12px 14px 12px; min-width: 0; position: sticky; top: calc(var(--mast-h, 60px) + 16px); }
+  .sp-grid > * { min-width: 0; }
+  /* Not enough width for both side by side: the drawing on top, centred, still no taller than 60% of the window. */
+  @container scenepair (max-width: 660px) {
+    .sp-grid { grid-template-columns: minmax(0, 1fr); }
+    .scene-card { position: static; }
+    .scene-card .scene { max-width: min(100%, calc(var(--scene-w) * 1.2), calc(60svh * var(--scene-ar))); margin: 0 auto; }
+  }
+  .scene-cap { margin: 0; font-size: 12.5px; color: var(--text-2); line-height: 1.45; }
+  .scene-cap b { color: var(--text); font-weight: 650; }
+  .scene-cap .sc-sum { color: var(--text); }
+  /* Faces: every solid has a material colour (--m); tops take it as is, sides darken by angle. */
+  .scene .ft { fill: var(--m); stroke: var(--sc-edge); stroke-width: .7; stroke-linejoin: round; }
+  .scene .fs { fill: color-mix(in srgb, var(--m) var(--k, 80%), #000); stroke: var(--sc-edge); stroke-width: .7; stroke-linejoin: round; }
+  .scene .sh.floor { fill: var(--sc-floor); }
+  .scene .sh.slab { fill: var(--sc-slab); } .scene .sh.slab.r { fill: color-mix(in srgb, var(--sc-slab) 82%, #000); }
+  .scene .sh.wall.back { fill: var(--sc-wall); } .scene .sh.wall.left { fill: var(--sc-wall-2); }
+  .scene .sh.wall-cut { fill: var(--sc-cut); } .scene .sh.wall-cut.side { fill: color-mix(in srgb, var(--sc-cut) 85%, #000); }
+  .scene .sh.skirt { stroke: var(--sc-line); stroke-width: 2; fill: none; }
+  .scene .sh.swing { fill: none; stroke: var(--sc-line); stroke-width: 1.2; stroke-dasharray: 4 3; }
+  .scene .m-table { --m: var(--sc-table); } .scene .m-leg { --m: var(--sc-base); } .scene .m-wood { --m: var(--sc-wood); }
+  .scene .m-chair { --m: var(--sc-chair); } .scene .m-chair-back { --m: var(--sc-chair-2); } .scene .m-chair-base { --m: var(--sc-base); }
+  .scene .m-sofa { --m: var(--sc-sofa); } .scene .m-sofa-back { --m: color-mix(in srgb, var(--sc-sofa) 85%, #000); }
+  .scene .m-counter { --m: var(--sc-counter); } .scene .m-stone { --m: var(--sc-stone); } .scene .m-appliance { --m: var(--sc-app); }
+  .scene .m-door { --m: var(--sc-door); } .scene .m-board { --m: var(--sc-board); } .scene .m-leaf { --m: var(--sc-leaf); } .scene .m-pot { --m: var(--sc-pot); }
+  .scene .m-lamp { --m: #E9E4D6; } .scene .m-screen-panel { --m: color-mix(in srgb, var(--sc-sofa) 70%, var(--sc-wall)); }
+  .scene .m-dev, .scene .m-router, .scene .m-laptop { --m: var(--sc-dev); } .scene .m-bezel { --m: var(--sc-bezel); }
+  .scene .m-router-home { --m: #F2F0EA; } .scene .m-printer { --m: var(--sc-printer); } .scene .m-printer-top { --m: color-mix(in srgb, var(--sc-printer) 88%, #000); }
+  .scene .m-ceil-dev { --m: var(--sc-ceil); } .scene .m-led-wall { --m: #101114; }
+  .scene .m-led-wall .ft, .scene .m-led-wall .fs { fill-opacity: .5; stroke-dasharray: 5 4; stroke: var(--text-3); }
+  /* Outlet plates, floor boxes and desk modules: real plates, white on the wall, ports on the face. */
+  .scene .m-plate { --m: var(--sc-plate); } .scene .m-floorbox { --m: var(--sc-lid); } .scene .m-deskmod { --m: #B9BCC2; }
+  .scene .m-plate .ft, .scene .m-plate .fs { stroke: var(--sc-plate-edge); stroke-width: .6; }
+  .scene .dc.d-sock { fill: color-mix(in srgb, var(--sc-plate) 90%, #000); }
+  .scene .dc.pt-power.d-sock { fill: color-mix(in srgb, var(--c-power, #C8102E) 22%, var(--sc-plate)); }
+  .scene .dc.d-hole { fill: var(--sc-hole); } .scene .dc.d-pin { fill: #9A968E; }
+  .scene .dc.d-rocker { fill: color-mix(in srgb, var(--sc-plate) 82%, #000); stroke: var(--sc-plate-edge); stroke-width: .3; }
+  .scene .dc.d-jack-lan { fill: var(--c-lan, #7C766C); } .scene .dc.d-jack-poe { fill: var(--c-poe, #2D6B45); } .scene .dc.d-jack-hdbt { fill: var(--c-hdbt, #B0601C); }
+  .scene .dc.d-jack-spare { fill: color-mix(in srgb, var(--sc-plate) 80%, #000); }
+  .scene .dc.d-fb-well { fill: var(--sc-well); } .scene .dc.d-plate-flat { fill: var(--sc-plate); stroke: var(--sc-plate-edge); stroke-width: .4; }
+  .scene .dc.d-conduit { fill: #8A857C; } .scene .dc.d-av-hdmi { fill: var(--c-hdmi, #2A5B8F); } .scene .dc.d-av-usb { fill: var(--c-usb, #5E479B); }
+  .scene .dc.pt { transition: stroke-width var(--dur-state) var(--ease-settle); }
+  .scene .dc.pt.hit:is(.d-sock, .d-jack-lan, .d-jack-poe, .d-jack-hdbt, .d-jack-spare, .d-conduit) { stroke: var(--accent); stroke-width: 1.6; }
+  .scene .ghost { --m: var(--sc-ghost) !important; }
+  .scene .ghost .ft, .scene .ghost .fs { stroke-opacity: .5; }
+  .scene .d-screen { fill: var(--sc-screen); } .scene .d-screen-lit { fill: var(--sc-lit); } .scene .d-glare { fill: #5A8CFF; opacity: .16; }
+  .scene .d-lens { fill: #0B0B0E; stroke: #6A7080; stroke-width: 1; } .scene .d-grille { fill: #5A5D66; } .scene .d-handle { fill: var(--sc-dev); }
+  .scene .opt { opacity: .62; }
+  .scene .outside .ft, .scene .outside .fs { fill-opacity: .45; stroke: var(--text-2); stroke-dasharray: 3 2; stroke-width: 1; }
+  .scene .ceil .ft { stroke: var(--text-3); stroke-width: 1; }
+  .scene .dim line { stroke: var(--text-3); stroke-width: 1.2; } .scene .dim circle { fill: var(--text-3); }
+  .scene .dim text, .scene .ruler text { font: 600 calc(16px * var(--ts, 1)) var(--font-mono); fill: var(--text-2); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
+  .scene .rdim line { stroke: var(--text-3); stroke-width: 1.1; stroke-dasharray: 3 3; } .scene .rdim circle { fill: var(--text-3); }
+  .scene .rdim text { fill: var(--text-3); font-size: calc(16px * var(--ts, 1)); }
+  .scene .sbar polygon { stroke: var(--text-2); stroke-width: 1.2; stroke-linejoin: round; } .scene .sbar .on { fill: var(--text-2); } .scene .sbar .off { fill: var(--surface); }
+  .scene .sbar text { font-size: calc(16px * var(--ts, 1)); fill: var(--text-2); }
+  /* Hidden things: a faint dashed outline where they are, drawn over what hides them. */
+  .scene .ghost-ol { opacity: .7; pointer-events: none; transition: opacity var(--dur-state) var(--ease-settle); }
+  .scene .ghost-ol polygon { fill: none; stroke-linejoin: round; }
+  .scene .ghost-ol .go-halo { stroke: rgba(255,255,255,.7); stroke-width: 2.2; fill: rgba(255,255,255,.06); }
+  .scene .ghost-ol .go-line { stroke: #15161B; stroke-width: 1; stroke-dasharray: 3 2.5; }
+  .scene-wrap.show-xray .ghost-ol, .scene-wrap.prev-xray .ghost-ol, .scene .ghost-ol.hit { opacity: 1; }
+  /* Markers: one shape per kind (a circle for a device, a square tag for a plate), solid when you can
+     see the thing in the room, dashed when it is hidden. */
+  .scene .no circle { r: calc(13px * var(--ts, 1)); fill: var(--yellow, #FFCB2E); stroke: #15161B; stroke-width: 1.4; transition: r var(--dur-state) var(--ease-settle), fill var(--dur-state); }
+  :root[data-look="studio"] .scene .no circle { fill: #F2C94C; }
+  .scene .no text { font: 700 calc(14px * var(--ts, 1)) var(--font-mono); fill: #15161B; pointer-events: none; dominant-baseline: central; }
+  .scene .no.hid circle, .scene .no.tag.hid rect, :root[data-look] .scene .no.hid circle { fill: #fff; stroke-dasharray: 3 2; }
+  .scene .no.tag rect { fill: #fff; stroke: #15161B; stroke-width: 1.4; transition: fill var(--dur-state); }
+  .scene .no.tag text { font-size: calc(13px * var(--ts, 1)); }
+  .scene .lead line { stroke: var(--text-2); stroke-width: 1.1; } .scene .lead circle { fill: var(--text-2); }
+  .scene .lead.hid line { stroke-dasharray: 3 2.5; }
+  .scene .it, .scene .fx, .scene .pl, .scene .no, .scene .lead, .scene .cab, .scene .feed { transition: opacity var(--dur-state) var(--ease-settle), filter var(--dur-state); }
+  .scene [data-sk] { cursor: pointer; }
+  /* Cables, coloured by signal: shown with "Cables", or the ones you point at. */
+  .scene .cab { --cab: var(--grey, #8C857A); cursor: pointer; outline: none; opacity: 0; pointer-events: none; }
+  .scene .cab.sig-hdmi { --cab: var(--c-hdmi, #2A5B8F); } .scene .cab.sig-usb { --cab: var(--c-usb, #5E479B); } .scene .cab.sig-lan { --cab: var(--c-lan, #7C766C); }
+  .scene .cab.sig-poe { --cab: var(--c-poe, #2D6B45); } .scene .cab.sig-hdbt { --cab: var(--c-hdbt, #B0601C); } .scene .cab.sig-power { --cab: var(--c-power, #A2382F); } .scene .cab.sig-audio { --cab: var(--c-audio, #1F6F6A); }
+  .scene .cab-hit { fill: none; stroke: transparent; stroke-width: 12; }
+  /* Lanes are 3.2 px apart (PITCH_PX in cableroute.mjs), so a line is a little thinner than that. */
+  .scene .cab-line { fill: none; stroke: var(--cab); stroke-width: 1.8; stroke-linecap: butt; stroke-linejoin: round; }
+  .scene .cab-end { fill: var(--surface); stroke: var(--cab); stroke-width: 1.2; transition: r var(--dur-state) var(--ease-settle); }
+  .scene .cab-flow { fill: none; stroke: #fff; stroke-width: 1.2; stroke-dasharray: 2 9; stroke-linecap: round; opacity: 0; }
+  .scene .cab-line.cab-under { stroke-dasharray: 3 2.5; stroke-opacity: .7; }
+  .scene .cab.hit .cab-line { stroke-width: 3; }
+  .scene .cab.hit .cab-end { r: 3.6px; stroke-width: 1.6; }
+  .scene .cab.hit .cab-flow { opacity: .9; animation: sc-flow 1s linear infinite; }
+  /* Containment: trunking you can see is a pale channel with a fine edge; containment in the floor, the
+     ceiling or behind the display a dashed outline. Only with the cables. */
+  .scene .tk { fill: var(--sc-trunk); stroke: var(--sc-trunk-edge); stroke-width: .7; stroke-linejoin: round; opacity: 0; pointer-events: none; transition: opacity var(--dur-state) var(--ease-settle), stroke var(--dur-state); }
+  .scene .tk.tk-hid { fill: color-mix(in srgb, var(--sc-trunk) 35%, transparent); stroke-dasharray: 3 2; }
+  .scene .tk.hit { stroke: var(--accent); stroke-width: 1.2; }
+  .scene .feed { fill: none; stroke: var(--text-3); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0; transition: opacity var(--dur-state) var(--ease-settle); }
+  .scene .feed.hit { stroke: var(--accent); stroke-width: 1.6; }
+  .scene .entry { opacity: 0; pointer-events: none; transition: opacity var(--dur-state) var(--ease-settle); }
+  .scene .entry circle { fill: var(--surface); stroke: var(--text-2); stroke-width: 1.2; }
+  .scene .entry path { fill: none; stroke: var(--text-2); stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
+  .scene-wrap.show-cables .cab, .scene-wrap.prev-cables .cab, .scene .cab.hit { opacity: 1; pointer-events: auto; }
+  .scene-wrap.show-cables .tk, .scene-wrap.prev-cables .tk, .scene .tk.hit { opacity: 1; }
+  .scene-wrap.show-cables .entry, .scene-wrap.prev-cables .entry { opacity: 1; pointer-events: auto; }
+  .scene-wrap.show-cables .feed, .scene-wrap.prev-cables .feed, .scene .feed.hit { opacity: 1; pointer-events: auto; }
+  .scene-wrap.focus.show-cables .tk:not(.hit), .scene-wrap.focus.show-cables .feed:not(.hit) { opacity: .35; }
+  /* See behind: what is in front goes see-through, so hidden things show where they really are. */
+  .scene-wrap.show-xray .occ, .scene-wrap.prev-xray .occ, .scene-wrap.focus-hid .occ, .scene-wrap.show-cables:not(.cables-default) .occ, .scene-wrap.prev-cables:not(.cables-default) .occ { opacity: .18; }
+  .scene-wrap.show-xray .outside, .scene-wrap.prev-xray .outside { opacity: 1; }
+  .scene-wrap.focus .it:not(.hit), .scene-wrap.focus .pl:not(.hit), .scene-wrap.focus .no:not(.hit), .scene-wrap.focus .lead:not(.hit), .scene-wrap.focus .fx, .scene-wrap.focus .cab:not(.hit) { opacity: .3; }
+  .scene-wrap.focus.show-cables .cab:not(.hit) { opacity: .12; }
+  .scene-wrap.focus .fx.occ { opacity: .18; }
+  .scene-wrap.focus .it.hit, .scene-wrap.focus .pl.hit, .scene-wrap.focus .no.hit { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 85%, transparent)) drop-shadow(0 0 1.5px var(--accent)); }
+  .scene-wrap.focus .no.hit circle { r: calc(17px * var(--ts, 1)); }
+  .scene-wrap.focus .no.tag.hit rect { fill: var(--accent-soft, #fff); }
+  /* A pinned device with an open fault glows red instead of the accent (rule D6). */
+  .scene-wrap.tone-bad.focus .pin.hit { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--red) 85%, transparent)) drop-shadow(0 0 1.5px var(--red)); }
+  .scene-wrap.tone-bad.focus .no.pin.hit circle { fill: var(--red); stroke: #fff; }
+  .scene-wrap.tone-bad.focus .no.pin.hit text { fill: #fff; }
+  @keyframes sc-flow { to { stroke-dashoffset: -24; } }
+  /* The layer chips float in the drawing's top corner, so they cost no height. */
+  .scene-tools { position: absolute; z-index: 2; top: 8px; left: 8px; right: 8px; display: flex; gap: 6px; flex-wrap: wrap; pointer-events: none; }
+  .scene-tools > * { pointer-events: auto; }
+  .scene-tools .lchip { background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(6px); padding: 4px 10px 4px 7px; font-size: 12.5px; }
+  .scene-tools .lchip[aria-pressed="true"] { background: var(--accent-soft); }
+  .lchip { appearance: none; display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px 5px 8px; border-radius: var(--pill-radius); border: 1px solid var(--line); background: var(--surface); color: var(--text-2); font: 600 13px/1 var(--font-sans); cursor: pointer; transition: background var(--dur-state), border-color var(--dur-state), color var(--dur-state), transform var(--dur-state) var(--ease-settle); }
+  .lchip:hover { transform: translateY(-1px); color: var(--text); border-color: var(--line-strong); }
+  .lchip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
+  .lc-ic { width: 14px; height: 14px; border-radius: 4px; border: 2px solid; }
+  .lc-ic.xr { border-color: var(--text-2); border-style: dashed; } .lc-ic.rn { border-color: var(--c-hdbt, #B0601C); border-style: dashed; border-radius: 50%; }
+
+  .room-key { display: grid; gap: 10px; }
+  .rk-g { break-inside: avoid; }
+  .rk-g h4 { margin: 0 0 3px; font: 700 10.5px/1.2 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); }
+  .rk-g ol { list-style: none; margin: 0; padding: 0; }
+  .rk-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 9px; align-items: center; padding: 5px 6px; border-radius: var(--radius); cursor: default; break-inside: avoid; transition: background var(--dur-state), transform var(--dur-state) var(--ease-settle); }
+  .rk-row + .rk-row { border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+  .rk-row:hover, .rk-row.hit, .rk-row:focus-visible { background: var(--accent-soft); transform: translateX(3px); outline: none; }
+  .rk-row.opt { color: var(--text-2); }
+  .rk-no { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 700 11px/1 var(--font-mono); background: var(--yellow, #FFCB2E); color: #15161B; border: 1.5px solid #15161B; }
+  :root[data-look="studio"] .rk-no { background: #F2C94C; }
+  .rk-no.hid, :root[data-look] .rk-no.hid { background: var(--surface); border-style: dashed; color: var(--text); border-color: var(--text-2); }
+  .rk-no.tag, :root[data-look] .rk-no.tag { border-radius: 5px; background: #fff; }
+  .rk-no.tag.hid, :root[data-look] .rk-no.tag.hid { background: var(--surface); }
+  .rk-main { min-width: 0; } .rk-main a, .rk-main > span { font-weight: 650; font-size: 13.5px; line-height: 1.25; }
+  .rk-main small { display: block; font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .room-key.compact .rk-row { padding: 4px 6px; }
+  @media (prefers-reduced-motion: reduce) { .scene .cab-flow { animation: none !important; } .scene .it, .scene .fx, .scene .pl, .scene .no, .scene .cab, .scene .lead, .scene .ghost-ol, .scene .tk, .scene .feed, .scene .entry, .scene .cab-end { transition: none; } }
+</style>

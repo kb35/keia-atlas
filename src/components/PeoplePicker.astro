@@ -1,0 +1,103 @@
+---
+/* PeoplePicker: a small people list that grows from the avatar it was opened from (M11), for
+   assigning a task or anything else with an owner. One picker per page, moved to <body>.
+
+   window.rsPeoplePicker.open(anchor, { people, current, title, onPick })
+     people   [{ id, name, initials, role, team, away }]: the project team first, who is away greyed
+     current  the person id that is set now
+     onPick   (id) => void, called when a person is chosen; the picker closes itself
+   Search narrows the list as you type; arrows move, Enter picks, Escape closes; focus goes back
+   to the anchor. */
+---
+<div class="pp" data-pp hidden role="dialog" aria-label="Assign to" data-help="project.picker">
+  <p class="pp-h" data-pp-title>Assign to</p>
+  <input class="pp-q" type="search" data-pp-q placeholder="Find a person" aria-label="Find a person" autocomplete="off" />
+  <div class="pp-list" data-pp-list role="listbox"></div>
+</div>
+
+<script is:inline data-astro-rerun>
+  (function () {
+    if (window.rsPeoplePicker) return;
+    var el = null, anchor = null, opts = null, closing = null;
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+    var M = function () { return window.rsMotion ? window.rsMotion() : { reduced: true, pop: 0, exit: 0, ease: 'ease' }; };
+    var box = function () { if (el && document.body.contains(el)) return el; el = document.querySelector('[data-pp]'); if (el && el.parentElement !== document.body) document.body.appendChild(el); return el; };
+    var draw = function () {
+      var q = box().querySelector('[data-pp-q]').value.trim().toLowerCase(), list = box().querySelector('[data-pp-list]');
+      var ppl = (opts.people || []).filter(function (p) { return !q || (p.name + ' ' + (p.role || '')).toLowerCase().indexOf(q) >= 0; });
+      var html = '', group = null;
+      ppl.forEach(function (p) {
+        var g = p.team ? 'On this project' : 'Everyone else';
+        if (g !== group) { group = g; html += '<p class="pp-g">' + g + '</p>'; }
+        html += '<button type="button" role="option" class="pp-p' + (p.away ? ' away' : '') + (p.id === opts.current ? ' now' : '') + '" data-pp-pick="' + esc(p.id) + '" aria-selected="' + (p.id === opts.current) + '">' +
+          '<span class="av">' + esc(p.initials) + '</span><span class="pp-n"><b>' + esc(p.name) + '</b><small>' + esc(p.role || '') + '</small></span>' +
+          (p.away ? '<span class="pp-away">Away</span>' : p.id === opts.current ? '<span class="pp-now">Now</span>' : '') + '</button>';
+      });
+      list.innerHTML = html || '<p class="pp-none faint">Nobody matches.</p>';
+    };
+    var place = function () {
+      var r = anchor.getBoundingClientRect(), b = box(), w = Math.min(300, innerWidth - 16), h = b.offsetHeight;
+      var below = innerHeight - r.bottom > h + 12 || r.top < h + 12;
+      var left = Math.max(8, Math.min(r.left, innerWidth - w - 8));
+      var top = below ? r.bottom + 6 : r.top - h - 6;
+      b.style.width = w + 'px'; b.style.left = left + 'px'; b.style.top = Math.max(8, top) + 'px';
+      b.style.transformOrigin = (r.left + r.width / 2 - left) + 'px ' + (below ? '0' : '100%');
+    };
+    var open = function (a, o) {
+      if (closing) { closing.cancel(); closing = null; }
+      anchor = a; opts = o || {};
+      var b = box(); b.querySelector('[data-pp-title]').textContent = opts.title || 'Assign to';
+      b.querySelector('[data-pp-q]').value = ''; draw(); b.hidden = false; place();
+      var m = M();
+      if (!m.reduced) b.animate([{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'none' }], { duration: m.pop, easing: m.ease });
+      setTimeout(function () { var now = b.querySelector('.pp-p.now') || b.querySelector('.pp-p'); (now || b.querySelector('[data-pp-q]')).focus({ preventScroll: true }); }, 0);
+      a.setAttribute('aria-expanded', 'true');
+    };
+    var close = function (back) {
+      var b = box(); if (!b || b.hidden) return;
+      var m = M(), a = anchor;
+      if (a) a.setAttribute('aria-expanded', 'false');
+      var done = function () { b.hidden = true; closing = null; if (back && a) a.focus({ preventScroll: true }); };
+      if (m.reduced) done(); else { closing = b.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.7)' }], { duration: m.exit, easing: m.ease, fill: 'forwards' }); closing.onfinish = done; }
+    };
+    document.addEventListener('click', function (e) {
+      var b = box(); if (!b || b.hidden) return;
+      var pick = e.target.closest('[data-pp-pick]');
+      if (pick && b.contains(pick)) { var id = pick.dataset.ppPick; close(true); if (opts.onPick) opts.onPick(id); return; }
+      if (!b.contains(e.target) && !(anchor && anchor.contains(e.target))) close(false);
+    });
+    document.addEventListener('input', function (e) { if (e.target.matches('[data-pp-q]')) draw(); });
+    document.addEventListener('keydown', function (e) {
+      var b = box(); if (!b || b.hidden) return;
+      if (e.key === 'Escape') { e.preventDefault(); close(true); return; }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        var items = Array.prototype.slice.call(b.querySelectorAll('.pp-p')), i = items.indexOf(document.activeElement);
+        var n = e.key === 'ArrowDown' ? Math.min(items.length - 1, i + 1) : i <= 0 ? -1 : i - 1;
+        e.preventDefault(); (n < 0 ? b.querySelector('[data-pp-q]') : items[n]).focus();
+      }
+    });
+    addEventListener('resize', function () { var b = box(); if (b && !b.hidden && anchor) place(); });
+    document.addEventListener('astro:before-swap', function () { close(false); });
+    window.rsPeoplePicker = { open: open, close: close };
+  })();
+</script>
+
+<style is:global>
+  .pp { position: fixed; z-index: 70; display: grid; gap: 6px; padding: 10px; background: var(--surface); border: var(--border-card); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); }
+  .pp[hidden] { display: none; }
+  :root[data-look="classic"] .pp { border: 2px solid var(--ink); }
+  .pp-h { margin: 0; font: 700 10.5px/1.2 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); }
+  .pp-q { width: 100%; box-sizing: border-box; font: 500 13.5px/1.3 var(--font-sans); padding: 7px 10px; border-radius: 8px; border: 1.5px solid var(--line-strong); background: var(--surface); color: var(--text); }
+  .pp-q:focus { outline: 3px solid var(--focus); outline-offset: 1px; }
+  .pp-list { display: grid; gap: 1px; max-height: min(360px, calc(100vh - 140px)); overflow: auto; }
+  .pp-g { margin: 6px 4px 2px; font: 700 10px/1.2 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+  .pp-p { appearance: none; border: 0; background: none; font: inherit; color: inherit; text-align: left; display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: center; gap: 9px; padding: 5px 6px; border-radius: var(--radius); cursor: pointer; transition: background var(--dur-hover) var(--ease-settle); }
+  .pp-p:hover, .pp-p:focus-visible { background: var(--surface-2); outline: none; }
+  .pp-p:focus-visible { box-shadow: inset 0 0 0 2px var(--focus, var(--ink)); }
+  .pp-p .av { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 700 10px/1 var(--font-mono); background: var(--surface-3); color: var(--text); }
+  .pp-n { display: grid; min-width: 0; } .pp-n b { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .pp-n small { font-size: 11.5px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pp-p.away { opacity: .5; } .pp-p.away .av { background: var(--surface-2); color: var(--text-3); }
+  .pp-away, .pp-now { font: 700 10px/1.2 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); padding: 2px 6px; border-radius: 999px; border: 1px solid var(--line); }
+  .pp-now { color: var(--green-ink); border-color: var(--green); }
+  .pp-none { margin: 4px; font-size: 13px; }
+</style>

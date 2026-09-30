@@ -1,0 +1,147 @@
+---
+// Changes (demo): every proposed change to Keia Atlas's knowledge, who proposed it, who approves it,
+// and the file it writes. Like pull requests on the data: nothing changes until it is approved and merged.
+import Shell from '../../layouts/Shell.astro';
+import Icon from '../../components/Icon.astro';
+import PageBand from '../../components/PageBand.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import Section from '../../components/Section.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import { href } from '../../lib/data.mjs';
+const SEED = [
+  { id: 'CHG-040', title: 'AV refresh playbook: add a step to label both ends of every patch cable', kind: 'playbook', path: 'data/playbooks/av-refresh.yaml', change: 'adds a step to Install, version 1.3 to 1.4', by: 'Liam Doyle', byRole: 'On-site technician', approver: 'Tomás Varga, Programme manager with Sofia Reyes, Service manager, AV', date: '2026-09-28', status: 'review', project: 'PRJ-12',
+    text: '  - phase: install\n    steps:\n+     - { title: "Label both ends of every patch cable", role: tech, note: "Skylark" }\n', note: 'Suggested from PRJ-12 New York office video bar refresh, about 21.05 Skylark. It is already on that project as a one-off.' },
+  { id: 'CHG-039', title: 'Video bar profile: add a symptom for the external camera switching back after a reboot', kind: 'profile', path: 'data/device-classes/video-bar.yaml', change: 'changes, version 1.0 to 1.1', by: 'Aoife Byrne', byRole: 'AV and IT delivery engineer', approver: 'Sofia Reyes, Service manager, AV', date: '2026-09-27', status: 'review',
+    text: '  discrimination:\n+   external_camera_reverts:\n+     likely_causes: [Known issue after a reboot on X52 and X32 (ADV-002); camera not re-selected after an update]\n+     first_check: device_management\n', note: 'Came from the Heron snag on PRJ-14.' },
+  { id: 'CHG-038', title: 'Poly VideoOS 5.0.1 logged: do not install', kind: 'firmware', path: 'data/firmware/poly-videoos.yaml', change: 'adds a release above 4.7.0-466077', by: 'Vendor watcher', byRole: 'Agent', approver: 'Niamh Walsh (Lab), then Sofia Reyes', date: '2026-08-29', status: 'merged',
+    text: 'releases:\n+ - version: 5.0.1.470014\n+   released: "2026-08-28"\n+   status: blocked\n+   advisory: ADV-001\n', note: 'Proposed by an agent; approved by people.' },
+  { id: 'CHG-037', title: 'AV refresh playbook 1.3: reserve addresses by MAC before the units ship', kind: 'playbook', path: 'data/playbooks/av-refresh.yaml', change: 'changes, version 1.2 to 1.3', by: 'Ruth Kelly', byRole: 'Project manager', approver: 'Tomás Varga, Programme manager with Sofia Reyes', date: '2026-09-18', status: 'merged',
+    text: '  - phase: procure\n    steps:\n+     - { title: Send MACs to the network team for address reservations before delivery, role: network }\n', note: 'The fix captured on PRJ-12, task T-1203.' },
+  { id: 'CHG-036', title: 'New project: Dublin office IDF switch refresh', kind: 'project', path: 'data/projects/prj-16.yaml', change: 'new file', by: 'Ruth Kelly', byRole: 'Project manager', approver: 'Tomás Varga, Programme manager', date: '2026-08-21', status: 'merged',
+    text: '# Tasks for the first two phases come from the Comms room refresh playbook.\nid: PRJ-16\nname: Dublin office IDF switch refresh\nkind: infra-refresh\nplaybook: infra-refresh\n…\n' },
+  { id: 'CHG-035', title: 'New device model: Logitech Rally Bar Mini', kind: 'model', path: 'data/device-models/logitech-rally-bar-mini.yaml', change: 'new file', by: 'Niamh Walsh', byRole: 'Innovation engineer', approver: 'Sofia Reyes, after a Lab check', date: '2026-09-12', status: 'changes',
+    text: '# Device model: Logitech Rally Bar Mini\nmanufacturer: Logitech\nmodel: Rally Bar Mini\nclass: video-bar\n…\n', note: 'Sofia: "Needs a second reading of the ports against the data sheet before it counts."' },
+];
+const STATUS = { review: 'Waiting for review', approved: 'Approved', merged: 'Merged', changes: 'Changes asked for', withdrawn: 'Withdrawn' };
+const KIND = { project: 'Project', playbook: 'Playbook', profile: 'Device profile', model: 'Device model', config: 'Configuration', firmware: 'Firmware' };
+const slug = (v) => String(v).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const FACETS = [
+  { key: 'kind', label: 'Kind', options: Object.entries(KIND).map(([value, label]) => ({ value, label })) },
+  { key: 'status', label: 'Status', options: Object.entries(STATUS).map(([value, label]) => ({ value, label })) },
+  { key: 'by', label: 'Proposed by', options: [...new Set(SEED.map((c) => c.by))].sort().map((by) => ({ value: slug(by), label: by })) },
+];
+const SORT = { options: [{ value: 'newest', label: 'Newest first' }, { value: 'review', label: 'Waiting for review first' }, { value: 'kind', label: 'By kind' }] };
+const count = (st) => SEED.filter((c) => c.status === st).length;
+const NUMBERS = [
+  { n: count('review'), label: 'Waiting for review', to: '?status=review' },
+  { n: count('changes'), label: 'Changes asked for', to: '?status=changes', tone: count('changes') ? 'warn' : undefined },
+  { n: count('approved'), label: 'Approved', to: '?status=approved' },
+  { n: count('merged'), label: 'Merged', to: '?status=merged' },
+];
+---
+<Shell title="Changes" section="changes" crumbs={[{ label: 'Changes' }]}>
+  <PageBand overline="Register" title="Changes" lede="Every proposed change to what Keia Atlas knows, who approves it, and the file it writes." sim numbers={NUMBERS}>
+    <a slot="action" class="btn primary" href={href('/edit/')}><Icon name="plus" size={16} />Propose a change</a>
+  </PageBand>
+  <div class="content changes">
+    <FilterBar facets={FACETS} placeholder="Find a change, file or person" label="Find a change" noun={['change', 'changes']} scope=".content.changes" sort={SORT} />
+    <div class="chg-list" data-chg-list></div>
+    <EmptyState text="No changes match these filters." />
+    <Section title="How a change works" id="how" aside="Like a pull request on the data: nothing changes until it is approved and merged.">
+      <div class="card pad chg-flow">
+        <ol>
+          <li><b>Propose</b><span>From any page, or from a task when it closes with a fix</span></li>
+          <li><b>Check</b><span>The same rules as the rest of the data: required fields, real models, a source</span></li>
+          <li><b>Review</b><span>The owner of that knowledge approves or asks for changes</span></li>
+          <li><b>Merge</b><span>Keia Atlas rebuilds; every device, room and vendor pack shows it</span></li>
+        </ol>
+      </div>
+    </Section>
+  </div>
+  <script is:inline data-astro-rerun define:vars={{ SEED }}>window.RS_CHG_SEED = SEED;</script>
+  <script is:inline data-astro-rerun slot="end">
+    (function () {
+      var box = document.querySelector('[data-chg-list]'); if (!box) return;
+      var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+      var get = function () { try { return JSON.parse(localStorage.getItem('rs4-changes') || '[]'); } catch (_) { return window.__rsLocalChanges || []; } };
+      var put = function (l) { try { localStorage.setItem('rs4-changes', JSON.stringify(l)); } catch (_) { window.__rsLocalChanges = l; } };
+      var STATUS = { review: 'Waiting for review', approved: 'Approved', merged: 'Merged', changes: 'Changes asked for', withdrawn: 'Withdrawn' };
+      var KIND = { project: 'Project', playbook: 'Playbook', profile: 'Device profile', model: 'Device model', config: 'Configuration', firmware: 'Firmware' };
+      var slug = function (v) { return String(v).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); };
+      var bar0 = document.querySelector('[data-fb]');
+      var sort = function () { return bar0 && bar0.rsFilter ? bar0.rsFilter.sort() : (new URLSearchParams(location.search).get('sort') || 'newest'); };
+      // Newest first is the default; the others keep the newest first inside each group.
+      function sortNow() {
+        var by = sort(), els = Array.prototype.slice.call(box.children);
+        var key = function (el) { return by === 'review' ? (el.dataset.fStatus === 'review' ? 0 : 1) : by === 'kind' ? el.dataset.fKind : 0; };
+        els.map(function (el, i) { return { el: el, i: i, k: key(el), d: el.dataset.date }; })
+          .sort(function (a, b) { return a.k < b.k ? -1 : a.k > b.k ? 1 : a.d < b.d ? 1 : a.d > b.d ? -1 : a.i - b.i; })
+          .forEach(function (x) { box.appendChild(x.el); });
+      }
+      // The key numbers in the band were counted when the page was built; recount with this browser's proposals.
+      function counts(all) {
+        document.querySelectorAll('.kn a[href*="status="]').forEach(function (a) {
+          var st = (a.getAttribute('href').match(/status=([a-z]+)/) || [])[1], n = a.querySelector('b'); if (!st || !n) return;
+          n.textContent = String(all.filter(function (c) { return c.status === st; }).length);
+        });
+      }
+      function render() {
+        var mine = get(), all = mine.concat(window.RS_CHG_SEED);
+        box.innerHTML = all.map(function (c) {
+          var local = mine.some(function (m) { return m.id === c.id; });
+          return '<article class="card chg st-' + c.status + '" id="' + c.id.toLowerCase() + '" data-fi data-f-status="' + esc(c.status) + '" data-f-kind="' + esc(c.kind) + '" data-f-by="' + esc(slug(c.by)) + '" data-date="' + esc(c.date) + '" data-find="' + esc([c.id, c.title, c.by, c.byRole, c.approver, c.path, c.change, c.note, STATUS[c.status], KIND[c.kind] || c.kind].join(' ')) + '">' +
+            '<header><span class="mono faint">' + c.id + '</span><span class="tag">' + (KIND[c.kind] || c.kind) + '</span><span class="chg-st">' + STATUS[c.status] + '</span>' + (local ? '<span class="tag sim">Yours, in this browser</span>' : '') + '<span class="faint chg-date">' + new Date(c.date).toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric' }) + '</span></header>' +
+            '<h2>' + esc(c.title) + '</h2>' +
+            '<p class="chg-meta"><span>Proposed by <b>' + esc(c.by) + '</b>, ' + esc(c.byRole) + '</span><span>Approves: <b>' + esc(c.approver) + '</b></span></p>' +
+            (c.note ? '<p class="faint chg-note">' + esc(c.note) + '</p>' : '') +
+            '<details><summary><span class="mono">' + esc(c.path) + '</span> · ' + esc(c.change) + '</summary><pre class="ed-yaml">' + esc(c.text).replace(/^(\+.*)$/gm, '<ins>$1</ins>').replace(/^(-.*)$/gm, '<del>$1</del>').replace(/^(#.*)$/gm, '<i>$1</i>') + '</pre></details>' +
+            (c.status === 'review' ? '<p class="chg-acts"><button type="button" class="btn small primary" data-act="approved" data-id="' + c.id + '">Approve</button><button type="button" class="btn small" data-act="changes" data-id="' + c.id + '">Ask for changes</button>' + (local ? '<button type="button" class="btn small" data-act="withdraw" data-id="' + c.id + '">Withdraw</button>' : '') + '<span class="faint">Demo: anyone can play the approver.</span></p>' : '') +
+ (c.status === 'withdrawn' ? '<p class="chg-acts"><button type="button" class="btn small" data-act="review" data-id="' + c.id + '">Put back for review</button><span class="faint">Withdrawn changes are kept, not deleted.</span></p>' : '') +
+            (c.status === 'approved' ? '<p class="chg-acts"><button type="button" class="btn small primary" data-act="merged" data-id="' + c.id + '">Merge</button><span class="faint">In the real system, merging rebuilds Keia Atlas from the data.</span></p>' : '') +
+            '</article>';
+        }).join('');
+        sortNow(); counts(all);
+        var bar = document.querySelector('[data-fb]'); if (bar && bar.rsFilter) bar.rsFilter.run(false);
+        if (location.hash) { var t = document.querySelector(location.hash); if (t) { t.classList.add('flash'); t.scrollIntoView({ block: 'center' }); } }
+      }
+      box.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-act]'); if (!b) return;
+        var id = b.dataset.id, act = b.dataset.act, mine = get(), seed = window.RS_CHG_SEED;
+        var c = mine.find(function (x) { return x.id === id; }) || seed.find(function (x) { return x.id === id; });
+        if (act === 'withdraw') c.status = 'withdrawn'; else c.status = act;
+        put(mine); render();
+      });
+      if (bar0) bar0.addEventListener('fb:sort', function () { bar0.rsFilter.run(true, sortNow); });
+      render();
+    })();
+  </script>
+</Shell>
+<style is:global>
+  .chg .tag.sim { border-style: dashed; color: var(--amber-ink); }
+  .chg-flow ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; counter-reset: f; }
+  .chg-flow li { position: relative; display: grid; gap: 4px; padding: 10px 12px 10px 42px; border-radius: var(--radius); background: var(--surface-2); font-size: 12.5px; color: var(--text-2); counter-increment: f; }
+  .chg-flow li::before { content: counter(f); position: absolute; left: 10px; top: 10px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--on-ink); font: 700 11px/1 var(--font-mono); }
+  .chg-flow b { font-size: 14px; color: var(--text); }
+  .chg-list { display: grid; gap: 16px; }
+  .chg { display: grid; gap: 8px; padding: 16px 18px; scroll-margin-top: 90px; }
+  :root[data-look="classic"] .chg { border: 2px solid var(--ink); }
+  .chg.flash { box-shadow: 0 0 0 3px var(--yellow), var(--shadow-md); }
+  .chg header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .chg-date { margin-left: auto; font-size: 12.5px; }
+  .chg-st { font: 700 10.5px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; padding: 5px 8px; border-radius: 999px; background: var(--blue-soft); color: var(--blue-ink); }
+  .st-merged .chg-st { background: var(--green-soft); color: var(--green-ink); }
+  .st-approved .chg-st { background: var(--violet-soft); color: var(--violet-ink); }
+  .st-changes .chg-st { background: var(--amber-soft); color: var(--amber-ink); }
+  .st-withdrawn .chg-st { background: var(--surface-3); color: var(--text-2); }
+  .st-withdrawn { opacity: .8; }
+  .chg h2 { margin: 0; font-size: 18px; }
+  .chg-meta { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 20px; font-size: 13px; color: var(--text-2); }
+  .chg-note { margin: 0; font-size: 13px; }
+  .chg details summary { cursor: pointer; font-size: 12.5px; color: var(--text-2); }
+  .chg .ed-yaml { margin: 8px 0 0; padding: 10px 12px; border-radius: 8px; font: 500 12px/1.55 var(--font-mono); white-space: pre-wrap; background: var(--surface-2); }
+  .ed-yaml ins { text-decoration: none; color: var(--green-ink); background: var(--green-soft); display: inline-block; width: 100%; }
+  .ed-yaml del { text-decoration: none; color: var(--red-ink); background: var(--red-soft); display: inline-block; width: 100%; }
+  .ed-yaml i { font-style: normal; color: var(--text-3); }
+  .chg-acts { margin: 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; }
+  @media (max-width: 900px) { .chg-flow ol { grid-template-columns: 1fr 1fr; } }
+</style>

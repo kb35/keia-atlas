@@ -1,0 +1,66 @@
+# Cables at a site: patch cables in comms room racks, and spare cables kept in stores.
+# One file per site (data/cables/<site>.yaml). Demo data. Types, colours and purposes come from the
+# house standard (data/standards/cables.yaml), and the validator checks each cable against it.
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/cables
+title: Cables at a site
+type: object
+additionalProperties: false
+required: [site, cables, demo]
+properties:
+  site: { description: "The site id, the same as the file name.", type: string }
+  demo: { const: true }
+  cables:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, role, type, length_m, colour, purpose, quantity, where]
+      properties:
+        id: { description: "Unique across all sites, for example dub-cb-01.", type: string, pattern: "^[a-z]{3}-cb-[0-9]{2,3}$" }
+        role: { description: "A patch cable that is in use in a rack, or a spare in a store.", enum: [patch, spare] }
+        type: { description: "A cable type id from the standard.", type: string }
+        length_m: { type: number, exclusiveMinimum: 0, maximum: 100 }
+        colour: { description: "A colour id from the standard.", type: string }
+        purpose: { description: "A purpose id from the standard.", type: string }
+        quantity: { description: "How many identical cables. A bundle of patch cables in a row is one line.", type: integer, minimum: 1 }
+        where:
+          type: object
+          additionalProperties: false
+          required: [room]
+          properties:
+            room: { type: string }
+            space: { description: "The room's id in data/spaces, when it is a recorded room.", type: string }
+            rack: { description: "The rack id in data/racks. Needed for patch cables.", type: string }
+            cabinet: { type: string }
+            shelf: { type: string }
+        connects:
+          description: For patch cables, what each end plugs into. Give a rack unit and port range, or say the device in words.
+          type: object
+          additionalProperties: false
+          required: [from, to]
+          properties:
+            from: { $ref: "#/$defs/end" }
+            to: { $ref: "#/$defs/end" }
+        minimum: { description: "For spares, the least to keep.", type: integer, minimum: 0 }
+        last_counted: { description: "For spares, when the stock was last counted.", type: string, format: date }
+        notes: { type: string }
+        archived:
+          description: Archive instead of deleting.
+          type: object
+          additionalProperties: false
+          required: [date, reason]
+          properties:
+            date: { type: string, format: date }
+            reason: { type: string }
+$defs:
+  end:
+    type: object
+    additionalProperties: false
+    properties:
+      rack: { description: "Only when this end is in a different rack from the cable's own.", type: string }
+      u: { description: "The lowest rack unit of the device or panel.", type: integer, minimum: 1 }
+      ports: { description: "One port or a range, for example 7 or 1-24.", type: string, pattern: "^[0-9]+(-[0-9]+)?$" }
+      device: { description: "The device in words, when it is not a rack unit (a power strip, a provider's box, several devices).", type: string }
+    minProperties: 1

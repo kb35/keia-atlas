@@ -1,0 +1,15 @@
+---
+import ProfileView from '../../../components/ProfileView.astro';
+import { classes, models, usedIn } from '../../../lib/data.mjs';
+import { artParts } from '../../../lib/art.mjs';
+export function getStaticPaths() {
+  return Object.keys(classes).map((cls) => ({ params: { cls } }));
+}
+// Default model: the one most installed, preferring one with a traced drawing.
+export function defaultModel(cls) {
+  const ids = Object.keys(models).filter((id) => models[id].class === cls);
+  return [...ids].sort((a, b) => (artParts(b) ? 1 : 0) - (artParts(a) ? 1 : 0) || (usedIn[b]?.units ?? 0) - (usedIn[a]?.units ?? 0))[0] ?? null;
+}
+const { cls } = Astro.params;
+---
+<ProfileView cls={cls} model={defaultModel(cls)} />

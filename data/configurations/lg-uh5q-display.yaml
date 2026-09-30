@@ -1,0 +1,165 @@
+# Configuration: LG UH5Q-E commercial display, for meeting rooms and signage.
+# Setting names and menu paths are the vendor's (webOS 24 user guide, Apr 2026, cited per setting); the values and
+# reasons are Aigna's (demo). Defaults are given only where the guide states them.
+id: lg-uh5q-display
+name: UH5Q-E display for meeting rooms and signage
+models: [lg-55uh5q-e, lg-75uh5q-e]
+mode: Networked, LG Business Cloud managed, controlled by the room system
+version: "1.0"
+owner: sofia
+updated: "2026-09-29"
+firmware: "webOS 24"
+requires:
+  - "A wired data outlet behind the display on the Displays and signage VLAN (31), with a DHCP reservation"
+  - "An LG Business Cloud (ConnectedCare) account for the site"
+  - "The site's NTP servers handed out by DHCP"
+managed_by: "The display's own menu for first setup, then LG Business Cloud (ConnectedCare)"
+summary: "Aigna wires every UH5Q-E to the network, keeps it reachable in standby (Network Ready and Wake On LAN), sets its clock from NTP, turns its own energy saving and no-signal power off features off, and lets the room system and a daily schedule decide when it is on. It is locked, monitored over SNMP and managed in LG Business Cloud."
+menus: [Ez Setting, General, Display, Sound, Admin]
+steps:
+  - Mount the display, patch LAN IN to the room's display outlet, connect HDMI 1 from the video bar or player, then power on.
+  - "Set the clock from NTP and the time zone first: the schedule depends on it."
+  - Change the admin password, then set power, energy saving and the schedule.
+  - "Set inputs and SIMPLINK for the room type, then Set ID, SNMP and Crestron where the room uses it."
+  - Update to the Lab's release, enrol in LG Business Cloud, then lock the menus last.
+  - Save the settings with Setting Data Cloning and load them on the next display of the same model.
+setup:
+  - id: preflight
+    title: Pre-flight
+    critical: true
+    detail: "Confirm the display outlet is live on VLAN 31 with a DHCP reservation for the display's MAC address, and an LG Business Cloud install code for the site. Have the site's admin password from the vault."
+  - id: connect
+    title: Connect LAN, HDMI 1, then power
+    critical: true
+    after: [preflight]
+    why_order: "The display should find its reserved address on first boot, and HDMI 1 is one of the inputs that can wake it from standby (HDMI 3 and DP cannot)."
+    source: lg-uh5q-owners-manual-43-65
+  - id: clock
+    title: Set the clock from NTP
+    critical: true
+    path: "[General] > [Time & Date] > [Set Automatically], [NTP Server Setting], [Time Zone]"
+    after: [connect]
+    why_order: "NTP needs the network, and the On/Off Scheduler runs on the display's clock."
+    source: lg-webos-24-signage-user-guide
+  - id: password
+    title: Change the admin password
+    critical: true
+    path: "[Admin] > [Change Password]"
+    after: [connect]
+    why_order: "The lock screen and the OSD lock ask for it later; the guide does not state the default."
+    source: lg-webos-24-signage-user-guide
+  - id: power
+    title: Power, standby and energy saving
+    critical: true
+    path: "[General] > [Power]; [Display] > [Advanced Setting] > [Energy Saving]"
+    after: [clock]
+    why_order: "Network Ready and Wake On LAN keep the network alive in standby, which the schedule and fleet management rely on."
+    detail: "PM Mode Network Ready, Wake On LAN on (wired), Power On Status LST, No Signal Power Off off, No IR Power Off off, Energy Saving Off, Smart Energy Saving off."
+    source: lg-webos-24-signage-user-guide
+  - id: schedule
+    title: On/Off schedule and holidays
+    path: "[Ez Setting] > [On/Off Scheduler]"
+    after: [clock]
+    why_order: The schedule runs on the display's clock, which must be right first.
+    source: lg-webos-24-signage-user-guide
+  - id: inputs
+    title: Inputs and SIMPLINK
+    path: "[Ez Setting] > [Fail Over]; [General] > [Advanced Setting] > [SIMPLINK Setup]"
+    source: lg-webos-24-signage-user-guide
+  - id: control
+    title: Set ID, SNMP and Crestron
+    path: "[General] > [Set ID]; [General] > [Network] > [SNMP]; [General] > [Advanced Setting] > [Crestron]"
+    source: lg-webos-24-signage-user-guide
+  - id: firmware
+    title: Update to the Lab's release
+    path: "[Admin] > [Software Update]"
+    after: [clock]
+    why_order: Updates are checked over the network against the display's clock.
+    detail: "Auto Update off; CHECK FOR UPDATES only when the Lab has passed the release."
+    source: lg-webos-24-signage-user-guide
+  - id: cloud
+    title: Enrol in LG Business Cloud
+    path: "[Ez Setting] > [LG Business Cloud]"
+    after: [firmware]
+    why_order: The display reports its firmware when it enrols, so it should be on the fleet standard first.
+    detail: "Enter the site's install code (or scan the QR code), check the server status shows connected, then name the display with its hostname in ConnectedCare."
+    source: lg-webos-24-signage-user-guide
+  - id: locks
+    title: Lock the menus and keys
+    critical: true
+    path: "[Admin] > [Lock Mode]"
+    after: [password, power, schedule, inputs, control, cloud]
+    why_order: "OSD Lock hides the menus (they then need the password and a 10 second press), so it is the last thing set on the display."
+    detail: "OSD Lock on, USB Lock on, IR Operation Lock On (Power Key Only), Local Key Operation Lock On (Power Key Only), Wi-Fi Lock on, Screen Share Lock on, Home Dashboard Lock on."
+    source: lg-webos-24-signage-user-guide
+  - id: clone
+    title: Save the settings for the next display
+    path: "[Ez Setting] > [Setting Data Cloning]"
+    after: [locks]
+    why_order: The copy must hold the finished settings.
+    detail: "Export to USB, import on each further display of the same model, then set only its name and check the schedule."
+    source: lg-webos-24-signage-user-guide
+  - id: verify
+    title: Verify
+    after: [clone]
+    why_order: The check is of the finished display.
+    detail: "Turn the display off and on from the room system and from LG Business Cloud; start a call and check it wakes on the video bar (meeting rooms); read its status over SNMP."
+groups:
+  - name: Time and schedule
+    where: "[General] > [Time & Date] and [Ez Setting] > [On/Off Scheduler]"
+    settings:
+      - { derive: time-servers, action: change, name: Set Automatically, path: "[General] > [Time & Date] > [Set Automatically]", value: "On, with the site's NTP servers in [NTP Server Setting]", per_device: true, layer: country, why: "Schedules, logs and the cloud's view only line up when the clock is right.", source: lg-webos-24-signage-user-guide }
+      - { derive: time-zone, action: change, name: Time Zone, path: "[General] > [Time & Date] > [Time Zone]", value: "The site's time zone", per_device: true, layer: country, why: "The schedule runs in local time.", source: lg-webos-24-signage-user-guide }
+      - { action: verify, name: Daylight Saving Time, path: "[General] > [Time & Date] > [Daylight Saving Time]", value: "Follows the time zone", layer: country, why: "A schedule an hour out twice a year is the most common timer complaint.", source: lg-webos-24-signage-user-guide }
+      - { derive: office-hours, action: change, name: On/Off Time Setting, path: "[Ez Setting] > [On/Off Scheduler] > [On/Off Time Setting]", value: "Mon to Fri on at the office's opening time; every day off at closing time plus one hour", per_device: true, layer: country, why: "Signage is on when people arrive; the off time is a backstop if the room system misses a power off, which is where the energy saving comes from.", source: lg-webos-24-signage-user-guide }
+      - { derive: holidays, action: change, name: Holiday Setting, path: "[Ez Setting] > [On/Off Scheduler] > [Holiday Setting]", value: "The country's public holidays", layer: country, why: "The display stays off on days the office is closed.", source: lg-webos-24-signage-user-guide }
+  - name: Power and standby
+    where: "[General] > [Power]"
+    settings:
+      - { action: change, name: PM Mode, path: "[General] > [Power] > [PM Mode]", default: "Power Off", value: "Network Ready", layer: profile, why: "In the default Power Off mode the display drops off the network when off, so the room system and LG Business Cloud cannot turn it on or see it.", source: lg-webos-24-signage-user-guide }
+      - { action: change, name: Wake On LAN (Networked Standby Mode), path: "[General] > [Power] > [Wake On LAN (Networked Standby Mode)]", value: "Wired On, Wireless Off", layer: profile, why: "Lets the network wake the display; Wi-Fi is not used.", source: lg-webos-24-signage-user-guide }
+      - { action: change, name: Power On Status, path: "[General] > [Power] > [Power On Status]", value: "LST (Last Status)", layer: profile, why: "After a power cut the display returns to what it was doing, so signage comes back on and an empty room stays off.", source: lg-webos-24-signage-user-guide }
+      - { action: change, name: No Signal Power Off (15 Min), path: "[General] > [Power] > [No Signal Power Off (15 Min)]", value: "Off", layer: profile, why: "When the video bar sleeps the display would switch itself off after 15 minutes and may not wake for the next meeting, which people report as no picture.", source: lg-webos-24-signage-user-guide }
+      - { action: change, name: No IR Power Off (4 hour), path: "[General] > [Power] > [No IR Power Off (4 hour)]", value: "Off", layer: profile, why: "Nobody uses the remote, so after four hours a working display would turn itself off mid-afternoon.", source: lg-webos-24-signage-user-guide }
+      - { action: change, name: DPM (Standby Mode), path: "[General] > [Power] > [DPM (Standby Mode)]", value: "Off", layer: profile, why: "Standby on no signal is the room system's job; DPM cannot be woken from HDMI 3 or DP at all.", source: lg-webos-24-signage-user-guide }
+      - { action: leave, name: Power On Delay, path: "[General] > [Power] > [Power On Delay]", value: "Not used", layer: profile, why: "Only needed to stagger a video wall's start.", source: lg-webos-24-signage-user-guide }
+  - name: Energy saving
+    where: "[Display] > [Advanced Setting] > [Energy Saving]"
+    settings:
+      - { action: change, name: Brightness Control, path: "[Display] > [Advanced Setting] > [Energy Saving] > [Brightness Control]", value: "Off", layer: profile, why: "Dimming the backlight makes content and the far end look dull, and an Auto setting changes brightness under the camera. Aigna saves far more energy by turning the display off when the room is empty.", source: lg-webos-24-signage-user-guide }
+      - { action: change, name: Smart Energy Saving, path: "[Display] > [Advanced Setting] > [Energy Saving] > [Smart Energy Saving]", value: "Off", layer: profile, why: "It changes brightness with the content, which is distracting on slides and video calls.", source: lg-webos-24-signage-user-guide }
+      - { action: leave, name: Brightness Scheduling, path: "[Display] > [Advanced Setting] > [Energy Saving] > [Brightness Scheduling]", value: "Not used", layer: profile, why: "The On/Off schedule does the job.", source: lg-webos-24-signage-user-guide }
+  - name: Inputs and CEC
+    where: "[Ez Setting] > [Fail Over] and [General] > [Advanced Setting]"
+    settings:
+      - { action: change, name: Auto Switching, path: "[Ez Setting] > [Fail Over] > [Auto Switching]", value: "Meeting rooms on with Input Priority Manual, HDMI 1 first, Action Mode Return; signage off", layer: room-type, why: "In a meeting room the display returns to the video bar; signage must never leave its player's input.", source: lg-webos-24-signage-user-guide }
+      - { action: change, name: SIMPLINK Setup, path: "[General] > [Advanced Setting] > [SIMPLINK Setup]", value: "On in video bar rooms; off for signage and rooms with a control system", layer: room-type, why: "The video bar wakes the display and selects its input over CEC; elsewhere CEC from a player or laptop would switch the display unexpectedly.", source: lg-webos-24-signage-user-guide }
+      - { action: verify, name: Office Meeting Mode, path: "[Ez Setting] > [Office Meeting Mode]", value: "Off", layer: profile, why: "Its Auto Power Off turns both automatic power offs back on.", source: lg-webos-24-signage-user-guide }
+  - name: Network and control
+    where: "[General] > [Network] and [General]"
+    settings:
+      - { derive: dhcp-reservation, action: verify, name: Wired connection, path: "[General] > [Network]", value: "DHCP, the address fixed by a reservation", layer: naming-network, why: "The network team can change the address centrally without a site visit.", source: lg-webos-24-signage-user-guide }
+      - { action: change, name: Set ID, path: "[General] > [Set ID]", value: "1", layer: profile, why: "RS-232C and network control commands address the display by its ID.", source: lg-webos-24-signage-user-guide }
+      - { derive: vault-monitoring, action: change, name: SNMP, path: "[General] > [Network] > [SNMP]", value: "On, with the site's monitoring community from the vault", per_device: true, layer: naming-network, why: "Monitoring reads the display's status and raises an alert when it stops answering.", source: lg-webos-24-signage-user-guide }
+      - { action: change, name: Port Control, path: "[General] > [Network] > [Port Control]", value: "Block every port the room does not use", layer: profile, why: "Fewer open services on a device in a public room.", source: lg-webos-24-signage-user-guide }
+      - { action: change, name: Crestron, path: "[General] > [Advanced Setting] > [Crestron]", default: "Port 41794", value: "Only in rooms with a Crestron control system: the processor's address and the room's IP-ID", layer: room-type, why: "Lets the room's control system drive the display over the network.", source: lg-webos-24-signage-user-guide }
+      - { action: verify, name: 802.1X EAP, path: "[General] > [Network] > [802.1X EAP]", value: "Off", layer: naming-network, why: "Aigna authenticates display ports by MAC address at the switch.", source: lg-webos-24-signage-user-guide }
+      - { derive: management, action: change, name: LG Business Cloud, path: "[Ez Setting] > [LG Business Cloud]", value: "Enrolled with the site's install code; named with the hostname in ConnectedCare", per_device: true, layer: naming-network, why: "Fleet management sees every display's power, input, temperature and firmware and can turn it on, off or restart it.", source: lg-business-cloud }
+      - { action: leave, name: Server Setting, path: "[Ez Setting] > [Server Setting]", value: "Not used", layer: profile, why: "SuperSign is not used; signage content comes from the signage player.", source: lg-webos-24-signage-user-guide }
+  - name: Admin and locks
+    where: "[Admin]"
+    settings:
+      - { derive: vault-site, action: change, name: Change Password, path: "[Admin] > [Change Password]", value: "The site's six-digit password from the vault", per_device: true, layer: profile, why: "A default password is the same on every display.", source: lg-webos-24-signage-user-guide }
+      - { action: change, name: Auto Update, path: "[Admin] > [Software Update] > [Auto Update]", value: "Off", layer: profile, why: "An update can change menus and defaults, and restart a display during a meeting; the Lab passes a release first.", source: lg-webos-24-signage-user-guide }
+      - { action: change, name: OSD Lock, path: "[Admin] > [Lock Mode] > [OSD Lock]", value: "On", layer: profile, why: "Stops anyone changing a setting from the remote in a public room.", source: lg-webos-24-signage-user-guide }
+      - { action: change, name: IR Operation Lock, path: "[Admin] > [Lock Mode] > [IR Operation Lock]", value: "On (Power Key Only)", layer: profile, why: "A stray remote can still turn it on or off, and nothing else.", source: lg-webos-24-signage-user-guide }
+      - { action: change, name: Local Key Operation Lock, path: "[Admin] > [Lock Mode] > [Local Key Operation Lock]", value: "On (Power Key Only)", layer: profile, why: "The buttons on the display are within reach on signage and in rooms.", source: lg-webos-24-signage-user-guide }
+      - { action: change, name: USB Lock, path: "[Admin] > [Lock Mode] > [USB Lock]", value: "On", layer: profile, why: "No content from a stick someone plugs in.", source: lg-webos-24-signage-user-guide }
+      - { action: change, name: Wi-Fi Lock, path: "[Admin] > [Lock Mode] > [Wi-Fi Lock]", value: "On", layer: profile, why: "The display is wired; its Wi-Fi stays off so it cannot join another network.", source: lg-webos-24-signage-user-guide }
+      - { action: change, name: Screen Share Lock, path: "[Admin] > [Lock Mode] > [Screen Share Lock]", value: "On", layer: profile, why: "Content is shared through the video bar, not straight to the display.", source: lg-webos-24-signage-user-guide }
+gaps:
+  - "The guide states only a few defaults (PM Mode Power Off, Crestron port 41794); the rest are written as the value Aigna wants."
+  - "The guide has no on-set menu to rename the display; the name is set in Control Manager or ConnectedCare."
+  - "No LG document read states the TCP port for network control; third-party drivers use 9761."
+  - "SNMP is listed as depending on model, and the guide says SNMP 2.0; confirm on a unit."
+  - "USB firmware update is not described in the guide."

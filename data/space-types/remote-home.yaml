@@ -1,0 +1,155 @@
+# Space type: Remote and home
+# Keia Atlas house standard, not from a published guideline. See docs/decisions/0009-house-standard.md
+# Keia part (profile to verification_model): which classes of device belong here.
+# Keia Atlas part: build options, the models each option names, and the outlets.
+
+schema: composite-profile
+
+profile:
+  name: Remote and home
+  space_type: remote-home
+  version: "1.0"
+  last_updated: "2026-09-27"
+  owner: Keia Atlas maintainers
+  capacity: "1 person"
+  purpose: >-
+    A remote worker's setup at home: one cable from the laptop to the desk, a camera, and
+    a centrally managed home network, for whichever laptop the person uses.
+
+sources:
+  - file: docs/decisions/0009-house-standard.md
+    provides: 'Keia Atlas house standard: why this space type and its kit'
+  - file: data/device-classes/monitor.yaml
+    provides: Healthy state for the monitor class
+  - file: data/device-classes/dock.yaml
+    provides: Healthy state for the dock class
+  - file: data/device-classes/network-gateway.yaml
+    provides: Healthy state for the home network gateway class
+
+equipment_categories:
+  - category: desk_display
+    description: Desk monitor with dock and camera
+    object_profile: data/device-classes/monitor.yaml
+    quantity: "1"
+  - category: docking
+    description: Desk dock for display, network and charging over one cable
+    object_profile: data/device-classes/dock.yaml
+    quantity: "1"
+  - category: home_network
+    description: Home gateway and Wi-Fi access point
+    object_profile: data/device-classes/network-gateway.yaml
+    quantity: "1"
+
+verification_model:
+  platforms_to_check:
+    - platform: keia_atlas
+      check: every required device in the chosen option is recorded in the space and wired
+        as the option says
+    - platform: inventory
+      check: every device has an active record in this space
+    - platform: dhcp_dns
+      check: every networked device has an address reservation and DNS records
+    - platform: device_management
+      check: meeting devices are online, paired and on standard firmware
+
+keia_atlas:
+  standard: house
+  category: remote
+  capacity:
+    min: 1
+    max: 1
+  geometry:
+    # The room shell for a floor-level 3D model; basis says where each value comes from.
+    width_m: 3
+    depth_m: 2.6
+    ceiling_m: 2.6
+    display_wall: none
+    door: { wall: left, from_m: 0.2, to_m: 1.05 }
+    data_entry: { via: home-broadband, at: the home router }
+    containment: [skirting, desk-tray, desk-leg, floor-cover, sideboard-trunking]
+    basis:
+      size: chosen
+      ceiling: house-default
+      door: house-default
+      data_entry: house-default
+      containment: house-default
+    notes:
+      - A typical home room.
+  options:
+    - id: usb-c-monitor
+      name: USB-C monitor
+      clients:
+        - macos
+        - windows
+      summary: A 27 inch USB-C monitor with built-in camera, network and charging for Mac
+        and Windows laptops, plus a UniFi Express 7.
+      equipment:
+        - key: monitor
+          class: monitor
+          model: dell-p2726deb
+          quantity: 1
+          requirement: required
+          location: table-top
+          notes: 'One USB-C cable: picture, camera, wired network and 90 W charging'
+        - &id001
+          key: network-gateway
+          class: network-gateway
+          model: unifi-express-7
+          quantity: 1
+          requirement: required
+          location: tbd
+          notes: Router and Wi-Fi 7 access point behind the home broadband router, managed
+            centrally
+      wiring:
+        - from: monitor.usb-c-1
+          to: laptop
+          cable: usb-c
+        - from: monitor.lan-1
+          to: network-gateway.lan-2
+          cable: cat6
+        - from: network-gateway.lan-1
+          to: home-router
+          cable: cat6
+          notes: The gateway sits behind the home broadband router
+    - id: mac
+      name: Mac
+      clients:
+        - macos
+      summary: Apple Studio Display on a CalDigit TS5 Thunderbolt 5 dock, plus a UniFi Express
+        7.
+      equipment:
+        - key: monitor
+          class: monitor
+          model: apple-studio-display-2026
+          quantity: 1
+          requirement: required
+          location: table-top
+        - key: dock
+          class: dock
+          model: caldigit-ts5
+          quantity: 1
+          requirement: required
+          location: table-top
+          notes: 'One Thunderbolt cable from the Mac: display, wired network, charging and
+            accessories'
+        - *id001
+      wiring:
+        - from: dock.usb-c-7
+          to: laptop
+          cable: thunderbolt
+          notes: 'One cable: display, network, charging and accessories'
+        - from: monitor.usb-c-1
+          to: dock.usb-c-4
+          cable: thunderbolt
+        - from: dock.lan-1
+          to: network-gateway.lan-2
+          cable: cat6
+        - from: network-gateway.lan-1
+          to: home-router
+          cable: cat6
+          notes: The gateway sits behind the home broadband router
+  notes:
+    - 'Keia Atlas house standard: not from a published guideline.'
+    - 'No option is vendor-stated for Linux laptops yet: none of the monitors or docks here
+      lists Linux. Keia Atlas claims only what vendors state.'
+    - 'No DisplayLink-based docks: they need extra drivers.'

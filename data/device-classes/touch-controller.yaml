@@ -1,0 +1,94 @@
+# Device class: Touch controller
+# A Keia object profile: what a healthy device of this class looks like on every
+# platform that knows about it. Specific models are in data/device-models/ (step 3).
+
+schema: object-profile
+
+profile:
+  name: Touch controller
+  object_role: Small touchscreen on the table that starts and controls meetings on the video
+    bar or codec
+  naming_prefixes:
+    - tc
+  version: "1.0"
+  last_updated: "2026-09-27"
+  owner: Keia Atlas maintainers
+
+sources:
+  - file: data/sources/room-guidance.yaml
+    provides: Which space types use this class of device, and where it goes
+
+platforms:
+  keia_atlas:
+    required_fields:
+      - space
+      - model
+      - serial
+      - lifecycle_state
+      - expected_firmware
+    healthy_indicators:
+      - recorded in the space its space type expects
+      - every port wired as the space type says
+  inventory:
+    required_fields:
+      - asset_tag
+      - serial
+      - model
+      - space
+      - status
+      - hostname
+    healthy_indicators:
+      - status is active
+      - space matches where the device is installed
+  dhcp_dns:
+    required_fields:
+      - hostname
+      - mac_address
+      - ip_address
+    healthy_indicators:
+      - address reservation matches the MAC address
+      - forward and reverse DNS records resolve
+  device_management:
+    required_fields:
+      - device_name
+      - serial
+      - firmware_version
+    healthy_indicators:
+      - online in the vendor's device management service
+      - firmware at the fleet standard for the model
+      - settings match the configuration profile for the model
+    firmware_expectations: Set per model by its configuration profile
+
+consistency:
+  - check: serial match
+    compare:
+      - keia_atlas.serial
+      - inventory.serial
+  - check: space match
+    compare:
+      - keia_atlas.space
+      - inventory.space
+  - check: hostname match
+    compare:
+      - inventory.hostname
+      - dhcp_dns.hostname
+  - check: firmware match
+    compare:
+      - device_management.firmware_version
+      - keia_atlas.expected_firmware
+
+discrimination:
+  controller_shows_not_paired:
+    likely_causes:
+      - video bar offline
+      - controller and video bar on different networks
+    first_check: device_management
+  controller_dark:
+    likely_causes:
+      - PoE port off
+      - patch cable pulled out
+    first_check: keia_atlas
+
+not_applicable:
+  - room_booking
+  - monitoring

@@ -1,0 +1,38 @@
+# Configuration: Dell Pro P conferencing monitor hub (P2726DEB / P3426WEB). Setting names, menu paths and defaults are the vendor's (cited per setting);
+# the values and reasons are Aigna's (demo). Researched from vendor documents, Sept 2026.
+id: dell-pro-p-conferencing-hub
+name: Dell Pro P conferencing monitor hub (P2726DEB / P3426WEB)
+models: [dell-p2726deb, dell-p3426web]
+mode: Hot desk, USB-C conferencing monitor
+version: '1.0'
+owner: sofia
+updated: '2026-09-28'
+summary: Aigna sets the OSD once per monitor at install, USB-C 90W as the input people dock to, auto-switching on, DDC/CI left on for Dell Display Manager,
+  and USB charging in standby on for the webcam/mic hub.
+managed_by: Monitor OSD
+steps: ['Connect the laptop to the USB-C 90W port for video, data and up to 90 W charging in one cable.', 'Open the OSD and set Input Source > Auto Select
+    on, with the USB-C option set to prompt for multiple inputs.', Leave DDC/CI on so Dell Display Manager can adjust brightness and input remotely., Turn
+    on Other USB Charging so downstream USB devices keep charging while the monitor is in standby., 'Run Reset Input Source if the monitor was used for
+    anything else before, then apply the above.', Run the desk's verification.]
+groups:
+- name: Input Source
+  where: Monitor OSD
+  settings:
+  - {name: Auto Select, path: Input Source > Auto Select, value: 'On, with the option for USB-C set to Prompt for Multiple Inputs', action: change, layer: profile,
+    why: 'Switches to whichever cable is live without the user hunting through the input menu, but still asks if two inputs are connected at once so it
+      doesn''t flip mid-call.', source: dell-pro-p-24-27-34-usb}
+  - {name: Reset Input Source, path: Input Source > Reset Input Source, value: Run once at install, action: verify, layer: profile, why: 'Clears whatever
+      a previous desk or the factory floor left set, before Aigna''s own values are applied.', source: dell-pro-p-24-27-34-usb}
+- name: Personalize
+  where: Monitor OSD
+  settings:
+  - {name: USB, path: Personalize > USB, value: 'Other USB Charging: On in standby', action: change, layer: profile, why: 'Lets a phone or headset plugged
+      into the monitor''s hub keep charging while the laptop is asleep, without the laptop itself staying awake.', source: dell-ultrasharp-27-monitor-u2724d-user-s}
+- name: Others
+  where: Monitor OSD
+  settings:
+  - {name: DDC/CI, path: Others > DDC/CI, value: On (vendor default), action: verify, layer: profile, why: Dell Display Manager needs DDC/CI on to set brightness
+      and input remotely; Aigna just confirms it hasn't been turned off., source: dell-ultrasharp-27-monitor-u2724d-user-s}
+gaps: [A USB-C Prioritization (High Resolution vs. High Data Speed) setting was confirmed on the U3425WE's OSD but not in the excerpts read from this Pro
+    P family's own manual; if present here it isn't broken out separately., 'No documented dedicated KVM-switch setting on either model, only Auto Select''s
+    own input-switching behaviour.', No published current firmware/controller version for this monitor pair.]

@@ -1,0 +1,383 @@
+---
+// An office. Record archetype (page-anatomy.md, B):
+//   band      Office · region · local time · open or closed; in use now, problems now, people on site today,
+//             open incidents (each drills down, P10); "Open in 3D" where a floor file exists
+//   top       the floor map, a floor at a time, rooms coloured by their state now and each one opening the room
+//             (or, with no floor file, the floors as lists of rooms), beside the sticky Today panel: the three
+//             service lights, who is on site and what needs attention
+//   tiles     internet (the circuits where modelled), comms rooms (sizing verdicts), work in the next two weeks
+//   sections  rooms by floor, with pictures; comms rooms and racks; open work and incidents; vendors and visits;
+//             facts
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import SidePanel from '../../components/SidePanel.astro';
+import Section from '../../components/Section.astro';
+import DetailTabs from '../../components/DetailTabs.astro';
+import FloorMap from '../../components/FloorMap.astro';
+import RoomPlanSprite from '../../components/RoomPlanSprite.astro';
+import GuideLive from '../../components/GuideLive.astro';
+import { href, countryName, plural, fmtDate, KIND, PHASES, PHASE_LABEL, PROJECT_KIND, VENDOR_KIND, DEMO_TODAY } from '../../lib/data.mjs';
+import { WORK_KIND } from '../../lib/work.mjs';
+import { office, liveModelFor, REGION_SHORT, ROLE_WORD, LIGHT_WORD, OPEN_Q, roomTitle, INC_WORD } from '../../lib/locations.mjs';
+import { recHere } from '../../lib/vt.mjs';
+import { storeOf } from '../../lib/stock.mjs';
+
+interface Props { site: string }
+const o = office(Astro.props.site);
+const s = o.s, M = o.M;
+const store = storeOf(o.id);
+const today = fmtDate(DEMO_TODAY, { weekday: 'long', day: 'numeric', month: 'long' });
+const NUMBERS = [
+  { id: 'loc-use', n: '–', label: 'In use now', to: `/locations/?site=${o.id}&status=use` },
+  { id: 'loc-problem', n: '–', label: 'Problems now', to: `/locations/?site=${o.id}&status=problem` },
+  { n: o.people.length, label: 'On site today', to: `/team/?office=${o.id}` },
+  { n: o.inc.length, label: 'Open incidents', to: `/incidents/?site=${o.id}&${OPEN_Q}`, tone: o.inc.length ? 'bad' as const : undefined },
+];
+const roomsOn = (f) => f.rooms.filter((r) => KIND(r) !== 'comms');
+const floorTabs = M ? M.floors.map((f) => ({ id: `floor-${f.id}`, label: f.name, count: roomsOn(o.floors.find((x) => x.id === String(f.id)) ?? { rooms: [] }).length })) : [];
+const racks = Object.fromEntries((M?.racks ?? []).map((r) => [r.id, r.space]));
+const units = (r) => r.positions.reduce((n, p) => n + p.units.length, 0);
+const incIn = (id) => o.inc.filter((v) => v.space.id === id);
+const attention = [
+  ...o.inc.slice(0, 3).map((v) => ({ tone: v.inc.priority <= 2 ? 'bad' : 'warn', text: v.inc.short_description, sub: `${v.inc.number} · ${INC_WORD[v.inc.state]} · ${v.roomTitle}`, to: v.href })),
+  ...o.comms.filter((c) => c.verdict.tone === 'bad').map((c) => ({ tone: 'warn', text: `${c.title} is short for what it serves`, sub: c.verdict.text, to: `/rooms/${c.space.id}/#sizing` })),
+  ...(store?.low ? [{ tone: 'warn', text: `IT store: ${plural(store.low, 'line')} below minimum`, sub: `${store.number ? `${store.number} ` : ''}${store.name}`, to: store.href }] : []),
+  ...o.comms.filter((c) => c.pill.tone === 'warn').map((c) => ({ tone: 'warn', text: `${c.title}: older network kit`, sub: c.pill.rf.text, to: `/rooms/${c.space.id}/` })),
+];
+const OPEN_PHASES = PHASES.filter((p) => p !== 'closed').join(',');
+// Device swaps due are one item a room and a year; here they are one line for the office and year, opening the work
+// plan for this office and that year (so the number in the line is the number the plan shows).
+const swaps = new Map();
+const rest = [];
+for (const w of o.twoWeeks) {
+  if (w.kind !== 'refresh') { rest.push(w); continue; }
+  const year = w.end.slice(0, 4);
+  const cur = swaps.get(year) ?? { ...w, units: 0 };
+  cur.units += +(/^Replace (\d+)/.exec(w.title)?.[1] ?? 1);
+  swaps.set(year, cur);
+}
+const swapItems = [...swaps.entries()].map(([year, w]) => ({ ...w, title: `Replace ${plural(w.units, 'device')} due in ${year}`, href: href(`/refresh/?site=${o.id}&year=${year}`) }));
+const work2 = [...rest, ...swapItems].filter((w) => w.kind !== 'time-off').sort((a, b) => (a.start ?? '').localeCompare(b.start ?? ''));
+// Work that started before today says when it ends; the rest, when it starts.
+const dm = (d) => fmtDate(d, { day: 'numeric', month: 'short' });
+const when = (w) => (!w.start ? 'No date' : w.start < DEMO_TODAY && w.end ? `Until ${dm(w.end)}` : dm(w.start));
+const upcomingVisits = o.visits.filter((v) => (v.end ?? v.start) >= DEMO_TODAY);
+const FACTS = [
+  ['Kind', ROLE_WORD[s.role] ?? 'Office'],
+  ['Where', `${s.city}, ${countryName(s.country)}`],
+  ['Region', REGION_SHORT[s.region]],
+  ['Time zone', s.time_zone],
+  ['Floors', (s.floors ?? []).map((f) => f.name.replace(/:.*$/, '')).join(', ') || 'Not recorded'],
+  ['Rooms', `${plural(o.peopleRooms.filter((r) => KIND(r) !== 'desks').length, 'room')}, ${plural(o.desks, 'desk')}, ${plural(o.comms.length, 'comms room')}`],
+  ['Devices', plural(o.units, 'unit')],
+  ['Mains', s.mains ? `${s.mains.volts} V, ${s.mains.hz} Hz, plug ${s.mains.plugs?.join(', ')}` : 'Not recorded'],
+  ['On-site technician', o.tech.length ? o.tech.map((p) => p.name).join(', ') : 'None; covered from another office'],
+  ['3D model', M ? 'Modelled: every floor, comms room, cable run and circuit' : 'Not modelled yet'],
+];
+const json = JSON.stringify({ ...liveModelFor([o.id]), base: href('/') }).replace(/</g, '\\u003c');
+---
+<Shell title={s.name} section="office" crumbs={[{ label: 'Locations', to: '/locations/' }, { label: REGION_SHORT[s.region], to: `/locations/${s.region}/` }, { label: s.name }]} about={{ kind: 'office', label: s.name, to: `/locations/${o.id}/` }}>
+  <PageBand overline="Office" title={s.name} sim="live" numbers={NUMBERS} rec={`loc-${o.id}`}>
+    <Fragment slot="overline">
+      <span class="code">{s.code}</span>
+      <a href={href(`/locations/${s.region}/`)} data-help="loc.region">{REGION_SHORT[s.region]}</a>
+      <span class="ob-tz" data-loc-tz={s.time_zone} data-help="loc.open"><span data-loc-clock>--:--</span> local · <span class="ob-open" data-loc-open>&nbsp;</span></span>
+    </Fragment>
+    <Fragment slot="lede">{ROLE_WORD[s.role] ?? 'Office'} in {s.city}, {countryName(s.country)}. {plural(o.peopleRooms.filter((r) => KIND(r) !== 'desks').length, 'room')} and {plural(o.desks, 'desk')} on {plural((s.floors ?? []).length, 'floor')}.</Fragment>
+    {M ? <a slot="action" class="btn primary" href={href(`/locations/${o.id}/3d/`)} data-help="loc.3d">Open in 3D</a>
+      : <span slot="action" class="ob-no3d faint" data-help="loc.3d">3D model: not modelled yet</span>}
+  </PageBand>
+
+  <div class="content ofc" data-loc="office" data-loc-racks={JSON.stringify(racks)}>
+    <RoomPlanSprite />
+    <div class="g12 top">
+      <section class="card s-7 stick ofc-map" aria-label="Floors" {...recHere(`loc-${o.id}`)} data-help="loc.floor">
+        {M ? (
+          <DetailTabs tabs={floorTabs} label="Floors" param="floor">
+            {M.floors.map((f) => (
+              <div slot={`floor-${f.id}`}><FloorMap site={o.id} floor={f.id} interactive /></div>
+            ))}
+          </DetailTabs>
+        ) : (
+          <div class="ofc-floors">
+            <p class="faint ofc-note">No floor plan is modelled for this office yet. Its rooms, floor by floor:</p>
+            {o.floors.map((f) => (
+              <div class="ofc-fl">
+                <h3>{f.name}</h3>
+                <div class="ofc-chips">
+                  {roomsOn(f).map((r) => <a class="ofc-chip" href={href(`/rooms/${r.id}/`)} data-loc-room={r.id} data-vt-rec={r.id} title={roomTitle(r)}><span class="mono">{r.number ?? ''}</span>{r.name}</a>)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <p class="ofc-key" aria-label="Key"><span><i data-st="use"></i>In use</span><span><i data-st="free"></i>Free</span><span><i data-st="problem"></i>Problem</span><span><i data-st="closed"></i>Closed</span></p>
+      </section>
+
+      <SidePanel class="s-5" title="Today" meta={today} id="today" help="loc.today">
+        <div class="td">
+          <ul class="td-lights" data-help="loc.lights">
+            {o.lights.map((l) => (
+              <li><a href={l.to.startsWith('#') ? l.to : href(l.to)}><i class="hl" data-state={l.tone} aria-hidden="true"></i><b>{l.label}</b><span>{l.text}</span></a></li>
+            ))}
+          </ul>
+          <div>
+            <h3 class="td-h">On site today <span class="faint">{o.people.length}</span></h3>
+            {o.people.length ? (
+              <ul class="td-people">
+                {o.people.map((p) => <li><a href={href(`/team/?p=${p.id}`)} title={`${p.name}, ${p.role}`}><span class="avatar sm" aria-hidden="true">{p.initials}</span><span><b>{p.name}</b><small>{p.role}</small></span></a></li>)}
+              </ul>
+            ) : <p class="faint td-none">Nobody is booked in today.</p>}
+          </div>
+          <div>
+            <h3 class="td-h">Needs attention</h3>
+            <ul class="td-att" data-loc-att></ul>
+            <ul class="td-att">
+              {attention.map((a) => <li><a href={href(a.to)}><i class="hl" data-state={a.tone} aria-hidden="true"></i><span>{a.text}</span><small>{a.sub}</small></a></li>)}
+            </ul>
+            {!attention.length && <p class="faint td-none" data-loc-att-none>Nothing needs attention right now.</p>}
+          </div>
+        </div>
+      </SidePanel>
+    </div>
+
+    <div class="g12">
+      <div class="card side-card s-3" data-help="loc.internet">
+        <h3>Internet</h3>
+        {M && M.circuits.length ? (
+          <ul class="tl">
+            {M.circuits.map((c) => <li><b>{c.provider}</b><small>{c.role === 'primary' ? 'Primary' : 'Backup'} · {c.type}{c.bandwidth && c.bandwidth !== 'Not recorded' ? ` · ${c.bandwidth}` : ''}</small></li>)}
+          </ul>
+        ) : <p class="faint">Circuits not modelled yet. They come with the office's floor file.</p>}
+        {M && <a class="tl-all" href={href(`/locations/${o.id}/3d/`)}>Follow them in 3D →</a>}
+      </div>
+      <div class="card side-card s-3" data-help="loc.comms">
+        <h3>Comms rooms</h3>
+        {o.comms.length ? (
+          <ul class="tl">
+            {o.comms.map((c) => <li><a href={href(`/rooms/${c.space.id}/`)}><b>{c.title}</b></a><small><i class="hl" data-state={c.verdict.tone} aria-hidden="true"></i> {c.verdict.text}</small></li>)}
+          </ul>
+        ) : <p class="faint">Not recorded.</p>}
+        <a class="tl-all" href="#comms">Racks and sizing ↓</a>
+      </div>
+      <div class="card side-card s-3" data-help="loc.store">
+        <h3>IT store</h3>
+        {store ? (
+          <>
+            <ul class="tl">
+              <li><a href={href(store.roomHref)}><b>{store.number ? `${store.number} ` : ''}{store.name}</b></a><small>{plural(store.units.length, 'spare unit')} · {plural(store.consumables.length, 'counted line')}</small></li>
+              <li><a href={href(store.href)}><b class:list={{ 'tl-bad': store.low > 0 }}>{store.low ? `${store.low} below minimum` : 'Nothing below minimum'}</b></a><small>Last counted {fmtDate(store.lastCounted)}{store.overdue ? ', a count is overdue' : ''}</small></li>
+            </ul>
+            <a class="tl-all" href={href(store.href)}>Open the IT store →</a>
+          </>
+        ) : <p class="faint">No IT store recorded.</p>}
+      </div>
+      <div class="card side-card s-3" data-help="loc.work">
+        <h3>Next two weeks</h3>
+        {work2.length ? (
+          <ul class="tl">
+            {work2.slice(0, 4).map((w) => <li><a href={w.href}><b>{w.title}</b></a><small>{when(w)} · {WORK_KIND[w.kind]}</small></li>)}
+          </ul>
+        ) : <p class="faint">Nothing booked.</p>}
+        <a class="tl-all" href={href(`/work/schedule/?site=${o.id}`)}>See all {work2.length} in Schedule →</a>
+      </div>
+    </div>
+
+    <Section title="Rooms by floor" id="rooms" help="loc.rooms" aside={plural(o.peopleRooms.length, 'room')}>
+      <div class="rf">
+        {o.floors.map((f) => roomsOn(f).length > 0 && (
+          <div class="rf-floor">
+            <h3 class="rf-h">{f.name} <span class="faint">{plural(roomsOn(f).length, 'room')}</span></h3>
+            <div class="rf-grid">
+              {roomsOn(f).map((r) => (
+                <a class:list={['rf-card', { alert: incIn(r.id).length > 0 }]} href={href(`/rooms/${r.id}/`)} data-loc-room={r.id}>
+                  <span class="rf-pic" data-vt-rec={r.id}><svg class="rplan" viewBox="0 0 120 80" aria-hidden="true"><use href={`#rp-${r.space_type}`} /></svg></span>
+                  <span class="rf-b"><span class="mono rf-no">{r.number ?? s.code}</span><b>{r.name}</b><small>{r.type.profile.name}{r.count ? ` · ${r.count} desks` : ''} · {plural(units(r), 'device')}</small></span>
+                  <i class="rf-st" aria-hidden="true"></i>
+                </a>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <a slot="aside" href={href(`/rooms/?site=${o.id}`)} data-vt-rec="dd-rooms">All {plural(o.rooms.length, 'room')} in Rooms →</a>
+    </Section>
+
+    <Section title="Comms rooms and racks" id="comms" help="loc.comms">
+      {o.comms.length ? (
+        <div class="cm">
+          {o.comms.map((c) => (
+            <article class="cm-row">
+              <header class="cm-h">
+                <a href={href(`/rooms/${c.space.id}/`)}><b>{c.title}</b></a>
+                <span class="faint">{c.mdf ? 'Main comms room (MDF)' : 'Floor comms room (IDF)'} · {c.racks.length ? c.racks.map((k) => `${k.name}, ${k.height_u}U`).join('; ') : 'No rack recorded'}</span>
+                <span class={`pill ${c.pill.tone}`}>{c.pill.text}</span>
+              </header>
+              <table class="cm-t to-cards">
+                <thead><tr><th scope="col">Sized for</th><th scope="col">Needs</th><th scope="col">Has</th><th scope="col">Verdict</th></tr></thead>
+                <tbody>
+                  {c.size.rows.map((r) => (
+                    <tr><th scope="row" data-label="Sized for">{r.name}</th><td data-label="Needs">{r.need}<small class="faint"> {r.needNote}</small></td><td data-label="Has">{r.have ?? '–'}</td><td data-label="Verdict"><span class={`cm-v t-${r.v.tone}`}>{r.v.text}</span></td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </article>
+          ))}
+        </div>
+      ) : <p class="faint">Not recorded.</p>}
+      <a slot="aside" href={href(`/cables/?site=${o.id}`)}>Cables at {s.name} →</a>
+    </Section>
+
+    <Section title="Open work and incidents" id="work" help="loc.openwork">
+      <GuideLive where="office" site={o.id} />
+      <div class="ow">
+        <div>
+          <h3 class="ow-h">Projects <a href={href(`/projects/?site=${o.id}&phase=${OPEN_PHASES}`)} class="faint">{o.projects.length}</a></h3>
+          {o.projects.length ? (
+            <ul class="tl">
+              {o.projects.map((p) => <li><a href={href(`/projects/${p.id.toLowerCase()}/`)}><b>{p.name}</b></a><small>{p.id} · {PROJECT_KIND[p.kind] ?? p.kind} · {PHASE_LABEL[p.phase] ?? p.phase}</small></li>)}
+            </ul>
+          ) : <p class="faint">No open projects.</p>}
+        </div>
+        <div>
+          <h3 class="ow-h">Incidents <a href={href(`/incidents/?site=${o.id}&${OPEN_Q}`)} class="faint">{o.inc.length}</a></h3>
+          {o.inc.length ? (
+            <ul class="tl">
+              {o.inc.map((v) => <li><a href={href(v.href)}><b>{v.inc.short_description}</b></a><small><span class={`ri-p p-${v.inc.priority}`}>P{v.inc.priority}</span> {v.inc.number} · {INC_WORD[v.inc.state]} · {v.roomTitle}</small></li>)}
+            </ul>
+          ) : <p class="faint">No open incidents.</p>}
+        </div>
+      </div>
+    </Section>
+
+    <Section title="Vendors and visits" id="vendors" help="loc.vendors">
+      <div class="ow">
+        <div>
+          <h3 class="ow-h">Vendors <a href={href(`/vendors/?site=${o.id}`)} class="faint">{o.vendors.length}</a></h3>
+          {o.vendors.length ? (
+            <ul class="tl">
+              {o.vendors.map((v) => <li><a href={href(`/vendors/?site=${o.id}&q=${encodeURIComponent(v.name)}`)}><b>{v.name}</b></a><small>{VENDOR_KIND[v.kind] ?? v.kind}</small></li>)}
+            </ul>
+          ) : <p class="faint">No vendors recorded for this office.</p>}
+        </div>
+        <div>
+          <h3 class="ow-h">Visits <a href={href(`/work/schedule/?site=${o.id}&kind=visit`)} class="faint">{upcomingVisits.length}</a></h3>
+          {upcomingVisits.length ? (
+            <ul class="tl">
+              {upcomingVisits.map((v) => <li><a href={v.href}><b>{v.title}</b></a><small>{fmtDate(v.start)}{v.end && v.end !== v.start ? ` to ${fmtDate(v.end)}` : ''}</small></li>)}
+            </ul>
+          ) : <p class="faint">No visits booked.</p>}
+        </div>
+      </div>
+    </Section>
+
+    <Section title="Facts" id="facts" help="loc.facts">
+      <dl class="kv ofc-facts">
+        {FACTS.map(([a, b]) => <div><dt>{a}</dt><dd>{b}</dd></div>)}
+      </dl>
+    </Section>
+    <script type="application/json" data-loc-model set:html={json}></script>
+  </div>
+
+  <script>
+    import { startLocations } from '../../lib/locations-client.mjs';
+    function init() {
+      const root = document.querySelector('[data-loc="office"]') as any;
+      if (!root || root.__loc) return;
+      const stop = startLocations(root);
+      document.addEventListener('astro:before-swap', stop, { once: true });
+    }
+    init();
+    document.addEventListener('astro:page-load', init);
+  </script>
+</Shell>
+
+<style>
+  .ofc { display: grid; gap: var(--gutter); }
+  .ob-tz { font-variant-numeric: tabular-nums; }
+  .ob-open[data-open="1"] { color: var(--green-ink, var(--green)); font-weight: 650; }
+  .ob-no3d { font-size: 13px; align-self: center; }
+  .ofc-map { padding: 14px 16px; display: grid; gap: 10px; }
+  .ofc-note { margin: 0; font-size: 13px; }
+  .ofc-floors { display: grid; gap: 14px; }
+  .ofc-fl h3 { margin: 0 0 8px; font-size: 14px; }
+  .ofc-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ofc-chip { display: inline-flex; gap: 6px; align-items: baseline; padding: 5px 9px; border-radius: 6px; font-size: 12.5px; color: var(--ink); text-decoration: none; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); transition: background var(--dur-state) var(--ease-settle), box-shadow var(--dur-state) var(--ease-settle); }
+  .ofc-chip .mono { color: var(--text-2); font-size: 11px; }
+  .ofc-chip:hover { box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .ofc-chip[data-st=use] { background: color-mix(in srgb, var(--blue) 18%, var(--bg)); }
+  .ofc-chip[data-st=free] { background: color-mix(in srgb, var(--green) 14%, var(--bg)); }
+  .ofc-chip[data-st=problem] { background: color-mix(in srgb, var(--red) 18%, var(--bg)); box-shadow: inset 0 0 0 1.5px var(--red); }
+  .ofc-key { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; font-size: 12px; color: var(--text-2); }
+  .ofc-key span { display: inline-flex; align-items: center; gap: 6px; }
+  .ofc-key i { width: 12px; height: 12px; border-radius: 3px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-strong); }
+  .ofc-key i[data-st=use] { background: color-mix(in srgb, var(--blue) 30%, var(--bg)); }
+  .ofc-key i[data-st=free] { background: color-mix(in srgb, var(--green) 22%, var(--bg)); }
+  .ofc-key i[data-st=problem] { background: color-mix(in srgb, var(--red) 30%, var(--bg)); box-shadow: inset 0 0 0 1.5px var(--red); }
+  .td { display: grid; gap: 16px; }
+  .td-h { margin: 0 0 8px; font-size: 13px; text-transform: none; }
+  .td-lights, .td-people, .td-att { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .td-lights a, .td-att :global(a) { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; align-items: center; color: var(--ink); text-decoration: none; font-size: 13.5px; padding: 6px 8px; border-radius: 8px; transition: background var(--dur-state) var(--ease-settle); }
+  .td-att :global(.hl) { width: 10px; height: 10px; }
+  .td-lights a { grid-template-columns: auto 110px minmax(0, 1fr); }
+  .td-lights span { color: var(--text-2); font-size: 13px; }
+  .td-att + .td-att { margin-top: 6px; }
+  .td-att:empty { display: none; }
+  .td-att :global(small) { grid-column: 2; color: var(--text-2); font-size: 12px; }
+  .td-lights a:hover, .td-att :global(a:hover), .td-people a:hover { background: var(--surface-2); }
+  .td-people { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+  .td-people a { display: flex; gap: 8px; align-items: center; color: var(--ink); text-decoration: none; padding: 4px 6px; border-radius: 8px; min-width: 0; }
+  .td-people a > span:last-child { display: grid; min-width: 0; }
+  .td-people b { font-size: 13px; font-weight: 650; }
+  .td-people small { color: var(--text-2); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .td-none { margin: 0; font-size: 13px; }
+  .tl { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .tl li { display: grid; gap: 2px; min-width: 0; }
+  .tl a { color: var(--ink); text-decoration: none; }
+  .tl a:hover { text-decoration: underline; }
+  .tl b { font-weight: 650; font-size: 13.5px; }
+  .tl small { color: var(--text-2); font-size: 12.5px; display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .tl .hl { width: 9px; height: 9px; }
+  .tl-bad { color: var(--red-ink); }
+  .tl-all { margin-top: auto; font-size: 13px; font-weight: 600; }
+  .side-card p.faint { margin: 0; font-size: 13px; }
+  .rf { display: grid; gap: 18px; }
+  .rf-h { margin: 0 0 10px; font-size: 14px; }
+  .rf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+  .rf-card { position: relative; display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 10px; align-items: center; padding: 8px 10px; border-radius: 10px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink); text-decoration: none; transition: box-shadow var(--dur-state) var(--ease-settle), transform var(--dur-state) var(--ease-settle); }
+  .rf-card:hover { box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .rf-card.alert { box-shadow: inset 0 0 0 1.5px var(--red); }
+  .rf-pic { display: block; border-radius: 6px; background: var(--surface-2); overflow: hidden; }
+  .rf-pic .rplan { display: block; width: 100%; height: auto; }
+  .rf-b { display: grid; gap: 1px; min-width: 0; }
+  .rf-b b { font-size: 13.5px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rf-b small { color: var(--text-2); font-size: 11.5px; }
+  .rf-no { font-size: 11px; color: var(--text-2); }
+  .rf-st { position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 50%; background: transparent; transition: background var(--dur-state) var(--ease-settle); }
+  .rf-card[data-st=use] .rf-st { background: var(--blue); }
+  .rf-card[data-st=free] .rf-st { background: var(--green); }
+  .rf-card[data-st=problem] .rf-st { background: var(--red); }
+  .rf-card[data-st=closed] .rf-st { background: var(--surface-3); }
+  .cm { display: grid; gap: 18px; }
+  .cm-row { display: grid; gap: 8px; }
+  .cm-h { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+  .cm-h a { color: var(--ink); }
+  .cm-h .faint { font-size: 13px; }
+  .cm-t { width: 100%; font-size: 13px; }
+  .cm-t th[scope=row] { font-weight: 600; text-align: left; }
+  .cm-v { font-weight: 650; }
+  .cm-v.t-bad { color: var(--red-ink); } .cm-v.t-manage { color: var(--green-ink, var(--green)); } .cm-v.t-faint { color: var(--text-2); font-weight: 500; }
+  .ow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gutter); }
+  .ow-h { margin: 0 0 10px; font-size: 14px; display: flex; gap: 8px; align-items: baseline; }
+  .ow-h a { font-variant-numeric: tabular-nums; }
+  .ri-p { font: 700 10.5px/1 var(--font-mono); padding: 3px 5px; border-radius: 4px; background: var(--surface-2); }
+  .ri-p.p-1, .ri-p.p-2 { background: var(--red-soft); color: var(--red-ink); }
+  .ofc-facts div { grid-template-columns: 180px minmax(0, 1fr); }
+  @container content (max-width: 699px) {
+    .ow { grid-template-columns: minmax(0, 1fr); }
+    .td-lights a { grid-template-columns: auto minmax(0, 1fr); }
+    .td-lights span { grid-column: 2; }
+  }
+  @container content (max-width: 559px) { .ofc-facts div { grid-template-columns: minmax(0, 1fr); } }
+  @media (prefers-reduced-motion: reduce) { .rf-card, .ofc-chip, .rf-st, .td-lights a, .td-att a { transition: none; } }
+</style>

@@ -1,0 +1,42 @@
+# Configuration: TP-583Txr/Rxr extender pair. Setting names, menu paths and defaults are the vendor's (cited per setting);
+# the values and reasons are Aigna's (demo). Researched from vendor documents, Sept 2026.
+id: kramer-tp583-pair
+name: TP-583Txr/Rxr extender pair
+models: [kramer-tp-583txr, kramer-tp-583rxr]
+mode: Point to point
+version: '1.0'
+owner: sofia
+updated: '2026-09-28'
+summary: A fixed HDMI HDBaseT extender pair for a source-to-display run with RS-232 and IR extension. Both units ship with every DIP-switch off/up, which
+  is already what Aigna wants, so the whole file is verify checks.
+managed_by: Front-panel DIP switches
+steps: [Mount TP-583Txr near the source (or scaler output) and TP-583Rxr at the display end., Verify every DIP-switch on both units before applying power
+    (factory default is all Off/up)., Connect the LINE RJ-45 on TP-583Txr to the LINE RJ-45 on TP-583Rxr with a single certified HDBaseT cable., 'Wire RS-232
+    and IR extension only if the room design uses them (for example, display control via TP-583Rxr''s RS-232 port).', Power both units from their 12V adapters.,
+  'Power-cycle both units once, since DIP-switches 1B, 2B and 3B only take effect after a restart.', Confirm the LINK LED lights on both units and the display
+    syncs.]
+groups:
+- name: DIP-switches (both units)
+  where: Rear panel SETUP DIP-switches
+  settings:
+  - {name: Set HDBT Range (DIP 1A), path: Rear panel > SETUP DIP-switches > 1A, value: Off / up (HDBaseT normal range), action: verify, layer: room-type,
+    why: Normal range covers Aigna's typical HDBaseT runs at full 4K60 quality; ultra-long range trades bandwidth for reach and is only used on a longer
+      cable run., source: kramer-tp-583txr-tp-583t-tp-583rxr-tp}
+  - {name: 'Set Compression Level, extended range (DIP 2A)', path: Rear panel > SETUP DIP-switches > 2A, value: 'Off / up (standard compression, EDID passthrough)',
+    action: verify, layer: profile, why: Keeps true EDID passthrough for reliable plug-and-play with Aigna's room PCs and displays; the high-compression
+      position hardcodes the EDID instead., source: kramer-tp-583txr-tp-583t-tp-583rxr-tp}
+  - {name: Define Compressed Resolutions (DIP 1B), path: Rear panel > SETUP DIP-switches > 1B, value: Off / up (compress only above 1080p), action: verify,
+    layer: profile, why: Leaves 1080p and below uncompressed for the best quality at Aigna's normal run lengths., source: kramer-tp-583txr-tp-583t-tp-583rxr-tp}
+  - {name: 'Define RS-232 Function (DIP 2B, 3B)', path: 'Rear panel > SETUP DIP-switches > 2B, 3B', value: 'Off, Off (embed RS-232 data and control signals
+      over the extension line)', action: verify, layer: profile, why: 'Extends the display''s RS-232 control back to the source end, which Aigna''s room
+      control relies on.', source: kramer-tp-583txr-tp-583t-tp-583rxr-tp}
+  - {name: Define IR Pass-through (DIP 4B), path: Rear panel > SETUP DIP-switches > 4B, value: Off / up (pass-through the IR signal to the IR port via IR
+      cable), action: verify, layer: room-type, why: Matches Aigna's standard IR-cable-to-sensor wiring; only switched to the modulated position if an
+      IR emitter cable is used instead., source: kramer-tp-583txr-tp-583t-tp-583rxr-tp}
+- name: RS-232
+  where: Rear panel 3-pin terminal block
+  settings:
+  - {name: Extended RS-232 baud rate, value: '300-115200 baud, auto (not adjustable)', action: verify, layer: profile, why: The extension line carries whatever
+      rate the connected controller and display use; there's nothing to set on the extender itself., source: kramer-tp-583txr-tp-583t-tp-583rxr-tp}
+gaps: ['No web interface, IP control, or firmware-version reporting is documented for either unit.', No current firmware or hardware revision is published;
+    settings were checked against the manual's own P/N 2900-301246 Rev 2.]

@@ -1,0 +1,59 @@
+# Demo playbook. Aigna's own way of working; not taken from any real company.
+id: workplace-refresh
+name: Workplace IT refresh
+kind: workplace-refresh
+version: "1.0"
+intensity: light
+weeks: { min: 8, max: 14 }
+summary: "Replace the shared equipment on a floor that sits outside the meeting rooms, such as printers, signage players and room booking panels, one floor at a time, keeping each position, hostname and address."
+when: "Use for shared workplace devices that are past their years in service and swap like for like. Not for laptops, phones or anything one person carries; those are outside Keia Atlas. Meeting room devices use the AV refresh playbook."
+changes:
+  - { date: "2026-09-29", change: "First version." }
+phases:
+  - phase: plan
+    weeks: "1 to 2"
+    steps:
+      - { title: "Pull the printers, signage players and booking panels past their years in service from the refresh plan", role: delivery, output: List of units due }
+      - { title: "Confirm the current standard model for each kind of device", role: sm-av }
+      - { title: "Agree a floor order and quiet weeks with facilities", role: pm, output: Floor order }
+      - { title: "Budget line and purchase request", role: programme }
+    gate: { by: [programme], checks: [Scope and budget agreed, Floors fit the year plan] }
+  - phase: design
+    weeks: "1 to 2"
+    steps:
+      - { title: "Swap sheet per floor: position, old model, new model, hostname and address kept", role: delivery, output: Swap sheet }
+      - { title: "Check mounts, supplies, cables and power suit the new model", role: delivery }
+      - { title: "Take the configuration from each new model's configuration page", role: delivery }
+      - { title: "Check each print queue, signage playlist and booking panel link that has to carry over", role: network, output: Links to carry over }
+    gate: { by: [sm-av], checks: [Every swap is to the current standard, Nothing that depends on the old device is missed] }
+  - phase: procure
+    weeks: "3 to 6"
+    steps:
+      - { title: "Order units, mounts and one spare per ten", role: pm, long_lead: true }
+      - { title: "Send MACs to the network team for address reservations before delivery", role: network }
+      - { title: "Record serials on arrival against the swap sheet", role: tech }
+    gate: { by: [pm], checks: [Everything received, Addresses reserved] }
+  - phase: integrate
+    weeks: One day per floor, then 1
+    steps:
+      - { title: "Retire the old unit in the asset register the same day", role: tech, step: provision }
+      - { title: "Add the new unit to device management and monitoring", role: delivery, step: provision }
+      - { title: "Tell the floor which day the printers and panels will be off", role: pm, step: install }
+      - { title: "Swap the unit, keeping position and hostname", role: tech, step: install }
+      - { title: "Configure each device in its setup order, then set and verify its settings", role: delivery, step: configure }
+      - { title: "Point print queues, signage playlists and booking links at the new device", role: network, step: configure }
+      - { title: "Run the verification for each device", role: delivery, step: commission }
+      - { title: "Print, display and book a test from the floor", role: tech, step: commission }
+      - { title: "Snag list", role: delivery, output: Snag list, step: commission }
+    gate: { by: [delivery], checks: [Every floor in the batch installed, "Every device passes, or its snags are accepted"] }
+  - phase: handover
+    weeks: "1"
+    steps:
+      - { title: "Handover note to the service desk: what changed on each floor", role: pm, output: Handover note }
+      - { title: "Redeploy or dispose of the old units", role: pm }
+    gate: { by: [sm-av], checks: [Records match what is on the floors] }
+  - phase: closed
+    weeks: "-"
+    steps:
+      - { title: "Feed what was learned back into this playbook", role: pm }
+    gate: { by: [programme], checks: [Lessons captured] }

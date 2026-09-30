@@ -1,0 +1,176 @@
+# Device model: BrightSign XT1145
+# Facts from the vendor's public documentation (two independent readings, reconciled).
+# Anything the sources don't state is left out and listed under gaps.
+
+manufacturer: BrightSign
+
+model: XT1145
+
+class: signage-player
+
+summary: A 4K60 HDR digital signage media player with HDMI input and output, PoE+ Gigabit Ethernet, USB-A
+  and USB-C, GPIO, IR and RS-232 control, and analog/optical audio out, powered by a 12V DC adapter or
+  PoE+.
+
+dimensions_mm:
+  width: 238.62
+  height: 19.19
+  depth: 185.9
+  notes: Vendor table gives 238.62 x 185.90 x 19.19 mm labeled 'WxDxH' for the shared XT245/XT1145/XT2145
+    chassis; mapped here to width/depth/height accordingly. Figure is for the player body alone.
+
+weight_kg: 0.68
+
+power:
+  inputs:
+    - type: dc
+      volts: 12V
+      watts: 36
+      supplied: true
+      notes: 'Included 36W (12V/3A) power adapter with a proprietary locking connector. Connects at: 12V@3A
+        locking DC power connector.'
+    - type: poe
+      poe:
+        role: powered
+        standard: 802.3at
+      supplied: false
+      notes: 'Ethernet port is labeled ''PoE+ Gigabit Ethernet'' on the hardware-interfaces spec table;
+        a separate page notes power is reduced to 12W ''when the player is powered via type 1 poe'' (i.e.
+        basic 802.3af), so the port appears to accept both PoE and PoE+ with a reduced budget on basic
+        PoE. Connects at: PoE+ Gigabit Ethernet (RJ-45).'
+  consumption_w:
+    typical: 12
+
+mounting:
+  - wall
+
+sources:
+  - source: brightsign-xt245-xt1145-xt2145-hardware-set-up
+    provides: Port labels, faces and panel layout
+  - source: brightsign-xt5-hardware-interfaces
+    provides: Port labels, faces and panel layout
+  - source: brightsign-xt5-environmental-power
+    provides: Port labels, faces and panel layout
+  - source: brightsign-series-5-product-selector-specifications
+    provides: Dimensions, weight, power and interfaces
+  - source: brightsign-xt5-datasheet-2024-xt245-xt1145-xt2145
+    provides: Dimensions, weight, power and interfaces
+
+ports:
+  - id: hdmi-in-1
+    label: HDMI IN
+    connector: hdmi
+    signals:
+      - video
+      - audio
+    direction: in
+    face: rear
+    order: 1
+    notes: Max video resolution 4096x2160x60p (HDMI 2.0); HDCP support on this input was 'coming soon'
+      per a future OS update note.
+  - id: hdmi-out-1
+    label: HDMI OUT
+    connector: hdmi
+    signals:
+      - video
+      - audio
+    direction: out
+    face: rear
+    order: 2
+    notes: HDMI 2.1a per the hardware-interfaces spec table; CEC control and AVI passthrough supported.
+  - id: usb-a-1
+    label: USB A 2.0 PORT
+    connector: usb-a
+    signals:
+      - usb
+      - power
+    direction: bidirectional
+    face: rear
+    order: 3
+    usb_power_w: 5
+    notes: Provides 5V/1A power to peripheral devices.
+  - id: usb-c-1
+    label: USB C PORT
+    connector: usb-c
+    signals:
+      - usb
+      - power
+    direction: bidirectional
+    face: rear
+    order: 4
+    usb_power_w: 5
+    notes: Supports high-speed USB host mode; provides 5V/1A power to peripheral devices; also used to
+      access BrightSignOS internal web pages.
+  - id: lan-1
+    label: PoE+ Gigabit Ethernet
+    connector: rj45
+    signals:
+      - ethernet
+      - poe
+    direction: bidirectional
+    face: rear
+    order: 5
+    poe:
+      role: powered
+      standard: 802.3at
+    notes: 10/100/1000 Mbps; 802.1X supported on the port. Labeled PoE+ on the datasheet. re. a conflicting
+      'Type 1 PoE' reference elsewhere.
+  - id: gpio-1
+    label: GPIO
+    connector: terminal-block
+    signals:
+      - gpio
+    direction: bidirectional
+    face: front
+    order: 4
+    notes: 12-pin Phoenix/terminal-block connector with 8 bi-directional ports plus an LED connector;
+      inputs sink 24mA or less, pins can supply 3.3V@500mA.
+  - id: ir-1
+    label: IR IN/OUT
+    connector: 3.5mm
+    signals:
+      - ir
+    direction: bidirectional
+    face: front
+    order: 2
+    notes: Combined IR in/out 3.5mm jack; supports NEC and RC5 formats.
+  - id: rs232-1
+    label: SERIAL
+    connector: 3.5mm
+    signals:
+      - rs232
+    direction: bidirectional
+    face: front
+    order: 3
+    notes: 3.5mm (1/8in) TRS jack, TX/RX/GND only, default baud rate 115200.
+  - id: audio-out-1
+    label: AUDIO OUT
+    connector: 3.5mm
+    signals:
+      - audio
+    direction: out
+    face: front
+    order: 1
+    notes: Combination analog/optical (SPDIF) 3.5mm jack; 2V RMS output; 32ohm minimum load impedance.
+  - id: power-in
+    label: 12V@3A LOCKING POWER CONNECTOR
+    connector: proprietary
+    signals:
+      - power
+    direction: in
+    face: front
+    order: 5
+    notes: Proprietary locking DC connector, rated 12V/3A.
+
+gaps:
+  - No maximum power draw; about 12 W typical while playing.
+  - No part number beyond the model name.
+  - Front and rear here follow BrightSign's own naming (front is the panel with audio, IR, serial, GPIO
+    and power; rear is the panel with HDMI, USB and Ethernet). The docs show no side ports.
+  - The microSD slot, SVC button, Reset button and the two Wi-Fi antenna connectors are shown on the panels
+    but are not modelled as ports.
+
+notes:
+  - BrightSign's docs call the network port PoE+ but also describe running at reduced power on Type 1
+    PoE (802.3af).
+  - Size and weight are shared across the XT245, XT1145 and XT2145.

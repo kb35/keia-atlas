@@ -1,0 +1,119 @@
+---
+// Search: every result for a query, grouped, with facets to narrow it. The same parser and index as
+// the search overlay (SearchOverlay.astro); the query lives in the address (?q=) so it can be shared.
+import Shell from '../../layouts/Shell.astro';
+import Icon from '../../components/Icon.astro';
+
+const EXAMPLES = ['EMEA rooms with X52', 'rooms with x52', 'x52 in Dublin', 'retired codecs', 'configurations for poly', 'projects at the Dublin office', 'displays older than 7 years', 'who is on site in APAC', 'cafeteria', 'open incidents', 'firmware do not install', 'rooms without a scheduler in London'];
+---
+<Shell title="Search" section="search" crumbs={[{ label: 'Search' }]} vendorOk>
+  <section class="band">
+    <div class="meta"><span class="overline">Search everything</span></div>
+    <h1>Search</h1>
+    <p class="lede">Rooms, room profiles, devices (retired ones too), models, configurations and their settings, firmware, projects and tasks, people. Type it the way you would ask a colleague.</p>
+  </section>
+  <div class="content srch" id="srch" data-ks-root data-mode="page">
+    <label class="srch-box">
+      <Icon name="search" size={20} />
+      <span class="sr-only">Search Keia Atlas</span>
+      <input type="text" data-ks-input placeholder="EMEA rooms with X52" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-controls="srch-results" />
+      <button type="button" class="ks-clear" data-ks-clear aria-label="Clear" hidden>×</button>
+    </label>
+    <div class="ks-chips srch-chips" data-ks-chips aria-label="What Keia Atlas understood"></div>
+    <p class="ks-note srch-note" data-ks-note hidden></p>
+    <div class="srch-grid">
+      <details class="srch-refine" open data-refine>
+        <summary><Icon name="sliders" size={16} />Refine</summary>
+        <div class="srch-facets" data-ks-facets></div>
+      </details>
+      <div class="srch-main">
+        <p class="faint srch-count" data-ks-count aria-live="polite"></p>
+        <div class="ks-results srch-results" id="srch-results" role="listbox" aria-label="Results" data-ks-results data-ks-scroll></div>
+        <div class="ks-empty srch-empty" data-ks-empty>
+          <section data-ks-recent-wrap hidden>
+            <header><span class="overline">Recent</span><button type="button" class="ks-link" data-ks-recent-clear>Clear</button></header>
+            <div class="ks-list" data-ks-recent></div>
+          </section>
+          <section>
+            <header><span class="overline">Try</span></header>
+            <div class="ks-try">{EXAMPLES.map((q) => <button type="button" class="ks-ex" data-ks-q={q}>{q}</button>)}</div>
+          </section>
+          <section class="card srch-how">
+            <h2>How Keia Atlas reads a search</h2>
+            <p>There is no AI model here. Keia Atlas reads your words left to right with a fixed set of rules, so the same words always give the same answer:</p>
+            <ul>
+              <li><b>What you want back:</b> rooms, devices, models, configurations, projects, people…</li>
+              <li><b>Where:</b> a region (EMEA, Americas, APAC, or words like Europe), a site, a city, a floor.</li>
+              <li><b>What it has:</b> a model in any spelling (x52, X 52, Studio X52), a make, a kind of device. "With" means has one; "without" means has none.</li>
+              <li><b>What state:</b> retired, being replaced, older kit, due for replacement, open, blocked; and age, like "older than 7 years".</li>
+            </ul>
+            <p>Each thing it understood becomes a chip. Remove a chip, or open it to pick another value. Small typos and plurals are forgiven; numbers never are, so x52 never turns into x32.</p>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script is:inline data-astro-rerun slot="end">
+    (function () {
+      var root = document.getElementById('srch'); if (!root || !window.rsSearch) return;
+      var input = root.querySelector('[data-ks-input]');
+      var qs = new URLSearchParams(location.search), q0 = qs.get('q') || '';
+      input.value = q0;
+      // Facets fold away on phones.
+      var refine = root.querySelector('[data-refine]');
+      if (refine && matchMedia('(max-width: 760px)').matches) refine.open = false;
+      var tm;
+      var ctl = window.rsSearch.bind(root, {
+        mode: 'page', perGroup: 6,
+        onRun: function (q) {
+          clearTimeout(tm);
+          tm = setTimeout(function () {
+            var u = new URL(location.href);
+            if (q.trim()) u.searchParams.set('q', q.trim()); else u.searchParams.delete('q');
+            if (u.href !== location.href) history.replaceState(history.state, '', u.href);
+          }, 300);
+        },
+        onSubmit: function (q) { window.rsSearch.recent.add(q); },
+      });
+      if (!q0 && matchMedia('(hover: hover)').matches) input.focus();
+    })();
+  </script>
+</Shell>
+<style is:global>
+  .srch { gap: 12px; padding-top: 14px; }
+  .srch-box { display: flex; align-items: center; gap: 12px; max-width: 820px; height: 54px; padding: 0 14px 0 18px; border-radius: var(--pill-radius); border: 1px solid var(--line-strong, var(--line)); background: var(--surface); color: var(--text-3); transition: border-color var(--dur-state, 300ms), box-shadow var(--dur-state, 300ms); }
+  .srch-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .srch-box input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--text); font: 450 18px var(--font-sans); }
+  .srch .srch-chips { padding: 0; }
+  .srch .srch-note { margin: 0; }
+  .srch-grid { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 24px; align-items: start; margin-top: 6px; }
+  .srch-refine > summary { display: none; }
+  .srch-grid:has(.srch-facets:empty) { grid-template-columns: minmax(0, 1fr); }
+  .srch-grid:has(.srch-facets:empty) .srch-refine { display: none; }
+  .srch-empty { max-width: 900px; }
+  .srch-facets { display: grid; gap: 16px; position: sticky; top: calc(var(--mast-h) + 16px); }
+  .srch-facets:empty { display: none; }
+  .ks-fc { display: grid; gap: 2px; }
+  .ks-fc .overline { margin: 0 0 4px 8px; }
+  .ks-fv { appearance: none; display: flex; justify-content: space-between; gap: 10px; align-items: center; border: 0; background: none; color: var(--text); font: 500 13.5px var(--font-sans); padding: 6px 8px; border-radius: var(--radius); cursor: pointer; text-align: left; transition: background var(--dur-fast, 140ms); }
+  .ks-fv:hover { background: var(--surface-2); }
+  .ks-fv .num { color: var(--text-3); font-size: 12px; }
+  .ks-fv.on { background: var(--accent-soft); color: var(--accent-ink, var(--accent)); font-weight: 650; }
+  .ks-fv.on .num { color: inherit; }
+  .srch-count { margin: 0 0 4px 10px; font-size: 13px; min-height: 1em; }
+  .srch-results { padding: 0; }
+  .srch-results .ks-grp { background: var(--surface); border: var(--border-card); border-radius: var(--radius-lg); padding: 4px 6px 6px; margin-bottom: 12px; }
+  .srch-empty { padding: 0; gap: 20px; }
+  .srch-how { padding: 18px 20px; max-width: 70ch; }
+  .srch-how h2 { font-size: 16px; margin: 0 0 6px; }
+  .srch-how p, .srch-how li { font-size: 14px; color: var(--text-2); }
+  .srch-how ul { padding-left: 18px; margin: 8px 0; display: grid; gap: 4px; }
+  .srch-how b { color: var(--text); }
+  @media (max-width: 900px) {
+    .srch-grid { grid-template-columns: 1fr; gap: 10px; }
+    .srch-refine > summary { display: inline-flex; align-items: center; gap: 8px; list-style: none; cursor: pointer; font: 600 13.5px var(--font-sans); padding: 8px 14px; border-radius: var(--pill-radius); border: 1px solid var(--line); background: var(--surface); }
+    .srch-refine > summary::-webkit-details-marker { display: none; }
+    .srch-facets { position: static; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); margin-top: 10px; }
+    .srch-box { height: 48px; } .srch-box input { font-size: 16px; }
+  }
+</style>

@@ -1,0 +1,85 @@
+# Runs: the permanent cabling at a site, one file per site (data/runs/<site>.yaml). A horizontal run goes from a
+# comms room patch panel port to one data outlet in a room, or to one access point; a backbone run joins two
+# panels (the riser fibre). The id is the label on the panel end (SITE-ROOM-RACK-UNIT-PORT). Patch cords, which
+# join switch ports to panel ports, stay in data/cables. Made up for the demo (rule F9).
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/runs
+title: Runs
+type: object
+additionalProperties: false
+required: [site, fictional, limits, runs]
+$defs:
+  panelEnd:
+    type: object
+    additionalProperties: false
+    required: [rack, u]
+    properties:
+      rack: { type: string }
+      u: { type: integer, minimum: 1 }
+      port: { type: integer, minimum: 1 }
+      ports: { description: 'A range of ports, "1-12".', type: string, pattern: "^[0-9]+(-[0-9]+)?$" }
+properties:
+  site: { type: string, pattern: "^[a-z0-9]+$" }
+  fictional: { type: string, minLength: 1 }
+  limits:
+    description: Copper length limits, with where they come from.
+    type: object
+    additionalProperties: false
+    required: [copper_link_m, copper_channel_m, sources]
+    properties:
+      copper_link_m: { type: number }
+      copper_channel_m: { type: number }
+      sources:
+        type: array
+        minItems: 1
+        items: { type: object, additionalProperties: false, required: [title, url], properties: { title: { type: string }, url: { type: string, format: uri } } }
+  allowance:
+    description: House allowances included in each length (slack at each end) and assumed for the channel check (the device cord).
+    type: object
+    additionalProperties: false
+    properties:
+      rack_slack_m: { type: number }
+      outlet_slack_m: { type: number }
+      outlet_cord_m: { type: number }
+      notes: { type: string }
+  tester: { type: string }
+  runs:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, kind, type, purpose, from, to, via, length_m, test]
+      properties:
+        id: { type: string, pattern: "^[A-Z]{3}-[0-9]{1,3}\\.[0-9]{2}-R[0-9]+-U[0-9]{2}-P[0-9]{2}$" }
+        kind: { enum: [horizontal, backbone] }
+        type: { description: A cable type from the house cable standard., type: string }
+        purpose: { description: A purpose from the house cable standard; the colour follows from it., type: string }
+        cores: { type: integer, minimum: 1 }
+        from: { $ref: "#/$defs/panelEnd" }
+        to:
+          description: "The far end: a room's outlet (space and outlet id, as the room drawing numbers it), an access point, or another panel."
+          type: object
+          additionalProperties: false
+          properties:
+            space: { type: string }
+            outlet: { type: string, pattern: "^(desk-[0-9]{2,3}/)?[a-z-]+/[a-z-]+#[0-9]+$" }
+            access_point: { type: string }
+            rack: { type: string }
+            u: { type: integer, minimum: 1 }
+            ports: { type: string, pattern: "^[0-9]+(-[0-9]+)?$" }
+        via: { description: "The trays and risers it runs through, in order from the panel.", type: array, minItems: 1, items: { type: string } }
+        length_m: { description: "The cable length: route, drops and the house slack.", type: number, exclusiveMinimum: 0 }
+        spare: { description: "Terminated at both ends but not patched to a switch: a spare outlet, live once a patch cord is added. Only a room outlet with nothing plugged into it.", type: boolean }
+        test:
+          type: object
+          additionalProperties: false
+          required: [result, date]
+          properties:
+            result: { enum: [pass, fail] }
+            date: { type: string, format: date }
+            length_m: { type: number }
+            margin_db: { type: number }
+            loss_db: { type: number }
+            notes: { type: string }
+        notes: { type: string }

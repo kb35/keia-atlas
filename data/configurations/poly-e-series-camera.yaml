@@ -1,0 +1,61 @@
+# Configuration: Studio E60/E70 as an additional camera. Setting names, menu paths and defaults are the vendor's (cited per setting);
+# the values and reasons are Aigna's (demo). Researched from vendor documents, Sept 2026.
+id: poly-e-series-camera
+name: Studio E60/E70 as an additional camera
+models: [poly-e60, poly-e70]
+mode: 'Additional camera: USB to any Studio X / G62, or IP LLN to Studio X72 / G62 only'
+version: '1.0'
+owner: sofia
+updated: '2026-09-28'
+firmware: Poly VideoOS 4.6.0 (host); Studio E60 camera software 1.1.3.6+; Studio E70 camera software 1.12.0+ for IP LLN
+summary: Both cameras attach to a Poly Studio X or Studio G62 as a second camera, either over USB (any host) or, on Studio X72 and Studio G62 only, over
+  the host's link-local network (LLN) port as an IP camera. Settings live on the host's web interface, not on the camera itself. The E60 is a long-throw
+  12x PTZ used for presenter tracking in large rooms; the E70 is the dual-lens DirectorAI camera used for wide-room framing.
+managed_by: Device web interface (of the Studio X or Studio G62 it is attached to)
+steps: ['USB: connect the camera''s USB-C/USB-B port to a USB-A port on the host system and power it from its own adapter, or (E70 on G62) from a PoE injector
+    on its Ethernet port.', 'IP LLN (Studio X72 or Studio G62 only): connect the camera''s Ethernet port to the host''s LLN port. The LLN port supplies
+    no power, so power the camera from its own adapter, a PoE/PoE+ injector, or, for more than one IP camera, a Netgear ProAV M4250-9G1F-PoE+ (GSM4210PD)
+    switch.', 'IP LLN only: in the host''s web interface, go to General Settings > Device Management, find the camera under Available Devices by its MAC
+    address, and select Pair.', 'In the host''s web interface, go to Audio/Video > Video Inputs and set Framing Size, White Balance and Tracking Mode below.',
+  Go to Audio/Video > Video Inputs > General Camera Settings and set Enable User Camera Selection., 'If more than one camera is attached, confirm the intended
+    camera is primary (embedded camera, then HDCI, then USB, then HDMI source, in that priority order).', 'Run the room''s verification, including camera
+    framing and tracking.']
+groups:
+- name: Framing and image
+  where: Host system's web interface > Audio/Video > Video Inputs
+  settings:
+  - {name: Framing Size, path: Audio/Video > Video Inputs, value: Medium, action: verify, layer: profile, why: Medium is Poly's own default group-framing
+      view and suits Aigna's meeting rooms; no need to change it., source: poly-partner-mode-ag-4-6-0}
+  - {name: White Balance, path: Audio/Video > Video Inputs, value: Auto, action: verify, layer: profile, why: Auto is what Poly recommends for most rooms;
+      only switch to Manual if a room's lighting gives poor colour., source: poly-partner-mode-ag-4-6-0}
+- name: Tracking
+  where: Host system's web interface > Audio/Video > Video Inputs
+  settings:
+  - {name: Tracking Mode, path: Audio/Video > Video Inputs, value: Frame Group, action: change, layer: model, why: The E70's default tracking behaviour
+      isn't documented; Aigna sets Frame Group so the camera covers the whole room rather than chasing individual speakers., source: poly-partner-mode-ag-4-6-0}
+  - {name: Tracking Mode, path: Audio/Video > Video Inputs, value: Frame Presenter, action: change, layer: model, why: The E60 is the long-throw camera
+      Aigna uses for presenter tracking in large rooms and auditoriums; this is the mode built for that., source: poly-partner-mode-ag-4-6-0}
+  - {name: Tracking Enabled, path: Audio/Video > Video Inputs, value: 'On', action: change, layer: profile, why: Framing settings only take effect once
+      tracking is on; the documented default isn't stated., source: poly-partner-mode-ag-4-6-0}
+- name: General camera settings
+  where: Host system's web interface > Audio/Video > Video Inputs > General Camera Settings
+  settings:
+  - {name: Allow Other Participants in a Call to Control Your Camera, path: Audio/Video > Video Inputs > General Camera Settings, value: 'Off', action: change,
+    layer: profile, why: Far End Camera Control isn't something Aigna wants the other party adjusting; the documented default isn't stated., source: poly-partner-mode-ag-4-6-0}
+  - {name: Camera sleep mode, path: Audio/Video > Video Inputs > General Camera Settings, value: Leave at whatever Google Meet Partner Mode sets, action: verify,
+    layer: model, why: The admin guide says not to configure sleep settings in Partner Mode; Google Meet manages this camera behaviour itself., source: poly-partner-mode-ag-4-6-0}
+  - {name: Enable User Camera Selection, path: Audio/Video > Video Inputs > General Camera Settings, value: 'On', action: change, layer: profile, why: Lets
+      someone in the room pick the other camera from the touch controller without calling IT; the documented default isn't stated., source: poly-partner-mode-ag-4-6-0}
+- name: IP LLN pairing (Studio X72 and Studio G62 only)
+  where: Host system's web interface > General Settings > Device Management
+  settings:
+  - {derive: pair, name: Pair, path: General Settings > Device Management > Available Devices, value: The camera with this room's MAC address, per_device: true, action: change,
+    layer: profile, why: 'Pairing by MAC stops a camera pairing with the room next door, the same as the TC10.', source: poly-partner-mode-ag-4-6-0}
+  - {name: Power for the LLN connection, value: 'The camera''s own adapter, a PoE/PoE+ injector, or a Netgear ProAV M4250-9G1F-PoE+ switch for more than
+      one IP camera', action: change, layer: naming-network, why: 'The LLN port itself supplies no power; Aigna''s large rooms with multiple IP cameras
+      need the Netgear switch, not a chain of injectors.', source: poly-partner-mode-ag-4-6-0}
+gaps: [No power draw in watts for either camera; only PoE/PoE+ class and the adapter rating are documented (see the device models)., 'The default values
+    for Tracking Mode, Tracking Enabled, FECC and Enable User Camera Selection aren''t stated in the admin guide; Aigna''s values are treated as a change
+    against an undocumented default.', 'Studio X32 and Studio X52 have no LLN port, so IP LLN connection only works on Studio X72 or Studio G62; on those
+    two hosts, only USB works for the E60/E70.', Mixing an IP LLN camera with a USB-connected camera on the same host isn't supported; a room needs one
+    connection type or the other.]

@@ -1,0 +1,86 @@
+# House values: the fixed values every unit's build sheet is worked out from, recorded once.
+# Made up for the demo (Aigna is a made-up company). A configuration setting names the value it needs with
+# `derive` (schemas/ext/configuration.schema.yaml); src/lib/buildsheet.mjs fills it in from this file, the site,
+# the room and the unit. Anything not recorded here or in the unit's own data shows as "Not recorded".
+id: aigna
+company: Aigna
+domain: aigna.example
+# Aigna's own time servers, the same pair everywhere (the network standard's NTP rule: handed out by DHCP).
+time_servers: [ntp1.aigna.example, ntp2.aigna.example]
+# DNS resolvers per region, in the regional hub's address block. DHCP hands them out with each reservation.
+dns:
+  amer: [10.10.0.53, 10.10.0.54]
+  emea: [10.20.0.53, 10.20.0.54]
+  apac: [10.60.0.53, 10.60.0.54]
+sip_domain: sip.aigna.example
+# A room's calendar resource: the name people see and the resource's address.
+# {site} the site's name, {city} its city (the site's name for a remote site), {number} the room number, {room} the room's name, {code} the site code (lower case),
+# {digits} the room number without its dot, {slug} the room's name in lower case with hyphens.
+calendar:
+  name: "{city} {number} {room}"
+  address: "{code}-{digits}-{slug}@resource.aigna.example"
+# Who looks after the rooms, as a device's contact details show it.
+support: "{site} AV team, av-support@aigna.example"
+# Where each secret lives in the password vault. A build sheet shows the entry's name, never the secret.
+vault:
+  site: "{site} / AV / {model} / {setting}"
+  room: "{site} / AV / {room} / {model} / {setting}"
+  monitoring: "{site} / Monitoring / {setting}"
+# The VLAN each kind of device goes on, from the network standard's VLAN plan (data/standards/network.yaml).
+# Only the kinds the plan names; any other kind shows "Not recorded" until the plan names it.
+vlans:
+  - { vlan: "10", classes: [network-switch, network-gateway, wireless-access-point] }
+  - { vlan: "30", classes: [video-bar, codec, touch-controller, camera, microphone, scheduler-panel] }
+  - { vlan: "31", classes: [display, signage-player] }
+  - { vlan: "70", classes: [printer] }
+# The management platforms, and where each office's devices sit in them. {site} and {region} are filled in.
+platforms:
+  - id: logitech-sync
+    name: Logitech Sync
+    org: Aigna
+    group_label: Room group
+    group: "{site}"
+    configurations: [logitech-meetup-2-google-meet, logitech-scribe-whiteboard, logitech-tap-scheduler-room-booking]
+  - id: poly-lens
+    name: Poly Lens
+    org: Aigna
+    group_label: Site policy
+    group: "{site} rooms"
+    configurations: [poly-x-google-meet, poly-g62-video-mode]
+  - id: google-admin
+    name: Google Admin console
+    org: aigna.example
+    group_label: Organisational unit
+    group: "Rooms / {region} / {site}"
+    configurations: [poly-x-google-meet, logitech-meetup-2-google-meet]
+  - id: webex-control-hub
+    name: Webex Control Hub
+    org: Aigna
+    group_label: Workspace location
+    group: "{site}"
+    configurations: [cisco-desk-pro-webex-google-meet]
+  - id: bsn-cloud
+    name: BrightSign BSN.cloud
+    org: Aigna signage
+    group_label: Group
+    group: "{site}"
+    configurations: [brightsign-xt1145-bsn-cloud]
+  - id: lg-business-cloud
+    name: LG Business Cloud
+    org: Aigna
+    group_label: Site
+    group: "{site}"
+    configurations: [lg-uh5q-display]
+  - id: samsung-vxt
+    name: Samsung VXT
+    org: Aigna
+    group_label: Group
+    group: "{site}"
+    configurations: [samsung-qmc-display]
+  - id: unifi
+    name: UniFi Network
+    org: Aigna
+    group_label: Site
+    group: "{site}"
+    configurations: [unifi-express-7-remote-gateway]
+demo: true

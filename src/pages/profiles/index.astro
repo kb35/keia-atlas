@@ -1,0 +1,174 @@
+---
+// Device profiles: every kind of device and what healthy means for it (List archetype,
+// docs/standards/page-anatomy.md). Cards grouped by area (Meeting, Signal and audio, Desks and home,
+// Building); each opens the profile, where the drawing switches between its models.
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import DeviceArt from '../../components/DeviceArt.astro';
+import ConfigScript from '../../components/ConfigScript.astro';
+import { classes, models, spaces, spaceTypes, className, plural, href, advisoriesFor, configFor } from '../../lib/data.mjs';
+import { artParts } from '../../lib/art.mjs';
+import { usedIn } from '../../lib/data.mjs';
+
+const GROUPS = [
+  ['Meeting', ['video-bar', 'codec', 'touch-controller', 'camera', 'microphone', 'display', 'scheduler-panel', 'desk-video-device']],
+  ['Signal and audio', ['av-extender', 'av-switcher', 'adapter', 'amplifier', 'loudspeaker']],
+  ['Desks and home', ['monitor', 'dock', 'network-gateway']],
+  ['Building', ['network-switch', 'signage-player', 'printer', 'security-device']],
+];
+const listed = new Set(GROUPS.flatMap(([, c]) => c));
+const rest = Object.keys(classes).filter((c) => !listed.has(c));
+if (rest.length) GROUPS.push(['Other', rest]);
+const areaKey = (g) => g.toLowerCase().split(' ')[0];
+const modelsOf = (cls) => Object.keys(models).filter((id) => models[id].class === cls);
+const pick = (cls) => [...modelsOf(cls)].sort((a, b) => (artParts(b) ? 1 : 0) - (artParts(a) ? 1 : 0) || (usedIn[b]?.units ?? 0) - (usedIn[a]?.units ?? 0))[0] ?? null;
+const unitsOf = (cls) => {
+  let n = 0, live = 0;
+  // n as the Units list counts rows (each position and each piece of older kit), so the figures open it showing the same number.
+  for (const s of Object.values(spaces)) for (const p of s.positions) if (p.cls === cls) for (const u of p.units) { if (u.stage === 'manage') live++; }
+  for (const s of Object.values(spaces)) for (const p of [...s.positions, ...s.olderKit]) if (p.cls === cls) n++;
+  return { n, live };
+};
+const roomProfiles = (cls) => Object.values(spaceTypes).filter((t) => t.keia_atlas.options.some((o) => o.equipment.some((e) => e.class === cls))).length;
+const P = GROUPS.flatMap(([g, list]) => list.filter((c) => classes[c]).map((c) => {
+  const ms = modelsOf(c), u = unitsOf(c);
+  const advs = [...new Map(ms.flatMap(advisoriesFor).map((a) => [a.id, a])).values()];
+  const makers = [...new Set(ms.map((m) => models[m].manufacturer))];
+  const status = [u.n ? 'installed' : 'none', advs.length && 'advisory', ms.some((m) => configFor(m)) && 'configured'].filter(Boolean);
+  return {
+    cls: c, name: className(c), area: g, areaKey: areaKey(g), models: ms.length, units: u.n, live: u.live, rooms: roomProfiles(c), advs: advs.length, makers, status,
+    art: pick(c), role: classes[c].profile.object_role ?? '',
+    find: [className(c), g, classes[c].profile.object_role ?? '', ...ms.map((id) => `${models[id].manufacturer} ${models[id].model}`)].join(' '),
+  };
+}));
+P.forEach((p, i) => { p.i = i; });
+const R = P.map(({ cls, name, areaKey: a, units, i }) => ({ cls, name, area: a, units, i }));
+const STATUS = { installed: 'Has units', none: 'No units yet', advisory: 'Has an advisory', configured: 'Has a configuration' };
+const makers = [...new Set(P.flatMap((p) => p.makers))].sort((a, b) => a.localeCompare(b));
+const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const FACETS = [
+  { key: 'status', label: 'Status', options: Object.entries(STATUS).map(([value, label]) => ({ value, label })) },
+  { key: 'area', label: 'Area', options: GROUPS.map(([g]) => ({ value: areaKey(g), label: g })) },
+  { key: 'maker', label: 'Maker', options: makers.map((m) => ({ value: slug(m), label: m })) },
+];
+const SORT = { options: [{ value: 'area', label: 'By area' }, { value: 'name', label: 'By name' }, { value: 'units', label: 'Most units first' }] };
+const VIEWS = [{ value: 'cards', label: 'Cards', show: '[data-grid]' }, { value: 'list', label: 'List', show: '[data-list]' }];
+const nAdv = P.filter((p) => p.advs).length;
+const NUMBERS = [
+  { n: Object.keys(models).length, label: 'Models', to: '/models/' },
+  { n: P.reduce((n, p) => n + p.units, 0), label: 'Units', to: '/devices/' },
+  { n: nAdv, label: nAdv === 1 ? 'With an advisory' : 'With advisories', to: '?status=advisory', tone: nAdv ? 'warn' : undefined },
+];
+const attrs = (p) => ({ 'data-fi': '', 'data-id': p.cls, 'data-area': p.areaKey, 'data-find': p.find, 'data-f-status': p.status.join('|'), 'data-f-area': p.areaKey, 'data-f-maker': p.makers.map(slug).join('|') });
+---
+<Shell vendorOk title="Device profiles" section="profiles" crumbs={[{ label: 'Device profiles' }]}>
+  <PageBand overline="Catalogue" title="Device profiles" lede="What healthy means for each kind of device, on every system that knows about it." numbers={NUMBERS} />
+
+  <div class="content pfl">
+    <FilterBar facets={FACETS} placeholder="Find a device profile, model or maker" label="Find a device profile" noun={['device profile', 'device profiles']} scope=".content.pfl" views={VIEWS} viewKey="rs5-profiles-view" sort={SORT} />
+
+    <div class="pfl-grid" data-grid>
+      {GROUPS.map(([g]) => <h2 class="pfl-gh" data-gh={areaKey(g)}>{g}</h2>)}
+      {P.map((p) => (
+        <a class="card pcard" href={href(`/profiles/${p.cls}/`)} {...attrs(p)}>
+          <span class="stage pc-art" data-vt-rec={p.cls}><DeviceArt model={p.art} cls={p.cls} small label="" /></span>
+          <span class="pc-body">
+            <b class="pc-name">{p.name}</b>
+            <small class="pc-sub">{p.models ? plural(p.models, 'model') : 'Model set per project'} · {plural(p.units, 'unit')}</small>
+            <span class="pc-flags">
+              {p.advs > 0 && <span class="pf-st st-adv">{plural(p.advs, 'advisory', 'advisories')}</span>}
+              {!p.units && <span class="pf-st st-none">No units yet</span>}
+            </span>
+          </span>
+        </a>
+      ))}
+    </div>
+
+    <div class="pfl-list card" data-list hidden>
+      <table class="pfl-t">
+        <thead><tr><th scope="col">Device profile</th><th scope="col">Area</th><th scope="col" class="num">Models</th><th scope="col" class="num">Units</th><th scope="col" class="num">In service</th><th scope="col" class="num">Room profiles</th><th scope="col">Signals</th></tr></thead>
+        <tbody>
+          {P.map((p) => (
+            <tr {...attrs(p)}>
+              <td><a href={href(`/profiles/${p.cls}/`)}><b>{p.name}</b></a></td>
+              <td>{p.area}</td>
+              <td class="num">{p.models}</td>
+              <td class="num">{p.units}</td>
+              <td class="num">{p.live}</td>
+              <td class="num">{p.rooms}</td>
+              <td>{p.advs > 0 && <span class="pf-st st-adv">{plural(p.advs, 'advisory', 'advisories')}</span>}{!p.units && <span class="faint">No units yet</span>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <EmptyState text="No device profiles match these filters." />
+  </div>
+  <ConfigScript />
+
+  <script is:inline data-astro-rerun define:vars={{ R, AREAS: GROUPS.map(([g]) => areaKey(g)) }} slot="end">
+    (function () {
+      var grid = document.querySelector('.pfl [data-grid]'), bar = document.querySelector('.pfl [data-fb]'); if (!grid || !bar) return;
+      var cards = new Map(Array.prototype.map.call(grid.querySelectorAll('[data-fi]'), function (el) { return [el.dataset.id, el]; }));
+      var heads = new Map(Array.prototype.map.call(grid.querySelectorAll('[data-gh]'), function (el) { return [el.dataset.gh, el]; }));
+      var tbody = document.querySelector('.pfl-t tbody');
+      var rows = new Map(Array.prototype.map.call(tbody.children, function (el) { return [el.dataset.id, el]; }));
+      var sort = bar.rsFilter ? bar.rsFilter.sort() : (new URLSearchParams(location.search).get('sort') || 'area');
+      // By area: each area's heading, then its cards. Other orders: one run of cards, no headings.
+      function reorder() {
+        var list = R.slice().sort(function (a, b) {
+          return (sort === 'name' ? a.name.localeCompare(b.name) : sort === 'units' ? b.units - a.units : 0) || a.i - b.i;
+        });
+        if (sort === 'area') AREAS.forEach(function (k) { var h = heads.get(k); if (h) grid.appendChild(h); list.filter(function (r) { return r.area === k; }).forEach(function (r) { grid.appendChild(cards.get(r.cls)); }); });
+        else list.forEach(function (r) { grid.appendChild(cards.get(r.cls)); });
+        list.forEach(function (r) { tbody.appendChild(rows.get(r.cls)); });
+        heads.forEach(function (h) { h.hidden = sort !== 'area'; });
+        paintHeads();
+      }
+      // A heading shows only while its area has a card showing.
+      function paintHeads() {
+        if (sort !== 'area') return;
+        heads.forEach(function (h, k) { h.hidden = !grid.querySelector('[data-fi][data-area="' + k + '"]:not([hidden]):not(.fb-out)'); });
+      }
+      bar.addEventListener('fb:change', paintHeads);
+      bar.addEventListener('fb:sort', function (e) { sort = e.detail.value; bar.rsFilter.run(true, reorder); });
+      if (bar.rsFilter) bar.rsFilter.run(false, reorder); else reorder();
+    })();
+  </script>
+</Shell>
+
+<style>
+  .pfl { padding-top: 18px; gap: 16px; }
+  .pfl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+  .pfl-gh { grid-column: 1 / -1; margin: 10px 0 -2px; font-size: 18px; }
+  .pfl-gh:first-child { margin-top: 0; }
+  .pfl-gh[hidden] { display: none; }
+  .pcard { display: grid; grid-template-rows: auto 1fr; overflow: hidden; color: inherit; text-decoration: none; transition: transform var(--dur-state) var(--ease-settle), box-shadow var(--dur-state) var(--ease-settle); }
+  .pcard[hidden] { display: none; }
+  .pcard:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); color: inherit; }
+  .pc-art { display: grid; place-items: center; height: 108px; padding: 8px 18px; border-radius: 0; border-bottom: 1px solid var(--line); }
+  .pc-art :global(.model-art) { max-height: 92px; width: auto; max-width: 100%; }
+  .pc-art :global(.model-art.generic) { width: 100%; height: 92px; color: var(--text-2); }
+  .pc-art :global(.model-art.generic svg) { width: 84px; height: auto; }
+  .pc-body { display: grid; gap: 3px; padding: 10px 14px 13px; align-content: start; }
+  .pc-name { font: 700 16px/1.25 var(--font-display); }
+  .pc-sub { font-size: 12.5px; color: var(--text-2); }
+  .pc-flags { display: flex; flex-wrap: wrap; gap: 4px; }
+  .pc-flags:not(:empty) { margin-top: 5px; }
+  .pf-st { font: 700 11px/1 var(--font-sans); padding: 4px 8px; border-radius: var(--pill-radius); white-space: nowrap; margin-right: 4px; }
+  .pf-st.st-adv { background: var(--amber-soft); color: var(--amber-ink); }
+  .pf-st.st-none { background: var(--surface-3); color: var(--text-2); }
+  .pfl-grid[hidden], .pfl-list[hidden] { display: none; }
+  .pfl-list { overflow-x: auto; padding: 0; }
+  .pfl-t { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .pfl-t th { background: var(--surface-2); text-align: left; padding: 10px 12px; font: 700 11px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); border-bottom: 1px solid var(--line-strong); white-space: nowrap; }
+  .pfl-t td { padding: 9px 12px; border-bottom: 1px solid var(--line); }
+  .pfl-t td.num, .pfl-t th.num { text-align: right; }
+  .pfl-t tbody tr:nth-child(even) { background: color-mix(in srgb, var(--text) 3%, transparent); }
+  .pfl-t tbody tr:hover { background: color-mix(in srgb, var(--text) 7%, transparent); }
+  .pfl-t tr[hidden] { display: none; }
+  .pfl-t td a { color: inherit; text-decoration: none; } .pfl-t td a:hover { text-decoration: underline; }
+  @media (max-width: 760px) { .pfl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pc-art { height: 84px; padding: 6px 10px; } .pc-art :global(.model-art) { max-height: 70px; } }
+</style>

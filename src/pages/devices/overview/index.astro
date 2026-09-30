@@ -1,0 +1,384 @@
+---
+// Devices, Overview: how every unit that reports is doing right now Overview archetype
+// (page-anatomy.md, D). There are no live feeds yet, so the page runs the live simulation (src/lib/livesim.mjs):
+// units drop offline and come back, alerts are raised and cleared, a new moment every five seconds, the same
+// in every window. Units with an open incident show an alert until it is resolved.
+//   band      units online, offline, with alerts, with firmware out of date (live)
+//   bar       Region, Office, Kind, Status, and a switch for firmware out of date; it filters everything below
+//   side      Needs attention (units offline or alerting, worst first, with their incidents) and Alerts and
+//             changes (the latest)
+//   main      health by kind and by site (bars; select one to filter by it), then every unit as a dot, by site
+// Changes stay in place: a dot's colour eases to its new state and a ring marks it for a moment (M10).
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import FilterBar from '../../../components/FilterBar.astro';
+import EmptyState from '../../../components/EmptyState.astro';
+import LiveSide from '../../../components/LiveSide.astro';
+import { REGION_LABEL, href } from '../../../lib/data.mjs';
+import { devicesModel, lean, CLASS_LABEL } from '../../../lib/livemodel.mjs';
+
+const model = devicesModel();
+const U = model.units.map((u, i) => ({ ...u, i }));
+const SITES = model.sites.map((s, i) => ({ ...s, i, units: U.filter((u) => u.site === i) })).filter((s) => s.units.length);
+const CLASSES = Object.keys(CLASS_LABEL).map((c) => ({ c, label: CLASS_LABEL[c], n: U.filter((u) => u.cls === c).length })).sort((a, b) => b.n - a.n || a.label.localeCompare(b.label));
+const STATUS = { offline: 'Offline', alert: 'Alert', online: 'Online' };
+const FACETS = [
+  { key: 'region', label: 'Region', options: ['amer', 'emea', 'apac'].map((r) => ({ value: r, label: REGION_LABEL[r].replace('Europe, Middle East and Africa', 'EMEA') })) },
+  { key: 'site', label: 'Office', options: SITES.map((s) => ({ value: s.id, label: s.name, sub: s.city })) },
+  { key: 'kind', label: 'Kind', options: CLASSES.map((x) => ({ value: x.c, label: x.label })) },
+  { key: 'status', label: 'Status', options: Object.entries(STATUS).map(([value, label]) => ({ value, label })) },
+];
+const TOGGLES = [{ key: 'fw', label: 'Firmware out of date', title: 'Only units running firmware behind the standard' }];
+const SORT = { options: [{ value: 'attention', label: 'Problems first' }, { value: 'site', label: 'By office' }, { value: 'count', label: 'Most units first' }] };
+const NUMBERS = [
+  { id: 'lv-on', n: '–', label: 'Online', to: '?status=online' },
+  { id: 'lv-off', n: '–', label: 'Offline', to: '?status=offline' },
+  { id: 'lv-al', n: '–', label: 'With alerts', to: '?status=alert' },
+  { id: 'lv-fw', n: '–', label: 'Firmware out of date', to: '?fw=1' },
+];
+const find = (u, s) => `${u.n} ${u.host} ${u.mn} ${CLASS_LABEL[u.cls]} ${u.rn} ${s.name} ${s.city ?? ''} ${u.id}`;
+const json = JSON.stringify({ ...lean(model), base: href('/'), cls: CLASS_LABEL }).replace(/</g, '\\u003c');
+---
+<Shell title="Devices overview" section="devices-overview" crumbs={[{ label: 'Devices', to: '/devices/' }, { label: 'Overview' }]} about={{ kind: 'page', label: 'Devices overview' }}>
+  <PageBand overline="Devices" title="Overview" lede="Simulated live from each unit's health. Real feeds replace this with the same shape." sim="live" numbers={NUMBERS}>
+    <span slot="overline" class="lv-live" data-lv-live title="A new moment every five seconds, the same in every window"><span class="lv-dot" aria-hidden="true"></span>Live</span>
+  </PageBand>
+
+  <div class="content lvd lv-page" data-lv="devices">
+    <FilterBar facets={FACETS} toggles={TOGGLES} placeholder="Find a unit, hostname or room" label="Find a unit" noun={['unit', 'units']} scope=".content.lvd" sort={SORT} />
+
+    <div class="lv-layout">
+      <LiveSide attention="Needs attention" feedTitle="Alerts and changes" none="Every unit that reports is online, with no alerts." attentionTo="?status=offline,alert" attentionPlace="the unit map"
+        note="Simulated from each unit's kind and age and the open incidents, the same in every window. At stage 2 the real feeds plug in: monitoring and device management." />
+
+      <div class="lv-main">
+        <!-- Health by kind and by site pick that kind or site in the bar: a filter on this page's own list of
+             units (the address follows), so they stay on the page by design (rule P10). -->
+        <div class="lv-health" data-dd="filters this page's own list">
+          <section class="card lv-hcard" aria-labelledby="hk-h" data-steady>
+            <header class="lv-h"><h2 id="hk-h">Health by kind</h2><span class="faint">Select one to filter by it</span></header>
+            <div class="lv-hrows" data-health="kind">
+              {CLASSES.map((x) => (
+                <button type="button" class="lv-hr" data-k={x.c} aria-pressed="false">
+                  <span class="lv-hn"><b>{x.label}</b><small data-hn></small></span>
+                  <span class="lv-hv"><span class="lv-hbar" aria-hidden="true"><i data-st="online"></i><i data-st="alert"></i><i data-st="offline"></i></span><span class="lv-hx" data-hx></span></span>
+                </button>
+              ))}
+            </div>
+          </section>
+          <section class="card lv-hcard" aria-labelledby="hs-h" data-steady>
+            <header class="lv-h"><h2 id="hs-h">Health by office</h2><span class="faint">Select one to filter by it</span></header>
+            <div class="lv-hrows" data-health="site">
+              {SITES.map((s) => (
+                <button type="button" class="lv-hr" data-k={s.id} aria-pressed="false">
+                  <span class="lv-hn"><b>{s.name}</b><small data-hn></small></span>
+                  <span class="lv-hv"><span class="lv-hbar" aria-hidden="true"><i data-st="online"></i><i data-st="alert"></i><i data-st="offline"></i></span><span class="lv-hx" data-hx></span></span>
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <section class="card lv-sites" id="units" aria-labelledby="units-h" data-steady>
+          <header class="lv-h"><h2 id="units-h">Every unit that reports</h2><span class="faint">Each dot is a unit. Hover to look, select to open it.</span></header>
+          <div class="lv-rows" data-rows="units">
+            {SITES.map((s) => (
+              <article class="lv-site" data-fb-group data-steady data-site={s.i} aria-label={s.name}>
+                <header class="lv-sh">
+                  <span class="code">{s.code}</span>
+                  <span class="lv-sn"><a class="lv-sl" href={href(`/devices/?site=${s.id}`)} data-vt-rec="dd-devices" title={`Every unit at ${s.name}, in Units`}><b>{s.name}</b></a><small>{s.city}</small></span>
+                  <span class="lv-counts" data-counts></span>
+                </header>
+                <div class="lv-tiles lv-dots">
+                  {s.units.map((u) => (
+                    <a class="lv-t lv-u" href={href(`/device/?tag=${u.id}`)} data-i={u.i} data-fi data-find={find(u, s)} data-f-region={s.region} data-f-site={s.id} data-f-kind={u.cls} data-f-status="" data-t-fw={u.fw ? '1' : undefined} data-st="" data-peek aria-label={u.n}>
+                      <template data-peek-body><b class="peek-h">{u.n}</b><small>{u.mn || CLASS_LABEL[u.cls]} · {u.host}</small><small>{s.name} · {u.rn}</small><span class="lv-pk" data-pk></span></template>
+                    </a>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+          <p class="lv-legend" aria-label="Key">
+            <span><i class="lv-sw" data-st="online"></i>Online</span>
+            <span><i class="lv-sw" data-st="alert"></i>Alert, or an open incident</span>
+            <span><i class="lv-sw" data-st="offline"></i>Offline</span>
+            <span class="lv-legend-t">Units without a network connection (speakers, cables, monitors) do not report.</span>
+          </p>
+        </section>
+        <EmptyState text="No units match these filters." />
+      </div>
+    </div>
+    <script type="application/json" data-lv-model set:html={json}></script>
+  </div>
+
+  <script>
+    import { prepare, snapshot, diff, eventsBetween, TICK_MS, tickOf } from '../../../lib/livesim.mjs';
+    import { every, steady, refresh, repeek, ping, syncList, pushFeed, filterOf, visible, stickSide, esc, clock, ago, span } from '../../../lib/liveview.mjs';
+
+    const FEED = 8, KEEP = 400, BACK = 15 * 60e3;
+    const STW: Record<string, string> = { online: 'Online', alert: 'Alert', offline: 'Offline' };
+
+    function init() {
+      const root = document.querySelector('[data-lv="devices"]') as any;
+      if (!root || root.__lv) return;
+      root.__lv = true;
+      const W = window as any;
+      const D = JSON.parse(root.querySelector('[data-lv-model]').textContent);
+      const model = prepare(D), B = D.base;
+      const bar = root.querySelector('[data-fb]');
+      const side = root.querySelector('[data-lv-side]');
+      const attList = root.querySelector('[data-att]'), feedList = root.querySelector('[data-feed]');
+      const els = new Map<number, HTMLElement>();
+      root.querySelectorAll('[data-fi][data-i]').forEach((el: HTMLElement) => els.set(+el.dataset.i!, el));
+      const rows = [...root.querySelectorAll('.lv-site')] as HTMLElement[];
+      const unitHref = (u: any) => `${B}device/?tag=${encodeURIComponent(u.id)}`;
+      const siteOf = (u: any) => model.sites[u.site];
+      const cleanups: (() => void)[] = [];
+
+      // ---- Words for a unit's state ----
+      function reason(u: any, s: any) {
+        if (s.down) return 'Offline';
+        if (s.al >= 0) return u.alerts[s.al];
+        if (s.inc >= 0) return model.incs[s.inc].title;
+        return '';
+      }
+      const minsSince = (s: any, t: number) => (s.since != null ? Math.max(1, Math.round((t - s.since) / 60e3)) : null);
+      function fwLine(u: any) {
+        if (!u.fw) return '';
+        const [found, std] = u.fw.split('|');
+        return `<small>Firmware behind the standard${found && std ? `: ${esc(found)} found, ${esc(std)} is the standard` : ''}</small>`;
+      }
+      function peekStatus(u: any, s: any, t: number) {
+        const m = minsSince(s, t);
+        let line = `<span class="lv-pk-st" data-st="${s.st}">${STW[s.st]}${s.st !== 'online' && !s.down ? `: ${esc(reason(u, s).toLowerCase())}` : ''}${m ? `, for ${span(m)}` : ''}</span>`;
+        if (s.inc >= 0) { const inc = model.incs[s.inc]; line += `<a href="${esc(inc.to)}">${esc(inc.no)}, ${esc(inc.state.toLowerCase())}<small>${esc(inc.title)}</small></a>`; }
+        return line + fwLine(u);
+      }
+      function paint(el: HTMLElement, i: number, s: any, t: number) {
+        const u = model.units[i];
+        el.dataset.st = s.st; el.setAttribute('data-f-status', s.st);
+        el.setAttribute('aria-label', `${u.n}: ${STW[s.st].toLowerCase()}${s.st !== 'online' ? `, ${reason(u, s).toLowerCase()}` : ''}`);
+        const pk = (el.querySelector('template') as HTMLTemplateElement | null)?.content.querySelector('[data-pk]');
+        if (pk) pk.innerHTML = peekStatus(u, s, t);
+        repeek(el);
+      }
+
+      // ---- The first moment ----
+      let snap = snapshot(model, tickOf(Date.now()));
+      const bound = !!bar?.rsFilter;
+      model.units.forEach((u: any, i: number) => {
+        const el = els.get(i); if (!el) return;
+        if (bound) { const n = el.cloneNode(true) as HTMLElement; paint(n, i, snap.units[i], snap.t); el.replaceWith(n); els.set(i, n); }
+        else paint(el, i, snap.units[i], snap.t);
+      });
+
+      // ---- Health by kind and by site, and the site rows: counted from what the filters show ----
+      function paintHealth() {
+        const byK: Record<string, any> = {}, byS: Record<string, any> = {}, bySi = new Map<number, any>();
+        const add = (o: any, st: string, fw: boolean) => { o[st]++; o.all++; if (fw) o.fw++; };
+        const blank = () => ({ online: 0, alert: 0, offline: 0, fw: 0, all: 0 });
+        els.forEach((el, i) => {
+          if (el.classList.contains('fb-out')) return;
+          const u = model.units[i], st = el.dataset.st!, s = siteOf(u);
+          add(byK[u.cls] ??= blank(), st, !!u.fw); add(byS[s.id] ??= blank(), st, !!u.fw); add(bySi.get(u.site) ?? (bySi.set(u.site, blank()), bySi.get(u.site)), st, !!u.fw);
+        });
+        const kinds = bar?.rsFilter ? bar.rsFilter.get('kind') : [], sites = bar?.rsFilter ? bar.rsFilter.get('site') : [];
+        const paintRow = (b: HTMLElement, n: any, on: boolean) => {
+          n ??= blank();
+          b.querySelectorAll('.lv-hbar i').forEach((x: any) => { x.style.flexGrow = String(n[x.dataset.st]); x.classList.toggle('has', n[x.dataset.st] > 0); });
+          (b.querySelector('[data-hn]') as HTMLElement).textContent = `${n.all} ${n.all === 1 ? 'unit' : 'units'}${n.fw ? ` · ${n.fw} firmware out of date` : ''}`;
+          const bits = [];
+          if (n.offline) bits.push(`<b class="t-bad">${n.offline} offline</b>`);
+          if (n.alert) bits.push(`<b class="t-warn">${n.alert} ${n.alert === 1 ? 'alert' : 'alerts'}</b>`);
+          (b.querySelector('[data-hx]') as HTMLElement).innerHTML = bits.join(' · ') || (n.all ? 'All online' : 'None match');
+          b.classList.toggle('none', !n.all); b.setAttribute('aria-pressed', String(on));
+        };
+        root.querySelectorAll('[data-health="kind"] .lv-hr').forEach((b: any) => paintRow(b, byK[b.dataset.k], kinds.includes(b.dataset.k)));
+        root.querySelectorAll('[data-health="site"] .lv-hr').forEach((b: any) => paintRow(b, byS[b.dataset.k], sites.includes(b.dataset.k)));
+        for (const row of rows) {
+          const n = bySi.get(+row.dataset.site!) ?? blank();
+          // Each count opens this site's units in that state, in the map below (rule P10).
+          const at = (st: string, text: string) => { const q = new URLSearchParams(location.search); q.set('site', model.sites[+row.dataset.site!].id); q.set('status', st); return `<a href="${esc('?' + q.toString().replace(/%2C/g, ','))}">${text}</a>`; };
+          const bits = [at('online', `${n.online} online`)];
+          if (n.offline) bits.push(at('offline', `<b>${n.offline} offline</b>`));
+          if (n.alert) bits.push(at('alert', `<b class="t-warn">${n.alert} with ${n.alert === 1 ? 'an alert' : 'alerts'}</b>`));
+          (row.querySelector('[data-counts]') as HTMLElement).innerHTML = bits.join(' · ');
+        }
+      }
+      // Selecting a bar picks that kind or site in the filter bar (and again to drop it).
+      function setFacet(k: string, v: string) {
+        const f = bar?.querySelector(`[data-fb-facet="${k}"]`); if (!f) return;
+        const b = f.querySelector(`[data-fopt][data-v="${CSS.escape(v)}"]`) as HTMLElement | null; b?.click();
+      }
+      root.querySelectorAll('[data-health]').forEach((box: any) => box.addEventListener('click', (e: any) => {
+        const b = e.target.closest('.lv-hr'); if (!b) return;
+        const y0 = b.getBoundingClientRect().top;
+        setFacet(box.dataset.health, b.dataset.k);
+        const dy = b.getBoundingClientRect().top - y0; if (Math.abs(dy) > 1) scrollBy(0, dy);
+      }));
+
+      // ---- The band ----
+      let firstNumbers = true;
+      const lastN: Record<string, string> = {};
+      function number(id: string, v: number, tone: string) {
+        if (!W.rsKeyNumber) return;
+        W.rsKeyNumber(id, v, { tone: v ? tone : '' });
+        if (!firstNumbers && lastN[id] !== String(v) && W.rsMarkChanged) W.rsMarkChanged(document.querySelector(`.kn-i[data-kn="${id}"]`));
+        lastN[id] = String(v);
+      }
+      function paintNumbers() {
+        const n: Record<string, number> = { online: 0, alert: 0, offline: 0, fw: 0 };
+        model.units.forEach((u: any, i: number) => { n[snap.units[i].st]++; if (u.fw) n.fw++; });
+        number('lv-on', n.online, ''); number('lv-off', n.offline, 'bad'); number('lv-al', n.alert, 'warn'); number('lv-fw', n.fw, 'warn');
+        firstNumbers = false;
+      }
+
+      // ---- Needs attention: offline first, then alerts, then open incidents ----
+      let lastAtt: any[] = [];
+      function paintAttention(t: number, animate: boolean) {
+        const out: any[] = [];
+        model.units.forEach((u: any, i: number) => {
+          const s = snap.units[i]; if (s.st === 'online') return;
+          const site = siteOf(u), m = minsSince(s, t), inc = s.inc >= 0 ? model.incs[s.inc] : null;
+          const rank = s.down ? 0 : s.al >= 0 ? 1 : 2;
+          out.push({
+            key: u.id, sort: `${rank}${inc ? inc.pri : 9}${String(1e6 - (m ?? 0)).padStart(7, '0')}${u.n}`,
+            find: `${u.n} ${u.rn} ${site.name} ${u.id} ${reason(u, s)}`, region: site.region, site: site.id, kind: u.cls,
+            html: `<i data-r="${rank}" aria-hidden="true"></i><span class="lv-ar-b"><a href="${unitHref(u)}">${esc(u.n)}</a><small><b>${esc(reason(u, s))}</b> · ${esc(site.name)}</small></span>` +
+              `<span class="lv-ar-e">${m ? `<span>${span(m)}</span>` : ''}${inc ? `<a href="${esc(inc.to)}" title="${esc(inc.title)}">${esc(inc.no)}</a>` : ''}</span>`,
+          });
+        });
+        lastAtt = out.sort((a, b) => (a.sort < b.sort ? -1 : 1));
+        syncList(attList, lastAtt, () => { const li = document.createElement('li'); li.className = 'lv-ar'; return li; }, { animate });
+        filterAttention();
+      }
+      function filterAttention() {
+        const f = filterOf(bar, ['region', 'site', 'kind']);
+        const byKey = new Map(lastAtt.map((r) => [r.key, r]));
+        let shown = 0;
+        [...attList.children].forEach((li: any) => { const r = byKey.get(li.dataset.vk); const ok = !!r && visible(r, f); li.hidden = !ok; if (ok) shown++; });
+        root.querySelector('[data-att-none]').hidden = shown > 0;
+        root.querySelector('[data-att-n]').textContent = shown ? `${shown} ${shown === 1 ? 'unit' : 'units'}` : '';
+        document.dispatchEvent(new CustomEvent('rs:sa-refresh'));
+      }
+
+      // ---- Alerts and changes ----
+      let feed: any[] = [], seq = 0;
+      function describe(e: any) {
+        if (e.unit == null) return null;
+        const u = model.units[e.unit], s = siteOf(u), name = `<b>${esc(u.n)}</b>`;
+        const text = e.k === 'offline' ? `${name} went offline` : e.k === 'online' ? `${name} back online${e.dur ? ` after ${span(e.dur)}` : ''}`
+          : e.k === 'alert' ? `Alert on ${name}: ${esc(u.alerts[e.al].toLowerCase())}` : `Alert cleared on ${name}`;
+        return { key: `e${seq++}`, t: e.t, k: e.k, href: unitHref(u), text, sub: `${s.name} · ${u.rn}`, find: `${u.n} ${u.rn} ${s.name} ${u.id}`, region: s.region, site: s.id, kind: u.cls };
+      }
+      const makeEv = (x: any) => {
+        const li = document.createElement('li');
+        li.className = 'lv-ev'; li.dataset.k = x.k; li.dataset.t = String(x.t);
+        li.innerHTML = `<span class="lv-et">${clock(x.t)}</span><i class="lv-ek" aria-hidden="true"></i><a class="lv-eb" href="${x.href}"><span>${x.text}</span><small>${esc(x.sub)} · <span data-ago>${ago(x.t, snap.t)}</span></small></a>`;
+        return li;
+      };
+      function renderFeed() {
+        const f = filterOf(bar, ['region', 'site', 'kind']);
+        const list = feed.filter((x) => visible(x, f)).slice(-FEED).reverse();
+        feedList.replaceChildren(...list.map(makeEv));
+        root.querySelector('[data-feed-none]').hidden = list.length > 0;
+      }
+      function addToFeed(evs: any[]) {
+        const fresh = evs.map(describe).filter(Boolean);
+        if (!fresh.length) return;
+        feed.push(...fresh); if (feed.length > KEEP) feed = feed.slice(-KEEP);
+        const show = fresh.filter((x) => visible(x, filterOf(bar, ['region', 'site', 'kind']))).slice(-FEED).reverse();
+        if (show.length) { pushFeed(feedList, show, makeEv, FEED); root.querySelector('[data-feed-none]').hidden = true; }
+      }
+      function paintAgo(t: number) {
+        feedList.querySelectorAll('[data-ago]').forEach((el: any) => { el.textContent = ago(+el.closest('.lv-ev').dataset.t, t); });
+        root.querySelector('[data-feed-clock]').textContent = `As of ${clock(t)}`;
+      }
+      (function prefill() {
+        let from = snap.t - BACK, evs = eventsBetween(model, from, snap.t);
+        while (evs.length < FEED && snap.t - from < 60 * 60e3) { const older = eventsBetween(model, from - BACK, from); from -= BACK; evs = [...older, ...evs]; }
+        feed = evs.map(describe).filter(Boolean).slice(-KEEP);
+      })();
+
+      // ---- Sort the site rows ----
+      function reorder(v: string) {
+        const box = root.querySelector('[data-rows="units"]');
+        const key = (row: HTMLElement) => {
+          const si = +row.dataset.site!, idx = [...row.querySelectorAll('[data-fi]')].map((el: any) => +el.dataset.i);
+          const bad = idx.filter((i) => snap.units[i].st !== 'online').length;
+          return v === 'count' ? [-idx.length, si] : v === 'site' ? [si] : [-bad, si];
+        };
+        ([...box.children] as HTMLElement[]).map((row) => ({ row, k: key(row) })).sort((a, b) => { for (let i = 0; i < a.k.length; i++) if (a.k[i] !== b.k[i]) return a.k[i] - b.k[i]; return 0; }).forEach((x) => box.appendChild(x.row));
+      }
+
+      // ---- Each tick ----
+      function tick(t: number) {
+        if (t <= snap.t) { paintAgo(Date.now()); return; }
+        const from = Math.max(snap.t, t - BACK);
+        const evs = t - from > TICK_MS ? eventsBetween(model, from, t) : null;
+        const prev = snap, next = snapshot(model, t);
+        snap = next;
+        const changed: HTMLElement[] = [];
+        let statusMoved = false;
+        steady(() => {
+          model.units.forEach((u: any, i: number) => {
+            const a = prev.units[i], b = next.units[i], el = els.get(i); if (!el) return;
+            if (a.st !== b.st) { const n = refresh(el, (x: HTMLElement) => paint(x, i, b, t)); els.set(i, n); changed.push(n); statusMoved = true; }
+            else if (a.al !== b.al || a.down !== b.down) { paint(el, i, b, t); changed.push(el); }
+            else if (b.st !== 'online' && t % 60e3 < TICK_MS) paint(el, i, b, t);
+          });
+        });
+        changed.forEach(ping);
+        if (statusMoved && bar?.rsFilter && bar.rsFilter.get('status').length) bar.rsFilter.run(true);
+        paintHealth(); paintNumbers(); paintAttention(t, true);
+        addToFeed(evs ?? diff(model, prev, next));
+        paintAgo(t);
+      }
+
+      // ---- Start ----
+      paintHealth(); paintNumbers(); paintAttention(snap.t, false); renderFeed(); paintAgo(snap.t);
+      const onChange = () => { paintHealth(); filterAttention(); renderFeed(); };
+      const start = () => {
+        if (!bar?.rsFilter) return;
+        bar.addEventListener('fb:change', onChange);
+        bar.addEventListener('fb:sort', (e: any) => bar.rsFilter.run(true, () => reorder(e.detail.value)));
+        reorder(bar.rsFilter.sort());
+        bar.rsFilter.run(false);
+      };
+      if (bar?.rsFilter) start(); else document.addEventListener('DOMContentLoaded', start, { once: true });
+      cleanups.push(every(tick));
+      cleanups.push(stickSide(side));
+      const pause = () => document.querySelector('[data-lv-live]')?.classList.toggle('lv-paused', document.hidden);
+      document.addEventListener('visibilitychange', pause);
+      cleanups.push(() => document.removeEventListener('visibilitychange', pause));
+      document.addEventListener('astro:before-swap', () => { cleanups.forEach((f) => f()); }, { once: true });
+    }
+    init();
+    document.addEventListener('astro:page-load', init);
+  </script>
+</Shell>
+
+<style>
+  /* Health by kind and by site: two cards side by side, one under the other when the column is narrow. */
+  .lv-health { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: stretch; }
+  .lv-hcard { min-width: 0; padding-bottom: 10px; }
+  .lv-hrows { display: grid; padding: 0 10px; }
+  .lv-hr { appearance: none; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: center; width: 100%; padding: 6px 8px; border: 0; border-radius: var(--radius); background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: background var(--dur-hover) var(--ease-settle), opacity var(--dur-state) var(--ease-settle); }
+  .lv-hr:hover { background: var(--surface-2); }
+  .lv-hr[aria-pressed=true] { background: var(--accent-soft); color: var(--accent-ink); }
+  .lv-hr.none { opacity: .45; }
+  .lv-hn, .lv-hv { min-width: 0; display: grid; gap: 3px; }
+  .lv-hn b { font-size: 13.5px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lv-hn small { font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lv-hbar { display: flex; gap: 2px; height: 8px; border-radius: 4px; overflow: hidden; background: var(--surface-2); }
+  .lv-hbar i { flex: 0 1 0; min-width: 0; transition: flex-grow var(--dur-fill) var(--ease-settle); }
+  .lv-hbar i[data-st=online] { background: color-mix(in srgb, var(--green) 55%, var(--surface)); }
+  .lv-hbar i[data-st=alert] { background: var(--amber); }
+  .lv-hbar i[data-st=offline] { background: var(--red); }
+  .lv-hbar i.has { min-width: 5px; }
+  .lv-hx { font-size: 12px; line-height: 1.3; color: var(--text-3); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lv-hx :global(.t-bad) { color: var(--red-ink); } .lv-hx :global(.t-warn) { color: var(--amber-ink); }
+  .lv-sites :global(.lv-counts .t-warn) { color: var(--amber-ink); }
+  @container lvmain (max-width: 599px) { .lv-health { grid-template-columns: minmax(0, 1fr); gap: 14px; } }
+</style>

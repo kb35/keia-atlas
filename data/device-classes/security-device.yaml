@@ -1,0 +1,78 @@
+# Device class: Security device
+# A Keia object profile: what a healthy device of this class looks like on every
+# platform that knows about it. Specific models are in data/device-models/ (step 3).
+
+schema: object-profile
+
+profile:
+  name: Security device
+  object_role: 'Door, visitor and safety equipment at a reception: visitor sign-in, CCTV,
+    video intercom, door release, panic button'
+  version: "1.0"
+  last_updated: "2026-09-27"
+  owner: Keia Atlas maintainers
+
+sources:
+  - file: data/sources/room-guidance.yaml
+    provides: Which space types use this class of device, and where it goes
+
+platforms:
+  keia_atlas:
+    required_fields:
+      - space
+      - model
+      - serial
+      - lifecycle_state
+    healthy_indicators:
+      - recorded in the space its space type expects
+      - every port wired as the space type says
+  inventory:
+    required_fields:
+      - asset_tag
+      - serial
+      - model
+      - space
+      - status
+      - hostname
+    healthy_indicators:
+      - status is active
+      - space matches where the device is installed
+  dhcp_dns:
+    required_fields:
+      - hostname
+      - mac_address
+      - ip_address
+    healthy_indicators:
+      - address reservation matches the MAC address
+      - forward and reverse DNS records resolve
+  monitoring:
+    required_fields:
+      - monitor_name
+    healthy_indicators:
+      - reporting
+      - no open critical alerts
+
+consistency:
+  - check: serial match
+    compare:
+      - keia_atlas.serial
+      - inventory.serial
+  - check: space match
+    compare:
+      - keia_atlas.space
+      - inventory.space
+  - check: hostname match
+    compare:
+      - inventory.hostname
+      - dhcp_dns.hostname
+
+discrimination:
+  device_offline:
+    likely_causes:
+      - PoE port off
+      - network cable unplugged
+    first_check: monitoring
+
+not_applicable:
+  - device_management
+  - room_booking

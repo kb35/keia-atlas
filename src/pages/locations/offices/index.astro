@@ -1,0 +1,134 @@
+---
+// Locations, Offices: every office as a card, List archetype (page-anatomy.md,
+// A). Each card: a plan of the first floor where a floor file exists, the local time and whether it is open, the
+// three service lights, open incidents, people on site today and rooms, each opening its list. Filters: Region and
+// Status (open or closed now, from each office's own clock). Home offices follow, summarised per region.
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import FilterBar from '../../../components/FilterBar.astro';
+import EmptyState from '../../../components/EmptyState.astro';
+import Section from '../../../components/Section.astro';
+import OfficeCard from '../_OfficeCard.astro';
+import { href, DEMO_TODAY, fmtDate } from '../../../lib/data.mjs';
+import { REGIONS, REGION_SHORT, OFFICE_IDS, office, homeOffices, liveModelFor, sitesFloored, LIGHT_WORD, ROLE_WORD, OPEN_Q } from '../../../lib/locations.mjs';
+
+const OFFICES = OFFICE_IDS.map(office).sort((a, b) => REGIONS.indexOf(a.s.region) - REGIONS.indexOf(b.s.region));
+const HOMES = REGIONS.map((r) => ({ r, ...homeOffices(r) }));
+const FACETS = [
+  { key: 'region', label: 'Region', options: REGIONS.map((r) => ({ value: r, label: REGION_SHORT[r] })) },
+  { key: 'status', label: 'Status', options: [{ value: 'open', label: 'Open now' }, { value: 'closed', label: 'Closed now' }] },
+];
+const SORT = { options: [{ value: 'region', label: 'By region' }, { value: 'name', label: 'By name' }, { value: 'inc', label: 'Incidents first' }] };
+const VIEWS = [{ value: 'cards', label: 'Cards', show: '[data-grid]' }, { value: 'list', label: 'List', show: '[data-list]' }];
+const openInc = OFFICES.reduce((n, o) => n + o.inc.length, 0);
+const onSite = OFFICES.reduce((n, o) => n + o.people.length, 0);
+const NUMBERS = [
+  { n: OFFICES.length, label: 'Offices', fact: true },
+  { id: 'loc-open', n: '–', label: 'Open now', to: '?status=open' },
+  { n: openInc, label: 'Open incidents', to: `/incidents/?site=${OFFICES.map((o) => o.id).join(',')}&${OPEN_Q}`, tone: openInc ? 'bad' as const : undefined },
+  { n: onSite, label: 'On site today', fact: true },
+];
+const json = JSON.stringify({ ...liveModelFor(sitesFloored()), base: href('/') }).replace(/</g, '\\u003c');
+---
+<Shell title="Offices" section="offices" crumbs={[{ label: 'Locations', to: '/locations/' }, { label: 'Offices' }]} about={{ kind: 'page', label: 'Offices' }}>
+  <PageBand overline="Locations" title="Offices" rec="dd-locations-offices" lede={`Every office: its local time, how its services are, and who is in on ${fmtDate(DEMO_TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}.`} sim="live" numbers={NUMBERS} />
+
+  <div class="content offices" data-loc="offices">
+    <FilterBar facets={FACETS} placeholder="Find an office, city or code" label="Find an office" noun={['office', 'offices']} scope=".content.offices" views={VIEWS} viewKey="rs-offices-view" sort={SORT} />
+
+    <div class="oc-grid" data-grid data-sort-box>
+      {OFFICES.map((o) => <OfficeCard o={o} filter />)}
+    </div>
+
+    <div class="card of-list" data-list hidden>
+      <table class="to-cards">
+        <thead><tr><th scope="col">Office</th><th scope="col">Region</th><th scope="col">Local time</th><th scope="col">Services</th><th scope="col" class="num">Open incidents</th><th scope="col" class="num">On site today</th><th scope="col" class="num">Rooms</th></tr></thead>
+        <tbody data-sort-box>
+          {OFFICES.map((o) => (
+            <tr data-fi data-find={`${o.s.name} ${o.s.city} ${o.s.code} ${o.id}`.toLowerCase()} data-f-region={o.s.region} data-f-status="" data-loc-tz={o.s.time_zone} data-vk={o.id} data-inc={o.inc.length} data-name={o.s.name}>
+              <td data-label="Office"><a href={href(`/locations/${o.id}/`)}><b>{o.s.name}</b></a><small class="faint"> {ROLE_WORD[o.s.role]}</small></td>
+              <td data-label="Region"><a href={href(`/locations/${o.s.region}/`)}>{REGION_SHORT[o.s.region]}</a></td>
+              <td data-label="Local time"><span data-loc-clock>--:--</span> <small class="of-open" data-loc-open></small></td>
+              <td data-label="Services"><span class="of-lights">{o.lights.map((l) => <a href={l.to.startsWith('#') ? href(`/locations/${o.id}/${l.to}`) : href(l.to)} title={`${l.label}: ${LIGHT_WORD[l.tone]}, ${l.text}`}><i class="hl" data-state={l.tone} aria-hidden="true"></i>{l.label}</a>)}</span></td>
+              <td data-label="Open incidents" class="num"><a href={href(`/incidents/?site=${o.id}&${OPEN_Q}`)}>{o.inc.length}</a></td>
+              <td data-label="On site today" class="num"><a href={href(`/locations/${o.id}/#today`)}>{o.people.length}</a></td>
+              <td data-label="Rooms" class="num"><a href={href(`/rooms/?site=${o.id}`)}>{o.rooms.length}</a></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <EmptyState text="No offices match these filters." />
+
+    <Section title="Home offices" help="loc.homes" aside="Summarised by region">
+      <div class="ho-rows">
+        {HOMES.map((h) => (
+          <a class="card ho-row" href={href(`/locations/${h.r}/home-offices/`)} data-vt-rec={`ho-${h.r}`}>
+            <span class="code">{h.s.code}</span>
+            <span class="ho-n"><b>{h.s.name}</b><small>{REGION_SHORT[h.r]}</small></span>
+            <span class="ho-k ho-k1"><b>{h.rooms.length}</b> home offices</span>
+            <span class:list={['ho-k ho-k2', { bad: h.inc.length > 0 }]}><b>{h.inc.length}</b> open {h.inc.length === 1 ? 'incident' : 'incidents'}</span>
+            <span class="ho-go" aria-hidden="true">→</span>
+          </a>
+        ))}
+      </div>
+    </Section>
+    <script type="application/json" data-loc-model set:html={json}></script>
+  </div>
+
+  <script>
+    import { startLocations } from '../../../lib/locations-client.mjs';
+    function init() {
+      const root = document.querySelector('[data-loc="offices"]') as any;
+      if (!root || root.__loc) return;
+      const bar = root.querySelector('[data-fb]');
+      const stop = startLocations(root);
+      // Sort: by region (the site order), by name, or with the most open incidents first.
+      const order = new Map<string, number>();
+      root.querySelectorAll('[data-grid] [data-vk]').forEach((el: HTMLElement, i: number) => order.set(el.dataset.vk!, i));
+      const reorder = (v: string) => root.querySelectorAll('[data-sort-box]').forEach((box: HTMLElement) => {
+        [...box.children].sort((a: any, b: any) => v === 'name' ? a.dataset.name.localeCompare(b.dataset.name)
+          : v === 'inc' ? (+b.dataset.inc - +a.dataset.inc) || order.get(a.dataset.vk)! - order.get(b.dataset.vk)!
+          : order.get(a.dataset.vk)! - order.get(b.dataset.vk)!).forEach((x) => box.appendChild(x));
+      });
+      const start = () => {
+        if (!bar?.rsFilter) return;
+        bar.addEventListener('fb:sort', (e: any) => bar.rsFilter.run(true, () => reorder(e.detail.value)));
+        reorder(bar.rsFilter.sort());
+        bar.rsFilter.refresh();
+      };
+      if (bar?.rsFilter) start(); else document.addEventListener('DOMContentLoaded', start, { once: true });
+      document.addEventListener('astro:before-swap', stop, { once: true });
+    }
+    init();
+    document.addEventListener('astro:page-load', init);
+  </script>
+</Shell>
+
+<style>
+  .oc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gutter); }
+  @container content (max-width: 1099px) { .oc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @container content (max-width: 599px) { .oc-grid { grid-template-columns: minmax(0, 1fr); } }
+  .of-list { padding: 4px 0; }
+  .of-list table { width: 100%; }
+  .of-lights { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; }
+  .of-lights a { display: inline-flex; align-items: center; gap: 5px; color: var(--ink); text-decoration: none; font-size: 13px; }
+  .of-lights .hl { width: 10px; height: 10px; }
+  .of-open { color: var(--text-2); }
+  .of-open[data-open="1"] { color: var(--green-ink, var(--green)); }
+  .ho-rows { display: grid; gap: 10px; }
+  .ho-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto auto; gap: 16px; align-items: center; padding: 12px 16px; color: inherit; text-decoration: none; transition: box-shadow var(--dur-state) var(--ease-settle); }
+  .ho-row:hover { box-shadow: var(--shadow-md); }
+  .ho-n { display: grid; min-width: 0; }
+  .ho-n small, .ho-k { color: var(--text-2); font-size: 13px; }
+  .ho-k b { font: 700 17px/1 var(--font-display); color: var(--ink); font-variant-numeric: tabular-nums; }
+  .ho-k.bad b { color: var(--red-ink); }
+  .ho-go { color: var(--text-2); transition: transform var(--dur-state) var(--ease-settle); }
+  .ho-row:hover .ho-go { transform: translateX(3px); }
+  @container content (max-width: 559px) {
+    .ho-row { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "code name go" "k1 k1 k1" "k2 k2 k2"; gap: 4px 12px; }
+    .ho-row .code { grid-area: code; } .ho-n { grid-area: name; } .ho-go { grid-area: go; }
+    .ho-k1 { grid-area: k1; } .ho-k2 { grid-area: k2; }
+  }
+  @media (prefers-reduced-motion: reduce) { .ho-row, .ho-go { transition: none; } }
+</style>

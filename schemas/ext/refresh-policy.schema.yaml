@@ -1,0 +1,72 @@
+# Refresh policy: how long each class of device stays in service, and how many
+# engineering hours each lifecycle task takes. Keia Atlas works out from these and
+# the install dates which devices are due in which year, and the hours needed.
+# No prices: budgeting is a separate task in Keia's Plan stage.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/refresh-policy
+title: Refresh policy
+type: object
+additionalProperties: false
+required: [name, standard, horizon, tasks, classes, sources]
+properties:
+  name: { type: string }
+  standard:
+    description: Whose policy this is. "house" means Keia Atlas's own choice for the made-up company.
+    enum: [house]
+  horizon:
+    description: The years the plan shows. Anything due before the first year is shown as due now.
+    type: object
+    additionalProperties: false
+    required: [from, to]
+    properties:
+      history_from:
+        description: The first year of the record. The work plan shows every year from here to the last plan year.
+        type: integer
+        minimum: 1990
+        maximum: 2100
+      from: { type: integer, minimum: 2020, maximum: 2100 }
+      to: { type: integer, minimum: 2020, maximum: 2100 }
+  tasks:
+    description: >
+      Engineering hours per device for each Keia lifecycle task, as a low and high estimate.
+      networked_only means the task only applies to devices with a network address.
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [task, stage, low, high]
+      properties:
+        task: { enum: [provision, configure, install, commission, decommission] }
+        stage: { enum: [deploy, retire] }
+        low: { type: number, minimum: 0 }
+        high: { type: number, minimum: 0 }
+        networked_only: { type: boolean }
+        notes: { type: string }
+  classes:
+    description: Years in service for each device class.
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [class, years]
+      properties:
+        class:
+          description: Device class id (a file in data/device-classes/).
+          type: string
+          pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
+        years: { type: integer, minimum: 1, maximum: 20 }
+        notes: { type: string }
+  sources:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [source, provides]
+      properties:
+        source: { type: string }
+        provides: { type: string }
+  notes:
+    type: array
+    items: { type: string }

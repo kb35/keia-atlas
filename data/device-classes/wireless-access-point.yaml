@@ -1,0 +1,112 @@
+# Device class: Wireless access point
+# A Keia object profile: what a healthy device of this class looks like on every
+# platform that knows about it. Specific models are in data/device-models/.
+# The rules for where access points go and how Wi-Fi is set up are in the Wi-Fi standard (data/standards/wifi.yaml).
+
+schema: object-profile
+
+profile:
+  name: Wireless access point
+  object_role: Ceiling-mounted Wi-Fi access point that serves staff, guests and room devices in an area
+    of the office, powered over Ethernet from a comms room switch and managed centrally
+  naming_prefixes:
+    - ap
+  version: "1.0"
+  last_updated: "2026-09-29"
+  owner: Keia Atlas maintainers
+
+sources:
+  - file: data/standards/wifi.yaml
+    provides: Where access points go, how they are cabled and powered, and the Wi-Fi settings they carry
+  - file: data/sources/unifi.yaml
+    provides: The access point models, their power and the vendor's Wi-Fi guidance
+
+platforms:
+  keia_atlas:
+    required_fields:
+      - space
+      - model
+      - serial
+      - lifecycle_state
+      - expected_firmware
+    healthy_indicators:
+      - recorded in the area the Wi-Fi design places it
+      - its switch port and cable recorded
+  inventory:
+    required_fields:
+      - asset_tag
+      - serial
+      - model
+      - space
+      - status
+      - hostname
+    healthy_indicators:
+      - status is active
+      - space matches where the access point is mounted
+  dhcp_dns:
+    required_fields:
+      - hostname
+      - mac_address
+      - ip_address
+    healthy_indicators:
+      - address reservation on the management VLAN matches the MAC address
+      - forward and reverse DNS records resolve
+  device_management:
+    required_fields:
+      - device_name
+      - serial
+      - firmware_version
+    healthy_indicators:
+      - adopted and online in the UniFi Network application
+      - firmware at the fleet standard for the model
+      - uplink at 2.5 Gb/s and powered at PoE+
+      - radios on the channels and widths the Wi-Fi standard sets
+    firmware_expectations: The release the Lab has passed; automatic updates off
+  monitoring:
+    required_fields:
+      - monitor_name
+    healthy_indicators:
+      - reporting
+      - no open critical alerts
+      - channel use below the alert threshold
+
+consistency:
+  - check: serial match
+    compare:
+      - keia_atlas.serial
+      - inventory.serial
+  - check: space match
+    compare:
+      - keia_atlas.space
+      - inventory.space
+  - check: hostname match
+    compare:
+      - inventory.hostname
+      - dhcp_dns.hostname
+  - check: firmware match
+    compare:
+      - device_management.firmware_version
+      - keia_atlas.expected_firmware
+
+discrimination:
+  no_wifi_in_an_area:
+    likely_causes:
+      - access point offline (no PoE, cable or switch port fault)
+      - access point not adopted after a reset
+      - radio disabled or on a blocked channel
+    first_check: device_management
+  slow_or_dropping_wifi:
+    likely_causes:
+      - channel crowded by neighbours
+      - uplink negotiated at 1 Gb/s or 100 Mb/s (cable fault)
+      - too many clients on one radio
+    first_check: monitoring
+  access_point_keeps_restarting:
+    likely_causes:
+      - switch PoE budget exceeded
+      - PoE only at 802.3af instead of PoE+
+      - firmware fault
+    first_check: device_management
+
+not_applicable:
+  - room_booking

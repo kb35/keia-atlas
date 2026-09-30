@@ -1,0 +1,221 @@
+---
+// A project's Deploy overview. List archetype.
+// The first block is the answer to "what needs me?": the exceptions to fix, and what Keia Atlas checked
+// and waits for someone to accept in one action. Then the work in batches (every unit that shares a
+// configuration, in the order an engineer sets them up), or by room for commissioning. A batch or a room
+// opens as its own page, flying in from its card. A vendor (View as) sees only their installs.
+import Shell from '../../../../layouts/Shell.astro';
+import PageBand from '../../../../components/PageBand.astro';
+import FilterBar from '../../../../components/FilterBar.astro';
+import Section from '../../../../components/Section.astro';
+import EmptyState from '../../../../components/EmptyState.astro';
+import LiveBar from '../../../../components/LiveBar.astro';
+import IntegrateLive from '../../../../components/IntegrateLive.astro';
+import { projects, sites, PHASE_LABEL, TASK_STATUS, SITE_ORDER, phasesOf, fmtDate, DEMO_TODAY, href, className } from '../../../../lib/data.mjs';
+import { integratePlan, buildModel, batchHref, roomHref } from '../../../../lib/integrate.mjs';
+import { metersHtml, batchFootHtml, roomFootHtml, roomChipsHtml, needsHtml, readyHtml } from '../../../../lib/integrate-view.mjs';
+import { person } from '../../../../lib/demo.mjs';
+
+export function getStaticPaths() {
+  return Object.values(projects).filter((p) => phasesOf(p).includes('integrate')).map((p) => ({ params: { id: p.id.toLowerCase() } }));
+}
+const p = Object.values(projects).find((x) => x.id.toLowerCase() === Astro.params.id);
+const plan = integratePlan(p);
+const M = buildModel(plan);
+const F = M.figures();
+const home = `/projects/${p.id.toLowerCase()}/`;
+const PHASE = PHASE_LABEL.integrate;
+const siteIds = SITE_ORDER.filter((s) => plan.units.some((u) => u.site === s));
+const kinds = [...new Set(plan.units.map((u) => u.cls))].map((c) => ({ value: c, label: className(c) })).sort((a, b) => a.label.localeCompare(b.label));
+const STATUS = [
+  { value: 'needs', label: 'Needs you' }, { value: 'accept', label: 'Checked, to accept' }, { value: 'test', label: 'Ready for the room test' },
+  { value: 'doing', label: 'Under way' }, { value: 'todo', label: 'To do' }, { value: 'done', label: 'Done' },
+];
+const FACETS = [
+  ...(siteIds.length > 1 ? [{ key: 'site', label: 'Office', options: siteIds.map((value) => ({ value, label: sites[value].name })) }] : []),
+  { key: 'kind', label: 'Kind', options: kinds },
+  { key: 'status', label: 'Status', options: STATUS },
+  { key: 'room', label: 'Room', options: plan.rooms.map((r) => ({ value: r.id, label: r.name, sub: siteIds.length > 1 ? r.siteName : undefined })) },
+];
+const next = plan.batches.find((b) => M.batchSum(b.id).status !== 'done') ?? plan.batches[0];
+const intTasks = p.tasks.filter((t) => t.phase === 'integrate');
+const late = (t) => t.status !== 'done' && t.due && t.due < DEMO_TODAY;
+const keptByRoom = plan.rooms.map((r) => ({ r, kept: plan.kept.filter((k) => k.room === r.id) })).filter((x) => x.kept.length);
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many ?? `${one}s`}`;
+---
+<Shell title={`${PHASE}: ${p.name}`} section="projects" minStage={3} vendorOk about={{ kind: 'project', label: `${p.id} ${p.name}, ${PHASE}`, to: `${home}integrate/` }}
+  crumbs={[{ label: 'Projects', to: '/projects/' }, { label: p.name, to: home }, { label: PHASE }]}>
+  <PageBand overline={`Project ${p.id}`} title={PHASE} sim="live"
+    numbers={[
+      { n: F.needs, label: 'Need you', to: '#needs', tone: F.needs ? 'warn' : undefined, id: 'int-needs' },
+      { n: F.toAccept, label: 'Checked, to accept', to: '#checked', tone: F.toAccept ? 'good' : undefined, id: 'int-accept' },
+      { n: `${F.setUp}/${F.units}`, label: 'Units set up', fact: true, id: 'int-setup' },
+      { n: `${F.signed}/${F.rooms}`, label: 'Rooms signed off', to: '?view=rooms&status=done', id: 'int-rooms' },
+    ]}>
+    <Fragment slot="overline">
+      <span>{sites[p.site].name}</span>
+      <span class:list={['pill', p.phase === 'integrate' ? 'deploy' : 'plain']}>{PHASE_LABEL[p.phase]} phase</span>
+    </Fragment>
+    <Fragment slot="lede"><a href={href(home)}>{p.name}</a>: {plural(plan.units.length, 'unit')} in {plural(plan.batches.length, 'batch', 'batches')}{plan.kept.length ? `; ${plan.kept.length} kept as they are` : ''}.</Fragment>
+    {next && <a slot="action" class="btn primary" data-help="integrate.next" href={batchHref(plan, next.id)}>Open the next batch</a>}
+  </PageBand>
+
+  <div class="content integrate iv" data-int data-page="overview">
+    <FilterBar facets={FACETS} placeholder="Find a unit, hostname or room" label="Find a unit" noun={['batch', 'batches']} scope=".content.integrate"
+      views={[{ value: 'batches', label: 'Batches', show: '[data-view-batches]', noun: ['batch', 'batches'] }, { value: 'rooms', label: 'Rooms', show: '[data-view-rooms]', noun: ['room', 'rooms'] }]}
+      viewsHelp="integrate.views" sort={{ options: [{ value: 'order', label: 'By work order' }, { value: 'needs', label: 'Needs you first' }, { value: 'name', label: 'By name' }] }} />
+    <LiveBar page={`integrate:${p.id}`} />
+
+    <p class="iv-vendor" data-vendor-only data-help="integrate.vendor">Viewing as <b data-vendor-name></b>. Only your installs show: select Installed when a unit is mounted, connected and powered on, and Keia Atlas confirms it when it comes online.</p>
+    <p class="iv-vendor" data-vendor-empty>Nothing on this project is for you to install. Your own projects are on the <a href={href('/vendor/')}>vendor page</a>.</p>
+
+    <div class="g12 iv-top" id="needs" data-engineer-only>
+      <section class="card iv-box s-7" aria-labelledby="iv-needs-h">
+        <header class="iv-h" data-help="integrate.needs"><h2 id="iv-needs-h">Needs you</h2><span class="faint">Only the exceptions. Everything else, Keia Atlas checks.</span></header>
+        <div data-slot="needs" set:html={needsHtml(M)} />
+      </section>
+      <section class="card iv-box s-5" id="checked" aria-labelledby="iv-ready-h">
+        <header class="iv-h" data-help="integrate.checked"><h2 id="iv-ready-h">Checked by Keia Atlas</h2><span class="faint">Passed, waiting for a person to accept</span></header>
+        <div data-slot="ready" data-by="follow" set:html={readyHtml(M, { by: 'batch' })} />
+      </section>
+    </div>
+
+    <div data-view-batches>
+      {plan.batches.length === 0 && <EmptyState filter={false} text="This project changes no devices yet." action="See the project" to={home} />}
+      <div class="iv-grid" data-sortable>
+        {plan.batches.map((b) => {
+          const st = M.batchSum(b.id).status;
+          const units = b.units.map((id) => M.U.get(id));
+          return (
+            <a class="card iv-b" href={batchHref(plan, b.id)} data-fi data-bcard={b.id} data-st={st} data-order={b.n} data-name={b.title}
+              data-find={[b.title, b.clsName, ...b.models, b.cfg?.name, ...units.map((u) => `${u.host ?? ''} ${u.roomName}`)].filter(Boolean).join(' ')}
+              data-f-site={[...new Set(units.map((u) => u.site))].join('|')} data-f-kind={b.cls.join('|')} data-f-status={st} data-f-room={b.rooms.join('|')} data-help="integrate.batch">
+              <header class="iv-bh">
+                <span class="iv-n num" aria-hidden="true">{b.n}</span>
+                <span class="iv-bt"><b data-vt-rec={`int-${b.id}`}>{b.title}</b><small>{b.touched ? `Re-check: ${b.units.length === 1 ? 'it pairs' : 'they pair'} with the new ${plan.batches.find((x) => !x.touched && x.rooms.some((r) => b.rooms.includes(r)))?.noun ?? 'units'}` : b.cfg ? `${b.cfg.name} ${b.cfg.version}` : 'Nothing to set: provision and install'}</small></span>
+              </header>
+              <p class="iv-via faint">{b.via ? `Set once through ${b.via}` : `${plural(b.rooms.length, 'room')}`}{b.models.length > 1 ? ` · ${b.models.join(', ')}` : ''}</p>
+              <div class="iv-meters" data-slot="meters" data-b={b.id} set:html={metersHtml(M, b.id)} />
+              <footer class="iv-foot" data-slot="bfoot" data-b={b.id} set:html={batchFootHtml(M, b.id)} />
+            </a>
+          );
+        })}
+      </div>
+    </div>
+
+    <div data-view-rooms hidden>
+      <div class="iv-rgrid" data-sortable>
+        {plan.rooms.filter((r) => r.units.length).map((r, i) => {
+          const st = M.roomSum(r.id).status;
+          const units = r.units.map((id) => M.U.get(id));
+          return (
+            <article class="card iv-r" data-fi data-rcard={r.id} data-st={st} data-order={i} data-name={r.name}
+              data-find={[r.name, r.profile, ...units.map((u) => `${u.short} ${u.host ?? ''} ${u.modelName ?? ''}`)].join(' ')}
+              data-f-site={r.site} data-f-kind={[...new Set(units.map((u) => u.cls))].join('|')} data-f-status={st} data-f-room={r.id} data-help="integrate.room">
+              <header class="iv-rh">
+                <a class="iv-rt" href={roomHref(plan, r.id)}><b data-vt-rec={`int-r-${r.id}`}>{r.name}</b></a>
+                <span class="faint">{r.profile}{siteIds.length > 1 ? ` · ${r.siteName}` : ''}</span>
+              </header>
+              <div class="iv-chips" data-slot="rchips" data-r={r.id} data-engineer-only set:html={roomChipsHtml(M, r.id)} />
+              {r.kept.length > 0 && <p class="iv-kept faint" data-engineer-only>{plural(r.kept.length, 'more device')} kept as they are, covered by the room test</p>}
+              <div class="iv-vi" data-vendor-only data-slot="vinstall" data-r={r.id}></div>
+              <footer class="iv-rf">
+                <span data-slot="rfoot" data-r={r.id} data-engineer-only set:html={roomFootHtml(M, r.id)} />
+                <a class="btn small" href={roomHref(plan, r.id)} data-engineer-only>Open the room</a>
+              </footer>
+            </article>
+          );
+        })}
+      </div>
+    </div>
+    <EmptyState text="Nothing matches these filters." />
+
+    {keptByRoom.length > 0 && (
+      <Section title="Kept as they are" help="integrate.kept" aside={`${plan.kept.length} devices`} data-engineer-only>
+        <p class="iv-note muted">This project changes {plan.scope.map((c) => className(c).toLowerCase()).join(' and ')}s and re-checks what pairs with them. Everything else in each room stays, and the room test covers it.</p>
+        <div class="g12">
+          {keptByRoom.map(({ r, kept }) => (
+            <div class="card side-card s-4">
+              <h3><a href={roomHref(plan, r.id)}>{r.name}</a></h3>
+              <p class="iv-keptl">{kept.map((k) => k.short).join(', ')}</p>
+            </div>
+          ))}
+        </div>
+      </Section>
+    )}
+
+    <Section title={`${PHASE} tasks`} help="integrate.tasks" aside={`${intTasks.length} on this project`} showAll={6} data-engineer-only>
+      <div class="list" data-items>
+        {intTasks.map((t) => (
+          <a class="row plain iv-task" href={href(`${home}tasks/${t.id.toLowerCase()}/`)}>
+            <span>
+              <span class="name"><i class="hl" data-state={{ done: 'ok', doing: 'warn', blocked: 'bad', todo: 'off' }[t.status]}></i> {t.title}</span>
+              <span class="sub">{t.id} · {person(t.owner).name}{t.blocked_by ? ` · ${t.blocked_by}` : ''}</span>
+            </span>
+            <span class="end"><span class:list={['faint', { late: late(t) }]}>{t.due ? `Due ${fmtDate(t.due, { day: 'numeric', month: 'short' })}` : ''}</span><span class:list={['pill', { manage: t.status === 'done', deploy: t.status === 'doing', bad: t.status === 'blocked' }]}>{TASK_STATUS[t.status]}</span></span>
+          </a>
+        ))}
+      </div>
+    </Section>
+
+    <Section title={`How ${PHASE} works`} help="integrate.how" data-engineer-only>
+      <div class="g12">
+        <div class="card side-card s-4">
+          <h3>Batches, not rooms</h3>
+          <p class="muted iv-p">Units that share a configuration are set up together: the shared profile once, then only what differs per unit (its name and address). Batches run in the order an engineer works: network, room system, what pairs with it, then the rest.</p>
+        </div>
+        <div class="card side-card s-4">
+          <h3>Checked, not ticked</h3>
+          <p class="muted iv-p">Keia Atlas checks what it can see: the records in the systems, the unit online on its switch port, the settings read back. What passes waits for one Accept, recorded with who, when and what passed. Exceptions stay out of it until someone fixes them.</p>
+        </div>
+        <div class="card side-card s-4">
+          <h3>Rooms and installers</h3>
+          <p class="muted iv-p">Commissioning is room by room: a short room test once every unit is set up, and "All passed" signs the room off. A vendor sees only their installs, one action per unit. Every change is live between windows, with History and Undo.</p>
+        </div>
+      </div>
+    </Section>
+
+    <IntegrateLive plan={plan} />
+  </div>
+</Shell>
+
+<style>
+  .iv-top { margin-bottom: 18px; align-items: stretch; }
+  .iv-box { padding: 16px 20px 16px; display: grid; gap: 12px; align-content: start; }
+  .iv-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+  .iv-h h2 { margin: 0; font-size: 16px; }
+  .iv-h span { font-size: 12.5px; }
+  .iv-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gutter); }
+  .iv-rgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gutter); }
+  @container content (max-width: 1099px) { .iv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @container content (max-width: 699px) { .iv-grid, .iv-rgrid { grid-template-columns: minmax(0, 1fr); } }
+  .iv-b { display: grid; gap: 12px; align-content: start; padding: 16px 18px; color: inherit; text-decoration: none; transition: box-shadow var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle); }
+  .iv-b:hover { box-shadow: var(--shadow-md, var(--shadow-sm)); border-color: var(--line-strong); }
+  .iv-b:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .iv-bh { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; align-items: start; }
+  .iv-n { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); font: 700 12px/1 var(--font-mono); color: var(--text-2); }
+  .iv-bt { display: grid; gap: 2px; min-width: 0; }
+  .iv-bt b { font-size: 15px; line-height: 1.3; }
+  .iv-bt small { font-size: 12.5px; color: var(--text-2); }
+  .iv-via { margin: -4px 0 0 34px; font-size: 12px; }
+  .iv-meters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .iv-foot { min-height: 20px; }
+  .iv-r { display: grid; gap: 12px; align-content: start; padding: 16px 18px; }
+  .iv-rh { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+  .iv-rt { color: var(--text); text-decoration: none; font-size: 15px; }
+  .iv-rt:hover { text-decoration: underline; }
+  .iv-rh .faint { font-size: 12.5px; }
+  .iv-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .iv-kept { margin: 0; font-size: 12.5px; }
+  .iv-rf { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+  .iv-vendor { margin: 0 0 14px; padding: 10px 14px; border-radius: var(--radius); background: var(--surface-2); font-size: 13.5px; color: var(--text-2); }
+  .iv-note { margin: 0 0 12px; font-size: 13.5px; }
+  .iv-keptl { margin: 0; font-size: 13px; color: var(--text-2); }
+  .iv-p { margin: 0; font-size: 13.5px; }
+  .iv-task .name { display: flex; align-items: center; gap: 8px; }
+  .iv-task .late { color: var(--red-ink); font-weight: 650; }
+  .content.integrate :global(.livebar) { margin-bottom: 14px; }
+  .iv[data-mode=vendor] :global(.fb-views), .iv[data-mode=vendor] [data-view-batches] { display: none !important; }
+  :global(.rchip) { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px 5px 6px; border-radius: var(--pill-radius); background: var(--surface-2); font-size: 12.5px; }
+  :global(.rchip .ig) { width: 14px; height: 14px; }
+</style>

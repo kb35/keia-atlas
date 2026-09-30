@@ -1,0 +1,182 @@
+---
+// One platform's idea of "healthy" for a kind of device. Each field the platform must hold gets its
+// own small picture of what that field is, filled in for one example device: a room pin for the room,
+// a label for the serial number, the parts of a hostname, the two halves of a MAC address, and so on.
+// Hostname, serial and asset tag come from the data; address, MAC and firmware are demo values.
+import Icon from './Icon.astro';
+import DeviceArt from './DeviceArt.astro';
+import { roomWords, modelName, STAGES, STAGE_LABEL } from '../lib/data.mjs';
+const { k, name, p, ex } = Astro.props;
+const cap = (s) => s[0].toUpperCase() + s.slice(1);
+
+const LABEL = {
+  space: 'Room', model: 'Model', serial: 'Serial number', lifecycle_state: 'Lifecycle state', expected_firmware: 'Expected firmware',
+  asset_tag: 'Asset tag', status: 'Status', hostname: 'Hostname', mac_address: 'MAC address', ip_address: 'IP address',
+  device_name: 'Device name', firmware_version: 'Firmware installed', monitor_name: 'Monitor name', resource_name: 'Calendar resource', capacity: 'Capacity',
+};
+const NOTE = {
+  space: 'Where it is installed', model: 'Which product it is', serial: 'From the maker\'s label', lifecycle_state: 'Where it is in its life',
+  expected_firmware: 'The standard for this model', asset_tag: 'Aigna\'s own tag', status: 'In the asset register', hostname: 'From the naming standard',
+  mac_address: 'Burned in by the maker', ip_address: 'Reserved for this MAC', device_name: 'Must match the hostname', firmware_version: 'What the device reports',
+  monitor_name: 'What monitoring calls it', resource_name: 'The room\'s calendar', capacity: 'Seats the calendar offers',
+};
+const short = ex.host.split('.')[0];
+const hp = short.match(/^([a-z]+)-([a-z0-9]+)-([a-z]+)(\d+)$/i);
+const macParts = ex.mac.toUpperCase().split(':');
+const ipParts = ex.ip.split('.');
+const stageAt = STAGES.indexOf(ex.stage ?? 'manage');
+const beat = Array.from({ length: 8 }, (_, i) => `${i * 18},12 ${i * 18 + 6},12 ${i * 18 + 8},4 ${i * 18 + 10},18 ${i * 18 + 12},12`).join(' ');
+const resource = `${ex.site}-${ex.space}`.replace(/\s+/g, '-');
+---
+<article class={`hcard hc-${k}`}>
+  <header>
+    <span class="hc-ok" aria-hidden="true"><Icon name="check" size={13} /></span>
+    <h3>{name}</h3>
+  </header>
+  <ul class="hc-checks">{p.healthy_indicators.map((t) => <li>{roomWords(cap(t))}</li>)}</ul>
+
+  <div class="fields">
+    {p.required_fields.map((f) => (
+      <div class={`fv fv-${f}`}>
+        <p class="fv-h"><b>{LABEL[f] ?? f.replace(/_/g, ' ')}</b><code>{f}</code></p>
+        <div class="fv-vis">
+          {f === 'space' && (
+            <span class="fv-row"><span class="v-pin"><Icon name="room" size={14} /></span><span><b>{ex.space}</b><small>{ex.site}</small></span></span>
+          )}
+          {f === 'model' && (
+            <span class="fv-row">{ex.model && <span class="fv-art"><DeviceArt model={ex.model} cls={ex.cls} small /></span>}<b>{ex.model ? modelName(ex.model) : 'Set per project'}</b></span>
+          )}
+          {f === 'serial' && (
+            <span class="sticker"><small>S/N</small><b class="mono">{ex.serial}</b><span class="v-bars thin">{Array.from({ length: 22 }, (_, i) => <i style={`width:${((i * 5) % 3) + 1}px`}></i>)}</span></span>
+          )}
+          {f === 'asset_tag' && (
+            <span class="assettag"><span class="v-bars">{Array.from({ length: 14 }, (_, i) => <i style={`width:${((i * 7) % 3) + 1}px`}></i>)}</span><span><small>Property of Aigna</small><b class="mono">{ex.asset}</b></span></span>
+          )}
+          {f === 'lifecycle_state' && (
+            <span class="life">
+              <span class="life-rail">{STAGES.map((s, i) => <i class:list={{ done: i < stageAt, now: i === stageAt }} title={STAGE_LABEL[s]}></i>)}</span>
+              <b>{STAGE_LABEL[ex.stage ?? 'manage']}</b>
+            </span>
+          )}
+          {f === 'expected_firmware' && (
+            <span class="fw"><span class="fw-badge mono">{ex.fw}</span><small>Standard for {ex.model ? modelName(ex.model) : 'this model'}</small></span>
+          )}
+          {f === 'firmware_version' && (
+            <span class="fw"><span class="fw-badge mono">{ex.fw}</span><span class="fw-eq"><Icon name="check" size={13} />Matches the standard</span></span>
+          )}
+          {f === 'status' && <span class="pill-ok">Active</span>}
+          {f === 'hostname' && (hp ? (
+            <span class="parts">
+              {[[hp[1], 'site'], [hp[2], 'room'], [hp[3], 'kind'], [hp[4], 'number']].map(([v, l], i) => <>{i > 0 && i < 3 && <span class="dash">-</span>}<span class="part"><b class="mono">{v}</b><small>{l}</small></span></>)}
+            </span>
+          ) : <b class="mono">{short}</b>)}
+          {f === 'mac_address' && (
+            <span class="parts mac">
+              <span class="grp maker">{macParts.slice(0, 3).map((o) => <b class="mono">{o}</b>)}<small>Maker's prefix</small></span>
+              <span class="grp unit">{macParts.slice(3).map((o) => <b class="mono">{o}</b>)}<small>This unit</small></span>
+            </span>
+          )}
+          {f === 'ip_address' && (
+            <span class="parts ip">
+              {[[`${ipParts[0]}.${ipParts[1]}`, 'site network'], [ipParts[2], 'floor'], [ipParts[3], 'device']].map(([v, l], i) => <>{i > 0 && <span class="dash">.</span>}<span class="part"><b class="mono">{v}</b><small>{l}</small></span></>)}
+            </span>
+          )}
+          {f === 'device_name' && (
+            <span class="match"><b class="mono">{short}</b><span class="eq"><Icon name="link" size={12} />same as hostname</span></span>
+          )}
+          {f === 'monitor_name' && (
+            <span class="mon"><svg viewBox="0 0 144 22" preserveAspectRatio="none" aria-hidden="true"><polyline points={beat} fill="none" stroke-width="2" stroke-linejoin="round" /></svg><b class="mono">{short}</b></span>
+          )}
+          {f === 'resource_name' && (
+            <span class="fv-row"><span class="v-calicon"><b>{ex.day}</b><small>{ex.month}</small></span><b class="mono res">{resource}</b></span>
+          )}
+          {f === 'capacity' && (
+            <span class="seats">{Array.from({ length: Math.min(ex.seats, 12) }, () => <i></i>)}<b>{ex.seats} seats</b></span>
+          )}
+        </div>
+        <p class="fv-note">{NOTE[f] ?? ''}</p>
+      </div>
+    ))}
+  </div>
+</article>
+
+<style is:global>
+  .health-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; align-items: start; }
+  .hcard { display: grid; gap: 10px; align-content: start; padding: 14px 16px 16px; background: var(--surface); border: var(--border-card); border-radius: var(--radius-lg); }
+  :root[data-look="classic"] .hcard { border: 2px solid var(--ink); }
+  .hcard header { display: flex; align-items: center; gap: 8px; }
+  .hcard h3 { font: 700 15.5px/1.2 var(--font-display); }
+  .hc-ok { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: var(--green); color: var(--surface); flex: none; }
+  .hc-checks { margin: 0; padding-left: 18px; font-size: 13px; color: var(--text-2); display: grid; gap: 2px; }
+  .hc-text { margin: 0; font-size: 13.5px; color: var(--text-2); }
+
+  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .fv { display: grid; gap: 6px; align-content: start; padding: 9px 10px; border-radius: var(--radius); background: var(--surface-2); min-width: 0; }
+  .fv-hostname, .fv-mac_address, .fv-ip_address, .fv-model, .fv-serial, .fv-lifecycle_state, .fv-asset_tag { grid-column: 1 / -1; }
+  .assettag b, .sticker b { white-space: nowrap; }
+  .fv-h { margin: 0; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0 6px; }
+  .fv-h b { font-size: 12px; font-weight: 700; }
+  .fv-h code { font-size: 10px; color: var(--text-3); }
+  .fv-note { margin: 0; font-size: 11px; color: var(--text-3); }
+  .fv-vis { min-width: 0; font-size: 12.5px; }
+  .fv-vis small { display: block; font-size: 10.5px; color: var(--text-3); }
+  .fv-vis b { font-size: 12.5px; }
+  .fv-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .fv-row b { display: block; }
+  .v-pin { width: 24px; height: 24px; flex: none; border-radius: 50% 50% 50% 4px; transform: rotate(-45deg); display: grid; place-items: center; background: var(--accent); color: var(--on-accent); }
+  .v-pin svg { transform: rotate(45deg); }
+  .fv-art { width: 72px; height: 32px; flex: none; display: grid; place-items: center; }
+  .fv-art .model-art { max-width: 100%; max-height: 100%; }
+
+  .sticker { display: inline-grid; gap: 1px; padding: 6px 10px; border-radius: 5px; background: #FBFAF6; color: #15161B; border: 1px solid #CFCBC0; box-shadow: 0 1px 0 rgba(0,0,0,.08); }
+  .sticker small { color: #6B675E !important; font: 700 9px/1 var(--font-mono) !important; letter-spacing: .1em; }
+  .sticker b { font-size: 13px; }
+  .v-bars { display: flex; gap: 1.5px; height: 26px; align-items: stretch; }
+  .v-bars.thin { height: 12px; }
+  .v-bars i { background: currentColor; }
+  .assettag { display: inline-flex; gap: 8px; align-items: center; padding: 5px 9px; border-radius: 5px; background: #EDEDED; color: #15161B; border: 1px solid #BDBDBD; background-image: linear-gradient(135deg, rgba(255,255,255,.7), rgba(255,255,255,0) 60%); }
+  .assettag small { color: #555 !important; font-size: 9px !important; }
+
+  .life { display: flex; align-items: center; gap: 10px; }
+  .life-rail { display: flex; align-items: center; }
+  .life-rail i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--surface); }
+  .life-rail i + i { margin-left: 14px; position: relative; }
+  .life-rail i + i::before { content: ""; position: absolute; right: 100%; top: 3px; width: 16px; height: 2px; background: var(--line-strong); }
+  .life-rail i.done { background: var(--ink); border-color: var(--ink); }
+  .life-rail i.now { background: var(--green); border-color: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
+
+  .fw { display: grid; gap: 4px; justify-items: start; }
+  .fw-badge { padding: 3px 8px; border-radius: 5px; background: var(--surface); border: 1.5px solid var(--ink); font-size: 13px; font-weight: 700; }
+  .fw-eq { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 650; color: var(--green-ink); }
+  .pill-ok { display: inline-block; font: 700 10.5px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; padding: 5px 8px; border-radius: 999px; background: var(--green-soft); color: var(--green-ink); }
+
+  .parts { display: flex; align-items: flex-start; gap: 3px; flex-wrap: wrap; }
+  .part { display: grid; justify-items: center; }
+  .part b { padding: 3px 7px; border-radius: 4px; background: var(--surface); border: 1px solid var(--line-strong); font-size: 13px; }
+  .part small { margin-top: 2px; }
+  .dash { font: 700 14px/26px var(--font-mono); color: var(--text-3); }
+  .fv-hostname .part:nth-of-type(1) b { border-color: var(--blue); background: var(--blue-soft); }
+  .fv-hostname .part:nth-of-type(2) b { border-color: var(--green); background: var(--green-soft); }
+  .fv-hostname .part:nth-of-type(3) b { border-color: var(--violet); background: var(--violet-soft); }
+  .mac { gap: 8px; }
+  .grp { display: grid; grid-template-columns: repeat(3, auto); gap: 2px; padding: 4px; border-radius: 6px; }
+  .grp small { grid-column: 1 / -1; text-align: center; }
+  .grp b { padding: 2px 5px; border-radius: 3px; background: var(--surface); font-size: 12.5px; }
+  .grp.maker { background: var(--amber-soft); }
+  .grp.unit { background: var(--blue-soft); }
+  .match { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .eq { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 650; color: var(--green-ink); }
+  .mon { display: grid; gap: 2px; }
+  .mon svg { width: 100%; height: 22px; }
+  .mon polyline { stroke: var(--green); stroke-dasharray: 300; stroke-dashoffset: 300; animation: draw 2.4s var(--ease-settle, ease-out) forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  .v-calicon { width: 34px; flex: none; border-radius: 5px; overflow: hidden; text-align: center; background: var(--surface); border: 1.5px solid var(--line-strong); }
+  .v-calicon b { display: block; font: 800 14px/1.4 var(--font-display); }
+  .v-calicon small { background: var(--red); color: #fff !important; font: 700 8px/1.6 var(--font-mono) !important; text-transform: uppercase; letter-spacing: .06em; }
+  .res { font-size: 11.5px !important; overflow-wrap: anywhere; }
+  .seats { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; }
+  .seats i { width: 9px; height: 9px; border-radius: 3px 3px 1px 1px; background: var(--text-2); }
+  .seats b { margin-left: 6px; }
+  @media (max-width: 500px) { .fields { grid-template-columns: 1fr; } }
+  @media (prefers-reduced-motion: reduce) { .mon polyline { stroke-dashoffset: 0; animation: none; } }
+</style>

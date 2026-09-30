@@ -1,0 +1,53 @@
+# Configuration: U-CAM USB-to-HDMI bridge. Setting names, menu paths and defaults are the vendor's (cited per setting);
+# the values and reasons are Aigna's (demo). Researched from vendor documents, Sept 2026.
+id: inogeni-u-cam
+name: U-CAM USB-to-HDMI bridge
+models: [inogeni-u-cam]
+mode: USB webcam or room camera to HDMI, feeding a Kramer switcher/scaler input
+version: '1.0'
+owner: sofia
+updated: '2026-09-28'
+firmware: '2.18'
+summary: A small box that turns a USB camera's video into HDMI for a room's switcher. Aigna joins it to the AV VLAN, tightens the default web/API password,
+  and sets the HDMI/audio source; most defaults (DHCP, standby) are already right.
+managed_by: Device web interface
+steps: ['Connect the room''s USB camera (and, if separate, its USB audio device) to the two USB 3.0 input ports.', Connect HDMI OUT to the switcher/scaler
+    input., Connect the LAN port to the AV VLAN., Power from the included 100-240VAC to 12V/1.2A supply., 'Browse to the device''s webpage (self-signed
+    HTTPS certificate, so expect a browser warning) and change the default admin/admin login.', 'On the CONFIGURATION tab, set the HDMI resolution, camera
+    source and audio input for the room.', Check the STATUS tab shows the expected firmware version and that video/audio devices are detected.]
+groups:
+- name: Network
+  where: Device webpage > SYSTEM tab
+  settings:
+  - {derive: dhcp-reservation, name: IP addressing, value: 'DHCP (default), with a reservation on the AV VLAN', layer: naming-network, why: Aigna's AV devices sit on a DHCP-reserved
+      address on the AV VLAN rather than a hand-typed static one., action: verify, source: inogeni-u-cam-user-guide-v1-9}
+- name: Security
+  where: Device webpage > SYSTEM tab
+  settings:
+  - {derive: vault-site, name: Web/API password, value: 'From the password vault, per site', per_device: true, layer: profile, why: 'The device ships with username admin and
+      password admin, which must be changed before it goes into service.', action: change, source: inogeni-u-cam-user-guide-v1-9}
+  - {name: REST API bearer token, value: 'Generated, not left blank', layer: profile, why: Adds authentication to the REST API rather than leaving it open
+      to anything on the AV VLAN., action: change, source: inogeni-u-cam-user-guide-v1-9}
+- name: Video and audio
+  where: Device webpage > CONFIGURATION tab
+  settings:
+  - {derive: on-site, name: HDMI output resolution, value: The room display/switcher's native input resolution, per_device: true, layer: room-type, why: 'Matches whatever
+      the connected Kramer switcher input expects, up to 4K30.', action: change, source: inogeni-u-cam-user-guide-v1-9}
+  - {derive: as-written, name: Camera source, value: The room's USB camera on USB 3.0 input 1, per_device: true, layer: room-type, why: Selects which of the two USB inputs
+      the HDMI output is captured from., action: change, source: inogeni-u-cam-user-guide-v1-9}
+  - {derive: as-written, name: Audio input, value: The room's USB camera or a separate USB audio device on input 2, per_device: true, layer: room-type, why: Lets audio be taken
+      from a separate soundbar/mic rather than forcing the camera's own mic., action: change, source: inogeni-u-cam-user-guide-v1-9}
+- name: Power management
+  where: Serial/REST command (ALLOWSTANDBYMODE)
+  settings:
+  - {name: Standby mode, value: Disabled, layer: profile, why: Keeps the bridge live and ready between meetings rather than dropping the HDMI signal to
+      the switcher when USB streaming stops., action: change, source: inogeni-u-cam-user-guide-v1-9}
+- name: Control
+  where: RS-232 terminal block
+  settings:
+  - {name: RS-232 baud rate, value: '9600 baud, 8N1, no flow control (fixed default)', layer: profile, why: 'Matches whatever room controller, if any, talks
+      to the bridge over its 3-pin terminal block.', action: verify, source: inogeni-u-cam-user-guide-v1-9}
+gaps: ['No factory default is stated for ALLOWSTANDBYMODE, so it''s marked ''change'' rather than ''verify''.', 'Firmware here (2.18) is the latest version
+    the user guide''s change log mentions being reflected in its screenshots, not a number INOGENI states as ''current''; there is no separate release-notes
+    source to confirm it.', 'The two physical ends of the case aren''t labelled front/rear in any source found; inputs (USB x2, LAN) are on one end and
+    outputs (HDMI, RS-232, power) on the other.']

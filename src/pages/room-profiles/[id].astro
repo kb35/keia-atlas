@@ -1,0 +1,307 @@
+---
+import Shell from '../../layouts/Shell.astro';
+import Icon from '../../components/Icon.astro';
+import PageBand from '../../components/PageBand.astro';
+import SidePanel from '../../components/SidePanel.astro';
+import Section from '../../components/Section.astro';
+import DetailTabs from '../../components/DetailTabs.astro';
+import Wiring from '../../components/Wiring.astro';
+import RoomScene from '../../components/RoomScene.astro';
+import RoomKey from '../../components/RoomKey.astro';
+import { recHere } from '../../lib/vt.mjs';
+import { commsFacts, racksIn, standardFor, sizeFor, refreshFor, SIZING_RULES, HOUSE_NETWORK } from '../../lib/comms.mjs';
+import { incidentList } from '../../lib/incidents.mjs';
+import { spaceTypes, spaces, sites, sources, rackGear, className, modelName, LOC_LABEL, OS_LABEL, plural, href } from '../../lib/data.mjs';
+
+export async function getStaticPaths() {
+  return Object.keys(spaceTypes).map((id) => ({ params: { id } }));
+}
+
+const CATEGORY_HEADING = {
+  connect: 'Meeting and collaboration',
+  focus: 'Focus',
+  recharge: 'Recharge',
+  welcome: 'Welcome',
+  support: 'Support',
+  remote: 'Remote',
+  infrastructure: 'Comms rooms',
+};
+
+const SERVICE_LABEL = { power: 'Power', data: 'Data', 'direct-run': 'Direct cable run' };
+const PROVIDED_LABEL = { it: 'IT', facilities: 'Facilities' };
+
+function rangeLabel(v) {
+  if (v && typeof v === 'object') return `${v.min} to ${v.max}`;
+  return String(v);
+}
+function howMany(q) {
+  if (q === 'tbd') return 'Set per project';
+  if (q && typeof q === 'object') return `${q.min} to ${q.max}`;
+  return String(q);
+}
+// "4 power, 3 data" for the facts beside the drawing; an outlet count set per project says so.
+function outletLine(infra) {
+  const by = new Map();
+  for (const o of infra ?? []) {
+    const cur = by.get(o.service) ?? { n: 0, open: false };
+    if (typeof o.quantity === 'number') cur.n += o.quantity; else cur.open = true;
+    by.set(o.service, cur);
+  }
+  return [...by].map(([s, v]) => `${v.n || ''}${v.open ? (v.n ? ' or more' : 'Set per project:') : ''} ${(SERVICE_LABEL[s] ?? s).toLowerCase()}`.trim()).join(', ');
+}
+
+const { id } = Astro.params;
+const t = spaceTypes[id];
+const rs = t.keia_atlas;
+const options = rs.options;
+const isHouse = rs.standard === 'house';
+const infra = rs.category === 'infrastructure';
+// A comms room profile has no build options and no standard rack: one standard, whose parts
+// are listed, and a sizing method that fits each comms room to the rooms it serves. Older kit is simply
+// older devices being replaced in the network refresh.
+const hasTabs = !infra && options.length > 1;
+const current = infra ? options.find((o) => !o.superseded_by) ?? options[0] : null;
+
+const builtAll = Object.values(spaces).filter((s) => s.space_type === id);
+const usingCount = builtAll.length;
+// Comms rooms: how each one compares with the house network standard (UniFi, decision 0028) and with what
+// the rooms it serves need (sizeFor).
+const compare = infra ? builtAll.map((s) => { const f = commsFacts(s); return { s, f, st: standardFor(s), z: sizeFor(s, f), rf: refreshFor(s.site) }; })
+  .sort((a, b) => Number(b.st.matches) - Number(a.st.matches) || a.s.id.localeCompare(b.s.id)) : [];
+const matching = compare.filter((c) => c.st.matches).length;
+const shortOf = compare.filter((c) => c.z.rows.some((r) => r.v.tone === 'bad')).length;
+const required0 = infra ? current.equipment.filter((e) => e.requirement === 'required').reduce((k, e) => k + (typeof e.quantity === 'number' ? e.quantity : 1), 0) : 0;
+// Older devices still in the comms rooms built to this profile (their rack gear that is not the standard).
+const olderGear = [];
+if (infra) for (const s of builtAll) for (const r of racksIn(s.id)) for (const it of r.items) {
+  const g = it.gear ? rackGear[it.gear] : null;
+  if (!g || !['switch', 'firewall', 'wlc'].includes(it.kind) || g.standard === HOUSE_NETWORK.id) continue;
+  const row = olderGear.find((o) => o.g === g) ?? olderGear[olderGear.push({ g, role: it.label.replace(/,?\s*(third|fourth|second|first|this) floor$/i, '').replace(/ [AB12]$/, ''), rooms: new Set() }) - 1];
+  row.rooms.add(s.id);
+}
+const NUMBERS = infra ? [
+  { n: usingCount, label: 'Built to it', to: `/rooms/?type=${id}` },
+  { n: `${matching} of ${usingCount}`, label: `${HOUSE_NETWORK.name} standard`, to: '#compare' },
+  { n: shortOf, label: shortOf === 1 ? 'Short of what it serves' : 'Short of what they serve', to: '#compare', tone: shortOf ? 'warn' : undefined },
+  { n: required0, label: required0 === 1 ? 'Required part' : 'Required parts', to: '#parts' },
+].filter(Boolean) : [
+  rs.capacity && { n: rs.capacity.min === rs.capacity.max ? rs.capacity.min : `${rs.capacity.min} to ${rs.capacity.max}`, label: rs.capacity.max === 1 ? 'Person' : 'People', fact: true },
+  rs.area && { n: rangeLabel(rs.area.m2), label: 'm²', fact: true },
+  { n: options.length, label: options.length === 1 ? 'Build option' : 'Build options', fact: true },
+  { n: usingCount, label: usingCount === 1 ? 'Room built to it' : 'Rooms built to it', to: `/rooms/?type=${id}` },
+].filter(Boolean);
+const guidelineSource = !isHouse ? sources[rs.guideline] : null;
+const openAt = (sid) => incidentList.filter((v) => v.open && v.inc.room === sid).length;
+// How many of each part a comms room needs, in words, from the sizing rules.
+const PART_RULE = { 'access-switch': 'one per 48 ports needed, with 20 percent headroom', 'core-switch': 'a pair, for every floor comms room', firewall: 'a pair in Shadow Mode', 'av-switch': 'one per floor, for Dante and Q-SYS', codec: 'when the floor has a large room' };
+const nParts = infra ? current.equipment.reduce((k, e) => k + (typeof e.quantity === 'number' ? e.quantity : 1), 0) : 0;
+---
+<Shell vendorOk about={{ kind: infra ? 'comms' : 'room profile', label: t.profile.name }} title={t.profile.name} section="types" crumbs={[{ label: 'Room profiles', to: '/room-profiles/' }, { label: t.profile.name }]}>
+  <PageBand overline={CATEGORY_HEADING[rs.category]} title={t.profile.name} lede={t.profile.purpose} numbers={NUMBERS}>
+    {isHouse ? <span slot="overline" class="tag">House standard</span> : <a slot="overline" class="tag" href={guidelineSource.url} target="_blank" rel="noopener" title={guidelineSource.title}>Industry guidance <Icon name="link" size={12} /></a>}
+  </PageBand>
+
+  <div class:list={['content rt', { 'rt-one': !hasTabs }]}>
+    {infra ? (
+      <div class="rt-opt">
+        <p class="rt-sum">
+          <span class="pill manage">{HOUSE_NETWORK.name} standard</span>
+          <span>{current.summary} How new and refreshed comms rooms are built{current.since ? ` from ${new Date(current.since).toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}. There is no standard rack: each comms room is sized for the rooms it serves (<a href="#sizing">how</a>), and older network kit is replaced in the <a href={href('/playbooks/network-refresh/')}>network refresh</a>.</span>
+        </p>
+
+        <div class="g12 top" id="sizing">
+          <section class="card sz-card s-7 stick" aria-label="How a comms room is sized" data-help="profile.sizing" {...recHere(id)}>
+            <h2 class="sz-h">How a comms room is sized</h2>
+            <p class="sz-lede faint">From the rooms it serves to the rack that holds it. House rules where public standards leave the figure to the designer; unknowns stay unknown.</p>
+            <ol class="sz-steps">
+              {SIZING_RULES.map((r, i) => (
+                <li class="sz-step" data-help="profile.rule" data-help-name={r.name}>
+                  <b class="sz-n num">{i + 1}</b>
+                  <span class="sz-main"><b>{r.name}</b><span>{r.rule}</span><small class="faint">{r.source}</small></span>
+                </li>
+              ))}
+            </ol>
+            <p class="sz-foot faint">Each comms room page shows its own figures against what is installed: <a href="#compare">how they compare</a>.</p>
+          </section>
+
+          <SidePanel class="s-5" title="What goes in it" meta={`${plural(nParts, 'part')} · the models in the standard`} help="profile.parts" id="parts">
+            <ol class="pt-list">
+              {current.equipment.map((e) => (
+                <li class="pt-row" data-help="profile.part" data-help-name={e.role ?? className(e.class)}>
+                  <b class="pt-n num">{howMany(e.quantity)}</b>
+                  <span class="pt-main">
+                    <span class="pt-name">{e.role ?? className(e.class)}</span>
+                    <small>{e.model ? <a href={href(`/models/${e.model}/`)}>{modelName(e.model)}</a> : 'Model set per room'}{PART_RULE[e.key] ? ` · ${PART_RULE[e.key]}` : ''}</small>
+                  </span>
+                  <span class={`pill ${e.requirement === 'required' ? 'manage' : 'info'}`}>{e.requirement === 'required' ? 'Required' : 'Optional'}</span>
+                </li>
+              ))}
+              <li class="pt-row pt-still"><b class="pt-n num">1</b><span class="pt-main"><span class="pt-name">UPS with a battery pack</span><small>APC Smart-UPS SRT 3000VA · power strips on two feeds</small></span><span class="pill manage">Required</span></li>
+              <li class="pt-row pt-still"><b class="pt-n num">1</b><span class="pt-main"><span class="pt-name">Out-of-band console server</span><small>ZPE Nodegrid Serial Console Plus{id === 'mdf' ? ' · and a cellular router' : ''}</small></span><span class="pill manage">Required</span></li>
+              <li class="pt-row pt-still"><b class="pt-n num">1+</b><span class="pt-main"><span class="pt-name">Patch panels and fibre housing</span><small>Panduit 48-port Cat6A panels, one per 48 outlets · Corning fibre housing</small></span><span class="pill manage">Required</span></li>
+            </ol>
+            {olderGear.length > 0 && (
+              <section class="pt-older" data-help="profile.older">
+                <h4>Older devices still in service</h4>
+                <ol class="pt-list">
+                  {olderGear.map(({ g, role, rooms }) => (
+                    <li class="pt-row pt-still">
+                      <b class="pt-n num">{rooms.size}</b>
+                      <span class="pt-main"><span class="pt-name">{g.manufacturer.split(' ')[0]} {g.model}</span><small>{role} in {plural(rooms.size, 'comms room')} · older kit, being replaced by {HOUSE_NETWORK.name} in the <a href={href('/playbooks/network-refresh/')}>network refresh</a></small></span>
+                      <span class="pill warn">Older</span>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            )}
+          </SidePanel>
+        </div>
+
+        <Section title="How the comms rooms compare" id="compare" help="profile.compare" aside={`${matching} of ${plural(compare.length, 'room')} on the ${HOUSE_NETWORK.name} standard · ${shortOf} short of what ${shortOf === 1 ? 'it serves' : 'they serve'}`}>
+          {compare.length === 0 ? <p class="muted">None built yet.</p> : (
+            <div class="list cb-list">
+              {compare.map(({ s, f, st, z, rf }) => {
+                const ports = z.rows.find((r) => r.id === 'ports'), rack = z.rows.find((r) => r.id === 'rack');
+                return (
+                  <a class="row cb-row" href={href(`/rooms/${s.id}/`)} title={st.older.length ? `Older kit: ${st.older.join(', ')}` : undefined}>
+                    <span class="cb-r">
+                      <span class="name">{s.number} {s.name}</span>
+                      <span class="sub">{sites[s.site].name}, {sites[s.site].city} · {z.rooms} rooms{z.workspaces ? `, ${z.workspaces} desks` : ''}{z.videoRooms ? `, ${plural(z.videoRooms, 'video room')}` : ''}{st.replacing ? ' · old units waiting to be collected' : ''}</span>
+                    </span>
+                    <span class="cb-facts">
+                      <span><small>Ports</small><b class="num">{ports.have ?? '?'} of {ports.need}</b><em class={`cb-v v-${ports.v.tone}`}>{ports.v.text}</em></span>
+                      <span><small>Rack</small><b class="num">{rack.have ?? '?'} of {rack.need}</b><em class={`cb-v v-${rack.v.tone}`}>{rack.v.text}</em></span>
+                      <span><small>Free ports</small><b class="num">{f.ports?.known ? `${f.ports.total - f.ports.used}` : <span class="faint">?</span>}</b></span>
+                      <span><small>Incidents</small><b class="num">{openAt(s.id) ? <span class="pill bad">{openAt(s.id)}</span> : '0'}</b></span>
+                    </span>
+                    <span class="end">
+                      {!st.hasRack ? <span class="faint">No rack recorded</span> : st.matches ? <span class="pill manage">{HOUSE_NETWORK.name}</span>
+                        : <span class="pill warn">{rf.year ? `Older kit, refresh ${rf.year}` : `Older kit, ${rf.short}`}</span>}
+                    </span>
+                  </a>
+                );
+              })}
+            </div>
+          )}
+          <p class="faint rt-note">Ports and rack are what the room has against what the rooms it serves need (the sizing method above). A comms room is on the standard when every switch, gateway and controller in its rack is {HOUSE_NETWORK.name}; the AV switch stays Netgear AV Line (tested for Dante and Q-SYS). Point at a room to see its older kit.</p>
+        </Section>
+      </div>
+    ) : (
+    <DetailTabs label="Build option" tabs={options.map((o) => ({ id: o.id, label: o.name }))}>
+      {options.map((opt, i) => {
+        const built = builtAll.filter((s) => s.option?.id === opt.id);
+        const nItems = opt.equipment.reduce((k, e) => k + (typeof e.quantity === 'number' ? e.quantity : 1), 0);
+        const rec = i === 0 ? recHere(id) : {};
+        return (
+          <div slot={opt.id} class="rt-opt">
+            {id === 'open-area' ? (
+              <div class="card pad" {...rec}>
+                <p class="rt-sum">{opt.summary}</p>
+                <p class="faint">No room drawing: where each access point hangs is on each office's floor plan and in its 3D model. Built to it: <a href={`#rooms-${opt.id}`}>{plural(built.length, 'floor')}</a>.</p>
+              </div>
+            ) : (
+            <RoomScene option={opt} type={id} uid={`rt-${opt.id}`} pair rec={rec}>
+              <SidePanel slot="side" title="What's in the room" meta={`${plural(nItems, 'item')} · hover one to find it`}>
+                <p class="rt-sum">{!hasTabs && <b>{opt.name}: </b>}{opt.summary}</p>
+                <RoomKey option={opt} uid={`rt-${opt.id}`} />
+                <dl class="kv rt-facts">
+                  {rs.capacity && <div><dt>Seats</dt><dd>{rs.capacity.min === rs.capacity.max ? rs.capacity.min : `${rs.capacity.min} to ${rs.capacity.max}`}</dd></div>}
+                  {opt.infrastructure?.length > 0 && <div><dt>Outlets</dt><dd><a href={`#outlets-${opt.id}`}>{outletLine(opt.infrastructure)}</a></dd></div>}
+                  {opt.clients?.length > 0 && <div><dt>Works with</dt><dd>{opt.clients.map((c) => OS_LABEL[c] ?? c).join(', ')} laptops</dd></div>}
+                  <div><dt>Built to it</dt><dd><a href={`#rooms-${opt.id}`}>{plural(built.length, 'room')}</a></dd></div>
+                </dl>
+              </SidePanel>
+            </RoomScene>
+            )}
+
+            {opt.infrastructure?.length > 0 && (
+              <Section title="Outlets" id={`outlets-${opt.id}`}>
+                <div class="outlet-cards">
+                  {opt.infrastructure.map((inf) => (
+                    <article class={`oc oc-${inf.service}`}>
+                      <span class="oc-n num">{howMany(inf.quantity)}</span>
+                      <span class="oc-main"><b>{SERVICE_LABEL[inf.service] ?? inf.service}, {(LOC_LABEL[inf.location] ?? inf.location).toLowerCase()}</b><small>{inf.serves?.join(', ')}</small>{inf.notes && <small class="faint">{inf.notes}</small>}</span>
+                      <span class="tag">{PROVIDED_LABEL[inf.provided_by] ?? inf.provided_by}</span>
+                    </article>
+                  ))}
+                </div>
+                {!isHouse && <p class="faint rt-note">Power for the room's kit is never on a light switch, so nothing turns it off (house assumption).</p>}
+              </Section>
+            )}
+
+            <Wiring option={opt} allOptional heading="Wiring" note={opt.equipment.some((e) => e.requirement === 'optional') ? 'Shown with every optional device fitted. Each room page shows its own.' : ''} />
+
+            <Section title="Rooms built to it" id={`rooms-${opt.id}`} aside={plural(built.length, 'room')} showAll={12}>
+              {built.length === 0 ? <p class="muted">None yet.</p> : (
+                <div class="built-grid" data-items>
+                  {built.map((b) => <a class="built" href={href(`/rooms/${b.id}/`)}><b>{b.number ? `${b.number} ` : ''}{b.name}</b><small>{sites[b.site]?.name}, {sites[b.site]?.city ?? ''}</small></a>)}
+                </div>
+              )}
+            </Section>
+          </div>
+        );
+      })}
+    </DetailTabs>
+    )}
+  </div>
+</Shell>
+
+<style is:global>
+  .rt-opt { display: grid; gap: 28px; min-width: 0; }
+  .rt-one .dt-list { display: none; }
+  .rt-sum { margin: 0; font-size: 14px; line-height: 1.45; color: var(--text-2); max-width: 90ch; }
+  .rt-sum b { color: var(--text); font-weight: 650; }
+  .rt .sp .rt-sum { margin-bottom: 12px; }
+  .rt-facts { margin-top: 14px; padding-top: 12px; border-top: var(--border-rule); }
+  .rt-facts dd { font-weight: 600; }
+  .outlet-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 10px; }
+  .oc { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 12px 14px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); border: 1px solid color-mix(in srgb, var(--line-strong) 55%, transparent); }
+  .oc-power { border-left-color: var(--amber); } .oc-data { border-left-color: var(--blue); } .oc-direct-run { border-left-color: var(--violet); }
+  .oc-n { font: 800 26px/1 var(--font-sans); }
+  .oc-main b { display: block; font-size: 14px; } .oc-main small { display: block; font-size: 12.5px; color: var(--text-2); margin-top: 2px; }
+  .rt-note { margin: 10px 0 0; font-size: 12.5px; }
+  .built-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 8px; }
+  .built { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); color: inherit; text-decoration: none; transition: transform var(--dur-state) var(--ease-settle), border-color var(--dur-state); }
+  .built:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .built small { color: var(--text-2); font-size: 12.5px; }
+
+  /* Comms room profiles: the standard line, the sizing method, the parts and the comparison. */
+  .rt-opt > .rt-sum { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; max-width: none; }
+  .rt-opt > .rt-sum .pill { flex: 0 0 auto; }
+  .rt-opt > .rt-sum > span { flex: 1 1 40ch; min-width: 0; max-width: 100ch; }
+  .sz-card { padding: 18px 22px 16px; display: grid; gap: 12px; align-content: start; }
+  .sz-h { margin: 0; font-size: 17px; }
+  .sz-lede { margin: -6px 0 0; font-size: 13px; max-width: 70ch; }
+  .sz-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .sz-step { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 12px; align-items: start; padding: 8px 6px; border-radius: var(--radius); }
+  .sz-step + .sz-step { border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+  .sz-n { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 700 11px/1 var(--font-mono); background: var(--accent-soft); color: var(--accent-ink, var(--text)); }
+  .sz-main { display: grid; gap: 2px; font-size: 13.5px; line-height: 1.4; }
+  .sz-main > b { font-weight: 650; } .sz-main > span { color: var(--text-2); } .sz-main small { font-size: 12px; }
+  .sz-foot { margin: 0; font-size: 12.5px; }
+  .pt-list { list-style: none; margin: 0; padding: 0; }
+  .pt-row { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 6px; }
+  .pt-row + .pt-row { border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+  .pt-n { font: 800 15px/1 var(--font-sans); text-align: center; }
+  .pt-main { min-width: 0; } .pt-name { display: block; font-weight: 650; font-size: 13.5px; line-height: 1.25; }
+  .pt-main small { display: block; font-size: 12px; color: var(--text-2); line-height: 1.35; }
+  .pt-older { margin-top: 14px; padding-top: 12px; border-top: var(--border-rule); }
+  .pt-older h4 { margin: 0 0 3px; font: 700 10.5px/1.2 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); }
+  /* How the comms rooms compare: one row per room, its figures in a line, the standard at the end. */
+  .cb-list { container: cb / inline-size; }
+  .cb-row { grid-template-columns: minmax(160px, 1fr) auto auto; padding: 11px 18px; }
+  .cb-row:first-child { border-top: 0; }
+  .cb-r { min-width: 0; }
+  .cb-facts { display: flex; gap: 22px; }
+  .cb-facts > span { display: grid; gap: 1px; }
+  .cb-facts small { font: 700 10px/1.2 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+  .cb-facts b { font-size: 13px; font-weight: 650; white-space: nowrap; }
+  .cb-v { font-style: normal; font-size: 11.5px; white-space: nowrap; color: var(--text-2); }
+  .cb-v.v-bad { color: var(--red-ink); font-weight: 650; } .cb-v.v-manage { color: var(--green-ink); }
+  .cb-row .end { min-width: 120px; }
+  @container cb (max-width: 840px) {
+    .cb-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .cb-facts { grid-column: 1 / -1; flex-wrap: wrap; gap: 8px 18px; }
+    .cb-row .end { min-width: 0; grid-column: 2; grid-row: 1; }
+  }
+</style>

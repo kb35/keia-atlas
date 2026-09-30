@@ -1,0 +1,33 @@
+---
+// Request something from the room guide: three tiles and two lines. A request is the service desk's
+// Request kind, which is being built: it goes through the live layer
+// and shows on the room's page in Keia Atlas until the desk has its own queue.
+import Guide from '../../../layouts/Guide.astro';
+import GuideForm from '../../../components/GuideForm.astro';
+import GuideLive from '../../../components/GuideLive.astro';
+import { href } from '../../../lib/data.mjs';
+import { REQUESTS } from '../../../lib/guide.mjs';
+import { guidePaths, guideRoom } from '../_room.mjs';
+
+export const getStaticPaths = guidePaths;
+const R = guideRoom(Astro.params.room);
+const ICON = {
+  help: '<circle cx="16" cy="10" r="5"/><path d="M6 27c1-6 5-9 10-9s9 3 10 9"/>',
+  change: '<path d="M6 11h19l-5-5M26 21H7l5 5"/>',
+  home: '<path d="M5 15L16 6l11 9"/><path d="M8 13v13h16V13"/><path d="M13 26v-7h6v7"/>',
+};
+const options = REQUESTS.map((r) => ({ id: r.id, label: r.label, hint: r.hint, icon: ICON[r.id] }));
+---
+<Guide title={`Request something, ${R.title}`} office={R.office} home={R.home}>
+  <GuideForm
+    kind="request" room={R.forClient}
+    back={href(R.home)} backLabel={R.title}
+    heading="What do you need?" lede={`From ${R.title}. Pick one, add a line if you like, then Send.`}
+    options={options}
+    noteLabel="What you need" notePlaceholder="For example: set up for a talk on Friday at 2"
+    doneHeading="Thanks, we have it"
+    doneLines={[`The ${R.office} team will be in touch, usually within a working day.`, 'The service desk is being built. Until then, IT staff see your request on this room\'s page in Keia Atlas.']}
+    staff={{ to: href(`/rooms/${R.forClient.id}/#room-guide`), label: 'For IT staff: see it on the room page' }}
+    notice="The service desk is being built: requests show on the room's page in Keia Atlas for now." />
+  <GuideLive />
+</Guide>

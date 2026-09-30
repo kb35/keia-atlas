@@ -1,0 +1,365 @@
+---
+/* The Schedule's Year view: the year plan as one gantt at its natural height (the page scrolls; on a phone
+   the gantt scrolls sideways inside its card, rule L5). Lanes, top to bottom: projects cut into phases,
+   the pipeline, the Lab, what is due in the work plan by site, each team's load by month, and the
+   planning reviews, with change freezes and today drawn across all of them.
+   Built at build time from the same work items as the other views (src/lib/work.mjs); the page script in
+   ScheduleViews.astro filters its rows (FilterBar) and hides the ones outside Me or My team (data-people).
+   Props: P, the Schedule's data (ScheduleViews.astro). */
+import { plans, projects, labTests, sites, PHASE_LABEL, PROJECT_KIND, LAB_STATUS, DEMO_TODAY, href, fmtDate, phasesOf } from '../lib/data.mjs';
+import { person, TEAMS } from '../lib/demo.mjs';
+import { work } from '../lib/work.mjs';
+import { addDays, isWeekend } from '../lib/workcore.mjs';
+import { chipKind, personDay, loadBand, LOAD_WORDS } from '../lib/schedulecore.mjs';
+
+const { P } = Astro.props;
+const plan = plans.fy2027;
+const T0 = new Date(plan.from).getTime(), T1 = new Date(plan.to).getTime() + 86400000;
+const pos = (d) => Math.max(0, Math.min(100, ((new Date(d).getTime() - T0) / (T1 - T0)) * 100));
+const span = (a, b) => ({ left: pos(a), width: Math.max(0.8, pos(b) - pos(a)) });
+const months = Array.from({ length: 12 }, (_, i) => { const d = new Date(`${plan.from}T00:00:00Z`); d.setUTCMonth(d.getUTCMonth() + i); return d.toISOString().slice(0, 10); });
+const monthEnd = (m) => { const d = new Date(`${m}T00:00:00Z`); d.setUTCMonth(d.getUTCMonth() + 1); d.setUTCDate(0); return d.toISOString().slice(0, 10); };
+const today = pos(DEMO_TODAY);
+const mLabel = (m, i) => new Date(`${m}T00:00:00Z`).toLocaleDateString('en-IE', { month: 'short', timeZone: 'UTC' });
+const siteRegion = (s) => sites[s]?.region ?? '';
+const byId = new Map(P.people.map((p) => [p.id, p]));
+const teamsOf = (ids) => [...new Set(ids.map((id) => byId.get(id)?.team).filter(Boolean))];
+const bar = (xs) => [...new Set(xs.filter(Boolean))].join('|');
+
+// A project's bar, cut into its playbook's phases. Phases with a planned end use it; the rest share what
+// is left before the target.
+function segments(p) {
+  const H = Object.fromEntries((p.history ?? []).map((h) => [h.phase, h]));
+  const phases = phasesOf(p).filter((ph) => ph !== 'closed');
+  const at = phases.indexOf(p.phase === 'closed' ? phases[phases.length - 1] : p.phase);
+  const out = []; let from = p.start;
+  const known = phases.filter((ph) => H[ph]);
+  const lastKnown = known.length ? H[known[known.length - 1]].planned : p.start;
+  const rest = phases.filter((ph) => !H[ph]);
+  const step = rest.length ? (new Date(p.target) - new Date(lastKnown)) / rest.length : 0;
+  let r = 0;
+  phases.forEach((ph, i) => {
+    const end = H[ph] ? (H[ph].ended ?? H[ph].planned) : new Date(new Date(lastKnown).getTime() + step * ++r).toISOString().slice(0, 10);
+    out.push({ ph, end, ...span(from, end), state: p.phase === 'closed' || i < at ? 'done' : i === at ? 'now' : 'next' });
+    from = end;
+  });
+  return out;
+}
+const pmeta = new Map(P.projects.map((p) => [p.id, p]));
+const items = P.items;
+const list = Object.values(projects).filter((p) => (p.target ?? p.start) >= plan.from).sort((a, b) => a.start.localeCompare(b.start));
+const projRow = (p) => {
+  const tasks = items.filter((it) => it.project === p.id && it.kind === 'task');
+  const ids = pmeta.get(p.id)?.people ?? [p.owner];
+  return {
+    p, ids, segs: segments(p),
+    find: `${p.name} ${p.id} ${PROJECT_KIND[p.kind] ?? ''} ${sites[p.site]?.name ?? ''} ${ids.map((i) => byId.get(i)?.name ?? '').join(' ')}`,
+    kinds: bar(tasks.map(chipKind)), status: bar(tasks.map((t) => t.status)), teams: bar(teamsOf(ids)),
+    open: tasks.filter((t) => t.status !== 'done').length,
+  };
+};
+const rows = list.map(projRow);
+
+const labs = Object.values(labTests).sort((a, b) => a.start.localeCompare(b.start)).filter((l) => (l.end ?? l.start) >= plan.from);
+const labEnd = (l) => l.end ?? addDays(l.start, 20);
+const LAB_WORK = { queued: 'todo', testing: 'doing', passed: 'done', failed: 'done', adopted: 'done' };
+const freezes = plan.events.filter((e) => e.kind === 'freeze');
+const marks = plan.events.filter((e) => e.kind !== 'freeze');
+const STATUS = { idea: 'Idea', proposed: 'Proposed', approved: 'Approved' };
+
+// Due in the work plan: the swaps due this year and next, by site (from the work items, so the numbers
+// agree with the Work plan page and the Unscheduled tray).
+const dueBySite = new Map();
+for (const it of work.filter((x) => x.kind === 'refresh')) {
+  const r = dueBySite.get(it.site) ?? { site: it.site, years: {}, who: new Set() };
+  const y = it.id.split(':').pop();
+  const units = +(/Replace (\d+)/.exec(it.title)?.[1] ?? 0);
+  const c = (r.years[y] ??= { units: 0, hours: 0, rooms: 0, start: it.start, end: it.end, nobody: 0 });
+  c.units += units; c.hours += it.hours ?? 0; c.rooms++; if (!it.who.length) c.nobody++;
+  it.who.forEach((w) => r.who.add(w));
+  dueBySite.set(it.site, r);
+}
+const dueRows = P.siteOrder.filter((s) => dueBySite.has(s)).map((s) => dueBySite.get(s));
+
+// Team load by month: the hours booked for the team (work items plus project time not yet in tasks)
+// against the hours of the people in it who have work in the plan year, at six hours a working day.
+const ctx = { timeOff: P.timeOff, holidays: P.holidays, items, reserved: P.reserved };
+const active = new Set([...items.filter((it) => it.kind !== 'time-off' && (it.end ?? '') >= plan.from).flatMap((it) => it.who), ...P.reserved.map((r) => r.who)]);
+const TEAM_ORDER = ['delivery', 'onsite', 'it-infra', 'av-it', 'service-desk', 'leadership'];
+const loadRows = TEAM_ORDER.map((tm) => {
+  const ppl = P.people.filter((p) => p.team === tm && active.has(p.id));
+  const cells = months.map((m) => {
+    let h = 0, cap = 0;
+    const per = new Map();
+    for (let d = m; d <= monthEnd(m); d = addDays(d, 1)) {
+      if (isWeekend(d)) continue;
+      for (const p of ppl) {
+        const x = personDay(p, d, ctx);
+        h += x.hours; cap += x.cap;
+        per.set(p.id, (per.get(p.id) ?? 0) + x.hours);
+      }
+    }
+    const top = [...per.entries()].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 4);
+    return { m, h: Math.round(h), cap, band: loadBand(h, cap), pct: cap ? Math.round((h / cap) * 100) : 0, top };
+  });
+  return { tm, ppl, cells };
+}).filter((r) => r.ppl.length);
+const monthName = (m) => new Date(`${m}T00:00:00Z`).toLocaleDateString('en-IE', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+---
+<section class="card gantt-card" aria-label="The year" data-year>
+  <div class="gantt" style={`--today:${today}%`}>
+    <div class="g-head"><span class="g-label faint">{plan.name}</span><span class="g-track g-months">{months.map((m, i) => <span>{mLabel(m, i)}{(m.slice(5, 7) === '01' || i === 0) && <small>{m.slice(2, 4)}</small>}</span>)}</span></div>
+
+    <div class="g-lane" data-lane="projects" data-open="true">
+      <button type="button" class="g-lane-h" data-lane-btn data-help="schedule.lane" data-help-name="Projects" aria-expanded="true" aria-controls="lane-projects"><span class="g-label"><i class="chev" aria-hidden="true"></i>Projects<em data-lane-n>{rows.length}</em></span><span class="g-track"></span></button>
+      <div class="g-lane-body" id="lane-projects"><div class="g-lane-in">
+        {rows.map((r) => (
+          <a class="g-row" href={href(`/projects/${r.p.id.toLowerCase()}/`)} data-fi data-find={r.find} data-f-region={siteRegion(r.p.site)} data-f-site={r.p.site} data-f-kind={r.kinds || 'task'} data-f-status={r.status} data-f-team={r.teams} data-people={r.ids.join(' ')}>
+            <span class="g-label"><b>{r.p.name}</b><small>{r.p.id} · {PROJECT_KIND[r.p.kind]} · {person(r.p.owner).name}</small></span>
+            <span class="g-track" data-peek>
+              {r.segs.map((s) => <i class={`gseg gseg-${s.state}`} style={`left:${s.left}%;width:${s.width}%`}><em>{s.width > 7 ? PHASE_LABEL[s.ph] : ''}</em></i>)}
+              <template data-peek-body>
+                <b>{r.p.name}</b>
+                <small>{r.p.id} · {PROJECT_KIND[r.p.kind]} · {sites[r.p.site]?.name}</small>
+                <span class="yp-ph">{r.segs.map((s) => <span class={`yp-s yp-${s.state}`}>{PHASE_LABEL[s.ph]}<small>{fmtDate(s.end, { day: 'numeric', month: 'short' })}</small></span>)}</span>
+                <small>Project manager {person(r.p.owner).name} · target {fmtDate(r.p.target)} · {r.open} open {r.open === 1 ? 'task' : 'tasks'}</small>
+                <small>{r.ids.map((i) => byId.get(i)?.name).filter(Boolean).join(', ')}</small>
+                <a href={href(`/projects/${r.p.id.toLowerCase()}/`)}>Open the project</a>
+              </template>
+            </span>
+          </a>
+        ))}
+      </div></div>
+    </div>
+
+    <div class="g-lane" data-lane="pipeline" data-open="true">
+      <button type="button" class="g-lane-h" data-lane-btn data-help="schedule.lane" data-help-name="Pipeline" aria-expanded="true" aria-controls="lane-pipeline"><span class="g-label"><i class="chev" aria-hidden="true"></i>Pipeline<em>{plan.pipeline.length}</em></span><span class="g-track"></span></button>
+      <div class="g-lane-body" id="lane-pipeline"><div class="g-lane-in">
+        {plan.pipeline.map((w) => {
+          const by = person(w.raised_by)?.id === w.raised_by ? person(w.raised_by) : null;
+          return (
+            <div class="g-row" data-fi data-find={`${w.title} ${sites[w.site]?.name ?? ''} ${w.why ?? ''}`} data-f-region={siteRegion(w.site)} data-f-site={w.site} data-f-kind="plan" data-f-team={by?.team} data-people={by ? by.id : ''}>
+              <span class="g-label"><b>{w.title}</b><small>{STATUS[w.status]} · {sites[w.site]?.name} · raised by {by ? by.name : w.raised_by}</small></span>
+              <span class="g-track"><i class={`gbar pipe pipe-${w.status}`} style={`left:${span(w.start, w.end).left}%;width:${span(w.start, w.end).width}%`} data-peek tabindex="0"><em>{STATUS[w.status]}</em>
+                <template data-peek-body><b>{w.title}</b><small>{STATUS[w.status]} · {sites[w.site]?.name} · {fmtDate(w.start, { day: 'numeric', month: 'short' })} to {fmtDate(w.end)}</small><span>{w.why}</span></template>
+              </i></span>
+            </div>
+          );
+        })}
+      </div></div>
+    </div>
+
+    <div class="g-lane" data-lane="lab" data-open="true">
+      <button type="button" class="g-lane-h" data-lane-btn data-help="schedule.lane" data-help-name="The Lab" aria-expanded="true" aria-controls="lane-lab"><span class="g-label"><i class="chev" aria-hidden="true"></i>The Lab<em>{labs.length}</em></span><span class="g-track"></span></button>
+      <div class="g-lane-body" id="lane-lab"><div class="g-lane-in">
+        {labs.map((l) => {
+          const ids = [l.owner, ...(l.with ?? [])];
+          const at = byId.get(l.owner)?.office ?? 'dub';
+          return (
+            <a class="g-row" href={href(`/lab/#${l.id.toLowerCase()}`)} data-fi data-find={`${l.title} ${l.id}`} data-f-region={siteRegion(at)} data-f-site={at} data-f-kind="lab" data-f-status={LAB_WORK[l.status]} data-f-team={bar(teamsOf(ids))} data-people={ids.join(' ')}>
+              <span class="g-label"><b>{l.title}</b><small>{l.id} · {LAB_STATUS[l.status]}</small></span>
+              <span class="g-track"><i class={`gbar lab lab-${l.status}`} style={`left:${span(l.start, labEnd(l)).left}%;width:${span(l.start, labEnd(l)).width}%`}></i></span>
+            </a>
+          );
+        })}
+      </div></div>
+    </div>
+
+    <div class="g-lane" data-lane="due" data-open="true">
+      <button type="button" class="g-lane-h" data-lane-btn data-help="schedule.lane" data-help-name="Due in the work plan" aria-expanded="true" aria-controls="lane-due"><span class="g-label"><i class="chev" aria-hidden="true"></i>Due in the work plan<em>{dueRows.length}</em></span><span class="g-track"></span></button>
+      <div class="g-lane-body" id="lane-due"><div class="g-lane-in">
+        {dueRows.map((r) => {
+          const who = [...r.who];
+          return (
+            <a class="g-row" href={href(`/refresh/?site=${r.site}`)} data-fi data-find={`${sites[r.site]?.name} work plan ${who.map((i) => byId.get(i)?.name ?? '').join(' ')}`} data-f-region={siteRegion(r.site)} data-f-site={r.site} data-f-kind="refresh" data-f-status="todo" data-f-team={bar(teamsOf(who)) || 'onsite'} data-people={who.join(' ')}>
+              <span class="g-label"><b>{sites[r.site]?.name}</b><small>{who.length ? who.map((i) => byId.get(i)?.name).join(', ') : 'Nobody on it yet'}</small></span>
+              <span class="g-track">
+                {Object.entries(r.years).map(([y, c]) => {
+                  const end = c.end > plan.to ? plan.to : c.end;
+                  return (
+                    <i class:list={['gbar', 'due', { nobody: c.nobody }]} style={`left:${span(c.start, end).left}%;width:${span(c.start, end).width}%`} data-peek tabindex="0"><em>{c.units} {c.units === 1 ? 'device' : 'devices'} due {y}</em>
+                      <template data-peek-body><b>{sites[r.site]?.name}: {c.units} {c.units === 1 ? 'device' : 'devices'} due in {y}</b><small>{c.rooms} {c.rooms === 1 ? 'room' : 'rooms'} · about {Math.round(c.hours)} h of swaps</small><small>{c.nobody ? `${c.nobody} ${c.nobody === 1 ? 'room has' : 'rooms have'} nobody on it yet` : `On ${who.map((i) => byId.get(i)?.name).join(', ')}`}</small><a href={href(`/refresh/?site=${r.site}`)}>Open the work plan</a></template>
+                    </i>
+                  );
+                })}
+              </span>
+            </a>
+          );
+        })}
+      </div></div>
+    </div>
+
+    <div class="g-lane" data-lane="load" data-open="true">
+      <button type="button" class="g-lane-h" data-lane-btn data-help="schedule.lane" data-help-name="Team load" aria-expanded="true" aria-controls="lane-load"><span class="g-label"><i class="chev" aria-hidden="true"></i>Team load<em>{loadRows.length}</em></span><span class="g-track"></span></button>
+      <div class="g-lane-body" id="lane-load"><div class="g-lane-in">
+        {loadRows.map((r) => (
+          <div class="g-row g-load" data-load-team={r.tm} data-people={r.ppl.map((p) => p.id).join(' ')}>
+            <span class="g-label"><b>{TEAMS[r.tm]}</b><small>{r.ppl.length} {r.ppl.length === 1 ? 'person' : 'people'} with work this year</small></span>
+            <span class="g-track g-cells">
+              {r.cells.map((c) => (
+                <span class={`gl-c c${c.band}`} data-peek tabindex="0"><b>{c.h ? <>{c.h}<i class="gl-u"> h</i></> : ''}</b>
+                  <template data-peek-body>
+                    <b>{TEAMS[r.tm]}, {monthName(c.m)}</b>
+                    <small>{c.h} h booked of {c.cap} h ({c.pct}%): {LOAD_WORDS[c.band].toLowerCase()}</small>
+                    {c.top.length > 0 && <em>Most booked</em>}
+                    {c.top.map(([id, v]) => <small>{byId.get(id)?.name}: {Math.round(v)} h</small>)}
+                  </template>
+                </span>
+              ))}
+            </span>
+          </div>
+        ))}
+      </div></div>
+    </div>
+
+    <div class="g-lane-h g-static"><span class="g-label">Reviews and budget</span><span class="g-track"></span></div>
+    <div class="g-row g-marks">
+      <span class="g-label"><small>Programme manager, both service managers, head of AV and IT</small></span>
+      <span class="g-track">{marks.map((e) => <i class={`gmark gmark-${e.kind}`} style={`left:${pos(e.date)}%`} data-peek tabindex="0"><template data-peek-body><b>{e.title}</b><small>{fmtDate(e.date)}</small><small>{(e.who ?? []).map((w) => byId.get(w)?.name).filter(Boolean).join(', ')}</small></template></i>)}</span>
+    </div>
+
+    <div class="g-overlay" aria-hidden="true">
+      <span class="g-label"></span>
+      <span class="g-track">
+        {freezes.map((f) => <i class="freeze" style={`left:${span(f.date, f.end ?? f.date).left}%;width:${span(f.date, f.end ?? f.date).width}%`}><em>{f.title}</em></i>)}
+        <i class="g-today"><em>Today</em></i>
+      </span>
+    </div>
+  </div>
+</section>
+
+<script is:inline data-astro-rerun>
+  (function () {
+    /* Lanes open and close; the choice is kept in rs4-plan-lanes. The page never moves (rsHold). */
+    var KEY = 'rs4-plan-lanes';
+    var read = function () { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (_) { return {}; } };
+    var write = function (s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (_) {} };
+    var set = function (lane, open) {
+      lane.setAttribute('data-open', open ? 'true' : 'false');
+      var b = lane.querySelector('[data-lane-btn]'); if (b) b.setAttribute('aria-expanded', open ? 'true' : 'false');
+      var body = lane.querySelector('.g-lane-body'); if (body) body.inert = !open;
+    };
+    var lanes = document.querySelectorAll('[data-year] .g-lane');
+    if (!lanes.length) return;
+    var st = read();
+    lanes.forEach(function (l) { set(l, st[l.dataset.lane] !== false); });
+    // Animate only after the first paint, so a remembered state does not play on load.
+    requestAnimationFrame(function () { requestAnimationFrame(function () { var g = document.querySelector('[data-year] .gantt'); if (g) g.classList.add('g-ready'); }); });
+    if (window.__rsLaneHook) return;
+    window.__rsLaneHook = true;
+    document.addEventListener('click', function (e) {
+      var one = e.target.closest && e.target.closest('[data-year] [data-lane-btn]');
+      if (!one) return;
+      var lane = one.closest('.g-lane'), open = lane.getAttribute('data-open') === 'false', s = read();
+      var swap = function () { set(lane, open); };
+      if (window.rsHold) window.rsHold(document.querySelector('[data-year]'), swap); else swap();
+      s[lane.dataset.lane] = open; write(s);
+    });
+  })();
+</script>
+
+<style is:global>
+  .gantt-card { padding: 0; overflow: clip; }
+  .gantt { position: relative; --hh: 30px; }
+  .g-head, .g-row, .g-lane-h, .g-overlay { display: grid; grid-template-columns: 250px minmax(0, 1fr); }
+  .g-head, .g-row, .g-lane-h { background: var(--surface); }
+  .g-head { position: sticky; top: var(--sch-stick, 0px); z-index: 5; height: var(--hh); border-bottom: 1px solid var(--line); }
+  .g-head .g-label { display: flex; align-items: center; font-size: 11.5px; }
+  .g-label { position: sticky; left: 0; z-index: 3; background: inherit; padding: 0 12px 0 16px; min-width: 0; }
+  .g-overlay .g-label { position: static; }
+  .g-track { position: relative; }
+  .g-months { display: grid; grid-template-columns: repeat(12, 1fr); }
+  .g-months span { display: flex; align-items: center; gap: 4px; height: var(--hh); padding-left: 6px; font: 600 11px/1 var(--font-mono); color: var(--text-2); border-left: 1px solid var(--line); }
+  .g-months small { font-size: 9.5px; color: var(--text-3); }
+  .g-today em { position: absolute; top: 5px; left: 4px; font: 700 9.5px/1 var(--font-mono); font-style: normal; color: var(--on-accent); background: var(--red); padding: 3px 5px; border-radius: 3px; }
+
+  .g-lane-h { width: 100%; height: 26px; align-items: center; border: 0; border-top: 1px solid var(--line); background: var(--surface-2); color: var(--text-3); text-align: left; font: 700 10.5px/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; padding: 0; }
+  button.g-lane-h { appearance: none; cursor: pointer; }
+  button.g-lane-h:hover, button.g-lane-h:focus-visible { color: var(--text); }
+  button.g-lane-h:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .g-lane-h .g-label { display: flex; align-items: center; }
+  .g-lane-h em { margin-left: 8px; padding: 2px 6px; border-radius: 999px; background: var(--surface-3); font: 600 10px/1 var(--font-mono); font-style: normal; letter-spacing: 0; color: var(--text-2); }
+  .chev { display: inline-block; width: 6px; height: 6px; margin: -3px 9px 0 1px; border-right: 1.6px solid currentColor; border-bottom: 1.6px solid currentColor; transform: rotate(45deg); }
+  .g-ready .chev { transition: transform var(--dur-state) var(--ease-settle); }
+  .g-lane[data-open="false"] .chev { transform: rotate(-45deg); margin-top: 0; }
+  .g-lane-body { display: grid; grid-template-rows: 1fr; }
+  .g-lane-in { min-height: 0; overflow: clip; }
+  .g-ready .g-lane-body { transition: grid-template-rows var(--dur-morph) var(--ease-settle); }
+  .g-lane[data-open="false"] .g-lane-body { grid-template-rows: 0fr; }
+  .g-lane[data-open="false"] .g-lane-in { visibility: hidden; }
+  .g-ready .g-lane-in { transition: visibility 0s linear var(--dur-morph); }
+  .g-ready .g-lane[data-open="true"] .g-lane-in { transition-delay: 0s; }
+
+  .g-row { align-items: center; min-height: 32px; color: inherit; text-decoration: none; border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+  a.g-row:hover { background: var(--surface-2); color: inherit; }
+  .g-row[hidden] { display: none; }
+  .g-row .g-label b { display: block; font-size: 12.5px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .g-row .g-label small { display: block; font-size: 10.5px; line-height: 1.2; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .g-row .g-track { height: 32px; background-image: linear-gradient(to right, var(--line) 1px, transparent 1px); background-size: calc(100% / 12) 100%; }
+  .gseg, .gbar { position: absolute; top: 7px; bottom: 7px; border-radius: 4px; overflow: hidden; transform-origin: left; animation: g-grow var(--dur-morph) var(--ease-settle) both; }
+  .gseg { border: 1.5px solid var(--ink); border-radius: 0; margin-left: -1px; }
+  .gseg:first-of-type { border-radius: 4px 0 0 4px; }
+  .gseg:last-of-type { border-radius: 0 4px 4px 0; }
+  .gseg em, .gbar em { position: absolute; inset: 0 5px; font: 600 10px/15px var(--font-sans); font-style: normal; white-space: nowrap; overflow: hidden; }
+  .gseg-done { background: var(--green-soft); border-color: var(--green); } .gseg-done em { color: var(--green-ink); }
+  .gseg-now { background: var(--blue); border-color: var(--blue); } .gseg-now em { color: var(--blue-soft); font-weight: 750; }
+  .gseg-next { background: repeating-linear-gradient(135deg, var(--surface) 0 6px, var(--surface-2) 6px 12px); border-style: dashed; border-color: var(--line-strong); } .gseg-next em { color: var(--text-3); }
+  .pipe { border: 2px dashed var(--line-strong); background: var(--surface); }
+  .pipe-approved { border-style: solid; border-color: var(--text-2); background: var(--surface-2); }
+  .pipe-idea { opacity: .7; }
+  .pipe em { color: var(--text-2); }
+  .lab { background: var(--violet-soft); border: 1.5px solid var(--violet); }
+  .lab-failed { background: var(--red-soft); border-color: var(--red); }
+  .lab-passed, .lab-adopted { background: var(--green-soft); border-color: var(--green); }
+  .lab-queued { background: transparent; border-style: dashed; }
+  .due { background: var(--amber-soft); border: 1.5px solid var(--amber); }
+  .due em { color: var(--amber-ink); }
+  .due.nobody { border-style: dashed; }
+  .g-cells { display: grid; grid-template-columns: repeat(12, 1fr); gap: 3px; padding: 5px 3px; }
+  .gl-c { display: grid; place-items: center; border-radius: 5px; background: var(--surface-2); font: 700 10.5px/1 var(--font-mono); color: var(--text); transition: box-shadow var(--dur-hover) var(--ease-settle); }
+  .gl-c:hover, .gl-c:focus-visible, .gl-c.peek-on { box-shadow: 0 0 0 2px var(--accent); outline: none; }
+  .gl-c.c1 { background: color-mix(in srgb, var(--green) 22%, var(--surface)); } .gl-c.c2 { background: color-mix(in srgb, var(--green) 50%, var(--surface)); }
+  .gl-c.c3 { background: color-mix(in srgb, var(--amber) 55%, var(--surface)); } .gl-c.c4 { background: color-mix(in srgb, var(--red) 60%, var(--surface)); }
+  .g-marks .g-track { height: 32px; }
+  .g-marks .g-label small { white-space: normal; }
+  .gmark { position: absolute; top: 9px; width: 13px; height: 13px; margin-left: -7px; transform: rotate(45deg); background: var(--blue); border: 1.5px solid var(--ink); }
+  .gmark-budget { background: var(--amber); }
+  .g-overlay { position: absolute; top: var(--hh); bottom: 0; left: 0; right: 0; z-index: 2; pointer-events: none; }
+  .g-overlay .g-track { height: 100%; }
+  .freeze { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--red) 14%, transparent) 0 6px, transparent 6px 12px); border-left: 1px dashed var(--red); border-right: 1px dashed var(--red); }
+  .freeze em { position: absolute; bottom: 4px; left: 4px; font: 600 10px/1.1 var(--font-mono); font-style: normal; color: var(--red-ink); writing-mode: vertical-rl; transform: rotate(180deg); }
+  .g-today { position: absolute; top: 0; bottom: 0; left: var(--today); width: 2px; background: var(--red); }
+  .yp-ph { display: flex; flex-wrap: wrap; gap: 4px; }
+  .yp-s { display: grid; padding: 3px 7px; border-radius: 6px; font-size: 12px; font-weight: 650; background: var(--surface-2); }
+  .yp-s small { font-weight: 500; font-size: 11px !important; }
+  .yp-now { background: var(--blue-soft); color: var(--blue-ink); } .yp-done { background: var(--green-soft); color: var(--green-ink); }
+  @keyframes g-grow { from { transform: scaleX(0); } }
+  .gl-u { font-style: normal; }
+  .gl-c b { white-space: nowrap; }
+  /* Responsive (layout.md L10), by the width of the page's content; the plan never scrolls sideways.
+       under 1000 px  a narrower name column, month names without the year, hours without the "h"
+       under 600 px   each row puts its name above its bar, and the bars take the full width */
+  @container content (max-width: 999px) {
+    .g-head, .g-row, .g-lane-h, .g-overlay { grid-template-columns: 170px minmax(0, 1fr); }
+    .g-label { padding: 0 8px 0 12px; }
+    .g-months span { padding-left: 4px; font-size: 10px; }
+    .g-months small, .gl-u { display: none; }
+    .g-cells { gap: 2px; padding: 5px 2px; }
+    .gl-c { font-size: 9.5px; }
+    .gseg em, .gbar em { inset: 0 3px; font-size: 9.5px; }
+  }
+  @container content (max-width: 599px) {
+    .g-head, .g-row, .g-lane-h, .g-overlay { grid-template-columns: minmax(0, 1fr); }
+    .g-head { position: static; }
+    .g-head .g-label, .g-overlay .g-label { display: none; }
+    .g-overlay { top: var(--hh); }
+    .g-row { padding-top: 6px; }
+    .g-row .g-label, .g-lane-h .g-label { position: relative; z-index: 3; padding: 0 12px; }
+    .g-lane-h { height: 30px; }
+    .g-lane-h .g-track { display: none; }
+    .g-months span { padding-left: 2px; font-size: 9px; letter-spacing: -.02em; }
+    .g-row .g-track { height: 28px; }
+    .g-marks .g-label small { white-space: nowrap; }
+  }
+  @media (prefers-reduced-motion: reduce) { .gseg, .gbar { animation: none; } .g-ready .g-lane-body, .g-ready .g-lane-in, .g-ready .chev { transition: none; } }
+</style>

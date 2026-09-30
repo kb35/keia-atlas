@@ -1,0 +1,60 @@
+---
+// An office in 3D: a model of a whole office, including the MDF and all the cable in, so everything can be seen,
+// makes sense and is connected, even the ISP in and out. Built for each site with floor files (today the Dublin office). Record-style (page-anatomy.md,
+// B): the model (Office3D: 3D or the floor plan) beside the path panel, then what the model holds.
+// Decision 0030 and rooms.md R8: one building model, shown two ways.
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import Section from '../../../components/Section.astro';
+import Office3D from '../../../components/Office3D.astro';
+import { building, sitesWithFloors, wifiAreas } from '../../../lib/floors.mjs';
+import { sites } from '../../../lib/data.mjs';
+
+export function getStaticPaths() {
+  return sitesWithFloors().map((site) => ({ params: { site } }));
+}
+const { site } = Astro.params;
+const M = building(site);
+const S = sites[site];
+const rooms = Object.values(M.rooms).filter((r) => r.rect);
+const horizontal = M.runs.filter((r) => r.kind === 'horizontal');
+const longest = Math.max(...horizontal.map((r) => r.length_m));
+const trays = M.floors.flatMap((f) => f.trays);
+const fullest = trays.filter((t) => t.fill != null).sort((a, b) => b.fill - a.fill)[0];
+const NUMBERS = [
+  { n: rooms.length, label: 'Rooms placed', to: `/rooms/?site=${site}` },
+  { n: horizontal.length, label: 'Cable runs', fact: true },
+  { n: M.aps.length, label: 'Access points', fact: true },
+  { id: 'o3-prob', n: '–', label: 'Rooms with a problem', to: `/locations/?site=${site}&status=problem`, tone: 'bad' as const },
+];
+const FACTS = [
+  ['Floors', M.floors.map((f) => `${f.name} at ${f.level_m} m`).join(', ') + `; slab to slab ${M.floors[0].slab_to_slab_m} m, ceilings ${M.floors[0].ceiling_m} m`],
+  ['Comms rooms', M.racks.map((k) => `${M.rooms[k.space]?.number ?? ''} ${M.rooms[k.space]?.name ?? k.space}, ${k.height_u}U`).join('; ')],
+  ['Cable runs', `${horizontal.length} permanent links (every data outlet, in use or spare, and every access point) and ${M.runs.length - horizontal.length} riser fibre; longest copper run ${longest} m, within the 90 m limit`],
+  ['Trays', `${trays.length} lengths of ladder, tray and basket; the fullest is the ${fullest ? `${fullest.name.charAt(0).toLowerCase()}${fullest.name.slice(1)} on floor ${M.floors.find((f) => f.level_m === fullest.level)?.id}, at ${Math.round(fullest.fill * 100)} percent of what it takes at the 40 percent fill limit` : 'not recorded'}`],
+  ['Wi-Fi', M.floors.map((f) => { const w = wifiAreas(M, f.id); return `${f.name}: ${M.aps.filter((a) => a.floor === f.id).length} access points for ${Math.round(w.open)} m² of open area${w.gathering ? ` and ${Math.round(w.gathering)} m² of town hall` : ''}`; }).join('; ')],
+  ['The way in', M.circuits.map((c) => `${c.provider} (${c.role}) from the ${M.entry_points.find((e) => e.id === c.entry)?.name.replace(/^Telecoms entry, /, '').replace(/ \(ground floor\)/, '') ?? 'entry'}, ${c.lead_in?.length_m ?? '?'} m of fibre`).join('; ') + '. Both share riser 1 inside the building: one path, recorded as a risk.'],
+];
+---
+<Shell title={`${M.siteName} in 3D`} section="locations" crumbs={[{ label: 'Locations', to: '/locations/' }, { label: M.siteName, to: `/locations/${site}/` }, { label: '3D model' }]} about={{ kind: 'page', label: `${M.siteName} in 3D` }}>
+  <PageBand overline={`Office · ${S?.city ?? site}`} title={`${M.siteName} in 3D`} lede="Every floor, comms room, cable run and internet circuit, joined up. Choose anything to follow it to the internet." sim="live" numbers={NUMBERS} />
+  <div class="content o3-page">
+    <Office3D site={site} />
+    <Section title="What the model holds" aside="Fictional floor plan" help="o3.holds">
+      <dl class="o3-hold">
+        {FACTS.map(([a, b]) => <div><dt>{a}</dt><dd>{b}</dd></div>)}
+      </dl>
+      <p class="faint o3-hold-note">{M.fictional} Room sizes and shapes follow each room's profile, with the differences a real building has (a column, a door moved, a slightly different size). Lengths are measured along the trays, with 3 m of slack at the panel.</p>
+    </Section>
+  </div>
+</Shell>
+
+<style>
+  .o3-page { display: grid; gap: var(--gutter); }
+  .o3-hold { display: grid; gap: 10px; margin: 0; }
+  .o3-hold div { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 12px; }
+  .o3-hold dt { font-weight: 650; }
+  .o3-hold dd { margin: 0; color: var(--text-2); }
+  .o3-hold-note { margin: 12px 0 0; font-size: 13px; }
+  @container content (max-width: 559px) { .o3-hold div { grid-template-columns: minmax(0, 1fr); gap: 2px; } }
+</style>

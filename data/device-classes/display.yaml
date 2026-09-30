@@ -1,0 +1,108 @@
+# Device class: Display
+# A Keia object profile: what a healthy device of this class looks like on every
+# platform that knows about it. Specific models are in data/device-models/ (step 3).
+
+schema: object-profile
+
+profile:
+  name: Display
+  object_role: Flat panel that shows the far end and shared content in a space
+  naming_prefixes:
+    - dsp
+  version: "1.1"
+  last_updated: "2026-09-29"
+  owner: Keia Atlas maintainers
+
+sources:
+  - file: data/sources/room-guidance.yaml
+    provides: Which space types use this class of device, and where it goes
+  - file: data/standards/displays.yaml
+    provides: Mounting, network connection, timers and energy saving for every display (house standard)
+
+platforms:
+  keia_atlas:
+    required_fields:
+      - space
+      - model
+      - serial
+      - lifecycle_state
+    healthy_indicators:
+      - recorded in the space its space type expects
+      - every port wired as the space type says
+  inventory:
+    required_fields:
+      - asset_tag
+      - serial
+      - model
+      - space
+      - status
+      - hostname
+    healthy_indicators:
+      - status is active
+      - space matches where the device is installed
+  dhcp_dns:
+    required_fields:
+      - hostname
+      - mac_address
+      - ip_address
+    healthy_indicators:
+      - address reservation matches the MAC address
+      - forward and reverse DNS records resolve
+  device_management:
+    required_fields:
+      - device_name
+      - serial
+      - firmware_version
+    healthy_indicators:
+      - online in the maker's fleet management (Samsung VXT or LG Business Cloud)
+      - firmware at the fleet standard for the model
+      - on and off times match the office's hours
+    firmware_expectations: The release the Lab has passed; automatic updates off
+  monitoring:
+    required_fields:
+      - monitor_name
+    healthy_indicators:
+      - answers SNMP
+      - no open critical alerts
+
+consistency:
+  - check: serial match
+    compare:
+      - keia_atlas.serial
+      - inventory.serial
+  - check: space match
+    compare:
+      - keia_atlas.space
+      - inventory.space
+  - check: hostname match
+    compare:
+      - inventory.hostname
+      - dhcp_dns.hostname
+  - check: name match
+    compare:
+      - device_management.device_name
+      - dhcp_dns.hostname
+
+discrimination:
+  no_picture:
+    likely_causes:
+      - display off or on the wrong input
+      - HDBaseT link down
+      - source device asleep
+    first_check: keia_atlas
+  display_unreachable:
+    likely_causes:
+      - network cable unplugged
+      - port disabled
+      - address changed
+      - standby mode that drops the network (network standby off)
+    first_check: dhcp_dns
+  display_turns_itself_off:
+    likely_causes:
+      - no signal power off or auto power off left on
+      - off timer set to the wrong time or time zone
+      - energy saving mode on
+    first_check: device_management
+
+not_applicable:
+  - room_booking

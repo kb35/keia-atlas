@@ -1,0 +1,54 @@
+# Demo playbook. Aigna's own way of working; not taken from any real company.
+id: home-kit
+name: Home and remote kit
+kind: home-kit
+version: "1.0"
+intensity: light
+weeks: { min: 3, max: 8 }
+summary: "Give people who work from home a home office kit (monitor, dock and gateway), provisioned before it ships, set up at home by a technician or on a call, and commissioned with a test call."
+when: "Use for new starters or for people who move to home working. A home office is a room labelled by town and number, never a person's address. Laptops and phones are outside Keia Atlas: the kit is the monitor, dock and gateway."
+changes:
+  - { date: "2026-09-29", change: "First version." }
+phases:
+  - phase: plan
+    weeks: "Under 1"
+    steps:
+      - { title: "Collect each person's start date and country", role: pm, output: Start dates }
+      - { title: "Check the store for kits, and work out the shortfall", role: pm }
+      - { title: "Budget line and purchase request", role: programme }
+    gate: { by: [programme], checks: [People, dates and budget agreed] }
+  - phase: design
+    weeks: "Under 1"
+    steps:
+      - { title: "Pick the home office option for each person, from the remote-home room profile", role: delivery, output: Option per home office }
+      - { title: "Check the plug type and power for each country", role: delivery }
+      - { title: "Decide who sets up on site and who is talked through it on a call", role: pm }
+    gate: { by: [sm-av], checks: [Every option is to the standard] }
+  - phase: procure
+    weeks: "1 to 3"
+    steps:
+      - { title: "Take kits from the store and order the shortfall", role: pm, long_lead: true }
+      - { title: "Record serials on arrival", role: tech, output: Serials on arrival }
+    gate: { by: [pm], checks: [Every kit received] }
+  - phase: integrate
+    weeks: "1 to 2"
+    steps:
+      - { title: "Create the asset records and the home offices, and enrol each gateway in device management, before the kit ships", role: delivery, step: provision }
+      - { title: "Add each gateway to monitoring", role: network, step: provision }
+      - { title: "Ship each kit by courier with the return label, or hand it to the technician", role: pm, step: install }
+      - { title: "Set up at the person's home, or talk them through it on a call", role: tech, step: install }
+      - { title: "Configure each gateway from device management once it is online", role: delivery, step: configure }
+      - { title: "Commission each home office with a test call", role: delivery, step: commission }
+      - { title: "Snag list, and a follow-up call for anyone who needs one", role: delivery, output: Snag list, step: commission }
+    gate: { by: [delivery], checks: [Every home office installed, Every test call passes] }
+  - phase: handover
+    weeks: "Under 1"
+    steps:
+      - { title: "Handover note to the service desk: who has which kit, in which home office", role: pm, output: Handover note }
+      - { title: "Tell each person how to report a fault and how to return the kit", role: desk }
+    gate: { by: [sm-av], checks: [Records match the home offices] }
+  - phase: closed
+    weeks: "-"
+    steps:
+      - { title: "Feed what was learned back into this playbook", role: pm }
+    gate: { by: [programme], checks: [Lessons captured] }

@@ -1,0 +1,100 @@
+# A house standard: the rules integrators follow for one area (cabling, racks, Wi-Fi, displays...).
+# One file per standard in data/standards/, drawn by the Standards library at /standards/ and /standards/<id>/.
+# Each rule says what to do, why, how to check it, and where it comes from: a public standard named by its
+# title with a public summary in our own words (never copied text), vendor guidance from data/sources, or a
+# house choice (Aigna's own decision, marked as such).
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/house-standard
+title: House standard
+type: object
+additionalProperties: false
+required: [id, name, area, order, version, effective, owner, summary, scope, sections, references, demo]
+properties:
+  id: { $ref: "#/$defs/slug" }
+  name: { type: string }
+  area:
+    description: The area of the library it belongs to.
+    enum: [cabling, racks, power, network, wifi, displays, meeting-av, signage, scheduler-panels, home-offices]
+  order: { description: "Its place in the library, 1 first.", type: integer, minimum: 1 }
+  version: { type: string }
+  effective: { type: string, format: date }
+  owner: { description: "The Aigna role that owns the standard.", type: string }
+  summary: { description: "One line: what the standard makes true.", type: string }
+  intro: { description: "A short paragraph for integrators: what it covers and how to use it.", type: string }
+  scope: { type: array, items: { type: string } }
+  related: { description: "Ids of other standards (or cables, the colour and label standard).", type: array, items: { $ref: "#/$defs/slug" } }
+  applies_to:
+    description: What in Keia Atlas this standard governs, so the pages can link both ways.
+    type: object
+    additionalProperties: false
+    properties:
+      classes: { type: array, items: { $ref: "#/$defs/slug" } }
+      models: { type: array, items: { $ref: "#/$defs/slug" } }
+      configurations: { type: array, items: { $ref: "#/$defs/slug" } }
+      space_types: { type: array, items: { $ref: "#/$defs/slug" } }
+  figures:
+    description: "Key figures for the band: the standard's headline values, at most 4."
+    type: array
+    maxItems: 4
+    items:
+      type: object
+      additionalProperties: false
+      required: [n, label]
+      properties:
+        n: { type: [string, number] }
+        label: { type: string }
+  sections:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, title, rules]
+      properties:
+        id: { $ref: "#/$defs/slug" }
+        title: { type: string }
+        intro: { type: string }
+        figure: { description: "A drawing the page knows how to draw for this section.", enum: [display-height, viewing-distance, wifi-grid, rack-sizing, vlan-map] }
+        table:
+          type: object
+          additionalProperties: false
+          required: [caption, columns, rows]
+          properties:
+            caption: { type: string }
+            columns: { type: array, minItems: 2, items: { type: string } }
+            rows: { type: array, minItems: 1, items: { type: array, minItems: 2, items: { type: string } } }
+            note: { type: string }
+        rules:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, level, rule, why, check]
+            properties:
+              id: { $ref: "#/$defs/slug" }
+              level: { description: "must: every install, no exceptions without a change record. should: the default; an exception is written down.", enum: [must, should] }
+              rule: { description: "Do this. One sentence, an instruction.", type: string }
+              why: { type: string }
+              check: { description: "How an integrator or engineer proves it is done.", type: string }
+              house: { description: "True when this is Aigna's own choice, not a public standard's requirement.", type: boolean }
+              sources: { description: "Ids from this file's references.", type: array, items: { $ref: "#/$defs/slug" } }
+  references:
+    description: "Public standards and vendor documents the rules lean on. Named, summarised in our own words, never quoted."
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, name, kind, summary]
+      properties:
+        id: { $ref: "#/$defs/slug" }
+        name: { description: "The document's public title or number.", type: string }
+        publisher: { type: string }
+        kind: { enum: [standard, vendor, guide, regulation] }
+        summary: { description: "What it covers, in our own words.", type: string }
+        url: { description: "A public page about it: a summary, a catalogue entry or the vendor document. Paid standards link to their public catalogue page.", type: string }
+        source: { description: "The entry id in data/sources, for vendor documents.", $ref: "#/$defs/slug" }
+        checked: { type: string, format: date }
+  demo: { const: true }
+$defs:
+  slug: { type: string, pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }

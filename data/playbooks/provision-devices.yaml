@@ -1,0 +1,49 @@
+# Demo playbook. Aigna's own way of working; not taken from any real company.
+id: provision-devices
+name: Provision new devices
+kind: provision
+version: "1.0"
+intensity: light
+weeks: { min: 2, max: 6 }
+summary: "Take an order of new devices from the goods-in door to a store or to a site, with every unit recorded, updated to the standard firmware and ready to fit."
+when: "Use when devices arrive that are not yet tied to a room project, such as stock for a store or a delivery to a site. If the devices are for a room project, that project's playbook already includes these steps."
+changes:
+  - { date: "2026-09-29", change: "First version." }
+phases:
+  - phase: plan
+    weeks: "Under 1"
+    steps:
+      - { title: "Confirm what is arriving, from which order, and where it should end up: a store or a site", role: pm, output: Delivery note }
+      - { title: "Check the models are in the standard and the configurations exist", role: delivery }
+      - { title: "Book space in the store and a person to receive the goods", role: pm }
+    gate: { by: [pm], checks: [Destination agreed, Receiver booked] }
+  - phase: procure
+    weeks: "1 to 4"
+    steps:
+      - { title: "Chase the order and the delivery date", role: pm, long_lead: true }
+      - { title: "Ask the supplier for serials and MACs before delivery", role: pm }
+      - { title: "Check the goods against the order on arrival: quantity, model and damage", role: tech, output: Goods-in check }
+    gate: { by: [pm], checks: [Goods received and checked, Shortfalls raised with the supplier] }
+  - phase: integrate
+    weeks: "2 to 5 days"
+    steps:
+      - { title: "Record every serial and MAC, with a label photo", role: tech, step: provision }
+      - { title: "Create the asset records and put each unit in stock", role: tech, step: provision }
+      - { title: "Reserve addresses and add each unit to device management", role: network, step: provision }
+      - { title: "Shelve the units in the store, or pack them for the site", role: tech, step: install }
+      - { title: "Send site units by courier, and confirm the site has them", role: pm, step: install }
+      - { title: "Bring each unit up on the standard firmware and load its configuration", role: delivery, step: configure }
+      - { title: "Power on each unit and check it enrols and reports healthy", role: delivery, step: commission }
+      - { title: "Report any unit that fails on arrival, and raise its RMA", role: tech, step: commission }
+    gate: { by: [delivery], checks: [Every unit recorded and on the standard firmware, Faulty units raised as RMAs] }
+  - phase: handover
+    weeks: "Under 1"
+    steps:
+      - { title: "Tell the people who asked for the kit where it is and how to book it out", role: pm, output: Stock note }
+      - { title: "Update the spares count", role: pm }
+    gate: { by: [sm-av], checks: [Records match the shelves] }
+  - phase: closed
+    weeks: "-"
+    steps:
+      - { title: "Feed what was learned back into this playbook", role: pm }
+    gate: { by: [programme], checks: [Lessons captured] }

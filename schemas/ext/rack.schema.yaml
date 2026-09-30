@@ -1,0 +1,46 @@
+# Rack: what is mounted where in a comms room rack, from the bottom (U1) up.
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/rack
+title: Rack
+type: object
+additionalProperties: false
+required: [id, name, height_u, items]
+properties:
+  id: { type: string }
+  name: { type: string }
+  space: { description: The comms room it stands in., type: string }
+  space_type: { description: "For a typical layout: the room type it shows.", type: string }
+  option: { description: "For a typical layout: the build option of that room type it shows.", type: string }
+  notes: { type: array, items: { type: string } }
+  height_u: { type: integer, minimum: 6, maximum: 48 }
+  gear: { description: "The rack itself, from data/rack-gear/.", type: string }
+  side_pdus:
+    description: Power strips mounted upright at the back (0U), one per feed.
+    type: array
+    items: { type: object, additionalProperties: false, required: [gear, feed], properties: { gear: { type: string }, feed: { type: string } } }
+  items:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [u, size, kind, label]
+      properties:
+        u: { description: The lowest rack unit it occupies., type: integer, minimum: 1 }
+        size: { type: integer, minimum: 1 }
+        kind: { enum: [patch-panel, fibre-panel, switch, firewall, isp, ups, battery, pdu, cable-manager, shelf, codec, oob, wlc, blank, reserved] }
+        gear: { description: "The product, from data/rack-gear/.", type: string }
+        label: { type: string }
+        position: { description: "The install position in the comms room, when it is a recorded device.", type: string }
+        ports: { type: integer }
+        detail: { type: string }
+        owner: { description: "Who owns it, when it is not Aigna.", type: string }
+        replaced:
+          description: "What stood in this slot before a recorded replacement, so the rack can be shown as it was. The old unit's own record stays in the room's install file."
+          type: object
+          additionalProperties: false
+          required: [gear, date]
+          properties:
+            gear: { description: "The product that was here, from data/rack-gear/.", type: string }
+            label: { type: string }
+            date: { description: The day the new one took over., type: string, format: date }
+            reason: { type: string }

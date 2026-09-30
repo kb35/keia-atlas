@@ -1,0 +1,16 @@
+---
+// The work report for one closed task.
+import WorkReportPage from '../../../../../components/WorkReportPage.astro';
+import { projects } from '../../../../../lib/data.mjs';
+import { taskReport } from '../../../../../lib/report.mjs';
+
+export function getStaticPaths() {
+  return Object.values(projects).flatMap((p) => (p.tasks ?? []).filter((t) => t.status === 'done').map((t) => ({ params: { id: p.id.toLowerCase(), tid: t.id.toLowerCase() } })));
+}
+const p = Object.values(projects).find((x) => x.id.toLowerCase() === Astro.params.id);
+const t = p.tasks.find((x) => x.id.toLowerCase() === Astro.params.tid);
+const report = taskReport(p, t);
+const home = `/projects/${p.id.toLowerCase()}/tasks/${t.id.toLowerCase()}/`;
+---
+<WorkReportPage report={report} projectId={p.id} backTo={home} backLabel="Back to the task" about={{ kind: 'task', label: `${t.id} ${t.title}` }}
+  crumbs={[{ label: 'Projects', to: '/projects/' }, { label: p.name, to: `/projects/${p.id.toLowerCase()}/` }, { label: t.id, to: home }, { label: 'Work report' }]} />

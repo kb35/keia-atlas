@@ -1,0 +1,232 @@
+---
+// A maker case (decision 0029): a fault Aigna raises with a maker, prepared by Keia Atlas and sent by a person.
+// Two kinds of page share this template: a case on record (data/maker-cases), and a case Keia Atlas has prepared
+// for a repeat across the fleet or a known issue that affects us (new-...), which becomes a tracked case once a
+// person reads it, changes what it says if they want to, and sends it. Sending is simulated (stage 4 sends it
+// through the maker's support route). Status, reference and the link to a known issue are live-layer events.
+// A Record page (docs/standards/page-anatomy.md): the case beside its tracking, three tiles, then the evidence.
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import SidePanel from '../../../components/SidePanel.astro';
+import Section from '../../../components/Section.astro';
+import LiveBar from '../../../components/LiveBar.astro';
+import { href, fmtDate, INC_STATE } from '../../../lib/data.mjs';
+import { when } from '../../../lib/incidents.mjs';
+import { cases, draftCases, siteName, person, issues, CASE_STATUS, CASE_ORDER, CLUSTER_RULE } from '../../../lib/knownissues-view.mjs';
+
+export function getStaticPaths() {
+  return [...cases, ...draftCases].map((c) => ({ params: { id: c.id.toLowerCase() }, props: { c } }));
+}
+const { c } = Astro.props;
+const maker = c.feed?.maker ?? 'the maker';
+const route = c.route;
+const ev = c.ev ?? { units: [], timeline: [], logs: [], versions: c.firmware ?? [], sites: [] };
+const base = { status: c.draft ? 'draft' : c.status, summary: c.summary, ref: c.ref ?? null, known_issue: c.known_issue ?? null };
+const feedIssues = issues.filter((i) => i.feed.id === c.feed?.id);
+// A case on record: when each step happened, from its history (the live layer adds later steps with who and when).
+const stepBase = { draft: c.draft ? 'Keia Atlas, from what it found' : `${person(c.raised_by).name}, before sending` };
+if (!c.draft) for (const h of c.history) if (h.status && !stepBase[h.status]) stepBase[h.status] = `${h.maker ? maker : person(h.by).name}, ${when(h.at)}`;
+const sentLine = !c.draft ? `Sent to ${maker} by ${person(c.raised_by).name} on ${fmtDate(c.raised)}.` : '';
+const CASE = { item: `case:${c.id}`, base, maker, cluster: c.cluster ? `cluster:${c.cluster.key}` : null, sentLine };
+const sla = route.sla?.[0];
+const NUMBERS = [
+  { n: ev.units.length || (c.incidents?.length ?? 0), label: ev.units.length === 1 ? 'Incident' : 'Incidents', to: ev.units.length ? '#evidence' : undefined },
+  { n: ev.sites.length || c.fleetSites || 0, label: (ev.sites.length || c.fleetSites) === 1 ? 'Office' : 'Offices' },
+  { n: c.fleetCount ?? c.models.length, label: c.fleetCount != null ? 'Units of the model' : c.models.length === 1 ? 'Model' : 'Models' },
+  sla?.target === 'Next working day' ? { n: 1, label: 'Working day to answer' } : { n: sla ? sla.target : 'None', label: sla ? 'Maker answers within' : 'No service level' },
+];
+const STEPS = CASE_ORDER;
+const TO = ['acknowledged', 'investigating', 'published', 'closed'];
+const title = c.draft ? c.title : `${c.id}: ${c.title}`;
+---
+<Shell title={title} section="known-issues" minStage={2} crumbs={[{ label: 'Work', to: '/work/' }, { label: 'Known issues', to: '/known-issues/' }, { label: 'Maker cases', to: '/known-issues/#maker-cases' }, { label: c.draft ? 'New case' : c.id }]} about={{ kind: 'maker-case', label: title, to: c.path }}>
+  <PageBand overline="Maker case" title={c.title} lede={route.how} stage={4} numbers={NUMBERS}>
+    <Fragment slot="overline">
+      <span class="code" data-help="case.id">{c.draft ? 'New' : c.id}</span>
+      <span>{maker}</span>
+      <span class={`pill ${c.draft ? 'plain' : 'deploy'}`} data-case-pill data-help="case.status">{CASE_STATUS[base.status]}</span>
+    </Fragment>
+    <button slot="action" type="button" class="btn primary" data-case-primary data-help="case.send">{c.draft ? `Send to ${maker}` : "Record the maker's answer"}</button>
+  </PageBand>
+
+  <div class="content mc" data-ki-root data-case data-status={base.status}>
+    <script type="application/json" data-case-json set:html={JSON.stringify(CASE)} />
+    <div class="mc-confirm card" data-case-confirm hidden role="alertdialog" aria-labelledby="mc-confirm-h">
+      <div>
+        <b id="mc-confirm-h">Send this case to {maker}?</b>
+        <p class="muted">It goes as you, through {route.contract ? `the ${maker} support portal under contract ${route.contract}` : 'the route below'}, with the evidence and the logs ticked below. Simulated: nothing leaves Keia Atlas until stage 4, and even then only when a person sends it.</p>
+      </div>
+      <span class="mc-cb">
+        <button type="button" class="btn primary small" data-case-send>Send now</button>
+        <button type="button" class="btn small ghost" data-case-notyet>Not yet</button>
+      </span>
+    </div>
+
+    <div class="g12 top">
+      <section class="card pad s-7 mc-doc" aria-label="The case" data-help="case.doc">
+        <dl class="mc-head">
+          <div><dt>To</dt><dd><b>{maker}</b> · {route.how}</dd></div>
+          {route.contract && <div><dt>Contract</dt><dd>{route.contract}, until {fmtDate(route.until)}{sla ? ` · ${sla.what}: ${sla.target}` : ''}</dd></div>}
+          <div><dt>Subject</dt><dd>{c.title}</dd></div>
+          <div><dt>Models</dt><dd>{c.modelName ?? c.modelNames?.join(', ')}</dd></div>
+          {ev.versions.length > 0 && <div><dt>Firmware</dt><dd class="mono">{ev.versions.join(', ')}</dd></div>}
+        </dl>
+        <label class="mc-say" for="mc-sum">
+          <span class="overline">What we see</span>
+          <span class="faint" data-case-draftonly>Keia Atlas wrote this from the incidents. Change anything before you send it.</span>
+        </label>
+        <textarea id="mc-sum" rows="7" data-case-summary data-help="case.summary">{c.summary}</textarea>
+        <div class="mc-ask"><span class="overline">What we ask</span><p>{c.ask}</p></div>
+        <p class="mc-sent" data-case-sentline hidden>{sentLine}</p>
+        {ev.logs.length > 0 && (
+          <fieldset class="mc-logs" data-help="case.logs">
+            <legend class="overline">Logs to attach</legend>
+            {ev.logs.map((l) => <label><input type="checkbox" checked /> {l}</label>)}
+            <small class="faint">Keia Atlas gathers these from device management when the case is sent (stage 4).</small>
+          </fieldset>
+        )}
+      </section>
+
+      <SidePanel class="s-5" title="Tracking" meta={c.draft ? 'Not sent yet' : `Raised ${fmtDate(c.raised)}`} help="case.track" id="tracking">
+        <div data-case-track>
+          <ol class="mc-steps">
+            {STEPS.map((s) => (
+              <li data-case-step={s} data-base={stepBase[s] ?? ''} data-at="next">
+                <i aria-hidden="true"></i><b>{CASE_STATUS[s]}</b><small class="faint" data-case-when>{stepBase[s] ?? ''}</small>
+              </li>
+            ))}
+          </ol>
+          <div class="mc-ans" data-case-sentonly hidden={c.draft}>
+            <p class="overline">The maker's answer</p>
+            <span class="mc-row">{TO.map((s) => <button type="button" class="btn small ghost" data-case-to={s} data-help="case.answer">{CASE_STATUS[s]}</button>)}</span>
+            <label class="mc-field"><span>Maker's case number</span><span class="mc-in"><input type="text" data-case-ref placeholder="As the maker gives it" /><button type="button" class="btn small" data-case-refsave>Save</button></span></label>
+            <label class="mc-field"><span>Known issue it became</span><span class="mc-in"><select data-case-ki data-help="case.ki"><option value="">None yet</option>{feedIssues.map((i) => <option value={i.id} data-href={href(i.path)} title={i.title}>{i.ref ?? i.id}</option>)}</select><button type="button" class="btn small" data-case-kisave>Link</button></span></label>
+            <a class="faint" data-case-kilink hidden href="#">Open the known issue</a>
+          </div>
+          <p class="faint mc-draftnote" data-case-draftonly hidden={!c.draft}>Once sent, record here what the maker says: its case number, and the known issue it publishes. Keia Atlas links it back to the incidents and the fleet.</p>
+          <button type="button" class="btn small ghost" data-ki-history data-item={`case:${c.id}`} data-title={title} data-help="ki.history">History</button>
+        </div>
+      </SidePanel>
+    </div>
+
+    <div class="g12">
+      <section class="card side-card s-4" aria-labelledby="mc-why" data-help="case.why">
+        <h3 id="mc-why">Why this case</h3>
+        {c.cluster ? <p class="mc-t">The same model and symptom, {c.cluster.why}. The rule: {CLUSTER_RULE.count} or more incidents in {CLUSTER_RULE.days} days, or more than one office, with no known issue that explains them.</p>
+          : c.issueDraft ? <p class="mc-t">Known issue <a href={href(c.issueDraft.path)}>{c.issueDraft.ref ?? c.issueDraft.id}</a> affects our fleet, and there is no case with {maker} about it yet.</p>
+          : <p class="mc-t">{c.ask ? `Asked for: ${c.ask}` : 'Raised by hand.'}</p>}
+        {c.issue && <p class="mc-t">The maker published it as <a href={href(c.issue.path)}>{c.issue.ref ?? c.issue.id}</a>.</p>}
+      </section>
+      <section class="card side-card s-4" aria-labelledby="mc-con" data-help="case.contract">
+        <h3 id="mc-con">Contract and support</h3>
+        {route.contract ? (
+          <dl class="kv">
+            <div><dt>Contract</dt><dd>{route.contract}</dd></div>
+            <div><dt>Until</dt><dd>{fmtDate(route.until)}</dd></div>
+            {route.sla.map((s) => <div><dt>{s.what}</dt><dd>{s.target}</dd></div>)}
+            {route.owner && <div><dt>Relationship</dt><dd>{route.owner.name}</dd></div>}
+          </dl>
+        ) : <p class="mc-t">{route.how} No contract with {maker} is on record, so there is no service level.</p>}
+        {route.service?.length > 0 && <p class="faint mc-t">{route.service.map((s) => s.name).join(', ')} can also swap faulty units under the maintenance contract while the maker looks.</p>}
+      </section>
+      <section class="card side-card s-4" aria-labelledby="mc-who" data-help="case.who">
+        <h3 id="mc-who">Who decides</h3>
+        <p class="mc-t">{c.draft ? `Keia Atlas prepared it. A person reads it and sends it: usually ${route.owner?.name ?? 'the service manager'}, who looks after ${maker}.` : `Raised by ${person(c.raised_by).name}; ${person(c.owner).name} follows it up.`}</p>
+        <p class="faint mc-t">Nothing is sent, linked or closed without a person. Every step shows who and when, and Undo is in History.</p>
+      </section>
+    </div>
+
+    {ev.units.length > 0 && (
+      <Section title="The evidence" id="evidence" help="case.evidence" aside="Gathered by Keia Atlas">
+        <div class="tablewrap">
+          <table class="to-cards mc-units">
+            <thead><tr><th scope="col">Incident</th><th scope="col">Device</th><th scope="col">Where</th><th scope="col">Model</th><th scope="col">Serial</th><th scope="col">Version</th></tr></thead>
+            <tbody>
+              {ev.units.map((u) => (
+                <tr>
+                  <td class="mono"><a href={href(`/incidents/${u.number.toLowerCase()}/`)}>{u.number}</a></td>
+                  <td><a href={href(`/device/?tag=${u.tag}`)}>{u.name}</a></td>
+                  <td>{u.where}</td>
+                  <td>{u.model}</td>
+                  <td class="mono">{u.serial ?? 'Not known'}</td>
+                  <td class="mono">{u.firmware ?? (u.system?.firmware ? `${u.system.firmware} (its ${u.system.model})` : 'Not known')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <ol class="mc-tl" data-help="case.timeline">
+          {ev.timeline.map((t) => (
+            <li class:list={{ ev: t.evidence }}><span class="mono faint">{when(t.at)}</span><span><a class="mono" href={href(`/incidents/${t.number.toLowerCase()}/`)}>{t.number}</a> {t.text}<small class="faint"> · {t.where}</small></span></li>
+          ))}
+        </ol>
+      </Section>
+    )}
+
+    {!c.draft && (
+      <Section title="What each side said" id="said" help="case.said" aside={`${c.history.length} entries`}>
+        <ol class="mc-said">
+          {c.history.map((h) => (
+            <li class:list={{ mk: h.maker }}><span class="av">{h.maker ? maker.split(' ').map((w) => w[0]).join('').slice(0, 2) : person(h.by).initials}</span><span><b>{h.maker ? maker : person(h.by).name}</b> <small class="faint">{when(h.at)}{h.status ? ` · ${CASE_STATUS[h.status]}` : ''}</small><p>{h.note}</p></span></li>
+          ))}
+        </ol>
+      </Section>
+    )}
+
+    <LiveBar page={`case:${c.id}`} />
+  </div>
+  <script>
+    import { boot } from '../../../lib/knownissues-client.mjs';
+    boot();
+  </script>
+</Shell>
+<style>
+  .mc { gap: 18px; padding-top: 18px; }
+  .mc-confirm { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; padding: 16px 20px; border-color: var(--accent); animation: rs-grow var(--dur-pop) var(--ease-settle) both; }
+  .mc-confirm[hidden] { display: none; }
+  .mc-confirm p { margin: 4px 0 0; font-size: 13.5px; max-width: 70ch; }
+  .mc-cb, .mc-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .mc-doc { display: grid; gap: 14px; align-content: start; }
+  .mc-head { display: grid; gap: 8px; margin: 0; }
+  .mc-head > div { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 12px; font-size: 14px; padding-bottom: 8px; border-bottom: var(--border-rule); }
+  .mc-head dt { color: var(--text-3); font-size: 13px; } .mc-head dd { margin: 0; overflow-wrap: anywhere; }
+  .mc-say { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; font-size: 13px; }
+  .mc-doc textarea { width: 100%; font: inherit; font-size: 14.5px; line-height: 1.5; padding: 12px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); resize: vertical; }
+  .mc-doc textarea[readonly] { background: var(--surface-2); border-color: var(--line); }
+  .mc-ask p { margin: 4px 0 0; font-size: 14.5px; }
+  .mc-sent { margin: 0; font-weight: 600; font-size: 13.5px; color: var(--green-ink, #17612e); }
+  .mc-sent[hidden] { display: none; }
+  .mc-logs { border: 0; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13.5px; }
+  .mc-logs legend { margin-bottom: 6px; }
+  .mc-logs label { display: flex; gap: 8px; align-items: baseline; }
+  .mc-steps { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 0; }
+  .mc-steps li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 0 10px; padding: 6px 0; position: relative; }
+  .mc-steps li i { grid-row: 1 / span 2; width: 12px; height: 12px; margin-top: 3px; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--surface); transition: background var(--dur-state) var(--ease-settle), border-color var(--dur-state) var(--ease-settle); }
+  .mc-steps li:not(:last-child)::after { content: ''; position: absolute; left: 6px; top: 21px; bottom: -5px; width: 2px; background: var(--line); }
+  .mc-steps li b { font-size: 14px; } .mc-steps li small { font-size: 12.5px; }
+  .mc-steps li[data-at="done"] i { background: var(--green, #2e9e58); border-color: var(--green, #2e9e58); }
+  .mc-steps li[data-at="now"] i { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+  .mc-steps li[data-at="next"] b { color: var(--text-3); font-weight: 600; }
+  .mc-ans { display: grid; gap: 10px; margin-bottom: 12px; }
+  .mc-ans[hidden], .mc-draftnote[hidden], [data-case-kilink][hidden] { display: none; }
+  .mc-ans .overline { margin: 0; }
+  .mc-field { display: grid; gap: 4px; font-size: 13px; color: var(--text-2); }
+  .mc-field { contain: inline-size; }
+  .mc-in { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+  .mc-ans, .mc-ans > *, [data-case-track] { min-width: 0; }
+  .mc-field input, .mc-field select { width: 100%; min-width: 0; font: inherit; font-size: 14px; padding: 7px 10px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); }
+  .mc-draftnote { font-size: 13px; margin: 0 0 12px; }
+  .mc-t { margin: 0; font-size: 14px; }
+  .mc-units td a { color: inherit; }
+  .mc-tl, .mc-said { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
+  .mc-tl li { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 12px; font-size: 13.5px; padding: 8px 12px; border-radius: var(--radius); background: var(--surface); border: var(--border-card); }
+  .mc-tl li.ev { background: var(--surface-2); }
+  .mc-said li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; padding: 12px 14px; border-radius: var(--radius-lg); background: var(--surface); border: var(--border-card); }
+  .mc-said li.mk { background: var(--surface-2); }
+  .mc-said p { margin: 4px 0 0; font-size: 14px; }
+  @container content (max-width: 699px) {
+    .mc-head > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    .mc-tl li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .mc-confirm { animation: none; } }
+</style>

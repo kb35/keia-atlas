@@ -1,0 +1,77 @@
+---
+// A project's phases as a rail: done phases filled, the current one lit, the rest outlined.
+// With `tabs`, each phase is itself the button that shows that phase's panel (data-phx), so there is no second row of buttons.
+// Pass `project` to show only the phases its playbook uses (a playbook may skip phases), or `phases`.
+import { PHASES, PHASE_LABEL, phasesOf } from '../lib/data.mjs';
+const { phase, small = false, history = [], tabs = false, project = null } = Astro.props;
+const list = Astro.props.phases ?? (project ? phasesOf(project) : PHASES);
+const H = Object.fromEntries(history.map((h) => [h.phase, h]));
+const d = (x) => new Date(x).toLocaleDateString('en-IE', { day: 'numeric', month: 'short' });
+const at = list.indexOf(phase);
+const cols = `--pr-n:${list.length}`;
+---
+{tabs ? (
+  <div class="phase-rail tabs" style={cols} role="tablist" aria-label={`Phase: ${PHASE_LABEL[phase]}, ${at + 1} of ${list.length}. Pick a phase to see it.`}>
+    {list.map((p, i) => (
+      <button type="button" role="tab" data-help="phase-rail" data-help-name={PHASE_LABEL[p]} data-phx={p} aria-selected={i === at ? 'true' : 'false'} class:list={['pr-step', { done: i < at, now: i === at }]} aria-current={i === at ? 'step' : undefined}>
+        <span class="pr-dot" aria-hidden="true"></span>
+        <span class="pr-label">{PHASE_LABEL[p]}</span>
+        {H[p] ? <span class:list={['pr-date', { late: H[p].ended && H[p].ended > H[p].planned }]}>{H[p].ended ? d(H[p].ended) : `Due ${d(H[p].planned)}`}</span> : <span class="pr-date">&nbsp;</span>}
+      </button>
+    ))}
+  </div>
+) : (
+<ol class:list={['phase-rail', { small }]} style={cols} aria-label={`Phase: ${PHASE_LABEL[phase]}, ${at + 1} of ${list.length}`}>
+  {list.map((p, i) => (
+    <li class:list={['pr-step', { done: i < at, now: i === at }]} data-help="phase-rail" data-help-name={PHASE_LABEL[p]} aria-current={i === at ? 'step' : undefined}>
+      <span class="pr-dot" aria-hidden="true"></span>
+      <span class="pr-label">{PHASE_LABEL[p]}</span>
+      {!small && H[p] && <span class:list={['pr-date', { late: H[p].ended && H[p].ended > H[p].planned }]}>{H[p].ended ? d(H[p].ended) : `Due ${d(H[p].planned)}`}</span>}
+    </li>
+  ))}
+</ol>
+)}
+<style is:global>
+  .phase-rail { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(var(--pr-n, 6), minmax(0, 1fr)); }
+  .pr-step { position: relative; display: grid; justify-items: center; gap: 8px; text-align: center; }
+  .pr-step::before { content: ""; position: absolute; top: 10px; left: -50%; right: 50%; height: 3px; background: var(--line); z-index: 0; }
+  .pr-step:first-child::before { display: none; }
+  .pr-step.done::before, .pr-step.now::before { background: var(--ph-done); }
+  .pr-dot { position: relative; z-index: 1; width: 22px; height: 22px; border-radius: 50%; background: var(--surface); border: 2.5px solid var(--line-strong); }
+  .pr-step.done .pr-dot { background: var(--ph-done); border-color: var(--ph-done); }
+  .pr-step.done .pr-dot::after { content: ""; position: absolute; inset: 4px 5px 7px; border: solid #fff; border-width: 0 0 2.5px 2.5px; transform: rotate(-45deg); }
+  .pr-step.now .pr-dot { background: var(--ph-now); border-color: var(--ph-now); box-shadow: 0 0 0 0 color-mix(in srgb, var(--ph-now) 60%, transparent); animation: pr-pulse 2.2s ease-out infinite; }
+  @keyframes pr-pulse { 70% { box-shadow: 0 0 0 9px transparent; } }
+  .pr-label { font: 600 12.5px/1.2 var(--font-sans); color: var(--text-3); }
+  .pr-step.done .pr-label { color: var(--text-2); }
+  .pr-date { margin-top: -4px; font: 500 10.5px/1.2 var(--font-mono); color: var(--text-3); }
+  .pr-date.late { color: var(--red-ink); }
+  .pr-step.now .pr-label { color: var(--text); font-weight: 750; }
+  .phase-rail.small .pr-dot { width: 14px; height: 14px; border-width: 2px; }
+  .phase-rail.small .pr-step::before { top: 6px; height: 2px; }
+  .phase-rail.small .pr-step.done .pr-dot::after { inset: 2px 3px 5px; border-width: 0 0 2px 2px; }
+  .phase-rail.small .pr-label { font-size: 11px; visibility: hidden; white-space: nowrap; }
+  .phase-rail.small .pr-step.now .pr-label { visibility: visible; }
+  /* Clickable rail: each phase is a tab. The picked phase gets a soft pill behind it; hover lifts the dot. */
+  .phase-rail.tabs .pr-step { appearance: none; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; padding: 0 4px 8px; border-radius: var(--radius); transition: background var(--dur-state); }
+  .phase-rail.tabs .pr-step:hover { background: var(--surface-2); }
+  .phase-rail.tabs .pr-step:hover .pr-dot { transform: scale(1.12); }
+  .phase-rail.tabs .pr-dot { transition: transform var(--dur-state) var(--ease-settle); }
+  .phase-rail.tabs .pr-step[aria-selected=true] { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+  .phase-rail.tabs .pr-step[aria-selected=true] .pr-label { color: var(--text); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
+  .phase-rail.tabs .pr-step:focus-visible { outline: 2px solid var(--focus, var(--ink)); outline-offset: 2px; }
+  .phase-rail.tabs .pr-step::before { top: 10px; }
+  .pr-step { min-width: 0; }
+  @media (max-width: 767px) { .phase-rail.small .pr-label { display: none; } }
+  /* Too narrow for six names side by side (content under 600 px, L10): the rail turns to run down the page,
+     each phase a line with its dot, name and date, so no name is squeezed or overlaps the next. */
+  @container content (max-width: 599px) {
+    .phase-rail:not(.small) { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    .phase-rail:not(.small) .pr-step { grid-template-columns: 22px minmax(0, 1fr) auto; justify-items: start; align-items: center; gap: 12px; text-align: left; padding: 5px 8px; }
+    .phase-rail:not(.small) .pr-step::before { top: -50%; bottom: 50%; left: 17.5px; right: auto; width: 3px; height: auto; }
+    .phase-rail:not(.small) .pr-date { margin: 0; }
+    .phase-rail.tabs .pr-step { padding: 5px 8px; }
+    .phase-rail.tabs .pr-step::before { top: -50%; }
+  }
+  @media (prefers-reduced-motion: reduce) { .pr-step.now .pr-dot { animation: none; } .phase-rail.tabs .pr-dot { transition: none; } }
+</style>

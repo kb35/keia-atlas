@@ -1,0 +1,354 @@
+---
+// Room usage (stage 2, simulated). Archetype D (docs/standards/page-anatomy.md): band, filter bar, one rooms
+// table with the room's detail in a sticky side panel, then the roll-up by site and where the numbers come from.
+// For every bookable room: seats against the people who usually turn up, hours booked against hours
+// actually occupied (no-shows), the busy hours of the week, and whether it is in use right now. For
+// engineers too: open incidents, failed calls and little-used kit, each linking to where it is handled.
+// Never meeting titles or organisers: only occupied or not, and a headcount band. Every number is made up,
+// generated from the room's id (src/lib/usage.mjs, and ./_engineer.mjs for the engineering columns).
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import SidePanel from '../../components/SidePanel.astro';
+import Section from '../../components/Section.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import RoomPlanSprite from '../../components/RoomPlanSprite.astro';
+import { href, spaceTypes, KIND, KIND_LABEL, REGION_LABEL } from '../../lib/data.mjs';
+import { REGION_SHORT } from '../../lib/demo.mjs';
+import { roomList, siteRoll, regionRoll, allRoll, FLAG, SOURCE, DAYS, DAY_LONG, HOUR0, HOURS_DAY, WEEK_H, BANDS, SITE_ROLE } from '../../lib/usage.mjs';
+import { roomSignals, isHome, WHERE, failed, failing, littleUsed, byRoom } from './_engineer.mjs';
+import '../../styles/viz.css';
+import './_usage.css';
+
+const pct = (n) => `${Math.round(n * 100)}%`;
+const n1 = (n) => Math.round(n).toLocaleString('en-IE');
+const dev = (e) => href(`/device/?tag=${e.tag}`);
+const KEY = { meeting: 'meeting', small: 'small' };
+
+// One entry per room: what the table row and the side panel both need.
+const R = roomList.map(({ s, site, u }, i) => {
+  const sig = roomSignals(s.id);
+  return { s, site, u, i, sig, kind: KIND(s), where: isHome(s.site) ? 'home' : 'office', profile: s.type.profile?.name ?? s.space_type, status: u.flag ?? 'steady' };
+});
+const withIncidents = R.filter((r) => r.sig.incidents.length).length;
+const HOME = R.some((r) => r.where === 'home');
+// What the browser needs to draw the side panel and to work out "now".
+const ROOMS = R.map(({ s, site, u, sig, profile }) => ({
+  id: s.id, name: s.name, num: s.number ?? '', site: s.site, siteName: site.name, code: site.code, tz: site.time_zone, region: site.region,
+  profile, cap: u.cap, typ: u.typical, peak: u.peak,
+  bookH: Math.round(u.bookH * 10) / 10, occH: Math.round(u.occH * 10) / 10, nsH: Math.round(u.noShowH * 10) / 10,
+  occ: Math.round(u.occupied * 100), booked: Math.round(u.booked * 100), ns: Math.round(u.noShow * 100), full: Math.round(u.fullShare * 100),
+  flag: u.flag, why: u.why, act: u.act, heat: u.heat,
+  inc: sig.incidents.map((x) => ({ n: x.number, t: x.title, h: x.href })),
+}));
+const DEVICES = Object.fromEntries(R.map(({ s }) => [s.id, []]));
+const DEV_LINE = (e) => e.kind === 'video' ? `${e.callH} call hours, ${e.calls} calls` : e.kind === 'display' ? `On ${Math.round(e.onH)} h a week` : e.kind === 'signage' ? `${e.actualH} of ${e.setH} hours set` : e.kind === 'switch' ? `${e.used} of ${e.ports} ports` : `Lamp ${e.lampPct}% of rated`;
+for (const { s } of R) {
+  DEVICES[s.id] = (byRoom[s.id] ?? []).map((e) => ({ h: dev(e), n: e.name, l: DEV_LINE(e), f: e.kind === 'video' ? failed[e.tag] : 0, w: failing(e), lu: littleUsed(e), t: e.flag?.text ?? '' }));
+}
+const CFG = { DAYS, DAY_LONG, HOUR0, HOURS_DAY, WEEK_H, BANDS, FLAG, SOURCE, ROOM_BASE: href('/rooms/'), HOME };
+
+const FACETS = [
+  { key: 'region', label: 'Region', options: regionRoll.filter((r) => r.rooms).map((r) => ({ value: r.id, label: REGION_SHORT[r.id] })) },
+  { key: 'site', label: 'Office', options: siteRoll.map((x) => ({ value: x.id, label: x.site.name, sub: x.site.city })) },
+  { key: 'kind', label: 'Kind', options: Object.keys(KEY).filter((k) => R.some((r) => r.kind === k)).map((k) => ({ value: k, label: KIND_LABEL[k] })) },
+  { key: 'status', label: 'Status', options: [{ value: 'over', label: FLAG.over.label }, { value: 'under', label: FLAG.under.label }, { value: 'ghost', label: 'Booked but empty' }, { value: 'steady', label: 'Steady' }] },
+  { key: 'type', label: 'Room profile', options: [...new Set(R.map((r) => r.s.space_type))].map((t) => ({ value: t, label: spaceTypes[t].profile.name })).sort((a, b) => a.label.localeCompare(b.label)) },
+  ...(HOME ? [{ key: 'where', label: 'Where', options: WHERE }] : []),
+];
+const SORT = { options: [
+  { value: 'busiest', label: 'Busiest first' }, { value: 'quiet', label: 'Quietest first' }, { value: 'noshow', label: 'No-shows first' }, { value: 'full', label: 'Fullest first' },
+  { value: 'now', label: 'In use now first' }, { value: 'issues', label: 'Engineering first' }, { value: 'site', label: 'By office' }, { value: 'name', label: 'By name' },
+] };
+const TOGGLES = [
+  { key: 'now', label: 'In use now', title: 'Only rooms in use right now (worked out live on this page)' },
+  { key: 'issues', label: 'Open incidents', title: 'Only rooms with an open incident' },
+  { key: 'failed', label: 'Failed calls', title: 'Only rooms where video calls keep failing' },
+];
+const NUMBERS = [
+  { n: '–', label: 'In use now', id: 'inuse', to: '?now=1' },
+  { n: pct(allRoll.occupied), label: 'Of the week occupied', fact: true },
+  { n: pct(allRoll.noShow), label: 'Of bookings no-show', fact: true },
+  { n: withIncidents, label: 'With open incidents', to: '?issues=1', tone: withIncidents ? 'bad' : undefined },
+];
+---
+<Shell title="Room usage" section="usage" minStage={2} crumbs={[{ label: 'Rooms', to: '/rooms/' }, { label: 'Usage' }]}>
+  <PageBand overline="Occupancy" title="Room usage" lede="How much each room is used over a typical four weeks, and which are in use now. Never meeting titles or who booked." sim numbers={NUMBERS} />
+
+  <div class="content ru" data-ru>
+    <RoomPlanSprite />
+    <FilterBar facets={FACETS} toggles={TOGGLES} placeholder="Find a room, number or office" label="Find a room" noun={['room', 'rooms']} scope=".content.ru" sort={SORT} />
+
+    <div class="g12 top" id="rooms">
+      <div class="s-8 ut-main">
+        <Section showAll={15}>
+        <div class="card ut-card">
+          <div class="ut-scroll">
+            <table class="ut ut-rooms">
+              <thead><tr>
+                <th scope="col">Room</th>
+                <th scope="col" class="r" title="People in a typical meeting, of the seats">People</th>
+                <th scope="col" title="Share of the working week occupied; the lighter bar is booked">Occupied</th>
+                <th scope="col" class="r">No-shows</th>
+                <th scope="col">Now</th>
+                <th scope="col" title="Open incidents, calls that failed, and kit that is barely used. Each links to where it is handled.">Engineering</th>
+              </tr></thead>
+              <tbody data-items>
+                {R.map(({ s, site, u, i, sig, kind, where, profile, status }) => {
+                  const worst = sig.failing[0];
+                  return (
+                    <tr class="ut-row" tabindex="0" data-k={s.id} data-i={i} data-fi
+                      data-find={`${s.name} ${s.number ?? ''} ${site.name} ${site.city} ${site.code} ${profile}`.toLowerCase()}
+                      data-f-region={site.region} data-f-site={s.site} data-f-kind={kind} data-f-status={status} data-f-type={s.space_type} data-f-where={HOME ? where : undefined}
+                      data-t-issues={sig.incidents.length ? '1' : undefined} data-t-failed={sig.failing.length ? '1' : undefined}
+                      data-occ={Math.round(u.occupied * 1000)} data-ns={Math.round(u.noShow * 1000)} data-fill={Math.round((u.typical / u.cap) * 1000)}
+                      data-inc={sig.incidents.length * 1000 + sig.failedCalls} data-name={s.name} data-site={site.name}>
+                      <td class="ut-room">
+                        <a class="ut-name" href={href(`/rooms/${s.id}/`)}>
+                          <span class="ut-plan" data-vt-rec={s.id}><svg class="rplan" viewBox="0 0 120 80" aria-hidden="true"><use href={`#rp-${s.space_type}`} /></svg></span>
+                          <span class="ut-nm"><b>{s.name}</b><small title={`${s.number} · ${site.name} · ${profile}`}>{s.number} · {site.code} · {profile}</small></span>
+                        </a>
+                        {u.flag && <span class:list={['uflag', 'dot', FLAG[u.flag].tone]} title={FLAG[u.flag].long}><span class="sr-only">{FLAG[u.flag].label}</span></span>}
+                      </td>
+                      <td class="r num" title={`Usually ${u.typical} people, ${u.cap} seats`}><b>{u.typical}</b><small> of {u.cap}</small></td>
+                      <td>
+                        <span class="ub-row" title={`Booked ${Math.round(u.bookH)} h, occupied ${Math.round(u.occH)} h of ${WEEK_H} h a week`}>
+                          <span class="ub" aria-hidden="true"><i class="ub-b" style={`width:${pct(u.booked)}`}></i><i class="ub-o" style={`width:${pct(u.occupied)}`}></i></span>
+                          <span class="num ub-v">{pct(u.occupied)}</span>
+                        </span>
+                      </td>
+                      <td class="r num">{pct(u.noShow)}</td>
+                      <td class="ut-now" data-now={s.id}><span class="nw closed">...</span></td>
+                      <td class="ut-eng">
+                        {sig.incidents.map((x) => <a class="uc bad" href={x.href} title={x.title}>{x.number}</a>)}
+                        {worst && <a class="uc warn" href={dev(worst)} title={`${sig.failedCalls} calls a week failed. Worst: ${worst.name}`}>{sig.failedCalls} failed</a>}
+                        {sig.little.length > 0 && <a class="uc" href={dev(sig.little[0])} title={`${sig.little.map((e) => e.name).join(', ')}: barely used`}>{sig.little.length} little used</a>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div class="ut-foot">
+            <p class="src-note"><b>Privacy:</b> only occupied or free, and a headcount band. Never meeting titles, organisers or who booked a room.</p>
+            <button type="button" class="btn small ghost" data-sa-btn hidden></button>
+          </div>
+        </div>
+        </Section>
+        <EmptyState text="No rooms match these filters." />
+      </div>
+
+      <SidePanel class="s-4" title="This room" meta="Pick a row to change it">
+        <div data-ru-detail aria-live="polite"></div>
+      </SidePanel>
+    </div>
+
+    <Section title="By office" aside="Occupied share of the working week, and how many rooms need a look. Pick a site to filter the table.">
+      <div class="card ut-card">
+        <div class="ut-scroll">
+          <table class="ut ut-sites">
+            <thead><tr>
+              <th scope="col">Office</th><th scope="col" class="r">Rooms</th><th scope="col" class="r">Seats</th><th scope="col">Occupied</th>
+              <th scope="col" class="r">No-shows</th><th scope="col" class="r">Over-used</th><th scope="col" class="r">Under-used</th><th scope="col" class="r">Booked, empty</th>
+            </tr></thead>
+            <tbody>
+              {regionRoll.filter((r) => r.rooms).map((r) => (
+                <>
+                  <tr class="ut-reg">
+                    <th scope="row"><button type="button" class="ut-pick" data-pick="region" data-v={r.id} title={REGION_LABEL[r.id]}>{REGION_SHORT[r.id]}</button></th>
+                    <td class="r num">{r.rooms}</td><td class="r num">{n1(r.seats)}</td>
+                    <td><span class="ub-row"><span class="ub" aria-hidden="true"><i class="ub-o" style={`width:${pct(r.occupied)}`}></i></span><span class="num ub-v">{pct(r.occupied)}</span></span></td>
+                    <td class="r num">{pct(r.noShow)}</td><td class="r num">{r.over || ''}</td><td class="r num">{r.under || ''}</td><td class="r num">{r.ghost || ''}</td>
+                  </tr>
+                  {siteRoll.filter((x) => x.site.region === r.id).map((x) => (
+                    <tr>
+                      <th scope="row" class="ut-sub"><button type="button" class="ut-pick" data-pick="site" data-v={x.id} title={`${x.site.name}, ${x.site.city}: ${SITE_ROLE[x.site.role] ?? ''}`}>{x.site.name}</button><small>{x.site.city}</small></th>
+                      <td class="r num">{x.rooms}</td><td class="r num">{n1(x.seats)}</td>
+                      <td><span class="ub-row"><span class="ub" aria-hidden="true"><i class="ub-o" style={`width:${pct(x.occupied)}`}></i></span><span class="num ub-v">{pct(x.occupied)}</span></span></td>
+                      <td class="r num">{pct(x.noShow)}</td><td class="r num">{x.over || ''}</td><td class="r num">{x.under || ''}</td><td class="r num">{x.ghost || ''}</td>
+                    </tr>
+                  ))}
+                </>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </Section>
+
+    <Section title="Where the numbers come from" aside="All figures on this page are simulated for the demo.">
+      <div class="g12">
+        {['booked', 'occupied', 'noShow', 'headcount'].map((k) => (
+          <div class="card side-card s-3"><h3>{{ booked: 'Booked', occupied: 'Occupied', noShow: 'No-shows', headcount: 'Now and headcount' }[k]}</h3><p class="src-note">{SOURCE[k]}</p></div>
+        ))}
+        <div class="card side-card"><h3>Engineering columns</h3><p class="src-note">Open incidents come from the service desk tickets. Failed calls are calls that did not connect or dropped in the first minute, counted from the same call history as call hours. Little used is a video device the usage rules flag as barely worked. Simulated, like everything else here.</p></div>
+      </div>
+    </Section>
+  </div>
+  <div class="viz-tip" role="tooltip" data-viz-tip></div>
+
+  <script is:inline data-astro-rerun define:vars={{ ROOMS, DEVICES, CFG }} slot="end">
+    (function () {
+      var root = document.querySelector('[data-ru]'), bar = document.querySelector('[data-fb]'); if (!root || !bar) return;
+      var byId = {}; ROOMS.forEach(function (r) { byId[r.id] = r; });
+      var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+      var H = function (h) { return (h < 10 ? '0' : '') + h + ':00'; };
+      var reduced = function () { return window.rsMotion ? window.rsMotion().reduced : matchMedia('(prefers-reduced-motion: reduce)').matches; };
+      var whenBar = function (fn) { if (bar.rsFilter) fn(); else document.addEventListener('DOMContentLoaded', fn, { once: true }); };
+
+      /* Now: each site's own local time. A room is in use this hour with the chance its heat map gives,
+         decided the same way for everyone looking in that hour. Only yes or no, and a headcount band. */
+      var hash = function (s) { var n = 2166136261; for (var i = 0; i < s.length; i++) { n = Math.imul(n ^ s.charCodeAt(i), 16777619) >>> 0; } return n / 4294967296; };
+      var WD = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+      var local = function (tz) {
+        var parts = {}; new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', hour: '2-digit', minute: '2-digit', year: 'numeric', month: '2-digit', day: '2-digit', hour12: false }).formatToParts(new Date()).forEach(function (p) { parts[p.type] = p.value; });
+        return { d: WD[parts.weekday], h: +parts.hour % 24, m: parts.minute, date: parts.year + parts.month + parts.day, wd: parts.weekday };
+      };
+      var nowOf = function (r) {
+        var t = local(r.tz);
+        if (t.d > 4 || t.h < CFG.HOUR0 || t.h >= CFG.HOUR0 + CFG.HOURS_DAY) return { open: false, t: t };
+        var p = r.heat[t.d][t.h - CFG.HOUR0] / 100;
+        var on = hash(r.id + t.date + t.h) < p;
+        var n = Math.max(1, Math.min(r.peak, Math.round(r.typ * (0.55 + hash(t.date + r.id + t.h) * 0.8))));
+        return { open: true, on: on, band: n <= 2 ? 0 : n <= 5 ? 1 : n <= 10 ? 2 : n <= 20 ? 3 : 4, t: t };
+      };
+      var NOW = {};
+      var paintNow = function () {
+        var inUse = 0, open = 0;
+        ROOMS.forEach(function (r) {
+          var x = NOW[r.id] = nowOf(r);
+          if (x.open) open++; if (x.on) inUse++;
+          var el = root.querySelector('[data-now="' + r.id + '"]'); if (!el) return;
+          el.innerHTML = !x.open ? '<span class="nw closed" title="Outside 08:00 to 18:00 on a weekday, local time">Closed</span>'
+            : x.on ? '<span class="nw on"><i></i>In use <small>' + CFG.BANDS[x.band] + '</small></span>' : '<span class="nw free"><i></i>Free</span>';
+          el.closest('.ut-row').dataset.now = x.on ? '2' : x.open ? '1' : '0';
+          if (x.on) el.closest('.ut-row').setAttribute('data-t-now', '1'); else el.closest('.ut-row').removeAttribute('data-t-now');
+        });
+        // "In use now" is a switch in the bar, and the band's figure opens it (rule P10): read the rows again.
+        var fbar = root.querySelector('[data-fb]') || document.querySelector('[data-fb]');
+        setTimeout(function () { if (fbar && fbar.rsFilter) fbar.rsFilter.refresh(); }, 0);
+        // The first key number in the band is "in use now".
+        window.rsKeyNumber('inuse', open ? inUse + ' of ' + open : '0', { label: open ? 'In use now' : 'Every site closed' });
+      };
+
+      /* The side panel for one room. */
+      var seq = function (v) { return v <= 0 ? 0 : Math.min(7, 1 + Math.floor(v / 14.3)); };
+      function detail(r) {
+        var x = NOW[r.id] || nowOf(r);
+        var f = r.flag ? CFG.FLAG[r.flag] : null;
+        var seats = '';
+        var shown = Math.min(r.cap, 24);
+        for (var i = 0; i < shown; i++) seats += '<i class="' + (i < r.typ ? 'typ' : i < r.peak ? 'pk' : '') + '"></i>';
+        var over = r.typ > r.cap ? r.typ - r.cap : 0;
+        for (var j = 0; j < over; j++) seats += '<i class="ovr"></i>';
+        var heat = '<div class="hm" role="group" aria-label="Share of each hour occupied, weekday by hour">' +
+          '<span></span>' + Array.from({ length: CFG.HOURS_DAY }, function (_, h) { return '<span class="hm-h">' + ((CFG.HOUR0 + h) % 2 === 0 ? (CFG.HOUR0 + h) : '') + '</span>'; }).join('') +
+          r.heat.map(function (row, d) {
+            return '<span class="hm-d">' + CFG.DAYS[d] + '</span>' + row.map(function (v, h) {
+              var now = x.open && x.t.d === d && x.t.h === CFG.HOUR0 + h;
+              return '<span class="hm-c hq' + seq(v) + (now ? ' now' : '') + '" tabindex="0" data-tip="<b>' + CFG.DAY_LONG[d] + ', ' + H(CFG.HOUR0 + h) + ' to ' + H(CFG.HOUR0 + h + 1) + '</b><br>Occupied ' + v + '% of the time' + (now ? '<br>This hour, now' : '') + '" aria-label="' + CFG.DAY_LONG[d] + ' ' + H(CFG.HOUR0 + h) + ': occupied ' + v + '%"></span>';
+            }).join('');
+          }).join('') + '</div>';
+        var bar = function (cls, label, h, note) {
+          return '<div class="bo"><span class="bo-l">' + label + '</span><span class="bo-t"><i class="' + cls + '" style="width:' + Math.min(100, (h / CFG.WEEK_H) * 100) + '%"></i></span><span class="bo-v num">' + Math.round(h) + ' h</span>' + (note ? '<small class="bo-n">' + note + '</small>' : '') + '</div>';
+        };
+        var devs = DEVICES[r.id] || [];
+        var eng = '<section class="rd-sec"><h3>For engineers <span class="faint">what to look at in this room</span></h3>' +
+          (r.inc.length ? '<ul class="rd-list">' + r.inc.map(function (n) { return '<li><a class="uc bad" href="' + n.h + '">' + esc(n.n) + '</a><span>' + esc(n.t) + '</span></li>'; }).join('') + '</ul>' : '<p class="rd-p">No open incidents.</p>') +
+          (devs.length ? '<ul class="rd-list rd-devs">' + devs.map(function (d) {
+            return '<li><a href="' + d.h + '"><b>' + esc(d.n) + '</b><small>' + esc(d.l) + '</small></a>' +
+              (d.w ? '<span class="uc warn">' + d.f + ' failed</span>' : d.f ? '<span class="uc">' + d.f + ' failed</span>' : '') + (d.lu ? '<span class="uc">Little used</span>' : '') + '</li>';
+          }).join('') + '</ul>' : '') + '</section>';
+        return '<div class="rd" data-room="' + r.id + '">' +
+          '<header class="rd-h"><div><p class="rd-k">' + esc(r.code) + ' · ' + esc(r.num) + '</p><h3 class="rd-t">' + esc(r.name) + '</h3><p class="rd-s">' + esc(r.profile) + ', ' + esc(r.siteName) + '</p></div>' +
+          '<a class="btn small ghost rd-go" href="' + CFG.ROOM_BASE + r.id + '/">Room page</a></header>' +
+          '<p class="rd-now ' + (x.on ? 'on' : x.open ? 'free' : 'closed') + '"><i></i>' + (x.on ? 'In use now, ' + CFG.BANDS[x.band].toLowerCase() + ' people' : x.open ? 'Free now' : 'Closed now') + '<small>' + x.t.wd + ' ' + (x.t.h < 10 ? '0' : '') + x.t.h + ':' + x.t.m + ' local time</small></p>' +
+          (f ? '<div class="rd-flag ' + f.tone + '"><span class="uflag ' + f.tone + '">' + f.long + '</span><p>' + esc(r.why) + '</p><p class="rd-act">' + esc(r.act) + '</p></div>' : '') +
+          '<section class="rd-sec"><h3>Seats and people <span class="faint">typical meeting</span></h3><div class="rd-seats" aria-hidden="true">' + seats + '</div>' +
+          '<p class="rd-p"><b>' + r.typ + '</b> people in a typical meeting, in <b>' + r.cap + '</b> seats. Busiest: ' + r.peak + (r.peak > r.cap ? ' (people standing)' : '') + '. Full in ' + r.full + '% of meetings.</p>' +
+          '<ul class="seat-key" aria-hidden="true"><li><i class="typ"></i>Typical</li><li><i class="pk"></i>Up to the busiest</li><li><i></i>Empty seat</li></ul></section>' +
+          '<section class="rd-sec"><h3>A typical week <span class="faint">of ' + CFG.WEEK_H + ' bookable hours</span></h3>' +
+          bar('b-b', 'Booked', r.bookH) + bar('b-o', 'Occupied', r.occH) + bar('b-n', 'No-shows', r.nsH, r.ns + '% of booked hours') + '</section>' +
+          '<section class="rd-sec"><h3>Busy hours <span class="faint">local time, average of four weeks</span></h3>' + heat +
+          '<div class="hm-key" aria-hidden="true"><span>0%</span>' + [1, 2, 3, 4, 5, 6, 7].map(function (k) { return '<i class="hq' + k + '"></i>'; }).join('') + '<span>100%</span></div></section>' +
+          eng + '</div>';
+      }
+      var panel = root.querySelector('[data-side-panel]'), box = root.querySelector('[data-ru-detail]');
+      var show = function (id, animate) {
+        var r = byId[id]; if (!r) return;
+        var go = function () { box.innerHTML = detail(r); };
+        if (animate && window.rsPanelSwap && panel) window.rsPanelSwap(panel, go); else go();
+        root.querySelectorAll('.ut-row').forEach(function (b) { if (b.dataset.k === id) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current'); });
+      };
+
+      /* Sort. Rows keep their place key, so the bar slides them into their new order. */
+      var rowsBox = root.querySelector('[data-items]');
+      var rows = Array.prototype.slice.call(rowsBox.children);
+      var sort = bar.rsFilter ? bar.rsFilter.sort() : (new URLSearchParams(location.search).get('sort') || 'busiest');
+      var KEY = {
+        busiest: function (e) { return -e.dataset.occ; }, quiet: function (e) { return +e.dataset.occ; }, noshow: function (e) { return -e.dataset.ns; }, full: function (e) { return -e.dataset.fill; },
+        now: function (e) { return -(+(e.dataset.now || 0) * 10000 + +e.dataset.occ); }, issues: function (e) { return -e.dataset.inc; },
+      };
+      var reorder = function () {
+        var sorted = rows.slice();
+        if (sort === 'name') sorted.sort(function (a, b) { return a.dataset.name.localeCompare(b.dataset.name, 'en', { numeric: true }) || a.dataset.i - b.dataset.i; });
+        else if (sort === 'site') sorted.sort(function (a, b) { return a.dataset.site.localeCompare(b.dataset.site, 'en') || a.dataset.i - b.dataset.i; });
+        else { var k = KEY[sort] || KEY.busiest; sorted.sort(function (a, b) { return k(a) - k(b) || a.dataset.i - b.dataset.i; }); }
+        sorted.forEach(function (el) { rowsBox.appendChild(el); });
+      };
+      bar.addEventListener('fb:sort', function (e) { sort = e.detail.value; bar.rsFilter.run(true, reorder); });
+      whenBar(function () {
+        sort = bar.rsFilter.sort();
+        if (sort !== 'busiest') { bar.rsFilter.run(false, reorder); var f = rowsBox.querySelector('.ut-row:not(.fb-out)'); if (f) show(f.dataset.k, false); }
+      });
+
+      /* Keep the panel on a room that is still showing. */
+      document.addEventListener('fb:change', function () {
+        var cur = rowsBox.querySelector('.ut-row[aria-current=true]');
+        if (cur && !cur.classList.contains('fb-out')) return;
+        var first = rowsBox.querySelector('.ut-row:not(.fb-out)');
+        if (first) show(first.dataset.k, true);
+      });
+      var toPanel = function () {
+        // Under 1100 px the panel sits below the table: bring it into view.
+        if (panel && matchMedia('(max-width: 1100px)').matches) panel.scrollIntoView({ behavior: reduced() ? 'auto' : 'smooth', block: 'start' });
+      };
+      rowsBox.addEventListener('click', function (e) { if (e.target.closest('a')) return; var b = e.target.closest('.ut-row'); if (b) { show(b.dataset.k, true); toPanel(); } });
+      rowsBox.addEventListener('keydown', function (e) {
+        if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.ut-row')) { e.preventDefault(); show(e.target.dataset.k, true); toPanel(); }
+      });
+
+      /* A site or region in the roll-up filters the table above it. */
+      root.querySelectorAll('[data-pick]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!bar.rsFilter) return;
+          bar.rsFilter.clear();
+          var opt = document.querySelector('[data-fb-facet="' + b.dataset.pick + '"] [data-fopt][data-v="' + b.dataset.v + '"]'); if (opt) opt.click();
+          var to = document.getElementById('rooms'); if (to) to.scrollIntoView({ behavior: reduced() ? 'auto' : 'smooth', block: 'start' });
+        });
+      });
+
+      /* Home offices are one click away: start on offices when there are both. */
+      if (CFG.HOME) whenBar(function () {
+        if (new URLSearchParams(location.search).has('where')) return;
+        var opt = document.querySelector('[data-fb-facet="where"] [data-fopt][data-v="office"]'); if (opt) opt.click();
+      });
+
+      /* Tooltip for the heat map cells. */
+      var tip = document.querySelector('[data-viz-tip]');
+      var tipOn = function (el) { if (!tip || !el.dataset.tip) return; tip.innerHTML = el.dataset.tip; var b = el.getBoundingClientRect(); tip.classList.add('on'); var w = tip.offsetWidth; tip.style.left = Math.max(8, Math.min(innerWidth - w - 8, b.left + b.width / 2 - w / 2)) + 'px'; tip.style.top = (b.top - tip.offsetHeight - 8) + 'px'; };
+      var tipOff = function () { if (tip) tip.classList.remove('on'); };
+      box.addEventListener('mouseover', function (e) { var c = e.target.closest('[data-tip]'); if (c) tipOn(c); });
+      box.addEventListener('mouseout', function (e) { if (e.target.closest('[data-tip]')) tipOff(); });
+      box.addEventListener('focusin', function (e) { var c = e.target.closest('[data-tip]'); if (c) tipOn(c); });
+      box.addEventListener('focusout', tipOff);
+
+      paintNow();
+      show(ROOMS[0].id, false);
+      // Refresh "now" once a minute while the page is open.
+      if (window.__rsUsageTimer) clearInterval(window.__rsUsageTimer);
+      window.__rsUsageTimer = setInterval(function () { if (!document.querySelector('[data-ru]')) { clearInterval(window.__rsUsageTimer); return; } paintNow(); }, 60000);
+    })();
+  </script>
+</Shell>

@@ -1,0 +1,75 @@
+---
+// How a room's devices reach the internet, hop by hop: the device, the data outlet, the floor's
+// comms room (IDF), the fibre back to the main comms room (MDF), the firewall and the provider's
+// circuit, then the cloud services the devices use. With a real room, each hop names the comms
+// room and the switch; for a room profile, the hops are generic.
+import Icon from './Icon.astro';
+import { networkPath, classes, className, href, rackFor, rackGear } from '../lib/data.mjs';
+const { space = null, heading = 'How it reaches the internet' } = Astro.props;
+const path = space ? networkPath(space) : { mdf: null, idf: null };
+const networked = space ? space.positions.filter((p) => classes[p.cls]?.platforms?.dhcp_dns && p.hostname) : [];
+const pick = (c, key) => c?.positions.find((p) => p.position === key || p.position.startsWith(`${key}#`));
+const roomName = (c) => (c ? `${c.name}, ${c.number}` : '');
+const SW = { 'av-switch': 'AV switch', 'access-switch': 'Access switch', 'core-switch': 'Core switch' };
+const swName = (p) => SW[p.key] ?? className(p.cls);
+const idfSwitch = path.idf && (pick(path.idf, 'av-switch') ?? pick(path.idf, 'access-switch'));
+const core = path.mdf && pick(path.mdf, 'core-switch');
+const fw = path.mdf && pick(path.mdf, 'firewall');
+const sameRoom = path.idf && path.mdf && path.idf.id === path.mdf.id;
+const hops = [
+  { icon: 'devices', title: space ? `${networked.length} networked ${networked.length === 1 ? 'device' : 'devices'}` : 'Room devices', sub: networked.slice(0, 3).map((p) => p.hostname).join(', ') + (networked.length > 3 ? '…' : '') || 'Video bar, touch controller, panel', cable: 'Cat 6 in the wall' },
+  { icon: 'wire', title: 'Data outlet', sub: 'In the floor box or wall', cable: 'Horizontal cable' },
+  { icon: 'rack', title: path.idf ? roomName(path.idf) : 'Floor comms room (IDF)', sub: idfSwitch ? `${swName(idfSwitch)} ${idfSwitch.hostname}` : 'Patch panel, PoE switch, AV VLAN', to: path.idf && href(`/rooms/${path.idf.id}/`), cable: sameRoom ? 'In the same rack' : 'Fibre uplink' },
+  ...(sameRoom ? [] : [{ icon: 'rack', title: path.mdf ? roomName(path.mdf) : 'Main comms room (MDF)', sub: core ? `Core switch ${core.hostname}` : 'Core switches', to: path.mdf && href(`/rooms/${path.mdf.id}/`), cable: 'In the same rack' }]),
+  { icon: 'shield', title: 'Firewall', sub: fw ? fw.hostname : 'A pair, at the edge', cable: 'Provider handoff' },
+  { icon: 'globe', title: 'Internet circuit', sub: "The provider's line", cable: 'The internet' },
+  { icon: 'link', title: 'Cloud services', sub: 'Google Meet, Poly Lens, calendar' },
+];
+const known = !space || (path.idf || path.mdf);
+// What the packets pass through, from the comms rooms' racks (or the typical equipment for a room profile).
+const gearIn = (room, kind) => { const r = room && rackFor(room.id); const it = r?.items.find((i) => i.kind === kind && i.gear); return it ? rackGear[it.gear] : null; };
+const nm = (g, fb) => (g ? `${g.manufacturer.split(' ')[0]} ${g.model}` : fb);
+const idfR = path.idf ?? null, mdfR = path.mdf ?? null;
+const detail = [
+  null, 'Cat6A to a numbered jack',
+  `${nm(gearIn(idfR, 'patch-panel'), 'Patch panel')}, then ${nm(gearIn(idfR, 'switch') ?? gearIn(idfR, 'shelf'), 'a PoE access switch')}`,
+  ...(sameRoom ? [] : [nm(mdfR && rackGear['cisco-c9500-24y4c'], 'Core switch pair')]),
+  nm(gearIn(mdfR ?? idfR, 'firewall') ?? (!space ? rackGear['paloalto-pa-445'] : null), 'Firewall pair'),
+  "The provider's box ends their line", null,
+];
+hops.forEach((h, i) => { if (detail[i]) h.gear = detail[i]; });
+const oob = gearIn(mdfR ?? idfR, 'oob') ?? (!space ? rackGear['zpe-nodegrid-gate-sr'] : null);
+---
+<section class="npath" aria-labelledby="np-h">
+  <div class="section-head"><h2 id="np-h">{heading}</h2><span class="aside faint">{space ? (known ? 'From the comms rooms recorded for this site' : 'Comms rooms not recorded for this site yet, so the hops are generic') : 'The same path for every room of this type'}</span></div>
+  <ol class="np">
+    {hops.map((h, i) => (
+      <li class="np-hop" style={`--i:${i}`}>
+        {h.to ? <a class="np-node" href={h.to}><span class="np-i"><Icon name={h.icon} size={18} /></span><b>{h.title}</b><small class="mono">{h.sub}</small>{h.gear && <small class="np-gear">{h.gear}</small>}</a>
+              : <span class="np-node"><span class="np-i"><Icon name={h.icon} size={18} /></span><b>{h.title}</b><small class="mono">{h.sub}</small>{h.gear && <small class="np-gear">{h.gear}</small>}</span>}
+        {h.cable && <span class="np-link" aria-hidden="true"><i></i><em>{h.cable}</em></span>}
+      </li>
+    ))}
+  </ol>
+  {oob && <p class="np-oob"><span class="np-i"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12a10 10 0 0 1 14 0M8 15a6 6 0 0 1 8 0M12 18h.01"/></svg></span><span><b>When the network itself is down</b> the network team still reaches every switch and firewall through the out-of-band path: {oob.manufacturer} {oob.model} in the {mdfR ? 'main comms room' : 'comms room'}, over its own cellular link.</span></p>}
+</section>
+<style is:global>
+  .np { list-style: none; margin: 0; padding: 4px 0 8px; display: flex; flex-wrap: wrap; row-gap: 14px; align-items: stretch; }
+  .np-hop { display: flex; align-items: center; flex: 0 0 auto; }
+  .np-node { display: grid; justify-items: start; gap: 3px; width: 150px; min-height: 96px; padding: 10px 12px; border-radius: var(--radius-lg); background: var(--surface); border: var(--border-card); color: inherit; text-decoration: none; animation: np-in var(--dur-morph, .5s) var(--ease-settle) both; animation-delay: calc(var(--i) * 70ms); }
+  :root[data-look="classic"] .np-node { border: 1.5px solid var(--ink); box-shadow: 2px 2px 0 var(--ink); }
+  a.np-node:hover { color: inherit; box-shadow: var(--shadow-md); }
+  .np-node b { font-size: 12.5px; line-height: 1.25; }
+  .np-node small { font-size: 10.5px; color: var(--text-3); overflow-wrap: anywhere; }
+  .np-gear { font-size: 10.5px; color: var(--text-2); font-weight: 600; }
+  .np-oob { display: flex; gap: 10px; align-items: center; margin: 6px 0 0; font-size: 13px; color: var(--text-2); padding: 10px 12px; border-radius: var(--radius); border: 1px dashed var(--line-strong); }
+  .np-oob b { color: var(--text); }
+  .np-i { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--surface-2); color: var(--text-2); }
+  .np-link { position: relative; width: 88px; height: 96px; display: grid; place-items: center; }
+  .np-link i { position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: repeating-linear-gradient(90deg, var(--line-strong) 0 6px, transparent 6px 10px); }
+  .np-link i::after { content: ""; position: absolute; top: -3px; left: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px var(--green-soft); animation: np-packet 2.2s linear infinite; animation-delay: calc(var(--i) * 0.3s); }
+  .np-link em { position: absolute; top: 22px; left: 4px; right: 4px; font: 600 9.5px/1.2 var(--font-mono); font-style: normal; color: var(--text-3); text-align: center; }
+  @keyframes np-packet { from { left: 0; } to { left: calc(100% - 8px); } }
+  @keyframes np-in { from { opacity: 0; transform: translateY(6px); } }
+  @media (prefers-reduced-motion: reduce) { .np-link i::after, .np-node { animation: none; } }
+</style>

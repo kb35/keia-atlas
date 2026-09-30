@@ -1,0 +1,76 @@
+# The internet in and out of the Dublin office: two providers' circuits, from the building entry to the firewalls. Made up;
+# written by tools/migrations/2026-09-30-dublin-floors.mjs. The providers' boxes are the ADVA pair at U24 in the MDF.
+site: dub
+fictional: "Made up for the demo: the providers, the entry and the lead-in lengths are invented."
+entry_points:
+  - id: dub-entry-south
+    name: Telecoms entry, south duct (ground floor)
+    level_m: 0
+    at: [ 32.25, 0 ]
+    notes: A duct from the street into the ground floor telecoms room, then up riser 1.
+  - id: dub-entry-north
+    name: Telecoms entry, north duct (ground floor)
+    level_m: 0
+    at: [ 32.25, 24 ]
+    notes: A second duct from the other street, for a diverse route into the building.
+circuits:
+  - id: dub-isp-1
+    name: Internet circuit 1
+    provider: Carrier One
+    role: primary
+    type: Dedicated internet access over fibre, handed off as Ethernet
+    bandwidth: Not recorded
+    entry: dub-entry-south
+    lead_in:
+      type: fibre-os2
+      cores: 2
+      length_m: 42
+      via: &a1
+        - dub-riser-1
+        - t3-comms
+    panel:
+      rack: dub-3-21-r1
+      u: 42
+      ports: 13-14
+    handoff:
+      rack: dub-3-21-r1
+      u: 24
+      customer: [ 1 ]
+      network: [ 5, 6 ]
+    firewall:
+      rack: dub-3-21-r1
+      u: 22
+      port: 2
+    cables:
+      - dub-cb-13
+      - dub-cb-11
+  - id: dub-isp-2
+    name: Internet circuit 2
+    provider: Carrier Two
+    role: secondary
+    type: Dedicated internet access over fibre, handed off as Ethernet
+    bandwidth: Not recorded
+    entry: dub-entry-north
+    lead_in:
+      type: fibre-os2
+      cores: 2
+      length_m: 55
+      via: *a1
+    panel:
+      rack: dub-3-21-r1
+      u: 42
+      ports: 15-16
+    handoff:
+      rack: dub-3-21-r1
+      u: 24
+      customer: [ 2 ]
+      network: [ 7, 8 ]
+    firewall:
+      rack: dub-3-21-r1
+      u: 23
+      port: 2
+    cables:
+      - dub-cb-13
+      - dub-cb-12
+notes:
+  - "Both lead-ins come up riser 1, so the two circuits share one path inside the building: worth a second riser when the building allows."

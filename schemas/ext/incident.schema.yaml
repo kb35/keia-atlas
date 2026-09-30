@@ -1,0 +1,81 @@
+# Incident: a ServiceNow incident as Keia Atlas sees it. The ticket fields mirror ServiceNow's
+# incident table; `history` mirrors the ticket's activity log; the keia_atlas block is what Keia Atlas
+# adds by matching the ticket to a room and its devices. Tickets stay in ServiceNow (decision 0020);
+# the lifecycle rules are in decision 0024 and checked by tools/crossrefs.mjs.
+# Demo data: there is no live ServiceNow connection.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/incident
+title: Incident
+type: object
+additionalProperties: false
+required: [number, opened, short_description, caller, priority, state, assignment_group, subject, history, keia_atlas, demo]
+$defs:
+  when: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$", description: "Local time at the site, to the minute (2026-09-28T07:58)." }
+properties:
+  number: { type: string, pattern: "^INC[0-9]{7}$", description: The ServiceNow incident number. }
+  opened: { $ref: "#/$defs/when", description: When the ticket was opened. The first history entry has the same time. }
+  short_description: { type: string }
+  description: { type: string }
+  caller: { type: string, description: The person who reported it (a made-up name). }
+  priority: { enum: [1, 2, 3, 4], description: "ServiceNow priority: 1 critical, 2 high, 3 moderate, 4 low." }
+  state: { enum: [new, in-progress, on-hold, resolved], description: The ticket's state now. Must equal the last state in history. }
+  assignment_group: { type: string }
+  subject:
+    description: What the ticket is about, once Keia Atlas has matched it. A whole room, or one device in it.
+    type: object
+    additionalProperties: false
+    required: [kind, room]
+    properties:
+      kind: { enum: [room, device] }
+      room: { type: string, description: A room id (data/spaces). }
+      position: { type: string, description: "For a device: its position in the room's install (video-bar, display#2, kit-07/network-gateway)." }
+      device: { type: string, description: "For a device: the asset tag of the unit at that position. A device needs both position and device; a room has neither (checked in tools/crossrefs-incidents.mjs)." }
+  history:
+    description: The ticket's activity log, oldest first, as ServiceNow keeps it, plus the notes Keia Atlas adds.
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [at, source]
+      properties:
+        at: { $ref: "#/$defs/when" }
+        state: { enum: [new, in-progress, on-hold, resolved], description: Set when this entry changes the ticket's state. }
+        by: { type: string, description: A person in the demo team (src/lib/demo.mjs) who made the entry. }
+        person: { type: string, description: "Someone outside the team, by name: the caller, a vendor's engineer." }
+        source: { enum: [servicenow, keia_atlas], description: Where the entry was made. Keia Atlas entries are work notes it wrote back (stage 4) or matches it made (stage 2). }
+        hold_reason: { enum: [awaiting-caller, awaiting-vendor, awaiting-change, awaiting-parts], description: Why the ticket is on hold. Only on an on-hold entry. }
+        resolution:
+          description: How it was resolved. Only on a resolved entry.
+          type: object
+          additionalProperties: false
+          required: [code, notes]
+          properties:
+            code: { enum: [fixed, workaround, no-fault-found, duplicate, cancelled] }
+            notes: { type: string, minLength: 1 }
+        note: { type: string, description: "The comment or work note, in plain words." }
+  demo: { const: true }
+  keia_atlas:
+    type: object
+    additionalProperties: false
+    required: [matched_by, evidence, next]
+    properties:
+      matched_by: { type: string, description: How Keia Atlas knew which room and device the ticket is about. }
+      symptom: { type: string, description: "The symptom in the device profile's guide this matches (a key under discrimination in data/device-classes)." }
+      firmware: { type: string, description: "The firmware device management reports for the unit, when it reports one." }
+      evidence:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [from, says, level]
+          properties:
+            from: { type: string }
+            says: { type: string }
+            level: { enum: [ok, warn, bad] }
+      related: { description: "Linked work: a project task (T-1234), a Lab test or a known issue.", type: array, items: { type: string } }
+      next: { description: "What Keia Atlas suggests doing next, from the guide.", type: array, items: { type: string } }
+      assigned: { type: string }
+      work_note: { description: "Stage 4: the note Keia Atlas would write back to the ticket.", type: string }
+      captured_fix: { type: string }

@@ -1,0 +1,62 @@
+# Builds the Docker image and checks the container serves the site under
+# /keia-atlas/. Nothing is pushed anywhere. Docker is not available on the
+# maintainer's own machine, so this is the check that proves the Dockerfile works.
+name: Container
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get the code, including the pinned Keia submodule
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          submodules: true
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build the image (no push)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          push: false
+          load: true
+          tags: keia-atlas:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run the container
+        run: docker run -d --name keia-atlas -p 8080:8080 keia-atlas:ci
+
+      - name: Wait for it, then check the site returns 200 under /keia-atlas/
+        run: |
+          for i in $(seq 1 20); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/keia-atlas/ || true)
+            if [ "$code" = "200" ]; then break; fi
+            sleep 1
+          done
+          echo "GET /keia-atlas/ -> $code"
+          test "$code" = "200"
+
+      - name: Check the root redirect and the 404 status
+        run: |
+          root=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' http://localhost:8080/)
+          echo "GET / -> $root"
+          case "$root" in "302 "*"/keia-atlas/") ;; *) exit 1 ;; esac
+          missing=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/keia-atlas/no-such-page/)
+          echo "GET /keia-atlas/no-such-page/ -> $missing"
+          test "$missing" = "404"
+
+      - name: Show container logs if anything failed
+        if: failure()
+        run: docker logs keia-atlas

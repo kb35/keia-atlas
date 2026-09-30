@@ -1,0 +1,26 @@
+---
+// A compact table of models for one group of devices: the model, how many, where, and how long each
+// has been in service. Years in service come from each unit's own install date (or the day it came out).
+import DeviceGlyph from './DeviceGlyph.astro';
+import { rowName } from '../lib/refresh.mjs';
+import { href, sites } from '../lib/data.mjs';
+const { rows } = Astro.props;
+const LIMIT = 8;
+const yr = (a, b) => (b < 1 ? 'under 1 y' : a.toFixed(0) === b.toFixed(0) ? `${b.toFixed(0)} y` : `${a < 1 ? '<1' : a.toFixed(0)} to ${b.toFixed(0)} y`);
+---
+<div class="tablewrap">
+  <table class="wp-table">
+    <thead><tr><th scope="col">Model</th><th scope="col" class="r">Units</th><th scope="col">Offices</th><th scope="col" class="r">In service</th></tr></thead>
+    <tbody>
+      {rows.map((r, k) => (
+        <tr hidden={k >= LIMIT} data-more={k >= LIMIT ? '' : undefined}>
+          <td><span class="wp-dev"><span class="dg"><DeviceGlyph cls={r.cls} size={26} /></span>{r.model ? <a href={href(`/models/${r.model}/`)}><b>{rowName(r)}</b></a> : <b>{rowName(r)}</b>}</span></td>
+          <td class="num r">{r.n}</td>
+          <td class="faint">{[...r.sites].map((s) => sites[s].code).join(', ')}</td>
+          <td class="num r">{yr(r.minYears, r.maxYears)}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+  {rows.length > LIMIT && <button type="button" class="wp-more" data-more-btn data-n={rows.length}>Show all {rows.length}</button>}
+</div>

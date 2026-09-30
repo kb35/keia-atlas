@@ -1,0 +1,179 @@
+---
+// A floor plan to scale, drawn from the building model in src/lib/floors.mjs: the outline, the
+// core, corridors and named areas, every room at its place with its number and door, the comms room's rack, the
+// riser, the trays (and, with `cables`, every run on the floor in its purpose colour) and the access points. It is
+// the check on the data, and the 3D view's other half (decision 0030): the phone view, the keyboard route and the
+// view when a browser can't draw 3D. The fictional label (rule F9) is always shown.
+//
+// Props: site, floor, cables (draw the runs), highlight (a room id to mark), interactive (rooms, racks, access
+// points and runs carry data-sel keys, and rooms, racks and access points can be focused and chosen with Enter;
+// the page's script does the choosing: src/lib/office3d-client.mjs).
+//
+// On a narrow box (under 520 px) the plan turns a quarter turn, so its long side runs down the screen and rooms
+// stay big enough to read and tap (as room plans do on cards, rooms.md R6); the words stay upright.
+import { building } from '../lib/floors.mjs';
+import { doorOf } from '../lib/office3d.mjs';
+
+interface Props { site: string; floor: string; cables?: boolean; highlight?: string | null; interactive?: boolean }
+const { site, floor, cables = false, highlight = null, interactive = false } = Astro.props;
+const M = building(site);
+const F = M?.floors.find((f) => f.id === floor) ?? null;
+const rooms = F ? Object.values(M.rooms).filter((r) => r.floor === floor && r.rect) : [];
+const xs = F ? F.outline.map((p) => p[0]) : [0], ys = F ? F.outline.map((p) => p[1]) : [0];
+const W = Math.max(...xs), H = Math.max(...ys);
+const pad = 1.5;
+// Plan y runs north (up); SVG y runs down.
+const Y = (y) => H - y;
+const rectAttrs = ([x0, y0, x1, y1]) => ({ x: x0, y: Y(y1), width: x1 - x0, height: y1 - y0 });
+const pts = (P) => P.map(([x, y]) => `${x},${Y(y)}`).join(' ');
+const runs = cables && M ? M.runs.filter((r) => r.floor === floor && r.path) : [];
+const racks = M ? M.racks.filter((r) => r.floor === floor && r.at) : [];
+const aps = M ? M.aps.filter((a) => a.floor === floor) : [];
+const label = (r) => r.number ?? r.name;
+const roomName = (r) => `${r.number ? `${r.number} ` : ''}${r.name}`;
+const apModel = (a) => (a.model === 'unifi-u7-pro-max' ? 'U7 Pro Max' : 'U7 Pro');
+const pick = (key, name) => (interactive ? { 'data-sel': key, tabindex: 0, role: 'button', 'aria-label': name, 'aria-pressed': 'false' } : {});
+const coreLabel = { stair: 'Stairs', lift: 'Lifts', riser: 'Riser', toilets: 'WC', store: 'Store' };
+---
+{F && (
+  <figure class:list={['floormap', { 'fm-pick': interactive }]} data-fm={floor} data-fm-w={W} data-fm-h={H} data-fm-pad={pad}>
+    <svg viewBox={`${-pad} ${-pad} ${W + pad * 2} ${H + pad * 2}`} role="group" aria-label={`${M.siteName}, ${F.name}: floor plan`} data-fm-svg>
+      <g data-fm-plan>
+        <polygon class="fm-outline" points={pts(F.outline)} />
+        {F.areas.map((a) => <rect class={`fm-area fm-area-${a.kind}`} {...rectAttrs(a.rect)}><title>{a.name}</title></rect>)}
+        {F.corridors.map((c) => <rect class="fm-corridor" {...rectAttrs(c.rect)}><title>{c.name}</title></rect>)}
+        {F.core.map((c) => (
+          <g class={`fm-core fm-core-${c.kind}`}>
+            <rect {...rectAttrs(c.rect)}><title>{c.name}</title></rect>
+            {coreLabel[c.kind] && c.rect[2] - c.rect[0] > 2.5 && <text x={(c.rect[0] + c.rect[2]) / 2} y={Y((c.rect[1] + c.rect[3]) / 2)}>{coreLabel[c.kind]}</text>}
+          </g>
+        ))}
+        {rooms.map((r) => {
+          const door = doorOf(r);
+          return (
+            <g class:list={['fm-room', { 'fm-bank': r.count > 1, 'fm-comms': ['mdf', 'idf'].includes(r.space_type), 'fm-on': r.id === highlight }]} {...pick(`room:${r.id}`, roomName(r))}>
+              <rect {...rectAttrs(r.rect)}><title>{`${roomName(r)}${r.variations.length ? `: ${r.variations.map((v) => v.text).join('; ')}` : ''}`}</title></rect>
+              {r.geo.odd.filter((o) => o.rect).map((o) => <rect class="fm-odd" {...rectAttrs(o.rect)} />)}
+              {r.desks.map((d) => <circle class="fm-desk" cx={d.at[0]} cy={Y(d.at[1])} r="0.28" />)}
+              {door && <line class="fm-door" x1={door[0][0]} y1={Y(door[0][1])} x2={door[1][0]} y2={Y(door[1][1])} />}
+              {r.geo.entry && r.count === 1 && <circle class="fm-entry" cx={r.geo.entry[0]} cy={Y(r.geo.entry[1])} r="0.18" />}
+              <text x={(r.rect[0] + r.rect[2]) / 2} y={Y((r.rect[1] + r.rect[3]) / 2)}>{label(r)}</text>
+            </g>
+          );
+        })}
+        {F.trays.map((t) => <polyline class={`fm-tray fm-tray-${t.kind}`} data-tray={t.id} points={pts(t.path)}><title>{`${t.name}: ${t.runs} cables${t.capacity ? ` of ${t.capacity}` : ''}`}</title></polyline>)}
+        {runs.length > 0 && (
+          <g class="fm-runs">
+            {runs.map((r) => <polyline class="fm-run" data-sel={interactive ? `run:${r.id}` : undefined} style={`--hex:${r.hex ?? 'currentColor'}`} points={pts(r.path.map((p) => [p[0], p[1]]))}><title>{r.id}</title></polyline>)}
+          </g>
+        )}
+        {F.risers.map((x) => <rect class="fm-riser" {...rectAttrs(x.rect)}><title>{x.name}</title></rect>)}
+        {racks.map((r) => (
+          <g class="fm-rack" {...pick(`rack:${r.id}`, `${r.name}, ${M.rooms[r.space]?.name ?? r.space}`)}>
+            <rect class="fm-hit" x={r.at[0] - 0.9} y={Y(r.at[1]) - 0.9} width="1.8" height="1.8" />
+            <rect x={r.at[0] - 0.3} y={Y(r.at[1]) - 0.53} width="0.6" height="1.07"><title>{r.name}</title></rect>
+          </g>
+        ))}
+        {aps.map((a) => (
+          <g class="fm-ap" {...pick(`ap:${a.id}`, `Access point ${a.hostname}, ${apModel(a)}`)}>
+            <circle class="fm-hit" cx={a.at[0]} cy={Y(a.at[1])} r="0.9" />
+            <circle cx={a.at[0]} cy={Y(a.at[1])} r="0.45" /><title>{`${a.hostname}, ${apModel(a)}`}</title>
+          </g>
+        ))}
+        <g class="fm-scale" transform={`translate(0 ${H + 0.9})`}><line x1="0" x2="5" y1="0" y2="0" /><text x="5.4" y="0.35">5 m</text></g>
+        <g class="fm-north" transform={`translate(${W - 0.6} ${H + 0.75})`} aria-hidden="true"><path d="M0,-0.6 L0.35,0.35 L0,0.15 L-0.35,0.35 Z" /><text x="0.9" y="0.1">N</text></g>
+      </g>
+    </svg>
+    <figcaption>{F.fictional}</figcaption>
+  </figure>
+)}
+
+<script>
+  // Turn the plan a quarter turn when its box is narrow; keep the words upright.
+  function turn(fig: HTMLElement) {
+    const W = +fig.dataset.fmW!, H = +fig.dataset.fmH!, pad = +fig.dataset.fmPad!;
+    const svg = fig.querySelector('[data-fm-svg]') as SVGSVGElement, g = fig.querySelector('[data-fm-plan]') as SVGGElement;
+    const on = fig.clientWidth > 0 && fig.clientWidth < 520;
+    if (fig.classList.contains('fm-turned') === on && fig.dataset.fmDone) return;
+    fig.dataset.fmDone = '1';
+    fig.classList.toggle('fm-turned', on);
+    svg.setAttribute('viewBox', on ? `${-pad} ${-pad} ${H + pad * 2} ${W + pad * 2}` : `${-pad} ${-pad} ${W + pad * 2} ${H + pad * 2}`);
+    if (on) g.setAttribute('transform', `matrix(0 1 -1 0 ${H} 0)`); else g.removeAttribute('transform');
+    g.querySelectorAll('text').forEach((t) => {
+      if (!on) { t.removeAttribute('transform'); return; }
+      const x = +(t.getAttribute('x') ?? 0), y = +(t.getAttribute('y') ?? 0);
+      t.setAttribute('transform', `rotate(-90 ${x} ${y})`);
+    });
+  }
+  function init() {
+    document.querySelectorAll<HTMLElement>('[data-fm]').forEach((fig) => {
+      if ((fig as any).__fm) return; (fig as any).__fm = true;
+      turn(fig);
+      if ('ResizeObserver' in window) new ResizeObserver(() => requestAnimationFrame(() => turn(fig))).observe(fig);
+    });
+  }
+  init();
+  document.addEventListener('astro:page-load', init);
+</script>
+
+<style>
+  .floormap { margin: 0; min-width: 0; }
+  .floormap svg { width: 100%; height: auto; display: block; font-family: var(--font-sans); }
+  .fm-outline { fill: var(--surface, var(--bg)); stroke: var(--line-strong); stroke-width: 0.12; }
+  .fm-area { fill: var(--green-soft); opacity: 0.5; }
+  .fm-area-town-hall { fill: var(--amber-soft); opacity: 0.8; }
+  .fm-corridor { fill: var(--grey-soft); }
+  .fm-core rect { fill: var(--grey-soft); stroke: var(--line); stroke-width: 0.05; }
+  .fm-core-lift-lobby rect { opacity: 0.6; }
+  .fm-core text { font-size: 0.7px; fill: var(--text-2, var(--ink)); text-anchor: middle; dominant-baseline: middle; }
+  .fm-room rect { fill: var(--bg); stroke: var(--ink); stroke-width: 0.08; transition: fill var(--dur-state) var(--ease-settle), stroke var(--dur-state) var(--ease-settle), opacity var(--dur-state) var(--ease-settle); }
+  .fm-bank > rect { fill: none; stroke-dasharray: 0.3 0.2; stroke: var(--line-strong); }
+  .fm-comms > rect { fill: var(--surface-2); }
+  .fm-on > rect { stroke: var(--accent); stroke-width: 0.2; }
+  .fm-room text { font-size: 0.8px; fill: var(--ink); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+  .fm-scale text, .fm-north text { font-size: 0.8px; fill: var(--text-2, var(--ink)); dominant-baseline: middle; }
+  .fm-north path { fill: var(--text-2, var(--ink)); }
+  .fm-odd { fill: var(--line-strong) !important; stroke: none !important; }
+  .fm-desk { fill: var(--line-strong); }
+  .fm-door { stroke: var(--surface, var(--bg)); stroke-width: 0.16; }
+  .fm-entry { fill: var(--c-lan); }
+  .fm-tray { fill: none; stroke: var(--amber); stroke-width: 0.18; stroke-linecap: round; stroke-linejoin: round; transition: stroke var(--dur-state) var(--ease-settle), opacity var(--dur-state) var(--ease-settle); }
+  .fm-tray-basket { stroke-width: 0.09; }
+  .fm-tray-ladder { stroke: var(--accent); stroke-width: 0.25; }
+  .fm-run { fill: none; stroke: var(--hex, currentColor); stroke-width: 0.04; opacity: 0.5; stroke-linejoin: round; transition: opacity var(--dur-state) var(--ease-settle), stroke var(--dur-state) var(--ease-settle); }
+  .fm-riser { fill: var(--blue-soft); stroke: var(--blue); stroke-width: 0.08; }
+  .fm-rack rect:not(.fm-hit) { fill: var(--ink); }
+  .fm-hit { fill: transparent; stroke: none; }
+  .fm-ap circle:not(.fm-hit) { fill: var(--bg); stroke: var(--blue); stroke-width: 0.15; transition: fill var(--dur-state) var(--ease-settle), stroke var(--dur-state) var(--ease-settle); }
+  .fm-scale line { stroke: var(--ink); stroke-width: 0.1; }
+  .floormap figcaption { font-size: 0.8rem; color: var(--text-2, var(--ink)); margin-top: 0.4rem; }
+
+  /* Chosen and live (set by the page's script). Room states: the same colours as the Rooms overview. */
+  .fm-pick [data-sel]:not(.fm-run) { cursor: pointer; }
+  .fm-pick [data-sel]:focus { outline: none; }
+  .fm-pick [data-sel]:focus-visible > rect:not(.fm-hit), .fm-pick [data-sel]:focus-visible > circle:not(.fm-hit) { stroke: var(--focus, var(--accent)); stroke-width: 0.3; }
+  .fm-room[data-st=use] > rect { fill: color-mix(in srgb, var(--blue) 24%, var(--bg)); }
+  .fm-room[data-st=free] > rect { fill: color-mix(in srgb, var(--green) 20%, var(--bg)); }
+  .fm-room[data-st=closed] > rect { fill: var(--surface-2); }
+  .fm-room[data-st=problem] > rect { fill: color-mix(in srgb, var(--red) 22%, var(--bg)); stroke: var(--red); stroke-width: 0.22; animation: fm-pulse var(--dur-pulse, 2.4s) ease-in-out infinite; }
+  .fm-ap[data-st=warn] circle:not(.fm-hit) { stroke: var(--amber); fill: var(--amber-soft); }
+  .fm-ap[data-st=bad] circle:not(.fm-hit) { stroke: var(--red); fill: var(--red-soft); stroke-width: 0.25; animation: fm-pulse var(--dur-pulse, 2.4s) ease-in-out infinite; }
+  .fm-rack[data-st=bad] rect:not(.fm-hit), .fm-rack[data-st=warn] rect:not(.fm-hit) { fill: var(--red); }
+  @keyframes fm-pulse { 50% { stroke-opacity: 0.35; } }
+  .fm-nocables .fm-runs { display: none; }
+  .fm-health .fm-run { stroke: var(--grey); }
+  .fm-health .fm-run[data-st=ok] { stroke: var(--green); }
+  .fm-health .fm-run[data-st=warn] { stroke: var(--amber); }
+  .fm-health .fm-run[data-st=bad] { stroke: var(--red); opacity: 0.9; }
+  .fm-lit .fm-room:not(.is-lit) > rect, .fm-lit .fm-tray:not(.is-lit), .fm-lit .fm-ap:not(.is-lit) circle:not(.fm-hit) { opacity: 0.4; }
+  .fm-lit .fm-run:not(.is-lit) { opacity: 0.04; }
+  .fm-nocables.fm-lit .fm-runs { display: inline; }
+  .fm-nocables.fm-lit .fm-run:not(.is-lit) { display: none; }
+  .fm-run.is-lit { opacity: 1; stroke-width: 0.16; }
+  .fm-tray.is-lit { stroke: var(--accent); opacity: 1; }
+  .fm-room.is-lit > rect { stroke: var(--accent); stroke-width: 0.2; }
+  .fm-room.is-sel > rect, .fm-rack.is-sel rect:not(.fm-hit) { stroke: var(--accent); stroke-width: 0.32; }
+  .fm-rack.is-lit rect:not(.fm-hit) { fill: var(--accent); }
+  .fm-ap.is-lit circle:not(.fm-hit) { stroke: var(--accent); stroke-width: 0.25; }
+  .fm-turned .fm-room text { font-size: 0.9px; }
+</style>

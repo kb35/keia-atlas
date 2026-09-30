@@ -1,0 +1,52 @@
+# Demo playbook. Aigna's own way of working; not taken from any real company.
+id: rma
+name: RMA
+kind: rma
+version: "1.0"
+intensity: light
+weeks: { min: 2, max: 6 }
+summary: "Return a failed unit to the vendor and fit its replacement, with the room kept working in the meantime. It starts from an incident that has been put on hold for the vendor."
+when: "Use when a unit has failed inside its warranty or support, and you have proved the fault by swapping parts. There is no design: the replacement takes the old unit's position and hostname. If the unit is out of support, buy a new one with the AV refresh playbook."
+changes:
+  - { date: "2026-09-29", change: "First version." }
+  - { date: "2026-09-30", change: "The swap can take a spare unit from the office's IT store, and the store is topped up afterwards." }
+phases:
+  - phase: plan
+    weeks: "Under 1"
+    steps:
+      - { title: "Prove the fault: swap one part at a time until it follows the unit", role: tech, output: Fault notes }
+      - { title: "Check warranty or support cover for the unit", role: pm }
+      - { title: "Raise the RMA with the vendor or their reseller, with serial and fault notes", role: pm, output: RMA number }
+      - { title: "Look in the office's IT store for a spare of the same model. If there is one, the swap can happen now; if not, give the room a workaround until the replacement arrives", role: tech, note: A unit with the status Spare has a serial and a shelf }
+      - { title: "Put the incident on hold for the vendor, with the RMA number", role: desk, note: Say when the replacement is due }
+    gate: { by: [pm], checks: [Fault proved, RMA number recorded, Workaround in place] }
+  - phase: procure
+    weeks: "1 to 4"
+    steps:
+      - { title: "Chase the vendor for the ship date, and tell the room's users if it slips", role: pm, long_lead: true }
+      - { title: "Ask whether the vendor sends the replacement before or after the faulty unit goes back", role: pm, note: Advance replacement is faster }
+      - { title: "Record the replacement's serial on arrival", role: tech }
+    gate: { by: [pm], checks: [Replacement received, Serial recorded] }
+  - phase: integrate
+    weeks: "Half a day"
+    steps:
+      - { title: "Add the replacement's serial and MAC at the failed unit's position; mark the old unit as returned", role: tech, step: provision }
+      - { title: "Book the room out", role: pm, step: install }
+      - { title: "Swap the unit, from the IT store's spare if you took one, keeping position and hostname, and take the workaround away", role: tech, step: install }
+      - { title: "Check the firmware is the standard and load the configuration, if the unit has one", role: delivery, step: configure }
+      - { title: "Run the room's verification", role: delivery, step: commission }
+      - { title: "Test call, or the room's own test, from the failed position", role: tech, step: commission }
+    gate: { by: [delivery], checks: [Replacement working at its position, Room passes its verification] }
+  - phase: handover
+    weeks: "Under 1"
+    steps:
+      - { title: "Pack the faulty unit and send it back with the RMA number, and keep the courier receipt", role: tech }
+      - { title: "Resolve the incident with the fix and the new serial", role: desk, output: Resolved incident }
+      - { title: "Update the asset register. A spare that went into the room stops being a spare; if the store is now below its minimum, order one more", role: pm }
+    gate: { by: [sm-av], checks: [Faulty unit on its way back, Incident resolved, Records match the room] }
+  - phase: closed
+    weeks: "-"
+    steps:
+      - { title: "Note the failure on the model's page if it is the second of the same kind", role: pm }
+      - { title: "Feed what was learned back into this playbook", role: pm }
+    gate: { by: [programme], checks: [Lessons captured] }

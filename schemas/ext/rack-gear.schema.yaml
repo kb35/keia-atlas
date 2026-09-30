@@ -1,0 +1,29 @@
+# Rack equipment: a real product that goes in a comms room rack (switch, firewall, console server,
+# patch panel, UPS), with the facts needed to draw its front and say what it does. Facts come from
+# the vendor documents in `sources`; `does` and `owner` are Aigna's.
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/rack-gear
+title: Rack equipment
+type: object
+additionalProperties: false
+required: [id, manufacturer, model, kind, rack_units, width, face, owner, does, sources]
+properties:
+  id: { type: string, pattern: "^[a-z0-9-]+$" }
+  manufacturer: { type: string }
+  model: { type: string }
+  part_number: { type: string }
+  device_model: { description: "The device model with every port, when Keia Atlas has one (data/device-models/). The rack drawing and the card read its ports and PoE from it.", type: string, pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
+  standard: { description: "The house standard the product belongs to, when it is one (for example unifi). Racks whose switching and gateways all carry it match the standard.", type: string }
+  kind: { enum: [rack, core-switch, access-switch, firewall, oob, wlc, isp, fibre-panel, patch-panel, cable-manager, ups, pdu] }
+  rack_units: { type: integer, minimum: 0 }
+  width: { description: "How much of the rack's width it takes: full, half, a half-width pair, a tray, or the side (0U).", enum: [full, half, half-pair, tray, side, rack] }
+  face: { description: How the front is drawn., type: string }
+  owner: { type: string }
+  does: { type: string }
+  front: { description: The front panel as the vendor describes it., type: string }
+  facts: { type: object, additionalProperties: { type: string } }
+  leds: { type: object, additionalProperties: { type: string } }
+  sources:
+    type: array
+    minItems: 1
+    items: { type: object, additionalProperties: false, required: [title, url], properties: { title: { type: string }, url: { type: string } } }

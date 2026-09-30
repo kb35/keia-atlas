@@ -1,0 +1,188 @@
+---
+/* HelpMode: the "?" Help switch's one delegated listener, the card it shows, and the dotted outlines (decision 0027,
+   docs/rules/platform.md, "Help on every page"). Shell renders this once.
+
+   How it works
+     - The switch (data-help-toggle, in the top bar) sets html[data-help="on"]. It is remembered for this window
+       (sessionStorage "rs5-help", put back on every page by Shell's boot script). "?" toggles it, Escape turns it off.
+     - Anything can say what it is with data-help="<key>". The keys and their words live in src/lib/help.mjs (the
+       registry), which the build turns into /help/index.json; this script fetches that the first time help goes on.
+       A key with a colon ("filter.facet:region") falls back to the part before it, so a family of things can share
+       an entry and still have a special one. data-help="page" means "this whole page": main's data-page-help.
+       data-help-name overrides the card's heading and fills {name} in the words.
+     - With help on, everything that has help gets a dotted outline. Hover or keyboard focus shows a small card
+       (the Peek look): what it is, what to do, and a "Learn more" link into Learn. On a touch screen the first tap
+       explains instead of acting; a second tap on the same thing acts.
+     - Peek cards step aside for anything that has help while help is on. */
+---
+<div class="peek help-peek" data-help-card role="tooltip" hidden><div class="peek-in" data-help-in></div></div>
+<span class="sr-only" role="status" aria-live="polite" data-help-live></span>
+
+<script is:inline data-astro-rerun>
+  (function () {
+    var S = window.__rsHelp = window.__rsHelp || {};
+    S.card = document.querySelector('[data-help-card]');
+    S.inner = S.card && S.card.querySelector('[data-help-in]');
+    S.live = document.querySelector('[data-help-live]');
+    S.el = null;
+    var root = document.documentElement;
+    var isOn = function () { return root.getAttribute('data-help') === 'on'; };
+    var store = function (on) { try { sessionStorage.setItem('rs5-help', on ? 'on' : 'off'); } catch (_) { S.mem = on; } };
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+    var paintSwitch = function () {
+      document.querySelectorAll('[data-help-toggle]').forEach(function (b) { b.setAttribute('aria-pressed', String(isOn())); });
+    };
+
+    // The registry, fetched once, the first time help is on.
+    S.load = function () {
+      if (S.data) return S.data;
+      var b = document.querySelector('[data-help-src]');
+      var url = b ? b.getAttribute('data-help-src') : 'help/index.json';
+      S.data = fetch(new URL(url, location.href)).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).catch(function () { S.data = null; return {}; });
+      return S.data;
+    };
+    var learnBase = function () {
+      var a = document.querySelector('.nav [data-nav="learn"]');
+      return a ? a.getAttribute('href').split('#')[0] : 'learn/';
+    };
+    // Which entry an element means: its key, else the part before a colon, else the general one.
+    var keyOf = function (el) {
+      var k = el.getAttribute('data-help');
+      if (k === 'page') { var m = document.getElementById('main'); k = (m && m.getAttribute('data-page-help')) || 'page.generic'; }
+      return k;
+    };
+    var lookup = function (D, k) { return D[k] || D[k.split(':')[0]] || (k.indexOf('page.') === 0 ? D['page.generic'] : null); };
+
+    S.set = function (on, quiet) {
+      root.setAttribute('data-help', on ? 'on' : 'off'); store(on); S.hide(); paintSwitch();
+      if (on) S.load();
+      if (S.live && !quiet) S.live.textContent = on ? 'Help is on. Hover or focus anything with a dotted outline to see what it is.' : 'Help is off.';
+    };
+    S.hide = function () {
+      if (!S.card) return; clearTimeout(S.ht);
+      var was = S.el; S.el = null;
+      if (was) was.classList.remove('help-on');
+      if (S.card.hidden) return;
+      S.card.classList.add('out');
+      S.ht = setTimeout(function () { if (S.card.classList.contains('out')) S.card.hidden = true; }, 160);
+    };
+    var place = function (el) {
+      var card = S.card, r = el.getBoundingClientRect(), cw = card.offsetWidth, ch = card.offsetHeight, m = 10;
+      var x = Math.min(Math.max(m, r.left + r.width / 2 - cw / 2), innerWidth - cw - m);
+      var below = r.bottom + 8, y = below + ch > innerHeight - m && r.top - ch - 8 > m ? r.top - ch - 8 : below;
+      card.style.left = x + 'px'; card.style.top = Math.max(m, Math.min(y, innerHeight - ch - m)) + 'px';
+      card.dataset.side = y < r.top ? 'above' : 'below';
+    };
+    S.show = function (el) {
+      if (!S.card || !isOn() || !el) return;
+      var shownFor = el;
+      S.load().then(function (D) {
+        if (!isOn() || S.want !== shownFor) return;
+        var k = keyOf(shownFor), h = lookup(D, k);
+        if (!h) return;
+        var own = shownFor.getAttribute('data-help-name') || '', name = own || (h.name === '{name}' ? '' : h.name || '');
+        var fill = function (t) { return esc(String(t || '').replace(/\{name\}/g, own || name)); };
+        var html = '<b class="help-h">' + esc(name) + '</b>' +
+          '<p><em>What it is</em>' + fill(h.what) + '</p>' +
+          (h.do ? '<p><em>What to do</em>' + fill(h.do) + '</p>' : '');
+        if (h.learn) html += '<a class="help-more" href="' + esc(learnBase() + h.learn.hash) + '">Learn more: ' + esc(h.learn.label) + '</a>';
+        S.inner.innerHTML = html;
+        if (S.el && S.el !== shownFor) S.el.classList.remove('help-on');
+        S.el = shownFor; shownFor.classList.add('help-on');
+        document.dispatchEvent(new CustomEvent('rs:help-shown', { detail: { key: k } }));
+        clearTimeout(S.ht); S.card.hidden = false; S.card.classList.remove('out'); place(shownFor);
+      });
+    };
+    // The nearest thing with help (never <html> itself, which carries data-help="on").
+    var target = function (node) { var el = node && node.closest ? node.closest('[data-help]') : null; return el && el !== root ? el : null; };
+    var inCard = function (node) { return node && node.closest && node.closest('[data-help-card]'); };
+    var t;
+
+    if (window.__rsHelpHook) { paintSwitch(); if (isOn()) S.load(); return; }
+    window.__rsHelpHook = true;
+
+    // A touch screen has no hover: remember the last pointer so the first tap can explain instead of act.
+    var touching = false;
+    document.addEventListener('pointerdown', function (e) { touching = e.pointerType === 'touch'; }, true);
+
+    document.addEventListener('mouseover', function (e) {
+      if (!isOn() || touching) return;
+      if (inCard(e.target)) { clearTimeout(t); return; }
+      var el = target(e.target);
+      clearTimeout(t);
+      if (!el) { if (S.el) t = setTimeout(S.hide, 160); return; }
+      if (el === S.el || el.classList.contains('open')) return;
+      S.want = el; t = setTimeout(function () { S.show(el); }, S.el ? 40 : 200);
+    });
+    document.addEventListener('mouseout', function (e) {
+      if (!isOn() || touching || !S.el) return;
+      var to = e.relatedTarget;
+      if (to && (inCard(to) || target(to) === S.el)) return;
+      clearTimeout(t); t = setTimeout(S.hide, 200);
+    });
+    document.addEventListener('focusin', function (e) {
+      if (!isOn() || inCard(e.target)) return;
+      var el = target(e.target);
+      if (el && e.target.matches && e.target.matches(':focus-visible')) { S.want = el; S.show(el); }
+    });
+    document.addEventListener('focusout', function (e) { if (isOn() && S.el && !inCard(e.relatedTarget) && target(e.relatedTarget) !== S.el) S.hide(); });
+
+    // Touch: the first tap on something with help explains it; a second tap on the same thing does what it does.
+    document.addEventListener('click', function (e) {
+      var sw = e.target.closest && e.target.closest('[data-help-toggle]');
+      if (sw) { S.set(!isOn()); return; }
+      if (e.target.closest && e.target.closest('[data-help-on]')) { S.set(true); return; }
+      if (isOn() && !touching && S.el && !inCard(e.target)) S.hide();   // a click acts; the card gets out of the way
+      if (!isOn() || !touching || inCard(e.target)) return;
+      var el = target(e.target);
+      if (!el) { S.hide(); return; }
+      // Something the page made clickable inside a big block that has help (a link in a side panel) still acts.
+      var inter = e.target.closest('a, button, input, select, summary, [role="tab"]');
+      if (inter && inter !== el && el.contains(inter) && !inter.hasAttribute('data-help')) return;
+      if (S.el === el) { S.hide(); return; }
+      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+      S.want = el; S.show(el);
+    }, true);
+
+    document.addEventListener('keydown', function (e) {
+      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+      var a = document.activeElement, typing = a && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName));
+      if (e.key === '?' && !typing) { e.preventDefault(); S.set(!isOn()); return; }
+      if (e.key === 'Escape' && isOn()) {
+        // Anything else that Escape closes goes first (a dialog, a menu, the search box, the History drawer).
+        if (document.querySelector('dialog[open], .fb-chip.open, .acct-menu:not([hidden]), [data-ks]:not([hidden]), .lb-drawer:not([hidden]), [data-peek-card]:not([hidden])')) return;
+        S.set(false);
+      }
+    });
+    addEventListener('scroll', function () { if (S.el && !touching) S.hide(); }, { passive: true });
+    addEventListener('resize', function () { if (S.el) S.hide(); });
+    document.addEventListener('astro:before-swap', function () { S.hide(); S.el = null; S.want = null; });
+    document.addEventListener('astro:after-swap', function () { S.card = document.querySelector('[data-help-card]'); S.inner = S.card && S.card.querySelector('[data-help-in]'); S.live = document.querySelector('[data-help-live]'); });
+    document.addEventListener('astro:page-load', function () { paintSwitch(); if (isOn()) S.load(); });
+    paintSwitch(); if (isOn()) S.load();
+  })();
+</script>
+
+<style is:global>
+  /* The switch: a round "?" and the word, beside Report. Pressed means help is on. */
+  .help-btn { appearance: none; display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0; border-radius: 50%; border: 1px solid var(--mast-line); background: var(--mast-2, var(--surface)); color: var(--mast-text); font: 700 13.5px/1 var(--font-sans); cursor: pointer; white-space: nowrap; transition: border-color var(--dur-state, 300ms), background var(--dur-state, 300ms), color var(--dur-state, 300ms); }
+  .help-btn:hover { border-color: var(--accent); }
+  .help-btn .hb-q { font: 800 16px/1 var(--font-sans); }
+  .help-btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+
+  /* Everything that has help, so people can see what they can ask about. */
+  :root[data-help="on"] [data-help]:not(main) { outline: 1.5px dotted color-mix(in srgb, var(--accent) 65%, transparent); outline-offset: 2px; cursor: help; }
+  :root[data-help="on"] [data-help].help-on, :root[data-help="on"] [data-help]:hover { outline-style: solid; }
+  :root[data-help="on"] [data-help-toggle] { cursor: pointer; }
+  /* A block that only carries help for what is inside it (a whole facet list, a tab row) keeps quiet until it is the one being explained. */
+  :root[data-help="on"] [data-help="shell.tabs"]:not(.help-on):not(:hover),
+  :root[data-help="on"] [data-help="shell.viewas"]:not(.help-on) { outline-color: transparent; }
+
+  /* The card is the Peek card, with a link at the foot. */
+  .help-peek { z-index: 95; pointer-events: auto; }
+  .help-peek .help-h { font-size: 13.5px; }
+  .help-peek p { margin: 0; }
+  .help-peek em { display: block; margin: 0 0 2px; }
+  .help-peek .help-more { display: inline-block; margin: 2px 0 0 -7px; font-weight: 600; color: var(--accent-ink, var(--accent)); text-decoration: underline; text-underline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { .help-btn { transition: none; } }
+</style>

@@ -1,0 +1,65 @@
+# Configuration: Desk Pro G2, Webex cloud registration with Google Meet interop. Setting names, menu paths and defaults are the vendor's (cited per setting);
+# the values and reasons are Aigna's (demo). Researched from vendor documents, Sept 2026.
+id: cisco-desk-pro-webex-google-meet
+name: Desk Pro G2, Webex cloud registration with Google Meet interop
+models: [cisco-desk-pro]
+mode: Webex cloud registration, Join Google Meet button (dial by meeting code)
+version: '1.0'
+owner: sofia
+updated: '2026-09-28'
+firmware: Cisco RoomOS 10.15
+summary: Aigna's one Cisco device doesn't run Google Meet itself. It registers to the Webex cloud service, which lights up the built-in Join Google Meet
+  button that dials into a Google Meet using just the meeting code from the calendar invite; the Join Webex button is hidden since Aigna doesn't hold
+  Webex meetings. Room booking still comes from the room's Google Calendar, connected through Webex Control Hub's Hybrid Calendar for Google.
+managed_by: Device web interface; cloud settings in Cisco Webex Control Hub
+steps: [Connect the Desk Pro to the room's AV port and power on; it takes its reserved DHCP address., 'In the device web interface, set the admin passphrase
+    (mandatory before use; there is none by default).', Set Provisioning Mode to Webex so the device registers to the Webex cloud service (needs the encryption
+    option key installed)., Claim the device into Aigna's Webex Control Hub organisation using its activation code., 'In Control Hub, connect Hybrid
+    Calendar for Google and assign the room''s Google Calendar to the device.', 'Set identity, time zone and NTP below, or let Control Hub''s device configuration
+    push them.', Hide the Join Webex button and leave the Join Google Meet button shown., 'Run the room''s verification, including a test Google Meet dial
+    by meeting code.']
+groups:
+- name: Registration and Google Meet interop
+  where: Device web interface
+  settings:
+  - {name: Provisioning Mode, path: Configuration > Provisioning, param: Provisioning Mode, value: Webex, action: change, layer: profile, why: 'Registers
+      the device to the Webex cloud service, which is what makes the Join Google Meet button available; the default is Auto (provisioning server picked
+      up from DHCP), not Webex.', source: cisco-roomos-10-15-admin-guide}
+  - {name: UserInterface Features Call JoinGoogleMeet, path: Device settings > UserInterface, param: UserInterface Features Call JoinGoogleMeet, value: Auto,
+    action: verify, layer: profile, why: Auto (shown) is Cisco's own default once the device is Webex-cloud registered; Aigna just leaves it., source: cisco-roomos-10-15-admin-guide}
+  - {name: UserInterface Features Call JoinWebex, path: Device settings > UserInterface, param: UserInterface Features Call JoinWebex, value: Hidden, action: change,
+    layer: profile, why: 'Aigna doesn''t hold Webex meetings on this device, so the button would only confuse people; the default is Auto (shown).',
+    source: cisco-roomos-10-15-admin-guide}
+- name: Identity, time and network
+  where: Device web interface
+  settings:
+  - {derive: hostname, name: SystemUnit Name, path: Device settings > SystemUnit, param: SystemUnit Name, value: The hostname, per_device: true, layer: naming-network, why: 'Sent
+      as the DHCP hostname and used as the SNMP name, matching how Aigna names every other room device. The default is blank.', action: change, source: cisco-roomos-10-15-admin-guide}
+  - {derive: time-zone, name: Time Zone, path: Device settings > Time Zone, param: Time Zone, value: The site's IANA time zone, per_device: true, layer: country, why: Meeting
+      times on the touch panel must match the room calendar; the default is Etc/UTC., action: change, source: cisco-roomos-10-15-admin-guide}
+  - {name: NetworkServices NTP Mode, path: Device settings > NetworkServices, param: NetworkServices NTP Mode, value: Manual, layer: naming-network, why: Use
+      Aigna's own time servers instead of whatever the DHCP server hands out; the default is Auto., action: change, source: cisco-roomos-10-15-admin-guide}
+  - {derive: time-server-1, name: NetworkServices NTP Server 1 Address, path: Device settings > NetworkServices, param: NetworkServices NTP Server 1 Address, value: ntp1.aigna.example,
+    layer: naming-network, why: Aigna's primary time server; the default is 0.tandberg.pool.ntp.org., action: change, source: cisco-roomos-10-15-admin-guide}
+  - {derive: time-server-2, name: NetworkServices NTP Server 2 Address, path: Device settings > NetworkServices, param: NetworkServices NTP Server 2 Address, value: ntp2.aigna.example,
+    layer: naming-network, why: 'A second server, so one failure doesn''t stop time sync.', action: change, source: cisco-roomos-10-15-admin-guide}
+  - {derive: dhcp-reservation, name: Network IPv4 Assignment, path: Device settings > Network, param: Network IPv4 Assignment, value: DHCP, layer: naming-network, why: Aigna puts
+      AV devices on the AV VLAN with a DHCP reservation rather than a static address; this is also the vendor default., action: verify, source: cisco-roomos-10-15-admin-guide}
+- name: Security
+  where: Device web interface > Security
+  settings:
+  - {derive: vault-site, name: Admin passphrase, path: Security > Users > admin, value: 'From the password vault, per site', per_device: true, layer: profile, why: The default
+      admin account ships with no passphrase set at all; RoomOS won't let the device be used until one is set., action: change, source: cisco-roomos-10-15-admin-guide}
+- name: Calendar (Webex Control Hub)
+  where: Cisco Webex Control Hub
+  settings:
+  - {name: Hybrid Calendar service, value: Google Calendar (Hybrid Calendar for Google), layer: profile, why: Aigna's rooms are Google Calendar resources;
+      this is what shows the room's bookings on the panel., action: change, source: cisco-roomos-10-15-admin-guide}
+  - {derive: calendar, name: Room calendar, value: The room's calendar resource, per_device: true, layer: room-type, why: Links this device to its own room's bookings., action: change,
+    source: cisco-roomos-10-15-admin-guide}
+gaps: ['The Join Google Meet button dials in using the meeting code from the Google invite; it isn''t a native Google Meet client, and Cisco doesn''t document
+    one-button-to-push for Google Meet the way it does for native Webex meetings.', 'Cloud-managed automatic software upgrades are only documented for devices
+    linked to Webex Edge for Devices (an on-premises CUCM/VCS registration bridged to the cloud). For a device registered directly to the Webex cloud service,
+    as here, the guide doesn''t document a device-side automatic-update toggle; updates are managed from Control Hub instead, which is outside the device
+    web interface this configuration covers.', 'Whether Hybrid Calendar for Google needs Webex Edge for Devices, or works for a device registered directly
+    to the Webex cloud, isn''t fully spelled out in this guide; Control Hub''s own calendar-service documentation should be checked before rollout.']

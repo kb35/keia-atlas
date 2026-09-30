@@ -1,0 +1,40 @@
+# Configuration: UltraSharp Thunderbolt hub monitors (U2724DE / U3425WE). Setting names, menu paths and defaults are the vendor's (cited per setting);
+# the values and reasons are Aigna's (demo). Researched from vendor documents, Sept 2026.
+id: dell-ultrasharp-thunderbolt-hub
+name: UltraSharp Thunderbolt hub monitors (U2724DE / U3425WE)
+models: [dell-u2724de, dell-u3425we]
+mode: Hot desk, Thunderbolt hub monitor
+version: '1.0'
+owner: sofia
+updated: '2026-09-28'
+summary: Aigna sets the OSD once per monitor, the Thunderbolt upstream port as the input people dock to with auto-switching on, DDC/CI left on, and treats
+  the monitor's own RJ45 as a pass-through rather than a setting to configure.
+managed_by: Monitor OSD
+steps: ['Connect the laptop to the Thunderbolt 4 upstream port for video, data, network pass-through and up to 90 W charging in one cable.', 'Open the OSD
+    and set Input Source > Auto Select on, with the Thunderbolt option set to prompt for multiple inputs.', Leave DDC/CI on so Dell Display Manager can
+    adjust brightness and input remotely., 'Check the RJ45 port shows the laptop''s own network, not a second address; it only passes through once the upstream
+    cable is connected.', 'Run Reset Input Source if the monitor was used elsewhere before, then apply the above.', Run the desk's verification.]
+groups:
+- name: Input Source
+  where: Monitor OSD
+  settings:
+  - {name: Auto Select, path: Input Source > Auto Select, value: 'On, Options for Thunderbolt set to Prompt for Multiple Inputs', action: change, layer: profile,
+    why: 'Switches to the live cable automatically but still asks if more than one input is connected, so a second laptop docking nearby doesn''t steal
+      the display.', source: dell-ultrasharp-34-curved-thunderbolt-hub-monitor}
+  - {name: Reset Input Source, value: Run once at install, action: verify, layer: profile, why: Clears whatever a previous desk left set before Aigna's
+      own values are applied., source: dell-ultrasharp-34-curved-thunderbolt-hub-monitor}
+- name: Others
+  where: Monitor OSD
+  settings:
+  - {name: DDC/CI, path: Others > DDC/CI, value: On (vendor default), action: verify, layer: profile, why: Dell Display Manager needs DDC/CI on to set brightness
+      and input remotely; Aigna just confirms it hasn't been turned off., source: dell-ultrasharp-34-curved-thunderbolt-hub-monitor}
+- name: Network pass-through
+  where: Monitor OSD
+  settings:
+  - {name: RJ45 (2.5GbE), value: 'Pass-through only, active once the Thunderbolt upstream cable is connected', action: verify, layer: naming-network, why: 'The
+      port isn''t a separate switch port with its own address; it only works once the host is docked, so there''s nothing to configure on the monitor itself.',
+    source: dell-ultrasharp-27-thunderbolt-hub-monitor-u2724de}
+gaps: ['OSD wording was confirmed from the U3425WE''s own manual; the U2724DE''s own PDF was blocked from direct reading, so its menu item names are assumed
+    identical given the shared UltraSharp Thunderbolt-hub design, not separately confirmed.', 'No documented USB-C Prioritization (High Resolution / High
+    Data Speed) setting found specifically for the U2724DE''s own Thunderbolt downstream/upstream pair, only for the U3425WE.', No published current firmware/controller
+    version for either monitor.]

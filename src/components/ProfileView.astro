@@ -1,0 +1,645 @@
+---
+// A device profile: what healthy means for one kind of device (a Keia object profile), with a drawing
+// of each model (Record archetype, docs/standards/page-anatomy.md).
+//   Band      the kind of device, what it is for, and its fleet in figures.
+//   Picture   the chosen model drawn big, with the models to switch between on top of it (7 columns).
+//   Panel     the chosen model: status, figures, meeting platforms, why it is in the standard, advisories.
+//   Tabs      Ports, What healthy looks like, Configuration, Firmware, Troubleshoot, Fleet.
+// The model switcher changes the model in place: the page fetches the other model's page and morphs
+// keyed parts (data-k), so the drawing and ports move rather than flash (decision 0015, docs/rules/devices.md).
+import Shell from '../layouts/Shell.astro';
+import Icon from './Icon.astro';
+import DeviceArt from './DeviceArt.astro';
+import ProfilePorts from './ProfilePorts.astro';
+import StageBar from './StageBar.astro';
+import HealthCard from './HealthCard.astro';
+import ConfigView from './ConfigView.astro';
+import ConfigScript from './ConfigScript.astro';
+import PageBand from './PageBand.astro';
+import SidePanel from './SidePanel.astro';
+import DetailTabs from './DetailTabs.astro';
+import { recHere } from '../lib/vt.mjs';
+import { classes, models, spaces, sites, spaceTypes, usedIn, typesUsing, STAGES, STAGE_LABEL, SITE_ORDER, modelName, plural, href, roomWords, modelChoices, advisoriesFor, configFor, firmwareFor, standardFirmware, ADV_LEVEL, FW_STATUS, MODEL_STATUS, LAYER_LABEL, src as sourceOf, fmtDate } from '../lib/data.mjs';
+import { artSource } from '../lib/art.mjs';
+import { classFaces, FACE_LABEL } from '../lib/ports.mjs';
+import { layoutPorts } from '../lib/ports.mjs';
+
+
+const { cls, model } = Astro.props;
+const C = classes[cls];
+const ids = Object.keys(models).filter((id) => models[id].class === cls);
+const M = model ? models[model] : null;
+const faces = classFaces(ids);
+const sizes = ids.map((id) => layoutPorts(id, faces));
+const panelW = Math.max(200, ...sizes.map((s) => s.w)), panelH = Math.max(0, ...sizes.map((s) => s.h));
+const hasPorts = ids.some((id) => models[id].ports?.length);
+
+const PLATFORM = { keia_atlas: 'Keia Atlas', inventory: 'Asset register', dhcp_dns: 'Addresses and DNS', device_management: 'Device management', room_booking: 'Room booking', monitoring: 'Monitoring' };
+const nice = (s) => s.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+const cap = (s) => s[0].toUpperCase() + s.slice(1);
+const stages = Object.fromEntries(STAGES.map((s) => [s, 0]));
+// Units are counted the way the Units list counts them (a row for each position and each piece of older kit), so
+// "Units" here opens Units showing the same number (rule P10). The stages count every unit record.
+let units = 0;
+for (const s of Object.values(spaces)) for (const p of s.positions) if (p.cls === cls) for (const u of p.units) stages[u.stage]++;
+for (const s of Object.values(spaces)) for (const p of [...s.positions, ...s.olderKit]) if (p.cls === cls) units++;
+const types = Object.entries(spaceTypes).filter(([, t]) => t.keia_atlas.options.some((o) => o.equipment.some((e) => e.class === cls)));
+const url = (id) => href(`/profiles/${cls}/${id}/`);
+const short = (id) => models[id].model.replace(/\s*\(.*\)$/, '');
+const src = model ? artSource(model) : null;
+const symptoms = Object.entries(C.discrimination ?? {});
+
+// Facts shown under the drawing: only what the model file states.
+const mm = (n) => `${(+n).toLocaleString('en-IE', { maximumFractionDigits: 1 })} mm`;
+const facts = M ? [
+  M.dimensions_mm?.width && ['Width', mm(M.dimensions_mm.width)],
+  M.dimensions_mm?.height && ['Height', mm(M.dimensions_mm.height)],
+  M.dimensions_mm?.depth && ['Depth', mm(M.dimensions_mm.depth)],
+  M.weight_kg && ['Weight', `${M.weight_kg} kg`],
+  M.power?.consumption_w?.max && ['Power', `${M.power.consumption_w.max} W max`],
+  ['Ports', String(M.ports?.length ?? 0)],
+].filter(Boolean) : [];
+// One example device of this kind, so the health cards can show what the evidence looks like.
+// Hostname, serial and tag come from the data; address, MAC and firmware are demo values.
+let exPos = null;
+for (const sp of Object.values(spaces)) for (const pos of sp.positions) {
+  if (pos.cls !== cls || pos.current?.stage !== 'manage') continue;
+  // Prefer a unit of the chosen model, then one with a hostname.
+  const score = (x) => (x.model === model ? 2 : 0) + (x.hostname ? 1 : 0);
+  if (!exPos || score(pos) > score(exPos.p)) exPos = { s: sp, p: pos };
+}
+const h = (str) => [...str].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 7);
+const ex = exPos && (() => {
+  const { s: sp, p: pos } = exPos, n = h(pos.current.serial);
+  const hex = (v) => (v & 255).toString(16).padStart(2, '0');
+  return {
+    space: sp.number ? `${sp.number} ${sp.name}` : sp.name, site: sites[sp.site].name, ports: models[pos.model]?.ports?.length ?? 6,
+    asset: pos.current.asset_tag, serial: pos.current.serial,
+    host: `${pos.hostname ?? `${sp.id}-${C.profile.naming_prefixes?.[0] ?? 'dev'}01`}.aigna.example`,
+    ip: `10.${(SITE_ORDER.indexOf(sp.site) + 1) * 10}.${sp.floor ?? 1}.${20 + (n % 200)}`,
+    mac: ['02', hex(n), hex(n >> 8), hex(n >> 16), hex(n >> 24), hex(n >> 4)].join(':'),
+    fw: `${4 + (n % 2)}.${n % 5}.${n % 3}`, day: 28, month: 'Sep', seats: sp.capacity ?? sp.seats ?? 8,
+    model: pos.model, cls, stage: pos.current.stage, siteId: sp.site, floor: sp.floor, fwStd: standardFirmware(pos.model)?.version,
+  };
+})();
+// What anyone installing, updating or troubleshooting this model needs: why it is in the standard,
+// its advisories, its configuration and its firmware line (all cited).
+const choice = model ? modelChoices[model] : null;
+const advs = model ? advisoriesFor(model) : [];
+const cfg = model ? configFor(model) : null;
+const cfgCount = cfg ? cfg.groups.reduce((n, g) => n + g.settings.filter((x) => x.action !== 'leave').length, 0) : 0;
+const fwl = model ? firmwareFor(model) : null;
+const fwStd = model ? standardFirmware(model) : null;
+let mUnits = 0, mService = 0; const mSites = new Set();
+for (const s of Object.values(spaces)) for (const p of s.positions) if (p.model === model) for (const u of p.units) { mUnits++; if (u.stage === 'manage') mService++; mSites.add(s.site); }
+const SUPPORT = { yes: 'Supported', no: 'Not supported', 'not-confirmed': 'Not confirmed', 'via-partner': 'Through a partner app' };
+const SUPPORT_ICON = { yes: 'check', no: 'stop', 'not-confirmed': 'about', 'via-partner': 'link' };
+const monthYear = (d) => (d ? new Date(d.length === 7 ? `${d}-01` : d).toLocaleDateString('en-IE', { month: 'short', year: 'numeric' }) : '');
+const srcLink = (id) => sourceOf(id);
+const choiceStatus = (id) => modelChoices[id]?.status;
+const portFaces = M ? [...new Set((M.ports ?? []).map((p) => p.face ?? 'none'))].map((f) => FACE_LABEL[f]).join(' and ') : '';
+const statusOf = (id) => choiceStatus(id) ?? (typesUsing[id] ? 'standard' : 'legacy');
+const title = M ? `${C.profile.name}: ${modelName(model)}` : C.profile.name;
+// The band: the fleet of this kind of device, in figures that link where they can.
+const NUMBERS = [
+  { n: units, label: units === 1 ? 'Unit' : 'Units', to: `/devices/?cls=${cls}` },
+  { n: stages.manage, label: STAGE_LABEL.manage, to: `/devices/?cls=${cls}&state=service` },
+  { n: types.length, label: types.length === 1 ? 'Room profile' : 'Room profiles', to: '#fleet' },
+  { n: symptoms.length, label: symptoms.length === 1 ? 'Symptom' : 'Symptoms', to: '#troubleshoot' },
+];
+const TABS = [
+  hasPorts && M && { id: 'ports', label: 'Ports', count: M.ports?.length ?? 0 },
+  { id: 'healthy', label: 'What healthy looks like', count: Object.keys(C.platforms).length },
+  { id: 'configuration', label: 'Configuration', count: cfgCount || undefined },
+  { id: 'firmware', label: 'Firmware', count: fwl ? fwl.releases.length : undefined },
+  { id: 'troubleshoot', label: 'Troubleshoot', count: symptoms.length },
+  { id: 'fleet', label: 'Fleet', count: units },
+].filter(Boolean);
+---
+<Shell vendorOk about={{ kind: 'profile', cls, label: title, model: M ? modelName(model) : undefined, to: `/profiles/${cls}/${model ?? ''}` }} title={title} section="profiles" crumbs={M ? [{ label: 'Device profiles', to: '/profiles/' }, { label: C.profile.name, to: `/profiles/${cls}/` }, { label: modelName(model) }] : [{ label: 'Device profiles', to: '/profiles/' }, { label: C.profile.name }]}>
+  <PageBand overline="Device profile" title={C.profile.name} lede={`${roomWords(C.profile.object_role)}.`} numbers={NUMBERS}>
+    <Fragment slot="overline">
+      <span class="code mono">{cls}</span>
+      <span>Version {C.profile.version}</span>
+      <span>{ids.length ? plural(ids.length, 'model') : 'Model set per project'}</span>
+    </Fragment>
+    <button slot="action" type="button" class="btn primary" data-open-report="change">Propose a change</button>
+  </PageBand>
+
+  <div class="content pv-page" data-morph-root>
+    <div class="g12 top" data-k="top">
+      <!-- The chosen model, drawn big, with the models to switch between on top of it. -->
+      <section class="card product s-7 stick" aria-label={M ? `${modelName(model)}, drawn front-on` : C.profile.name} data-k="product" {...recHere(cls)}>
+        {ids.length > 0 ? (
+          <div class="mp" data-k="mp">
+            <div class="seg mp-tiles" role="group" aria-label="Model" data-k="seg">
+              <span class="seg-thumb" data-k="seg-thumb" aria-hidden="true"></span>
+              {ids.map((id) => (
+                <a class="seg-item mp-tile" href={url(id)} data-model-link data-k={`chip-${id}`} aria-current={id === model ? 'true' : undefined}>
+                  <span class="mp-art" data-k={`mpa-${id}`}><DeviceArt model={id} cls={cls} small /></span>
+                  <span class="mp-name" data-k={`mpn-${id}`}>{short(id)}</span>
+                  <span class:list={['mp-st', `ms-${statusOf(id)}`]} data-k={`mps-${id}`}>{MODEL_STATUS[statusOf(id)]}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        ) : <p class="muted mp-none">No specific model: each project picks one.</p>}
+        <div class="stage product-stage" data-k="stage">
+          {M ? <DeviceArt model={model} cls={cls} label={`${modelName(model)}, drawn front-on`} /> : <DeviceArt model={null} cls={cls} label={C.profile.name} />}
+        </div>
+        <div class="product-foot" data-k="pfoot">
+          <p class="product-dims" data-k="pdims">{M ? <>{facts.filter(([k]) => ['Width', 'Height', 'Depth'].includes(k)).map(([, v]) => v).join(' × ') || 'Size not published'}{src ? ', front, to scale' : ', outline for its kind'}</> : 'Outline for its kind'}</p>
+          {M && <a class="product-link" href={href(`/models/${model}/`)} data-k="pb-link">Every spec and port <Icon name="arrow" size={14} /></a>}
+        </div>
+      </section>
+
+      <!-- The chosen model: what it is, where it runs, and what to know before touching it. -->
+      <SidePanel class="s-5 mb" title={M ? modelName(model) : 'No model chosen'} meta={M ? MODEL_STATUS[statusOf(model)] : undefined}>
+        {M ? (
+          <div class="mb-body" data-k="mb-body">
+            {(choice?.since || choice?.review) && <p class="mb-status" data-k="mb-status">{choice?.since && <span>In the standard since {monthYear(choice.since)}</span>}{choice?.review && <span class="faint">Next review {fmtDate(choice.review)}</span>}</p>}
+            <dl class="mb-stats" data-k="mb-stats">
+              <div><dt>Units</dt><dd class="num">{mUnits ? <a class="dd-n" href={href(`/devices/?q=${encodeURIComponent(modelName(model))}`)} data-vt-rec="dd-devices" title={`Every ${modelName(model)} in Units`}>{mUnits}</a> : mUnits}</dd></div>
+              <div><dt>{STAGE_LABEL.manage}</dt><dd class="num">{mService ? <a class="dd-n" href={href(`/devices/?q=${encodeURIComponent(modelName(model))}&state=service`)} data-vt-rec="dd-devices" title={`Every ${modelName(model)} in service, in Units`}>{mService}</a> : mService}</dd></div>
+              <div><dt>Offices</dt><dd class="num" data-dd-fact>{mSites.size}</dd></div>
+              <div><dt>Standard firmware</dt><dd class="mono">{fwStd?.version ?? 'Not tracked'}</dd></div>
+            </dl>
+            {choice && (
+              <ul class="plat" data-k="plat" aria-label="Meeting platforms">
+                {choice.platforms.map((pl) => (
+                  <li class={`pl pl-${pl.support}`} title={pl.note}>
+                    <span class="pl-i"><Icon name={SUPPORT_ICON[pl.support]} size={13} /></span>
+                    <span><b>{pl.name}</b><small>{SUPPORT[pl.support]}</small></span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {choice && (
+              <details class="why" data-k="why">
+                <summary>Why Aigna uses the {models[model].model} <span class="faint">({choice.why.length})</span></summary>
+                <ul>{choice.why.map((w) => <li>{w.point}{w.source && srcLink(w.source) && <a class="cite" href={srcLink(w.source).url} target="_blank" rel="noopener" title={srcLink(w.source).title}>source</a>}</li>)}</ul>
+              </details>
+            )}
+            {advs.length > 0 && (
+              <section class="advs" data-k="advs" aria-label="Advisories">
+                {advs.map((a) => (
+                  <article class={`adv lv-${a.level}`} data-k={`adv-${a.id}`} tabindex="0">
+                    <span class="adv-i"><Icon name={a.level === 'do-not-install' ? 'stop' : a.level === 'act' ? 'alert' : 'about'} size={18} /></span>
+                    <div class="adv-body">
+                      <p class="adv-top"><span class="adv-lv">{ADV_LEVEL[a.level]}</span><span class="mono faint">{a.id}</span><span class="faint">{a.status === 'open' ? 'Open' : 'Decided'} · {fmtDate(a.date)}</span></p>
+                      <h3>{a.title}</h3>
+                      <p class="adv-act">{a.action}</p>
+                      <details class="adv-more"><summary>What the vendor says</summary><p>{a.says}</p><p class="adv-src">{a.sources.map((sid) => srcLink(sid) && <a href={srcLink(sid).url} target="_blank" rel="noopener">{srcLink(sid).title}</a>)}</p></details>
+                    </div>
+                  </article>
+                ))}
+              </section>
+            )}
+            {!choice && !advs.length && <p class="muted mb-note" data-k="mb-note">{typesUsing[model] ? 'In the standard: at least one room profile uses it.' : 'Not in any room profile today.'} {facts.length > 1 ? `${facts.filter(([k]) => k !== 'Ports').map(([k, v]) => `${k} ${v}`).join(', ')}.` : ''}</p>}
+          </div>
+        ) : <p class="muted">Each project chooses the model for this kind of device.</p>}
+      </SidePanel>
+    </div>
+    <p class="sr-only" aria-live="polite" data-k="announce" id="model-announce">{M ? `Showing ${modelName(model)}` : ''}</p>
+
+    <DetailTabs tabs={TABS} label="Profile">
+      {hasPorts && M && (
+        <section slot="ports" class="card ports-card" aria-labelledby="ports-h" data-k="ports-wrap">
+          <div class="ports-top" data-k="ports-top">
+            <h2 id="ports-h" class="sr-only">Ports</h2>
+            <p class="faint port-count" data-k="port-count">{plural(M.ports?.length ?? 0, 'port')}{portFaces && `, ${portFaces.toLowerCase()}`}</p>
+            <dl class="pfacts" data-k="pfacts">
+              {facts.filter(([k]) => k !== 'Ports').map(([k, v]) => <div data-k={`f-${k}`}><dt>{k}</dt><dd class="mono num">{v}</dd></div>)}
+            </dl>
+          </div>
+          <div class="ports-scroll" data-k="ports-scroll"><ProfilePorts model={model} faces={faces} width={panelW} height={panelH} /></div>
+          <p class="pb-src" data-k="pb-src">{src ? `Drawing traced from ${src}. Ports from the vendor's documentation.` : 'No traced drawing yet, so it is shown as the outline for its kind. Ports from the vendor\'s documentation.'}</p>
+        </section>
+      )}
+
+      <section slot="healthy" aria-label="What healthy looks like" data-health>
+        <p class="tab-lede faint">{ex ? <>Checked on one example, <span class="mono">{ex.host.split('.')[0]}</span> (simulated values). <button type="button" class="btn small" data-recheck>Check again</button></> : 'What each platform must hold for this kind of device.'}</p>
+        <div class="health-grid">
+          {Object.entries(C.platforms).map(([k, p]) => ex ? <HealthCard k={k} name={PLATFORM[k] ?? nice(k)} p={p} ex={ex} /> : (
+            <article class="hcard"><header><h3>{PLATFORM[k] ?? nice(k)}</h3></header><p class="hc-when">Healthy when {roomWords(p.healthy_indicators.join('; '))}.</p></article>
+          ))}
+        </div>
+        <p class="faint learn-link">What each field means, and how hostnames and addresses are built: <a href={href('/learn/fields/')}>Learn: device fields</a></p>
+      </section>
+
+      <div slot="configuration" data-k="p-configuration">
+        {cfg ? (
+          <ConfigView cfg={cfg} pane="summary" />
+        ) : (
+          <div class="card empty-card">
+            <p class="name">Nothing to configure on {M ? modelName(model) : 'this kind of device'}</p>
+            <p class="muted">It works as it comes, or it is set up through the device it connects to. See <a href={href('/configurations/')}>every configuration</a>.</p>
+          </div>
+        )}
+      </div>
+
+      <div slot="firmware" class="stack" data-k="p-firmware">
+        {fwl ? (
+          <>
+            <section class="fw-now card">
+              <span class="fw-chip mono">{fwStd?.version}</span>
+              <div><p class="kind">Aigna standard · {fwl.name}</p><p class="muted">{fwStd?.aigna} Updates come through {fwl.managed_in}.</p></div>
+              <button type="button" class="btn small fw-log" data-open-report="firmware" data-report-model={M ? `${M.manufacturer} ${M.model}` : C.profile.name}><Icon name="chip" size={14} />New firmware found</button>
+            </section>
+            <p class="fw-sum">
+              {fwl.releases.filter((r) => r.status === 'lab').map((r) => <span class="fws-chip s-lab"><b class="mono">{r.version}</b> in the Lab</span>)}
+              {fwl.releases.filter((r) => r.status === 'blocked').map((r) => <span class="fws-chip s-blocked"><b class="mono">{r.version}</b> do not install</span>)}
+            </p>
+            <details class="fw-all">
+              <summary>Every release, and why each was or wasn't taken ({fwl.releases.length})</summary>
+              <ol class="fw-line">
+                {fwl.releases.map((r) => (
+                  <li class={`fwr fw-${r.status}`}>
+                    <span class="fwr-dot" aria-hidden="true"></span>
+                    <div class="fwr-body">
+                      <p class="fwr-top"><b class="mono">{r.version}</b><span class={`fws s-${r.status}`}>{FW_STATUS[r.status]}</span><span class="faint">{monthYear(r.released)}</span>
+                        {r.lab && <a class="tag" href={href(`/lab/#${r.lab.toLowerCase()}`)}>{r.lab}</a>}{r.advisory && <span class="tag">{r.advisory}</span>}</p>
+                      {r.aigna && <p class="fwr-note">{r.aigna}</p>}
+                      <ul class="fwr-h">{r.headlines.map((h) => <li>{h}</li>)}</ul>
+                      {r.known_issues?.length > 0 && <details><summary>{plural(r.known_issues.length, 'known issue')}</summary><ul>{r.known_issues.map((k) => <li>{k}</li>)}</ul></details>}
+                      {srcLink(r.source) && <a class="cite" href={srcLink(r.source).url} target="_blank" rel="noopener">Release notes</a>}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </details>
+          </>
+        ) : (
+          <div class="card empty-card">
+            <p class="name">No firmware line tracked for {M ? modelName(model) : 'this kind of device'}</p>
+            <p class="muted">When the vendor watcher tracks a model, its releases, Aigna's decision on each, and any advisories appear here and on every device of that model.</p>
+          </div>
+        )}
+      </div>
+
+      <div slot="troubleshoot" class="stack" data-k="p-troubleshoot">
+        {fwStd?.known_issues?.length > 0 && (
+          <section class="card pad">
+            <h3>Known issues in the standard firmware ({fwStd.version})</h3>
+            <ul>{fwStd.known_issues.map((k) => <li>{k}</li>)}</ul>
+          </section>
+        )}
+        {symptoms.length > 0 && (
+          <section aria-labelledby="symptoms">
+            <div class="section-head"><h2 id="symptoms">Symptoms</h2><span class="aside faint">Likely causes and where to look first</span></div>
+            <div class="list">
+              {symptoms.map(([k, d]) => (
+                <div class="row plain">
+                  <span><span class="name">{nice(k)}</span><span class="sub">{roomWords(d.likely_causes.map(cap).join('; '))}</span></span>
+                  <span class="end"><span class="tag">Check {PLATFORM[d.first_check] ?? nice(d.first_check)} first</span></span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+        {C.consistency?.length > 0 && (
+          <section aria-labelledby="consistency">
+            <div class="section-head"><h2 id="consistency">Cross-checks</h2><span class="aside faint">The same fact must agree everywhere it is recorded</span></div>
+            <div class="tablewrap"><table>
+              <thead><tr><th scope="col">Check</th><th scope="col">Compares</th></tr></thead>
+              <tbody>{C.consistency.map((c) => <tr><td>{nice(c.check)}</td><td class="mono small">{c.compare.join(' = ')}</td></tr>)}</tbody>
+            </table></div>
+          </section>
+        )}
+      </div>
+
+      <div slot="fleet" class="g12" data-k="p-fleet">
+        <div class="card side-card s-4">
+          <h3>Fleet, all models</h3>
+          <p class="fleet-num num">{units}</p>
+          <p class="muted fleet-sub">{C.profile.name.toLowerCase()} units</p>
+          {units > 0 && <StageBar stages={stages} />}
+          <dl class="kv">{STAGES.filter((s) => stages[s]).map((s) => <div><dt><i class={`dot ${s}`}></i>{STAGE_LABEL[s]}</dt><dd class="num">{stages[s]}</dd></div>)}</dl>
+          {units > 0 && <a class="btn small" href={href(`/devices/?cls=${cls}`)}>Every unit<Icon name="arrow" size={14} /></a>}
+        </div>
+        <div class="card side-card s-4">
+          <h3>Used in</h3>
+          {types.length > 0 ? <div class="tagwrap">{types.map(([id, t]) => <a class="tag" href={href(`/room-profiles/${id}/`)}>{roomWords(t.profile.name)}</a>)}</div> : <p class="muted">No room profile uses it yet.</p>}
+        </div>
+        <div class="card side-card s-4">
+          <h3>Profile file</h3>
+          <dl class="kv">
+            <div><dt>File</dt><dd class="mono small">data/device-classes/{cls}.yaml</dd></div>
+            <div><dt>Version</dt><dd>{C.profile.version}</dd></div>
+            <div><dt>Updated</dt><dd>{C.profile.last_updated}</dd></div>
+            <div><dt>Hostname prefix</dt><dd class="mono">{C.profile.naming_prefixes?.join(', ')}</dd></div>
+          </dl>
+        </div>
+      </div>
+    </DetailTabs>
+  </div>
+
+  <script is:inline data-astro-rerun slot="end">
+    (function () {
+      /* Runs on every page load, including pages the client router swaps in. Document-level
+         handlers are attached once; per-page setup runs each time. Tabs belong to DetailTabs.
+         Motion takes its durations and curve from window.rsMotion (motion.css). */
+      var P = window.__rsProfile;
+      if (!P) {
+        P = window.__rsProfile = {};
+        var reduced = function () { return matchMedia('(prefers-reduced-motion: reduce)').matches; };
+        var M0 = function () { return window.rsMotion ? window.rsMotion() : { morph: 520, exit: 240, stagger: 24, state: 300, delay: 120, reduced: reduced() }; };
+        /* The model switcher's thumb glides to the chosen model. */
+        P.placeThumb = function (animate) {
+          var seg = document.querySelector('.seg'), on = seg && seg.querySelector('[aria-current]'), th = seg && seg.querySelector('.seg-thumb');
+          if (!th || !on) return;
+          if (!animate) th.style.transition = 'none';
+          th.style.transform = 'translate(' + on.offsetLeft + 'px,' + on.offsetTop + 'px)';
+          th.style.width = on.offsetWidth + 'px';
+          th.style.height = on.offsetHeight + 'px';
+          if (!animate) { th.offsetWidth; th.style.transition = ''; }
+        };
+
+        /* ---- The keyed morph, following the rule book ----
+           Persist: an element with the same data-k keeps its node and moves (CSS transitions).
+           Enter:   a new keyed port grows from nothing at its own centre (.m-enter).
+           Exit:    a keyed port that is gone shrinks to nothing at its own centre (.m-exit), then goes.
+           Drawing parts always exist in every model of a type (empty ones are zero-sized), so a part
+           that appears is first placed, at zero size, at the centre of where it will be, and a part
+           that disappears shrinks to zero at the centre of where it was. */
+        var key = function (n) { return n.nodeType === 1 ? n.getAttribute('data-k') : null; };
+        var geo = function (el) {
+          var g = {}; (el.getAttribute('style') || '').split(';').forEach(function (p) { var i = p.indexOf(':'); if (i > 0) g[p.slice(0, i).trim()] = parseFloat(p.slice(i + 1)); });
+          return g;
+        };
+        var isZero = function (g) { return 'r' in g ? !g.r : !(g.width || g.height); };
+        var point = function (g) {
+          return 'r' in g ? 'cx:' + g.cx + 'px;cy:' + g.cy + 'px;r:0px' : 'x:' + (g.x + g.width / 2) + 'px;y:' + (g.y + g.height / 2) + 'px;width:0px;height:0px;rx:0px';
+        };
+        var inArt = function (el) { return el.closest && el.closest('.model-art') && /^(rect|circle)$/.test(el.nodeName); };
+        // Things whose live state lives in attributes a script set (the tabs, the thumb, a held box, a sticky
+        // panel): the next page's copy takes the state of this one, so the morph keeps it.
+        function keepState(next) {
+          var live = document.querySelector('[data-morph-root] [data-dt]'), nx = next.querySelector('[data-dt]');
+          if (live && nx) {
+            var cur = live.rsTabs ? live.rsTabs.current() : null;
+            if (cur) {
+              nx.querySelectorAll('[data-dt-tab]').forEach(function (t) { var on = t.dataset.dtTab === cur; t.setAttribute('aria-selected', String(on)); t.setAttribute('tabindex', on ? '0' : '-1'); });
+              nx.querySelectorAll('[data-dt-panel]').forEach(function (p) { if (p.dataset.dtPanel === cur) p.removeAttribute('hidden'); else p.setAttribute('hidden', ''); });
+            }
+            [['.dt-on'], ['[data-dt-box]']].forEach(function (s) { var a = live.querySelector(s[0]), b = nx.querySelector(s[0]); if (a && b && a.getAttribute('style')) b.setAttribute('style', a.getAttribute('style')); });
+          }
+          var sp = document.querySelector('[data-morph-root] .sp'), nsp = next.querySelector('.sp');
+          if (sp && nsp && sp.getAttribute('style')) nsp.setAttribute('style', sp.getAttribute('style'));
+        }
+        function morphNode(from, to) {
+          if (from.nodeType === 3) { if (from.nodeValue !== to.nodeValue) from.nodeValue = to.nodeValue; return; }
+          if (from.nodeType !== 1) return;
+          if (from.nodeName === 'SCRIPT') return;
+          var keepStyle = from.classList && from.classList.contains('seg-thumb');
+          if (inArt(from) && !from.closest('clipPath')) {
+            var a = geo(from), b = geo(to);
+            if (isZero(a) && !isZero(b)) {            // enter: jump (unseen) to the target's centre, then grow
+              from.style.transition = 'none'; from.setAttribute('style', point(b)); from.getBoundingClientRect(); from.style.transition = '';
+            } else if (!isZero(a) && isZero(b)) {     // exit: shrink to own centre, keep its look until gone
+              from.setAttribute('style', point(a));
+              setTimeout(function () { if (from.isConnected && isZero(geo(from))) from.setAttribute('class', to.getAttribute('class') || ''); }, M0().morph);
+              return;
+            }
+          }
+          for (var at of Array.from(from.attributes)) if (!to.hasAttribute(at.name) && !(keepStyle && at.name === 'style')) from.removeAttribute(at.name);
+          for (var bt of Array.from(to.attributes)) if (from.getAttribute(bt.name) !== bt.value) from.setAttribute(bt.name, bt.value);
+          morphChildren(from, to);
+        }
+        function morphChildren(from, to) {
+          var want = Array.from(to.childNodes), keyed = new Map(), used = new Set(), entering = 0;
+          Array.from(from.childNodes).forEach(function (n) { var k = key(n); if (k) keyed.set(k + '|' + n.nodeName, n); });
+          want.forEach(function (t, i) {
+            var cur = from.childNodes[i] || null, k = key(t);
+            var match = k ? keyed.get(k + '|' + t.nodeName) : (cur && !key(cur) && !(cur.classList && cur.classList.contains('m-exit')) && cur.nodeName === t.nodeName ? cur : null);
+            if (match && match.parentNode !== from) match = null;
+            if (match) { if (match !== cur) from.insertBefore(match, cur); if (k) keyed.delete(k + '|' + t.nodeName); used.add(match); morphNode(match, t); }
+            else {
+              var n = document.importNode(t, true); from.insertBefore(n, cur); used.add(n);
+              if (n.nodeType === 1 && (n.getAttribute('data-k') || '').indexOf('port-') === 0 && !reduced()) {
+                var inner = n.querySelector('.pt-in') || n; inner.style.setProperty('--i', entering++); inner.classList.add('m-enter');
+                inner.addEventListener('animationend', function () { inner.classList.remove('m-enter'); }, { once: true });
+              }
+            }
+          });
+          /* Whatever is left over is leaving. Keyed ports shrink away; everything else goes now. */
+          Array.from(from.childNodes).forEach(function (n) {
+            if (used.has(n) || (n.classList && n.classList.contains('m-exit'))) return;
+            var k = key(n);
+            if (k && k.indexOf('port-') === 0 && !reduced()) {
+              n.removeAttribute('data-k'); n.classList.add('m-exit-host');
+              var inner = n.querySelector('.pt-in') || n; inner.classList.add('m-exit');
+              setTimeout(function () { n.remove(); }, M0().exit + M0().stagger);
+            } else from.removeChild(n);
+          });
+        }
+        P.go = async function (url, push) {
+          var root = document.querySelector('[data-morph-root]');
+          try {
+            var res = await fetch(url); if (!res.ok) throw 0;
+            var doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+            var next = doc.querySelector('[data-morph-root]'); if (!next || !root) throw 0;
+            keepState(next);
+            morphChildren(root, next);
+            P.placeThumb(!reduced());
+            P.runChecks();
+            // The configuration summary came in with the new model: check it again when it shows.
+            if (window.rsCfg) { document.querySelectorAll('[data-cw]').forEach(function (a) { window.rsCfg.applyFixed(a); }); window.rsCfg.watch(); }
+            document.title = doc.title;
+            // The path in the top bar names the model too: take the next page's.
+            var oc = document.querySelector('.mast .crumbs'), nc = doc.querySelector('.mast .crumbs');
+            if (oc && nc) oc.innerHTML = nc.innerHTML;
+            // A state-less history entry: the page router leaves it alone and Back comes to us.
+            var dt = root.querySelector('[data-dt]'), tab = dt && dt.rsTabs ? dt.rsTabs.current() : '';
+            var first = dt && dt.querySelector('[data-dt-tab]');
+            if (push) history.pushState(null, '', url + (tab && first && tab !== first.dataset.dtTab ? '#' + tab : ''));
+          } catch (e) { location.href = url; }
+        };
+
+        /* Health checks: each row spins while it is checked, then ticks; the card ticks when all rows have. */
+        P.runChecks = function () {
+          var cards = document.querySelectorAll('[data-health] .hcard'), m = M0();
+          (P.timers || []).forEach(clearTimeout); P.timers = [];
+          cards.forEach(function (card, ci) {
+            var rows = card.querySelectorAll('[data-check]'), head = card.querySelector('[data-hc-state]');
+            rows.forEach(function (r) { r.className = 'hr-c'; }); if (head) head.className = 'hc-state';
+            if (m.reduced) { rows.forEach(function (r) { r.classList.add('ok'); }); if (head) head.classList.add('ok'); return; }
+            var t0 = m.delay + ci * m.state / 2, step = m.stagger * 7;
+            rows.forEach(function (r, i) {
+              P.timers.push(setTimeout(function () { r.classList.add('checking'); }, t0 + i * step));
+              P.timers.push(setTimeout(function () { r.classList.remove('checking'); r.classList.add('ok'); }, t0 + i * step + m.morph));
+            });
+            if (head) {
+              P.timers.push(setTimeout(function () { head.classList.add('checking'); }, t0));
+              P.timers.push(setTimeout(function () { head.classList.remove('checking'); head.classList.add('ok'); }, t0 + rows.length * step + m.morph));
+            }
+          });
+        };
+        document.addEventListener('click', function (e) {
+          if (e.target.closest('[data-recheck]')) { P.runChecks(); return; }
+          var a = e.target.closest('a[data-model-link]');
+          if (!a || e.metaKey || e.ctrlKey || e.shiftKey || !document.querySelector('[data-morph-root]')) return;
+          e.preventDefault();   // the page router sees this and stays out of the model switch
+          if (a.getAttribute('aria-current')) return;
+          P.go(a.href, true);
+        }, true);   // capture phase: runs before the page router's own click handler
+        /* Back and Forward between models: entries without router state are ours. */
+        addEventListener('popstate', function (e) { if (!e.state && document.querySelector('[data-morph-root]')) P.go(location.pathname, false); });
+        addEventListener('resize', function () { P.placeThumb(false); });
+      }
+      /* Per page. */
+      P.placeThumb(false);
+      if (document.fonts) document.fonts.ready.then(function () { P.placeThumb(false); });
+      /* Run the health checks the first time they come into view (their tab is opened). */
+      var hs = document.querySelector('[data-health]');
+      if (hs && 'IntersectionObserver' in window) {
+        var io = new IntersectionObserver(function (en) { if (en.some(function (x) { return x.isIntersecting; })) { io.disconnect(); P.runChecks(); } }, { threshold: 0.2 });
+        io.observe(hs);
+      } else if (hs) P.runChecks();
+    })();
+  </script>
+  <ConfigScript />
+</Shell>
+<style is:global>
+  .pv-page { gap: 24px; }
+  /* The picture: the models to switch between on top, the drawing as big as the column allows. */
+  .product { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; min-width: 0; }
+  .mp { padding: 12px 12px 10px; border-bottom: var(--border-rule); }
+  .mp-none { margin: 0; padding: 12px 16px; border-bottom: var(--border-rule); }
+  .seg { position: relative; display: flex; flex-wrap: wrap; gap: 6px; isolation: isolate; }
+  .seg-thumb { position: absolute; z-index: -1; top: 0; left: 0; width: 0; height: 0; transition: transform var(--dur-morph) var(--ease-settle), width var(--dur-morph) var(--ease-settle), height var(--dur-morph) var(--ease-settle); }
+  .mp-tile { display: grid; grid-template-columns: 44px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 8px; align-items: center; min-width: 118px; flex: 1 1 0; max-width: 190px; padding: 6px 8px 6px 6px; border-radius: var(--radius-lg); border: 1.5px solid var(--line); background: var(--surface); color: var(--text); text-decoration: none; transition: border-color var(--dur-hover) var(--ease-settle); }
+  .mp-tile:hover { border-color: var(--line-strong); color: var(--text); }
+  .mp-tile[aria-current] { border-color: transparent; background: transparent; }
+  .mp-art { grid-row: 1 / 3; width: 44px; height: 28px; display: grid; place-items: center; }
+  .mp-art .model-art { max-width: 100%; max-height: 100%; }
+  .mp-name { font: 700 13.5px/1.15 var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mp-st { font-size: 11px; font-weight: 600; }
+  .ms-standard { color: var(--green-ink); } .ms-candidate { color: var(--blue-ink); } .ms-under-review { color: var(--amber-ink); } .ms-legacy { color: var(--text-3); }
+  .mp-tiles .seg-thumb { border-radius: var(--radius-lg); background: var(--surface); box-shadow: 0 0 0 2.5px var(--ink); }
+  :root[data-look="classic"] .mp-tile { border-color: var(--ink); }
+  :root[data-look="classic"] .mp-tile[aria-current] { border-color: transparent; }
+  :root[data-look="classic"] .mp-tiles .seg-thumb { background: var(--yellow); box-shadow: 0 0 0 2px var(--ink), 4px 4px 0 var(--ink); }
+  :root[data-look="classic"] .mp-tile[aria-current] .mp-st, :root[data-look="classic"] .mp-tile[aria-current] .mp-name { color: #15161B; }
+  .product-stage { position: relative; border-radius: 0; min-height: clamp(260px, 36vh, 380px); }
+  .product-stage .model-art { position: absolute; inset: 0 16px; width: calc(100% - 32px); height: 100%; view-transition-name: art-hero; }
+  .product-stage .model-art.generic { inset: 15% 30%; width: 40%; height: 70%; aspect-ratio: auto; }
+  .product-stage .model-art.generic svg { width: 100%; height: 100%; }
+  .product-foot { display: flex; align-items: center; justify-content: space-between; gap: 6px 16px; flex-wrap: wrap; padding: 9px 14px; border-top: var(--border-rule); }
+  .product-dims { margin: 0; font: 500 12px/1.3 var(--font-mono); color: var(--text-3); }
+  .product-link { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-2); text-decoration: none; }
+  .product-link:hover { color: var(--text); }
+
+  /* The chosen model, in the panel beside the drawing. */
+  .mb .sp-meta { font-weight: 650; }
+  .mb-body { display: grid; gap: 14px; }
+  .mb-status { margin: -4px 0 0; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; color: var(--text-2); }
+  .mb-stats { display: grid; grid-template-columns: repeat(4, auto); justify-content: space-between; gap: 8px 16px; margin: 0; }
+  .mb-stats div { display: grid; gap: 3px; }
+  .mb-stats dt { font-size: 11.5px; color: var(--text-3); }
+  .mb-stats dd { margin: 0; font: var(--weight-display) 20px/1 var(--font-display); }
+  .mb-stats .dd-n { color: inherit; text-decoration: none; }
+  .mb-stats .dd-n:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .mb-stats dd.mono { font: 600 15px/1.3 var(--font-mono); }
+  .mb-h { margin: 0 0 6px; font: 700 var(--overline-size, 11px)/1.2 var(--font-sans); letter-spacing: var(--overline-track, .08em); text-transform: var(--overline-case, uppercase); color: var(--text-3); }
+  .mb-note { margin: 0; font-size: 13.5px; }
+  .why > summary { cursor: pointer; font-size: 13.5px; font-weight: 650; }
+  .why ul { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; font-size: 13.5px; }
+  .plat { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .pl { display: flex; align-items: center; gap: 8px; padding: 5px 10px 5px 6px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); }
+  .pl b { display: block; font-size: 12.5px; }
+  .pl small { display: block; font-size: 11px; color: var(--text-3); }
+  .pl-i { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+  .pl-yes .pl-i { background: var(--green-soft); color: var(--green-ink); }
+  .pl-no .pl-i { background: var(--red-soft); color: var(--red-ink); }
+  .pl-not-confirmed .pl-i { background: var(--amber-soft); color: var(--amber-ink); }
+  .pl-via-partner .pl-i { background: var(--blue-soft); color: var(--blue-ink); }
+
+  /* Advisories: one line until you hover or tab to them; "do not install" always shows its action. */
+  .advs { display: grid; gap: 8px; }
+  .adv .adv-act, .adv .adv-more { max-height: 0; opacity: 0; overflow: hidden; transition: max-height var(--dur-enter) var(--ease-settle), opacity var(--dur-exit) var(--ease-settle); }
+  .adv:hover .adv-act, .adv:focus-within .adv-act, .adv:focus .adv-act, .adv.lv-do-not-install .adv-act { max-height: 120px; opacity: 1; }
+  .adv:hover .adv-more, .adv:focus-within .adv-more, .adv:focus .adv-more { max-height: 400px; opacity: 1; }
+  .adv { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; padding: 7px 10px; border-radius: var(--radius-lg); background: var(--surface); border: 1.5px solid var(--line-strong); cursor: default; transition: box-shadow var(--dur-hover) var(--ease-settle); }
+  .adv:hover { box-shadow: var(--shadow-md); }
+  .adv-i { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: var(--surface-2); }
+  .lv-do-not-install { border-color: var(--red); background: color-mix(in srgb, var(--red) 7%, var(--surface)); }
+  .lv-do-not-install .adv-i { background: var(--red); color: #fff; }
+  .lv-act { border-color: var(--amber); } .lv-act .adv-i { background: var(--amber-soft); color: var(--amber-ink); }
+  .lv-check .adv-i { background: var(--blue-soft); color: var(--blue-ink); }
+  .adv-body { display: grid; gap: 3px; min-width: 0; }
+  .adv-top { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 12px; }
+  .adv-lv { font: 700 10.5px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; }
+  .lv-do-not-install .adv-lv { color: var(--red-ink); } .lv-act .adv-lv { color: var(--amber-ink); } .lv-check .adv-lv { color: var(--blue-ink); }
+  .adv h3 { margin: 0; font: 700 13.5px/1.25 var(--font-display); }
+  .adv-top .faint { display: none; } .adv:hover .adv-top .faint, .adv:focus-within .adv-top .faint, .adv:focus .adv-top .faint { display: inline; }
+  .adv-act { margin: 0; font-size: 13px; color: var(--text-2); }
+  .adv-more summary { cursor: pointer; font-size: 12px; color: var(--text-3); }
+  .adv-more p { margin: 6px 0 0; font-size: 13px; }
+  .adv-src { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; }
+  .cite { margin-left: 6px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+
+  /* Tabs */
+  .tab-lede { margin: 0 0 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 13.5px; }
+  .ports-card { padding: 16px 18px 14px; display: grid; gap: 8px; }
+  .ports-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px 28px; flex-wrap: wrap; }
+  .port-count { margin: 0; font-size: 13.5px; }
+  .pfacts { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0; }
+  .pfacts div { display: grid; gap: 2px; }
+  .pfacts dt { font-size: 11.5px; color: var(--text-3); }
+  .pfacts dd { margin: 0; font-size: 13px; color: var(--text); }
+  .ports-scroll { overflow-x: auto; padding-top: 10px; }
+  .pb-src { margin: 0; font-size: 12px; color: var(--text-3); }
+  .learn-link { margin: 12px 0 0; font-size: 12.5px; }
+  .fleet-num { margin: 0; font: var(--weight-display) var(--big-num)/1 var(--font-display); letter-spacing: -.02em; }
+  .fleet-sub { margin: -6px 0 0; font-size: 13px; }
+  .kv dt .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 8px; vertical-align: 1px; background: var(--grey); }
+  .kv dt .dot.manage { background: var(--green); } .kv dt .dot.deploy { background: var(--blue); } .kv dt .dot.retire { background: var(--amber); } .kv dt .dot.plan, .kv dt .dot.procure { background: var(--violet); }
+  .tagwrap { display: flex; flex-wrap: wrap; gap: 6px; }
+  .side-card .btn { justify-self: start; display: inline-flex; gap: 6px; align-items: center; }
+  .mono.small, .small { font-size: 12px; }
+  .empty-card { padding: 24px; display: grid; gap: 6px; max-width: 680px; }
+  .empty-card p { margin: 0; }
+  .empty-card .name { font-weight: var(--weight-name); font-size: 15px; }
+
+  /* Firmware */
+  .fw-sum { display: flex; gap: 8px; flex-wrap: wrap; margin: 0; }
+  .fws-chip { display: inline-flex; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 13px; border: 1px solid var(--line); }
+  .fws-chip.s-lab { border-style: dashed; } .fws-chip.s-blocked { background: var(--red-soft); color: var(--red-ink); border-color: var(--red); }
+  .fw-all > summary { cursor: pointer; font-weight: 650; padding: 8px 0; }
+  .fw-all[open] > summary { margin-bottom: 8px; }
+  .fw-now { display: flex; gap: 16px; align-items: center; padding: 16px 20px; }
+  .fw-now p { margin: 0; }
+  .fw-log { margin-left: auto; flex: none; display: inline-flex; gap: 6px; align-items: center; }
+  .fw-now .muted { font-size: 13.5px; margin-top: 4px; }
+  .fw-chip { flex: none; font-size: 18px; font-weight: 700; padding: 10px 14px; border-radius: 10px; background: var(--green-soft); color: var(--green-ink); border: 2px solid var(--green); }
+  .fw-line { list-style: none; margin: 0; padding: 0; display: grid; }
+  .fwr { position: relative; display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 14px; padding-bottom: 14px; }
+  .fwr::before { content: ""; position: absolute; left: 10px; top: 20px; bottom: 0; width: 2px; background: var(--line-strong); }
+  .fwr:last-child::before { display: none; }
+  .fwr-dot { width: 22px; height: 22px; border-radius: 50%; border: 2.5px solid var(--line-strong); background: var(--surface); }
+  .fw-standard .fwr-dot { background: var(--green); border-color: var(--green); }
+  .fw-blocked .fwr-dot { background: var(--red); border-color: var(--red); }
+  .fw-lab .fwr-dot { background: var(--violet); border-color: var(--violet); }
+  .fwr-body { display: grid; gap: 6px; padding: 12px 14px; border-radius: var(--radius-lg); background: var(--surface); border: var(--border-card); }
+  .fw-blocked .fwr-body { border-color: var(--red); }
+  .fwr-body p { margin: 0; }
+  .fwr-top { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: baseline; }
+  .fwr-top b { font-size: 15px; }
+  .fws { font: 700 10.5px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; padding: 4px 7px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); }
+  .fws.s-standard { background: var(--green-soft); color: var(--green-ink); }
+  .fws.s-blocked { background: var(--red); color: #fff; }
+  .fws.s-lab { background: var(--violet-soft); color: var(--violet-ink); }
+  .fwr-note { font-size: 13.5px; font-weight: 600; }
+  .fwr-h { margin: 0; padding-left: 18px; font-size: 13px; color: var(--text-2); display: grid; gap: 2px; }
+  .fwr-body details summary { cursor: pointer; font-size: 12.5px; color: var(--text-2); }
+  .fwr-body details ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
+  .fwr-body .cite { margin: 0; justify-self: start; }
+
+  @media (max-width: 1100px) { .product-stage { min-height: clamp(200px, 45vw, 340px); } }
+  @media (max-width: 760px) {
+    .mp-tile { flex: 1 1 calc(50% - 4px); min-width: 0; grid-template-columns: 48px minmax(0, 1fr); } .mp-art { width: 48px; }
+    .mb-stats { grid-template-columns: repeat(2, auto); justify-content: start; gap: 10px 28px; }
+    .fw-now { flex-wrap: wrap; } .fw-log { margin-left: 0; }
+  }
+</style>

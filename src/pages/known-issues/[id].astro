@@ -1,0 +1,270 @@
+---
+// One known issue (decision 0029): what the maker says, where it is in our fleet (every unit on an affected
+// version, by office, each a link to its unit page), the incidents that look like it, the fix, and the case with
+// the maker. A Record page (docs/standards/page-anatomy.md): the fleet picture beside what the maker says, three
+// tiles (incidents, the fix, the maker), then the affected units. Every action goes through the live layer.
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import SidePanel from '../../components/SidePanel.astro';
+import Section from '../../components/Section.astro';
+import LiveBar from '../../components/LiveBar.astro';
+import { SITE_ORDER, sites, modelName, href, fmtDate, INC_STATE } from '../../lib/data.mjs';
+import { when } from '../../lib/incidents.mjs';
+import { issues, matchesOf, caseForIssue, draftForIssue, siteName, KI_TONE, AFFECTS, CONFIDENCE, CASE_STATUS } from '../../lib/knownissues-view.mjs';
+
+export function getStaticPaths() {
+  return issues.map((it) => ({ params: { id: it.id.toLowerCase() }, props: { it } }));
+}
+const { it } = Astro.props;
+const ms = matchesOf(it.id);
+const mcase = caseForIssue(it.id);
+const draft = mcase ? null : draftForIssue(it.id);
+const shown = [...it.ex.exposed, ...it.ex.unknown];
+const offices = [...new Set(shown.map((u) => u.site))];
+const exRooms = [...new Set(it.ex.exposed.map((u) => u.room))];
+const tellRooms = exRooms.length ? exRooms : [...new Set(it.ex.unknown.map((u) => u.room))];
+const AFF_TONE = { yes: 'bad', maybe: 'warn', no: 'manage' };
+const confTone = { strong: 'bad', possible: 'warn' };
+const ref = it.ref ?? it.id;
+
+// The fleet picture: every unit of the models the maker names, by office, lit by what it means for this issue.
+const WHY = { version: 'On a version without it', need: "Its room doesn't meet the maker's condition", never: "Its room doesn't meet the maker's condition" };
+const allUnits = [...it.ex.exposed.map((u) => ({ ...u, st: 'exposed' })), ...it.ex.unknown.map((u) => ({ ...u, st: 'unknown' })), ...it.ex.safe.map((u) => ({ ...u, st: 'safe' }))];
+const rowsBySite = SITE_ORDER.map((s) => ({ site: s, units: allUnits.filter((u) => u.site === s) })).filter((r) => r.units.length);
+const ST_ORDER = { exposed: 0, unknown: 1, safe: 2 };
+for (const r of rowsBySite) r.units.sort((a, b) => ST_ORDER[a.st] - ST_ORDER[b.st] || a.name.localeCompare(b.name));
+const picHead = it.affects === 'yes' ? `${it.ex.exposed.length} ${it.ex.exposed.length === 1 ? 'unit runs' : 'units run'} an affected version`
+  : it.affects === 'maybe' ? `${it.ex.unknown.length} units may run an affected version`
+  : !it.models.length ? 'Not in our fleet' : 'No unit is exposed';
+const picLine = it.affects === 'maybe' ? "Keia Atlas doesn't track this maker's firmware per unit yet (stage 2 reads it from device management), so every unit of the model counts until it does."
+  : !it.models.length ? `The maker names ${it.maker_models.join(', ')}, which Aigna doesn't have.`
+  : it.needs?.never ? it.needs.never
+  : it.affects === 'no' && it.ex.safe.every((u) => u.why === 'need') ? `The maker's condition: ${it.needs.text.toLowerCase()}. No room has it.`
+  : it.affects === 'no' ? `Every unit runs a version the maker doesn't list (${it.affected.join(', ')}).`
+  : `Versions from device management, simulated until stage 2. ${it.needs ? `Counted only where ${it.needs.text.toLowerCase()}.` : ''}`;
+
+const NUMBERS = [
+  { n: it.affects === 'maybe' ? it.ex.unknown.length : it.ex.exposed.length, label: it.affects === 'maybe' ? 'Units, version unknown' : 'Units exposed', to: shown.length ? '#affected-units' : undefined, tone: it.affects === 'yes' ? 'bad' : it.affects === 'maybe' ? 'warn' : undefined },
+  { n: offices.length, label: offices.length === 1 ? 'Office' : 'Offices' },
+  { n: 0, label: 'Incidents linked', to: '#incidents', id: 'linked' },
+  { n: it.fixed_in ? it.fixed_in.split(/[.-]/).slice(0, 3).join('.') : it.status === 'wont-fix' ? 'None' : 'Not yet', label: 'Fixed in', to: '#the-fix' },
+];
+const tellText = `Known issue ${ref} (${it.maker}): ${it.symptom}${it.workaround ? ` Workaround: ${it.workaround.text}` : ''}`;
+---
+<Shell title={`${ref}: ${it.title}`} section="known-issues" minStage={2} crumbs={[{ label: 'Work', to: '/work/' }, { label: 'Known issues', to: '/known-issues/' }, { label: it.maker, to: `/known-issues/?maker=${it.feed.id}` }, { label: ref }]} about={{ kind: 'known-issue', label: `${ref}, ${it.title}`, to: it.path }}>
+  <PageBand overline="Known issue" title={it.title} lede={it.symptom} stage={2} numbers={NUMBERS} rec={it.id}>
+    <Fragment slot="overline">
+      <span class="code" data-help="ki.ref">{ref}</span>
+      <span>{it.maker}</span>
+      <span class={`pill ${KI_TONE[it.status]}`} data-help="ki.status">{it.statusLabel}</span>
+      <span class={`pill ${AFF_TONE[it.affects]}`} data-help="ki.affects">{AFFECTS[it.affects]}</span>
+      {it.demo && <span class="pill plain" data-help="ki.demo">Demo issue</span>}
+    </Fragment>
+    {ms.length > 0 ? <button slot="action" type="button" class="btn primary" data-ki-linkall data-item={`ki:${it.id}`} data-help="ki.link-all">Link these incidents</button>
+      : tellRooms.length > 0 ? <button slot="action" type="button" class="btn primary" data-ki-tell-open data-help="ki.tell">Tell the team</button> : null}
+  </PageBand>
+
+  <div class="content ki-rec" data-ki-root data-ki-issue data-item={`ki:${it.id}`} data-id={it.id}>
+    <div class="g12 top">
+      <section class="card pad s-7 ki-pic" aria-label="Where it is in the fleet" data-help="ki.fleet">
+        <header class="ki-ph">
+          <div><p class="overline">Where it is in our fleet</p><h2>{picHead}</h2></div>
+          {tellRooms.length > 0 && <button type="button" class="btn small" data-ki-tell-open data-help="ki.tell">Tell the team</button>}
+          {tellRooms.length > 0 && <button type="button" class="btn small ghost" data-ki-tell-undo data-rooms={tellRooms.join('|')} hidden>Take the notes back</button>}
+        </header>
+        <p class="faint ki-pl">{picLine}</p>
+        <p class="ki-state" data-ki-toldstate hidden></p>
+        <div class="ki-tell card" data-ki-tell-form hidden>
+          <label for="ki-tell-t"><b>A note on {tellRooms.length} {tellRooms.length === 1 ? 'room' : 'rooms'}</b> <span class="faint">Everyone who opens those rooms sees it, with your name.</span></label>
+          <textarea id="ki-tell-t" rows="4">{tellText}</textarea>
+          <span class="ki-tellb">
+            <button type="button" class="btn small primary" data-ki-tell-send data-rooms={tellRooms.join('|')}>Leave the note</button>
+            <button type="button" class="btn small ghost" data-ki-tell-cancel>Not now</button>
+          </span>
+        </div>
+        {rowsBySite.length > 0 ? (
+          <ul class="ki-fleet">
+            {rowsBySite.map((r) => {
+              const ex = r.units.filter((u) => u.st === 'exposed').length, un = r.units.filter((u) => u.st === 'unknown').length;
+              return (
+                <li>
+                  <a class="ki-site" href={href(`/rooms/?site=${r.site}`)}><b>{siteName(r.site)}</b><small class="faint">{sites[r.site].city ?? 'Home offices'}</small></a>
+                  <span class="ki-dots">
+                    {r.units.map((u) => <a class={`ki-dot st-${u.st}`} href={href(`/device/?tag=${u.tag}`)} title={`${u.name} · ${u.firmware ?? 'version not known'}${u.st === 'safe' ? ` · ${WHY[u.why]}` : ''}`} aria-label={`${u.name}, ${u.st === 'exposed' ? 'exposed' : u.st === 'unknown' ? 'version not known' : WHY[u.why]}`}></a>)}
+                  </span>
+                  <span class="ki-sn num">{ex ? <b class="t-bad">{ex}</b> : un ? <b class="t-warn">{un}</b> : <b class="faint">0</b>}<small class="faint"> of {r.units.length}</small></span>
+                </li>
+              );
+            })}
+          </ul>
+        ) : <p class="ki-none">{it.maker_models?.length ? `No ${it.maker_models.join(', ')} in any office.` : 'No units of these models.'}</p>}
+        {rowsBySite.length > 0 && (
+          <p class="ki-key faint"><span><i class="ki-dot st-exposed"></i>Exposed</span><span><i class="ki-dot st-unknown"></i>Version not known</span><span><i class="ki-dot st-safe"></i>Not exposed</span><span>Select a dot for its unit.</span></p>
+        )}
+      </section>
+
+      <SidePanel class="s-5" title="What the maker says" meta={`Checked ${when(it.feed.checked)}`} help="ki.maker-says">
+        <dl class="kv">
+          <div><dt>Reference</dt><dd class="mono">{it.ref ?? 'None published'}</dd></div>
+          <div><dt>Models</dt><dd>{it.modelNames.join(', ')}</dd></div>
+          <div><dt>Affected versions</dt><dd class="mono">{it.affected.join(', ')}</dd></div>
+          <div><dt>Fixed in</dt><dd class="mono">{it.fixed_in ?? (it.status === 'wont-fix' ? "Won't fix" : 'Not yet')}</dd></div>
+          <div><dt>First published</dt><dd>{it.published.length === 7 ? fmtDate(`${it.published}-01`, { month: 'short', year: 'numeric' }) : fmtDate(it.published)}</dd></div>
+          {it.needs && <div><dt>Only when</dt><dd>{it.needs.text}</dd></div>}
+        </dl>
+        {it.affected_note && <p class="faint ki-note">{it.affected_note}</p>}
+        <div class="ki-wa" data-help="ki.workaround">
+          <p class="overline">Workaround</p>
+          {it.workaround ? <><p>{it.workaround.text}</p><small class="faint">{it.workaround.from === 'maker' ? 'Published by the maker.' : "Aigna's own. The maker didn't publish one."}</small></> : <p class="faint">None published.</p>}
+        </div>
+        <p class="ki-src">
+          {it.sourceRec?.url ? <a href={it.sourceRec.url} rel="noopener">{it.sourceRec.title}</a> : <span>{it.sourceRec?.title}</span>}
+          {it.advisoryRec && <> · <a href={href(it.advisoryRec.to)}>{it.advisoryRec.id}: {it.advisoryRec.title}</a></>}
+        </p>
+        {it.demo && <p class="faint ki-note">Made up for the demo: not from a real release note.</p>}
+      </SidePanel>
+    </div>
+
+    <div class="g12">
+      <section class="card side-card s-4" id="incidents" data-ki-card aria-labelledby="ki-inc-h" data-help="ki.incidents">
+        <h3 id="ki-inc-h">Incidents that look like it</h3>
+        {ms.length ? (
+          <ul class="ki-mrows">
+            {ms.map((m) => (
+              <li class="ki-mrow" data-ki-m data-item={`ki:${it.id}`} data-inc={m.inc.number} data-state="open">
+                <span class="ki-mmain">
+                  <a class="mono" href={href(m.inc.v.href)}>{m.inc.number}</a>
+                  <span class={`pill ${confTone[m.confidence]}`} data-help="ki.confidence">{CONFIDENCE[m.confidence]}</span>
+                  <b>{m.inc.v.inc.short_description}</b>
+                  <small class="faint">{m.inc.v.where} · {INC_STATE[m.inc.v.inc.state]}</small>
+                  <small class="ki-why">{m.reasons.map((r) => <span data-ok={r.ok === true ? '1' : '0'} title={r.title}>{r.text}</span>)}</small>
+                  <small class="ki-mstate" data-ki-mstate></small>
+                </span>
+                <span class="ki-mbtn">
+                  <button type="button" class="btn small" data-ki-act="link" data-help="ki.link">Link</button>
+                  <button type="button" class="btn small ghost" data-ki-act="not" data-help="ki.not-this">Not this</button>
+                  <button type="button" class="btn small ghost" data-ki-act="back" data-help="ki.put-back">Put back</button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : <p class="muted ki-t">No incident looks like it. Keia Atlas checks every new ticket against it.</p>}
+        <p class="faint ki-t">Linking never closes a ticket; the person working it decides.</p>
+      </section>
+
+      <section class="card side-card s-4" id="the-fix" aria-labelledby="ki-fix-h" data-help="ki.fix">
+        <h3 id="ki-fix-h">The fix</h3>
+        <p class="ki-t">{it.fix.text}</p>
+        {it.fix.kind === 'rollout' && <a class="btn small" href={href(`/projects/${it.fix.project.toLowerCase()}/`)}>Open {it.fix.project}</a>}
+        {it.fix.kind === 'propose' && (
+          <span class="ki-fb">
+            <button type="button" class="btn small" data-ki-plan data-help="ki.plan">Propose a firmware rollout</button>
+            <button type="button" class="btn small ghost" data-ki-unplan hidden>Take it back</button>
+            <a class="faint" href={href('/playbooks/firmware-rollout/')}>The Firmware rollout playbook</a>
+          </span>
+        )}
+        {it.fix.kind === 'blocked' && it.releaseAdvisory && <a class="faint" href={href(it.releaseAdvisory.to)}>Why: {it.releaseAdvisory.id}, {it.releaseAdvisory.title}</a>}
+        <p class="ki-state" data-ki-planstate hidden></p>
+      </section>
+
+      <section class="card side-card s-4" aria-labelledby="ki-mk-h" data-help="ki.maker">
+        <h3 id="ki-mk-h">With the maker</h3>
+        {mcase ? (
+          <>
+            <p class="ki-t"><a href={href(mcase.path)}><b class="mono">{mcase.id}</b> {mcase.title}</a></p>
+            <p class="ki-t"><span class={`pill ${mcase.status === 'closed' ? 'manage' : 'deploy'}`}>{CASE_STATUS[mcase.status]}</span>{mcase.ref && <span class="faint"> · case {mcase.ref}</span>}</p>
+            {mcase.ask && <p class="faint ki-t">Asked for: {mcase.ask}</p>}
+          </>
+        ) : draft ? (
+          <>
+            <p class="ki-t">No case with {it.maker} about this yet. Keia Atlas has one ready with the units, versions and incidents.</p>
+            <a class="btn small" href={href(draft.path)} data-help="ki.raise">Raise with the maker</a>
+          </>
+        ) : <p class="muted ki-t">Nothing to raise: it doesn't affect us.</p>}
+        <button type="button" class="btn small ghost ki-hist" data-ki-history data-item={`ki:${it.id}`} data-title={`${ref} ${it.title}`} data-help="ki.history">History</button>
+      </section>
+    </div>
+
+    {shown.length > 0 && (
+      <Section title="Affected units" id="affected-units" help="ki.units" aside={`${shown.length} in ${offices.length} ${offices.length === 1 ? 'office' : 'offices'}`} showAll={10}>
+        <div class="list" data-items>
+          {shown.map((u) => (
+            <div class="row plain ki-urow" data-ki-room={u.room}>
+              <span>
+                <a class="name" href={href(`/device/?tag=${u.tag}`)}>{u.name}</a>
+                <span class="sub">{modelName(u.model)} · <a href={href(`/rooms/${u.room}/`)}>{u.roomTitle}</a>, {siteName(u.site)} · <span class="mono">{u.tag}</span></span>
+              </span>
+              <span class="end"><span class="ki-noted" title="A note about this known issue is on the room">Note left</span><span class="mono faint">{u.firmware ?? 'Version not known'}</span></span>
+            </div>
+          ))}
+        </div>
+      </Section>
+    )}
+
+    <LiveBar page={`ki:${it.id}`} />
+  </div>
+  <script>
+    import { boot } from '../../lib/knownissues-client.mjs';
+    boot();
+  </script>
+</Shell>
+<style>
+  .ki-rec { gap: 18px; padding-top: 18px; }
+  .ki-pic { display: grid; gap: 12px; align-content: start; }
+  .ki-ph { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 10px 16px; }
+  .ki-ph .overline { margin: 0 0 4px; }
+  .ki-ph h2 { margin: 0; font-size: 20px; }
+  .ki-pl { margin: 0; font-size: 13.5px; }
+  .ki-state { margin: 0; font-size: 13px; font-weight: 600; color: var(--green-ink, #17612e); }
+  .ki-state[hidden], .ki-tell[hidden] { display: none; }
+  .ki-tell { display: grid; gap: 8px; padding: 14px; background: var(--surface-2); box-shadow: none; }
+  .ki-tell label { display: grid; gap: 2px; font-size: 13.5px; }
+  .ki-tell textarea { width: 100%; font: inherit; font-size: 14px; padding: 10px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); resize: vertical; }
+  .ki-tellb, .ki-fb { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .ki-fleet { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .ki-fleet li { display: grid; grid-template-columns: 150px minmax(0, 1fr) 64px; gap: 12px; align-items: center; padding: 8px 0; border-top: var(--border-rule); }
+  .ki-fleet li:first-child { border-top: 0; }
+  .ki-site { display: grid; color: inherit; text-decoration: none; font-size: 14px; } .ki-site:hover b { text-decoration: underline; }
+  .ki-site small { font-size: 12px; }
+  .ki-dots { display: flex; flex-wrap: wrap; gap: 4px; }
+  .ki-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--grey-soft); border: 1.5px solid var(--grey, #8a8a8a); transition: transform var(--dur-hover) var(--ease-settle); }
+  a.ki-dot:hover, a.ki-dot:focus-visible { transform: scale(1.35); }
+  .ki-dot.st-exposed { background: var(--red, #d92d20); border-color: var(--red, #d92d20); }
+  .ki-dot.st-unknown { background: var(--amber-soft, #fff1cc); border-color: var(--amber, #c98a00); }
+  .ki-dot.st-safe { background: var(--green-soft, #dff3e4); border-color: var(--green, #2e9e58); }
+  .ki-sn { text-align: right; font-size: 13px; }
+  .t-bad { color: var(--red-ink, #9a2318); } .t-warn { color: var(--amber-ink, #7a5600); }
+  .ki-key { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0; font-size: 12.5px; }
+  .ki-key span { display: inline-flex; align-items: center; gap: 6px; }
+  .ki-none { margin: 8px 0; font-size: 15px; }
+  .ki-note { margin: 10px 0 0; font-size: 12.5px; }
+  .ki-wa { margin-top: 14px; padding: 12px 14px; border-radius: var(--radius); background: var(--surface-2); display: grid; gap: 4px; }
+  .ki-wa .overline, .ki-wa p { margin: 0; } .ki-wa p { font-size: 14px; }
+  .ki-src { margin: 12px 0 0; font-size: 13px; overflow-wrap: anywhere; }
+  .ki-t { margin: 0; font-size: 14px; }
+  .ki-hist { justify-self: start; }
+  .ki-mrows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .ki-mrow { display: grid; gap: 8px; padding: 10px 12px; border-radius: var(--radius); background: var(--surface-2); transition: background var(--dur-state) var(--ease-settle), opacity var(--dur-state) var(--ease-settle); }
+  .ki-mmain { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+  .ki-mmain b { flex-basis: 100%; font-size: 14px; }
+  .ki-mmain small { flex-basis: 100%; font-size: 12.5px; }
+  .ki-why { display: flex; flex-wrap: wrap; gap: 4px 10px; color: var(--text-2); }
+  .ki-why span::before { content: '\2713'; margin-right: 4px; color: var(--green-ink, #17612e); }
+  .ki-why span[data-ok="0"]::before { content: '?'; color: var(--amber-ink, #7a5600); }
+  .ki-mstate { font-size: 12.5px; color: var(--text-2); font-weight: 600; }
+  .ki-mstate:empty { display: none; }
+  .ki-mbtn { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ki-mrow [data-ki-act="back"] { display: none; }
+  .ki-mrow:not([data-state="open"]) [data-ki-act="link"], .ki-mrow:not([data-state="open"]) [data-ki-act="not"] { display: none; }
+  .ki-mrow:not([data-state="open"]) [data-ki-act="back"] { display: inline-flex; }
+  .ki-mrow[data-state="linked"] { background: var(--green-soft); }
+  .ki-mrow[data-state="not-this"] { opacity: .62; }
+  .ki-noted { display: none; font: 700 11px/1 var(--font-sans); padding: 4px 8px; border-radius: var(--pill-radius); background: var(--blue-soft); color: var(--blue-ink); }
+  .ki-urow[data-noted="1"] .ki-noted { display: inline-block; animation: rs-grow var(--dur-enter) var(--ease-settle) both; }
+  [hidden] { display: none !important; }
+  @container content (max-width: 699px) {
+    .ki-fleet li { grid-template-columns: minmax(0, 1fr) auto; }
+    .ki-dots { grid-column: 1 / -1; grid-row: 2; }
+  }
+  @media (prefers-reduced-motion: reduce) { .ki-urow[data-noted="1"] .ki-noted { animation: none; } }
+</style>

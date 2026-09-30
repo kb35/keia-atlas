@@ -1,0 +1,72 @@
+# Demo project. People, dates, hours and agent activity are made up; rooms and devices are the real sample data.
+id: PRJ-12
+name: New York office video bar refresh
+kind: refresh
+playbook: av-refresh
+site: nyc
+phase: integrate
+owner: ruth
+budget:
+  approved: 68000
+  currency: USD
+  lines:
+    - { item: "Poly Studio X72 units (3) and mounts", amount: 29400, status: spent, supplier: "Poly distributor" }
+    - { item: "Spare unit", amount: 9800, status: committed, supplier: "Poly distributor" }
+    - { item: "Technician and engineering time (internal)", amount: 14200, status: estimate }
+    - { item: "Cabling and sundries", amount: 1900, status: spent }
+start: "2026-08-03"
+target: "2026-11-27"
+demo: true
+summary: Replace the Poly Studio X72s that are past their years in service at the New York office, one floor at a time, keeping each position and hostname so nothing downstream breaks.
+roles:
+  - { person: tomas, as: programme, hours: 12, logged: 6, does: "Fits the refresh into the year plan and holds the budget" }
+  - { person: ruth, as: pm, hours: 60, logged: 28, does: "Runs the dates, room bookings and the handover" }
+  - { person: aoife, as: lead, hours: 48, logged: 30, does: "Confirms what is due, writes the install tasks, signs off commissioning" }
+  - { person: carlos, as: technician, hours: 64, logged: 18, does: "Swaps Curlew and Whooper Swan and runs the verification" }
+  - { person: elena, as: technician, hours: 8, logged: 0, does: "Swaps Skylark and records the serials and MACs" }
+  - { person: marco, as: network, hours: 8, logged: 6, does: "Reserves addresses and checks switch ports" }
+  - { person: sofia, as: service-owner, hours: 6, logged: 3, does: "Confirms the replacement model is the current standard" }
+history:
+  - { phase: plan, planned: "2026-08-14", ended: "2026-08-12", signed_off_by: tomas, summary: "Scope agreed: three X72 rooms first, four X52s to follow next quarter.", artefacts: [Scope and budget line, "List of units past their years in service"] }
+  - { phase: design, planned: "2026-08-28", ended: "2026-08-27", signed_off_by: sofia, summary: "Like-for-like swap to the current standard; no change to room types or wiring.", artefacts: [Room-by-room swap sheet, Confirmed standard model] }
+  - { phase: procure, planned: "2026-09-18", ended: "2026-09-22", signed_off_by: ruth, summary: "Units and mounts arrived four days late; addresses reserved before delivery.", artefacts: [Purchase order, Delivery note with serials, Address reservations] }
+  - phase: integrate
+    planned: "2026-10-30"
+    summary: One room under way; Whooper Swan blocked by a board meeting.
+    steps:
+      - { step: install, planned: "2026-10-30", summary: One room under way; Whooper Swan blocked by a board meeting. }
+charter:
+  why: Three Poly Studio X72s at the New York office are past their years in service. Replace them one floor at a time so no floor loses more than one room at once.
+  success:
+    - Three rooms on the current standard, each passing verification from another site
+    - No position or hostname changes, so booking and monitoring keep working
+    - Each old unit retired in the asset register on the day of its swap
+log:
+  - { id: R-1, kind: risk, title: "Board meetings take Whooper Swan out of the install windows", status: open, owner: ruth, raised: "2026-09-15", due: "2026-10-14", note: "The room is booked until 14 October. If the next window slips too, Skylark goes first.", room: nyc-20-10, task: T-1206 }
+  - { id: I-1, kind: issue, title: "Curlew's old unit is still on the wall beside the new one", status: open, owner: carlos, raised: "2026-09-25", due: "2026-10-06", note: "Both units are powered until the new one passes commissioning; the old one must be retired the same day it comes down.", room: nyc-20-05, task: T-1204 }
+  - { id: X-1, kind: dependency, title: "Whooper Swan display fault fixed before the swap", status: open, owner: carlos, raised: "2026-09-26", due: "2026-10-14", note: "The open incident on the display needs closing first, or the new bar is commissioned against a faulty screen.", room: nyc-20-10, incident: INC0041121 }
+  - { id: X-2, kind: dependency, title: "Address reservations from the network team", status: closed, owner: marco, raised: "2026-08-28", decided: "2026-09-18", note: "Asked for by MAC before the units shipped; a lesson from the London office.", task: T-1203 }
+  - { id: D-1, kind: decision, title: "Keep every position and hostname", status: closed, owner: sofia, raised: "2026-08-20", decided: "2026-08-27", note: "A like-for-like swap keeps the rooms inside the AV refresh playbook and off the custom design path." }
+changes:
+  - { id: CR-1, title: "Add the four X52s due next quarter as a second batch", why: "The refresh planner found four more units at the New York office past their years in service. One project and one set of room bookings instead of two.", days: 20, cost: 38000, proposed_by: tomas, approver: tomas, status: proposed, raised: "2026-09-26" }
+spaces:
+  - { space: nyc-20-05, state: in-progress, note: Old unit still in place while the new one is commissioned }
+  - { space: nyc-20-10, state: not-started }
+  - { space: nyc-21-05, state: not-started }
+tasks:
+  - { id: T-1201, title: Confirm which X72s are due, owner: aoife, hours: 4, due: "2026-08-12", phase: plan, kind: survey, status: done, nothing_new: guide-was-right }
+  - { id: T-1202, title: Order replacement units and mounts, owner: tomas, team: procurement, hours: 2, due: "2026-08-28", phase: procure, kind: order, status: done, nothing_new: not-device-related }
+  - { id: T-1203, title: Reserve addresses for new units on the 20th floor, owner: marco, team: it-network, hours: 3, due: "2026-09-18", phase: procure, kind: network, status: done, captured_fix: "Ask for the reservation by MAC before the unit ships; the network team's queue is five working days." }
+  - { id: T-1204, title: Install the new video bar in Curlew, space: nyc-20-05, owner: carlos, hours: 6, due: "2026-10-02", phase: integrate, kind: install, status: doing }
+  - { id: T-1205, title: Commission Curlew and run the verification, space: nyc-20-05, owner: aoife, hours: 3, due: "2026-10-06", phase: integrate, kind: commission, status: todo }
+  - { id: T-1206, title: Swap the X72 in Whooper Swan, space: nyc-20-10, owner: carlos, hours: 6, due: "2026-10-16", phase: integrate, kind: install, status: blocked, blocked_by: Room booked for a board meeting until 14 October }
+  - { id: T-1207, title: Swap the X72 in Skylark, space: nyc-21-05, owner: elena, hours: 6, due: "2026-10-23", phase: integrate, kind: install, status: todo }
+  - { id: T-1208, title: Hand over with a snag list, owner: ruth, hours: 4, due: "2026-11-27", phase: handover, kind: handover, status: todo }
+  - { id: T-1209, title: "Provision Curlew's new video bar: asset record, DNS, device management and monitoring", space: nyc-20-05, owner: aoife, hours: 2, due: "2026-09-30", phase: integrate, kind: provision, status: doing, where: remote }
+  - { id: T-1210, title: Configure Curlew's video bar in its setup order, space: nyc-20-05, owner: carlos, hours: 3, start: "2026-10-05", due: "2026-10-05", phase: integrate, kind: configure, status: todo }
+  - { id: T-1211, title: Provision the Skylark replacement before it is unboxed, space: nyc-21-05, owner: aoife, hours: 2, due: "2026-10-09", phase: integrate, kind: provision, status: todo }
+  - { id: T-1212, title: Record serials and MACs for the Whooper Swan and Skylark units, owner: elena, hours: 2, due: "2026-10-08", phase: integrate, kind: records, status: todo }
+agents:
+  - { name: Refresh planner, status: proposed, says: "Four more X52s at the New York office pass their years in service next quarter.", proposes: "Add them to this project as a second batch" }
+  - { name: Evidence watcher, status: working, says: "Checking the new Curlew unit against device management and the asset register." }
+  - { name: Guide keeper, status: proposed, says: "The address-reservation fix from T-1203 has now helped on 3 installs.", proposes: "Promote it to a step in the AV refresh playbook" }

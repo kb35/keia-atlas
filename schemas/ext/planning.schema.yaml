@@ -1,0 +1,226 @@
+# Planning data: one file per kind (ratios, headcount, budget, scenarios), told apart by `kind`. Demo data.
+# Financial years are written fy2027 (July 2026 to June 2027).
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/planning
+title: Planning data
+type: object
+required: [id, kind, name, demo]
+properties:
+  id: { type: string }
+  kind: { enum: [ratios, headcount, budget, scenarios] }
+  name: { type: string }
+  demo: { const: true }
+$defs:
+  fy: { type: string, pattern: '^fy20[0-9]{2}$' }
+  roleId: { enum: [tech, delivery, network, pm] }
+  region: { enum: [amer, emea, apac] }
+  size:
+    type: object
+    additionalProperties: false
+    required: [name, rooms, desks, staff, units, like]
+    properties:
+      name: { type: string }
+      rooms: { type: integer, minimum: 1 }
+      desks: { type: integer, minimum: 0 }
+      staff: { type: integer, minimum: 1 }
+      units: { type: integer, minimum: 1 }
+      like: { type: string }
+  perRole:
+    type: object
+    additionalProperties: false
+    required: [per_room, per_unit, per_staff, per_kit]
+    properties:
+      per_room: { type: number, minimum: 0 }
+      per_unit: { type: number, minimum: 0 }
+      per_staff: { type: number, minimum: 0 }
+      per_kit: { type: number, minimum: 0 }
+allOf:
+  - if: { properties: { kind: { const: ratios } } }
+    then:
+      additionalProperties: false
+      required: [id, kind, name, demo, hours, support, refresh_roles, targets, office_sizes, fit_out, benchmarks]
+      properties:
+        id: {}
+        kind: {}
+        name: {}
+        demo: {}
+        hours:
+          type: object
+          additionalProperties: false
+          required: [per_day, working_days, leave_days]
+          properties:
+            per_day: { type: number, minimum: 1, maximum: 12 }
+            working_days: { type: integer, minimum: 200, maximum: 262 }
+            leave_days: { type: integer, minimum: 0, maximum: 60 }
+        support:
+          type: object
+          additionalProperties: false
+          required: [tech, delivery, network, pm]
+          properties:
+            tech: { $ref: '#/$defs/perRole' }
+            delivery: { $ref: '#/$defs/perRole' }
+            network: { $ref: '#/$defs/perRole' }
+            pm: { $ref: '#/$defs/perRole' }
+        refresh_roles:
+          type: object
+          additionalProperties: false
+          required: [provision, configure, install, commission, decommission]
+          properties:
+            provision: { $ref: '#/$defs/roleId' }
+            configure: { $ref: '#/$defs/roleId' }
+            install: { $ref: '#/$defs/roleId' }
+            commission: { $ref: '#/$defs/roleId' }
+            decommission: { $ref: '#/$defs/roleId' }
+        targets:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required: [role, per, n, note]
+            properties:
+              role: { $ref: '#/$defs/roleId' }
+              per: { enum: [staff, room, unit, office] }
+              n: { type: number, exclusiveMinimum: 0 }
+              note: { type: string }
+        office_sizes:
+          type: object
+          additionalProperties: false
+          required: [S, M, L]
+          properties:
+            S: { $ref: '#/$defs/size' }
+            M: { $ref: '#/$defs/size' }
+            L: { $ref: '#/$defs/size' }
+        fit_out:
+          type: object
+          additionalProperties: false
+          required: [cost_per_unit, hours_per_unit, refresh_after, refresh_share]
+          properties:
+            cost_per_unit: { type: number, exclusiveMinimum: 0 }
+            hours_per_unit:
+              type: object
+              additionalProperties: false
+              required: [pm, delivery, tech, network]
+              properties:
+                pm: { type: number, minimum: 0 }
+                delivery: { type: number, minimum: 0 }
+                tech: { type: number, minimum: 0 }
+                network: { type: number, minimum: 0 }
+            refresh_after: { type: integer, minimum: 1, maximum: 10 }
+            refresh_share: { type: number, minimum: 0, maximum: 1 }
+        benchmarks:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [body, what, note]
+            properties:
+              body: { type: string }
+              what: { type: string }
+              note: { type: string }
+  - if: { properties: { kind: { const: headcount } } }
+    then:
+      additionalProperties: false
+      required: [id, kind, name, demo, staff, changes]
+      properties:
+        id: {}
+        kind: {}
+        name: {}
+        demo: {}
+        staff:
+          type: object
+          additionalProperties: { type: integer, minimum: 0 }
+        changes:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [year, role, region, add, status, why]
+            properties:
+              year: { $ref: '#/$defs/fy' }
+              role: { $ref: '#/$defs/roleId' }
+              region: { $ref: '#/$defs/region' }
+              add: { type: integer }
+              status: { enum: [approved, proposed] }
+              why: { type: string }
+  - if: { properties: { kind: { const: budget } } }
+    then:
+      additionalProperties: false
+      required: [id, kind, name, demo, currency, rates, hour_rate, envelopes, unit_price]
+      properties:
+        id: {}
+        kind: {}
+        name: {}
+        demo: {}
+        currency: { const: EUR }
+        rates:
+          type: object
+          required: [EUR]
+          properties:
+            EUR: { const: 1 }
+          additionalProperties: { type: number, exclusiveMinimum: 0 }
+        hour_rate: { type: number, exclusiveMinimum: 0 }
+        envelopes:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [year, amount, status, note]
+            properties:
+              year: { $ref: '#/$defs/fy' }
+              amount: { type: number, minimum: 0 }
+              status: { enum: [set, proposed] }
+              note: { type: string }
+        unit_price:
+          type: object
+          additionalProperties: { type: number, minimum: 0 }
+  - if: { properties: { kind: { const: scenarios } } }
+    then:
+      additionalProperties: false
+      required: [id, kind, name, demo, scenarios]
+      properties:
+        id: {}
+        kind: {}
+        name: {}
+        demo: {}
+        scenarios:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, name, owner, say, changes]
+            properties:
+              id: { type: string, pattern: '^[a-z0-9-]+$' }
+              name: { type: string }
+              owner: { type: string }
+              say: { type: string }
+              changes:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  required: [op]
+                  properties:
+                    op: { enum: [cut, new-office, early, delay] }
+                  allOf:
+                    - if: { properties: { op: { const: cut } } }
+                      then:
+                        additionalProperties: false
+                        required: [op, percent, year]
+                        properties: { op: {}, percent: { type: number, exclusiveMinimum: 0, maximum: 100 }, year: { $ref: '#/$defs/fy' } }
+                    - if: { properties: { op: { const: new-office } } }
+                      then:
+                        additionalProperties: false
+                        required: [op, size, region, city, year]
+                        properties: { op: {}, size: { enum: [S, M, L] }, region: { $ref: '#/$defs/region' }, city: { type: string }, year: { $ref: '#/$defs/fy' } }
+                    - if: { properties: { op: { const: early } } }
+                      then:
+                        additionalProperties: false
+                        required: [op, class, year]
+                        properties: { op: {}, class: { type: string }, year: { $ref: '#/$defs/fy' } }
+                    - if: { properties: { op: { const: delay } } }
+                      then:
+                        additionalProperties: false
+                        required: [op, group, years]
+                        properties: { op: {}, group: { enum: [network, av] }, years: { type: integer, minimum: 1, maximum: 3 } }

@@ -1,0 +1,722 @@
+---
+// Team (stage 3). A List page with a picture and a side panel (docs/standards/page-anatomy.md): the band,
+// the filter bar, then the org chart at its natural height with the chosen person in a sticky side panel
+// beside it: where they work, who they report to, their week (the shared work list, src/lib/work.mjs),
+// their projects and hours, what they own and decide, and their letters in the RACI. Below the chart,
+// full width: the RACI and how the teams hand work to each other. The page scrolls; nothing inside it does.
+// People are made up; roles are Aigna's own.
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import SidePanel from '../../components/SidePanel.astro';
+import Section from '../../components/Section.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import Raci from '../../components/Raci.astro';
+import TeamChip from '../../components/TeamChip.astro';
+import TeamPerson from '../../components/TeamPerson.astro';
+import TeamFlow from '../../components/TeamFlow.astro';
+import { projects, sites, SITE_ORDER, spaces, vendors, classes, configurations, racks, incidents, commsRooms, PHASE_LABEL, DEMO_TODAY } from '../../lib/data.mjs';
+import { PEOPLE, ROLES, PROJECT_ROLE, REGION_SHORT } from '../../lib/demo.mjs';
+import { workByPerson, whereIs, overlaps, addDays, WORK_KIND, WORK_STATUS } from '../../lib/work.mjs';
+
+const byId = Object.fromEntries(PEOPLE.map((p) => [p.id, p]));
+const reportsOf = (id) => PEOPLE.filter((p) => p.reportsTo === id);
+const staff = PEOPLE.filter((p) => !p.vendor);
+const vendorsList = PEOPLE.filter((p) => p.vendor);
+
+// ---------- Where each person sits on the chart ----------
+// Teams as the chart draws them (the programme manager is their own box, not part of Delivery).
+const ORG_TEAM = { leadership: 'Leadership', delivery: 'Delivery', onsite: 'On site', programme: 'Programme', 'av-it': 'AV service', 'it-infra': 'IT infrastructure', 'service-desk': 'Service desk', vendor: 'Vendors' };
+const orgTeam = (p) => (p.roleId === 'head' ? 'leadership' : p.roleId === 'programme' ? 'programme' : p.team);
+// Short titles for the chart; the team name sits above each box, and the panel has the full title.
+const SHORT = { head: 'Head of AV and IT', 'delivery-manager': 'Delivery manager', programme: 'Programme manager', 'sm-av': 'Service manager', 'sm-infra': 'Service manager', desk: 'Service desk analyst', innovation: 'Innovation engineer', network: 'Network engineer', delivery: 'Delivery engineer', pm: 'Project manager', tech: 'Technician' };
+const head = PEOPLE.find((p) => p.roleId === 'head');
+const LEADS = [
+  { team: 'delivery', roleId: 'delivery-manager' },
+  { team: 'programme', roleId: 'programme' },
+  { team: 'av-it', roleId: 'sm-av' },
+  { team: 'it-infra', roleId: 'sm-infra' },
+  { team: 'service-desk', roleId: 'desk' },
+].map((l) => { const lead = PEOPLE.find((p) => p.roleId === l.roleId); return { ...l, name: ORG_TEAM[l.team], lead, reports: l.team === 'delivery' ? [] : reportsOf(lead.id) }; });
+const delMgr = LEADS[0].lead;
+
+// The delivery organisation: team by region. Each region has a manager for engineers, project managers
+// and technicians; where a region has none (APAC project management), another region's lead covers it.
+const REGIONS = [['emea', 'EMEA'], ['amer', 'Americas'], ['apac', 'APAC']];
+const GROUPS = [
+  { role: 'eng-manager', name: 'Engineering', sub: 'Delivery engineers' },
+  { role: 'pm-manager', name: 'Project management', sub: 'Project managers' },
+  { role: 'tech-manager', name: 'On site', sub: 'Technicians at the sites' },
+];
+const grid = GROUPS.map((g) => ({
+  ...g,
+  cells: REGIONS.map(([rid]) => {
+    const mgr = PEOPLE.find((p) => p.roleId === g.role && p.region === rid);
+    const cover = mgr ? null : PEOPLE.find((p) => p.roleId === g.role && p.covers?.includes(rid));
+    const reports = mgr ? reportsOf(mgr.id).filter((p) => !p.region || p.region === rid) : cover ? reportsOf(cover.id).filter((p) => p.region === rid) : [];
+    return { rid, mgr, cover, reports };
+  }),
+}));
+const regionCount = (rid) => grid.reduce((n, g) => { const c = g.cells.find((x) => x.rid === rid); return n + (c.mgr ? 1 : 0) + c.reports.length; }, 0);
+const deliveryCount = 1 + grid.reduce((n, g) => n + g.cells.reduce((m, c) => m + (c.mgr ? 1 : 0) + c.reports.length, 0), 0);
+// Chart order, for the list view's "By team".
+const CHART_ORDER = [head, ...LEADS.flatMap((l) => [l.lead, ...l.reports]), ...grid.flatMap((g) => g.cells.flatMap((c) => [c.mgr, ...c.reports])).filter(Boolean), ...vendorsList];
+const rank = Object.fromEntries([...new Set(CHART_ORDER)].map((p, i) => [p.id, i]));
+
+// ---------- Where people are, and their week (the shared work list) ----------
+const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_WORD = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday' };
+const WEEK = ['mon', 'tue', 'wed', 'thu', 'fri'];
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const dt = (s) => new Date(`${s}T00:00:00Z`);
+const fmt = (s) => `${DOW[dt(s).getUTCDay()]} ${dt(s).getUTCDate()} ${MON[dt(s).getUTCMonth()]}`;
+const fmtShort = (s) => `${dt(s).getUTCDate()} ${MON[dt(s).getUTCMonth()]}`;
+const span = (a, b) => (!b || a === b ? fmt(a) : `${fmtShort(a)} to ${fmtShort(b)}`);
+// The demo's today is a Monday; the week is Monday to Friday, "coming up" the three weeks after.
+const dow = dt(DEMO_TODAY).getUTCDay();
+const WK0 = addDays(DEMO_TODAY, dow === 0 ? -6 : 1 - dow);
+const WK_END = addDays(WK0, 4);
+const NEXT_END = addDays(WK0, 25);
+// "Monday to Thursday", "Tuesday and Thursday".
+const dayWords = (days = []) => {
+  const i = days.map((d) => WEEK.indexOf(d)).sort((a, b) => a - b);
+  if (i.length >= 3 && i[i.length - 1] - i[0] === i.length - 1) return `${DAY_WORD[WEEK[i[0]]]} to ${DAY_WORD[WEEK[i[i.length - 1]]]}`;
+  const w = i.map((k) => DAY_WORD[WEEK[k]]);
+  return w.length > 1 ? `${w.slice(0, -1).join(', ')} and ${w[w.length - 1]}` : w[0] ?? 'no set days';
+};
+const baseOf = (p) => {
+  if (p.home) {
+    const h = spaces[p.base];
+    return { label: `Home office in ${h?.town ?? h?.name ?? 'their town'}`, to: `/rooms/${p.base}/`, sub: `In ${sites[p.office]?.name ?? 'the office'} on ${dayWords(p.office_days)}` };
+  }
+  const s = sites[p.base];
+  return { label: `${s?.name}${s?.city ? `, ${s.city}` : ''}`, to: `/rooms/?site=${p.base}`, sub: p.vendor ? `On site ${dayWords(p.office_days)}, for their project` : `In the office ${dayWords(p.office_days)}` };
+};
+const TODAY_WORD = { office: (w) => `In ${sites[w.place]?.name ?? 'the office'} today`, home: () => 'At home today', away: () => 'Away today', remote: () => 'Remote today' };
+const todayOf = (p) => { const w = whereIs(p.id, DEMO_TODAY); return { kind: w.kind, place: w.place, label: TODAY_WORD[w.kind](w) }; };
+const TODAY = Object.fromEntries(PEOPLE.map((p) => [p.id, todayOf(p)]));
+const awayToday = (id) => TODAY[id].kind === 'away';
+const onSiteToday = (id) => TODAY[id].kind === 'office';
+
+const siteName = (id) => sites[id]?.name ?? '';
+const itemSub = (it) => it.kind === 'time-off' ? '' : [WORK_KIND[it.kind], it.project ?? (it.site ? siteName(it.site) : null)].filter(Boolean).join(' · ');
+const itemWhen = (it) => (it.start < WK0 && it.kind === 'incident' ? `Open since ${fmtShort(it.start)}` : span(it.start, it.end));
+const itemView = (it) => ({ when: itemWhen(it), text: it.title, sub: itemSub(it), to: it.href, status: it.kind === 'time-off' ? 'away' : it.status, state: it.kind === 'time-off' ? 'Away' : WORK_STATUS[it.status] });
+function weekOf(p) {
+  const mine = (workByPerson.get(p.id) ?? []).filter((it) => it.status !== 'done' && it.start);
+  const real = mine.filter((it) => it.kind !== 'refresh');
+  const items = real.filter((it) => overlaps(it, WK0, WK_END)).map(itemView);
+  const next = real.filter((it) => it.start > WK_END && it.start <= NEXT_END).slice(0, 3).map(itemView);
+  const plan = mine.filter((it) => it.kind === 'refresh' && overlaps(it, WK0, WK_END));
+  const planHours = Math.round(plan.reduce((h, it) => h + (it.hours ?? 0), 0));
+  const days = [0, 1, 2, 3, 4].map((i) => {
+    const d = addDays(WK0, i), w = whereIs(p.id, d);
+    const due = real.filter((it) => it.kind !== 'time-off' && it.end === d).length;
+    const label = w.kind === 'office' ? sites[w.place]?.code ?? 'Office' : w.kind === 'home' ? 'Home' : w.kind === 'away' ? 'Away' : 'Remote';
+    const word = w.kind === 'office' ? `in ${siteName(w.place)}` : w.kind === 'home' ? 'at home' : w.kind === 'away' ? 'away' : 'working remotely';
+    return { d, dow: DOW[dt(d).getUTCDay()].slice(0, 1), num: dt(d).getUTCDate(), today: d === DEMO_TODAY, where: w.kind, label, n: due, title: `${fmt(d)}: ${word}${due ? `, ${due} due` : ''}` };
+  });
+  // For a manager: who in their team is away this week.
+  const team = reportsOf(p.id).flatMap((r) => (workByPerson.get(r.id) ?? []).filter((it) => it.kind === 'time-off' && overlaps(it, WK0, WK_END)).map((it) => ({ person: r, when: span(it.start < WK0 ? WK0 : it.start, it.end > WK_END ? WK_END : it.end) })));
+  return {
+    label: `${fmtShort(WK0)} to ${fmtShort(WK_END)}`, days, items, next, team,
+    plan: plan.length ? `Work plan: ${plan.length} ${plan.length === 1 ? 'room' : 'rooms'} with devices due this year, about ${planHours} h` : null,
+  };
+}
+
+// ---------- The RACI, with the reason behind each letter ----------
+// Project work follows the phases (Plan, Design, Procure, Deploy, Hand over, Closed); the rest is how
+// the team is staffed, how problems go up, and who keeps the standard.
+const RACI_COLS = ['head', 'sm-av', 'sm-infra', 'programme', 'delivery-manager', 'eng-manager', 'pm-manager', 'tech-manager', 'pm', 'delivery', 'network', 'innovation', 'tech', 'vendor', 'service-vendor'];
+const RACI = [
+  { group: PHASE_LABEL.plan, sub: 'what, where, when and for how much' },
+  { label: 'Scope, budget and dates', cells: { programme: { letter: 'A', detail: 'Owns the year plan, so the budget line is theirs.' }, pm: { letter: 'R', detail: 'Writes the scope and the dates.' }, 'sm-av': 'C', 'sm-infra': 'C', head: 'I' } },
+  { group: PHASE_LABEL.design, sub: 'rooms to the room profiles, the network to the port maps' },
+  { label: 'Room design', cells: { 'sm-av': { letter: 'A', detail: 'Signs off the design gate against the house standard.' }, delivery: { letter: 'R', detail: 'Draws the design from the nearest room profiles.' }, vendor: { letter: 'C', detail: 'Details it; says what is buildable.' }, innovation: 'C', pm: 'I' } },
+  { label: 'Network and comms room design', cells: { 'sm-infra': { letter: 'A', detail: 'Signs off port maps, VLANs and rack layouts.' }, network: { letter: 'R' }, delivery: 'C', pm: 'I' } },
+  { group: PHASE_LABEL.procure, sub: 'orders, deliveries and the vendor' },
+  { label: 'Orders and the vendor', cells: { pm: { letter: 'A', detail: 'Places the orders and books the vendor.' }, programme: 'C', delivery: { letter: 'C', detail: 'Checks the models against the design.' }, vendor: 'I' } },
+  { group: PHASE_LABEL.integrate, sub: 'provision, install, configure and commission' },
+  { label: 'Provision', sub: 'Asset record, DNS, device management and monitoring', cells: { delivery: { letter: 'A', detail: 'Makes the records before a device goes on the network.' }, network: { letter: 'C', detail: 'Gives the port and the VLAN.' }, 'sm-infra': 'I', pm: 'I' } },
+  { label: 'Install', cells: { delivery: { letter: 'A', detail: 'Accepts the install before it is configured.' }, tech: { letter: 'R', detail: 'Aigna installs.' }, vendor: { letter: 'R', detail: 'Vendor installs, on bigger jobs.' }, pm: 'I' } },
+  { label: 'Serials and MACs recorded', cells: { delivery: { letter: 'A', detail: 'Reviews every record before it counts.' }, vendor: 'R', tech: 'R' } },
+  { label: 'Configure', cells: { delivery: { letter: 'A', detail: 'Loads the configuration the standard names, at its version.' }, vendor: { letter: 'R', detail: 'Sets devices up in their setup order, on vendor jobs.' }, tech: 'C', 'sm-av': { letter: 'C', detail: 'Owns the configurations.' } } },
+  { label: 'Commission', cells: { delivery: { letter: 'A', detail: 'Runs the checks and signs the room off.' }, tech: 'R', vendor: 'C', pm: 'I' } },
+  { group: PHASE_LABEL.handover, sub: 'to the service desk and the site' },
+  { label: 'Handover to the service desk', cells: { pm: { letter: 'A' }, delivery: 'R', 'sm-av': 'I', 'sm-infra': 'I' } },
+  { group: PHASE_LABEL.closed, sub: 'what the project taught' },
+  { label: 'Close the project', cells: { pm: { letter: 'A', detail: 'Closes it once the service desk has taken the rooms.' }, 'pm-manager': 'I', programme: { letter: 'I', detail: 'Updates the year plan.' } } },
+  { label: 'Adding a new task to the playbook', cells: { programme: { letter: 'A', detail: 'Approves playbook changes with the service manager.' }, 'sm-av': { letter: 'C', detail: 'Checks it against the house standard.' }, 'sm-infra': { letter: 'C', detail: 'Checks it for network playbooks.' }, pm: { letter: 'R', detail: 'Proposes it from a project.' }, delivery: 'R', tech: 'R', vendor: 'I' } },
+  { group: 'People and escalation', sub: 'who works on what, and where problems go' },
+  { label: 'Staffing engineers on a project', cells: { 'eng-manager': { letter: 'A', detail: 'Puts an engineer from their region on the project, and answers for their workload.' }, pm: { letter: 'C', detail: 'Asks for the people a project needs.' }, 'delivery-manager': { letter: 'C', detail: 'Steps in when regions compete for the same engineer.' }, delivery: 'I', programme: 'I' } },
+  { label: 'Staffing project managers', cells: { 'pm-manager': { letter: 'A', detail: 'Decides which project manager runs which project.' }, programme: { letter: 'C', detail: 'Says which project starts and when.' }, 'delivery-manager': 'C', pm: 'I' } },
+  { label: 'On-site cover and technician rotas', cells: { 'tech-manager': { letter: 'A', detail: 'Owns who covers which site, including holidays and sickness.' }, tech: { letter: 'R', detail: 'Covers the site and swaps shifts when asked.' }, pm: { letter: 'C', detail: 'Says when a project needs extra hands on site.' }, 'delivery-manager': 'I' } },
+  { label: 'People shared between regions', cells: { 'delivery-manager': { letter: 'A', detail: 'Settles it when two regions need the same person.' }, 'eng-manager': { letter: 'R', detail: 'Offers or asks for engineers.' }, 'pm-manager': 'R', 'tech-manager': 'R', programme: 'C', head: 'I' } },
+  { label: 'A task added that the playbook does not have', cells: { pm: { letter: 'A', detail: 'The project task list is theirs. Anyone on the project can add a task; the project manager sees it.' }, delivery: { letter: 'R', detail: 'Adds it, or suggests it.' }, tech: { letter: 'R', detail: 'Adds it, or suggests it.' }, 'eng-manager': 'I', 'tech-manager': 'I' } },
+  { label: 'Escalating a late or blocked project', cells: { pm: { letter: 'R', detail: 'Raises it with the reason and a new date.' }, 'pm-manager': { letter: 'A', detail: 'Decides whether it goes on to the programme manager.' }, programme: { letter: 'C', detail: 'Moves other projects if the plan has to change.' }, 'eng-manager': 'C', 'tech-manager': 'C', head: 'I' } },
+  { label: 'Escalating a fault the guide does not fix', cells: { tech: { letter: 'R', detail: 'Escalates with what they tried.' }, 'tech-manager': { letter: 'A', detail: 'Makes sure it lands with an engineer the same day.' }, delivery: { letter: 'R', detail: 'Picks it up and fixes it.' }, 'eng-manager': 'C', 'service-vendor': 'C', 'sm-av': 'I' } },
+  { group: 'Service and the standard', sub: 'rooms in use, and what the standard says' },
+  { label: 'Fixing a room that is down', cells: { tech: { letter: 'R', detail: 'First on site.' }, 'service-vendor': { letter: 'R', detail: 'When the fix is a covered repair or replacement.' }, 'sm-av': { letter: 'A', detail: 'Owns the AV service level.' }, delivery: 'C' } },
+  { label: 'Something new in the standard', cells: { 'sm-av': { letter: 'A', detail: 'Decides after the Lab result.' }, innovation: { letter: 'R', detail: 'Tests it in the Lab.' }, delivery: 'C', head: 'I' } },
+  { label: 'The year plan', cells: { head: { letter: 'A' }, programme: { letter: 'R' }, 'sm-av': 'C', 'sm-infra': 'C', 'delivery-manager': 'C', pm: 'I' } },
+];
+const raciOf = (roleId) => RACI.flatMap((r) => { const c = r.cells?.[roleId]; if (!c) return []; return [{ label: r.label, letter: typeof c === 'string' ? c : c.letter, detail: typeof c === 'object' ? c.detail : null }]; });
+
+// ---------- Everything the person panel shows ----------
+const activePrj = Object.values(projects).filter((j) => j.phase !== 'closed').sort((a, b) => a.id.localeCompare(b.id));
+const whereOf = (p) => (p.vendorName ? p.vendorName : p.site ? `${sites[p.site]?.name}, ${sites[p.site]?.city ?? ''}`.replace(/, $/, '') : p.region ? REGION_SHORT[p.region] : p.where);
+const INFO = Object.fromEntries(PEOPLE.map((p) => {
+  const mine = activePrj.flatMap((j) => (j.roles ?? []).filter((r) => r.person === p.id).map((r) => ({ id: j.id, name: j.name, as: PROJECT_ROLE[r.as] ?? r.as, phase: PHASE_LABEL[j.phase] ?? j.phase, hours: r.hours ?? 0, logged: r.logged ?? 0 })));
+  const pms = p.vendor ? [...new Set((p.projects ?? []).map((pid) => Object.values(projects).find((j) => j.id === pid)?.owner).filter(Boolean))].map((id) => byId[id]) : null;
+  return [p.id, {
+    teamName: ORG_TEAM[orgTeam(p)],
+    where: whereOf(p),
+    today: TODAY[p.id],
+    base: baseOf(p),
+    manager: p.reportsTo ? byId[p.reportsTo] : null,
+    outside: p.vendor ? `Their own company, ${p.vendorName}` : null,
+    worksWith: pms && pms.length ? pms : null,
+    reports: reportsOf(p.id),
+    week: weekOf(p),
+    projects: mine,
+    hours: mine.reduce((a, j) => ({ planned: a.planned + j.hours, logged: a.logged + j.logged }), { planned: 0, logged: 0 }),
+    raci: raciOf(p.roleId),
+    vendorLinks: !!p.vendor,
+  }];
+}));
+
+// ---------- The band and the filter bar ----------
+const awayN = PEOPLE.filter((p) => awayToday(p.id)).length;
+const onSiteN = PEOPLE.filter((p) => onSiteToday(p.id)).length;
+const NUMBERS = [
+  { n: staff.length, label: 'Staff', fact: true },
+  { n: REGIONS.length, label: 'Regions', fact: true },
+  { n: awayN, label: 'Away today', to: '?away=1' },
+  { n: onSiteN, label: 'On site today', to: '/work/schedule/' },
+];
+const regionsOf = (p) => (p.region ? [p.region, ...(p.covers ?? [])] : p.vendor ? vendors[p.vendor]?.regions ?? ['all'] : ['all']);
+const FIND = (p) => `${p.name} ${p.role} ${p.scope ?? ''} ${p.vendorName ?? ''} ${p.site ? siteName(p.site) : ''} ${siteName(p.office)} ${p.city ?? ''} ${p.home ? spaces[p.base]?.town ?? '' : ''}`;
+const ROLE_ORDER = [...RACI_COLS.slice(0, 13), 'desk', 'vendor', 'service-vendor'];
+// The office someone is in today (an office day, or a vendor at their project), for the Office today filter.
+const officeToday = (p) => (TODAY[p.id].kind === 'office' ? TODAY[p.id].place : '');
+const FACETS = [
+  { key: 'region', label: 'Region', options: [['emea', 'EMEA'], ['amer', 'Americas'], ['apac', 'APAC'], ['all', 'All regions']].map(([value, label]) => ({ value, label, sub: value === 'all' ? 'Not tied to one region' : undefined })) },
+  { key: 'team', label: 'Team', options: ['leadership', 'delivery', 'onsite', 'programme', 'av-it', 'it-infra', 'service-desk', 'vendor'].map((value) => ({ value, label: ORG_TEAM[value] })) },
+  { key: 'office', label: 'Office today', options: SITE_ORDER.filter((id) => sites[id]?.kind === 'office').map((value) => ({ value, label: sites[value].name, sub: `${PEOPLE.filter((p) => officeToday(p) === value).length} in today` })) },
+  { key: 'role', label: 'Role', options: ROLE_ORDER.filter((r) => PEOPLE.some((p) => p.roleId === r)).map((value) => ({ value, label: ROLES[value].name })) },
+];
+const TOGGLES = [{ key: 'away', label: 'Away today', title: 'Only people away today' }];
+const VIEWS = [{ value: 'chart', label: 'Chart', show: '[data-view-chart]' }, { value: 'list', label: 'List', show: '[data-view-list]' }];
+const SORT = { options: [{ value: 'team', label: 'By team' }, { value: 'name', label: 'By name' }, { value: 'region', label: 'By region' }, { value: 'base', label: 'By base' }] };
+// What the filter reads: one line per person, the same for the chart and the list.
+const fattrs = (p) => ({ 'data-fi': '', 'data-pid': p.id, 'data-find': FIND(p), 'data-f-region': [...new Set(regionsOf(p))].join('|'), 'data-f-team': orgTeam(p), 'data-f-role': p.roleId, 'data-f-office': officeToday(p) || undefined, 'data-t-away': awayToday(p.id) ? '1' : undefined });
+const REGION_WORD = { emea: 'EMEA', amer: 'Americas', apac: 'APAC', all: 'All regions' };
+const LIST = [...PEOPLE].sort((a, b) => rank[a.id] - rank[b.id]).map((p) => ({
+  p, team: ORG_TEAM[orgTeam(p)], region: [...new Set(regionsOf(p))].map((r) => REGION_WORD[r]).join(', '),
+  base: p.home ? `Home, ${spaces[p.base]?.town ?? ''}` : siteName(p.base),
+}));
+const PARENT = Object.fromEntries(PEOPLE.filter((p) => p.reportsTo).map((p) => [p.id, p.reportsTo]));
+const ROWS = LIST.map((x) => ({ id: x.p.id, name: x.p.name, team: rank[x.p.id], region: x.region, base: x.base }));
+
+// ---------- How the team works ----------
+const who = (t) => PEOPLE.filter((p) => p.team === t);
+const FLOW_TEAMS = [
+  { id: 'av-it', icon: 'profile', name: 'AV service', owns: `${Object.keys(classes).length} device profiles · ${Object.keys(configurations).length} configurations`, does: 'Decides the standard: which devices, which firmware, how they are set up.', to: '/profiles/' },
+  { id: 'delivery', icon: 'project', name: 'Delivery', owns: `${Object.keys(projects).length} projects`, does: 'Builds and changes rooms to the standard, as projects.', to: '/projects/' },
+  { id: 'it-infra', icon: 'rack', name: 'IT infrastructure', owns: `${commsRooms.length} comms rooms · ${Object.keys(racks).length} racks`, does: 'The network: switches, VLANs, comms rooms and the internet circuits.', to: '/rooms/?kind=comms' },
+  { id: 'service-desk', icon: 'alert', name: 'Service desk', owns: `${Object.values(incidents).filter((i) => i.state !== 'resolved').length} open incidents`, does: 'Takes the calls and tickets, and sends room problems on site.', to: '/incidents/' },
+  { id: 'onsite', icon: 'room', name: 'On site', owns: `${Object.keys(spaces).length} rooms at ${Object.keys(sites).length} sites`, does: 'Keeps rooms running day to day; first on the scene.', to: '/rooms/' },
+  { id: 'vendor', icon: 'kit', name: 'Vendors', owns: `${Object.keys(vendors).length} under contract`, does: 'Integrators install for projects; the service vendor repairs and replaces.', to: '/vendors/' },
+].map((t) => ({ ...t, people: who(t.id) }));
+
+const siteCode = (p) => (p.site ? sites[p.site]?.code : '');
+const mgrSub = (p) => `Manager${p.city ? ` · ${p.city}` : ''}`;
+---
+<Shell title="Team" section="team" minStage={3} crumbs={[{ label: 'Team' }]}>
+  <PageBand overline="People" title="Team" lede="Who does what, who they report to, and where everyone is this week." sim numbers={NUMBERS} />
+
+  <div class="content tm">
+    <FilterBar facets={FACETS} toggles={TOGGLES} placeholder="Find a person, role or town" label="Find a person" noun={['person', 'people']} scope=".content.tm" views={VIEWS} viewKey="rs5-team-view" sort={SORT} />
+
+    <div class="g12 top tm-top">
+      <div class="s-8 tm-main">
+        <section class="card oc" data-help="team.chart" aria-label="Org chart. Select a person for their details; arrow keys move between people." data-view-chart data-oc>
+          <div class="tm-reg" aria-hidden="true">{PEOPLE.map((p) => <i {...fattrs(p)}></i>)}</div>
+
+          <div class="oc-head"><TeamChip p={head} sub={SHORT.head} size="node" away={awayToday(head.id)} manager /></div>
+
+          <ul class="oc-leads">
+            {LEADS.map((l) => (
+              <li class={`oc-team ot-${l.team}`}>
+                <p class="oc-th"><span>{l.name}</span><i class="num" title={`${l.team === 'delivery' ? deliveryCount : 1 + l.reports.length} people`}>{l.team === 'delivery' ? deliveryCount : 1 + l.reports.length}</i></p>
+                <TeamChip p={l.lead} sub={SHORT[l.lead.roleId]} size="node" away={awayToday(l.lead.id)} manager={l.reports.length > 0 || l.team === 'delivery'} />
+                {l.reports.length > 0 && <ul class="oc-sub">{l.reports.map((r) => <li><TeamChip p={r} sub={SHORT[r.roleId] ?? r.role} size="node" away={awayToday(r.id)} /></li>)}</ul>}
+                {l.team === 'delivery' && <span class="oc-drop" aria-hidden="true"></span>}
+              </li>
+            ))}
+          </ul>
+
+          <div class="oc-deliv">
+            <p class="oc-cap"><b>Delivery, by region</b><small>Four leads report to {delMgr.name}, the global delivery manager.</small></p>
+            <div class="od-grid">
+              <p class="od-corner"><small>Team</small></p>
+              {REGIONS.map(([rid, short]) => <p class="od-rh"><b>{short}</b><small>{regionCount(rid)} people</small></p>)}
+              {grid.map((g) => (
+                <>
+                  <p class="od-gh"><b>{g.name}</b><small>{g.sub}</small></p>
+                  {g.cells.map((c) => (
+                    <div class="od-cell" data-region-label={REGIONS.find((r) => r[0] === c.rid)[1]}>
+                      {c.mgr ? <TeamChip p={c.mgr} sub={mgrSub(c.mgr)} size="lead" away={awayToday(c.mgr.id)} manager />
+                        : c.cover ? <TeamChip p={c.cover} sub={`Leads from ${REGION_SHORT[c.cover.region]}`} size="lead" ghost />
+                        : <p class="od-none">Nobody yet</p>}
+                      {c.reports.length > 0 && <ul class="oc-list">{c.reports.map((r) => <li><TeamChip p={r} sub={SHORT[r.roleId] ?? r.role} tag={siteCode(r)} away={awayToday(r.id)} /></li>)}</ul>}
+                    </div>
+                  ))}
+                </>
+              ))}
+            </div>
+          </div>
+
+          <div class="oc-vend">
+            <p class="oc-cap"><b>Vendors, outside the line</b><small>They report to their own company and work with a project manager.</small></p>
+            <ul>{vendorsList.map((v) => <li><TeamChip p={v} sub={v.vendorName} size="lead" away={awayToday(v.id)} /></li>)}</ul>
+          </div>
+
+          <p class="oc-key" aria-label="Key">
+            <span class="k-mgr">Manages people</span>
+            <span class="k-away">Away today</span>
+            <span class="k-ghost">Shown again: leads from another region</span>
+            <span class="k-tag">Office they cover</span>
+          </p>
+        </section>
+
+        <section class="card tm-list" data-help="team.list" aria-label="Everyone on the team" data-view-list hidden>
+          <table class="tl">
+            <thead><tr><th scope="col">Person</th><th scope="col">Role</th><th scope="col">Team</th><th scope="col">Region</th><th scope="col">Base</th><th scope="col">Today</th></tr></thead>
+            <tbody data-rows>
+              {LIST.map((x) => (
+                <tr {...fattrs(x.p)}>
+                  <td><button type="button" class="tl-p" data-pick-row={x.p.id}><span class="pc-av" aria-hidden="true">{x.p.initials}</span><b>{x.p.name}</b></button></td>
+                  <td>{x.p.role}</td>
+                  <td>{x.team}</td>
+                  <td>{x.region}</td>
+                  <td>{x.base}</td>
+                  <td><span class={`tl-today t-${TODAY[x.p.id].kind}`}>{TODAY[x.p.id].kind === 'office' ? sites[TODAY[x.p.id].place]?.code : TODAY[x.p.id].kind === 'home' ? 'Home' : TODAY[x.p.id].kind === 'away' ? 'Away' : 'Remote'}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+
+        <EmptyState text="Nobody on the team matches these filters." />
+      </div>
+
+      <SidePanel class="s-4 tm-panel" help="team.panel" title={head.name} meta={INFO[head.id].teamName} label="Person details" id="person">
+        <button slot="head" type="button" class="btn small ghost tm-back" data-back>Back to the chart</button>
+        <div data-panel>
+          {PEOPLE.map((p) => <TeamPerson p={p} info={INFO[p.id]} hidden={p.id !== head.id} />)}
+        </div>
+      </SidePanel>
+    </div>
+
+    <Section title="Who does what (RACI)" help="team.raci" id="raci" aside="Hover a letter for the reason. Pick a role to see only its work.">
+      <div class="card tm-raci"><Raci rows={RACI} cols={RACI_COLS} id="team" caption="RACI for the team's work" /></div>
+    </Section>
+
+    <Section title="How the team works" help="team.flow" id="how" aside="Hover or focus a team to follow its work; select it to open its pages.">
+      <div class="card"><TeamFlow teams={FLOW_TEAMS} /></div>
+    </Section>
+  </div>
+
+  <script is:inline data-astro-rerun define:vars={{ FIRST: head.id, ROWS, PARENT }} slot="end">
+    (function () {
+      var oc = document.querySelector('[data-oc]'), host = document.querySelector('[data-panel]');
+      if (!oc || !host || oc.__tm) return; oc.__tm = true;
+      var panel = host.closest('[data-side-panel]'), bar = document.querySelector('.content.tm [data-fb]');
+      var M = function () { return window.rsMotion ? window.rsMotion() : { reduced: true }; };
+      var chips = Array.prototype.slice.call(oc.querySelectorAll('.pc'));
+      var tbody = document.querySelector('[data-rows]');
+      var rowsById = {}; Array.prototype.forEach.call(tbody.children, function (tr) { rowsById[tr.dataset.pid] = tr; });
+      var arts = {}; host.querySelectorAll('[data-person]').forEach(function (a) { arts[a.dataset.person] = a; });
+      var title = panel.querySelector('.sp-h h2'), meta = panel.querySelector('.sp-meta');
+      var KIDS = {};
+      Object.keys(PARENT).forEach(function (k) { (KIDS[PARENT[k]] = KIDS[PARENT[k]] || []).push(k); });
+      var stacked = function () { return matchMedia('(max-width: 1100px)').matches; };
+      var cur = null, pinned = false;
+      var keepP = function () {
+        if (!pinned || !cur) return;
+        var p = new URLSearchParams(location.search); p.set('p', cur);
+        try { history.replaceState(history.state, '', location.pathname + '?' + p + location.hash); } catch (_) {}
+      };
+
+      // ---- Picking a person: the chart marks them, their managers up the line and the people they manage ----
+      function select(id, opts) {
+        opts = opts || {};
+        if (!arts[id]) return;
+        var prev = cur; cur = id;
+        chips.forEach(function (c) {
+          var pid = c.dataset.pid;
+          c.setAttribute('aria-pressed', String(pid === id && !c.classList.contains('pc-ghost')));
+          c.classList.toggle('is-sel', pid === id);
+          c.classList.remove('is-up', 'is-down');
+        });
+        var up = PARENT[id]; while (up) { chips.forEach(function (c) { if (c.dataset.pid === up) c.classList.add('is-up'); }); up = PARENT[up]; }
+        (KIDS[id] || []).forEach(function (k) { chips.forEach(function (c) { if (c.dataset.pid === k) c.classList.add('is-down'); }); });
+        Object.keys(rowsById).forEach(function (k) { rowsById[k].classList.toggle('is-sel', k === id); });
+        if (prev !== id) {
+          var swap = function () {
+            Object.keys(arts).forEach(function (k) { arts[k].hidden = k !== id; });
+            title.textContent = arts[id].dataset.name; if (meta) meta.textContent = arts[id].dataset.team;
+          };
+          if (prev && window.rsPanelSwap && !opts.quiet) window.rsPanelSwap(panel, swap); else swap();
+        }
+        if (!opts.quiet) pinned = true;
+        keepP();
+        // When the panel sits under the chart (narrow windows), bring it into view.
+        if (opts.reveal && stacked()) panel.scrollIntoView({ block: 'start', behavior: M().reduced ? 'auto' : 'smooth' });
+      }
+      var chipFor = function (id) { return chips.find(function (x) { return x.dataset.pid === id && !x.classList.contains('pc-ghost'); }); };
+      oc.addEventListener('click', function (e) { var c = e.target.closest('.pc'); if (c) select(c.dataset.pid, { reveal: true }); });
+      tbody.addEventListener('click', function (e) { var b = e.target.closest('[data-pick-row]'); if (b) select(b.dataset.pickRow, { reveal: true }); });
+      panel.addEventListener('click', function (e) {
+        var pick = e.target.closest('[data-pick]');
+        if (pick) { select(pick.dataset.pick); return; }
+        var r = e.target.closest('[data-to-raci]');
+        if (r) {
+          e.preventDefault();
+          var w = document.querySelector('[data-raci="team"]'); if (w && w.rsRaci) w.rsRaci.show(r.dataset.toRaci);
+          document.getElementById('raci').scrollIntoView({ block: 'start', behavior: M().reduced ? 'auto' : 'smooth' });
+          return;
+        }
+        if (e.target.closest('[data-back]')) {
+          var c = chipFor(cur); var list = document.querySelector('[data-view-list]');
+          var to = list && !list.hidden ? rowsById[cur] : c;
+          if (to) { to.scrollIntoView({ block: 'center', behavior: M().reduced ? 'auto' : 'smooth' }); var f = to.matches('button') ? to : to.querySelector('button'); if (f) f.focus({ preventScroll: true }); }
+        }
+      });
+
+      // ---- Arrow keys move between people on the chart ----
+      oc.addEventListener('keydown', function (e) {
+        var dirs = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowUp: [0, -1] }, d = dirs[e.key];
+        var from = e.target.closest('.pc'); if (!d || !from) return;
+        e.preventDefault();
+        // The nearest person in that direction: first inside a 45 degree cone, else anywhere that way.
+        var a = from.getBoundingClientRect(), ax = a.left + a.width / 2, ay = a.top + a.height / 2, best = null, bs = Infinity, loose = null, ls = Infinity;
+        chips.forEach(function (c) {
+          if (c === from || c.offsetParent === null) return;
+          var b = c.getBoundingClientRect(), bx = b.left + b.width / 2, by = b.top + b.height / 2, dx = bx - ax, dy = by - ay;
+          var along = d[0] ? dx * d[0] : dy * d[1], across = d[0] ? Math.abs(dy) : Math.abs(dx);
+          if (along <= 4) return;
+          var s = along + across * 2.5;
+          if (across <= along && s < bs) { bs = s; best = c; }
+          if (s < ls) { ls = s; loose = c; }
+        });
+        best = best || loose;
+        if (best) { best.focus(); select(best.dataset.pid); }
+      });
+
+      // ---- Filters: in the chart, people who match stay bright and everyone else steps back, so the chart keeps its shape ----
+      var reg = {}; oc.querySelectorAll('.tm-reg [data-fi]').forEach(function (r) { reg[r.dataset.pid] = r; });
+      var qi = bar.querySelector('[data-fb-q]'), lastQ = qi.value.trim();
+      function paint(on) {
+        var hit = {};
+        Object.keys(reg).forEach(function (id) { if (!reg[id].classList.contains('fb-out')) hit[id] = true; });
+        oc.classList.toggle('filtering', on);
+        chips.forEach(function (c) { c.classList.toggle('hit', on && !!hit[c.dataset.pid]); });
+        oc.querySelectorAll('.oc-team, .od-cell, .oc-vend').forEach(function (b) { b.classList.toggle('miss', on && !b.querySelector('.pc.hit')); });
+        return Object.keys(hit);
+      }
+      bar.addEventListener('fb:change', function (e) {
+        var hits = paint(e.detail.active), typed = qi.value.trim();
+        // Typing a name shows that person; a filter that leaves out the chosen person moves to the first who matches.
+        if (e.detail.active && hits.length && ((typed && typed !== lastQ) || hits.indexOf(cur) < 0)) select(hits.sort(function (a, b) { return ROWS.findIndex(function (r) { return r.id === a; }) - ROWS.findIndex(function (r) { return r.id === b; }); })[0], { quiet: true });
+        lastQ = typed;
+        keepP(); // The bar rewrites the address without the chosen person, so put it back.
+      });
+      qi.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' || !cur) return;
+        var c = chipFor(cur); select(cur, { reveal: true }); if (c && c.offsetParent) c.focus();
+      });
+
+      // ---- Sort (the list view): rows slide into their new order ----
+      var nat = function (x, y) { return String(x).localeCompare(String(y), 'en', { numeric: true }); };
+      function reorder(by) {
+        ROWS.slice().sort(function (a, b) {
+          var c = by === 'name' ? nat(a.name, b.name) : by === 'region' ? nat(a.region, b.region) : by === 'base' ? nat(a.base, b.base) : 0;
+          return c || a.team - b.team;
+        }).forEach(function (r) { tbody.appendChild(rowsById[r.id]); });
+      }
+      bar.addEventListener('fb:sort', function (e) { bar.rsFilter.run(true, function () { reorder(e.detail.value); }); });
+      var s0 = bar.rsFilter ? bar.rsFilter.sort() : new URLSearchParams(location.search).get('sort');
+      if (s0 && s0 !== 'team') reorder(s0);
+
+      // ---- The RACI's column names stick under the top bar and the sticky filter bar ----
+      var raci = document.querySelector('[data-raci="team"]');
+      function raciTop() {
+        var mast = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mast-h')) || 60;
+        var sticky = getComputedStyle(bar).position === 'sticky';
+        raci.style.setProperty('--raci-top', (mast + (sticky ? bar.offsetHeight : 0)) + 'px');
+      }
+      if (raci) { raciTop(); if (window.ResizeObserver) new ResizeObserver(raciTop).observe(bar); window.addEventListener('resize', raciTop); }
+
+      // ---- Start: the person in the address, else whoever is signed in, else the head ----
+      var you = document.documentElement.dataset.who;
+      chips.forEach(function (c) { c.classList.toggle('is-you', c.dataset.pid === you); });
+      var start = new URLSearchParams(location.search).get('p'); pinned = !!arts[start]; if (!arts[start]) start = arts[you] ? you : FIRST;
+      select(start, { quiet: true });
+      if (bar.rsFilter) { var hits = paint(bar.rsFilter && document.querySelector('.content.tm').classList.contains('fb-on')); if (!pinned && hits.length && hits.length < Object.keys(reg).length && hits.indexOf(cur) < 0) select(hits[0], { quiet: true }); }
+    })();
+  </script>
+</Shell>
+<style is:global>
+  .tm-reg { display: none; }
+  .tm-top { align-items: start; }
+  .tm-main { display: grid; gap: 20px; min-width: 0; }
+  .tm-main > [hidden] { display: none; }
+
+  /* ---------- The org chart, at its natural height ---------- */
+  .oc { --lg: 14px; --ln: var(--line-strong); padding: 24px 24px 18px; display: grid; gap: 0; container: oc / inline-size; }
+  .oc-head { position: relative; justify-self: center; width: min(260px, 100%); padding-bottom: 22px; }
+  .oc-head::after { content: ''; position: absolute; left: calc(50% - 1px); bottom: 0; width: 2px; height: 22px; background: var(--ln); }
+
+  /* The leads on one bus line, each with their own people under them. */
+  .oc-leads { position: relative; list-style: none; margin: 0; padding: 22px 0 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--lg); }
+  .oc-leads::before { content: ''; position: absolute; top: 0; height: 2px; background: var(--ln); left: calc((100% - 4 * var(--lg)) / 10); right: calc((100% - 4 * var(--lg)) / 10); }
+  .oc-team { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 10px 8px 12px; border-radius: var(--radius-lg); background: var(--surface-2); transition: opacity var(--dur-state) var(--ease-settle); }
+  .oc-team::before { content: ''; position: absolute; left: calc(50% - 1px); top: -22px; width: 2px; height: 22px; background: var(--ln); }
+  .oc-th { margin: 0; display: flex; justify-content: center; align-items: baseline; gap: 6px; font: 700 10.5px/1.25 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); text-align: center; }
+  .oc-th i { font-style: normal; color: var(--text-3); }
+  .oc-sub { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  .oc-sub > li { position: relative; }
+  .oc-sub > li::before { content: ''; position: absolute; left: calc(50% - 1px); top: -12px; width: 2px; height: 12px; background: var(--ln); }
+  /* Delivery hangs from its lead: a line from the lead down to the grid below. */
+  .ot-delivery { padding-bottom: 0; }
+  .oc-drop { flex: 1 1 auto; align-self: center; width: 2px; min-height: 10px; margin-bottom: 0; background: var(--ln); }
+  .oc-deliv { position: relative; margin-top: 22px; display: grid; gap: 10px; }
+  .oc-deliv::before { content: ''; position: absolute; top: -22px; height: 22px; width: 2px; background: var(--ln); left: calc((100% - 4 * var(--lg)) / 10 - 1px); }
+  .oc-cap { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+  .oc-cap b { font: 700 11px/1.2 var(--font-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--text); }
+  .oc-cap small { font-size: 12.5px; color: var(--text-3); }
+  .oc-deliv .oc-cap { padding-left: calc((100% - 4 * var(--lg)) / 10 + 12px); min-height: 18px; }
+
+  /* The delivery grid: a row per team, a column per region. */
+  .od-grid { display: grid; grid-template-columns: 124px repeat(3, minmax(0, 1fr)); border: var(--border-card); border-radius: var(--radius-lg); background: var(--surface); overflow: hidden; }
+  .od-grid > * { margin: 0; padding: 12px; border-bottom: 1px solid var(--line); min-width: 0; }
+  .od-grid > :nth-last-child(-n+4) { border-bottom: 0; }
+  .od-corner, .od-rh { background: var(--surface-2); display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; padding-top: 10px; padding-bottom: 10px; }
+  .od-corner small { font: 700 10.5px/1.2 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+  .od-rh b { font: 700 11px/1.2 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text); }
+  .od-rh small { font-size: 12px; color: var(--text-3); }
+  .od-gh { display: grid; align-content: start; gap: 3px; background: var(--surface-2); border-right: 1px solid var(--line); }
+  .od-corner { border-right: 1px solid var(--line); }
+  .od-gh b { font-size: 13.5px; } .od-gh small { font-size: 12px; color: var(--text-3); line-height: 1.35; }
+  .od-cell { display: grid; align-content: start; gap: 8px; transition: opacity var(--dur-state) var(--ease-settle); }
+  .od-cell + .od-cell, .od-rh + .od-rh { border-left: 1px solid var(--line); }
+  .od-none { margin: 0; font-size: 13px; color: var(--text-3); }
+  /* A manager's people hang from them on a tree line. */
+  .oc-list { list-style: none; margin: 0 0 0 14px; padding: 0 0 0 12px; border-left: 2px solid var(--ln); display: grid; gap: 6px; }
+  .oc-list > li { position: relative; min-width: 0; }
+  .oc-list > li::before { content: ''; position: absolute; left: -12px; top: 50%; width: 10px; height: 2px; background: var(--ln); }
+  .oc-list > li:last-child::after { content: ''; position: absolute; left: -14px; top: calc(50% + 2px); bottom: -2px; width: 2px; background: var(--surface); }
+
+  /* Vendors sit outside the line: no connector, a dashed edge. */
+  .oc-vend { margin-top: 22px; display: grid; gap: 10px; padding: 14px; border: 1.5px dashed var(--line-strong); border-radius: var(--radius-lg); transition: opacity var(--dur-state) var(--ease-settle); }
+  .oc-vend ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+
+  /* The key, under the chart. */
+  .oc-key { margin: 16px 0 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12px; color: var(--text-3); }
+  .oc-key span { display: inline-flex; align-items: center; gap: 7px; }
+  .oc-key .k-mgr::before { content: ''; width: 3px; height: 14px; border-radius: 2px; background: var(--text-2); }
+  .oc-key .k-away::before { content: 'Away'; font: 600 10px/1 var(--font-sans); padding: 2px 5px; border-radius: 4px; border: 1px dashed var(--line-strong); color: var(--text-2); }
+  .oc-key .k-ghost::before { content: ''; width: 16px; height: 12px; border-radius: 4px; border: 1px dashed var(--line-strong); }
+  .oc-key .k-tag::before { content: 'DUB'; font: 600 10px/1 var(--font-mono); padding: 3px 5px; border-radius: 4px; background: var(--surface-2); color: var(--text-2); }
+
+  /* ---------- A person on the chart ---------- */
+  .pc { appearance: none; position: relative; display: flex; align-items: center; gap: 9px; width: 100%; min-width: 0; padding: 6px 10px 6px 6px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); color: var(--text); font: 600 13px/1.25 var(--font-sans); text-align: left; cursor: pointer;
+    transition: border-color var(--dur-state) var(--ease-settle), background var(--dur-state) var(--ease-settle), opacity var(--dur-state) var(--ease-settle), box-shadow var(--dur-hover) var(--ease-settle); }
+  .pc:hover { border-color: var(--line-strong); box-shadow: var(--shadow-sm); }
+  .pc:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus); }
+  .pc-av { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; flex: none; font: 700 9.5px/1 var(--font-mono); background: var(--surface-3); color: var(--text); transition: background var(--dur-state) var(--ease-settle), color var(--dur-state) var(--ease-settle); }
+  .pc-txt { flex: 1; min-width: 0; display: grid; gap: 1px; }
+  .pc-txt b, .pc-txt small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pc-txt b { font-weight: 600; }
+  .pc-txt small { font-weight: 400; font-size: 12px; color: var(--text-3); }
+  .pc-tag { flex: none; font: 600 10px/1 var(--font-mono); color: var(--text-2); padding: 3px 5px; border-radius: 4px; background: var(--surface-2); }
+  .pc-away { flex: none; font: 600 10px/1 var(--font-sans); padding: 2px 5px; border-radius: 4px; border: 1px dashed var(--line-strong); color: var(--text-2); }
+  .pc-lead { padding: 8px 10px 8px 8px; }
+  .pc-lead .pc-av { width: 32px; height: 32px; font-size: 10.5px; }
+  .pc-lead .pc-txt b { font-size: 14px; }
+  /* Upright cards for the head and the team leads. */
+  .pc-node { flex-direction: column; justify-content: center; gap: 6px; padding: 12px 8px 10px; text-align: center; }
+  .pc-node .pc-av { width: 38px; height: 38px; font-size: 12px; }
+  .pc-node .pc-txt { justify-items: center; }
+  .pc-node .pc-txt b { white-space: normal; font-size: 13.5px; }
+  .pc-node .pc-txt small { white-space: normal; }
+  .pc-node .pc-away { position: absolute; top: 6px; right: 6px; }
+  .oc-sub .pc-node { padding: 10px 6px 8px; }
+  .oc-sub .pc-node .pc-av { width: 30px; height: 30px; font-size: 10px; }
+  .oc-head .pc-node { padding: 14px 12px 12px; }
+  .oc-head .pc-node .pc-av { width: 44px; height: 44px; font-size: 13.5px; }
+  .oc-head .pc-node .pc-txt b { font-size: 15.5px; }
+  .pc-mgr { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-2) 55%, transparent); }
+  .pc-node.pc-mgr { box-shadow: inset 0 3px 0 var(--text-2); }
+  .pc-mgr:focus-visible { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-2) 55%, transparent), 0 0 0 3px var(--focus); }
+  .pc-ghost { border-style: dashed; background: transparent; }
+  .pc-ghost .pc-av { background: transparent; border: 1px dashed var(--line-strong); }
+  .pc.is-you .pc-txt b::after { content: ' (you)'; font-weight: 400; color: var(--text-3); }
+  /* Selected, their managers up the line, and the people they manage. */
+  .pc.is-sel { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent); }
+  .pc.is-sel .pc-av { background: var(--accent); color: var(--on-accent); }
+  .pc.is-sel .pc-txt small { color: var(--accent-ink); }
+  .pc.is-up { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+  .pc.is-up .pc-av, .pc.is-down .pc-av { background: var(--accent-soft); color: var(--accent-ink); }
+  .pc.is-down { border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+  /* Filtering: the chart keeps its shape; people who do not match step back. */
+  .oc.filtering .pc:not(.hit) { opacity: .3; }
+  .oc.filtering .pc.hit { border-color: var(--text-2); }
+  .oc.filtering .pc.hit.is-sel { border-color: var(--accent); }
+  .oc.filtering .miss { opacity: .8; }
+
+  /* ---------- The list view ---------- */
+  .tm-list { overflow-x: auto; }
+  .tl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .tl th, .tl td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .tl thead th { font: 700 10.5px/1.2 var(--font-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); background: var(--surface-2); }
+  .tl tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--text) 3%, var(--surface)); }
+  .tl tbody tr:last-child td { border-bottom: 0; }
+  .tl tbody tr.is-sel td { background: var(--accent-soft); }
+  .tl-p { appearance: none; border: 0; background: none; padding: 0; display: inline-flex; align-items: center; gap: 9px; font: 600 13.5px/1.2 var(--font-sans); color: var(--text); cursor: pointer; }
+  .tl-p:hover b { text-decoration: underline; }
+  .tl-p:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus); border-radius: 6px; }
+  .tl-today { font: 600 11px/1 var(--font-mono); padding: 4px 7px; border-radius: var(--pill-radius); background: var(--surface-2); color: var(--text-2); }
+  .tl-today.t-away { border: 1px dashed var(--line-strong); background: none; }
+  .tl-today.t-office { background: var(--green-soft); color: var(--green-ink); }
+
+  /* ---------- The person, in the side panel ---------- */
+  .tm-panel .sp-h h2 { font-size: 20px; }
+  .tm-back { display: none; }
+  .tm-p { display: grid; align-content: start; gap: 16px; }
+  .tm-p[hidden] { display: none; }
+  .tm-p-id { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: center; }
+  .tm-p-av { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; font: 700 14px/1 var(--font-mono); background: var(--accent); color: var(--on-accent); }
+  .tm-p-role { margin: 0; font-size: 14px; font-weight: 600; color: var(--text); }
+  .tm-p-tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 0; }
+  .tm-p-tags .tag { font-size: 11.5px; padding: 3px 8px; white-space: normal; }
+  .tm-p-today.t-office { background: var(--green-soft); color: var(--green-ink); border-color: transparent; }
+  .tm-p-today.t-away { border: 1px dashed var(--line-strong); background: none; }
+  .tm-p-links { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tm-p-line { margin: 0; display: grid; gap: 10px; }
+  .tm-p-line > div { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 10px; align-items: start; }
+  .tm-p-line dt { font-size: 12.5px; color: var(--text-3); padding-top: 2px; }
+  .tm-p-line dt .num { color: var(--text-2); font-weight: 700; margin-left: 2px; }
+  .tm-p-line dd { margin: 0; min-width: 0; font-size: 13.5px; line-height: 1.4; }
+  .tm-p-line dd small { display: block; font-size: 12px; color: var(--text-3); }
+  .tm-p-line dd a { color: var(--text); }
+  .tm-p-picks { display: flex; flex-wrap: wrap; gap: 4px; }
+  .tm-p-pick { appearance: none; display: inline-flex; align-items: center; gap: 7px; max-width: 100%; padding: 3px 10px 3px 3px; border-radius: var(--pill-radius); border: 1px solid var(--line); background: var(--surface); color: var(--text); font: 600 12.5px/1.2 var(--font-sans); text-align: left; cursor: pointer; transition: border-color var(--dur-hover) var(--ease-settle), background var(--dur-hover) var(--ease-settle); }
+  .tm-p-pick:hover { border-color: var(--line-strong); background: var(--surface-2); }
+  .tm-p-pick:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus); }
+  .tm-p-pick > span:last-child { display: grid; min-width: 0; }
+  .tm-p-pick b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .tm-p-pick small { font-weight: 400; font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tm-p-pick .pc-av { width: 24px; height: 24px; font-size: 9px; }
+  .tm-p-pick.sm .pc-av { width: 20px; height: 20px; font-size: 8px; }
+  .tm-p-none { margin: 0; font-size: 13px; color: var(--text-3); }
+  .tm-p-sec { display: grid; gap: 8px; padding-top: 14px; border-top: var(--border-rule); }
+  .tm-p-sec h3 { margin: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font: 700 10.5px/1.2 var(--font-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--text-2); }
+  .tm-p-sec h3 span { font: 500 12px/1.2 var(--font-sans); letter-spacing: 0; text-transform: none; color: var(--text-3); }
+  .tm-p-list + h3 { margin-top: 6px; }
+  .tm-p-sub { margin: 4px 0 0; font-size: 12px; font-weight: 700; color: var(--text-3); }
+  /* The week as five days: where they are, and how much is due. */
+  .tm-p-days { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+  .tm-p-days li { position: relative; display: grid; justify-items: center; gap: 2px; padding: 6px 2px 5px; border-radius: var(--radius); background: var(--surface-2); }
+  .tm-p-days span { font: 600 10px/1 var(--font-mono); color: var(--text-3); }
+  .tm-p-days b { font: 700 14px/1.1 var(--font-sans); }
+  .tm-p-days i { font: 600 10.5px/1.2 var(--font-mono); font-style: normal; color: var(--text-2); }
+  .tm-p-days em { position: absolute; top: 3px; right: 4px; font: 700 9.5px/1 var(--font-mono); font-style: normal; color: var(--blue-ink); }
+  .tm-p-days li.today { box-shadow: inset 0 0 0 1.5px var(--text-2); }
+  .tm-p-days li.w-office { background: var(--green-soft); } .tm-p-days li.w-office i { color: var(--green-ink); }
+  .tm-p-days li.w-away { background: repeating-linear-gradient(135deg, var(--surface-2) 0 5px, var(--surface-3) 5px 7px); }
+  .tm-p-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .tm-p-items li { display: grid; grid-template-columns: 78px minmax(0, 1fr) auto; gap: 8px; align-items: start; font-size: 13px; line-height: 1.35; }
+  .tm-p-when { color: var(--text-3); font-size: 12px; padding-top: 1px; }
+  .tm-p-what { min-width: 0; } .tm-p-what a { color: var(--text); text-decoration: none; } .tm-p-what a:hover { text-decoration: underline; }
+  .tm-p-what small { display: block; color: var(--text-3); font-size: 11.5px; }
+  .tm-p-state { font: 700 10.5px/1 var(--font-sans); padding: 3px 7px; border-radius: var(--pill-radius); background: var(--surface-2); color: var(--text-2); white-space: nowrap; }
+  .tm-p-state.s-doing { background: var(--blue-soft); color: var(--blue-ink); }
+  .tm-p-state.s-blocked { background: var(--red-soft); color: var(--red-ink); }
+  .tm-p-state.s-booked { background: var(--violet-soft); color: var(--violet-ink); }
+  .tm-p-state.s-away { background: var(--surface-3); color: var(--text); }
+  .tm-p-plan { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-2); }
+  .tm-p-plan a { color: inherit; }
+  /* Projects with hours logged against planned. */
+  .tm-p-prj { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .tm-p-prj li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; align-items: center; }
+  .tm-p-prj a { font-size: 13.5px; font-weight: 600; color: var(--text); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tm-p-prj a:hover { text-decoration: underline; }
+  .tm-p-prj a .mono { font-size: 11px; color: var(--text-3); font-weight: 600; }
+  .tm-p-prj small { grid-column: 1; font-size: 12px; color: var(--text-3); }
+  .tm-p-bar { grid-column: 1; height: 5px; border-radius: 99px; background: var(--surface-3); overflow: hidden; }
+  .tm-p-bar i { display: block; height: 100%; border-radius: 99px; background: var(--blue); }
+  .tm-p-h { grid-column: 2; grid-row: 1 / span 3; font: 600 12px var(--font-mono); color: var(--text-2); }
+  .tm-p-more { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--accent-ink); text-decoration: none; }
+  .tm-p-more:hover { text-decoration: underline; }
+  .tm-p-list { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 13.5px; line-height: 1.4; }
+  .tm-p-hands { margin: 0; font-size: 13px; color: var(--text-2); line-height: 1.45; }
+  .tm-p-raci { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .tm-p-raci li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 9px; align-items: start; font-size: 13.5px; line-height: 1.35; }
+  .tm-p-raci .rc { width: 22px; height: 22px; font-size: 11px; border-radius: 6px; }
+  .tm-p-raci small { display: block; font-size: 11.5px; font-weight: 600; color: var(--text-3); }
+
+  /* ---------- Below the chart ---------- */
+  .content.tm .sec { scroll-margin-top: calc(var(--mast-h, 60px) + 72px); }
+  .tm-raci { padding-bottom: 4px; }
+
+  /* A narrower chart (1280 wide, with the panel beside it): names may wrap, the tree line tightens. */
+  @container oc (max-width: 700px) {
+    .oc { --lg: 10px; }
+    .oc-team { padding: 8px 6px 10px; }
+    .pc-node .pc-txt b { font-size: 13px; }
+    .pc-node .pc-txt small { font-size: 11.5px; }
+    .od-grid { grid-template-columns: 92px repeat(3, minmax(0, 1fr)); }
+    .od-grid > * { padding: 10px 8px; }
+    .od-gh b { font-size: 12.5px; }
+    .od-cell .pc-tag { display: none; }
+    .od-cell .pc { gap: 7px; padding: 6px 8px 6px 6px; }
+    .od-cell .pc-av { width: 24px; height: 24px; font-size: 9px; }
+    .od-cell .pc-txt b, .od-cell .pc-txt small { white-space: normal; }
+    .od-cell .pc-away { position: absolute; top: -7px; right: 6px; background: var(--surface); }
+    .oc-list { margin-left: 8px; padding-left: 8px; }
+    .oc-list > li::before { left: -8px; width: 6px; }
+    .oc-list > li:last-child::after { left: -10px; }
+  }
+  /* Narrow: the leads stack and every card lies flat. */
+  @container oc (max-width: 560px) {
+    .oc { padding: 16px 14px; }
+    .oc-leads { grid-template-columns: 1fr; padding-top: 0; }
+    .oc-leads::before, .oc-team::before, .oc-deliv::before, .oc-head::after, .oc-drop, .oc-sub > li::before { display: none; }
+    .oc-head { width: 100%; padding-bottom: 14px; }
+    .pc-node { flex-direction: row; text-align: left; justify-content: flex-start; padding: 8px 10px 8px 8px; }
+    .pc-node .pc-txt { justify-items: start; }
+    .pc-node .pc-away { position: static; }
+    .pc-node.pc-mgr { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-2) 55%, transparent); }
+    .oc-th { justify-content: flex-start; }
+    .ot-delivery { padding-bottom: 10px; }
+    .oc-deliv { margin-top: 18px; }
+    .oc-deliv .oc-cap { padding-left: 0; }
+    .od-grid { display: block; border: 0; background: none; overflow: visible; }
+    .od-grid > * { border: 0; padding: 0; }
+    .od-corner, .od-rh { display: none; }
+    .od-gh { background: none; border: 0; margin: 14px 0 6px !important; }
+    .od-cell { border: var(--border-card) !important; border-radius: var(--radius-lg); padding: 10px !important; margin-bottom: 8px; }
+    .od-cell::before { content: attr(data-region-label); font: 700 10.5px/1.2 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+  }
+
+  /* The panel sits under the chart below 1100 px wide (SidePanel stops sticking there): a way back up. */
+  @media (max-width: 1100px) { .tm-back { display: inline-flex; } .tm-panel { scroll-margin-top: calc(var(--mast-h, 60px) + 12px); } }
+
+  /* Reduced motion (rule M7): states still change, nothing moves or fades. */
+  @media (prefers-reduced-motion: reduce) {
+    .pc, .pc-av, .oc-team, .od-cell, .oc-vend, .tm-p-pick { transition: none !important; }
+  }
+</style>

@@ -1,0 +1,40 @@
+# Demo project. People, dates, hours and money are made up; the room, the incident and the device are the real sample data.
+id: PRJ-21
+name: Heron HDBaseT receiver RMA
+kind: rma
+playbook: rma
+site: chi
+phase: procure
+owner: david
+start: "2026-09-24"
+target: "2026-10-09"
+demo: true
+summary: The HDBaseT receiver behind Heron's display wall at the Chicago office has failed, so laptops at the table show nothing. Kramer is replacing it (RMA-55120, due 2 October). Started from incident INC0041177, which is on hold for the vendor.
+budget:
+  approved: 500
+  currency: USD
+  lines:
+    - { item: "Return courier for the faulty receiver", amount: 120, status: estimate }
+    - { item: "Replacement receiver (under warranty)", amount: 0, status: committed, supplier: "Kramer, through the integrator" }
+roles:
+  - { person: david, as: pm, hours: 8, logged: 3, does: "Chases Kramer for the ship date and closes the incident" }
+  - { person: grace, as: technician, hours: 8, logged: 4, does: "Proved the fault, runs the workaround and swaps the receiver" }
+  - { person: camila, as: engineer, hours: 2, logged: 0, does: "Runs the room's verification after the swap" }
+  - { person: sofia, as: service-owner, hours: 1, logged: 0, does: "Signs off the records at handover" }
+history:
+  - { phase: plan, planned: "2026-09-25", ended: "2026-09-24", signed_off_by: david, summary: "A bench receiver brought the picture back, so the fault is the receiver. RMA-55120 raised; a long HDMI cable runs from the table to the scaler until the replacement arrives.", artefacts: [Fault notes, RMA-55120] }
+  - { phase: procure, planned: "2026-10-02", summary: "Waiting for Kramer to ship the replacement, due 2 October." }
+log:
+  - { id: X-1, kind: dependency, title: "Replacement receiver from Kramer", status: open, owner: david, raised: "2026-09-25", due: "2026-10-02", note: "Ships on 2 October under the RMA. Install is booked for the day after.", task: T-2104 }
+spaces:
+  - { space: chi-12-03, state: in-progress, note: "Laptops at the table work over a long HDMI cable until the receiver is replaced" }
+tasks:
+  - { id: T-2101, title: "Prove the fault: swap the cable, then try a bench receiver", space: chi-12-03, owner: grace, hours: 2, start: "2026-09-24", due: "2026-09-24", phase: plan, kind: survey, status: done, where: onsite, captured_fix: "A bench receiver is the fastest test on a passive HDBaseT run: it separated the receiver from the cable in one try." }
+  - { id: T-2102, title: "Raise the RMA with Kramer through the integrator, and put INC0041177 on hold", owner: david, hours: 1, due: "2026-09-24", phase: plan, kind: order, status: done, nothing_new: one-off }
+  - { id: T-2103, title: "Run a long HDMI cable from the table to the scaler as a workaround", space: chi-12-03, owner: grace, hours: 1, due: "2026-09-24", phase: plan, kind: install, status: done, nothing_new: one-off }
+  - { id: T-2104, title: "Wait for the replacement receiver and record when it ships", owner: david, hours: 1, due: "2026-10-02", phase: procure, kind: order, status: blocked, team: vendor, blocked_by: "Kramer ships the replacement on 2 October (RMA-55120)" }
+  - { id: T-2105, title: "Record the replacement's serial and MAC at the receiver's position, and mark the old receiver as returned", space: chi-12-03, owner: grace, hours: 1, due: "2026-10-05", phase: integrate, kind: provision, status: todo }
+  - { id: T-2106, title: "Swap the receiver behind the display wall and take away the long cable", space: chi-12-03, owner: grace, hours: 2, start: "2026-10-06", due: "2026-10-06", phase: integrate, kind: install, status: todo, where: onsite, notes: "Chicago IT store spares: no receiver of this kind on the shelf (below its minimum of 1), so the swap waits for Kramer's replacement. Had there been a spare unit, Grace would have fitted it on 24 September." }
+  - { id: T-2107, title: "Run Heron's verification: a laptop at the table shows on both screens", space: chi-12-03, owner: camila, hours: 1, due: "2026-10-06", phase: integrate, kind: commission, status: todo }
+  - { id: T-2108, title: "Send the faulty receiver back to Kramer and keep the courier receipt", owner: grace, hours: 1, due: "2026-10-08", phase: handover, kind: handover, status: todo, where: onsite }
+  - { id: T-2109, title: "Resolve INC0041177 with the fix and the new serial, and update the spares count", owner: david, hours: 1, due: "2026-10-09", phase: handover, kind: records, status: todo, where: remote }

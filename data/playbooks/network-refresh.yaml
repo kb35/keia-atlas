@@ -1,0 +1,72 @@
+# Demo playbook. Aigna's own way of working; not taken from any real company.
+id: network-refresh
+name: Network refresh
+kind: network-refresh
+version: "1.0"
+intensity: heavy
+weeks: { min: 20, max: 32 }
+summary: "Renew the network across a whole site: the core, every comms room, the Wi-Fi access points and the firewall, floor by floor, so the site keeps working through the change."
+when: "Use when a site's network is past its support dates as a whole, or when a site moves to a new standard. For one comms room, use the Comms room refresh playbook."
+changes:
+  - { date: "2026-09-29", change: "First version. The site-wide work was split out of the old Infrastructure refresh." }
+phases:
+  - phase: plan
+    weeks: "3 to 4"
+    steps:
+      - { title: "List everything past vendor support, from the core to the access points", role: network, output: Equipment due }
+      - { title: "Choose the models from the infrastructure standard", role: sm-infra }
+      - { title: "Order the new internet circuit if the site is changing provider", role: network, long_lead: true, note: It sets the earliest cutover date }
+      - { title: "Agree the floor order and the change windows with the site", role: pm, output: Floor order }
+      - { title: "Raise the change requests", role: pm, long_lead: true }
+      - { title: "Budget and programme dates", role: programme, output: Budget and programme }
+    gate: { by: [sm-infra, programme], checks: [Scope, budget and windows agreed, Change requests raised, Circuit ordered if needed] }
+  - phase: design
+    weeks: "4 to 6"
+    steps:
+      - { title: "Survey the site: every comms room, every port and every access point", role: network, output: Site survey }
+      - { title: "Address plan and VLANs, kept where they still fit", role: network, output: Address plan }
+      - { title: "Port map from old switch to new, floor by floor", role: network, output: Port maps }
+      - { title: "Wi-Fi survey and access point positions", role: network, output: Wi-Fi plan }
+      - { title: "Rack elevations, power and UPS check for each comms room", role: network, output: Rack elevations }
+      - { title: "List every AV device on every floor and how to check it", role: delivery, output: AV re-verification list }
+      - { title: "Rollback plan for each window", role: network }
+      - { title: "Test the new configuration in the Lab", role: innovation, output: Lab result }
+    gate: { by: [sm-infra], checks: [Designs and rollback plans approved, Lab test passed, AV devices listed] }
+  - phase: procure
+    weeks: "6 to 12"
+    steps:
+      - { title: "Order switches, optics, access points and the firewall", role: pm, long_lead: true }
+      - { title: "Pre-stage every configuration in the Lab", role: network }
+      - { title: "Send serials and MACs to the network team for address reservations", role: pm }
+      - { title: "Label every port before the first window", role: tech }
+    gate: { by: [pm], checks: [Everything received and pre-staged, Addresses reserved] }
+  - phase: integrate
+    weeks: "6 to 10, one floor at a time"
+    steps:
+      - { title: "Record serial and MAC for each unit, with a label photo", role: tech, step: provision }
+      - { title: "Add each unit to the asset register, device management and monitoring", role: network, step: provision }
+      - { title: "When a vendor racks the equipment: record serial and MAC for each unit, with a label photo", role: vendor, note: Through the vendor portal, step: provision }
+      - { title: "Freeze changes on the floor for its window", role: pm, step: install }
+      - { title: "Rack and cable the new switches beside the old", role: tech, step: install }
+      - { title: "Cut over port by port from the map", role: network, step: install }
+      - { title: "Fit the access points on the floor", role: tech, step: install }
+      - { title: "Roll back if the checks fail", role: network, step: install }
+      - { title: "Load the pre-staged configuration and verify each port against the map", role: network, step: configure }
+      - { title: "Bring up the new Wi-Fi and move the floor's clients across", role: network, step: configure }
+      - { title: "Re-verify every AV room on the floor", role: delivery, step: commission }
+      - { title: "Check monitoring sees every device on the floor", role: network, step: commission }
+      - { title: "Snag list for the floor, cleared before the next window", role: delivery, output: Snag list, step: commission }
+      - { title: "Cut the site over to the new firewall and circuit", role: network, step: commission }
+    gate: { by: [network, sm-infra], checks: [Every floor moved and up, Every device back and monitored, Firewall and circuit live] }
+  - phase: handover
+    weeks: "2"
+    steps:
+      - { title: "Update the as-built rack, port and Wi-Fi records", role: network, output: As-built records }
+      - { title: "Handover pack to the service desk: what changed and who to call", role: pm, output: Handover pack }
+      - { title: "Retire the old equipment and the old circuit", role: pm }
+    gate: { by: [sm-infra], checks: [Records match the racks and the floors, Old equipment retired] }
+  - phase: closed
+    weeks: "-"
+    steps:
+      - { title: "Feed what was learned back into this playbook", role: pm }
+    gate: { by: [programme], checks: [Lessons captured] }

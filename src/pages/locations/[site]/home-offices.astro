@@ -1,0 +1,140 @@
+---
+// A region's home offices as one page (Locations includes home offices). List archetype (page-anatomy.md,
+// A): a card per home office with its town, who works there, the office they go in to, its kit and its state now
+// (from the same simulation as Locations, Overview), and its open incidents. Home offices are in scope as places
+// (kit at home), never as endpoints: no laptops or phones.
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import FilterBar from '../../../components/FilterBar.astro';
+import EmptyState from '../../../components/EmptyState.astro';
+import { href, plural, countryName, DEMO_TODAY } from '../../../lib/data.mjs';
+import { whereIs } from '../../../lib/work.mjs';
+import { REGIONS, REGION_SHORT, homeOffices, liveModelFor, OPEN_Q, INC_WORD } from '../../../lib/locations.mjs';
+
+export function getStaticPaths() {
+  return REGIONS.map((site) => ({ params: { site } }));
+}
+const region = Astro.params.site;
+const H = homeOffices(region);
+const withInc = H.rooms.filter((x) => x.inc.length).length;
+const atHome = H.rooms.filter((x) => x.owner && whereIs(x.owner.id, DEMO_TODAY).kind === 'home').length;
+const nearOffices = [...new Map(H.rooms.filter((x) => x.near).map((x) => [x.r.near, x.near])).entries()];
+const FACETS = [
+  { key: 'site', label: 'Office', options: nearOffices.map(([id, s]) => ({ value: id, label: s.name, sub: 'Nearest office' })) },
+  { key: 'status', label: 'Status', options: [{ value: 'use', label: 'In use' }, { value: 'free', label: 'Free' }, { value: 'problem', label: 'Problem' }, { value: 'closed', label: 'Closed' }] },
+];
+const SORT = { options: [{ value: 'town', label: 'By town' }, { value: 'office', label: 'By nearest office' }, { value: 'inc', label: 'Incidents first' }] };
+const VIEWS = [{ value: 'cards', label: 'Cards', show: '[data-grid]' }, { value: 'list', label: 'List', show: '[data-list]' }];
+const NUMBERS = [
+  { n: H.rooms.length, label: 'Home offices', fact: true },
+  { id: 'loc-problem', n: '–', label: 'Problems now', to: '?status=problem' },
+  { n: withInc, label: 'With open incidents', to: '?issues=1', tone: withInc ? 'bad' as const : undefined },
+  { n: atHome, label: 'At home today', fact: true },
+];
+const find = (x) => `${x.r.town ?? ''} ${x.r.name} ${x.owner?.name ?? ''} ${x.near?.name ?? ''} ${x.r.id}`.toLowerCase();
+const json = JSON.stringify({ ...liveModelFor([H.site]), base: href('/') }).replace(/</g, '\\u003c');
+---
+<Shell title={`Home offices, ${REGION_SHORT[region]}`} section="home-offices" crumbs={[{ label: 'Locations', to: '/locations/' }, { label: REGION_SHORT[region], to: `/locations/${region}/` }, { label: 'Home offices' }]} about={{ kind: 'page', label: `Home offices, ${REGION_SHORT[region]}` }}>
+  <PageBand overline="Home offices" title={`Home offices, ${REGION_SHORT[region]}`} rec={`ho-${region}`} lede="The kit at home for people who work from home: what it is, who uses it, and its state now." sim="live" numbers={NUMBERS} />
+
+  <div class="content homes" data-loc="homes">
+    <FilterBar facets={FACETS} toggles={[{ key: 'issues', label: 'Open incidents', title: 'Only home offices with an open incident' }]} placeholder="Find a town, person or office" label="Find a home office" noun={['home office', 'home offices']} scope=".content.homes" views={VIEWS} viewKey="rs-homes-view" sort={SORT} />
+
+    <div class="hm-grid" data-grid data-sort-box>
+      {H.rooms.map((x) => (
+        <a class:list={['card hm', { alert: x.inc.length > 0 }]} href={href(`/rooms/${x.r.id}/`)} data-fi data-find={find(x)} data-f-site={x.r.near ?? ''} data-f-status="" data-loc-room={x.r.id} data-t-issues={x.inc.length ? '1' : undefined} data-vk={x.r.id} data-town={x.r.town ?? x.r.name} data-office={x.near?.name ?? ''} data-inc={x.inc.length}>
+          <span class="hm-top"><b data-vt-rec={x.r.id}>{x.r.town ?? x.r.name}</b><span class="hm-st" data-help="loc.homestate"><i aria-hidden="true"></i><span data-st-word>–</span></span></span>
+          <small>{x.r.country ? countryName(x.r.country) : ''}{x.near ? ` · near the ${x.near.name}` : ''}</small>
+          <span class="hm-who">{x.owner ? <>{x.owner.name}<small> · {x.owner.role}</small></> : <span class="faint">Not assigned yet</span>}</span>
+          <span class="hm-k"><span>{plural(x.kits, 'device')}</span>{x.inc.map((v) => <span class="hm-inc" title={v.inc.short_description}>{v.inc.number} {INC_WORD[v.inc.state].toLowerCase()}</span>)}</span>
+        </a>
+      ))}
+    </div>
+
+    <div class="card hm-list" data-list hidden>
+      <table class="to-cards">
+        <thead><tr><th scope="col">Town</th><th scope="col">Who</th><th scope="col">Nearest office</th><th scope="col" class="num">Devices</th><th scope="col">Open incidents</th></tr></thead>
+        <tbody data-sort-box>
+          {H.rooms.map((x) => (
+            <tr data-fi data-find={find(x)} data-f-site={x.r.near ?? ''} data-f-status="" data-loc-room={x.r.id} data-t-issues={x.inc.length ? '1' : undefined} data-vk={x.r.id} data-town={x.r.town ?? x.r.name} data-office={x.near?.name ?? ''} data-inc={x.inc.length}>
+              <td data-label="Town"><a href={href(`/rooms/${x.r.id}/`)}><b>{x.r.town ?? x.r.name}</b></a></td>
+              <td data-label="Who">{x.owner ? x.owner.name : 'Not assigned yet'}</td>
+              <td data-label="Nearest office">{x.near ? <a href={href(`/locations/${x.r.near}/`)}>{x.near.name}</a> : ''}</td>
+              <td data-label="Devices" class="num">{x.kits}</td>
+              <td data-label="Open incidents">{x.inc.length ? x.inc.map((v) => <a href={href(v.href)}>{v.inc.number}</a>) : <span class="faint">None</span>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <EmptyState text="No home offices match these filters." />
+    <p class="faint hm-note">Working hours at home are 08:00 to 18:00 local. <a href={href(`/incidents/?site=${H.site}&${OPEN_Q}`)}>All open incidents at home offices in {REGION_SHORT[region]} →</a></p>
+    <script type="application/json" data-loc-model set:html={json}></script>
+  </div>
+
+  <script>
+    import { startLocations } from '../../../lib/locations-client.mjs';
+    const WORD: Record<string, string> = { use: 'In use', free: 'Free', problem: 'Problem', closed: 'Closed' };
+    function init() {
+      const root = document.querySelector('[data-loc="homes"]') as any;
+      if (!root || root.__loc) return;
+      const bar = root.querySelector('[data-fb]');
+      // Each item's state goes into the Status facet and its words, whenever the simulation moves it.
+      const sync = () => {
+        let moved = false;
+        root.querySelectorAll('[data-fi][data-loc-room]').forEach((el: HTMLElement) => {
+          const st = el.dataset.st ?? '';
+          if (el.getAttribute('data-f-status') !== st) { el.setAttribute('data-f-status', st); moved = true; }
+          const w = el.querySelector('[data-st-word]'); if (w) w.textContent = WORD[st] ?? '–';
+        });
+        if (moved && bar?.rsFilter) bar.rsFilter.refresh();
+      };
+      const stop = startLocations(root);
+      sync();
+      const obs = new MutationObserver(sync);
+      root.querySelectorAll('[data-grid] [data-loc-room]').forEach((el: HTMLElement) => obs.observe(el, { attributes: true, attributeFilter: ['data-st'] }));
+      const order = new Map<string, number>();
+      root.querySelectorAll('[data-grid] [data-vk]').forEach((el: HTMLElement, i: number) => order.set(el.dataset.vk!, i));
+      const reorder = (v: string) => root.querySelectorAll('[data-sort-box]').forEach((box: HTMLElement) => {
+        [...box.children].sort((a: any, b: any) => v === 'office' ? a.dataset.office.localeCompare(b.dataset.office) || a.dataset.town.localeCompare(b.dataset.town)
+          : v === 'inc' ? (+b.dataset.inc - +a.dataset.inc) || a.dataset.town.localeCompare(b.dataset.town)
+          : a.dataset.town.localeCompare(b.dataset.town)).forEach((x) => box.appendChild(x));
+      });
+      const start = () => {
+        if (!bar?.rsFilter) return;
+        bar.addEventListener('fb:sort', (e: any) => bar.rsFilter.run(true, () => reorder(e.detail.value)));
+        reorder(bar.rsFilter.sort());
+        bar.rsFilter.refresh();
+      };
+      if (bar?.rsFilter) start(); else document.addEventListener('DOMContentLoaded', start, { once: true });
+      document.addEventListener('astro:before-swap', () => { stop(); obs.disconnect(); }, { once: true });
+    }
+    init();
+    document.addEventListener('astro:page-load', init);
+  </script>
+</Shell>
+
+<style>
+  .hm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: var(--gutter); }
+  .hm { display: grid; gap: 6px; align-content: start; padding: 14px 16px; color: inherit; text-decoration: none; transition: box-shadow var(--dur-state) var(--ease-settle); }
+  .hm:hover { box-shadow: var(--shadow-md); }
+  .hm.alert { box-shadow: inset 0 0 0 1.5px var(--red); }
+  .hm-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+  .hm-top b { font: 700 16px/1.25 var(--font-display); }
+  .hm > small { color: var(--text-2); font-size: 12.5px; }
+  .hm-st { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; color: var(--text-2); white-space: nowrap; }
+  .hm-st i { width: 9px; height: 9px; border-radius: 50%; background: var(--surface-3); transition: background var(--dur-state) var(--ease-settle); }
+  .hm[data-st=use] .hm-st i { background: var(--blue); }
+  .hm[data-st=free] .hm-st i { background: var(--green); }
+  .hm[data-st=problem] .hm-st i { background: var(--red); }
+  .hm[data-st=problem] .hm-st { color: var(--red-ink); font-weight: 650; }
+  .hm-who { font-size: 13.5px; }
+  .hm-who small { color: var(--text-2); }
+  .hm-k { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12.5px; color: var(--text-2); }
+  .hm-inc { color: var(--red-ink); font-weight: 650; }
+  .hm-list { padding: 4px 0; }
+  .hm-list table { width: 100%; }
+  .hm-list td a + a { margin-left: 8px; }
+  .hm-note { margin: 0; font-size: 13px; }
+  @media (prefers-reduced-motion: reduce) { .hm, .hm-st i { transition: none; } }
+</style>

@@ -1,0 +1,18 @@
+---
+// The work report for one project: what was done, who, when, devices and serials, evidence, deviations,
+// sign-off, plus the charter, the three lights at close, the log, changes to scope and lessons learned.
+import WorkReportPage from '../../../components/WorkReportPage.astro';
+import { projects } from '../../../lib/data.mjs';
+import { projectReport } from '../../../lib/report.mjs';
+import { charter, lights, logEntries, changeRequests, lessons } from '../../../lib/project-status.mjs';
+
+export function getStaticPaths() {
+  return Object.values(projects).map((p) => ({ params: { id: p.id.toLowerCase() } }));
+}
+const p = Object.values(projects).find((x) => x.id.toLowerCase() === Astro.params.id);
+const report = projectReport(p);
+const home = `/projects/${p.id.toLowerCase()}/`;
+const extra = { charter: charter(p), lights: lights(p), log: logEntries(p), changes: changeRequests(p), lessons: lessons(p), closed: p.phase === 'closed' };
+---
+<WorkReportPage report={report} extra={extra} projectId={p.id} backTo={home} backLabel="Back to the project" about={{ kind: 'project', label: `${p.id} ${p.name}`, to: home }}
+  crumbs={[{ label: 'Projects', to: '/projects/' }, { label: p.name, to: home }, { label: 'Work report' }]} />

@@ -1,0 +1,145 @@
+---
+// Projects (stage 3, simulated): delivery work at each site, with phase, tasks and agents. List
+// archetype (docs/standards/page-anatomy.md): band, filter bar, then cards of one height or rows.
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import PhaseRail from '../../components/PhaseRail.astro';
+import Icon from '../../components/Icon.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import { projects, sites, playbooks, SITE_ORDER, PHASES, PHASE_LABEL, PROJECT_KIND, REGION_LABEL, TASK_STATUS, plural, href, fmtDate } from '../../lib/data.mjs';
+import { person } from '../../lib/demo.mjs';
+import { lights } from '../../lib/project-status.mjs';
+
+const list = Object.values(projects).sort((a, b) => a.id.localeCompare(b.id));
+const KIND = PROJECT_KIND;
+const count = (p, st) => p.tasks.filter((t) => t.status === st).length;
+const usedSites = SITE_ORDER.filter((sid) => list.some((p) => p.site === sid));
+const regionOf = (p) => sites[p.site].region ?? 'remote';
+const owners = [...new Set(list.map((p) => p.owner))];
+const FACETS = [
+  { key: 'region', label: 'Region', options: ['amer', 'emea', 'apac'].filter((r) => list.some((p) => regionOf(p) === r)).map((r) => ({ value: r, label: REGION_LABEL[r].replace('Europe, Middle East and Africa', 'EMEA') })) },
+  { key: 'site', label: 'Office', options: usedSites.map((value) => ({ value, label: sites[value].name, sub: sites[value].kind === 'remote' ? 'Home offices' : sites[value].city })) },
+  { key: 'kind', label: 'Kind', options: Object.entries(KIND).filter(([value]) => list.some((p) => p.kind === value)).map(([value, label]) => ({ value, label })) },
+  { key: 'phase', label: 'Phase', options: PHASES.filter((value) => list.some((p) => p.phase === value)).map((value) => ({ value, label: PHASE_LABEL[value] })) },
+  { key: 'owner', label: 'Run by', options: owners.map((value) => ({ value, label: person(value).name })) },
+];
+const SORT = { options: [
+  { value: 'id', label: 'By project number' }, { value: 'due', label: 'By due date' }, { value: 'phase', label: 'By phase' }, { value: 'blocked', label: 'Blocked first' },
+] };
+const VIEWS = [{ value: 'cards', label: 'Cards', show: '[data-grid]' }, { value: 'list', label: 'List', show: '[data-list]' }];
+const findText = (p) => [p.id, p.name, p.summary, KIND[p.kind], sites[p.site].name, PHASE_LABEL[p.phase], person(p.owner).name, playbooks[p.playbook]?.name].filter(Boolean).join(' ');
+const open = list.filter((p) => p.phase !== 'closed');
+const blocked = list.reduce((n, p) => n + count(p, 'blocked'), 0);
+// Each figure opens what it counts (rule P10): open projects here, blocked tasks in the Work list.
+const NUMBERS = [
+  { n: open.length, label: 'Open projects', to: `?phase=${[...new Set(open.map((p) => p.phase))].join(',')}` },
+  { n: list.filter((p) => p.phase === 'integrate').length, label: 'In Deploy', to: '?phase=integrate' },
+  { n: blocked, label: 'Blocked tasks', to: '/work/list/?kind=provision,install,configure,commission,task&status=blocked', tone: blocked ? 'bad' : undefined },
+];
+const attrs = (p) => ({
+  'data-fi': '', 'data-find': findText(p), 'data-f-region': regionOf(p), 'data-f-site': p.site, 'data-f-kind': p.kind, 'data-f-phase': p.phase, 'data-f-owner': p.owner,
+  'data-k-id': p.id, 'data-k-due': p.target, 'data-k-phase': String(PHASES.indexOf(p.phase)), 'data-k-blocked': String(count(p, 'blocked')),
+});
+// The three lights on each card: schedule, cost and scope, with the reason on hover.
+const LIGHT = { ok: 'green', warn: 'amber', bad: 'red', off: 'grey' };
+const lightsOf = (p) => { const L = lights(p); return [['Schedule', L.schedule], ['Cost', L.cost], ['Scope', L.scope]]; };
+const lightsLabel = (p) => lightsOf(p).map(([k, l]) => `${k} ${LIGHT[l.state]}: ${l.word}`).join('. ');
+const taskLabel = (p) => ['done', 'doing', 'blocked', 'todo'].map((st) => `${count(p, st)} ${TASK_STATUS[st].toLowerCase()}`).join(', ');
+---
+<Shell title="Projects" section="projects" minStage={3} crumbs={[{ label: 'Projects' }]}>
+  <PageBand overline="Work" title="Projects" rec="dd-projects" lede="Delivery work at each site: refreshes, fit-outs and custom designs, each following a playbook." sim numbers={NUMBERS}>
+    <a slot="action" class="btn primary" href={href('/edit/?kind=project')}><Icon name="plus" size={16} />New project</a>
+  </PageBand>
+  <div class="content projects">
+    <FilterBar facets={FACETS} placeholder="Find a project, office or person" label="Find a project" noun={['project', 'projects']} scope=".content.projects" views={VIEWS} viewKey="rs5-projects-view" sort={SORT} />
+    <div class="proj-grid" data-grid data-sortable>
+      {list.map((p) => (
+        <a class="card proj-card" href={href(`/projects/${p.id.toLowerCase()}/`)} {...attrs(p)}>
+          <span class="pc-top">
+            <span class="code">{p.id}</span>
+            <span class="pc-kind">{KIND[p.kind]}</span>
+            <span class="faint pc-site">{sites[p.site].name}</span>
+            {p.agents?.length > 0 && <span class="pc-agents" data-min-stage="6"><Icon name="agent" size={15} />{plural(p.agents.length, 'agent')}</span>}
+          </span>
+          <span class="pc-name">{p.name}</span>
+          <span class="muted pc-sum">{p.summary}</span>
+          <span class="pc-rail" data-vt-rec={p.id}><PhaseRail phase={p.phase} project={p} small /></span>
+          <span class="pc-meta faint">{fmtDate(p.start, { day: 'numeric', month: 'short' })} to {fmtDate(p.target)} · run by {person(p.owner).name}{p.playbook && playbooks[p.playbook] ? ` · ${playbooks[p.playbook].name}` : ''}</span>
+          <span class="pc-lights" data-help="project.light" data-help-name="Schedule, cost and scope" role="img" aria-label={lightsLabel(p)}>{lightsOf(p).map(([k, l]) => <span title={`${k}: ${l.word}. ${l.why}`}><i class="hl" data-state={l.state}></i>{k}</span>)}</span>
+          <span class="pc-foot">
+            <span class="task-bar" role="img" aria-label={taskLabel(p)}>
+              {['done', 'doing', 'blocked', 'todo'].map((st) => count(p, st) > 0 && <i class={`tb-${st}`} style={`flex:${count(p, st)}`}></i>)}
+            </span>
+            <span class="faint">{plural(p.tasks.length, 'task')}{count(p, 'blocked') ? <>, <b class="pc-blocked">{count(p, 'blocked')} blocked</b></> : ''}</span>
+            <span class="avatars">{(p.roles ?? []).map((r) => r.person).map((w) => <span class="av" title={person(w).name}>{person(w).initials}</span>)}</span>
+          </span>
+        </a>
+      ))}
+    </div>
+    <div class="list proj-rows" data-list data-sortable hidden>
+      {list.map((p) => (
+        <a class="row plain" href={href(`/projects/${p.id.toLowerCase()}/`)} {...attrs(p)}>
+          <span>
+            <span class="name"><span class="code">{p.id}</span> {p.name}</span>
+            <span class="sub">{KIND[p.kind]} · {sites[p.site].name} · run by {person(p.owner).name} · due {fmtDate(p.target)}</span>
+          </span>
+          <span class="end">
+            <span class="faint">{plural(p.tasks.length, 'task')}{count(p, 'blocked') ? `, ${count(p, 'blocked')} blocked` : ''}</span>
+            <span class="pc-lights" role="img" aria-label={lightsLabel(p)}>{lightsOf(p).map(([k, l]) => <span title={`${k}: ${l.word}. ${l.why}`}><i class="hl" data-state={l.state}></i></span>)}</span>
+            <span class:list={['pill', p.phase === 'closed' ? 'plain' : p.phase === 'integrate' ? 'deploy' : 'plan']}>{PHASE_LABEL[p.phase]}</span>
+          </span>
+        </a>
+      ))}
+    </div>
+    <EmptyState text="No projects match these filters." />
+  </div>
+</Shell>
+
+<script is:inline data-astro-rerun>
+  (function () {
+    /* Sort: re-order the cards and the rows inside the bar's run, so they slide into place. */
+    var bar = document.querySelector('.content.projects [data-fb]'); if (!bar || bar.__pjSort) return;
+    bar.__pjSort = true;
+    var key = { id: function (e) { return e.dataset.kId; }, due: function (e) { return e.dataset.kDue; }, phase: function (e) { return -(+e.dataset.kPhase); }, blocked: function (e) { return -(+e.dataset.kBlocked); } };
+    var reorder = function (v) {
+      var k = key[v] || key.id;
+      document.querySelectorAll('.content.projects [data-sortable]').forEach(function (box) {
+        Array.prototype.slice.call(box.children).sort(function (a, b) { var x = k(a), y = k(b); return x < y ? -1 : x > y ? 1 : a.dataset.kId.localeCompare(b.dataset.kId); }).forEach(function (el) { box.appendChild(el); });
+      });
+    };
+    var go = function () { if (bar.rsFilter) { if (bar.rsFilter.sort() !== 'id') reorder(bar.rsFilter.sort()); } };
+    bar.addEventListener('fb:sort', function (e) { bar.rsFilter.run(true, function () { reorder(e.detail.value); }); });
+    if (bar.rsFilter) go(); else setTimeout(go, 0);
+  })();
+</script>
+
+<style is:global>
+  .proj-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; align-items: stretch; }
+  .proj-card { display: grid; grid-template-rows: auto auto 1fr auto auto auto auto; gap: 10px; padding: 16px 18px; color: inherit; text-decoration: none; transition: transform var(--dur-hover) var(--ease-settle), box-shadow var(--dur-hover) var(--ease-settle); }
+  .proj-card:hover { color: inherit; transform: translateY(-2px); box-shadow: var(--shadow-md, var(--shadow-sm)); }
+  :root[data-look="classic"] .proj-card { border: 2px solid var(--ink); }
+  .pc-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+  .pc-kind { font-weight: 650; color: var(--text-2); }
+  .pc-site { font-size: 13px; }
+  .pc-agents { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font: 600 12px/1 var(--font-sans); color: var(--violet-ink); background: var(--violet-soft); padding: 4px 8px; border-radius: 999px; }
+  :root[data-agents="off"] .pc-agents { display: none; }
+  .pc-name { font: var(--weight-display) 22px/1.15 var(--font-display); letter-spacing: -.02em; }
+  .pc-sum { font-size: 13.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; align-self: start; }
+  .pc-rail { display: block; padding-top: 2px; }
+  .pc-meta { font-size: 12.5px; }
+  .pc-lights { display: flex; flex-wrap: wrap; gap: 4px 14px; font: 600 11.5px/1 var(--font-sans); color: var(--text-2); }
+  .pc-lights span { display: inline-flex; align-items: center; gap: 5px; } .pc-lights .hl { width: 9px; height: 9px; }
+  .proj-rows .pc-lights { gap: 4px; }
+  .pc-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 12.5px; }
+  .pc-blocked { color: var(--red-ink); font-weight: 700; }
+  .task-bar { display: flex; gap: 2px; width: 110px; height: 8px; border-radius: 99px; overflow: hidden; background: var(--surface-3); }
+  .task-bar i { display: block; }
+  .tb-done { background: var(--green); } .tb-doing { background: var(--blue); } .tb-blocked { background: var(--red); } .tb-todo { background: var(--grey); opacity: .5; }
+  .avatars { margin-left: auto; display: flex; }
+  .avatars .av { width: 26px; height: 26px; margin-left: -6px; border-radius: 50%; display: grid; place-items: center; font: 700 10px/1 var(--font-mono); background: var(--surface-3); color: var(--text); border: 2px solid var(--surface); }
+  :root[data-look="classic"] .avatars .av { background: var(--yellow); color: #15161B; border-color: var(--ink); border-width: 1.5px; }
+  .proj-rows .name .code { margin-right: 6px; vertical-align: 1px; }
+  @media (max-width: 760px) { .proj-grid { grid-template-columns: minmax(0, 1fr); } }
+  @media (prefers-reduced-motion: reduce) { .proj-card { transition: none; } }
+</style>

@@ -1,0 +1,475 @@
+---
+// Locations, Overview (was Rooms, Overview): what is happening in every room right
+// now, with a tile per region above the offices. Overview archetype (page-anatomy.md, D). There are no live feeds yet, so the page runs the live simulation (src/lib/livesim.mjs)
+// on the rooms' own usage and the units' health, a new moment every five seconds, the same in every window:
+//   band      rooms in use now, free now, with a problem, offices open now (live)
+//   bar       Region, Office, Kind, Status; it filters the tiles, the attention list and the feed
+//   side      Needs attention (rooms with a problem, worst first) and Happening now (the latest changes)
+//   main      a tile per region (offices open, rooms in use, problems, home offices; each opens the region or
+//             this page filtered), then every office, its rooms as small tiles coloured by state (hover to look, select to open the
+//             room); then home offices, summarised one row per region
+// Changes stay in place: a tile's colour eases to its new state and a ring marks it for a moment (M10).
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import LiveSide from '../../components/LiveSide.astro';
+import { REGION_LABEL, KIND_LABEL, href } from '../../lib/data.mjs';
+import { roomsModel, lean } from '../../lib/livemodel.mjs';
+import { REGIONS, REGION_SHORT, officesIn, HOME_SITE } from '../../lib/locations.mjs';
+
+const model = roomsModel();
+const SITE = model.sites;
+const siteRooms = (i) => model.rooms.map((r, ri) => ({ ...r, ri })).filter((r) => r.site === i);
+const OFFICES = SITE.map((s, i) => ({ ...s, i, rooms: siteRooms(i) })).filter((s) => !s.remote && s.rooms.length);
+const HOMES = SITE.map((s, i) => ({ ...s, i, rooms: siteRooms(i) })).filter((s) => s.remote && s.rooms.length);
+const REGION = { amer: 'Americas', emea: 'EMEA', apac: 'Asia Pacific' };
+const STATUS = { problem: 'Problem', use: 'In use', free: 'Free', closed: 'Closed' };
+const FACETS = [
+  { key: 'region', label: 'Region', options: ['amer', 'emea', 'apac'].map((r) => ({ value: r, label: REGION_LABEL[r].replace('Europe, Middle East and Africa', 'EMEA') })) },
+  { key: 'site', label: 'Office', options: [...OFFICES, ...HOMES].map((s) => ({ value: s.id, label: s.name, sub: s.remote ? 'Home offices' : s.city })) },
+  { key: 'kind', label: 'Kind', options: ['meeting', 'small', 'shared', 'desks', 'kits'].map((k) => ({ value: k, label: KIND_LABEL[k] })) },
+  { key: 'status', label: 'Status', options: Object.entries(STATUS).map(([value, label]) => ({ value, label })) },
+];
+const SORT = { options: [{ value: 'attention', label: 'Problems first' }, { value: 'site', label: 'By office' }, { value: 'busy', label: 'Busiest first' }] };
+const NUMBERS = [
+  { id: 'lv-use', n: '–', label: 'In use now', to: '?status=use' },
+  { id: 'lv-free', n: '–', label: 'Free now', to: '?status=free' },
+  { id: 'lv-problem', n: '–', label: 'With a problem', to: '?status=problem' },
+  { id: 'lv-open', n: '–', label: 'Offices open now', to: '#sites' },
+];
+const REGION_TILES = REGIONS.map((r) => ({ id: r, name: REGION_SHORT[r], offices: officesIn(r).length, homes: HOMES.find((h) => h.id === HOME_SITE[r])?.rooms.length ?? 0 }));
+const find = (r, s) => `${r.no} ${r.n} ${r.prof} ${s.name} ${s.city ?? ''} ${r.town ?? ''} ${r.id}`;
+const json = JSON.stringify({ ...lean(model, ['id', 'n', 'cls', 'old', 'inc']), base: href('/') }).replace(/</g, '\\u003c');
+---
+<Shell title="Locations" section="locations-overview" crumbs={[{ label: 'Locations' }]} about={{ kind: 'page', label: 'Locations overview' }}>
+  <PageBand overline="Locations" title="Overview" lede="Simulated live from room usage and device health. Real feeds replace this with the same shape." sim="live" numbers={NUMBERS}>
+    <span slot="overline" class="lv-live" data-lv-live title="A new moment every five seconds, the same in every window"><span class="lv-dot" aria-hidden="true"></span>Live</span>
+  </PageBand>
+
+  <div class="content lvr lv-page" data-lv="rooms">
+    <FilterBar facets={FACETS} placeholder="Find a room, number or office" label="Find a room" noun={['room', 'rooms']} scope=".content.lvr" sort={SORT} />
+
+    <div class="lv-layout">
+      <LiveSide attention="To review" feedTitle="Happening now" none="Nothing to review right now." attentionTo="?status=problem" attentionPlace="the room map"
+        note="Simulated from each room's usage and each unit's health, the same in every window. At stage 2 the real feeds plug in: monitoring, room booking, occupancy sensors and device management." />
+
+      <div class="lv-main">
+        <section class="lv-regions" aria-label="Regions">
+          {REGION_TILES.map((g) => (
+            <article class="card lv-rg" data-rg={g.id} data-help="loc.region-tile">
+              <header class="lv-rg-h">
+                <a class="lv-rg-n" href={href(`/locations/${g.id}/`)} data-vt-rec={`rg-${g.id}`}><b>{g.name}</b><span aria-hidden="true">→</span></a>
+                <a class="lv-rg-o" href={href(`/locations/${g.id}/#offices`)}><span data-rg-open>–</span> of {g.offices} offices open</a>
+              </header>
+              <dl class="lv-rg-k">
+                <div><dt>In use</dt><dd><a href={`?region=${g.id}&status=use`} data-rg-use>–</a></dd></div>
+                <div><dt>Problems</dt><dd><a href={`?region=${g.id}&status=problem`} data-rg-problem>–</a></dd></div>
+                <div><dt>Home offices</dt><dd><a href={href(`/locations/${g.id}/home-offices/`)}>{g.homes}</a></dd></div>
+              </dl>
+            </article>
+          ))}
+        </section>
+        <section class="card lv-sites" id="sites" aria-labelledby="sites-h" data-steady>
+          <header class="lv-h"><h2 id="sites-h">Offices</h2><span class="faint">Each tile is a room. Hover to look, select to open it.</span></header>
+          <div class="lv-rows" data-rows="office">
+            {OFFICES.map((s) => (
+              <article class="lv-site" data-fb-group data-steady data-site={s.i} data-sid={s.id} aria-label={s.name}>
+                <header class="lv-sh">
+                  <span class="code">{s.code}</span>
+                  <span class="lv-sn"><a class="lv-sl" href={href(`/locations/${s.id}/`)} data-vt-rec={`loc-${s.id}`} title={`Open the ${s.name}`}><b>{s.name}</b></a><small>{s.city} · <span data-clock>--:--</span> local</small></span>
+                  <span class="lv-open" data-open></span>
+                  <span class="lv-counts" data-counts></span>
+                </header>
+                <div class="lv-tiles">
+                  {s.rooms.map((r) => (
+                    <a class="lv-t" href={href(`/rooms/${r.id}/`)} data-i={r.ri} data-fi data-find={find(r, s)} data-f-region={s.region} data-f-site={s.id} data-f-kind={r.kind} data-f-status="" data-st="" data-peek data-vt-rec={r.id} aria-label={`${r.no} ${r.n}`.trim()}>
+                      <template data-peek-body><b class="peek-h">{`${r.no} ${r.n}`.trim()}</b><small>{r.prof} · {s.name}</small><span class="lv-pk" data-pk></span></template>
+                    </a>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+          <p class="lv-legend" aria-label="Key">
+            <span><i class="lv-sw" data-st="use"></i>In use</span>
+            <span><i class="lv-sw" data-st="use" data-call></i>In use, on a call</span>
+            <span><i class="lv-sw" data-st="free"></i>Free</span>
+            <span><i class="lv-sw" data-st="problem"></i>Problem</span>
+            <span><i class="lv-sw" data-st="closed"></i>Closed (outside 07:00 to 19:00 local, or the weekend)</span>
+          </p>
+        </section>
+
+        <section class="card lv-sites lv-homes" aria-labelledby="homes-h" data-steady>
+          <header class="lv-h"><h2 id="homes-h">Home offices</h2><span class="faint">Summarised by region. Working hours are 08:00 to 18:00 at home.</span></header>
+          <div class="lv-rows" data-rows="home">
+            {HOMES.map((s) => (
+              <article class="lv-site lv-home" data-fb-group data-steady data-site={s.i} data-sid={s.id} aria-label={s.name}>
+                <header class="lv-sh">
+                  <span class="code">{s.code}</span>
+                  <span class="lv-sn"><a class="lv-sl" href={href(`/locations/${s.region}/home-offices/`)} title={`Open ${s.name}, the home offices`}><b>{s.name}</b></a><small data-hn>{s.rooms.length} home offices</small></span>
+                  <a class="lv-open" href={href(`/rooms/?site=${s.id}`)} data-vt-rec="dd-rooms">See all {s.rooms.length} in Rooms →</a>
+                </header>
+                <div class="lv-hb">
+                  <div class="lv-bar" data-bar aria-hidden="true"><i data-st="use"></i><i data-st="free"></i><i data-st="problem"></i><i data-st="closed"></i></div>
+                  <p class="lv-hcounts" data-hcounts></p>
+                  <p class="lv-hprob" data-hprob hidden></p>
+                </div>
+                <div class="lv-hidden-items">
+                  {s.rooms.map((r) => <span class="lv-hi" data-i={r.ri} data-fi data-find={find(r, s)} data-f-region={s.region} data-f-site={s.id} data-f-kind="kits" data-f-status="" data-st=""></span>)}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+        <EmptyState text="No rooms match these filters." />
+      </div>
+    </div>
+    <script type="application/json" data-lv-model set:html={json}></script>
+  </div>
+
+  <script>
+    import { prepare, snapshot, diff, eventsBetween, TICK_MS, tickOf, hhmm, nextSwitch, local, roomUntil, OFFICE_HOURS } from '../../lib/livesim.mjs';
+    import { every, steady, refresh, repeek, ping, syncList, pushFeed, filterOf, visible, stickSide, esc, clock, ago, span } from '../../lib/liveview.mjs';
+
+    const FEED = 8, KEEP = 400, BACK = 15 * 60e3;
+    const STW: Record<string, string> = { use: 'In use', free: 'Free', problem: 'Problem', closed: 'Closed' };
+    const DAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    function init() {
+      const root = document.querySelector('[data-lv="rooms"]') as any;
+      if (!root || root.__lv) return;
+      root.__lv = true;
+      const W = window as any;
+      const D = JSON.parse(root.querySelector('[data-lv-model]').textContent);
+      const model = prepare(D), B = D.base;
+      const bar = root.querySelector('[data-fb]');
+      const side = root.querySelector('[data-lv-side]');
+      const attList = root.querySelector('[data-att]'), feedList = root.querySelector('[data-feed]');
+      const els = new Map<number, HTMLElement>();
+      root.querySelectorAll('[data-fi][data-i]').forEach((el: HTMLElement) => els.set(+el.dataset.i!, el));
+      const rows = [...root.querySelectorAll('.lv-site')] as HTMLElement[];
+      const roomName = (r: any) => `${r.no ? r.no + ' ' : ''}${r.n}`;
+      const roomHref = (r: any) => `${B}rooms/${r.id}/`;
+      const siteOf = (r: any) => model.sites[r.site];
+      const cleanups: (() => void)[] = [];
+
+      // ---- Words for a room's state ----
+      // `why` (from the simulation) says what was wrong at that moment: a unit offline or alerting, or an incident.
+      function reason(r: any, why: any) {
+        if (!why) return '';
+        if (why.unit != null) {
+          const u = model.units[why.unit];
+          const what = u.n.startsWith(r.n + ' ') ? u.n.slice(r.n.length + 1) : u.n;
+          const cap = what.charAt(0).toUpperCase() + what.slice(1);
+          if (why.down) return `${cap} offline`;
+          if (why.al >= 0) return `${cap}: ${u.alerts[why.al].toLowerCase()}`;
+          if (why.inc >= 0) return `${cap}: ${model.incs[why.inc].title}`;
+          return cap;
+        }
+        return model.incs[why.inc]?.title ?? 'Open incident';
+      }
+      const sinceOf = (why: any, t: number) => (why?.since != null ? Math.max(1, Math.round((t - why.since) / 60e3)) : null);
+      const incOf = (why: any) => (why?.inc != null && why.inc >= 0 ? model.incs[why.inc] : null);
+      function peekStatus(r: any, s: any, t: number) {
+        let line = `<span class="lv-pk-st" data-st="${s.st}">${STW[s.st]}${s.call ? ', on a call' : ''}</span>`;
+        if (s.st === 'problem') {
+          const m = sinceOf(s.why, t), inc = incOf(s.why);
+          line += `<small>${esc(reason(r, s.why))}${m ? `, for ${span(m)}` : ''}</small>`;
+          if (inc) line += `<a href="${esc(inc.to)}">${esc(inc.no)}, ${esc(inc.state.toLowerCase())}<small>${esc(inc.title)}</small></a>`;
+        } else if (s.st === 'closed') {
+          line += `<small>${r.home ? 'Outside working hours at home' : 'The office is closed'}</small>`;
+        } else if (!r.home) {
+          const u = roomUntil(r, t);
+          const at = u.t ? hhmm(r.tz, u.t) : null;
+          line += `<small>${s.use ? (at ? `Until about ${at} local` : '') : at ? `Free until ${at} local` : 'Free for the rest of the day'}</small>`;
+        }
+        return line;
+      }
+      function paint(el: HTMLElement, i: number, s: any, t: number) {
+        const r = model.rooms[i];
+        el.dataset.st = s.st; el.setAttribute('data-f-status', s.st);
+        if (s.call) el.setAttribute('data-call', ''); else el.removeAttribute('data-call');
+        if (el.tagName === 'A') {
+          el.setAttribute('aria-label', `${roomName(r)}: ${STW[s.st].toLowerCase()}${s.call ? ', on a call' : ''}${s.st === 'problem' ? `, ${reason(r, s.why).toLowerCase()}` : ''}`);
+          const tpl = el.querySelector('template') as HTMLTemplateElement | null;
+          const pk = tpl?.content.querySelector('[data-pk]');
+          if (pk) pk.innerHTML = peekStatus(r, s, t);
+          repeek(el);
+        }
+      }
+
+      // ---- The first moment ----
+      let snap = snapshot(model, tickOf(Date.now()));
+      const bound = !!bar?.rsFilter;
+      model.rooms.forEach((r: any, i: number) => {
+        const el = els.get(i); if (!el) return;
+        if (bound) { const n = el.cloneNode(true) as HTMLElement; paint(n, i, snap.rooms[i], snap.t); el.replaceWith(n); els.set(i, n); }
+        else paint(el, i, snap.rooms[i], snap.t);
+      });
+
+      // ---- Offices: clock, open or closed, and counts of what shows ----
+      const nextAt = new Map<number, number | null>();
+      function openText(s: any, si: number, t: number) {
+        const open = snap.sites[si];
+        if (!nextAt.has(si) || (nextAt.get(si) ?? Infinity) <= t) nextAt.set(si, nextSwitch(s.tz, t, OFFICE_HOURS));
+        const at = nextAt.get(si);
+        if (!at) return open ? 'Open' : 'Closed';
+        const lt = local(s.tz, at), today = local(s.tz, t).dow === lt.dow && at - t < 864e5;
+        const hm = hhmm(s.tz, at);
+        return open ? `Open until ${hm}` : `Closed, opens ${today ? '' : DAY[lt.dow] + ' '}${hm}`;
+      }
+      // A count in a site's header opens that site's rooms in that state, with the other filters kept.
+      function stateHref(sid: string, st: string) {
+        const q = new URLSearchParams(location.search); q.set('site', sid); q.set('status', st);
+        return '?' + q.toString().replace(/%2C/g, ',');
+      }
+      function paintRows(t: number) {
+        for (const row of rows) {
+          const si = +row.dataset.site!, s = model.sites[si];
+          const items = [...row.querySelectorAll('[data-fi]')].filter((el) => !el.classList.contains('fb-out')) as HTMLElement[];
+          const n: Record<string, number> = { use: 0, free: 0, problem: 0, closed: 0, call: 0 };
+          for (const el of items) { n[el.dataset.st!]++; if (el.hasAttribute('data-call')) n.call++; }
+          if (row.classList.contains('lv-home')) {
+            row.querySelectorAll('[data-bar] i').forEach((b: any) => { b.style.flexGrow = String(n[b.dataset.st]); b.title = `${n[b.dataset.st]} ${STW[b.dataset.st].toLowerCase()}`; });
+            (row.querySelector('[data-hn]') as HTMLElement).textContent = `${items.length} home ${items.length === 1 ? 'office' : 'offices'}${items.length < row.querySelectorAll('[data-fi]').length ? ' match' : ''}`;
+            (row.querySelector('[data-hcounts]') as HTMLElement).innerHTML = ['use', 'free', 'problem', 'closed'].filter((k) => n[k]).map((k) => `<a href="${esc(stateHref(row.dataset.sid!, k))}"><span><i class="lv-sw" data-st="${k}"></i>${n[k]} ${k === 'problem' ? 'with a problem' : STW[k].toLowerCase()}</span></a>`).join('') || '<span>None match</span>';
+            const probs = items.filter((el) => el.dataset.st === 'problem').map((el) => model.rooms[+el.dataset.i!]);
+            const hp = row.querySelector('[data-hprob]') as HTMLElement;
+            hp.hidden = !probs.length;
+            hp.innerHTML = probs.map((r: any) => `<a href="${roomHref(r)}"><i class="lv-sw" data-st="problem"></i>${esc(r.n)}: ${esc(reason(r, snap.rooms[model.rooms.indexOf(r)].why))}</a>`).join('');
+          } else {
+            (row.querySelector('[data-clock]') as HTMLElement).textContent = hhmm(s.tz, t);
+            const op = row.querySelector('[data-open]') as HTMLElement;
+            op.textContent = openText(s, si, t); op.dataset.open = snap.sites[si] ? '1' : '0';
+            row.classList.toggle('is-closed', !snap.sites[si]);
+            // Each count opens this office's rooms in that state, in the tiles above (rule P10).
+            const at = (st: string, text: string) => `<a href="${esc(stateHref(row.dataset.sid!, st))}">${text}</a>`;
+            const bits = snap.sites[si] ? [at('use', `${n.use} in use`), at('free', `${n.free} free`)] : [];
+            if (n.call) bits.push(`${n.call} on a call`);
+            if (n.problem) bits.push(at('problem', `<b>${n.problem} with a problem</b>`));
+            (row.querySelector('[data-counts]') as HTMLElement).innerHTML = bits.join(' · ') || `${items.length} ${items.length === 1 ? 'room' : 'rooms'}`;
+          }
+        }
+      }
+
+      // ---- The band ----
+      let firstNumbers = true;
+      const lastN: Record<string, string> = {};
+      function number(id: string, v: string, tone?: string) {
+        if (!W.rsKeyNumber) return;
+        W.rsKeyNumber(id, v, tone !== undefined ? { tone } : undefined);
+        if (!firstNumbers && lastN[id] !== v && W.rsMarkChanged) W.rsMarkChanged(document.querySelector(`.kn-i[data-kn="${id}"]`));
+        lastN[id] = v;
+      }
+      function paintNumbers() {
+        const n: Record<string, number> = { use: 0, free: 0, problem: 0, closed: 0 };
+        // Every room, home offices too, as the Status filter counts them: "In use now" opens ?status=use showing the same number.
+        model.rooms.forEach((r: any, i: number) => { n[snap.rooms[i].st]++; });
+        const offices = model.sites.map((s: any, i: number) => ({ s, i })).filter((x: any) => !x.s.remote && x.s.tz && model.rooms.some((r: any) => r.site === x.i));
+        const open = offices.filter((x: any) => snap.sites[x.i]).length;
+        number('lv-use', String(n.use)); number('lv-free', String(n.free));
+        number('lv-problem', String(n.problem), n.problem ? 'bad' : '');
+        number('lv-open', `${open} of ${offices.length}`);
+        // Region tiles: the same counts per region (home offices included, as the Status filter counts them).
+        root.querySelectorAll('[data-rg]').forEach((tile: HTMLElement) => {
+          const g = tile.dataset.rg;
+          let use = 0, prob = 0;
+          model.rooms.forEach((r: any, i: number) => {
+            if (model.sites[r.site].region !== g) return;
+            if (snap.rooms[i].st === 'use') use++;
+            if (snap.rooms[i].st === 'problem') prob++;
+          });
+          const set = (sel: string, v: string) => {
+            const el = tile.querySelector(sel) as HTMLElement;
+            if (el.textContent === v) return;
+            el.textContent = v;
+            if (!firstNumbers && W.rsMarkChanged) W.rsMarkChanged(el);
+          };
+          set('[data-rg-use]', String(use)); set('[data-rg-problem]', String(prob));
+          set('[data-rg-open]', String(offices.filter((x: any) => x.s.region === g && snap.sites[x.i]).length));
+          (tile.querySelector('[data-rg-problem]') as HTMLElement).classList.toggle('bad', prob > 0);
+        });
+        firstNumbers = false;
+      }
+
+      // ---- Needs attention ----
+      function attRows(t: number) {
+        const out: any[] = [];
+        model.rooms.forEach((r: any, i: number) => {
+          const s = snap.rooms[i]; if (s.st !== 'problem') return;
+          const site = siteOf(r), m = sinceOf(s.why, t), inc = incOf(s.why);
+          const rank = s.why.rank, pri = inc ? inc.pri : 9;
+          out.push({
+            key: r.id, rank, sort: `${rank}${pri}${String(1e6 - (m ?? 0)).padStart(7, '0')}${roomName(r)}`,
+            find: `${roomName(r)} ${site.name} ${r.town ?? ''} ${reason(r, s.why)}`, region: site.region, site: site.id, kind: r.kind,
+            html: `<i data-r="${rank}" aria-hidden="true"></i><span class="lv-ar-b"><a href="${roomHref(r)}">${esc(roomName(r))}</a><small><b>${esc(reason(r, s.why))}</b> · ${esc(site.name)}</small></span>` +
+              `<span class="lv-ar-e">${m ? `<span>${span(m)}</span>` : ''}${inc ? `<a href="${esc(inc.to)}" title="${esc(inc.title)}">${esc(inc.no)}</a>` : ''}</span>`,
+          });
+        });
+        return out.sort((a, b) => (a.sort < b.sort ? -1 : 1));
+      }
+      let lastAtt: any[] = [];
+      function paintAttention(t: number, animate: boolean) {
+        lastAtt = attRows(t);
+        syncList(attList, lastAtt, () => { const li = document.createElement('li'); li.className = 'lv-ar'; return li; }, { animate });
+        filterAttention();
+      }
+      function filterAttention() {
+        const f = filterOf(bar, ['region', 'site', 'kind']);
+        let shown = 0;
+        const byKey = new Map(lastAtt.map((r) => [r.key, r]));
+        [...attList.children].forEach((li: any) => { const r = byKey.get(li.dataset.vk); const ok = !!r && visible(r, f); li.hidden = !ok; if (ok) shown++; });
+        root.querySelector('[data-att-none]').hidden = shown > 0;
+        root.querySelector('[data-att-n]').textContent = shown ? `${shown} ${shown === 1 ? 'room' : 'rooms'}` : '';
+        document.dispatchEvent(new CustomEvent('rs:sa-refresh'));
+      }
+
+      // ---- Happening now ----
+      let feed: any[] = [];
+      let seq = 0;
+      function describe(e: any) {
+        if (e.site != null) {
+          const s = model.sites[e.site];
+          return { key: `e${seq++}`, t: e.t, k: e.k, href: '#sites', text: `<b>${esc(s.name)}</b> ${e.k === 'open' ? 'opened for the day' : 'closed for the day'}`, sub: s.city ?? '', find: `${s.name} ${s.city ?? ''}`, region: s.region, site: s.id, kind: ['meeting', 'small', 'shared', 'desks'] };
+        }
+        if (e.room == null) return null;
+        const r = model.rooms[e.room], s = siteOf(r), name = `<b>${esc(roomName(r))}</b>`;
+        const text = e.k === 'use' ? `${name} in use` : e.k === 'free' ? `${name} free again` : e.k === 'call-on' ? `Call started in ${name}` : e.k === 'call-off' ? `Call ended in ${name}`
+          : e.k === 'problem' ? `Problem in ${name}: ${esc(reason(r, e.why).replace(/^./, (c: string) => c.toLowerCase()))}` : `${name} back to normal`;
+        return { key: `e${seq++}`, t: e.t, k: e.k, href: roomHref(r), text, sub: r.home ? `${s.name}${r.town ? ', ' + r.town : ''}` : s.name, find: `${roomName(r)} ${s.name} ${r.town ?? ''}`, region: s.region, site: s.id, kind: r.kind };
+      }
+      const makeEv = (x: any) => {
+        const li = document.createElement('li');
+        li.className = 'lv-ev'; li.dataset.k = x.k; li.dataset.t = String(x.t);
+        li.innerHTML = `<span class="lv-et">${clock(x.t)}</span><i class="lv-ek" aria-hidden="true"></i><a class="lv-eb" href="${x.href}"><span>${x.text}</span><small>${esc(x.sub)} · <span data-ago>${ago(x.t, snap.t)}</span></small></a>`;
+        return li;
+      };
+      function renderFeed() {
+        const f = filterOf(bar, ['region', 'site', 'kind']);
+        const list = feed.filter((x) => visible(x, f)).slice(-FEED).reverse();
+        feedList.replaceChildren(...list.map(makeEv));
+        root.querySelector('[data-feed-none]').hidden = list.length > 0;
+      }
+      function addToFeed(evs: any[]) {
+        const fresh = evs.map(describe).filter(Boolean);
+        if (!fresh.length) return;
+        feed.push(...fresh); if (feed.length > KEEP) feed = feed.slice(-KEEP);
+        const f = filterOf(bar, ['region', 'site', 'kind']);
+        const show = fresh.filter((x) => visible(x, f)).slice(-FEED).reverse();
+        if (show.length) { pushFeed(feedList, show, makeEv, FEED); root.querySelector('[data-feed-none]').hidden = true; }
+      }
+      function paintAgo(t: number) {
+        feedList.querySelectorAll('[data-ago]').forEach((el: any) => { el.textContent = ago(+el.closest('.lv-ev').dataset.t, t); });
+        root.querySelector('[data-feed-clock]').textContent = `As of ${clock(t)}`;
+      }
+      // The last few minutes, so the feed starts full: back 15 minutes, further if it is quiet.
+      (function prefill() {
+        let from = snap.t - BACK, evs = eventsBetween(model, from, snap.t);
+        while (evs.filter((e: any) => e.site != null || e.room != null).length < FEED && snap.t - from < 60 * 60e3) {
+          const older = eventsBetween(model, from - BACK, from); from -= BACK; evs = [...older, ...evs];
+        }
+        feed = evs.map(describe).filter(Boolean).slice(-KEEP);
+      })();
+
+      // ---- Sort: offices with something wrong first, by site, or busiest first. Home offices keep their order. ----
+      function reorder(v: string) {
+        const box = root.querySelector('[data-rows="office"]');
+        const list = [...box.children] as HTMLElement[];
+        const key = (row: HTMLElement) => {
+          const si = +row.dataset.site!;
+          const idx = [...row.querySelectorAll('[data-fi]')].map((el: any) => +el.dataset.i);
+          const prob = idx.filter((i) => snap.rooms[i].st === 'problem').length, use = idx.filter((i) => snap.rooms[i].use).length / (idx.length || 1);
+          return v === 'busy' ? [-use, si] : v === 'site' ? [si] : [-prob, snap.sites[si] ? 0 : 1, si];
+        };
+        list.map((row) => ({ row, k: key(row) })).sort((a, b) => { for (let i = 0; i < a.k.length; i++) if (a.k[i] !== b.k[i]) return a.k[i] - b.k[i]; return 0; }).forEach((x) => box.appendChild(x.row));
+      }
+
+      // ---- Each tick ----
+      function tick(t: number) {
+        if (t <= snap.t) { paintAgo(Date.now()); return; }
+        const from = Math.max(snap.t, t - BACK);
+        const evs = t - from > TICK_MS ? eventsBetween(model, from, t) : null;
+        const next = snapshot(model, t);
+        const changed: HTMLElement[] = [];
+        let statusMoved = false;
+        const prev = snap;
+        snap = next;
+        steady(() => {
+          model.rooms.forEach((r: any, i: number) => {
+            const a = prev.rooms[i], b = next.rooms[i];
+            const el = els.get(i); if (!el) return;
+            if (a.st !== b.st) {
+              const n = refresh(el, (x: HTMLElement) => paint(x, i, b, t)); els.set(i, n); statusMoved = true;
+              if (n.tagName === 'A') changed.push(n);
+            } else if (a.call !== b.call || (b.st === 'problem' && JSON.stringify(a.why) !== JSON.stringify(b.why))) {
+              paint(el, i, b, t); if (el.tagName === 'A') changed.push(el);
+            } else if (el.tagName === 'A' && t % 60e3 < TICK_MS) paint(el, i, b, t);
+          });
+        });
+        changed.forEach(ping);
+        if (statusMoved && bar?.rsFilter && bar.rsFilter.get('status').length) bar.rsFilter.run(true);
+        paintRows(t); paintNumbers(); paintAttention(t, true);
+        addToFeed(evs ?? diff(model, prev, next));
+        paintAgo(t);
+      }
+
+      // ---- Start ----
+      paintRows(snap.t); paintNumbers(); paintAttention(snap.t, false); renderFeed(); paintAgo(snap.t);
+      const onChange = () => { paintRows(snap.t); filterAttention(); renderFeed(); };
+      const start = () => {
+        if (!bar?.rsFilter) return;
+        bar.addEventListener('fb:change', onChange);
+        bar.addEventListener('fb:sort', (e: any) => bar.rsFilter.run(true, () => reorder(e.detail.value)));
+        reorder(bar.rsFilter.sort());
+        bar.rsFilter.run(false);
+      };
+      if (bar?.rsFilter) start(); else document.addEventListener('DOMContentLoaded', start, { once: true });
+      cleanups.push(every(tick));
+      cleanups.push(stickSide(side));
+      const pause = () => document.querySelector('[data-lv-live]')?.classList.toggle('lv-paused', document.hidden);
+      document.addEventListener('visibilitychange', pause);
+      cleanups.push(() => document.removeEventListener('visibilitychange', pause));
+      document.addEventListener('astro:before-swap', () => { cleanups.forEach((f) => f()); }, { once: true });
+    }
+    init();
+    document.addEventListener('astro:page-load', init);
+  </script>
+</Shell>
+
+<style>
+  /* Region tiles: three across, then one a row on a narrow page. */
+  .lv-regions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .lv-rg { display: grid; gap: 10px; padding: 14px 16px; align-content: start; }
+  .lv-rg-h { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+  .lv-rg-n { display: inline-flex; gap: 6px; align-items: baseline; color: var(--ink); text-decoration: none; font: 700 17px/1.2 var(--font-display); }
+  .lv-rg-n span { color: var(--text-2); transition: transform var(--dur-state) var(--ease-settle); }
+  .lv-rg-n:hover span { transform: translateX(3px); }
+  .lv-rg-o { font-size: 12.5px; color: var(--text-2); text-decoration: none; font-variant-numeric: tabular-nums; }
+  .lv-rg-o:hover { text-decoration: underline; }
+  .lv-rg-k { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+  .lv-rg-k div { display: grid; gap: 2px; min-width: 0; }
+  .lv-rg-k dt { font-size: 12px; color: var(--text-2); }
+  .lv-rg-k dd { margin: 0; }
+  .lv-rg-k a { font: 700 20px/1.1 var(--font-display); color: var(--ink); text-decoration: none; font-variant-numeric: tabular-nums; }
+  .lv-rg-k a:hover { text-decoration: underline; }
+  .lv-rg-k a.bad { color: var(--red-ink); }
+  @container lvmain (max-width: 719px) { .lv-regions { grid-template-columns: minmax(0, 1fr); } }
+  @media (prefers-reduced-motion: reduce) { .lv-rg-n span { transition: none; } }
+
+  /* Home offices: a bar of states, the counts, and any that has a problem by name. */
+  .lv-home { align-items: center; }
+  .lv-hb { display: grid; gap: 6px; min-width: 0; }
+  .lv-bar { display: flex; gap: 2px; height: 12px; border-radius: 6px; overflow: hidden; background: var(--surface-2); }
+  .lv-bar i { flex: 0 1 0; min-width: 0; transition: flex-grow var(--dur-fill) var(--ease-settle); }
+  .lv-bar i[data-st=use] { background: var(--blue); } .lv-bar i[data-st=free] { background: var(--green-soft); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--green) 60%, transparent); }
+  .lv-bar i[data-st=problem] { background: var(--red); } .lv-bar i[data-st=closed] { background: repeating-linear-gradient(135deg, var(--surface-2) 0 3px, var(--surface-3) 3px 6px); }
+  .lv-hcounts { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; font-size: 12.5px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .lv-hcounts :global(span) { display: inline-flex; align-items: center; gap: 6px; }
+  .lv-hprob { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; font-size: 12.5px; }
+  .lv-hprob[hidden] { display: none; }
+  .lv-hprob :global(a) { display: inline-flex; align-items: center; gap: 6px; color: var(--red-ink); font-weight: 650; text-decoration: none; }
+  .lv-hprob :global(a:hover) { text-decoration: underline; }
+  .lv-hidden-items { display: none; }
+
+</style>

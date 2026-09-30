@@ -1,0 +1,70 @@
+# An IT store's stock rules: the least to keep of each model, and the counted stock (cords, mounts and parts
+# that carry no serial number). One file per office (data/spares/<site>.yaml). Demo data: the counts are made up.
+#
+# The spare UNITS are not here. They are units with the status Spare in the store room's install
+# (data/installs/<site>/<store>.yaml, spare_units), so each has a serial, an asset tag and a unit page.
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/spares
+title: IT store stock rules at an office
+type: object
+additionalProperties: false
+required: [site, store, last_counted, minimums, consumables, demo]
+properties:
+  site: { description: "The office's site id, the same as the file name.", type: string }
+  store: { description: "The IT store's room (a file in data/spaces/<site>/ whose room profile is it-store).", type: string }
+  last_counted: { description: "When the shelves were last counted for the units.", type: string, format: date }
+  demo: { const: true }
+  minimums:
+    description: "Keep at least this many spare units of a model in the store. Below it the model shows as low."
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, model, minimum]
+      properties:
+        id: { description: "Unique across all offices, for example dub-sp-01.", type: string, pattern: "^[a-z]{3}-sp-[0-9]{2,3}$" }
+        model: { description: "The device model (a file in data/device-models).", type: string }
+        minimum: { type: integer, minimum: 0 }
+        notes: { type: string }
+  consumables:
+    description: "Counted stock without serial numbers, kept in the store."
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, what, kind, quantity, minimum, where, last_counted]
+      properties:
+        id: { type: string, pattern: "^[a-z]{3}-sp-[0-9]{2,3}$" }
+        what: { description: "What it is, in words a technician would use.", type: string, minLength: 3 }
+        kind: { enum: [device, module, power, accessory] }
+        part_number: { type: string }
+        quantity: { description: "How many are on the shelf now.", type: integer, minimum: 0 }
+        minimum: { description: "The least to keep. Below this the line shows as low.", type: integer, minimum: 0 }
+        where:
+          description: "Which cabinet and shelf of the store it is kept on."
+          type: object
+          additionalProperties: false
+          required: [cabinet, shelf]
+          properties:
+            cabinet: { type: string }
+            shelf: { type: string }
+        last_counted: { type: string, format: date }
+        notes: { type: string }
+  retired:
+    description: "Lines the store no longer stocks. Kept for the record, left out of stock and warnings."
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, what, archived]
+      properties:
+        id: { type: string, pattern: "^[a-z]{3}-sp-[0-9]{2,3}$" }
+        what: { type: string }
+        model: { type: string }
+        archived:
+          type: object
+          additionalProperties: false
+          required: [date, reason]
+          properties:
+            date: { type: string, format: date }
+            reason: { type: string }

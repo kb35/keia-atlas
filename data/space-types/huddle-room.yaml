@@ -1,0 +1,288 @@
+# Space type: Huddle room
+# Based on public industry guidance (data/sources/room-guidance.yaml, decision 0006); house assumptions say so.
+# Keia part (profile to verification_model): which classes of device belong here.
+# Keia Atlas part: build options, the models each option names, and the outlets.
+
+schema: composite-profile
+
+profile:
+  name: Huddle room
+  space_type: huddle-room
+  version: "2.0"
+  last_updated: "2026-09-30"
+  owner: Keia Atlas maintainers
+  capacity: "4-5 people"
+  purpose: >-
+    Bookable small video room inside a neighbourhood. People join from the room system or
+    bring their own meeting on a laptop.
+
+sources:
+  - file: data/sources/room-guidance.yaml
+    provides: 'Public guidance for this space type: size, capacity, display size, kit class and outlets'
+  - file: data/device-classes/display.yaml
+    provides: Healthy state for the display class
+  - file: data/device-classes/video-bar.yaml
+    provides: Healthy state for the video bar class
+  - file: data/device-classes/touch-controller.yaml
+    provides: Healthy state for the touch controller class
+  - file: data/device-classes/scheduler-panel.yaml
+    provides: Healthy state for the scheduler panel class
+  - file: data/device-classes/adapter.yaml
+    provides: Healthy state for the adapter class
+
+equipment_categories:
+  - category: display
+    description: Screens for the far end and shared content
+    object_profile: data/device-classes/display.yaml
+    quantity: "1"
+  - category: video_conferencing
+    description: Video bar that runs meetings, or acts as the camera and speaker for a laptop
+    object_profile: data/device-classes/video-bar.yaml
+    quantity: "1"
+  - category: meeting_control
+    description: Touchscreen on the table that controls meetings
+    object_profile: data/device-classes/touch-controller.yaml
+    quantity: "1"
+  - category: scheduling_panel
+    description: Booking panel at the door
+    object_profile: data/device-classes/scheduler-panel.yaml
+    quantity: "1"
+    notes: Optional in every build of this space type
+  - category: adapters
+    description: Scalers, converters, PoE injectors and single-cable USB-C adapters
+    object_profile: data/device-classes/adapter.yaml
+    quantity: "2"
+
+verification_model:
+  platforms_to_check:
+    - platform: keia_atlas
+      check: every required device in the chosen option is recorded in the space and wired
+        as the option says
+    - platform: inventory
+      check: every device has an active record in this space
+    - platform: dhcp_dns
+      check: every networked device has an address reservation and DNS records
+    - platform: device_management
+      check: meeting devices are online, paired and on standard firmware
+    - platform: room_booking
+      check: the room resource exists with the right capacity and is linked to its devices
+
+keia_atlas:
+  standard: industry
+  guideline: zoom-huddle-space
+  category: connect
+  bookable: true
+  capacity:
+    min: 4
+    max: 5
+  area:
+    sq_ft: 120
+    m2: 11.14
+  geometry:
+    # The room shell for a floor-level 3D model; basis says where each value comes from.
+    width_m: 3.05
+    depth_m: 3.66
+    ceiling_m: 2.6
+    display_wall: back
+    door: { wall: left, from_m: 2.56, to_m: 3.46 }
+    data_entry: { via: ceiling, wall: left, at: above the door }
+    containment: [display-track, ceiling-basket, wall-pass-through, table-tray]
+    basis:
+      size: chosen
+      ceiling: house-default
+      door: house-default
+      data_entry: house-default
+      containment: house-default
+    notes:
+      - 10 x 12 ft, between Microsoft's focus room (10 x 9 ft) and small room (16 x 16 ft) (house assumption).
+  options:
+    - id: room-system
+      name: Room system
+      summary: Video bar runs meetings itself; a laptop can also use it as its camera and
+        speaker over one USB-C cable.
+      equipment:
+        - key: display
+          class: display
+          quantity: 1
+          requirement: required
+          location: display-wall
+          sizes_in: [43, 50]
+        - key: video-bar
+          class: video-bar
+          model: poly-studio-x32
+          quantity: 1
+          requirement: required
+          location: display-wall
+        - key: touch-controller
+          class: touch-controller
+          model: poly-tc10
+          quantity: 1
+          requirement: required
+          location: wall-below-table
+        - key: poe-injector
+          class: adapter
+          model: poly-poe-injector
+          role: Powers the video bar (needs its own extra patch cable)
+          quantity: 1
+          requirement: required
+          location: behind-display
+        - key: usb-c-adapter
+          class: adapter
+          model: sct-usb-pdi-100
+          role: Single USB-C cable for laptop video, USB and charging
+          quantity: 1
+          requirement: required
+          location: behind-display
+        - &id001
+          key: scheduler-panel
+          class: scheduler-panel
+          model: logitech-tap-scheduler
+          quantity: 1
+          requirement: optional
+          location: room-entrance
+      infrastructure:
+        - service: power
+          provided_by: it
+          quantity: 4
+          location: behind-display
+          serves: [display, PoE injector, USB-C adapter, spare]
+        - service: power
+          provided_by: facilities
+          quantity: 4
+          location: wall-below-table
+          height_mm: 610
+          notes: For people in the room. A recommendation; facilities decide.
+        - service: data
+          provided_by: it
+          quantity: 3
+          location: behind-display
+          serves: [display, video bar, spare]
+        - service: data
+          provided_by: it
+          quantity: 2
+          location: wall-below-table
+          height_mm: 610
+          serves: [touch controller, spare]
+        - service: data
+          provided_by: it
+          quantity: 1
+          location: room-entrance
+          serves: [scheduler panel (optional)]
+      wiring:
+        - from: video-bar.hdmi-out-1
+          to: display.hdmi-in-1
+          cable: hdmi
+        - from: poe-injector.lan-2
+          to: video-bar.lan-1
+          cable: cat6a
+          notes: PoE++ to the video bar
+        - from: poe-injector.lan-1
+          to: outlet:data/behind-display#2
+          cable: cat6a
+        - from: display.lan-1
+          to: outlet:data/behind-display#1
+          cable: cat6
+        - from: touch-controller.lan-1
+          to: outlet:data/wall-below-table#1
+          cable: cat6
+        - from: usb-c-adapter.hdmi-out-1
+          to: video-bar.hdmi-in-1
+          cable: hdmi
+        - from: usb-c-adapter.usb-a-1
+          to: video-bar.usb-c-1
+          cable: usb
+          notes: Device mode
+        - from: usb-c-adapter.usb-c-1
+          to: laptop
+          cable: usb-c
+          notes: One cable for video, USB and charging, through the wall pass-through
+        - from: display.power-in
+          to: outlet:power/behind-display#1
+          cable: power
+        - from: poe-injector.power-in
+          to: outlet:power/behind-display#2
+          cable: power
+        - from: usb-c-adapter.usb-c-2
+          to: outlet:power/behind-display#3
+          cable: power
+          notes: Through the adapter's own USB-C power supply
+        - from: scheduler-panel.lan-1
+          to: outlet:data/room-entrance#1
+          cable: cat6
+    - id: byom
+      name: Bring your own meeting
+      summary: People run the meeting on their own laptop and use the room camera, microphones
+        and speakers over USB.
+      equipment:
+        - key: display
+          class: display
+          quantity: 1
+          requirement: required
+          location: display-wall
+          sizes_in: [43, 50]
+        - key: video-bar
+          class: video-bar
+          model: logitech-meetup-2
+          quantity: 1
+          requirement: required
+          location: display-wall
+          notes: Above or below the display, used over USB from a laptop
+        - *id001
+      infrastructure:
+        - service: power
+          provided_by: it
+          quantity: 4
+          location: behind-display
+          serves: [video bar, display, spare, spare]
+        - service: power
+          provided_by: facilities
+          quantity: 4
+          location: wall-below-table
+          height_mm: 610
+          notes: For people in the room. A recommendation; facilities decide.
+        - service: data
+          provided_by: it
+          quantity: 3
+          location: behind-display
+          serves: [video bar, display, spare]
+        - service: data
+          provided_by: it
+          quantity: 1
+          location: room-entrance
+          serves: [scheduler panel (optional)]
+      wiring:
+        - from: video-bar.hdmi-out-1
+          to: display.hdmi-in-1
+          cable: hdmi
+        - from: video-bar.usb-c-1
+          to: laptop
+          cable: usb-c
+        - from: video-bar.lan-1
+          to: outlet:data/behind-display#1
+          cable: cat6
+        - from: display.lan-1
+          to: outlet:data/behind-display#2
+          cable: cat6
+        - from: video-bar.power-in
+          to: outlet:power/behind-display#1
+          cable: power
+        - from: display.power-in
+          to: outlet:power/behind-display#2
+          cable: power
+        - from: scheduler-panel.lan-1
+          to: outlet:data/room-entrance#1
+          cable: cat6
+  notes:
+    - The display is on the wall diagonally opposite the door (house layout).
+    - 'Size and capacity: a huddle room. Zoom''s huddle space takes up to 7 people with a 55 in
+      display and an all-in-one bar; this one seats 4 or 5 at a table (house assumption).'
+    - 'Display size: AVIXA DISCAS basic decision making, text at 3 percent of the image height
+      (house assumption), so the image is at least a sixth of the distance to the farthest seat.
+      That seat is about 2.6 m from the display here, so the display is at least 35 in. 43 or 50
+      in.'
+    - 'Kit class: the Poly Studio X32, which Poly makes for small rooms with pickup to 15 ft (4.6
+      m), or Logitech MeetUp 2, made for small meeting rooms with pickup to 7 m, for a laptop''s
+      meeting.'
+    - 'Outlets: a data outlet for every networked device plus a spare, at least two wherever data is
+      provided (TIA-568 asks for two per work area), and one at the door for a booking panel (house
+      assumption). Power for the room''s kit is never on a light switch (house assumption).'

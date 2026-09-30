@@ -1,0 +1,48 @@
+# Configuration: UniFi Express 7 remote worker gateway. Setting names, menu paths and defaults are the vendor's (cited per setting);
+# the values and reasons are Aigna's (demo). Researched from vendor documents, Sept 2026.
+id: unifi-express-7-remote-gateway
+name: UniFi Express 7 remote worker gateway
+models: [unifi-express-7]
+mode: Remote/home worker gateway
+version: '1.0'
+owner: marco
+updated: '2026-09-28'
+firmware: 5.1.12
+summary: Aigna adopts every remote worker's UX7 into the network team's UniFi console under an Aigna UI account, gives the worker their own isolated
+  network, and leaves it on the official update channel with automatic updates off.
+managed_by: UniFi Network app
+steps: [Connect the 10GbE port to the home internet router or ONT (the default WAN port); power over the included USB-C adapter., Adopt the gateway into
+    the site's console from the UniFi Mobile App over WiFi or Bluetooth., 'Sign the adoption in with an Aigna UI account, not a local-only login.', Create
+    the worker's own network (VLAN) and confirm DHCP is serving the 2.5GbE LAN port., Set the release channel to Official with automatic updates off., Confirm
+    the gateway shows as adopted and online in Site Manager.]
+groups:
+- name: Adoption
+  where: UniFi Mobile App
+  settings:
+  - {name: Adopt device, value: Adopt into the worker's site from Pending Adoption, action: change, layer: profile, why: Links the gateway to the UniFi
+      application that manages it; until adopted it only shows as Pending Adoption and takes no policy., source: unifi-device-adoption}
+  - {name: UI Account, value: 'An Aigna UI account, not a local-only login', action: change, layer: profile, why: 'Enables remote management from Site
+      Manager and automatic system backups, so the gateway can be supported without a visit to the worker''s home.', source: unifi-how-to-set-up-unifi}
+- name: WAN and LAN
+  where: UniFi Network app
+  settings:
+  - {name: WAN port, value: 10GbE port (factory default WAN); connect the home internet uplink here, action: verify, layer: naming-network, why: The 10GbE
+      port is the default WAN port out of the box; Aigna keeps the default rather than reassigning it in software., source: unifi-express-7-installation-guide}
+  - {derive: as-written, name: LAN network, value: 'The worker''s own network, DHCP on, over the 2.5GbE port', per_device: true, action: verify, layer: naming-network, why: The
+      2.5GbE port is LAN by default; the worker's own devices reach it over DHCP with no static addressing needed at a home site., source: unifi-vlan-creating-virtual-networks}
+- name: Networks
+  where: UniFi Network app
+  settings:
+  - {derive: on-site, name: Create Virtual Network, path: Settings > Networks > Create New Network, value: 'One network per remote worker, VLAN ID from Aigna''s naming
+      scheme, DHCP on', per_device: true, action: change, layer: naming-network, why: 'Keeps a remote worker''s home network isolated from anything else
+      on their router, the same way a site VLAN would.', source: unifi-vlan-creating-virtual-networks}
+- name: Updates
+  where: UniFi Network app
+  settings:
+  - {name: Release channel and automatic updates, path: Settings > Control Plane > Updates, value: 'Official channel, automatic updates off', action: change,
+    layer: profile, why: Aigna tests firmware in the Lab before it reaches a remote worker's gateway; the Early Access channel is never used at a home
+      site., source: unifi-updates-control-plane}
+gaps: [No documented default admin credentials or password-complexity rule specific to the UX7; it's set up through UI account sign-in rather than a local
+    admin password., The exact wording of the auto-update toggle (e.g. Off / Notify / All) isn't given by the help article read; only that it lives under
+    Settings > Control Plane > Updates., The firmware version cited (5.1.12) comes from a community release-notes page title; Ubiquiti doesn't publish a
+    single canonical 'current version' page for this model.]

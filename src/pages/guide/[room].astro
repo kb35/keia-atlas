@@ -1,0 +1,233 @@
+---
+// The room guide: what the QR code on a room's table opens. Phone first, one page, plain words.
+// Order: what we already know is wrong (if anything), the room, the two actions (report, request), then how
+// to start a meeting, share a screen and use the touch panel, from the room's own data (src/lib/guide.mjs).
+import Guide from '../../layouts/Guide.astro';
+import RoomScene from '../../components/RoomScene.astro';
+import DeviceArt from '../../components/DeviceArt.astro';
+import GuideLive from '../../components/GuideLive.astro';
+import { spaces, sites, KIND, href } from '../../lib/data.mjs';
+import { incidentList, byUrgency } from '../../lib/incidents.mjs';
+import { roomGuide, knownWords, GUIDE_KINDS, PLATFORMS } from '../../lib/guide.mjs';
+
+export function getStaticPaths() {
+  return Object.keys(spaces).filter((id) => GUIDE_KINDS.includes(KIND(spaces[id]))).map((room) => ({ params: { room } }));
+}
+const { room } = Astro.params;
+const x = spaces[room];
+const site = sites[x.site];
+const title = x.number ? `${x.number} ${x.name}` : x.name;
+const office = site.city ? `${site.city} office` : site.name;
+const floor = site.floors?.find((f) => f.id === x.floor)?.name;
+const seats = x.type.keia_atlas.capacity?.max;
+const g = roomGuide({ option: x.option, fitted: x.fitted, name: 'the room' });
+const known = incidentList.filter((v) => v.inc.room === room && v.open).sort(byUrgency);
+const pins = known.map((v) => v.sceneKey).filter(Boolean);
+const G = `/guide/${room}/`;
+// Start a meeting shows what runs the call (the video bar or codec); the touch panel has its own card.
+const startArt = g.bar?.model ?? g.monitor?.model;
+const startCls = g.bar?.class ?? g.monitor?.class ?? 'display';
+const sub = [office, floor, seats ? `${seats} seats` : null].filter(Boolean).join(' · ');
+---
+<Guide title={title} office={office} home={G}>
+  <div class="g-room" data-guide-room data-room={room}>
+    <section class="g-known" data-guide-known hidden={known.length === 0} aria-labelledby="g-known-h">
+      <span class="g-known-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3.5l9.5 16.5h-19z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /><path d="M12 10v4.5M12 17.2v.3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" /></svg></span>
+      <div>
+        <h2 id="g-known-h">We know</h2>
+        <ul data-guide-known-static>
+          {known.map((v) => <li><b>{v.inc.short_description}.</b> {knownWords({ state: v.inc.state, priority: v.inc.priority, hold: v.hold?.hold })}</li>)}
+        </ul>
+        <ul data-guide-known-live></ul>
+      </div>
+    </section>
+
+    <section class="g-hero" aria-label="The room">
+      <div class="g-id">
+        <p class="g-over">{x.type.profile.name}</p>
+        <h1 transition:name="g-room-title">{title}</h1>
+        <p class="g-sub">{sub}</p>
+      </div>
+      <div class="g-actions">
+        <a class="g-act bad" href={href(`${G}report/`)}>
+          <span class="g-act-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" /><path d="M12 7.5v5.5M12 16.3v.2" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" /></svg></span>
+          <span><b>Something not working?</b><small>Tell us in two taps</small></span>
+          <span class="g-go" aria-hidden="true">→</span>
+        </a>
+        <a class="g-act" href={href(`${G}request/`)}>
+          <span class="g-act-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" /></svg></span>
+          <span><b>Request something</b><small>Help, a change, or home office kit</small></span>
+          <span class="g-go" aria-hidden="true">→</span>
+        </a>
+      </div>
+      <div class="g-pic" transition:name="g-room-pic">
+        <RoomScene option={x.option} type={x.space_type} fitted={x.fitted} space={x} uid={`g-${room}`} highlight={pins} tone="bad" label={`Drawing of ${title}`} />
+      </div>
+    </section>
+
+    <nav class="g-jump" aria-label="On this page">
+      <a href="#start">Start a meeting</a>
+      {g.share && <a href="#share">Share your screen</a>}
+      {g.panelLines && <a href="#panel">The touch panel</a>}
+    </nav>
+
+    <div class="g-howto">
+      <section class="g-card g-start" id="start" aria-labelledby="h-start">
+        <header><h2 id="h-start">Start a meeting</h2><p>{g.joinLede}</p></header>
+        <div class="g-plat" role="radiogroup" aria-label="Your meeting app">
+          {PLATFORMS.map((p, i) => (
+            <label><input type="radio" name="g-plat" value={p.id} checked={i === 0} data-plat /><span>{p.label}</span></label>
+          ))}
+        </div>
+        <div class="g-how">
+          <div class="g-art" aria-hidden="true"><DeviceArt model={startArt} cls={startCls} small /></div>
+          {PLATFORMS.map((p) => (
+            <ol class="g-steps" data-p={p.id}>{g.join[p.id].map((l) => <li>{l}</li>)}</ol>
+          ))}
+        </div>
+      </section>
+
+      {g.share && (
+        <section class="g-card" id="share" aria-labelledby="h-share">
+          <header><h2 id="h-share">Share your screen</h2><p>{g.share.cable} cable {g.share.where}{g.share.wireless ? ', or without a cable' : ''}.</p></header>
+          <div class="g-how">
+            <div class="g-art" aria-hidden="true">
+              <svg class="g-cable" viewBox="0 0 160 96">
+                <rect x="14" y="18" width="70" height="46" rx="4" class="gc-lid" /><rect x="20" y="24" width="58" height="34" rx="2" class="gc-screen" />
+                <path d="M6 66h86l-6 8H12z" class="gc-base" />
+                <path d="M92 60c18 0 20-22 38-22" class="gc-wire" />
+                <rect x="128" y="31" width="22" height="14" rx="4" class="gc-plug" /><rect x="134" y="36" width="10" height="4" rx="2" class="gc-port" />
+              </svg>
+            </div>
+            <ol class="g-steps">{g.share.lines.map((l) => <li>{l}</li>)}</ol>
+          </div>
+          {g.share.wireless && <p class="g-tip">{g.share.wireless}</p>}
+        </section>
+      )}
+
+      {g.panelLines && (
+        <section class="g-card" id="panel" aria-labelledby="h-panel">
+          <header><h2 id="h-panel">The touch panel</h2><p>On the table, closest to the screen.</p></header>
+          <div class="g-how">
+            <div class="g-art" aria-hidden="true"><DeviceArt model={g.panel.model} cls="touch-controller" small /></div>
+            <ol class="g-steps">{g.panelLines.map((l) => <li>{l}</li>)}</ol>
+          </div>
+        </section>
+      )}
+
+      {(g.door || g.board) && (
+        <section class="g-card g-extra" aria-label="Also in this room">
+          {g.door && <p><b>Booking panel by the door.</b> {g.door.replace(/^The panel by the door /, 'It ')}</p>}
+          {g.board && <p><b>Whiteboard camera.</b> {g.board.replace(/^The camera over the whiteboard /, 'It ')}</p>}
+        </section>
+      )}
+    </div>
+
+    <section class="g-end" aria-label="Still stuck?">
+      <p>Still stuck? The {office} team can help.</p>
+      <a class="btn primary" href={href(`${G}report/`)}>Report a problem</a>
+      <a class="g-staff" href={href(`/rooms/${room}/#room-guide`)}>For IT staff: this room in Keia Atlas</a>
+    </section>
+  </div>
+  <GuideLive />
+  <script is:inline data-astro-rerun>
+    (function () {
+      // Remember the meeting app someone picked, for the next room they scan.
+      var k = 'rs-guide-platform', v = null;
+      try { v = localStorage.getItem(k); } catch (_) {}
+      if (v) { var r = document.querySelector('[data-plat][value="' + v + '"]'); if (r) r.checked = true; }
+      document.querySelectorAll('[data-plat]').forEach(function (r) { r.addEventListener('change', function () { try { localStorage.setItem(k, r.value); } catch (_) {} }); });
+    })();
+  </script>
+</Guide>
+
+<style>
+  .g-room { display: grid; gap: 16px; }
+  /* What we already know: first, calm, specific. */
+  .g-known { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; padding: 14px 16px; border-radius: var(--radius-lg); background: var(--amber-soft); color: var(--amber-ink); border: 1px solid color-mix(in srgb, var(--amber-ink) 25%, transparent); animation: rise var(--dur-enter) var(--ease-settle) backwards; }
+  .g-known-ic svg { width: 26px; height: 26px; }
+  .g-known h2 { font-size: 15px; margin: 2px 0 4px; }
+  .g-known ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 15px; line-height: 1.4; color: var(--text); }
+  .g-known ul:empty { display: none; }
+  .g-known :global(.g-ref) { font: 600 12px/1 var(--font-mono); color: var(--text-3); }
+
+  .g-hero { display: grid; gap: 14px; }
+  .g-over { margin: 0; font: 600 12px/1.2 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+  .g-id h1 { font-size: clamp(28px, 7vw, 40px); line-height: 1.1; margin: 4px 0 4px; letter-spacing: -.01em; }
+  .g-sub { margin: 0; color: var(--text-2); font-size: 15px; }
+  .g-pic { border-radius: var(--radius-lg); background: var(--surface); border: var(--border-card); padding: 8px; overflow: hidden; }
+  /* The drawing without its technical layers: no numbers, rulers, plates, cables or hidden kit. */
+  .g-pic :global(.scene-tools), .g-pic :global(.scene-cap), .g-pic :global(.marks), .g-pic :global(.ruler), .g-pic :global(.dim),
+  .g-pic :global(.cable-layer), .g-pic :global(.ghosts), .g-pic :global(.scene .pl), .g-pic :global(.scene .hid) { display: none; }
+  .g-pic :global(.scene) { display: block; width: 100%; height: auto; max-height: 34svh; }
+
+  .g-actions { display: grid; gap: 10px; }
+  .g-act { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 14px; align-items: center; min-height: 72px; padding: 14px 16px; border-radius: var(--radius-lg); background: var(--surface); border: var(--border-card); color: var(--text); text-decoration: none; box-shadow: var(--shadow-sm, none); transition: transform var(--dur-hover) var(--ease-settle), box-shadow var(--dur-hover), background var(--dur-hover); }
+  .g-act:hover { color: var(--text); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+  .g-act:active { transform: scale(.985); }
+  .g-act b { display: block; font: 700 17px/1.25 var(--font-display); }
+  .g-act small { display: block; font-size: 14px; color: var(--text-2); margin-top: 2px; }
+  .g-act-ic { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); color: var(--text-2); }
+  .g-act-ic svg { width: 24px; height: 24px; }
+  .g-act.bad { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+  .g-act.bad small { color: color-mix(in srgb, var(--on-ink) 75%, transparent); }
+  .g-act.bad .g-act-ic { background: var(--red); color: #fff; }
+  .g-go { font-size: 20px; color: var(--text-3); }
+  .g-act.bad .g-go { color: var(--on-ink); }
+
+  .g-jump { display: flex; flex-wrap: wrap; gap: 8px; }
+  .g-jump a { font-size: 14px; font-weight: 600; padding: 10px 14px; min-height: 44px; display: inline-flex; align-items: center; border-radius: 999px; background: var(--surface-2); color: var(--text); text-decoration: none; }
+  .g-jump a:hover { background: var(--surface-3); color: var(--text); }
+
+  .g-howto { display: grid; gap: 16px; }
+  .g-card { scroll-margin-top: 72px; display: grid; gap: 14px; padding: 18px 16px; border-radius: var(--radius-lg); background: var(--surface); border: var(--border-card); }
+  .g-card header h2 { font-size: 21px; }
+  .g-card header p { margin: 4px 0 0; color: var(--text-2); font-size: 15px; }
+  .g-how { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: center; }
+  .g-art { display: grid; place-items: center; padding: 8px; border-radius: var(--radius); background: var(--surface-2); min-height: 112px; }
+  .g-art :global(svg) { width: min(100%, 260px); height: auto; }
+  .g-steps { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 10px; }
+  .g-steps li { counter-increment: s; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; align-items: start; font-size: 16px; line-height: 1.45; }
+  .g-steps li::before { content: counter(s); width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--on-ink); font: 700 13px/1 var(--font-mono); margin-top: -1px; }
+  .g-tip { margin: 0; padding: 10px 12px; border-radius: var(--radius); background: var(--blue-soft); color: var(--text); font-size: 15px; }
+
+  /* The meeting app switch: word pills; the matching steps show, and arrive with a short rise. */
+  .g-plat { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px; border-radius: 999px; background: var(--surface-2); justify-self: start; }
+  .g-plat label { position: relative; }
+  .g-plat input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .g-plat span { display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border-radius: 999px; font-weight: 600; font-size: 14.5px; color: var(--text-2); transition: background var(--dur-state) var(--ease-settle), color var(--dur-state); }
+  .g-plat input:checked + span { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,.08)); }
+  .g-plat input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .g-start .g-steps { display: none; }
+  .g-start:has([value="meet"]:checked) [data-p="meet"], .g-start:has([value="teams"]:checked) [data-p="teams"], .g-start:has([value="zoom"]:checked) [data-p="zoom"] { display: grid; animation: rise var(--dur-enter) var(--ease-settle) backwards; }
+
+  .g-cable .gc-lid { fill: var(--surface); stroke: var(--text-2); stroke-width: 2; }
+  .g-cable .gc-screen { fill: var(--blue-soft); }
+  .g-cable .gc-base { fill: var(--surface-3); stroke: var(--text-2); stroke-width: 2; stroke-linejoin: round; }
+  .g-cable .gc-wire { fill: none; stroke: var(--accent); stroke-width: 4; stroke-linecap: round; stroke-dasharray: 90; stroke-dashoffset: 90; animation: g-draw 900ms var(--ease-settle) 200ms forwards; }
+  .g-cable .gc-plug { fill: var(--ink); } .g-cable .gc-port { fill: var(--surface-3); }
+  @keyframes g-draw { to { stroke-dashoffset: 0; } }
+  @media (prefers-reduced-motion: reduce) { .g-cable .gc-wire { stroke-dashoffset: 0; } }
+
+  .g-extra { gap: 10px; }
+  .g-extra p { margin: 0; font-size: 15.5px; line-height: 1.45; }
+  .g-end { display: grid; justify-items: center; gap: 12px; text-align: center; padding: 20px 0 4px; }
+  .g-end p { margin: 0; color: var(--text-2); font-size: 15px; }
+  .g-end .btn { min-height: 48px; padding-inline: 28px; font-size: 16px; }
+  .g-staff { font-size: 13px; color: var(--text-3); }
+
+  /* Wider: the room beside its two actions, the how-to cards side by side, picture beside the steps. */
+  @media (min-width: 600px) {
+    .g-how { grid-template-columns: 200px minmax(0, 1fr); gap: 20px; }
+    .g-card { padding: 22px 24px; }
+  }
+  @media (min-width: 900px) {
+    .g-hero { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); grid-template-areas: "id id" "pic act"; column-gap: 20px; align-items: start; }
+    .g-id { grid-area: id; } .g-pic { grid-area: pic; } .g-actions { grid-area: act; }
+    .g-act { min-height: 96px; }
+    .g-howto { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+    .g-start { grid-column: 1 / -1; }
+    .g-howto .g-how { grid-template-columns: minmax(0, 1fr); }
+    .g-start .g-how { grid-template-columns: 240px minmax(0, 1fr); }
+  }
+</style>

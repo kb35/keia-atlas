@@ -1,0 +1,53 @@
+# Configuration: imageFORCE C5150 Remote UI settings. Setting names, menu paths and defaults are the vendor's (cited per setting);
+# the values and reasons are Aigna's (demo). Researched from vendor documents, Sept 2026.
+id: canon-imageforce-c5150-remote-ui
+name: imageFORCE C5150 Remote UI settings
+models: [canon-imageforce-c5150]
+mode: Networked MFP, Remote UI managed
+version: '1.0'
+owner: sofia
+updated: '2026-09-28'
+summary: Aigna sets these from the printer's own Remote UI, changing the shared default Administrator password, pointing the clock at Aigna's time
+  server, switching monitoring to SNMPv3, and keeping firmware updates manual until the Lab has passed a release.
+managed_by: Device web interface
+steps: [Patch into the floor's print VLAN; the printer takes its DHCP reservation., 'At the control panel, change the Administrator password from the default
+    before Remote UI login is allowed at all.', 'Browse to http://<the printer''s address>/ and log in as Administrator.', Set the time zone and SNTP server.,
+  'Set SNMP to v3 only, with Aigna''s monitoring credentials.', Confirm PIN (Secure) printing shows as an output option in the driver., Turn off Scheduled
+    Update Settings; apply firmware manually after the Lab passes it., Run the room's verification.]
+groups:
+- name: Administrator access
+  where: Device web interface (Remote UI)
+  settings:
+  - {derive: vault-site, name: Administrator password, path: Settings/Registration > Management Settings > User Management > Authentication Management > Register/Edit Authentication
+      User, value: 'From the password vault, per site', per_device: true, action: change, layer: profile, why: 'Every unit ships with the same Administrator
+      password (7654321); Canon actually blocks Remote UI login on the default until it''s changed from the control panel, but the control-panel side still
+      needs a real password set.', source: canon-imageforce-c5150-remote-ui-start}
+- name: Date and time
+  where: Device web interface (Remote UI)
+  settings:
+  - {derive: time-zone, name: Date/Time Settings (time zone), path: Settings/Registration > Preferences > Timer/Energy Settings > Date/Time Settings, value: The site's time
+      zone, per_device: true, action: change, layer: country, why: Sets the clock used on print and scan job logs and the SNMP monitoring timestamps., source: canon-imageforce-c5150-date-time}
+  - {derive: time-server-1, name: SNTP Settings, path: Settings/Registration > Preferences > Network Settings > TCP/IP Settings > SNTP Settings, value: ntp1.aigna.example,
+    action: change, layer: naming-network, why: Syncs the clock from Aigna's time server automatically instead of a manual entry that drifts., source: canon-imageforce-c5150-tcpip-settings}
+- name: SNMP
+  where: Device web interface (Remote UI)
+  settings:
+  - {name: SNMP Settings, path: Settings/Registration > Preferences > Network Settings > SNMP Settings, value: SNMPv3 on with Aigna's monitoring credentials;
+      SNMPv1 off, action: change, layer: profile, why: SNMPv1 sends its community string in the clear; Aigna's print-fleet monitoring only needs v3.,
+    source: canon-imageforce-c5150-network-menu-list}
+- name: Printing
+  where: Device web interface (Remote UI)
+  settings:
+  - {name: Secure Print (PIN printing), value: Available to every user from the driver's Output Method by default, action: verify, layer: profile, why: No
+      separate admin-side toggle is documented for this model; Aigna just confirms the option is there before relying on it for sensitive jobs., source: canon-imageforce-c5150-secure-print}
+- name: Updates
+  where: Device web interface (Remote UI)
+  settings:
+  - {name: Scheduled Update Settings, path: Settings/Registration > License/Other > Register/Update Software > Scheduled Update Settings, value: 'Off',
+    action: change, layer: profile, why: 'Left on, the printer checks weekly or biweekly and downloads firmware on its own; Aigna applies a release only
+      after the Lab has passed it.', source: canon-imageforce-c5150-firmware-update}
+  - {name: Manual Update, path: Settings/Registration > License/Other > Register/Update Software > Manual Update, value: 'From Canon''s support site, applied
+      after the Lab passes it', action: change, layer: profile, why: The documented way to apply a Lab-approved release by hand., source: canon-imageforce-c5150-firmware-update}
+gaps: [No published current firmware/controller version for this model was found on the vendor pages read., 'No documented admin-side setting to require
+    Secure Print for every job; it''s opt-in per print job from the driver, so ''verify'' rather than ''change'' is the honest action here.', The exact
+    field names inside SNMP Settings (community string vs. v3 user/auth/priv) weren't broken out by the menu-list page read.]

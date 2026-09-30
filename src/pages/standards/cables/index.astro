@@ -1,0 +1,277 @@
+---
+// The house cable colour and labelling standard, drawn from data/standards/cables.yaml: the colours by
+// purpose, how a label reads, an example rack front, and what TIA-606 does and does not say (with sources).
+// Part of the standards library (/standards/), on the Record anatomy: PageBand, then Sections.
+import Shell from '../../../layouts/Shell.astro';
+import Icon from '../../../components/Icon.astro';
+import PageBand from '../../../components/PageBand.astro';
+import Section from '../../../components/Section.astro';
+import { fmtDate, href } from '../../../lib/data.mjs';
+import { cableStandard as S, colours, cableTypes, purposes } from '../../../lib/stock.mjs';
+import { patchCables, cableTotal } from '../../../lib/stock.mjs';
+
+const hex = (id) => colours[id].hex;
+const coded = S.purposes.filter((p) => p.coded !== false);
+const sharedWith = (p) => S.purposes.filter((o) => o.colour === p.colour && o.id !== p.id).map((o) => o.name.replace(/, feed ([AB])$/, ', feed $1'));
+const partColours = ['#3B6FD8', '#2E9E4F', '#B57A00', '#7B4FD0', '#C4326B'];
+const tia = S.tia606;
+const exParts = S.labelling.example.split('-');
+const farEnd = exParts.map((t, i) => (i === 3 ? 'U06' : t)).join('-');
+const lcFirst = (t) => t.charAt(0).toLowerCase() + t.slice(1);
+
+// ---- The example rack front (a small comms room, U16 at the top). ----
+const U = 34, TOP = 46, RX = 200, RW = 300, W = 700, H = TOP + 16 * U + 40;
+const yOf = (u) => TOP + (16 - u) * U;
+const yc = (u) => yOf(u) + (U - 3) / 2 + 1;
+const ANCH_L = RX + 10, ANCH_R = RX + RW - 10;
+const DEV = [
+  { u: 16, label: 'Fibre patch panel', kind: 'fibre' },
+  { u: 15, label: 'Internet provider handoff', kind: 'isp' },
+  { u: 14, label: 'Firewall A', kind: 'fw' },
+  { u: 13, label: 'Firewall B', kind: 'fw' },
+  { u: 12, label: 'Core switch', kind: 'core' },
+  { u: 11, label: 'Cable manager', kind: 'cm' },
+  { u: 10, label: 'Access switch', kind: 'access' },
+  { u: 9, label: 'Cable manager', kind: 'cm' },
+  { u: 8, label: 'Patch panel', kind: 'panel' },
+  { u: 7, label: 'AV switch', kind: 'av' },
+  { u: 6, label: 'Out-of-band router and console server', kind: 'oob' },
+  { u: 5, label: 'Blank', kind: 'blank' },
+  { u: 4, label: 'Blank', kind: 'blank' },
+  { u: 3, label: 'Blank', kind: 'blank' },
+  { u: 2, label: 'UPS', kind: 'ups', size: 2 },
+];
+// Cords: from unit, to unit, side of the rack they run down, lane (how far out), colour, strands, what it is.
+const CORDS = [
+  { a: 16, b: 12, side: 'L', lane: 1, c: 'aqua', what: 'Core switch to the fibre patch panel', type: 'OM4 fibre' },
+  { a: 16, b: 15, side: 'L', lane: 2, c: 'yellow', what: 'Provider fibre to the internet handoff', type: 'OS2 singlemode fibre' },
+  { a: 12, b: 10, side: 'L', lane: 3, c: 'aqua', what: 'Core switch to access switch', type: 'OM4 fibre' },
+  { a: 6, b: 10, side: 'L', lane: 4, c: 'purple', what: 'Console cable to the access switch', type: 'Console' },
+  { a: 15, b: 14, side: 'R', lane: 1, c: 'yellow', what: 'Internet handoff to firewall A', type: 'Cat6A uplink' },
+  { a: 14, b: 13, side: 'R', lane: 2, c: 'red', what: 'Firewall failover link', type: 'Cat6A critical' },
+  { a: 13, b: 12, side: 'R', lane: 3, c: 'yellow', what: 'Firewall B to the core switch', type: 'Cat6A uplink' },
+  { a: 10, b: 8, side: 'R', lane: 4, c: 'blue', n: 3, what: 'Access switch to the patch panel, one per desk outlet', type: 'Cat6A user data' },
+  { a: 7, b: 8, side: 'R', lane: 5, c: 'green', what: 'AV switch to the AV outlets on the panel', type: 'Cat6A AV' },
+  { a: 6, b: 12, side: 'R', lane: 6, c: 'grey', what: 'Management port to the out-of-band router', type: 'Cat6 management' },
+];
+const cordPath = (k, off = 0) => {
+  const x = k.side === 'L' ? ANCH_L - 6 : ANCH_R + 6;
+  const lx = k.side === 'L' ? RX - 12 - k.lane * 11 - off : RX + RW + 12 + k.lane * 11 + off;
+  const y1 = yc(k.a) + (k.n ? off * 0.6 : 0), y2 = yc(k.b) + (k.n ? off * 0.6 : 0);
+  const r = 5, s = k.side === 'L' ? -1 : 1, d = y2 > y1 ? 1 : -1;
+  return `M${x} ${y1} H${lx - s * r} Q${lx} ${y1} ${lx} ${y1 + d * r} V${y2 - d * r} Q${lx} ${y2} ${lx - s * r} ${y2} H${x}`;
+};
+const jacks = (n, x0, x1) => Array.from({ length: n }, (_, i) => x0 + (n === 1 ? 0 : (i * (x1 - x0)) / (n - 1)));
+const inRack = cableTotal(patchCables);
+---
+<Shell vendorOk title="Cable colours and labels" section="standards" about={{ kind: 'standard', label: 'Cable colours and labels', to: '/standards/cables/' }}
+  crumbs={[{ label: 'Standards', to: '/standards/' }, { label: 'Cabling and labelling', to: '/standards/?area=cabling' }, { label: 'Cable colours and labels' }]}>
+  <PageBand overline="Standard" title="Cable colours and labels" lede={S.summary} rec="cables"
+    numbers={[{ n: coded.length, label: 'Colour coded purposes', to: '#colours' }, { n: S.labelling.parts.length, label: 'Parts to a label', to: '#labels' }, { n: inRack, label: 'Patch cables checked', to: '/cables/' }]}>
+    <Fragment slot="overline">
+      <a href={href('/standards/?area=cabling')}>Cabling and labelling</a>
+      <span>Version {S.version}</span>
+    </Fragment>
+    <button slot="action" type="button" class="btn primary" data-open-report="change">Propose a change</button>
+  </PageBand>
+
+  <div class="content cs">
+
+    <Section title="The colours" id="colours" aside="Colour says what a cable is for. Read the swatch, then the name: colour is never the only clue.">
+      <div class="cs-grid">
+        {S.purposes.map((p) => {
+          const c = colours[p.colour], also = sharedWith(p);
+          return (
+            <article class:list={['card', 'cs-card', { 'cs-off': p.coded === false }]} data-vk={`cs-${p.id}`}>
+              <div class="cs-swatch" style={`--sw:${c.hex}`}>
+                <span class="cs-cable" aria-hidden="true"><i class="cs-plug"></i><i class="cs-jacket"></i><i class="cs-plug"></i></span>
+                <span class={`cs-chip ${c.ink}`}>{c.name}</span>
+              </div>
+              <div class="cs-body">
+                <h3>{p.name}</h3>
+                <p>{p.carries}</p>
+                <p class="cs-rule"><Icon name="check" size={14} /><span>{p.rule}</span></p>
+                <p class="cs-media">{p.media.map((m) => <span class="tag">{cableTypes[m].label}</span>)}</p>
+                {also.length > 0 && <p class="cs-also faint">Same colour as {also.map(lcFirst).join(' and ')}: told apart by the cable type and the plug.</p>}
+                <details><summary>Examples</summary><ul>{p.examples.map((e) => <li>{e}</li>)}</ul></details>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </Section>
+
+    <Section title="How a label reads" id="labels" aside="Site, room, rack, unit, port. At both ends of every cable.">
+      <div class="cs-two">
+        <div class="card pad cs-labcard">
+          <p class="overline">A label, as printed</p>
+          <div class="cs-flag" role="img" aria-label={`Label reads ${S.labelling.example} on the first line and the far end on the second line`}>
+            <div class="cs-flag-l"><small>This end</small><code>{exParts.map((t, i) => <><span class="tk" style={`--tk:${partColours[i]}`}>{t}</span>{i < 4 && <b>-</b>}</>)}</code></div>
+            <div class="cs-flag-l far"><small>Other end</small><code>{farEnd}</code></div>
+          </div>
+          <p class="cs-reads"><b>Reads:</b> {S.labelling.example_reads}</p>
+          <dl class="cs-parts">
+            {S.labelling.parts.map((pt, i) => (
+              <div><dt><span class="tk" style={`--tk:${partColours[i]}`}>{pt.token}</span></dt><dd>{pt.meaning} <code>{pt.example}</code></dd></div>
+            ))}
+          </dl>
+          <p class="faint">Format: <code>{S.labelling.format}</code>, for example <code>{S.labelling.example}</code>.</p>
+        </div>
+        <div class="card pad">
+          <p class="overline">Rules for every label</p>
+          <ol class="cs-rules">{S.labelling.rules.map((r) => <li>{r}</li>)}</ol>
+          <p class="overline cs-len-h">Lengths we stock</p>
+          <p class="cs-lens">{S.lengths_m.map((l) => <span class="tag mono">{l} m</span>)}</p>
+        </div>
+      </div>
+    </Section>
+
+    <Section title="An example rack front" id="rack" aside="A small comms room. Every cord is the colour for its purpose, so the rack can be read from the door.">
+      <div class="card pad cs-rackwrap">
+        <svg class="cs-rack" viewBox={`64 4 ${W - 128} ${H - 8}`} role="img" aria-labelledby="cs-rack-t cs-rack-d">
+          <title id="cs-rack-t">Example rack front with cords coloured by purpose</title>
+          <desc id="cs-rack-d">A 16 unit rack. Aqua fibre joins the core switch to the fibre panel and the access switch. Yellow carries the provider, firewall and core uplinks. A red cable joins the two firewalls. Blue cords join the access switch to the patch panel. A green cord joins the AV switch to the panel. Purple is the console cable and grey is management. Power strips at each side are black for feed A and grey for feed B.</desc>
+          <rect x="70" y="8" width={W - 140} height={H - 16} rx="14" class="r-cab" />
+          {/* the two power strips at the back, feed A (black) and feed B (grey) */}
+          <rect x="92" y={TOP} width="18" height={16 * U} rx="5" class="r-pdu-a" /><text x="101" y={TOP + 16 * U + 16} class="r-pdu-t" text-anchor="middle">A</text>
+          <rect x={W - 110} y={TOP} width="18" height={16 * U} rx="5" class="r-pdu-b" /><text x={W - 101} y={TOP + 16 * U + 16} class="r-pdu-t" text-anchor="middle">B</text>
+          <rect x={RX - 10} y={TOP - 4} width="10" height={16 * U + 8} class="r-rail" /><rect x={RX + RW} y={TOP - 4} width="10" height={16 * U + 8} class="r-rail" />
+          {Array.from({ length: 16 }, (_, i) => <text x={RX - 5} y={TOP + i * U + U / 2 + 3} class="r-un" text-anchor="middle">{16 - i}</text>)}
+          {DEV.map((d) => {
+            const y = yOf(d.u) + (d.size ? -U * (d.size - 1) : 0) + 1, h = (d.size ?? 1) * U - 3;
+            const n = { fibre: 12, isp: 4, fw: 8, core: 12, access: 24, panel: 24, av: 8, oob: 8 }[d.kind] ?? 0;
+            const cls = { blank: 'r-blank', cm: 'r-cm', panel: 'r-panel', fibre: 'r-panel' }[d.kind] ?? 'r-dev';
+            const cy = y + h / 2;
+            return (
+              <g>
+                <rect x={RX} y={y} width={RW} height={h} rx="2" class={cls} />
+                {n > 0 && jacks(n, RX + 40, RX + RW - 40).map((jx) => <rect x={jx - 4} y={y + 18} width="8" height="9" rx="1.2" class={d.kind === 'fibre' ? 'r-lc' : 'r-jack'} />)}
+                {['fw', 'core', 'access', 'panel', 'av', 'oob', 'fibre', 'isp'].includes(d.kind) && <><rect x={ANCH_L - 5} y={cy - 5.5} width="10" height="11" rx="1.5" class="r-anchor" /><rect x={ANCH_R - 5} y={cy - 5.5} width="10" height="11" rx="1.5" class="r-anchor" /></>}
+                {['fw', 'core', 'access', 'av', 'oob', 'isp'].includes(d.kind) && <><rect x={RX + RW - 30} y={y + 5} width="9" height="5" class="r-inl-a" /><rect x={RX + RW - 19} y={y + 5} width="9" height="5" class="r-inl-b" /></>}
+                {!['blank', 'cm', 'ups'].includes(d.kind) && <text x={RX + RW / 2} y={y + 12.5} class="r-lab" text-anchor="middle">{d.label}</text>}
+                {d.kind === 'ups' && <text x={RX + RW / 2} y={cy + 4} class="r-ups" text-anchor="middle">UPS</text>}
+              </g>
+            );
+          })}
+          {/* cords, over the faces, running down the side of the rack */}
+          {CORDS.map((k) => (
+            <g class="r-cord">
+              {Array.from({ length: k.n ?? 1 }, (_, i) => <path d={cordPath(k, i * 3.5)} stroke={hex(k.c)} class="r-cord-p" />)}
+            </g>
+          ))}
+        </svg>
+        <ul class="cs-legend">
+          {CORDS.map((k) => (
+            <li><i class="cb-sw wide" style={`--sw:${hex(k.c)}`}></i><span><b>{colours[k.c].name}</b> {k.what}<small>{k.type}</small></span></li>
+          ))}
+          <li><i class="cb-sw wide" style={`--sw:${hex('black')}`}></i><span><b>Black and grey</b> power cords to the strips at the back<small>Feed A black, feed B grey. The small inlets at the right of each device show both.</small></span></li>
+        </ul>
+      </div>
+    </Section>
+
+    <Section title="Which cable can be which colour" id="types" aside="A fibre is never blue, and an HDMI lead is never a colour code.">
+      <div class="card cs-tablewrap">
+        <table class="cs-table to-cards">
+          <thead><tr><th scope="col">Cable</th><th scope="col">Connectors</th><th scope="col">Colours it can be</th></tr></thead>
+          <tbody>
+            {S.cable_types.map((t) => {
+              const ps = S.purposes.filter((p) => p.media.includes(t.id));
+              return (
+                <tr><th scope="row">{t.label}</th><td>{t.connectors}</td><td><div class="cs-ps">{ps.map((p) => <span class="cs-pp"><i class="cb-sw" style={`--sw:${hex(p.colour)}`}></i>{colours[p.colour].name}: {p.name}</span>)}</div></td></tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Section>
+
+    <Section title="TIA-606 and cable colours" id="tia" aside={`Checked ${fmtDate(tia.checked)}`} help="std.sources">
+      <div class="card pad cs-tia">
+        <p class="cs-status"><span class={`cs-badge ${tia.status}`}><Icon name={tia.status === 'verified' ? 'check' : 'alert'} size={14} />{tia.status === 'verified' ? 'Verified against the standard' : 'Not verified against the standard'}</span></p>
+        <p><b>What it covers.</b> {tia.covers}</p>
+        <p><b>What we found about patch cord colours.</b> {tia.finding}</p>
+        {tia.limits && <p class="cs-limits"><b>Limits.</b> {tia.limits}</p>}
+        <h3>Sources we read</h3>
+        <ul class="cs-src">
+          {tia.sources.map((s) => <li><a class="stk-link" href={s.url} target="_blank" rel="noopener">{s.title}<Icon name="link" size={12} /></a><span>{s.says}</span></li>)}
+        </ul>
+        <h3>Fibre jacket colours</h3>
+        <p class="faint">Aqua for OM3 and OM4 and yellow for singlemode are the fibre makers' own jacket colours, so the standard follows them: aqua is only ever fibre, and yellow is singlemode fibre or a copper uplink, told apart by the plug.</p>
+        <ul class="cs-src">
+          {S.sources.map((s) => <li><a class="stk-link" href={s.url} target="_blank" rel="noopener">{s.title}<Icon name="link" size={12} /></a><span>{s.says}</span></li>)}
+        </ul>
+      </div>
+    </Section>
+
+    <Section title="Where it applies" id="scope">
+    <div class="cs-scope card pad" data-help="std.facts" data-help-name="Where it applies">
+      <p class="overline">Owner: {S.owner} · part of the <a href={href('/standards/cabling/')}>structured cabling standard</a></p>
+      <ul>{S.scope.map((t) => <li>{t}</li>)}</ul>
+      <p class="faint">Aigna is a made-up company, so this is a demo of how a house standard can live inside Keia Atlas. The colours are a house choice. Keia Atlas checks every cable in its data against this page: a cable whose colour is not the standard's colour for its purpose stops the build.</p>
+    </div>
+    </Section>
+  </div>
+</Shell>
+
+<style is:global>
+  .cs { gap: 30px; }
+  .stk-link { color: color-mix(in srgb, var(--link, var(--accent-ink)) 60%, var(--text)); }
+  .cs .cb-sw { display: inline-block; flex: none; width: 26px; height: 12px; border-radius: 6px; background: var(--sw); box-shadow: inset 0 0 0 1px rgba(128, 128, 128, .55), inset 0 -3px 3px rgba(0, 0, 0, .18), inset 0 2px 2px rgba(255, 255, 255, .25); }
+  .cs .cb-sw.wide { width: 40px; height: 14px; border-radius: 7px; }
+  .cs h2 { font-size: var(--h2-size); }
+  .cs-scope ul { margin: 8px 0 10px; padding-left: 20px; display: grid; gap: 4px; } .cs-scope h2 { font-size: 17px; margin: 0; } .cs-scope p { margin: 0; font-size: 13.5px; }
+  .cs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+  .cs-card { display: grid; grid-template-rows: auto 1fr; overflow: hidden; }
+  .cs-swatch { position: relative; display: grid; place-items: center; height: 96px; background: color-mix(in srgb, var(--sw) 10%, var(--surface-2)); border-bottom: 1px solid var(--line); }
+  .cs-cable { display: flex; align-items: center; width: 78%; }
+  .cs-jacket { flex: 1; height: 16px; background: var(--sw); border-radius: 8px; margin-inline: -4px; box-shadow: inset 0 0 0 1px rgba(128, 128, 128, .5), inset 0 -4px 4px rgba(0, 0, 0, .2), inset 0 3px 3px rgba(255, 255, 255, .28); }
+  .cs-plug { width: 22px; height: 24px; border-radius: 4px; background: linear-gradient(#e9eaee, #b7bac3); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .35); position: relative; z-index: 1; }
+  .cs-chip { position: absolute; left: 12px; top: 10px; font: 800 12px/1 var(--font-sans); padding: 5px 9px; border-radius: var(--pill-radius); background: var(--sw); box-shadow: inset 0 0 0 1px rgba(128, 128, 128, .5); }
+  .cs-chip.dark { color: #15161B; } .cs-chip.light { color: #fff; }
+  .cs-off .cs-cable { opacity: .55; }
+  .cs-body { padding: 12px 16px 14px; display: grid; gap: 8px; align-content: start; }
+  .cs-body h3 { font-size: 16px; margin: 0; } .cs-body p { margin: 0; font-size: 13.5px; color: var(--text-2); }
+  .cs-rule { display: flex; gap: 8px; align-items: flex-start; color: var(--text) !important; font-weight: 550; } .cs-rule svg { flex: none; margin-top: 3px; color: var(--green-ink); }
+  .cs-media { display: flex; flex-wrap: wrap; gap: 5px; }
+  .cs-also { font-size: 12.5px !important; }
+  .cs-body details summary { cursor: pointer; font-weight: 650; font-size: 13px; } .cs-body details ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--text-2); }
+  .cs-two { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .cs-labcard { display: grid; gap: 12px; }
+  .cs-flag { display: grid; gap: 0; width: max-content; max-width: 100%; border-radius: 6px; background: #fff; color: #15161B; box-shadow: 0 0 0 1px rgba(128, 128, 128, .5), var(--shadow-sm); overflow: hidden; }
+  .cs-flag-l { display: grid; grid-template-columns: 74px auto; align-items: center; gap: 10px; padding: 8px 14px; } .cs-flag-l + .cs-flag-l { border-top: 1px dashed #b9bcc4; }
+  .cs-flag-l small { font: 700 10px/1 var(--font-mono); text-transform: uppercase; letter-spacing: .06em; color: #6a6f7a; }
+  .cs-flag code { font: 700 17px/1.2 var(--font-mono); background: none; border: 0; padding: 0; color: #15161B; }
+  .cs-flag code b { font-weight: 700; color: #8a8f99; }
+  .cs-flag .far code { font-weight: 600; color: #444852; }
+  .tk { border-bottom: 3px solid var(--tk); padding-bottom: 1px; font-weight: 700; }
+  .cs-parts { display: grid; gap: 6px; margin: 0; } .cs-parts div { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 10px; align-items: baseline; } .cs-parts dt { font: 700 12px var(--font-mono); } .cs-parts dd { margin: 0; font-size: 13.5px; color: var(--text-2); }
+  .cs-parts code, .cs-labcard p code { font: 600 12px var(--font-mono); background: var(--surface-2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; color: var(--text); }
+  .cs-reads { margin: 0; font-size: 13.5px; } .cs-labcard > p.faint { margin: 0; font-size: 13px; }
+  .cs-rules { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 7px; font-size: 13.5px; } .cs-len-h { margin-top: 18px; } .cs-lens { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
+  .cs-rackwrap { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 22px; align-items: center; }
+  .cs-rack { width: 100%; height: auto; max-height: 640px; }
+  .cs-rack .r-cab { fill: #17181C; } .cs-rack .r-rail { fill: #5C6069; } .cs-rack .r-un { font: 700 8px var(--font-mono); fill: #D4D7DE; }
+  .cs-rack .r-dev { fill: #2C2F36; stroke: #3D414A; stroke-width: .8; } .cs-rack .r-panel { fill: #1A1B1F; stroke: #33363D; stroke-width: .8; } .cs-rack .r-cm { fill: #14151A; stroke: #2A2C32; } .cs-rack .r-blank { fill: #1E2024; stroke: #2C2F35; stroke-width: .6; }
+  .cs-rack .r-jack { fill: #0E0F12; stroke: #4A4E57; stroke-width: .5; } .cs-rack .r-lc { fill: #2FA7D8; } .cs-rack .r-anchor { fill: #08090B; stroke: #7A7F88; stroke-width: .6; }
+  .cs-rack .r-inl-a { fill: #0B0B0D; stroke: #5A5E68; stroke-width: .6; } .cs-rack .r-inl-b { fill: #8C929B; stroke: #5A5E68; stroke-width: .6; }
+  .cs-rack .r-pdu-a { fill: #0B0B0D; stroke: #4A4E57; stroke-width: 1; } .cs-rack .r-pdu-b { fill: #8C929B; stroke: #4A4E57; stroke-width: 1; } .cs-rack .r-pdu-t { font: 700 12px var(--font-mono); fill: #B7BBC4; }
+  .cs-rack .r-ups { font: 800 11px var(--font-sans); fill: #9AA0A8; letter-spacing: .1em; }
+  .cs-rack .r-lab { font: 600 10px var(--font-sans); fill: #C9CDD5; letter-spacing: .02em; }
+  .cs-rack .r-cord-p { fill: none; stroke-width: 4.2; stroke-linecap: round; stroke-linejoin: round; paint-order: stroke; }
+  .cs-rack .r-cord-p { filter: drop-shadow(0 0 1px rgba(0, 0, 0, .7)); }
+  .cs-legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; }
+  .cs-legend li { display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 10px; align-items: start; font-size: 13.5px; } .cs-legend small { display: block; color: var(--text-3); font-size: 12px; } .cs-legend .cb-sw { margin-top: 3px; }
+  .cs-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .cs-table th, .cs-table td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .cs-table thead th { font: 700 11px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); background: var(--surface-2); }
+  .cs-table tbody th { font: 650 13.5px var(--font-sans); letter-spacing: 0; text-transform: none; color: var(--text); background: none; }
+  .cs-table tbody tr:last-child th, .cs-table tbody tr:last-child td { border-bottom: 0; }
+  .cs-ps { display: flex; flex-wrap: wrap; gap: 6px 14px; } .cs-pp { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .cs-tia { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; overflow-wrap: anywhere; } .cs-tia p { margin: 0; font-size: 14px; max-width: 90ch; } .cs-tia h3 { font-size: 15px; margin: 8px 0 0; }
+  .cs-badge { display: inline-flex; align-items: center; gap: 7px; font: 700 12.5px/1 var(--font-sans); padding: 6px 11px; border-radius: var(--pill-radius); background: var(--amber-soft); color: var(--amber-ink); box-shadow: inset 0 0 0 1px var(--amber); }
+  .cs-badge.verified { background: var(--green-soft); color: var(--green-ink); box-shadow: inset 0 0 0 1px var(--green); }
+  .cs-limits { padding: 10px 14px; border-radius: var(--radius); background: var(--surface-2); border: 1px solid color-mix(in srgb, var(--amber) 55%, transparent); }
+  .cs-src { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; } .cs-src li { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; font-size: 13.5px; } .cs-src a { font-weight: 650; display: inline-flex; gap: 6px; align-items: center; width: max-content; max-width: 100%; } .cs-src span { color: var(--text-2); max-width: 90ch; }
+  @container content (max-width: 839px) { .cs-two, .cs-rackwrap { grid-template-columns: minmax(0, 1fr); } }
+  @container content (max-width: 699px) { .cs-flag code { font-size: 14px; } .cs-flag-l { grid-template-columns: 1fr; gap: 2px; } .cs-parts div { grid-template-columns: 1fr; gap: 2px; } }
+</style>

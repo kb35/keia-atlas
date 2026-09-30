@@ -1,0 +1,45 @@
+---
+// Learn: device fields. What each field on a device means and how Aigna builds it, drawn for one real
+// example. The device profile shows the same fields compactly; this is where the anatomy is taught.
+import Shell from '../../../layouts/Shell.astro';
+import FieldAnatomy from '../../../components/FieldAnatomy.astro';
+import { spaces, sites, classes, SITE_ORDER, standardFirmware, href } from '../../../lib/data.mjs';
+const sp = spaces['dub-3-09'], pos = sp.positions.find((p) => p.hostname === 'dub-309-vc01');
+const n = [...pos.current.serial].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+const hex = (v) => (v & 255).toString(16).padStart(2, '0');
+const ex = {
+  space: `${sp.number} ${sp.name}`, site: sites[sp.site].name, ports: 12, asset: pos.current.asset_tag, serial: pos.current.serial,
+  host: `${pos.hostname}.aigna.example`, ip: `10.${(SITE_ORDER.indexOf(sp.site) + 1) * 10}.${sp.floor}.${20 + (n % 200)}`,
+  mac: ['02', hex(n), hex(n >> 8), hex(n >> 16), hex(n >> 24), hex(n >> 4)].join(':'), fw: standardFirmware(pos.model)?.version ?? '4.6.2', day: 28, month: 'Sep', seats: 8,
+  model: pos.model, cls: pos.cls, stage: pos.current.stage,
+};
+const C = classes['video-bar'];
+const PLATFORM = { keia_atlas: 'Keia Atlas', inventory: 'Asset register', dhcp_dns: 'Addresses and DNS', device_management: 'Device management', room_booking: 'Room booking', monitoring: 'Monitoring' };
+---
+<Shell vendorOk title="Learn: device fields" section="learn" crumbs={[{ label: 'Learn', to: '/learn/' }, { label: 'Device fields' }]}>
+  <section class="band">
+    <div class="meta"><span class="kind">Learn</span></div>
+    <h1>Device fields</h1>
+    <p class="lede">Every platform that knows about a device holds a few facts about it. Here is what each one means and how Aigna builds it, drawn for one real example: the video bar in 3.09 Whooper Swan at the Dublin office (<a href={href('/device/?tag=' + pos.current.asset_tag)}>its device page</a>).</p>
+  </section>
+  <div class="content">
+    <section class="card pad lf-notes">
+      <h2>Three to know by heart</h2>
+      <dl>
+        <div><dt>Hostname</dt><dd><b class="mono">site-room-kind + number</b>. <span class="mono">dub-309-vc01</span> is Dublin, room 3.09, video conferencing, the first one. Anyone can read where a device is from its name.</dd></div>
+        <div><dt>MAC address</dt><dd>Six pairs of hex digits, burned in at the factory. The first three pairs name the maker (its <a href="https://en.wikipedia.org/wiki/MAC_address" target="_blank" rel="noopener">OUI, assigned by the IEEE</a>). The demo's MACs start with 02, the locally administered range, so they can never clash with a real device.</dd></div>
+        <div><dt>IP address</dt><dd>Reserved for the MAC, so the device always gets the same one. In the demo it reads site network, floor, device.</dd></div>
+      </dl>
+    </section>
+    <div class="health-grid">
+      {Object.entries(C.platforms).map(([k, p]) => <FieldAnatomy k={k} name={PLATFORM[k] ?? k} p={p} ex={ex} />)}
+    </div>
+  </div>
+</Shell>
+<style is:global>
+  .lf-notes h2 { margin: 0 0 8px; font-size: 18px; }
+  .lf-notes dl { margin: 0; display: grid; gap: 8px; }
+  .lf-notes dl div { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 12px; font-size: 14px; }
+  .lf-notes dt { font-weight: 700; }
+  .lf-notes dd { margin: 0; color: var(--text-2); }
+</style>

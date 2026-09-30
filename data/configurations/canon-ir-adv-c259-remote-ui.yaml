@@ -1,0 +1,55 @@
+# Configuration: imageRUNNER ADVANCE DX C259 Remote UI settings. Setting names, menu paths and defaults are the vendor's (cited per setting);
+# the values and reasons are Aigna's (demo). Researched from vendor documents, Sept 2026.
+id: canon-ir-adv-c259-remote-ui
+name: imageRUNNER ADVANCE DX C259 Remote UI settings
+models: [canon-ir-adv-c259]
+mode: Networked MFP, Remote UI managed
+version: '1.0'
+owner: sofia
+updated: '2026-09-28'
+summary: The same Remote UI pattern as Aigna's other Canon MFPs, checked against this model's own manual, the shared default Administrator password changed,
+  the clock pointed at Aigna's time server, and firmware left on manual updates only.
+managed_by: Device web interface
+steps: [Patch into the floor's print VLAN; the printer takes its DHCP reservation., 'At the control panel, change the Administrator password from the default
+    before Remote UI login is allowed at all.', 'Browse to http://<the printer''s address>/ and log in as Administrator.', Set the time zone and SNTP server.,
+  'Set SNMP to v3 only, with Aigna''s monitoring credentials.', Confirm PIN (Secure) printing shows as an output option in the driver., Turn off Scheduled
+    Update Settings; apply firmware manually after the Lab passes it., Run the room's verification.]
+groups:
+- name: Administrator access
+  where: Device web interface (Remote UI)
+  settings:
+  - {derive: vault-site, name: Administrator password, path: Settings/Registration > Management Settings > User Management > Authentication Management > Register/Edit Authentication
+      User, value: 'From the password vault, per site', per_device: true, action: change, layer: profile, why: Ships with the same default Administrator
+      password (7654321) as the rest of this Canon generation; Remote UI login is actually blocked on the default until it's changed at the control panel.,
+    source: canon-ir-adv-c259-remote-ui-start}
+- name: Date and time
+  where: Device web interface (Remote UI)
+  settings:
+  - {derive: time-zone, name: Setting the Date/Time (time zone), path: Settings/Registration > Preferences > Timer/Energy Settings > Date/Time Settings, value: The site's
+      time zone, per_device: true, action: change, layer: country, why: Sets the clock used on print and scan job logs and the SNMP monitoring timestamps.,
+    source: canon-ir-adv-c259-date-time}
+  - {derive: time-server-1, name: SNTP Settings, path: Settings/Registration > Preferences > Network Settings > TCP/IP Settings > SNTP Settings, value: ntp1.aigna.example,
+    action: change, layer: naming-network, why: Syncs the clock from Aigna's time server automatically instead of a manual entry that drifts., source: canon-ir-adv-c259-tcpip-settings}
+- name: SNMP
+  where: Device web interface (Remote UI)
+  settings:
+  - {name: SNMP Settings, path: Settings/Registration > Preferences > Network Settings > SNMP Settings, value: SNMPv3 on with Aigna's monitoring credentials;
+      SNMPv1 off, action: change, layer: profile, why: SNMPv1 sends its community string in the clear; Aigna's print-fleet monitoring only needs v3.,
+    source: canon-ir-adv-c259-network-menu-list}
+- name: Printing
+  where: Device web interface (Remote UI)
+  settings:
+  - {name: Secure Print (PIN printing), value: Available to every user from the driver's Output Method by default, action: verify, layer: profile, why: No
+      separate admin-side toggle is documented for this model; Aigna just confirms the option is there before relying on it for sensitive jobs.}
+- name: Updates
+  where: Device web interface (Remote UI)
+  settings:
+  - {name: Scheduled Update Settings, path: Settings/Registration > License/Other > Register/Update Software > Scheduled Update Settings, value: 'Off',
+    action: change, layer: profile, why: 'Left on, the printer checks and downloads firmware on its own; Aigna applies a release only after the Lab has
+      passed it.'}
+gaps: [No published current firmware/controller version for this model was found on the vendor pages read., 'No documented admin-side setting to require
+    Secure Print for every job; it''s opt-in per print job from the driver, so ''verify'' rather than ''change'' is the honest action here. This model''s
+    own Secure Print page could not be located (indexed search returned no USRMA-8274 match and a direct URL guess 404''d), so the action here is carried
+    over from the identical driver-side workflow confirmed on the C5150.', 'This model''s own License/Other > Register/Update Software page 404''d when
+    read directly; the path and Scheduled Update Settings item name are carried over from the C5150 manual''s identical Settings/Registration structure
+    (both are Gen3 Remote UI devices with matching Settings/Registration menus elsewhere), not independently confirmed on this model''s own page.']

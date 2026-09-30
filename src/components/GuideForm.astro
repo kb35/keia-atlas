@@ -1,0 +1,117 @@
+---
+// The two-tap form of the room guide: big tiles to pick one, then Send. Two optional lines below.
+// After Send the same place shows the reference and what happens next (src/lib/guide-client.mjs does the
+// sending, through the live layer). Used by the report and request pages.
+interface Opt { id: string; label: string; hint: string; icon: string }
+interface Props {
+  kind: 'report' | 'request';
+  room: Record<string, unknown>;
+  back: string; backLabel: string;
+  heading: string; lede: string;
+  options: Opt[];
+  noteLabel: string; notePlaceholder: string;
+  doneHeading: string; doneLines: string[];
+  staff?: { to: string; label: string };
+  notice?: string;
+}
+const { kind, room, back, backLabel, heading, lede, options, noteLabel, notePlaceholder, doneHeading, doneLines, staff, notice } = Astro.props;
+const uid = `gf-${kind}`;
+---
+<div class="gf" data-guide-form data-kind={kind}>
+  <script type="application/json" set:html={JSON.stringify(room)}></script>
+  <a class="gf-back" href={back}><span aria-hidden="true">←</span> {backLabel}</a>
+  <header class="gf-h" data-guide-before>
+    <h1 transition:name="g-room-title">{heading}</h1>
+    <p>{lede}</p>
+  </header>
+  <slot name="before" />
+  <form class="gf-form" novalidate>
+    <fieldset class="gf-tiles">
+      <legend class="sr-only">{heading}</legend>
+      {options.map((o) => (
+        <label class="gf-tile">
+          <input type="radio" name="pick" value={o.id} />
+          <span class="gf-ic" aria-hidden="true"><svg viewBox="0 0 32 32" set:html={o.icon} /></span>
+          <span class="gf-t"><b>{o.label}</b><small>{o.hint}</small></span>
+          <span class="gf-tick" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7" /></svg></span>
+        </label>
+      ))}
+    </fieldset>
+    <div class="gf-fields">
+      <label class="gf-field"><span>{noteLabel} <i>optional</i></span><input type="text" name="note" id={`${uid}-note`} maxlength="140" placeholder={notePlaceholder} autocomplete="off" enterkeyhint="send" /></label>
+      <label class="gf-field"><span>Your name <i>optional</i></span><input type="text" name="name" id={`${uid}-name`} maxlength="60" autocomplete="name" enterkeyhint="send" /></label>
+    </div>
+    <button type="submit" class="gf-send" data-send disabled>Send</button>
+    {notice && <p class="gf-notice">{notice}</p>}
+  </form>
+  <section class="gf-done" data-guide-done hidden aria-live="polite">
+    <span class="gf-check" aria-hidden="true"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="21" /><path d="M14 24.5l7 7 13-14" /></svg></span>
+    <h1 tabindex="-1" data-done-h>{doneHeading}</h1>
+    <p class="gf-ref"><span data-what></span> · Reference <b class="mono" data-ref></b></p>
+    <ul class="gf-next">{doneLines.map((l) => <li>{l}</li>)}</ul>
+    <div class="gf-done-act">
+      <a class="btn primary" href={back}>Back to the room guide</a>
+      <button type="button" class="btn ghost" data-again>{kind === 'report' ? 'Report something else' : 'Ask for something else'}</button>
+    </div>
+    {staff && <a class="gf-staff" href={staff.to}>{staff.label}</a>}
+  </section>
+</div>
+
+<style>
+  .gf { display: grid; gap: 16px; }
+  .gf-back { justify-self: start; display: inline-flex; gap: 6px; align-items: center; min-height: 40px; font-size: 15px; font-weight: 600; color: var(--text-2); text-decoration: none; }
+  .gf-back:hover { color: var(--text); }
+  .gf-h h1 { font-size: clamp(26px, 6.5vw, 36px); line-height: 1.12; }
+  .gf-h p { margin: 6px 0 0; color: var(--text-2); font-size: 15.5px; }
+  .gf-form { display: grid; gap: 16px; }
+  .gf-form[hidden] { display: none; }
+  .gf-tiles { border: 0; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .gf-tile { position: relative; display: grid; grid-template-rows: auto 1fr; gap: 8px; min-height: 100px; padding: 12px 14px; border-radius: var(--radius-lg); background: var(--surface); border: 2px solid var(--line); cursor: pointer; transition: border-color var(--dur-state) var(--ease-settle), background var(--dur-state) var(--ease-settle), transform var(--dur-hover) var(--ease-settle); -webkit-tap-highlight-color: transparent; }
+  .gf-tile:hover { border-color: var(--line-strong); }
+  .gf-tile:active { transform: scale(.98); }
+  .gf-tile input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .gf-tile:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .gf-tile:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--surface)); }
+  .gf-tile:last-of-type:nth-of-type(odd) { grid-column: 1 / -1; min-height: 80px; grid-template-rows: none; grid-template-columns: auto minmax(0, 1fr); align-items: center; }
+  .gf-ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--surface-2); color: var(--text); transition: background var(--dur-state), color var(--dur-state); }
+  .gf-tile:has(input:checked) .gf-ic { background: var(--accent); color: var(--on-accent); }
+  .gf-ic svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .gf-t b { display: block; font: 700 16.5px/1.2 var(--font-display); }
+  .gf-t small { display: block; margin-top: 3px; font-size: 13px; line-height: 1.35; color: var(--text-2); }
+  .gf-tick { position: absolute; top: 10px; right: 10px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); opacity: 0; transform: scale(.6); transition: opacity var(--dur-state) var(--ease-settle), transform var(--dur-state) var(--ease-settle); }
+  .gf-tick svg { width: 13px; height: 13px; fill: none; stroke: var(--on-accent); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+  .gf-tile:has(input:checked) .gf-tick { opacity: 1; transform: none; }
+
+  .gf-fields { display: grid; gap: 10px; }
+  .gf-field { display: grid; gap: 6px; font-size: 14px; font-weight: 600; color: var(--text); }
+  .gf-field i { font-style: normal; font-weight: 400; color: var(--text-3); }
+  .gf-field input { font: 400 16px/1.3 var(--font-sans); min-height: 48px; padding: 10px 14px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); width: 100%; }
+  .gf-field input:focus { outline: 2px solid var(--focus); outline-offset: 1px; border-color: transparent; }
+  .gf-send { min-height: 56px; border: 0; border-radius: var(--radius-lg); font: 700 18px/1 var(--font-sans); background: var(--surface-3); color: var(--text-3); cursor: not-allowed; transition: background var(--dur-state) var(--ease-settle), color var(--dur-state), transform var(--dur-hover) var(--ease-settle); }
+  .gf-send.ready { background: var(--accent); color: var(--on-accent); cursor: pointer; }
+  .gf-send.ready:hover { background: var(--accent-hover); }
+  .gf-send.ready:active { transform: scale(.985); }
+  .gf-notice { margin: 0; font-size: 13.5px; color: var(--text-3); text-align: center; }
+
+  .gf-done { display: grid; justify-items: center; text-align: center; gap: 12px; padding: 12px 0 8px; }
+  .gf-done h1 { font-size: clamp(26px, 6.5vw, 34px); outline: none; }
+  .gf-check svg { width: 76px; height: 76px; }
+  .gf-check circle { fill: color-mix(in srgb, var(--green, #2d8a4e) 14%, transparent); stroke: var(--green, #2d8a4e); stroke-width: 2.5; }
+  .gf-check path { fill: none; stroke: var(--green, #2d8a4e); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 36; stroke-dashoffset: 0; }
+  .gf-done.g-in .gf-check path { animation: gf-tick 520ms var(--ease-settle) 160ms backwards; }
+  .gf-done.g-in .gf-check { animation: gf-pop var(--dur-enter) var(--ease-settle) backwards; }
+  .gf-done.g-in > :not(.gf-check) { animation: rise var(--dur-enter) var(--ease-settle) 120ms backwards; }
+  @keyframes gf-tick { from { stroke-dashoffset: 36; } }
+  @keyframes gf-pop { from { opacity: 0; transform: scale(.94); } }
+  .gf-ref { margin: 0; font-size: 16px; color: var(--text-2); }
+  .gf-ref b { color: var(--text); font-size: 17px; letter-spacing: .02em; }
+  .gf-next { margin: 4px 0 0; padding: 14px 16px; list-style: none; display: grid; gap: 8px; max-width: 460px; text-align: left; border-radius: var(--radius-lg); background: var(--surface); border: var(--border-card); font-size: 15.5px; line-height: 1.45; }
+  .gf-next li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 10px; }
+  .gf-next li::before { content: ""; width: 8px; height: 8px; margin-top: 8px; border-radius: 50%; background: var(--accent); }
+  .gf-next li:first-child { font-weight: 600; }
+  .gf-done-act { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 4px; }
+  .gf-done-act .btn { min-height: 48px; }
+  .gf-staff { font-size: 13px; color: var(--text-3); }
+  @media (min-width: 600px) { .gf-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } .gf-tile:last-of-type:nth-of-type(odd) { grid-column: auto; min-height: 112px; grid-template-rows: auto 1fr; grid-template-columns: none; align-items: stretch; } .gf-fields { grid-template-columns: 2fr 1fr; } }
+  @media (min-width: 600px) { .gf-tiles:has(> .gf-tile:nth-child(3):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+</style>

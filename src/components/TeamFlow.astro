@@ -1,0 +1,125 @@
+---
+// How the team works: six teams on a 3 by 2 grid and the seven ways work moves between them. Every
+// arrow is straight or a right-angled elbow drawn in the gaps between the boxes, and every label has
+// its own space, so nothing crosses or overlaps. Hover or focus a team to follow its work.
+// Props: teams ({ id, name, icon, owns, does, to, people }), in grid order: top row left to right, then bottom row.
+import Icon from './Icon.astro';
+import { href } from '../lib/data.mjs';
+const { teams } = Astro.props;
+const T = Object.fromEntries(teams.map((t) => [t.id, t]));
+const AREA = { 'av-it': 'a', delivery: 'd', 'it-infra': 'c', 'service-desk': 's', onsite: 'o', vendor: 'v' };
+// Written out for screen readers and narrow screens, where the arrows are not drawn.
+const FLOWS = [
+  { a: 'av-it', b: 'delivery', label: 'The standard' },
+  { a: 'it-infra', b: 'delivery', label: 'Ports and VLANs' },
+  { a: 'vendor', b: 'delivery', label: 'Installs' },
+  { a: 'delivery', b: 'onsite', label: 'Finished rooms' },
+  { a: 'service-desk', b: 'onsite', label: 'Incidents' },
+  { a: 'vendor', b: 'onsite', label: 'Repairs' },
+  { a: 'onsite', b: 'av-it', label: 'Fixes go back into the standard' },
+];
+const outOf = (id) => FLOWS.filter((f) => f.a === id);
+---
+<div class="fl" data-fl>
+  {teams.map((m) => (
+    <a class={`fl-box flb-${m.id}`} data-help="team.flow-team" data-help-name={m.name} href={href(m.to)} data-team={m.id} style={`grid-area:${AREA[m.id]}`}>
+      <span class="flb-top"><span class="flb-ic"><Icon name={m.icon} size={18} /></span><b>{m.name}</b></span>
+      <span class="flb-owns">{m.owns}</span>
+      <span class="flb-does">{m.does}</span>
+      <span class="flb-people" aria-hidden="true">{m.people.slice(0, 8).map((p) => <span class="av" title={`${p.name}, ${p.role}`}>{p.initials}</span>)}{m.people.length > 8 && <span class="more">+{m.people.length - 8}</span>}</span>
+      <span class="flb-out">{outOf(m.id).map((f) => <span>Gives {T[f.b].name}: {f.label.toLowerCase()}</span>)}</span>
+    </a>
+  ))}
+  <div class="fl-h to-r" style="grid-area:ab" data-a="av-it" data-b="delivery" aria-hidden="true"><span class="fl-lab">The standard</span><i></i></div>
+  <div class="fl-h to-l" style="grid-area:dc" data-a="it-infra" data-b="delivery" aria-hidden="true"><span class="fl-lab">Ports and VLANs</span><i></i></div>
+  <div class="fl-h to-r" style="grid-area:so" data-a="service-desk" data-b="onsite" aria-hidden="true"><span class="fl-lab">Incidents</span><i></i></div>
+  <div class="fl-h to-l" style="grid-area:ov" data-a="vendor" data-b="onsite" aria-hidden="true"><span class="fl-lab">Repairs</span><i></i></div>
+  <div class="fl-mid" style="grid-area:m" aria-hidden="true">
+    <div class="fl-v" data-a="delivery" data-b="onsite"><span class="fl-lab">Finished rooms</span></div>
+    <div class="fl-z fl-zl" data-a="onsite" data-b="av-it"><span class="fl-lab">Fixes go back into the standard</span></div>
+    <div class="fl-z2 fl-zl2" data-a="onsite" data-b="av-it"></div>
+    <div class="fl-z fl-zr" data-a="vendor" data-b="delivery"><span class="fl-lab">Installs</span></div>
+    <div class="fl-z2 fl-zr2" data-a="vendor" data-b="delivery"></div>
+  </div>
+  <ol class="sr-only">{FLOWS.map((f) => <li>{T[f.a].name} to {T[f.b].name}: {f.label}</li>)}</ol>
+</div>
+<script is:inline data-astro-rerun>
+  (function () {
+    var box = document.querySelector('[data-fl]'); if (!box || box.__fl) return; box.__fl = true;
+    var on = function (t) {
+      var id = t.dataset.team; box.classList.add('focus');
+      var linked = {}; linked[id] = true;
+      box.querySelectorAll('[data-a]').forEach(function (f) { var hit = f.dataset.a === id || f.dataset.b === id; f.classList.toggle('on', hit); if (hit) { linked[f.dataset.a] = true; linked[f.dataset.b] = true; } });
+      box.querySelectorAll('[data-team]').forEach(function (b) { b.classList.toggle('on', !!linked[b.dataset.team]); });
+    };
+    var off = function () { box.classList.remove('focus'); box.querySelectorAll('.on').forEach(function (x) { x.classList.remove('on'); }); };
+    box.addEventListener('mouseover', function (e) { var t = e.target.closest('[data-team]'); if (t) on(t); });
+    box.addEventListener('focusin', function (e) { var t = e.target.closest('[data-team]'); if (t) on(t); });
+    box.addEventListener('mouseleave', off);
+    box.addEventListener('focusout', function (e) { if (!box.contains(e.relatedTarget)) off(); });
+  })();
+</script>
+<style is:global>
+  /* The grid: boxes in columns 1, 3 and 5, arrows in the 128 px gaps (columns 2 and 4) and the middle row. */
+  .fl { --gx: 128px; --fl-c: var(--text-3); --fl-w: 2px; position: relative; display: grid; grid-template-columns: minmax(0, 1fr) var(--gx) minmax(0, 1fr) var(--gx) minmax(0, 1fr); grid-template-rows: auto 92px auto;
+    grid-template-areas: "a ab d dc c" "m m m m m" "s so o ov v"; padding: 22px; }
+  .fl-box { position: relative; z-index: 1; display: grid; align-content: start; gap: 6px; padding: 14px 16px; border-radius: var(--radius-lg); background: var(--surface); border: var(--border-card); box-shadow: var(--shadow-sm); color: inherit; text-decoration: none; transition: box-shadow var(--dur-hover) var(--ease-settle), opacity var(--dur-state) var(--ease-settle), border-color var(--dur-state) var(--ease-settle); }
+  .fl-box:hover, .fl-box:focus-visible { box-shadow: var(--shadow-lg); color: inherit; }
+  .fl-box:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus); }
+  .flb-top { display: flex; align-items: center; gap: 10px; } .flb-top b { font-size: 16px; }
+  .flb-ic { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex: none; background: var(--accent-soft); color: var(--accent-ink); }
+  .flb-it-infra .flb-ic { background: var(--blue-soft); color: var(--blue-ink); } .flb-onsite .flb-ic { background: var(--green-soft); color: var(--green-ink); }
+  .flb-service-desk .flb-ic { background: var(--red-soft); color: var(--red-ink); } .flb-vendor .flb-ic { background: var(--yellow-soft); color: var(--yellow-ink); }
+  .flb-owns { font: 700 12px/1.3 var(--font-mono); color: var(--text); }
+  .flb-does { font-size: 13px; color: var(--text-2); line-height: 1.4; }
+  .flb-people { display: flex; margin-top: 2px; }
+  .flb-people .av { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; flex: none; font: 700 9px/1 var(--font-mono); background: var(--surface-3); color: var(--text); margin-right: -5px; border: 2px solid var(--surface); }
+  .flb-people .more { font-size: 11px; color: var(--text-3); margin-left: 10px; align-self: center; }
+  .flb-out { display: none; }
+
+  /* Labels sit beside their line, never on another one. */
+  .fl-lab { font: 700 11.5px/1.25 var(--font-sans); color: var(--text-2); background: var(--surface); padding: 3px 8px; border-radius: var(--pill-radius); border: 1px solid var(--line); white-space: nowrap; transition: color var(--dur-state) var(--ease-settle), border-color var(--dur-state) var(--ease-settle); }
+
+  /* Straight arrows across the column gaps: label above, line with its head at the receiving box. */
+  .fl-h { align-self: center; display: grid; justify-items: center; gap: 6px; padding: 0 2px; transition: opacity var(--dur-state) var(--ease-settle); }
+  .fl-h .fl-lab { white-space: normal; text-align: center; max-width: calc(var(--gx) - 8px); }
+  .fl-h i { position: relative; justify-self: stretch; height: var(--fl-w); background: var(--fl-c); transition: background var(--dur-state) var(--ease-settle); }
+  .fl-h i::after { content: ""; position: absolute; top: 50%; border: 6px solid transparent; transform: translateY(-50%); }
+  .fl-h.to-r i::after { right: -2px; border-left: 9px solid var(--fl-c); border-right: 0; }
+  .fl-h.to-l i::after { left: -2px; border-right: 9px solid var(--fl-c); border-left: 0; }
+
+  /* The middle row. f is one box column's width; x positions are fractions of a column plus the gaps. */
+  .fl-mid { position: relative; --f: calc((100% - 2 * var(--gx)) / 3); }
+  .fl-mid > div { position: absolute; transition: opacity var(--dur-state) var(--ease-settle), border-color var(--dur-state) var(--ease-settle); border-color: var(--fl-c); }
+  /* Delivery hands finished rooms down to On site: a straight line down the middle column. */
+  .fl-v { top: 0; bottom: 0; left: calc(var(--f) * 1.5 + var(--gx) - 1px); width: 0; border-left: var(--fl-w) solid; }
+  .fl-v::after { content: ""; position: absolute; bottom: -2px; left: calc(-1 * var(--fl-w) / 2 - 6px); border: 6px solid transparent; border-top: 9px solid; border-top-color: inherit; border-bottom: 0; }
+  .fl-v .fl-lab { position: absolute; top: 14px; right: 10px; }
+  /* Elbows: up from the sending box to the middle of the row, across, then up into the receiving box. */
+  .fl-z { top: 0; height: 50%; border-bottom: var(--fl-w) solid; border-left: var(--fl-w) solid; }
+  .fl-z::before { content: ""; position: absolute; top: -2px; left: calc(-1 * var(--fl-w) / 2 - 7px); border: 6px solid transparent; border-bottom: 9px solid; border-bottom-color: inherit; border-top: 0; }
+  .fl-z2 { top: 50%; bottom: 0; width: 0; border-left: var(--fl-w) solid; }
+  /* On site sends fixes back to AV service: from On site's left side, across, up into AV service. */
+  .fl-zl { left: calc(var(--f) * .72); right: calc(100% - (var(--f) * 1.2 + var(--gx)) - var(--fl-w)); }
+  .fl-zl2 { left: calc(var(--f) * 1.2 + var(--gx)); }
+  .fl-zl .fl-lab { position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); }
+  /* Vendors install for Delivery: from Vendors, across, up into Delivery's right side. */
+  .fl-zr { left: calc(var(--f) * 1.8 + var(--gx)); right: calc(100% - (var(--f) * 2.28 + 2 * var(--gx)) - var(--fl-w)); }
+  .fl-zr2 { left: calc(var(--f) * 2.28 + 2 * var(--gx)); }
+  .fl-zr .fl-lab { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); }
+
+  /* Following one team: its arrows and partners stay, the rest step back. */
+  .fl.focus [data-a]:not(.on) { opacity: .22; }
+  .fl.focus .fl-box:not(.on) { opacity: .5; }
+  .fl [data-a].on { --fl-c: var(--accent); }
+  .fl [data-a].on .fl-lab { color: var(--accent-ink); border-color: var(--accent); }
+
+  @media (prefers-reduced-motion: reduce) { .fl-box, .fl-h, .fl-h i, .fl-lab, .fl-mid > div { transition: none !important; } }
+  @media (max-width: 1000px) {
+    .fl { grid-template-columns: 1fr 1fr; grid-template-rows: none; grid-template-areas: "a d" "c o" "s v"; gap: 10px; padding: 12px; }
+    .fl-h, .fl-mid { display: none; }
+    .flb-out { display: grid; gap: 2px; font-size: 12.5px; color: var(--text-2); border-top: 1px solid var(--line); padding-top: 6px; }
+    .flb-out span::before { content: "\2192\00a0"; color: var(--text-3); }
+  }
+  @media (max-width: 760px) { .fl { grid-template-columns: 1fr; grid-template-areas: "a" "d" "c" "o" "s" "v"; } }
+</style>

@@ -1,0 +1,193 @@
+---
+// Wiring diagram for one room (or one build option of a room profile), plus the same cables as a table.
+// Reads left to right: where a signal starts, what carries or switches it, where it ends (layout in
+// src/lib/wiring.mjs). Power and network outlets are listed under each device instead of being drawn
+// as long lines. Hover a device or a cable to light the whole path it is on.
+//
+// highlight: node ids ("video-bar#1", "display#2") whose whole path stays lit, the way hovering lights it,
+// and comes back when the pointer leaves. An incident page uses it for the affected device.
+import { activeLinks, layout, describe, cableColour, CABLE_LABEL } from '../lib/wiring.mjs';
+import { GLYPHS } from '../lib/glyphs.mjs';
+const { option, fitted = [], allOptional = false, heading = 'Wiring', note = '', maxWidth = 1100, highlight = [] } = Astro.props;
+const fit = new Set(allOptional ? option.equipment.filter((e) => e.requirement === 'optional').map((e) => e.key) : fitted);
+const links = activeLinks(option, fit);
+const L = links.length ? layout(option, links, { maxWidth }) : null;
+const drawn = L ? L.edges : [];
+const legend = [...new Map(drawn.map((e) => [e.colour, e])).keys()];
+const LEG = { 'var(--c-hdmi)': 'Video', 'var(--c-usb)': 'USB', 'var(--c-hdbt)': 'HDBaseT', 'var(--c-lan)': 'Network', 'var(--c-power)': 'Power', 'var(--c-audio)': 'Audio', 'var(--grey)': 'Vendor cable' };
+const uid = `${option.id}-${allOptional ? 'all' : [...fit].join('-') || 'base'}`;
+const stubCount = L ? L.nodes.reduce((n, x) => n + x.stubs.length, 0) : 0;
+// The same walk the hover script does: a node, everything upstream of it and everything downstream.
+const pinned = new Set((highlight ?? []).filter((id) => L?.nodes.some((n) => n.id === id)));
+const lit = new Set();
+if (L && pinned.size) {
+  const byId = new Map(L.nodes.map((n) => [n.id, n]));
+  for (const start of pinned) {
+    lit.add(start);
+    for (const dir of ['ups', 'downs']) {
+      const stack = [start], seen = new Set();
+      while (stack.length) { const n = byId.get(stack.pop()); for (const m of n?.[dir] ?? []) if (!seen.has(m)) { seen.add(m); lit.add(m); stack.push(m); } }
+    }
+  }
+}
+const edgeLit = (e) => lit.has(e.U.id) && lit.has(e.D.id);
+---
+{L && (
+  <section class="wiring" aria-labelledby={`w-${uid}`} data-wiring>
+    <div class="w-top">
+      <h2 id={`w-${uid}`} data-help="wiring">{heading}</h2>
+      <span class="muted w-count">{drawn.length} signal {drawn.length === 1 ? 'cable' : 'cables'}{stubCount ? `, ${stubCount} to outlets` : ''}</span>
+      <div class="legend w-legend">
+        {legend.map((c) => <span style={`--c:${c}`}>{LEG[c] ?? 'Cable'}</span>)}
+        <button type="button" class="lchip w-play" aria-pressed="false" data-w-play><span class="lc-ic rn"></span>Show signals moving</button>
+      </div>
+    </div>
+    {note && <p class="muted w-note">{note}</p>}
+    <div class="card wiring-card">
+      <svg class:list={['w-svg', { focus: pinned.size > 0 }]} data-pin={pinned.size ? [...pinned].join(' ') : undefined} viewBox={`0 -4 ${L.width} ${L.height + 4}`} style={`max-width:${L.width}px`} role="img" aria-label={`Wiring diagram with ${links.length} cables, read left to right. The same cables are listed below.`}>
+        {L.heads.map((h) => (
+          <g class="w-head">
+            {(h.x1 - h.x0) / 2 - h.label.length * 3.9 - 10 > 14 && <path d={`M${h.x0 + 2} 15.5H${(h.x0 + h.x1) / 2 - h.label.length * 3.9 - 8}M${(h.x0 + h.x1) / 2 + h.label.length * 3.9 + 8} 15.5H${h.x1 - 2}`} />}
+            <text x={(h.x0 + h.x1) / 2} y="19" text-anchor="middle">{h.label}</text>
+          </g>
+        ))}
+        {drawn.map((e, k) => (
+          <g class:list={['w-edge', { lit: edgeLit(e) }]} data-u={e.U.id} data-d={e.D.id} tabindex="0">
+            <title>{`${CABLE_LABEL[e.link.cable]}: ${describe(e.link.from, option)} to ${describe(e.link.to, option)}`}</title>
+            <path d={e.d} class="w-hit" />
+            <path d={e.d} class="w-line" style={`stroke:${e.colour}`} />
+            <path d={e.d} class="w-flow" style={`stroke:${e.colour};--k:${k}`} />
+            {e.ends.map(([x, y]) => <circle cx={x} cy={y} r="3.2" style={`fill:${e.colour}`} />)}
+          </g>
+        ))}
+        {L.nodes.map((n) => (
+          <g class:list={['w-node', `k-${n.kind}`, { lit: lit.has(n.id), pin: pinned.has(n.id) }]} data-node={n.id} data-ups={n.ups.join(' ')} data-downs={n.downs.join(' ')} tabindex="0">
+            <title>{`${n.title}, ${n.sub}`}</title>
+            <rect x={n.x} y={n.y} width={n.w} height={n.h} rx="8" class="w-box" />
+            {GLYPHS[n.cls] && <g class="w-glyph" transform={`translate(${n.x + n.w - 34} ${n.y + 5}) scale(.7)`} set:html={GLYPHS[n.cls]} />}
+            {n.tl.map((t, i) => <text class="w-title" x={n.x + 10} y={n.y + 17 + i * 15}>{t}</text>)}
+            <text class="w-sub" x={n.x + 10} y={n.y + 17 + n.tl.length * 15}>{n.sl}</text>
+            {n.rows.map((r) => (
+              <g class="w-port">
+                <rect x={n.x + 6} y={r.y - 7.5} width={n.w - 12} height="15" rx="3" />
+                <text x={r.isIn && !r.isOut ? n.x + 12 : n.x + n.w - 12} y={r.y + 3.8} text-anchor={r.isIn && !r.isOut ? 'start' : 'end'}>{r.label.length > Math.floor((n.w - 24) / 6.4) ? r.label.slice(0, Math.floor((n.w - 24) / 6.4) - 1) + '…' : r.label}</text>
+              </g>
+            ))}
+            {n.stubRows.map((s) => (
+              <g class={`w-stub s-${s.service}`}>
+                <title>{s.label}</title>
+                <rect x={n.x + 10} y={s.y - 5} width="9" height="9" rx={s.service === 'power' ? 4.5 : 1.5} />
+                <text x={n.x + 24} y={s.y + 3}>{s.short}</text>
+              </g>
+            ))}
+          </g>
+        ))}
+      </svg>
+    </div>
+    <details class="w-table">
+      <summary>List every cable</summary>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th scope="col">Cable</th><th scope="col">From</th><th scope="col">To</th></tr></thead>
+          <tbody>
+            {links.map((l) => (
+              <tr>
+                <td style="white-space:nowrap"><span style={`display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;background:${cableColour(l)}`}></span>{CABLE_LABEL[l.cable]}</td>
+                <td>{describe(l.from, option)}</td>
+                <td>{describe(l.to, option)}{l.notes && <small>{l.notes}</small>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+)}
+<style is:global>
+  .wiring { display: grid; gap: 8px; }
+  .w-top { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 14px; }
+  .w-top h2 { margin: 0; font-size: 18px; }
+  .w-count { font-size: 13px; }
+  .w-legend { margin-left: auto; align-items: center; }
+  .w-note { margin: 0; font-size: 13px; }
+  .wiring-card { padding: 12px 14px 10px; overflow: hidden; }
+  .w-svg { width: 100%; height: auto; display: block; margin: 0 auto; }
+  .w-head text { font: 700 10.5px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; fill: var(--text-3); }
+  .w-head path { stroke: var(--line-strong); stroke-width: 1; fill: none; }
+  .w-box { fill: var(--surface); stroke: var(--line-strong); stroke-width: 1.2; transition: stroke var(--dur-state), stroke-width var(--dur-state); }
+  .k-laptop .w-box, .k-router .w-box { fill: var(--surface-2); stroke-dasharray: 4 3; }
+  .w-title { font: 700 12.5px var(--font-sans); fill: var(--text); }
+  .w-sub { font: 400 11px var(--font-sans); fill: var(--text-2); }
+  .w-port rect { fill: var(--surface-2); }
+  .w-port text { font: 500 10.5px var(--font-mono); fill: var(--text-2); }
+  .w-stub rect { stroke-width: 1.4; }
+  .w-stub.s-power rect { fill: #FFF6DD; stroke: #C98A00; } .w-stub.s-data rect { fill: #E3ECFF; stroke: #1E5BFF; }
+  .w-stub text { font: 500 10.5px var(--font-sans); fill: var(--text-3); }
+  .w-glyph { fill: none; stroke: var(--art-line, var(--text-2)); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+  .w-hit { fill: none; stroke: transparent; stroke-width: 12; }
+  .w-line { fill: none; stroke-width: 2.3; transition: stroke-width var(--dur-state) var(--ease-settle); }
+  .w-flow { fill: none; stroke-width: 3.6; stroke-dasharray: 3 14; stroke-linecap: round; opacity: 0; transition: opacity var(--dur-state); }
+  .w-node, .w-edge { cursor: pointer; outline: none; transition: opacity var(--dur-state) var(--ease-settle); }
+  .w-node:focus-visible .w-box, .w-node.lit .w-box { stroke: var(--accent); stroke-width: 2.4; }
+  .w-node.pin .w-box { stroke: var(--red); stroke-width: 3; fill: color-mix(in srgb, var(--red) 7%, var(--surface)); }
+  .w-svg.focus .w-edge:not(.lit), .w-svg.focus .w-node:not(.lit) { opacity: .2; }
+  .w-svg.focus .w-edge.lit .w-line { stroke-width: 3.6; }
+  .w-edge.lit .w-flow, .wiring.playing .w-flow { opacity: 1; animation: w-run 1.1s linear infinite; animation-delay: calc(var(--k) * -90ms); }
+  @keyframes w-run { to { stroke-dashoffset: -34; } }
+  .w-play { margin-left: 4px; }
+  @media (prefers-reduced-motion: reduce) { .w-flow { animation: none !important; stroke-dasharray: none; } .w-node, .w-edge, .w-line { transition: none; } }
+  .w-table summary { cursor: pointer; color: var(--accent); font-weight: 600; padding: 2px 0; font-size: 13.5px; }
+  .w-table[open] summary { margin-bottom: 8px; }
+</style>
+<script is:inline data-astro-rerun>
+  (function () {
+    if (window.__rsWireHook) return; window.__rsWireHook = true;
+    // Light a device and everything upstream and downstream of it: the whole path its signal is on.
+    function walk(svg, start, dir, seen) {
+      var stack = [start];
+      while (stack.length) {
+        var id = stack.pop();
+        var el = svg.querySelector('.w-node[data-node="' + CSS.escape(id) + '"]'); if (!el) continue;
+        (el.dataset[dir] || '').split(' ').filter(Boolean).forEach(function (n) { if (!seen.has(dir + n)) { seen.add(dir + n); seen.add(n); stack.push(n); } });
+      }
+    }
+    function lite(svg, nodeId, edge) {
+      // Nothing hovered: go back to the pinned devices (data-pin), if the page set any.
+      var ids = nodeId ? [nodeId] : !edge && svg.dataset.pin ? svg.dataset.pin.split(' ') : [];
+      svg.classList.toggle('focus', !!(ids.length || edge));
+      svg.querySelectorAll('.lit').forEach(function (x) { x.classList.remove('lit'); });
+      if (!ids.length && !edge) return;
+      var on = new Set();
+      if (edge) { on.add(edge.dataset.u); on.add(edge.dataset.d); walk(svg, edge.dataset.u, 'ups', on); walk(svg, edge.dataset.d, 'downs', on); }
+      else ids.forEach(function (id) { on.add(id); walk(svg, id, 'ups', on); walk(svg, id, 'downs', on); });
+      svg.querySelectorAll('.w-node').forEach(function (n) { if (on.has(n.dataset.node)) n.classList.add('lit'); });
+      svg.querySelectorAll('.w-edge').forEach(function (e) {
+        var a = on.has(e.dataset.u) && on.has(e.dataset.d);
+        if (edge) a = e === edge || (a && (isUp(svg, e, edge) || isDown(svg, e, edge)));
+        if (a) e.classList.add('lit');
+      });
+    }
+    // For a hovered cable, keep only cables that feed into it or carry on from it.
+    function reach(svg, from, dir) { var s = new Set([from]); walk(svg, from, dir, s); return s; }
+    function isUp(svg, e, edge) { var s = reach(svg, edge.dataset.u, 'ups'); return s.has(e.dataset.u) && s.has(e.dataset.d); }
+    function isDown(svg, e, edge) { var s = reach(svg, edge.dataset.d, 'downs'); return s.has(e.dataset.u) && s.has(e.dataset.d); }
+    function hit(t) {
+      if (!t || !t.closest) return null;
+      var n = t.closest('.w-node[data-node]'); if (n) return { svg: n.ownerSVGElement, node: n.dataset.node };
+      var e = t.closest('.w-edge'); if (e) return { svg: e.ownerSVGElement, edge: e };
+      return null;
+    }
+    document.addEventListener('mouseover', function (ev) { var h = hit(ev.target); if (h) lite(h.svg, h.node, h.edge); });
+    document.addEventListener('mouseout', function (ev) {
+      var h = hit(ev.target); if (!h) return;
+      var to = hit(ev.relatedTarget);
+      if (!to || to.svg !== h.svg) lite(h.svg, null, null);
+    });
+    document.addEventListener('focusin', function (ev) { var h = hit(ev.target); if (h) lite(h.svg, h.node, h.edge); });
+    document.addEventListener('focusout', function (ev) { var h = hit(ev.target); if (h) lite(h.svg, null, null); });
+    document.addEventListener('click', function (ev) {
+      var b = ev.target.closest && ev.target.closest('[data-w-play]'); if (!b) return;
+      var on = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', String(on)); b.closest('.wiring').classList.toggle('playing', on);
+    });
+  })();
+</script>

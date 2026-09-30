@@ -1,0 +1,79 @@
+# Configuration: SWT3-31-HU room switcher. Setting names, menu paths and defaults are the vendor's (cited per setting);
+# the values and reasons are Aigna's (demo). Researched from vendor documents, Sept 2026.
+id: kramer-swt3-31-hu
+name: SWT3-31-HU room switcher
+models: [kramer-swt3-31-hu]
+mode: Room table switcher, BYOM laptop as priority source
+version: '1.0'
+owner: sofia
+updated: '2026-09-28'
+summary: A 3x1 switcher with an embedded web UI that Aigna uses to name the device, join it to the AV VLAN, tighten the default password, and set the
+  USB-C laptop input as the priority source. Most AV behaviour (HDCP, colour handling, sleep) is left at Kramer's defaults.
+managed_by: Device web interface
+steps: [Patch into the room's AV port and power on; the device auto-acquires an address (DHCP) or falls back to 192.168.1.39., 'Browse to the device''s
+    IP, sign in with the default Admin/Admin credentials, and change the password immediately.', Set the device name and confirm the network settings below.,
+  Set the auto-switching policy and USB routing mode for the room., 'Set the RS-232 port''s role and, if the site uses NTP, point it at Aigna''s time
+    servers.', 'Wire and route the video/USB inputs; check HDCP, EDID and audio levels against the room''s display.', Firmware is applied manually from
+    the Device > General page; there is no automatic-update option to turn off.]
+groups:
+- name: Identity and network
+  where: Device web interface
+  settings:
+  - {derive: hostname, name: Device Name, path: Device > General > General Preferences, value: The hostname, per_device: true, layer: naming-network, why: 'Matches DNS, device
+      management and monitoring, so one name finds the device everywhere.', action: change, source: kramer-swt3-31-hu-user-manual-p-n}
+  - {derive: dhcp-reservation, name: IP Mode, path: Device > General > Network, value: 'DHCP (default), with a reservation on the AV VLAN', layer: naming-network, why: Aigna's
+      AV devices sit on a DHCP-reserved address on the AV VLAN rather than a hand-typed static one., action: verify, source: kramer-swt3-31-hu-user-manual-p-n}
+- name: Security
+  where: Security page
+  settings:
+  - {name: Security Status, path: Security > Security, value: On (default), layer: profile, why: Keeps the web pages behind a login instead of open to anyone
+      on the AV VLAN., action: verify, source: kramer-swt3-31-hu-user-manual-p-n}
+  - {derive: vault-site, name: Web Pages Access Password, path: Security > Security, value: 'From the password vault, per site', per_device: true, layer: profile, why: 'The
+      device ships with Admin/Admin, which must be changed before the switcher goes into service.', action: change, source: kramer-swt3-31-hu-user-manual-p-n}
+  - {name: 802.1X Authentication, path: Security > 802.1X, value: 'Off', layer: naming-network, why: Aigna's AV ports authenticate devices at the switch
+      instead of at the endpoint., action: change, source: kramer-swt3-31-hu-user-manual-p-n}
+- name: AV settings
+  where: AV Settings > Audio Video Settings page
+  settings:
+  - {name: HDCP (per input), value: Yes (default) on all inputs, layer: profile, why: Lets any HDCP-protected source play through without the installer
+      having to touch it per room., action: verify, source: kramer-swt3-31-hu-user-manual-p-n}
+  - {name: HDCP (output), value: Follow Input (default), layer: profile, why: 'Only encrypts the output when the active input needs it, which keeps unprotected
+      sources compatible with older displays.', action: verify, source: kramer-swt3-31-hu-user-manual-p-n}
+  - {name: Color Depth Force 8Bits, value: Disable (default), layer: profile, why: Leaves full colour depth in place; only used to force compatibility with
+      a difficult display., action: verify, source: kramer-swt3-31-hu-user-manual-p-n}
+  - {name: Force LPCM 2CH, value: Disable (default), layer: profile, why: Lets multi-channel or compressed audio through unchanged for Aigna's standard
+      Google Meet audio path., action: verify, source: kramer-swt3-31-hu-user-manual-p-n}
+  - {name: Force RGB on Output, value: Disable (default), layer: profile, why: Leaves the native colour space in place for the connected display., action: verify,
+    source: kramer-swt3-31-hu-user-manual-p-n}
+  - {name: Auto Sleep Delay, value: Enabled (default), layer: profile, why: Lets the output go to sleep after a signal loss instead of holding the display
+      awake indefinitely., action: verify, source: kramer-swt3-31-hu-user-manual-p-n}
+  - {name: No input signal (sleep timeout), value: 900 seconds (default), layer: profile, why: 'Gives a room enough time between meetings before the output
+      sleeps, without leaving it on all day.', action: verify, source: kramer-swt3-31-hu-user-manual-p-n}
+  - {derive: on-site, name: Analog output volume, path: Routing Settings > Analog Outputs, value: The room's calibrated listening level, per_device: true, layer: room-type,
+    why: The slider has no stated factory value; it's set to match each room's speakers during commissioning., action: change, source: kramer-swt3-31-hu-user-manual-p-n}
+- name: Routing
+  where: Routing / AV Settings pages
+  settings:
+  - {name: Auto-switching Selection Mode, path: AV Settings > Auto switching, value: 'Priority, with the USB-C laptop input (Input 1) highest', layer: profile,
+    why: Aigna's rooms are BYOM-first; plugging in a laptop should always win over an idle HDMI input., action: change, source: kramer-swt3-31-hu-user-manual-p-n}
+  - {name: USB Host Routing, path: Routing Settings > Routing Page, value: USB follows AV coupled routing, layer: profile, why: 'Keeps the active video
+      input''s USB peripherals (camera, soundbar) tied together, which is simpler for a room with one laptop at a time.', action: change, source: kramer-swt3-31-hu-user-manual-p-n}
+- name: Control and time
+  where: Control Gateway / Device > General pages
+  settings:
+  - {name: Serial Port Tunneling, path: Control Gateway > Serial Ports, value: Control (RS-232 controls the SWT3-31-HU itself), layer: profile, why: Aigna's
+      rooms don't chain a separate serially-controlled device off this switcher., action: verify, source: kramer-swt3-31-hu-user-manual-p-n}
+  - {name: Use Time Server (NTP), path: Device > General > Time and Date, value: Manual, layer: naming-network, why: Use Aigna's own time servers rather
+      than whatever the network offers., action: change, source: kramer-swt3-31-hu-user-manual-p-n}
+  - {derive: time-server-1, name: Time server address, path: Device > General > Time and Date, value: ntp1.aigna.example, layer: naming-network, why: 'Keeps the switcher''s
+      clock, and its device logs, aligned with the rest of the room''s equipment.', action: change, source: kramer-swt3-31-hu-user-manual-p-n}
+  - {name: Sync frequency, path: Device > General > Time and Date, value: 1 day, layer: profile, why: Keeps the clock accurate without polling the time
+      server unnecessarily often., action: change, source: kramer-swt3-31-hu-user-manual-p-n}
+- name: Firmware
+  where: Device > General page
+  settings:
+  - {name: Firmware update method, value: 'Manual upload only, no automatic-update toggle exists', layer: profile, why: 'There''s nothing to turn off; firmware
+      only changes when an installer manually uploads a file, which already matches Aigna''s Lab-first policy.', action: verify, source: kramer-swt3-31-hu-user-manual-p-n}
+gaps: ['No factory default is stated for the Auto-switching Selection Mode or for USB Host Routing coupling, so both are marked ''change'' rather than ''verify''.',
+  No current firmware number is published in the manual; settings were checked against the manual's own P/N 2900-301609 Rev 13., USB-C/B ethernet pass-through
+    and USB-C 2.0/3.0 data-rate mode are documented but left at their defaults; Aigna hasn't needed to change them for a standard room.]

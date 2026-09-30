@@ -1,0 +1,44 @@
+# Year plan: the AV and IT team's plan for twelve months. Projects and Lab tests come from their own
+# files; this adds what only the plan knows: the pipeline, reviews and change freezes.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/year-plan
+title: Year plan
+type: object
+additionalProperties: false
+required: [id, name, from, to, owners, pipeline, events, demo]
+properties:
+  id: { type: string }
+  name: { type: string }
+  from: { type: string, format: date }
+  to: { type: string, format: date }
+  owners: { description: Person ids who own the plan., type: array, items: { type: string } }
+  demo: { const: true }
+  pipeline:
+    description: Work in the plan that has not started as a project yet.
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [title, kind, site, start, end, status, why]
+      properties:
+        title: { type: string }
+        kind: { enum: [refresh, infra-refresh, fit-out, upgrade, custom-design, workplace-refresh, network-refresh, rma, provision, firmware-rollout, home-kit, decommission] }
+        site: { type: string }
+        start: { type: string, format: date }
+        end: { type: string, format: date }
+        status: { enum: [idea, proposed, approved] }
+        why: { type: string }
+        raised_by: { type: string }
+  events:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [kind, date, title]
+      properties:
+        kind: { enum: [review, freeze, budget] }
+        date: { type: string, format: date }
+        end: { type: string, format: date }
+        title: { type: string }
+        who: { type: array, items: { type: string } }

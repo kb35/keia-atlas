@@ -1,0 +1,202 @@
+---
+// The behaviour behind ConfigView.astro, included once on any page that shows a configuration:
+//  - the check: each Set or Verify row spins, then ticks (or crosses); the ring fills and, when
+//    everything is right, turns into a drawn tick. Results are simulated (src/lib/cfgstate.mjs).
+//  - "Fix it" puts the wrong values right and checks again, so the tick can be seen.
+//  - Show all settings, the practice setup ticks (kept on this browser), and the web interface map,
+//    where a clicked menu tile moves into the open panel and the one that was open goes back.
+// Tabs belong to DetailTabs. Nothing here moves the page: swaps go through window.rsHold (Shell.astro);
+// durations and the curve come from window.rsMotion (motion.css), and reduced motion stops the movement.
+---
+<script is:inline data-astro-rerun>
+  (function () {
+    var W = window.rsCfg;
+    if (!W) {
+      W = window.rsCfg = { fixed: {} };
+      var M = function () { return window.rsMotion ? window.rsMotion() : { reduced: true, ease: 'ease', state: 300, morph: 520, enter: 440, exit: 240, stagger: 24, delay: 120 }; };
+      var store = {
+        get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+        set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+      };
+      var plural = function (n, one, many) { return n + ' ' + (n === 1 ? one : many); };
+      var hold = function (box, swap) { if (window.rsHold && box) window.rsHold(box, swap); else swap(); };
+
+      /* The check. */
+      W.check = function (art) {
+        var box = art && art.querySelector('[data-cw-state]'); if (!box) return;
+        (art.__t || []).forEach(clearTimeout); art.__t = [];
+        var m = M(), fixed = art.classList.contains('fixed');
+        var rows = Array.prototype.slice.call(art.querySelectorAll('.cs2[data-tick]:not([data-tick=leave])'));
+        var total = rows.length || +box.dataset.total || 0;
+        var bad = fixed ? 0 : +box.dataset.bad || 0, drift = fixed ? 0 : +box.dataset.drift || 0;
+        var ring = box.querySelector('[data-st-ring]'), num = box.querySelector('[data-st-n]'), label = box.querySelector('[data-st-label]'), detail = box.querySelector('[data-st-detail]'), fix = box.querySelector('[data-cw-fix]');
+        var done = 0;
+        var paint = function () { if (num) num.textContent = total ? done + '/' + total : '0'; if (ring) ring.style.strokeDasharray = (total ? (done / total) * 100 : 0) + ' 100'; };
+        box.classList.remove('is-ok', 'is-bad'); box.classList.add('is-checking'); box.classList.toggle('is-empty', !total);
+        if (fix) fix.hidden = true;
+        if (detail) detail.textContent = '';
+        rows.forEach(function (r) { r.classList.remove('ok', 'bad', 'checking'); });
+        if (label) label.textContent = total ? 'Checking' : 'Checking records';
+        paint();
+        var mark = function (r) {
+          var t = r.dataset.tick; if (fixed && t === 'bad') t = 'ok';
+          r.classList.remove('checking'); r.classList.add(t);
+          var tk = r.querySelector('[data-tk]'); if (tk) tk.setAttribute('aria-label', t === 'ok' ? 'Correct on this unit' : 'Wrong on this unit');
+        };
+        var finish = function () {
+          box.classList.remove('is-checking');
+          var issues = bad + drift;
+          if (issues) {
+            var parts = []; if (bad) parts.push(plural(bad, 'setting', 'settings')); if (drift) parts.push(plural(drift, 'record', 'records'));
+            box.classList.add('is-bad'); if (label) label.textContent = issues + ' to fix'; if (detail) detail.textContent = parts.join(', '); if (fix) fix.hidden = false;
+          } else {
+            box.classList.add('is-ok'); if (label) label.textContent = total ? 'All correct' : 'Records in sync';
+          }
+        };
+        if (m.reduced) { rows.forEach(mark); done = total; paint(); finish(); return; }
+        // Rows are checked one after another, the whole run between one and three morphs long.
+        var span = Math.max(m.morph, Math.min(m.morph * 3, total * m.stagger * 2)), step = total ? span / total : 0;
+        for (var i = 0; i < total; i++) (function (i) {
+          var r = rows[i];
+          art.__t.push(setTimeout(function () { if (r) r.classList.add('checking'); }, m.delay + i * step));
+          art.__t.push(setTimeout(function () { if (r) mark(r); done = i + 1; paint(); }, m.delay + i * step + m.state));
+        })(i);
+        art.__t.push(setTimeout(finish, m.delay + span + m.enter));
+      };
+      /* Check each configuration on the page the first time its check comes into view. */
+      W.watch = function () {
+        var boxes = document.querySelectorAll('[data-cw] [data-cw-state]');
+        if (!('IntersectionObserver' in window)) { boxes.forEach(function (b) { W.check(b.closest('[data-cw]')); }); return; }
+        if (W.io) W.io.disconnect();
+        W.io = new IntersectionObserver(function (en) {
+          en.forEach(function (x) { if (x.isIntersecting) { W.io.unobserve(x.target); W.check(x.target.closest('[data-cw]')); } });
+        }, { threshold: 0.3 });
+        boxes.forEach(function (b) { W.io.observe(b); });
+      };
+
+      /* Fix it: the wrong values are put right on the unit and in every record (simulated). */
+      W.applyFixed = function (art) {
+        var on = !!W.fixed[art.dataset.cfg];
+        art.classList.toggle('fixed', on);
+        art.querySelectorAll('[data-fs-label]').forEach(function (l) {
+          if (!('orig' in l.dataset)) l.dataset.orig = l.textContent;
+          var st = l.closest('[data-fs-state]'); l.textContent = on && st && st.dataset.fsState !== 'sync' ? 'In sync' : l.dataset.orig;
+        });
+        var badge = art.querySelector('[data-fs-badge]');
+        if (badge) { if (!('orig' in badge.dataset)) badge.dataset.orig = badge.textContent; badge.textContent = on ? 'OK' : badge.dataset.orig; }
+      };
+      W.fix = function (art) {
+        W.fixed[art.dataset.cfg] = true;
+        document.querySelectorAll('[data-cw][data-cfg="' + art.dataset.cfg + '"]').forEach(W.applyFixed);
+        W.check(art);
+      };
+
+      W.setAll = function (on) {
+        W.all = on;
+        var swap = function () {
+          document.querySelectorAll('.cw-full').forEach(function (a) { a.classList.toggle('all', on); });
+          document.querySelectorAll('[data-cw-all]').forEach(function (c) { if (!c.disabled) c.checked = on; });
+        };
+        var box = document.querySelector('.cw-full [data-dt-box]');
+        // Showing more only grows the page; showing fewer is held so the page does not jump under the pointer.
+        hold(on ? null : box, swap);
+        store.set('rs-cfg-all', on ? '1' : '0');
+      };
+
+      /* The practice run: setup ticks, per configuration, on this browser. A step whose earlier step is not
+         ticked shows why it has to wait; ticking it anyway nudges it, and the reason stays in view. */
+      W.suKey = function (art) { return 'rs-cfg-su-' + art.dataset.cfg; };
+      W.suDone = function (art) { return (store.get(W.suKey(art)) || '').split(',').filter(Boolean); };
+      W.suPaint = function (art) {
+        var done = W.suDone(art), bs = art.querySelectorAll('[data-su]'), n = 0;
+        bs.forEach(function (b) {
+          var li = b.closest('li'), on = done.indexOf(b.dataset.su) >= 0;
+          var wait = (li.dataset.after || '').split(',').filter(Boolean).some(function (a) { return done.indexOf(a) < 0; });
+          b.setAttribute('aria-pressed', String(on)); li.classList.toggle('done', on); li.classList.toggle('blocked', wait); if (on) n++;
+        });
+        var bar = art.querySelector('[data-su-bar]'), lab = art.querySelector('[data-su-n]');
+        if (bar) bar.style.width = (bs.length ? (n / bs.length) * 100 : 0) + '%';
+        if (lab) lab.textContent = n + ' of ' + bs.length;
+      };
+      W.suToggle = function (art, n) {
+        var done = W.suDone(art), i = done.indexOf(n);
+        if (i >= 0) done.splice(i, 1); else done.push(n);
+        store.set(W.suKey(art), done.join(','));
+        var li = art.querySelector('[data-su-step="' + n + '"]');
+        hold(li && li.closest('.su'), function () { W.suPaint(art); });
+        if (li && i < 0 && li.classList.contains('blocked') && !M().reduced) { li.classList.remove('early'); void li.offsetWidth; li.classList.add('early'); }
+      };
+
+      /* The web interface map. The menus sit stacked as tiles; the open one shows beside them. A clicked
+         tile glides into the open space (a copy of it grows from the tile to the panel), the menu that
+         was open shrinks from the panel back to its place in the stack, and the other tiles slide
+         (FLIP: measure First, change, measure Last, Invert with a transform, Play it back to none). */
+      W.openMenu = function (art, k) {
+        var map = art.querySelector('.um2'), stack = art.querySelector('.um2-stack'), open = art.querySelector('[data-um-open]');
+        if (!stack || !open) return;
+        var m = M();
+        var tiles = Array.prototype.slice.call(stack.querySelectorAll('.um2-tile'));
+        var cur = tiles.filter(function (t) { return t.hidden; })[0], next = tiles.filter(function (t) { return t.dataset.um === k; })[0];
+        if (!next || next === cur) return;
+        var anim = !m.reduced && open.offsetParent;
+        var first = new Map(); tiles.forEach(function (t) { if (!t.hidden) first.set(t, t.getBoundingClientRect()); });
+        var from = next.getBoundingClientRect(), panelBox = open.getBoundingClientRect();
+        var head = open.querySelector('[data-um-panel]:not([hidden]) .um2-h'), headH = head ? head.getBoundingClientRect().height : 64;
+        var ghost = null;
+        if (anim) {
+          ghost = next.cloneNode(true); ghost.removeAttribute('data-um'); ghost.removeAttribute('role'); ghost.classList.add('um2-ghost'); ghost.setAttribute('aria-hidden', 'true');
+          Object.assign(ghost.style, { left: from.left + 'px', top: from.top + 'px', width: from.width + 'px', height: from.height + 'px' });
+          document.body.appendChild(ghost);
+        }
+        hold(map, function () {
+          if (cur) { cur.hidden = false; cur.setAttribute('aria-selected', 'false'); }
+          next.hidden = true; next.setAttribute('aria-selected', 'true');
+          art.querySelectorAll('[data-um-panel]').forEach(function (p) { p.hidden = p.dataset.umPanel !== k; });
+        });
+        if (!anim) return;
+        tiles.forEach(function (t) {
+          if (t.hidden) return;
+          var a = first.get(t), b = t.getBoundingClientRect();
+          if (!a) {   // the menu that was open: it shrinks from the panel back into its tile
+            t.animate([
+              { transform: 'translate(' + (panelBox.left - b.left) + 'px,' + (panelBox.top - b.top) + 'px)', width: panelBox.width + 'px', height: headH + 'px', opacity: 0.2 },
+              { transform: 'none', width: b.width + 'px', height: b.height + 'px', opacity: 1 },
+            ], { duration: m.morph, easing: m.ease });
+          } else if (Math.abs(a.top - b.top) > 1 || Math.abs(a.left - b.left) > 1) {
+            t.animate([{ transform: 'translate(' + (a.left - b.left) + 'px,' + (a.top - b.top) + 'px)' }, { transform: 'none' }], { duration: m.morph, easing: m.ease });
+          }
+        });
+        var to = open.getBoundingClientRect();
+        ghost.animate([
+          { left: from.left + 'px', top: from.top + 'px', width: from.width + 'px', height: from.height + 'px', opacity: 1 },
+          { left: to.left + 'px', top: to.top + 'px', width: to.width + 'px', height: headH + 'px', opacity: 1, offset: 0.6 },
+          { left: to.left + 'px', top: to.top + 'px', width: to.width + 'px', height: Math.min(to.height, window.innerHeight) + 'px', opacity: 0 },
+        ], { duration: m.morph, easing: m.ease }).onfinish = function () { ghost.remove(); };
+        var panel = art.querySelector('[data-um-panel="' + k + '"]');
+        if (panel) panel.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 0, offset: 0.4 }, { opacity: 1, transform: 'none' }], { duration: m.morph, easing: m.ease });
+      };
+
+      if (!window.__rsCfgHook) {
+        window.__rsCfgHook = true;
+        document.addEventListener('click', function (e) {
+          var art = e.target.closest && e.target.closest('[data-cw]'); if (!art) return;
+          if (e.target.closest('[data-cw-recheck]')) { W.check(art); return; }
+          if (e.target.closest('[data-cw-fix]')) { W.fix(art); return; }
+          if (e.target.closest('[data-cw-showall]')) { W.setAll(true); return; }
+          var su = e.target.closest('[data-su]');
+          if (su) { W.suToggle(art, su.dataset.su); return; }
+          if (e.target.closest('[data-su-reset]')) { store.set(W.suKey(art), ''); W.suPaint(art); return; }
+          var um = e.target.closest('.um2-tile[data-um]');
+          if (um) W.openMenu(art, um.dataset.um);
+        });
+        document.addEventListener('change', function (e) { if (e.target.matches && e.target.matches('[data-cw-all]')) W.setAll(e.target.checked); });
+      }
+    }
+    /* Per page. */
+    if (!document.querySelector('[data-cw]')) return;
+    if (W.all === undefined) { try { W.all = localStorage.getItem('rs-cfg-all') === '1'; } catch (e) { W.all = false; } }
+    document.querySelectorAll('[data-cw]').forEach(function (a) { W.applyFixed(a); W.suPaint(a); });
+    W.setAll(W.all);
+    W.watch();
+  })();
+</script>

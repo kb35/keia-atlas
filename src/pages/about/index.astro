@@ -1,0 +1,121 @@
+---
+import Shell from '../../layouts/Shell.astro';
+import Icon from '../../components/Icon.astro';
+import { decisions } from '../../lib/decisions.mjs';
+import { totals, href } from '../../lib/data.mjs';
+---
+<Shell title="About this project" section="about" crumbs={[{ label: 'About this project' }]}>
+  <section class="band">
+    <div class="meta"><span class="overline">About Keia Atlas</span></div>
+    <h1>About Keia Atlas</h1>
+    <p class="lede">A workplace technology console that treats the standard for each kind of room as data, draws every device down to its ports, and checks what is installed against what should be.</p>
+  </section>
+
+  <div class="content">
+    <div class="cols">
+      <div class="stack about">
+        <section aria-labelledby="problem">
+          <h2 id="problem">The problem</h2>
+          <p>AV and IT teams look after hundreds of meeting rooms, desks and shared rooms. The standard for each kind of room usually lives in a document or a slide deck. What is actually installed lives in a spreadsheet, an asset system and the vendor's cloud portals. Nothing connects them, so simple questions are hard to answer:</p>
+          <ul>
+            <li>Is this room built the way our standard says it should be?</li>
+            <li>Which cable goes into which port, and do we have enough outlets behind the display?</li>
+            <li>What is being replaced right now, and what is due next year?</li>
+          </ul>
+        </section>
+
+        <section aria-labelledby="approach">
+          <h2 id="approach">The approach</h2>
+          <ol>
+            <li><b>Write the standard as data.</b> Each room profile lists its build options, the device each option needs, the outlets it needs, and a wiring template that says which port connects to which. Most are based on public industry guidance: AVIXA's display sizing, the Microsoft Teams Rooms and Zoom room sizes, TIA-568 cabling and the makers' own room sizes, with every house assumption marked. The rest are a small house standard for home offices, comms rooms and IT stores.</li>
+            <li><b>Describe devices from the vendor's own documents.</b> Every one of the {totals.models} models has its size, power and every port, taken from datasheets and manuals. Each was read twice, independently, and the two readings compared field by field. Where a vendor is silent, the model says so under "gaps" rather than guessing.</li>
+            <li><b>Check it all at build time.</b> Every file is checked against a schema, then cross-checked: does every cable fit the connector at both ends, is any port used twice, are there enough outlets, does every installed unit have a unique serial and asset tag? A mistake stops the build.</li>
+            <li><b>Show it as a console.</b> The site leads with what needs attention, then lets you drill from a site to a room to a device and its ports.</li>
+          </ol>
+        </section>
+
+        <section aria-labelledby="built">
+          <h2 id="built">How it's built</h2>
+          <div class="flow" role="img" aria-label="YAML data, checked by JSON Schema, cross-checked, then built into static pages by Astro">
+            <span class="card">YAML data<small>{totals.types} room profiles, {totals.models} models, {totals.spaces} rooms</small></span>
+            <Icon name="arrow" />
+            <span class="card">JSON Schema<small>Ajv, strict mode</small></span>
+            <Icon name="arrow" />
+            <span class="card">Cross-checks<small>Wiring, outlets, serials</small></span>
+            <Icon name="arrow" />
+            <span class="card">Astro<small>{totals.units.toLocaleString('en-IE')} devices, static pages</small></span>
+          </div>
+          <ul>
+            <li><b>The Keia framework underneath.</b> The core vocabulary (room profiles, device classes, lifecycle stages, the split between a device's role and the physical box) comes from the <a href="https://github.com/kb35/keia">Keia framework</a>, an open way of describing environments. This console pins one version of it and never edits it; its own ideas sit in extension schemas.</li>
+            <li><b>Data first.</b> Plain YAML files, readable in any editor and reviewable in a pull request, checked by <a href="https://json-schema.org/">JSON Schema</a>.</li>
+            <li><b>A static site.</b> <a href="https://astro.build/">Astro</a> turns the data into plain HTML at build time. There is no server and no database to run.</li>
+            <li><b>Design tokens.</b> Every colour, size and radius is a token, so the five looks in Settings change tokens only, never components. Studio is the default; Enterprise uses <a href="https://www.patternfly.org/">PatternFly</a> token values (MIT).</li>
+            <li><b>Motion with purpose.</b> Pages move by direction with the browser's View Transitions API, drawings and ports morph as you step between models, and switching tabs never moves the page. All of it switches off if your system asks for reduced motion.</li>
+          </ul>
+        </section>
+
+        <section aria-labelledby="rules">
+          <h2 id="rules">The rule book</h2>
+          <p>How Keia Atlas moves, lays out pages, draws devices and rooms, and words things, written down as short numbered rules so anyone adding to it gets the same result.</p>
+          <a class="card rules-link" href={href('/about/rules/')}>
+            <span class="rl-ic" aria-hidden="true"><Icon name="book" size={22} /></span>
+            <span><b>Read the rule book</b><small>Motion, layout, devices, rooms, platform pages, words, looks and data, with live examples</small></span>
+            <Icon name="arrow" />
+          </a>
+        </section>
+
+        <section aria-labelledby="real">
+          <h2 id="real">What's real and what isn't</h2>
+          <p>Device models and their ports are real and public, and the room profiles rest on public industry guidance, with sources on every page and house assumptions marked. Aigna, its buildings, rooms, people and serial numbers are made up. Buildings are named after native Irish trees and rooms after Irish birds.</p>
+        </section>
+
+        <section aria-labelledby="decisions">
+          <div class="section-head"><h2 id="decisions">Decision records</h2><span class="aside muted">Why things are the way they are</span></div>
+          <div class="list">
+            {decisions.map((d) => (
+              <a class="row" href={href(`/about/decisions/${d.slug}/`)}>
+                <span class="code">{d.no}</span>
+                <span><span class="name">{d.title}</span><span class="sub">{d.context.length > 160 ? d.context.slice(0, d.context.lastIndexOf(' ', 157)) + '…' : d.context}</span></span>
+                <span class="end"><Icon name="arrow" /></span>
+              </a>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <aside class="stack" style="gap:16px">
+        <div class="card side-card">
+          <h3>Who made it</h3>
+          <p style="margin:0">Designed and directed by <b>Keith Brady</b>.</p>
+          <p class="muted" style="margin:0;font-size:13.5px">The code is written with AI assistance (Claude), working from Keith's descriptions of the system. Every design decision is written down in the records on this page.</p>
+        </div>
+        <div class="card side-card">
+          <h3>By the numbers</h3>
+          <dl class="kv">
+            <div><dt>Room profiles</dt><dd class="num">{totals.types}</dd></div>
+            <div><dt>Device models</dt><dd class="num">{totals.models}</dd></div>
+            <div><dt>Offices</dt><dd class="num">{totals.offices}</dd></div>
+            <div><dt>Rooms</dt><dd class="num">{totals.spaces}</dd></div>
+            <div><dt>Tracked devices</dt><dd class="num">{totals.units.toLocaleString('en-IE')}</dd></div>
+            <div><dt>Decision records</dt><dd class="num">{decisions.length}</dd></div>
+          </dl>
+        </div>
+      </aside>
+    </div>
+  </div>
+</Shell>
+<style is:global>
+  .about { max-width: 80ch; gap: 34px; }
+  .about h2 { font-size: var(--h2-size); margin-bottom: 10px; }
+  .about p, .about li { font-size: 15.5px; line-height: 1.65; }
+  .about p { margin: 0 0 10px; }
+  .about ul, .about ol { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
+  .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 6px 0 18px; color: var(--text-3); }
+  .flow .card { flex: 1 1 0; min-width: 118px; padding: 12px 14px; font: 700 15px/1.3 var(--font-display); color: var(--text); }
+  .flow small { display: block; font: 400 12.5px/1.3 var(--font-sans); color: var(--text-2); margin-top: 2px; }
+  .rules-link { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 14px 18px; color: inherit; text-decoration: none; transition: border-color var(--dur-state) var(--ease-settle), transform var(--dur-hover) var(--ease-settle); }
+  .rules-link:hover { color: inherit; border-color: var(--accent); transform: translateY(-1px); }
+  .rules-link .rl-ic { width: 40px; height: 40px; border-radius: var(--radius); display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-ink); }
+  .rules-link b { display: block; font-size: 15.5px; }
+  .rules-link small { display: block; color: var(--text-2); font-size: 13px; line-height: 1.4; }
+</style>

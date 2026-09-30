@@ -1,0 +1,363 @@
+---
+// One project (stage 3, simulated), laid out the way a project manager reads it. First the answer:
+// three lights (schedule, cost, scope) with a reason, the next gate and what is stuck. Then the
+// picture: the timeline, planned against actual with a gate at the end of each phase; the phase names
+// are the buttons that open a phase's record. The charter sits beside it. Then rooms, people and
+// budget; then the work (tasks as a board or a list, or a summary for a closed project), the log of
+// risks, issues, decisions and dependencies, change requests, and the agents (stage 6).
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import Section from '../../components/Section.astro';
+import SidePanel from '../../components/SidePanel.astro';
+import DetailTabs from '../../components/DetailTabs.astro';
+import Icon from '../../components/Icon.astro';
+import LiveBar from '../../components/LiveBar.astro';
+import ProjectStatus from '../../components/ProjectStatus.astro';
+import ProjectTimeline from '../../components/ProjectTimeline.astro';
+import TaskBoard from '../../components/TaskBoard.astro';
+import ProjectLog from '../../components/ProjectLog.astro';
+import { projects, spaces, sites, playbooks, PHASE_LABEL, phasesOf, STEP_LABEL, INTEGRATE_STEPS, TASK_STATUS, PROJECT_KIND, DEMO_TODAY, plural, href, fmtDate } from '../../lib/data.mjs';
+import { person, PROJECT_ROLE, ROLES } from '../../lib/demo.mjs';
+import { integrateBoard } from '../../lib/tasks.mjs';
+import { charter, nextGate, timeline, money } from '../../lib/project-status.mjs';
+import { recHere } from '../../lib/vt.mjs';
+
+export function getStaticPaths() {
+  return Object.values(projects).map((p) => ({ params: { id: p.id.toLowerCase() } }));
+}
+const p = Object.values(projects).find((x) => x.id.toLowerCase() === Astro.params.id);
+const pb = playbooks[p.playbook];
+const days = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000);
+const hist = Object.fromEntries((p.history ?? []).map((h) => [h.phase, h]));
+const hoursGiven = (p.roles ?? []).reduce((n, r) => n + r.hours, 0);
+const hoursLogged = (p.roles ?? []).reduce((n, r) => n + (r.logged ?? 0), 0);
+const SPACE_STATE = { 'not-started': 'Not started', 'in-progress': 'In progress', snags: 'Snags open', done: 'Done' };
+const short = (d) => fmtDate(d, { day: 'numeric', month: 'short' });
+const spaceName = (id) => (spaces[id]?.number ? `${spaces[id].number} ${spaces[id].name}` : spaces[id]?.name ?? id);
+const AGENT_STATE = { working: 'Working', proposed: 'Proposed a task', waiting: 'Waiting', done: 'Done' };
+const home = `/projects/${p.id.toLowerCase()}/`;
+const IB = phasesOf(p).includes('integrate') ? integrateBoard(p) : null;
+const C = charter(p), G = nextGate(p), T = timeline(p);
+const openTasks = p.tasks.filter((t) => t.status !== 'done').length;
+const blockedTasks = p.tasks.filter((t) => t.status === 'blocked').length;
+const openLog = (p.log ?? []).filter((l) => l.status === 'open').length;
+const waitingCR = (p.changes ?? []).filter((c) => c.status === 'proposed').length;
+const closed = p.phase === 'closed';
+const NUMBERS = [
+  { n: PHASE_LABEL[p.phase], label: `Phase ${phasesOf(p).indexOf(p.phase) + 1} of ${phasesOf(p).length}`, to: '#timeline' },
+  { n: G ? short(G.date) : short(p.target), label: closed ? 'Closed' : G?.late ? 'Gate, late' : 'Next gate', tone: G?.late ? 'bad' : undefined, to: '#timeline' },
+  { n: openTasks, label: blockedTasks ? `Open tasks, ${blockedTasks} blocked` : 'Open tasks', to: '#tasks', tone: blockedTasks ? 'bad' : undefined, id: 'open' },
+  { n: `${hoursLogged}/${hoursGiven}`, label: 'Hours logged', to: '#people' },
+];
+const TABS = [
+  { id: 'tasks', label: 'Tasks', count: p.tasks.length },
+  { id: 'log', label: 'Log', count: (p.log ?? []).length },
+  { id: 'changes', label: 'Change requests', count: (p.changes ?? []).length },
+  ...(p.agents?.length ? [{ id: 'agents', label: 'Agents', count: p.agents.length }] : []),
+];
+---
+<Shell about={{ kind: 'project', label: `${p.id} ${p.name}`, to: home }} title={p.name} section="projects" minStage={3} crumbs={[{ label: 'Projects', to: '/projects/' }, { label: p.name }]}>
+  <PageBand overline={`Project ${p.id}`} title={p.name} lede={p.summary} sim numbers={NUMBERS}>
+    <Fragment slot="overline">
+      <span>{PROJECT_KIND[p.kind]}</span>
+      <a href={href(`/rooms/?site=${p.site}`)}>{sites[p.site].name}</a>
+    </Fragment>
+    {closed
+      ? <a slot="action" class="btn primary wr-btn" href={href(`${home}report/`)}><Icon name="book" size={16} />Work report</a>
+      : IB && ['integrate', 'handover'].includes(p.phase) && <a slot="action" class="btn primary" href={href(`${home}integrate/`)}>Open Deploy</a>}
+  </PageBand>
+
+  <div class="content project">
+    <ProjectStatus project={p} />
+
+    <div class="g12 top" id="timeline">
+      <section class="card pad ptl-card s-7" aria-label="Timeline" {...recHere(p.id)}>
+        <header class="ptl-h">
+          <h2>Timeline</h2>
+          <span class="faint">{short(p.start)} to {short(p.target)}{pb ? <>, following <a href={href(`/playbooks/${pb.id}/`)}>the {pb.name} playbook</a>, version {pb.version}</> : ''}</span>
+        </header>
+        <ProjectTimeline project={p} />
+        <div class="phx-panels" data-help="project.phasepanel">
+          {phasesOf(p).map((ph) => {
+            const h = hist[ph], pbp = pb?.phases.find((x) => x.phase === ph), ts = p.tasks.filter((t) => t.phase === ph), row = T.rows.find((r) => r.phase === ph);
+            const slip = row?.slip ?? 0;
+            return (
+              <div class="phx" data-phx-panel={ph} hidden={ph !== p.phase}>
+                {ph === 'integrate' && IB && (
+                  <a class="phx-int" href={href(`${home}integrate/`)}>
+                    <span class="phx-int-h"><b>The Deploy board</b><small>{plural(IB.devices.length, 'device')} in {plural(IB.rooms.length, 'room')}, each through four steps. Tick each device's checklist, or hand it to the agent.</small></span>
+                    <span class="phx-int-n">{INTEGRATE_STEPS.map((s) => <span><b class="num">{IB.done[s]}/{IB.applies[s]}</b><small>{STEP_LABEL[s]}</small></span>)}</span>
+                    <span class="btn">Open Deploy<Icon name="arrow" size={15} /></span>
+                  </a>
+                )}
+                <div class="phx-rec">
+                  <h4>{PHASE_LABEL[ph]}: what happened</h4>
+                  {h ? (
+                    <>
+                      <p class="phx-when">{h.ended ? <>Ended {short(h.ended)}<span class:list={['slip', { late: slip > 0 }]}>{slip > 0 ? `${slip} days late` : slip < 0 ? `${-slip} days early` : 'on time'}</span></> : <>Open, due {short(h.planned)}{slip > 0 && <span class="slip late">{slip} days over</span>}</>}</p>
+                      <p class="phx-sum">{h.summary}</p>
+                      {h.artefacts?.length > 0 && <p class="phh-art"><span class="phh-art-h">Handed on</span>{h.artefacts.map((a) => <span class="art-chip">{a}</span>)}</p>}
+                      {h.signed_off_by && <p class="phh-sign"><i class="pst-dia signed" aria-hidden="true"></i>Gate signed off by {person(h.signed_off_by).name}{h.ended ? `, ${short(h.ended)}` : ''}</p>}
+                      {h.steps?.length > 0 && (
+                        <ul class="phx-steps" aria-label="Device steps">
+                          {h.steps.map((st) => <li><b>{STEP_LABEL[st.step]}</b><span>{st.ended ? `Ended ${short(st.ended)}` : `Due ${short(st.planned)}`}{st.signed_off_by ? `, signed off by ${person(st.signed_off_by).name}` : ''}</span></li>)}
+                        </ul>
+                      )}
+                    </>
+                  ) : <p class="muted">Not reached yet. Planned to end {short(row?.planEnd ?? p.target)}{pbp?.weeks ? ` (the playbook allows ${pbp.weeks}${/week|day/.test(String(pbp.weeks)) ? '' : ' weeks'})` : ''}.</p>}
+                </div>
+                <div class="phx-tasks">
+                  <h4>Tasks in this phase</h4>
+                  {ts.length ? ts.map((t) => (
+                    <a class="phx-t" href={href(`${home}tasks/${t.id.toLowerCase()}/`)}>
+                      <i class="tk-dot" data-s={t.status} aria-hidden="true"></i>
+                      <span><b>{t.title}</b><small>{person(t.owner).name} · {TASK_STATUS[t.status]}{t.captured_fix ? ' · fix captured' : ''}</small></span>
+                    </a>
+                  )) : <p class="faint">None recorded.</p>}
+                </div>
+                {pbp && (
+                  <div class="phx-pb">
+                    <h4>The gate{pbp.gate?.by?.length ? `, signed off by ${pbp.gate.by.map((r) => ROLES[r]?.name ?? r).join(' and ')}` : ''}</h4>
+                    <ul class="pbn-checks">{(pbp.gate?.checks ?? []).map((c) => <li><i class="pst-dia" aria-hidden="true"></i>{c}</li>)}</ul>
+                    <details class="pbn-more"><summary>What the playbook says: {plural(pbp.steps.length, 'step')}</summary>
+                      <ol>{pbp.steps.map((st) => <li><span class="pbn-role">{ROLES[st.role]?.name ?? st.role}{st.step ? ` · ${STEP_LABEL[st.step]}` : ''}</span>{st.title}</li>)}</ol>
+                    </details>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <SidePanel class="s-5" title="Charter" meta={`Sponsored by ${C.sponsor?.name ?? 'the programme'}`} help="project.charter">
+        <div class="ch">
+          <p class="ch-why">{C.why}</p>
+          <dl class="kv ch-kv">
+            <div><dt>Scope</dt><dd>{plural(C.rooms.length, 'room')} at {sites[p.site].name}</dd></div>
+            <div><dt>Kind of work</dt><dd>{C.kind}</dd></div>
+            <div><dt>Sponsor</dt><dd>{C.sponsor ? <span class="ch-p"><span class="av">{C.sponsor.initials}</span>{C.sponsor.name}</span> : 'Not named'}</dd></div>
+            <div><dt>Run by</dt><dd><span class="ch-p"><span class="av">{C.owner.initials}</span>{C.owner.name}</span></dd></div>
+            <div><dt>Dates</dt><dd>{short(p.start)} to {short(p.target)}</dd></div>
+            {p.budget && <div><dt>Budget</dt><dd>{money(p, p.budget.approved)}</dd></div>}
+          </dl>
+          <h3 class="overline ch-h">Success looks like</h3>
+          <ul class="ch-success">{C.success.map((s) => <li><Icon name="check" size={14} />{s}</li>)}</ul>
+          {pb && <p class="faint ch-pb">Follows <a href={href(`/playbooks/${pb.id}/`)}>the {pb.name} playbook</a>, version {pb.version}.</p>}
+        </div>
+      </SidePanel>
+    </div>
+
+    <div class="g12">
+      <section class="card side-card s-4" id="rooms" aria-labelledby="rooms-h">
+        <h3 id="rooms-h">Rooms</h3>
+        <div class="sp-list">
+          {p.spaces.map((s) => (
+            <a class={`spr spr-${s.state}`} href={href(`/rooms/${s.space}/`)}>
+              <span class="spr-dot" aria-hidden="true"></span>
+              <span><b>{spaceName(s.space)}</b><small>{SPACE_STATE[s.state]}{s.note ? `: ${s.note}` : ''}</small></span>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <section class="card side-card s-4" id="people" aria-labelledby="people-h">
+        <h3 id="people-h">People and time</h3>
+        {p.roles?.length > 0 ? (
+          <div class="pt-list">
+            {p.roles.map((r) => {
+              const pct = Math.min(100, Math.round(((r.logged ?? 0) / r.hours) * 100));
+              return (
+                <div class={`pt-row as-${r.as}`}>
+                  <span class="av">{person(r.person).initials}</span>
+                  <span class="pt-body">
+                    <span class="pt-top"><b>{person(r.person).name}</b><span class="pt-as">{PROJECT_ROLE[r.as]}</span></span>
+                    <span class="hbar" role="img" aria-label={`${r.logged ?? 0} of ${r.hours} hours logged`}><i style={`width:${pct}%`} class:list={{ over: pct >= 90 }}></i></span>
+                    <small class="mono">{r.logged ?? 0} of {r.hours} h{r.does ? ` · ${r.does}` : ''}</small>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : <p class="muted">Nobody assigned yet.</p>}
+        <a class="faint pt-team" href={href('/work/schedule/capacity/')}>Everyone's hours on the capacity plan</a>
+      </section>
+
+      {p.budget ? (() => {
+        const sum = (st) => p.budget.lines.filter((l) => l.status === st).reduce((n, l) => n + l.amount, 0);
+        const sp = sum('spent'), cm = sum('committed'), es = sum('estimate'), ap = p.budget.approved;
+        const pc = (n) => `${Math.min(100, (n / Math.max(ap, sp + cm + es)) * 100).toFixed(1)}%`;
+        return (
+          <section class="card side-card s-4" id="budget" aria-labelledby="money">
+            <h3 id="money">Budget</h3>
+            <p class="bud-top"><b class="num">{money(p, ap)}</b><small>approved</small></p>
+            <span class="bud-bar" aria-hidden="true"><i class="b-sp" style={`width:${pc(sp)}`}></i><i class="b-cm" style={`width:${pc(cm)}`}></i><i class="b-es" style={`width:${pc(es)}`}></i></span>
+            <dl class="kv">
+              <div><dt><i class="dot b-sp"></i>Spent</dt><dd>{money(p, sp)}</dd></div>
+              <div><dt><i class="dot b-cm"></i>Ordered, not yet paid</dt><dd>{money(p, cm)}</dd></div>
+              <div><dt><i class="dot b-es"></i>Still an estimate</dt><dd>{money(p, es)}</dd></div>
+              <div><dt>Left if all goes to plan</dt><dd class:list={{ over: ap - sp - cm - es < 0 }}>{money(p, ap - sp - cm - es)}</dd></div>
+            </dl>
+            <a class="faint" href={href('/work/budget/')}>Every project's budget</a>
+          </section>
+        );
+      })() : (
+        <section class="card side-card s-4" id="budget" aria-labelledby="money">
+          <h3 id="money">Budget</h3>
+          <p class="muted" style="margin:0;font-size:13.5px">No budget lines on this project yet.</p>
+          <a class="faint" href={href('/work/budget/')}>Every project's budget</a>
+        </section>
+      )}
+    </div>
+
+    <LiveBar page={`project:${p.id}`} />
+    <DetailTabs tabs={TABS} label="The work" class="proj-tabs">
+      <div slot="tasks"><TaskBoard project={p} /></div>
+      <div slot="log">
+        <p class="tab-lede faint">Risks (might happen), issues (have happened), decisions and dependencies, in one place. Open first{openLog ? `: ${openLog} open` : ''}.</p>
+        <ProjectLog project={p} which="log" />
+      </div>
+      <div slot="changes">
+        <p class="tab-lede faint">A change to what the project delivers. Anyone on the project can propose one; the approver decides, and the log keeps who and when{waitingCR ? `. ${plural(waitingCR, 'request')} waiting` : ''}.</p>
+        <ProjectLog project={p} which="changes" />
+      </div>
+      {p.agents?.length > 0 && (
+        <div slot="agents" class="agents-panel" data-min-stage="6">
+          <p class="tab-lede faint">Stage 6. Agents only propose; a person accepts a proposal as a task before anything changes. <a href={href('/learn/#agents')}>What the agents do</a></p>
+          <div class="g12 agent-list">
+            {p.agents.map((a) => (
+              <article class={`card side-card s-4 agent a-${a.status}`}>
+                <span class="ag-icon" aria-hidden="true"><Icon name="agent" size={18} /></span>
+                <span class="ag-body">
+                  <b>{a.name}</b>
+                  <small class="ag-state">{AGENT_STATE[a.status]}{a.status === 'working' && <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>}</small>
+                  <span class="ag-says">{a.says}</span>
+                  {a.proposes && (
+                    <span class="ag-prop">
+                      <span class="ag-prop-h">Proposed task</span>{a.proposes}
+                      <span class="ag-actions"><button type="button" class="btn small primary" data-demo-accept>Accept as a task</button><button type="button" class="btn small" data-demo-dismiss>Dismiss</button></span>
+                    </span>
+                  )}
+                </span>
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
+    </DetailTabs>
+  </div>
+
+  <script is:inline data-astro-rerun slot="end">
+    (function () {
+      /* Phases: pick one on the timeline to see what happened in it (or what the playbook plans). A link
+         to #plan, #integrate and so on opens that phase; the old #install and #commission open Deploy. */
+      var bs = document.querySelectorAll('[data-phx]'); if (!bs.length) return;
+      var show = function (b, animate) {
+        var cur = document.querySelector('[data-phx-panel]:not([hidden])'), next = document.querySelector('[data-phx-panel="' + b.dataset.phx + '"]');
+        var swap = function () { bs.forEach(function (x) { x.setAttribute('aria-selected', String(x === b)); }); document.querySelectorAll('[data-phx-panel]').forEach(function (pn) { pn.hidden = pn !== next; }); };
+        if (animate && window.rsMorphPanels && cur !== next) window.rsMorphPanels(cur, next, swap); else swap();
+      };
+      bs.forEach(function (b) { b.addEventListener('click', function () { show(b, true); }); });
+      var h0 = ((window.__rsNavTo && window.__rsNavTo.hash) || location.hash || '').replace('#', '');
+      h0 = { install: 'integrate', commission: 'integrate' }[h0] || h0;
+      var b0 = h0 && document.querySelector('[data-phx="' + h0 + '"]');
+      if (b0) show(b0, false);
+      /* Demo only: accepting or dismissing a proposal changes the card here, nothing else. */
+      document.querySelectorAll('[data-demo-accept],[data-demo-dismiss]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var prop = b.closest('.ag-prop'), ok = b.hasAttribute('data-demo-accept');
+          prop.classList.add(ok ? 'accepted' : 'dismissed');
+          prop.querySelector('.ag-actions').innerHTML = '<span class="ag-done">' + (ok ? 'Accepted as a task (demo)' : 'Dismissed (demo)') + '</span>';
+        });
+      });
+    })();
+  </script>
+</Shell>
+<style is:global>
+  .tag.sim { border-style: dashed; color: var(--amber-ink); }
+  .content.project { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gutter, 20px); }
+  .content.project > * { min-width: 0; }
+  .content.project > .sec, .content.project > .dt { margin: 0; }
+  .av { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; flex: none; font: 700 10.5px/1 var(--font-mono); background: var(--surface-3); color: var(--text); }
+  :root[data-look="classic"] .av { background: var(--yellow); color: #15161B; border: 1.5px solid var(--ink); }
+  /* The timeline card and the phase record under it. */
+  .ptl-card { display: grid; gap: 14px; align-content: start; }
+  .ptl-h { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 16px; }
+  .ptl-h h2 { margin: 0; font-size: 19px; } .ptl-h .faint { font-size: 12.5px; }
+  .phx-panels { border-top: var(--border-rule); padding-top: 14px; }
+  .phx { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px 20px; }
+  .phx > .phx-pb { grid-column: 1 / -1; }
+  .phx h4 { margin: 0 0 6px; font: 700 10.5px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); }
+  .phx-int { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; padding: 14px 16px; border-radius: var(--radius-lg); background: var(--accent-soft); border: 1.5px solid color-mix(in srgb, var(--accent) 35%, transparent); color: inherit; text-decoration: none; transition: box-shadow var(--dur-hover) var(--ease-settle); }
+  .phx-int:hover { color: inherit; box-shadow: var(--shadow-md, var(--shadow-sm)); }
+  .phx-int-h b { display: block; font: var(--weight-display, 700) 18px/1.2 var(--font-display); }
+  .phx-int-h small { display: block; margin-top: 3px; font-size: 13px; color: var(--text-2); }
+  .phx-int-h { flex: 1 1 100%; } .phx-int-n { display: flex; flex-wrap: wrap; gap: 12px 18px; margin-right: auto; } .phx-int-n > span { display: grid; gap: 2px; } .phx-int-n b { font: 800 20px/1 var(--font-sans); } .phx-int-n small { font-size: 11.5px; color: var(--text-3); }
+  .phx-int .btn { pointer-events: none; }
+  .phx-when { margin: 0 0 6px; font-weight: 700; } .slip { margin-left: 8px; font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--green-soft); color: var(--green-ink); } .slip.late { background: var(--red-soft); color: var(--red-ink); }
+  .phx-sum { margin: 0 0 8px; font-size: 14px; }
+  .phx-steps { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+  .phx-steps li { display: flex; gap: 8px; align-items: baseline; } .phx-steps b { min-width: 88px; font-weight: 650; } .phx-steps span { color: var(--text-2); }
+  .phh-art { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 8px; }
+  .phh-art-h { font: 700 10px/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); margin-right: 2px; }
+  .art-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 4px 9px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); }
+  .art-chip::before { content: ""; width: 9px; height: 11px; border: 1.5px solid currentColor; border-radius: 1px; opacity: .6; }
+  .phh-sign { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 12.5px; color: var(--text-2); }
+  .phx-t { display: grid; grid-template-columns: 9px minmax(0, 1fr); gap: 10px; align-items: start; padding: 6px 4px; border-radius: var(--radius); color: inherit; text-decoration: none; }
+  .phx-t:hover { background: var(--surface-2); } .phx-t .tk-dot { margin-top: 5px; }
+  .phx-t b { display: block; font-size: 13.5px; font-weight: 600; } .phx-t small { font-size: 12px; color: var(--text-2); }
+  .pbn-checks { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 4px; font-size: 13.5px; }
+  .pbn-checks li { display: flex; gap: 10px; align-items: center; } .pbn-checks .pst-dia { flex: none; }
+  .pbn-more { font-size: 13px; color: var(--text-2); } .pbn-more summary { cursor: pointer; font-weight: 600; }
+  .pbn-more ol { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; } .pbn-role { display: block; font: 650 11px/1.3 var(--font-sans); color: var(--text-3); }
+  @container content (max-width: 699px) { .phx { grid-template-columns: minmax(0, 1fr); } }
+  /* The charter. */
+  .ch { display: grid; gap: 12px; }
+  .ch-why { margin: 0; font-size: 14.5px; line-height: 1.5; }
+  .ch-kv dd { font-weight: 600; } .ch-p { display: inline-flex; align-items: center; gap: 6px; } .ch-p .av { width: 22px; height: 22px; font-size: 9px; }
+  .ch-h { margin: 2px 0 0; }
+  .ch-success { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13.5px; }
+  .ch-success li { display: flex; gap: 8px; align-items: start; } .ch-success svg { flex: none; margin-top: 3px; color: var(--green-ink); }
+  .ch-pb { margin: 0; font-size: 12.5px; }
+  /* Rooms, people, budget. */
+  .bud-top { margin: 4px 0 8px; display: flex; align-items: baseline; gap: 8px; } .bud-top b { font-size: 22px; } .bud-top small { color: var(--text-2); }
+  .bud-bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--surface-3); margin-bottom: 10px; }
+  .bud-bar i { display: block; height: 100%; animation: rs-grow-w var(--dur-fill) var(--ease-settle) both; }
+  @keyframes rs-grow-w { from { width: 0; } }
+  .b-sp { background: var(--ph-done); } .b-cm { background: var(--ph-now); } .b-es { background: repeating-linear-gradient(135deg, var(--line-strong) 0 4px, transparent 4px 8px); }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+  .kv dd.over { color: var(--red-ink); }
+  .pt-list { display: grid; gap: 12px; }
+  .pt-row { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; }
+  .pt-body { display: grid; gap: 3px; min-width: 0; }
+  .pt-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; } .pt-top b { font-size: 13.5px; }
+  .pt-as { font: 650 11px/1.2 var(--font-sans); color: var(--blue-ink); text-align: right; } .as-vendor .pt-as { color: var(--amber-ink); } .as-service-owner .pt-as { color: var(--violet-ink); }
+  .pt-body small { font-size: 12px; color: var(--text-2); } .pt-body small.mono { font-size: 11px; color: var(--text-3); }
+  .hbar { display: block; height: 6px; border-radius: 99px; background: var(--surface-3); overflow: hidden; margin-top: 3px; } .hbar i { display: block; height: 100%; background: var(--blue); border-radius: 99px; } .hbar i.over { background: var(--amber); }
+  .pt-team { font-size: 12.5px; }
+  .sp-list { display: grid; gap: 4px; }
+  .spr { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 10px; align-items: start; padding: 8px; border-radius: var(--radius); color: inherit; text-decoration: none; }
+  .spr:hover { background: var(--surface-2); color: inherit; } .spr b { display: block; font-size: 13.5px; } .spr small { display: block; font-size: 12px; color: var(--text-2); }
+  .spr-dot { width: 12px; height: 12px; margin-top: 3px; border-radius: 50%; border: 2px solid var(--line-strong); }
+  .spr-done .spr-dot { background: var(--green); border-color: var(--green); } .spr-in-progress .spr-dot { background: var(--blue); border-color: var(--blue); } .spr-snags .spr-dot { background: var(--amber); border-color: var(--amber); }
+  /* The work tabs. */
+  .tab-lede { margin: 0 0 12px; font-size: 13.5px; }
+  .tab-lede a { color: inherit; }
+  :root[data-agents="off"] .agents-panel, :root[data-agents="off"] .proj-tabs [data-dt-tab="agents"] { display: none; }
+  .agent { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px; }
+  .ag-icon { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--violet-soft); color: var(--violet-ink); }
+  .a-working .ag-icon { animation: ag-glow var(--dur-pulse) ease-in-out infinite; }
+  @keyframes ag-glow { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--violet) 22%, transparent); } }
+  .ag-body { display: grid; gap: 4px; min-width: 0; } .ag-body b { font-size: 13.5px; }
+  .ag-state { font: 700 10.5px/1.2 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--violet-ink); display: flex; align-items: center; gap: 6px; }
+  .dots { display: inline-flex; gap: 3px; } .dots i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; animation: dot calc(var(--dur-pulse) / 2) ease-in-out infinite; }
+  .dots i:nth-child(2) { animation-delay: .15s; } .dots i:nth-child(3) { animation-delay: .3s; }
+  @keyframes dot { 50% { opacity: .2; transform: translateY(-2px); } }
+  .ag-says { font-size: 13px; color: var(--text); }
+  .ag-prop { display: grid; gap: 6px; font-size: 13px; padding: 8px 10px; border-radius: 8px; border: 1.5px dashed var(--violet); background: var(--surface); }
+  .ag-prop-h { font: 700 10px/1.3 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--violet-ink); }
+  .ag-actions { display: flex; gap: 6px; flex-wrap: wrap; } .ag-prop.accepted { border-style: solid; border-color: var(--green); } .ag-prop.dismissed { opacity: .55; }
+  .ag-done { font: 600 12px/1.3 var(--font-sans); color: var(--green-ink); }
+  :root[data-look="classic"] .ptl-card { border: 2px solid var(--ink); box-shadow: var(--shadow-panel); }
+  @media (prefers-reduced-motion: reduce) { .a-working .ag-icon, .dots i { animation: none; } .bud-bar i { animation: none; } }
+</style>

@@ -1,0 +1,161 @@
+# House standard: racks and comms rooms. Made up for the demo. Sized by requirement, never a fixed rack.
+id: racks
+name: Racks and comms rooms
+area: racks
+order: 2
+version: "1.0"
+effective: "2026-03-01"
+owner: Service manager, IT infrastructure
+summary: Each comms room and rack is sized from what it serves (outlets, access points, PoE and power) plus room to grow, not from a fixed drawing.
+intro: >-
+  There is no standard rack. The rack, the switches and the UPS are worked out from the rooms the comms room serves: count
+  the outlets from the room profiles, add the access points and building systems, add headroom, then choose the kit. The
+  worked example shows the sum. Keia Atlas's typical rack layouts are examples of the result, not templates.
+scope:
+  - Main and floor comms rooms (MDF and IDF) in every office.
+  - Racks, patch panels, cable managers, switches and the UPS in them.
+  - "Not in scope: AV racks inside a meeting room, which follow the meeting room AV standard."
+related: [cabling, cables, power, network]
+applies_to:
+  classes: [network-switch]
+  space_types: [mdf, idf]
+figures:
+  - { n: "+25%", label: Port headroom }
+  - { n: "+20%", label: PoE headroom }
+  - { n: "25%", label: Rack units kept free }
+  - { n: "1 m", label: Clear in front }
+sections:
+  - id: sizing
+    title: Sizing a rack from what it serves
+    intro: Work down this list for every comms room. Write the numbers in the design; Keia Atlas's rack layouts are drawn from them.
+    figure: rack-sizing
+    table:
+      caption: "Worked example: a floor comms room serving 14 meeting rooms, 120 desks and 8 access points (made-up numbers)"
+      columns: [What, Counted from, Ports, PoE budget]
+      rows:
+        - [Desk and wall outlets, "Room profiles' data outlets: 120 desks, 22 wall outlets", "142", "0 W (desks use their own power)"]
+        - [Meeting room devices, "Room profiles: 14 rooms, 3 PoE devices each (video bar, touch controller, booking panel)", "42", "14 x (25.5 + 13 + 13) = 721 W"]
+        - [Wi-Fi access points, "Wi-Fi standard: 8 access points on this floor", "8", "8 x 25.5 = 204 W"]
+        - [Building systems, "Door access, sensors and cameras on the floor plan", "10", "10 x 13 = 130 W"]
+        - [Subtotal, "", "202", "1,055 W"]
+        - [With headroom, "Ports +25%, PoE +20%", "253 ports: six 48-port switches", "1,266 W across the switches"]
+      note: PoE is counted at the class limit of each device, not its typical draw. Uplinks, management and console ports are extra.
+    rules:
+      - id: count-outlets
+        level: must
+        rule: Count the data outlets the comms room serves from the room profiles of every room it feeds, plus the access points, building systems and spare outlets on the floor plan.
+        why: The room profiles already say how many outlets each room needs, so the rack is sized from the same record the rooms are built from.
+        check: The design's port count matches the sum in Keia Atlas for that comms room, within the spare outlets listed.
+        house: true
+      - id: port-headroom
+        level: must
+        rule: Provide at least 25% more switch ports than the count, and at least one spare 48-port patch panel's worth of rack space.
+        why: Moves and new devices arrive every year; a full switch turns a small change into a project.
+        check: Ports in use divided by ports installed is 80% or less at handover.
+        house: true
+      - id: poe-budget
+        level: must
+        rule: Add up the PoE class limit of every powered device on each switch, then choose switches whose PoE budget is at least 20% above that total.
+        why: Devices draw up to their class limit when they start or when a camera heats up; a budget that is only just enough drops devices at the worst moment.
+        check: The switch's PoE budget in its data sheet is at least 1.2 times the design's total for the devices on it.
+        house: true
+        sources: [ieee-802-3bt]
+      - id: rack-units
+        level: must
+        rule: Leave at least a quarter of the rack's units empty at handover, fitted with blanking panels.
+        why: Space for the next switch, and blanking panels keep hot exhaust air from circling back to the front.
+        check: Count the empty units on the rack elevation in the handover pack.
+        house: true
+        sources: [ashrae-tc99]
+  - id: rack
+    title: The rack itself
+    rules:
+      - id: rack-size
+        level: should
+        rule: Use a 19-inch four-post rack, 42 or 45 units high, 800 mm wide where there are more than 48 patched ports, and at least 1000 mm deep.
+        why: The extra width takes vertical cable managers so patch cords do not cover the equipment; the depth takes switches and a UPS.
+        check: The rack's data sheet and the rack elevation drawing.
+        house: true
+        sources: [eia-310]
+      - id: cable-managers
+        level: must
+        rule: Fit a 1U horizontal cable manager above or below every patch panel and vertical managers on both sides.
+        why: Patch cords then run to the side and down, and every port and label stays readable.
+        check: No patch cord crosses in front of another device.
+        house: true
+      - id: patch-short
+        level: must
+        rule: Use the shortest stocked patch cord that reaches with a gentle loop, and no coils behind managers.
+        why: Coils block airflow and hide faults.
+        check: Look behind the managers on handover.
+        house: true
+      - id: layout
+        level: should
+        rule: Put the heaviest kit (UPS, batteries) at the bottom, patch panels and access switches in the middle alternating panel and switch, and fibre panels at the top.
+        why: A low centre of gravity, and each switch sits next to the ports it serves so patch cords are short.
+        check: The rack elevation in the handover pack.
+        house: true
+  - id: room
+    title: The comms room
+    rules:
+      - id: clearance
+        level: must
+        rule: Keep at least 1 m clear in front of and 0.6 m behind every rack, and do not store anything in the comms room.
+        why: Room to work and to swap a switch without moving the rack; a store room becomes a fire risk and blocks access.
+        check: Measure on site, and photograph the room at handover.
+        sources: [tia-569]
+      - id: temperature
+        level: must
+        rule: Keep the air at the front of the racks between 18 and 27 degrees C, with cooling that runs all year and all night.
+        why: That is the range the equipment makers design for; building air conditioning that turns off at night cooks a comms room.
+        check: A temperature sensor at the rack front reports to monitoring, with an alert above 27 degrees C.
+        sources: [ashrae-tc99]
+      - id: access
+        level: must
+        rule: Lock the comms room on the building's access control, with entries logged.
+        why: Network kit is the easiest way into the network, and the log answers who was in the room.
+        check: The door is on access control and only the IT and facilities groups can open it.
+        house: true
+      - id: rack-bond
+        level: must
+        rule: Bond every rack to the room's telecommunications earthing busbar.
+        why: See the power and earthing standard.
+        check: A bonding conductor from each rack to the busbar, labelled.
+        sources: [tia-607]
+references:
+  - id: eia-310
+    name: EIA-310-E, Cabinets, Racks, Panels and Associated Equipment
+    publisher: Electronic Components Industry Association
+    kind: standard
+    summary: "Defines the 19-inch rack: the mounting width, the 44.45 mm rack unit and the hole spacing that lets any maker's kit fit any maker's rack."
+    url: https://www.ecianow.org/
+    checked: "2026-09-29"
+  - id: tia-569
+    name: ANSI/TIA-569-E, Telecommunications Pathways and Spaces
+    publisher: Telecommunications Industry Association
+    kind: standard
+    summary: Describes telecommunications rooms, including their size, access, clearances around racks and environmental needs.
+    url: https://tiaonline.org/products-and-services/tia-standards/
+    checked: "2026-09-29"
+  - id: tia-607
+    name: ANSI/TIA-607-D, Generic Telecommunications Bonding and Grounding (Earthing) for Customer Premises
+    publisher: Telecommunications Industry Association
+    kind: standard
+    summary: Describes bonding racks and trays to the telecommunications earthing busbar.
+    url: https://tiaonline.org/products-and-services/tia-standards/
+    checked: "2026-09-29"
+  - id: ashrae-tc99
+    name: ASHRAE TC 9.9, Thermal Guidelines for Data Processing Environments
+    publisher: ASHRAE
+    kind: guide
+    summary: Gives the recommended air temperature and humidity at the inlet of IT equipment (a recommended range of 18 to 27 degrees C), and airflow practice such as blanking empty rack units.
+    url: https://www.ashrae.org/technical-resources/bookstore/datacom-series
+    checked: "2026-09-29"
+  - id: ieee-802-3bt
+    name: IEEE 802.3bt, Power over Ethernet over four pairs (and 802.3af and 802.3at before it)
+    publisher: IEEE
+    kind: standard
+    summary: Defines the PoE types and classes, and the most power a switch port must provide for each class, from 15.4 W (class 3) and 30 W (class 4) up to 90 W (class 8) at the switch.
+    url: https://standards.ieee.org/ieee/802.3bt/6749/
+    checked: "2026-09-29"
+demo: true

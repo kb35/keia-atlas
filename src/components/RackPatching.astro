@@ -1,0 +1,128 @@
+---
+// The patch cables recorded in a comms room's rack, read at a glance: one line per device (top of the
+// rack first) with a strip of its cables in their standard colours, sized by how many, and a count. Open a
+// line to see its runs: how many, what cable, what for, and where each goes, named by what it plugs into
+// ("Patch panel A, ports 1 to 40"), each linked to the cable list and to the unit it reaches. Choosing a
+// device in the rack above opens its line and lights its runs. Goes inside a Section (the lines are its
+// data-items).
+import { patchGroups } from '../lib/comms.mjs';
+const { facts } = Astro.props;
+const groups = patchGroups(facts);
+// Each run names the rack items at its ends ("rack:U" of the item's lowest unit), so the rack drawing
+// can light the runs of the item chosen in it (RackView).
+const endKey = (c, e) => {
+  if (!e?.u || !c.rack || (e.rack && e.rack !== c.rack.id)) return null;
+  const it = c.rack.items.find((x) => e.u >= x.u && e.u < x.u + x.size);
+  return it ? `${c.rack.id}:${it.u}` : null;
+};
+const endsOf = (c) => [...new Set([endKey(c, c.connects?.from), endKey(c, c.connects?.to)].filter(Boolean))].join(' ');
+const uid = `rp-${facts.racks[0]?.id ?? 'x'}`;
+const most = Math.max(1, ...groups.map((g) => g.cables));
+// A line's strip is as long as its share of the biggest line, so 44 cables reads as more than 1 at a glance.
+const share = (g) => Math.max(6, Math.round((g.cables / most) * 100));
+---
+<div class="rp-wrap" data-rp-root>
+  <ol class="rp-groups" data-items>
+    {groups.map((g, gi) => (
+      <li class={`rp-g g-${g.grp}`} data-rp-group={g.item ? `${g.rack.id}:${g.item.u}` : ''}>
+        <button type="button" class="rp-h" aria-expanded="false" aria-controls={`${uid}-${gi}`} data-rp-toggle data-help="rack.patching" data-help-name={g.label}>
+          <i class="rp-gbar" aria-hidden="true"></i>
+          <span class="rp-name">{g.label}</span>
+          <span class="rp-strip" aria-hidden="true"><span class="rp-fill" style={`width:${share(g)}%`}>
+            {g.runs.map((c) => <i style={`--sw:${c.hex};flex-grow:${c.quantity}`} title={`${c.quantity} × ${c.typeLabel}, ${c.colourName.toLowerCase()}`}></i>)}
+          </span></span>
+          <span class="rp-count num">{g.cables} {g.cables === 1 ? 'cable' : 'cables'}<span class="faint"> in {g.runs.length} {g.runs.length === 1 ? 'run' : 'runs'}</span></span>
+          <span class="rp-chev" aria-hidden="true"></span>
+        </button>
+        <ul class="rp-runs" id={`${uid}-${gi}`} hidden>
+          {g.runs.map((c) => (
+            <li class="rp-r" data-rp-ends={endsOf(c)}>
+              <i class="rp-sw" style={`--sw:${c.hex}`} title={c.colourName}></i>
+              <span class="rp-c"><a class="rp-a" href={c.cableLink} title="This cable in the cable list"><b class="num">{c.quantity} ×</b> {c.typeLabel}</a><small>{c.lengthText}, {c.colourName.toLowerCase()}</small></span>
+              <span class="rp-to"><span class="rp-l">to</span> {c.toLink ? <a class="rp-a" href={c.toLink}>{c.toText}</a> : c.toText}{c.notes && <small>{c.notes}</small>}</span>
+              <span class="rp-p">{c.purposeName}</span>
+            </li>
+          ))}
+        </ul>
+      </li>
+    ))}
+  </ol>
+</div>
+
+<script is:inline data-astro-rerun>
+  (function () {
+    function init(root) {
+      if (root.__rp) return; root.__rp = true;
+      var M = window.rsMotion ? window.rsMotion() : { reduced: true };
+      function setOpen(g, open, animate) {
+        var btn = g.querySelector('[data-rp-toggle]'), list = g.querySelector('.rp-runs');
+        if (!btn || !list || (list.hidden === !open)) return;
+        var swap = function () { list.hidden = !open; btn.setAttribute('aria-expanded', String(open)); g.classList.toggle('is-open', open); };
+        if (window.rsHold) window.rsHold(root, swap); else swap();
+        if (open && animate && !M.reduced) {
+          // The runs rise in from the line they belong to, a beat apart.
+          Array.prototype.forEach.call(list.children, function (li, i) {
+            li.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: M.enter, easing: M.ease, delay: Math.min(i, 8) * M.stagger, fill: 'backwards' });
+          });
+        }
+      }
+      root.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-rp-toggle]'); if (!btn) return;
+        var g = btn.closest('.rp-g'); setOpen(g, btn.getAttribute('aria-expanded') !== 'true', true);
+      });
+      // A device chosen in the rack: open every line that holds one of its runs.
+      document.addEventListener('rs:rack-pick', function (e) {
+        var k = e.detail.rack + ':' + e.detail.u;
+        var own = root.querySelector('.rp-g[data-rp-group="' + k + '"]'), lit = [];
+        root.querySelectorAll('.rp-g').forEach(function (g) {
+          var mine = g === own || g.querySelector('[data-rp-ends~="' + k + '"]');
+          g.classList.toggle('is-lit', !!mine);
+          if (mine) lit.push(g);
+        });
+        // Its own line opens; a device with no line of its own (a patch panel) opens the lines that reach it.
+        (own ? [own] : lit).forEach(function (g) { setOpen(g, true, true); });
+      });
+    }
+    document.querySelectorAll('[data-rp-root]').forEach(init);
+  })();
+</script>
+
+<style is:global>
+  .rp-wrap { container: rp / inline-size; background: var(--surface); border: var(--border-card); border-radius: var(--radius-lg); overflow: hidden; }
+  .rp-groups { list-style: none; margin: 0; padding: 0; }
+  .rp-g { --gc: var(--line-strong); border-top: var(--border-rule); transition: background var(--dur-state) var(--ease-settle); }
+  .rp-g:first-child { border-top: 0; }
+  .rp-g.g-patch { --gc: var(--blue); } .rp-g.g-switch { --gc: var(--green); } .rp-g.g-edge { --gc: var(--red); } .rp-g.g-mgmt { --gc: var(--violet); } .rp-g.g-power { --gc: var(--amber); }
+  .rp-g.is-lit { background: var(--accent-soft); }
+  .rp-h { display: grid; grid-template-columns: 4px minmax(140px, 2fr) minmax(0, 3fr) auto 14px; gap: 14px; align-items: center; width: 100%; padding: 9px 16px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background var(--dur-hover) var(--ease-settle); }
+  .rp-h:hover, .rp-h:focus-visible { background: var(--surface-2); outline: none; }
+  .rp-g.is-lit .rp-h:hover { background: color-mix(in srgb, var(--accent-soft) 60%, var(--surface-2)); }
+  .rp-gbar { display: block; width: 4px; height: 22px; border-radius: 2px; background: var(--gc); }
+  .rp-name { font-weight: 650; font-size: 13.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rp-strip { display: block; height: 10px; min-width: 0; }
+  .rp-fill { display: flex; gap: 2px; height: 100%; }
+  .rp-strip i { display: block; flex: 1 1 0; min-width: 5px; border-radius: 3px; background: var(--sw); box-shadow: inset 0 0 0 1px rgba(128, 128, 128, .45); }
+  .rp-count { font-size: 12.5px; white-space: nowrap; font-weight: 650; }
+  .rp-chev { width: 8px; height: 8px; border-right: 1.5px solid var(--text-3); border-bottom: 1.5px solid var(--text-3); transform: rotate(45deg) translate(-2px, -2px); transition: transform var(--dur-state) var(--ease-settle); justify-self: center; }
+  .rp-h[aria-expanded="true"] .rp-chev { transform: rotate(225deg) translate(-2px, -2px); }
+  .rp-runs { list-style: none; margin: 0; padding: 2px 16px 10px 34px; display: grid; gap: 2px; }
+  .rp-runs[hidden] { display: none; }
+  .rp-r { display: grid; grid-template-columns: 26px minmax(120px, 1fr) minmax(0, 2fr) auto; gap: 12px; align-items: start; padding: 5px 6px; border-radius: var(--radius); font-size: 13px; transition: background var(--dur-state) var(--ease-settle), box-shadow var(--dur-state) var(--ease-settle); }
+  .rp-r.is-lit { background: var(--surface); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); }
+  .rp-sw { width: 26px; height: 11px; margin-top: 4px; border-radius: 6px; background: var(--sw); box-shadow: inset 0 0 0 1px rgba(128, 128, 128, .55), inset 0 -3px 3px rgba(0, 0, 0, .18), inset 0 2px 2px rgba(255, 255, 255, .25); }
+  .rp-c small, .rp-to small { display: block; font-size: 12px; color: var(--text-2); }
+  .rp-l { color: var(--text-3); }
+  .rp-p { color: var(--text-2); font-size: 12.5px; white-space: nowrap; }
+  .rp-a { color: inherit; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; transition: text-decoration-color var(--dur-hover) var(--ease-settle); }
+  .rp-a:hover, .rp-a:focus-visible { text-decoration-color: currentColor; }
+  /* Narrow: the strip drops under the name, and each run stacks. */
+  @container rp (max-width: 640px) {
+    .rp-h { grid-template-columns: 4px minmax(0, 1fr) auto 14px; grid-template-areas: "bar name count chev" "bar strip strip strip"; gap: 6px 12px; }
+    .rp-gbar { grid-area: bar; height: 100%; min-height: 34px; } .rp-name { grid-area: name; } .rp-strip { grid-area: strip; } .rp-count { grid-area: count; } .rp-chev { grid-area: chev; }
+    .rp-runs { padding-left: 16px; }
+    .rp-r { grid-template-columns: 26px minmax(0, 1fr); }
+    .rp-to, .rp-p { grid-column: 2; }
+    .rp-p { white-space: normal; }
+  }
+  @media (prefers-reduced-motion: reduce) { .rp-chev, .rp-h, .rp-g, .rp-r, .rp-a { transition: none; } }
+</style>

@@ -1,0 +1,333 @@
+# Space type: Hybrid meeting room
+# Based on public industry guidance (data/sources/room-guidance.yaml, decision 0006); house assumptions say so.
+# Keia part (profile to verification_model): which classes of device belong here.
+# Keia Atlas part: build options, the models each option names, and the outlets.
+
+schema: composite-profile
+
+profile:
+  name: Hybrid meeting room
+  space_type: hybrid-meeting-room
+  version: "2.0"
+  last_updated: "2026-09-30"
+  owner: Keia Atlas maintainers
+  capacity: "6-8 people"
+  purpose: >-
+    Upgraded room for inclusive hybrid meetings: a curved table facing two displays, with
+    the camera framing whoever is speaking. For presentations and conversation rather than
+    brainstorming.
+
+sources:
+  - file: data/sources/room-guidance.yaml
+    provides: 'Public guidance for this space type: size, capacity, display size, kit class and outlets'
+  - file: data/device-classes/display.yaml
+    provides: Healthy state for the display class
+  - file: data/device-classes/video-bar.yaml
+    provides: Healthy state for the video bar class
+  - file: data/device-classes/touch-controller.yaml
+    provides: Healthy state for the touch controller class
+  - file: data/device-classes/microphone.yaml
+    provides: Healthy state for the microphone class
+  - file: data/device-classes/av-extender.yaml
+    provides: Healthy state for the AV extender class
+  - file: data/device-classes/av-switcher.yaml
+    provides: Healthy state for the AV switcher class
+  - file: data/device-classes/network-switch.yaml
+    provides: Healthy state for the in-room network switch class
+  - file: data/device-classes/scheduler-panel.yaml
+    provides: Healthy state for the scheduler panel class
+
+equipment_categories:
+  - category: display
+    description: Screens for the far end and shared content
+    object_profile: data/device-classes/display.yaml
+    quantity: "2"
+  - category: video_conferencing
+    description: Video bar that runs meetings, or acts as the camera and speaker for a laptop
+    object_profile: data/device-classes/video-bar.yaml
+    quantity: "1"
+  - category: meeting_control
+    description: Touchscreen on the table that controls meetings
+    object_profile: data/device-classes/touch-controller.yaml
+    quantity: "1"
+  - category: microphones
+    description: Extra microphones beyond the video bar or codec
+    object_profile: data/device-classes/microphone.yaml
+    quantity: "2"
+  - category: signal_extension
+    description: HDBaseT transmitters and receivers carrying video, USB, network and power
+    object_profile: data/device-classes/av-extender.yaml
+    quantity: "4"
+  - category: source_switching
+    description: Switcher that chooses between laptop inputs
+    object_profile: data/device-classes/av-switcher.yaml
+    quantity: "1"
+  - category: network
+    description: In-room network switch for the AV devices
+    object_profile: data/device-classes/network-switch.yaml
+    quantity: "1"
+  - category: scheduling_panel
+    description: Booking panel at the door
+    object_profile: data/device-classes/scheduler-panel.yaml
+    quantity: "1"
+    notes: Optional in every build of this space type
+
+verification_model:
+  platforms_to_check:
+    - platform: keia_atlas
+      check: every required device in the chosen option is recorded in the space and wired
+        as the option says
+    - platform: inventory
+      check: every device has an active record in this space
+    - platform: dhcp_dns
+      check: every networked device has an address reservation and DNS records
+    - platform: device_management
+      check: meeting devices are online, paired and on standard firmware
+    - platform: room_booking
+      check: the room resource exists with the right capacity and is linked to its devices
+
+keia_atlas:
+  standard: industry
+  guideline: microsoft-teams-room-guidance
+  category: connect
+  capacity:
+    min: 6
+    max: 8
+  area:
+    sq_ft:
+      min: 350
+      max: 400
+    m2:
+      min: 33
+      max: 37
+  geometry:
+    # The room shell for a floor-level 3D model; basis says where each value comes from.
+    width_m: 6.6
+    depth_m: 5.2
+    ceiling_m: 2.6
+    display_wall: back
+    door: { wall: left, from_m: 4, to_m: 4.9 }
+    data_entry: { via: ceiling, wall: left, at: above the door }
+    containment: [display-track, wall-riser, ceiling-basket, table-tray, cable-spine, floor-box, floor-duct, floor-void, in-wall]
+    basis:
+      size: chosen
+      ceiling: house-default
+      door: house-default
+      data_entry: house-default
+      containment: house-default
+    notes:
+      - 6.6 x 5.2 m, a little deeper than Microsoft's 25 x 14 ft for the C-shaped table (house assumption).
+  options:
+    - id: standard
+      name: Standard
+      summary: Two 75 inch displays, a Poly Studio X72, two table microphones and HDBaseT
+        to both sides of the table.
+      equipment:
+        - key: display
+          class: display
+          quantity: 2
+          requirement: required
+          location: display-wall
+          sizes_in: [75]
+        - key: video-bar
+          class: video-bar
+          model: poly-studio-x72
+          quantity: 1
+          requirement: required
+          location: display-wall
+          notes: Camera set to frame the person speaking
+        - key: touch-controller
+          class: touch-controller
+          model: poly-tc10
+          quantity: 1
+          requirement: required
+          location: table-top
+          notes: Centre of the table, through a cable pass-through
+        - key: microphone
+          class: microphone
+          model: poly-expansion-microphone
+          quantity: 2
+          requirement: required
+          location: table-top
+          notes: One at each side of the table.
+        - key: network-switch
+          class: network-switch
+          model: netgear-m4250-gsm4210pd
+          quantity: 1
+          requirement: required
+          location: behind-display
+        - key: switcher
+          class: av-switcher
+          model: kramer-swt3-31-hu
+          role: Chooses between the laptop inputs
+          quantity: 1
+          requirement: required
+          location: behind-display
+        - key: hdbaset-tx
+          class: av-extender
+          model: kramer-ext3-c-xr-t
+          role: HDBaseT transmitters, one per side table
+          quantity: 2
+          requirement: required
+          location: below-table
+        - key: hdbaset-rx
+          class: av-extender
+          model: kramer-ext3-poe-xr-r
+          role: HDBaseT receivers
+          quantity: 2
+          requirement: required
+          location: behind-display
+        - key: scheduler-panel
+          class: scheduler-panel
+          model: logitech-tap-scheduler
+          quantity: 1
+          requirement: optional
+          location: room-entrance
+      infrastructure:
+        - service: power
+          provided_by: it
+          quantity: 8
+          location: behind-display
+          serves: [display 1, video bar, HDBaseT receiver, USB-C/HDMI switcher, display 2,
+            HDBaseT receiver, network switch, spare]
+        - service: power
+          provided_by: it
+          quantity: 4
+          location: below-table
+          serves: [HDBaseT transmitter, HDBaseT transmitter, spare, spare]
+        - service: data
+          provided_by: it
+          quantity: 5
+          location: behind-display
+          serves: [display 1, network switch, spare, display 2, video bar]
+        - service: direct-run
+          provided_by: it
+          quantity: 5
+          location: below-table
+          serves: [HDBaseT link 1, HDBaseT link 2, table microphone 1, table microphone 2,
+            spare]
+          notes: HDBaseT 3.0 runs from both table transmitters to the receivers at the display
+            wall.
+        - service: data
+          provided_by: it
+          quantity: 2
+          location: below-table
+          serves: [touch controller, spare]
+        - service: data
+          provided_by: it
+          quantity: 1
+          location: room-entrance
+          serves: [scheduler panel (optional)]
+      wiring:
+        - from: video-bar.hdmi-out-1
+          to: display#1.hdmi-in-1
+          cable: hdmi
+        - from: video-bar.hdmi-out-2
+          to: display#2.hdmi-in-1
+          cable: hdmi
+        - from: hdbaset-tx#1.hdbaset-1
+          to: hdbaset-rx#1.hdbaset-1
+          cable: cat6a
+          notes: Direct cable run 1
+        - from: hdbaset-tx#2.hdbaset-1
+          to: hdbaset-rx#2.hdbaset-1
+          cable: cat6a
+          notes: Direct cable run 2
+        - from: hdbaset-tx#1.usb-c-1
+          to: laptop
+          cable: usb-c
+          notes: Left side table
+        - from: hdbaset-tx#2.usb-c-1
+          to: laptop
+          cable: usb-c
+          notes: Right side table
+        - from: hdbaset-rx#1.hdmi-out-1
+          to: switcher.hdmi-in-2
+          cable: hdmi
+        - from: hdbaset-rx#2.hdmi-out-1
+          to: switcher.hdmi-in-3
+          cable: hdmi
+        - from: hdbaset-rx#1.usb-b-1
+          to: switcher.usb-b-2
+          cable: usb
+        - from: hdbaset-rx#2.usb-b-1
+          to: switcher.usb-b-3
+          cable: usb
+        - from: switcher.hdmi-out-1
+          to: video-bar.hdmi-in-1
+          cable: hdmi
+        - from: switcher.usb-a-2
+          to: video-bar.usb-c-1
+          cable: usb
+          notes: Device mode
+        - from: switcher.lan-1
+          to: network-switch.lan-2
+          cable: cat6
+          notes: The switch powers the switcher (PoE)
+        - from: video-bar.lan-2
+          to: network-switch.lan-1
+          cable: cat6
+          notes: Link-local network for Poly IP accessories
+        - from: network-switch.lan-9
+          to: outlet:data/behind-display#2
+          cable: cat6
+          notes: Uplink
+        - from: video-bar.lan-1
+          to: outlet:data/behind-display#5
+          cable: cat6
+        - from: display#1.lan-1
+          to: outlet:data/behind-display#1
+          cable: cat6
+        - from: display#2.lan-1
+          to: outlet:data/behind-display#4
+          cable: cat6
+        - from: microphone#1.mic-1
+          to: video-bar.mic-1
+          cable: poly-mic
+          notes: The second microphone chains from the first (house assumption)
+        - from: touch-controller.lan-1
+          to: outlet:data/below-table#1
+          cable: cat6
+        - from: scheduler-panel.lan-1
+          to: outlet:data/room-entrance#1
+          cable: cat6
+        - from: display#1.power-in
+          to: outlet:power/behind-display#1
+          cable: power
+        - from: video-bar.power-in
+          to: outlet:power/behind-display#2
+          cable: power
+        - from: hdbaset-rx#1.power-in
+          to: outlet:power/behind-display#3
+          cable: power
+        - from: switcher.power-in
+          to: outlet:power/behind-display#4
+          cable: power
+        - from: display#2.power-in
+          to: outlet:power/behind-display#5
+          cable: power
+        - from: hdbaset-rx#2.power-in
+          to: outlet:power/behind-display#6
+          cable: power
+        - from: network-switch.power-in
+          to: outlet:power/behind-display#7
+          cable: power
+        - from: hdbaset-tx#1.power-in
+          to: outlet:power/below-table#1
+          cable: power
+        - from: hdbaset-tx#2.power-in
+          to: outlet:power/below-table#2
+          cable: power
+  notes:
+    - The table sits about 1.4 to 1.5 m from the display wall.
+    - Where a floor box is not possible, a low-profile floor raceway carries the cables from
+      the display wall to the table.
+    - 'Size and capacity: Microsoft''s Signature Teams Room, 25 x 14 ft for 6 to 8 people at a
+      curved table facing a display centred on it. The area runs from 350 sq ft to 400 (house
+      allowance).'
+    - 'Display size: AVIXA DISCAS basic decision making, text at 3 percent of the image height
+      (house assumption), so the image is at least a sixth of the distance to the farthest seat.
+      That seat is about 3.5 m from the display here, so the display is at least 47 in. Two 75 in
+      displays.'
+    - 'Kit class: the Poly Studio X72, which Poly makes for large rooms, for its wide room coverage
+      at the curved table (house assumption).'

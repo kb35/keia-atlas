@@ -1,0 +1,535 @@
+---
+// One configuration, in parts, so a page can place each part where it belongs.
+//   summary   on a device profile's Configuration tab: the kind, name, what it needs, the check, the
+//             settings in counts, the steps to do first, the records in one line, and a link to the
+//             configuration's page.
+//   check     the check on the example unit: a ring fills as each Set or Verify setting is checked and
+//             turns into a drawn tick when all is right (or says what to fix, with Fix it).
+//   setup     the setup in the order it must be done, as a practice run (ticks stay on this browser).
+//   settings  every setting with its check tick; Set and Verify by default, Show all adds the defaults.
+//   map       the web interface: the menus as tiles; the open one shows its pages and settings.
+//   files     where the example unit's record lives in each system, against what Keia Atlas expects.
+// A configuration's page (/configurations/<id>/) wraps its parts in one element with data-cw and
+// data-cfg, and gives setup, settings, map and files a tab each (DetailTabs). The behaviour is in
+// ConfigScript.astro, included once per page. Check results are simulated (src/lib/cfgstate.mjs).
+// Configuring a real device happens in a project's Deploy page, not here.
+import Icon from './Icon.astro';
+import DeviceGlyph from './DeviceGlyph.astro';
+import { models, className, href, src as sourceOf, fmtDate, standardFirmware } from '../lib/data.mjs';
+import { fileState, providerOf, STATE_LABEL } from '../lib/cfgstate.mjs';
+import { mapOf } from '../pages/configurations/_use.mjs';
+
+interface Props { cfg: any; pane?: 'summary' | 'check' | 'setup' | 'settings' | 'map' | 'files' }
+const { cfg, pane = 'summary' } = Astro.props;
+const cls = models[cfg.models[0]].class;
+const ACT = { change: 'Set', verify: 'Verify', leave: 'Default' };
+const short = (m) => models[m].model.replace(/\s*\(.*\)$/, '');
+// "Studio X52, X32, X72": later models drop the words they share with the first.
+const modelList = (() => {
+  const names = cfg.models.map(short), first = names[0].split(' ');
+  return names.map((n, i) => {
+    if (!i) return n;
+    const w = n.split(' '); let k = 0; while (k < w.length - 1 && w[k] === first[k]) k++;
+    return w.slice(k).join(' ');
+  }).join(', ');
+})();
+const all = cfg.groups.flatMap((g) => g.settings.map((st) => ({ ...st, group: g.name, where: g.where })));
+const applied = all.filter((x) => x.action !== 'leave');
+const nSet = all.filter((x) => x.action === 'change').length, nVer = all.filter((x) => x.action === 'verify').length, nLeave = all.length - nSet - nVer;
+const nPer = all.filter((x) => x.per_device).length;
+const fs = fileState(cfg);
+const wrong = new Map(fs.wrong.map((w) => [w.name, w.got]));
+const fwStd = standardFirmware(cfg.models[0])?.version;
+const provider = providerOf(cfg);
+const live = fs.systems.filter((s) => s.state !== 'na');
+const drift = live.filter((s) => s.state !== 'sync').length;
+const issues = fs.wrong.length + drift;
+const srcLink = (id) => sourceOf(id);
+
+// Setup: the ordered steps. Older configurations only have plain steps.
+const setup = (cfg.setup ?? (cfg.steps ?? []).map((s, i) => ({ id: `s${i + 1}`, title: s }))).map((s, i) => ({ ...s, n: i + 1 }));
+const stepN = Object.fromEntries(setup.map((s) => [s.id, s.n]));
+const stepTitle = Object.fromEntries(setup.map((s) => [s.id, s.title]));
+const nCrit = setup.filter((s) => s.critical).length;
+
+const { liveMenus, elsewhere } = mapOf(cfg);
+const MENU_ICON = { Dashboard: 'home', 'General Settings': 'gear', Servers: 'rack', Network: 'net', 'Audio/Video': 'camera', Security: 'lock', Diagnostics: 'pulse' };
+const MENU_WHAT = {
+  Dashboard: 'The first page after you log in: model, serial, software and status at a glance.',
+  'General Settings': 'Who the device is and how it behaves: names, location, time, provider and updates.',
+  Servers: 'What the device talks to: provisioning, the Poly cloud and SNMP.',
+  Network: 'How it joins the network: address, host name, LLDP, VLAN, 802.1X, proxy.',
+  'Audio/Video': 'How the room sounds and looks: microphones, displays and the camera.',
+  Security: 'Who can get in and how: passwords, access, certificates.',
+  Diagnostics: 'Checks and tools for when something is wrong.',
+};
+const menuIcon = (n) => MENU_ICON[n] ?? 'sliders';
+const nAct = (m) => m.pages.reduce((n, p) => n + p.settings.filter((s) => s.action !== 'leave').length, 0);
+const nAll = (m) => m.pages.reduce((n, p) => n + p.settings.length, 0);
+const firstMenu = [...liveMenus].sort((a, b) => nAct(b) - nAct(a))[0];
+const key = (s) => s.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+const tick = (st) => (st.action === 'leave' ? 'leave' : wrong.has(st.name) ? 'bad' : 'ok');
+const kindPlural = ((n) => `${/^[A-Z][a-z]/.test(n) ? n[0].toLowerCase() + n.slice(1) : n}s`)(className(cls));
+const pathOf = (p) => (p ?? '').split(' > ').join(' › ');
+---
+{pane === 'check' && (
+  <div class="cw-state" data-cw-state data-total={applied.length} data-bad={fs.wrong.length} data-drift={drift} aria-live="polite">
+    <span class="st-dial" aria-hidden="true">
+      <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" class="st-bg" /><circle cx="24" cy="24" r="20" class="st-fg" pathLength="100" data-st-ring /><path class="st-tick" d="M15 24.5l6.2 6.2L33.5 18" pathLength="1" /><path class="st-x" d="M24 14v12M24 32.5v.5" /></svg>
+      <b class="st-n num" data-st-n>0</b>
+    </span>
+    <span class="st-text">
+      <b data-st-label>{applied.length ? 'Checking' : 'Nothing to set'}</b>
+      <small data-st-detail></small>
+      <small title={fs.device ? `Checked on ${fs.device.host ?? fs.device.tag}, ${fs.device.room}, ${fs.device.site} (simulated values)` : undefined}>{fs.device ? <>on <span class="mono">{fs.device.host ?? fs.device.tag}</span></> : 'No unit yet'}</small>
+    </span>
+    <span class="st-acts">
+      <button type="button" class="st-btn" data-cw-recheck>Check again</button>
+      {issues > 0 && <button type="button" class="st-btn fix" data-cw-fix hidden>Fix it</button>}
+    </span>
+  </div>
+)}
+
+{pane === 'summary' && (
+  <article class="cw cw-summary" data-cw data-cfg={cfg.id} aria-labelledby={`cw-h-${cfg.id}`}>
+    <header class="cw-head">
+      <span class="cw-icon" aria-hidden="true"><DeviceGlyph cls={cls} size={46} /></span>
+      <div class="cw-title">
+        <p class="cw-kind">{className(cls)}<span>·</span>v{cfg.version}<span>·</span>{fmtDate(cfg.updated)}</p>
+        <h2 id={`cw-h-${cfg.id}`}>{cfg.name}</h2>
+      </div>
+      <ul class="cw-spec" aria-label="What it needs">
+        <li><span>Model</span><b>{modelList}</b></li>
+        <li><span>Firmware</span><b class="mono">{cfg.firmware_min ?? (fwStd ? `${fwStd} or later` : cfg.firmware ?? 'Not versioned')}</b></li>
+        <li class="mode" title={cfg.mode}><span>Mode</span><b>{cfg.mode.length > 34 ? provider : cfg.mode}</b></li>
+      </ul>
+      <Astro.self cfg={cfg} pane="check" />
+    </header>
+    <div class="cws">
+      <div class="cws-c">
+        <p class="cws-h">Settings</p>
+        <span class="cws-bar" aria-hidden="true"><i class="b-s" style={`flex:${nSet || 0.001}`}></i><i class="b-v" style={`flex:${nVer || 0.001}`}></i><i class="b-d" style={`flex:${nLeave || 0.001}`}></i></span>
+        <p class="cws-n"><b class="num">{nSet}</b> set · <b class="num">{nVer}</b> verify{nLeave > 0 && <> · <b class="num">{nLeave}</b> left at the default</>}{nPer > 0 && <> · <b class="num">{nPer}</b> per device</>}</p>
+      </div>
+      <div class="cws-c">
+        <p class="cws-h">{nCrit ? 'Order matters' : 'New install, in order'}</p>
+        <ol class="cws-steps">{(nCrit ? setup.filter((s) => s.critical) : setup).slice(0, nCrit ? 5 : 4).map((st) => <li class:list={{ crit: st.critical }} title={st.title}><span class="num">{st.n}</span><span>{st.title}</span></li>)}</ol>
+      </div>
+      <div class="cws-c">
+        <p class="cws-h">Configuration file state</p>
+        {live.length ? <ul class="cws-fs">{live.map((x) => <li class={`k-${x.state}`} data-fs-state={x.state}><i></i>{x.name}<small data-fs-label>{STATE_LABEL[x.state]}</small></li>)}</ul> : <p class="cws-n">No unit installed yet.</p>}
+      </div>
+      <div class="cws-go">
+        <a class="btn cws-open" href={href(`/configurations/${cfg.id}/`)}>Open the configuration<Icon name="arrow" size={14} /></a>
+        <small class="faint">Configuring happens in a project's Deploy page.</small>
+      </div>
+    </div>
+  </article>
+)}
+
+{pane === 'setup' && (
+  <div class="cw-pane" aria-label="Setup order">
+    <div class="su-top">
+      <p><b>A practice run.</b> {nCrit ? <>Order matters for the steps marked Critical; a later step says which one comes first, and why.</> : <>A new install, in order.</>} Ticks stay on this browser. The real run is ticked device by device in a project's Deploy page.</p>
+      <span class="su-prog"><span class="su-bar"><i data-su-bar></i></span><span class="num" data-su-n>0 of {setup.length}</span></span>
+      <button type="button" class="linkish" data-su-reset>Clear ticks</button>
+    </div>
+    {cfg.requires?.length > 0 && <p class="su-req"><b>Before you start</b>{cfg.requires.map((r) => <span>{r}</span>)}</p>}
+    <ol class="su">
+      {setup.map((s) => (
+        <li class:list={['su-s', { crit: s.critical }]} data-su-step={s.n} data-after={(s.after ?? []).map((a) => stepN[a]).join(',')}>
+          <button type="button" class="su-b" aria-pressed="false" data-su={s.n}>
+            <span class="su-n num">{s.n}</span>
+            <span class="su-t">
+              <span class="su-tl"><b>{s.title}</b>{s.critical && <i class="crit-tag">Critical</i>}{s.unconfirmed && <i class="unc">Unconfirmed</i>}</span>
+              {s.path && <small class="mono">{pathOf(s.path)}</small>}
+              {s.detail && <span class="su-d">{s.detail}</span>}
+              {s.after?.length > 0 && (
+                <span class="su-after" data-su-after>
+                  <Icon name="lock" size={12} />
+                  <span><b>After {s.after.map((a) => `${stepN[a]}. ${stepTitle[a]}`).join(' and ')}</b><span class="su-wait"> (not ticked yet)</span>. {s.why_order}</span>
+                </span>
+              )}
+            </span>
+            <span class="su-tk" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M5.5 10.4l3 3L14.5 7" pathLength="1" /></svg></span>
+          </button>
+        </li>
+      ))}
+    </ol>
+  </div>
+)}
+
+{pane === 'settings' && (
+  <div class="cw-pane" aria-label="Settings">
+    {cfg.summary && <p class="cw-sum">{cfg.summary}</p>}
+    <div class="cw-set-bar">
+      <p class="cw-legend"><span><i class="bdg b-change">Set</i>change it</span><span><i class="bdg b-verify">Verify</i>the default is right, check it</span>{nLeave > 0 && <span class="lg-leave"><i class="bdg b-leave">Default</i>left as it comes</span>}{all.some((x) => x.unconfirmed) && <span><i class="unc">Unconfirmed</i>not checked on a unit yet</span>}</p>
+      <label class="cw-all" title={nLeave ? 'List every setting, including the ones left at the default' : 'Every setting is already listed'}>
+        <input type="checkbox" data-cw-all disabled={!nLeave} />
+        <span class="sw" aria-hidden="true"></span><span>Show all settings</span>{nLeave > 0 ? <span class="faint num">+{nLeave}</span> : <span class="faint">(all listed)</span>}
+      </label>
+      <button type="button" class="btn small" data-open-report="change"><Icon name="edit" size={14} />Propose a change</button>
+    </div>
+    {cfg.groups.map((g) => (
+      <div class:list={['cw-grp', { 'only-leave': g.settings.every((s) => s.action === 'leave') }]}>
+        <p class="cw-gh"><b>{g.name}</b><span>{g.where}</span></p>
+        <ul>
+          {g.settings.map((st) => (
+            <li class={`cs2 a-${st.action}`} data-tick={tick(st)}>
+              <span class="tk" data-tk role="img" aria-label={st.action === 'leave' ? 'Left at the default, not checked' : 'Waiting'}>
+                {st.action !== 'leave' && <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.5" /><path class="tk-ok" d="M6 10.4l2.6 2.6L14 7.4" pathLength="1" /><path class="tk-bad" d="M7 7l6 6M13 7l-6 6" /></svg>}
+              </span>
+              <span class="cs2-n"><i class={`bdg b-${st.action}`}>{ACT[st.action]}</i><b>{st.name}</b>{st.unconfirmed && <i class="unc">Unconfirmed</i>}{st.path && <small>{pathOf(st.path)}</small>}</span>
+              <span class="cs2-v"><span class="mono">{st.value}</span>{st.default && st.action !== 'verify' && st.default !== st.value && <small>Default: {st.default}</small>}
+                {(st.per_device || st.advisory) && <span class="cs2-tags">{st.per_device && <span class="ctag per">Per device</span>}{st.advisory && <span class="ctag adv">{st.advisory}</span>}</span>}
+                {wrong.has(st.name) && <small class="found">Found: {wrong.get(st.name)}</small>}
+              </span>
+              <span class="cs2-w">{st.why}{st.source && srcLink(st.source) && <a class="cite" href={srcLink(st.source).url} target="_blank" rel="noopener" title={srcLink(st.source).title}>source</a>}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ))}
+    {cfg.gaps?.length > 0 && <details class="cw-gaps"><summary>What the vendor's documents don't say ({cfg.gaps.length})</summary><ul>{cfg.gaps.map((g) => <li>{g}</li>)}</ul></details>}
+  </div>
+)}
+
+{pane === 'map' && liveMenus.length > 0 && (
+  <div class="cw-pane" aria-label="Web interface map">
+    <div class="um2">
+      <div class="um2-stack" role="tablist" aria-label="Menus" aria-orientation="vertical">
+        {liveMenus.map((m) => {
+          const sts = m.pages.flatMap((p) => p.settings), act = sts.filter((s) => s.action !== 'leave');
+          return (
+            <button type="button" role="tab" class:list={['um2-tile', { quiet: !act.length }]} data-um={key(m.name)} aria-selected={m === firstMenu ? 'true' : 'false'} hidden={m === firstMenu}>
+              <span class="um2-i"><Icon name={menuIcon(m.name)} size={16} /></span>
+              <span class="um2-nm"><b>{m.name}</b><small><span class="na">{act.length ? `${act.length} to set or verify` : 'Nothing to set'}</span><span class="nall">{sts.length} settings</span></small></span>
+              <span class="um2-dots" aria-hidden="true">{act.slice(0, 9).map((s) => <i class={wrong.has(s.name) ? 'bad' : s.action}></i>)}</span>
+            </button>
+          );
+        })}
+        {elsewhere.length > 0 && <p class="um2-else"><b>Also set outside the device</b>{elsewhere.join(', ')}. They are in Settings.</p>}
+      </div>
+      <div class="um2-open" data-um-open>
+        {liveMenus.map((m) => {
+          const nl = m.pages.reduce((n, p) => n + p.settings.filter((s) => s.action === 'leave').length, 0);
+          return (
+            <div class="um2-panel" data-um-panel={key(m.name)} hidden={m !== firstMenu}>
+              <div class="um2-h">
+                <span class="um2-i big"><Icon name={menuIcon(m.name)} size={20} /></span>
+                <span class="um2-ht"><b>{m.name}</b>{MENU_WHAT[m.name] && <small>{MENU_WHAT[m.name]}</small>}</span>
+                <span class="um2-hn faint"><span class="na">{nAct(m)} of {nAll(m)} to set or verify</span><span class="nall">{nAll(m)} settings</span>{cfg.firmware ? ` · ${cfg.firmware}` : ''}</span>
+              </div>
+              <div class="um2-pages">
+                {m.pages.map((pg) => (
+                  <div class:list={['um2-page', { 'only-leave': pg.settings.every((s) => s.action === 'leave') }]}>
+                    <p class="um2-path">{m.name}{pg.name && <> › <b>{pg.name}</b></>}</p>
+                    <ul>{pg.settings.map((st) => (
+                      <li class={`a-${st.action}`}><i class={`bdg b-${st.action}`}>{ACT[st.action]}</i><span class="um2-sn">{st.name}{st.unconfirmed && <i class="unc" title="Unconfirmed">?</i>}</span><span class="mono">{st.value}</span></li>
+                    ))}</ul>
+                  </div>
+                ))}
+              </div>
+              {nl > 0 && <p class="um2-more">{nAct(m) === 0 && <span>Nothing to change here: every setting stays as it ships. </span>}<button type="button" class="linkish" data-cw-showall>Show the {nl} left at the default</button></p>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  </div>
+)}
+
+{pane === 'files' && (
+  <div class="cw-pane" aria-label="Configuration file state">
+    <p class="fsx-top">
+      {fs.device ? <span>Where <b class="mono">{fs.device.host ?? fs.device.tag}</b> ({fs.device.room}, {fs.device.site}) is recorded in each system, against what Keia Atlas expects. Simulated values.</span> : <span>No unit of this model is installed yet, so no system has a record.</span>}
+      <span class="fsx-key"><i class="ln-del">-</i>found <i class="ln-add">+</i>expected</span>
+    </p>
+    <div class="fsx">
+      {live.map((sy) => (
+        <div class={`fsx-c st-${sy.state}`} data-fs-state={sy.state}>
+          <p class="fsx-h"><span class="fsx-i"><Icon name={sy.icon} size={15} /></span><span><b>{sy.name}</b><small>{sy.does}</small></span><span class={`fsx-st s-${sy.state}`} data-fs-label>{STATE_LABEL[sy.state]}</span></p>
+          <pre class="fsx-f"><span class="fsx-file"># {sy.file}</span>{sy.state === 'missing' && <span class="ln ln-del fixable"><i class="pm">-</i>(no record)</span>}{sy.fields.map((f) => f.ok ? <span class="ln"><i class="pm"> </i>{f.k}: {f.want}</span> : <>{f.got !== null && <span class="ln ln-del fixable"><i class="pm">-</i>{f.k}: {f.got}</span>}<span class="ln ln-add fixable"><i class="pm">+</i>{f.k}: {f.want}</span></>)}</pre>
+        </div>
+      ))}
+      {fs.systems.filter((s) => s.state === 'na').map((sy) => (
+        <div class="fsx-c st-na">
+          <p class="fsx-h"><span class="fsx-i"><Icon name={sy.icon} size={15} /></span><span><b>{sy.name}</b><small>{sy.does}</small></span><span class="fsx-st s-na">Not used</span></p>
+          <p class="fsx-nat">{fs.device ? `No record: ${kindPlural} are not kept in ${sy.name}.` : 'No unit installed yet.'}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
+<style is:global>
+  /* The wrapper on a configuration's page takes no room of its own: its parts sit on the page's grid. */
+  .cw.cw-full { display: contents; }
+  /* The summary on a device profile: one card. */
+  .cw-summary { display: grid; grid-template-columns: minmax(0, 1fr); background: var(--surface); border: var(--border-card); border-radius: var(--radius-lg); min-width: 0; }
+  .cw-head { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 8px 14px; align-items: center; padding: 14px 18px 12px; }
+  .cw-head .cw-icon { grid-row: 1 / 3; }
+  .cw-head .cw-state { grid-column: 3; grid-row: 1; }
+  .cw-head .cw-spec { grid-column: 2 / -1; grid-row: 2; }
+  .cw-icon { width: 58px; height: 58px; border-radius: 15px; display: grid; place-items: center; background: var(--surface-2); color: var(--text); border: 1px solid var(--line); }
+  .cw-kind { margin: 0; display: flex; gap: 6px; font: 700 10.5px/1 var(--font-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); }
+  .cw-kind span { opacity: .5; }
+  .cw-title { min-width: 0; }
+  .cw-title h2 { margin: 5px 0 0; font: var(--weight-display, 700) 22px/1.1 var(--font-display); letter-spacing: -.015em; }
+  .cw-spec { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .cw-spec li { display: inline-flex; align-items: baseline; gap: 6px; padding: 4px 9px; border-radius: 7px; background: var(--surface-2); border: 1px solid var(--line); font-size: 12.5px; max-width: 100%; }
+  .cw-spec span { font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+  .cw-spec b { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .cw-spec b.mono { font: 600 12px var(--font-mono); }
+  .cw-spec .mode { background: var(--blue-soft); border-color: transparent; } .cw-spec .mode b { color: var(--blue-ink); }
+
+  /* The check: a ring fills as settings are checked; all correct draws a tick. */
+  .cw-state { display: grid; grid-template-columns: 44px auto auto; gap: 10px; align-items: center; padding: 6px 10px 6px 8px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); transition: background var(--dur-state) var(--ease-settle), border-color var(--dur-state) var(--ease-settle); }
+  .st-dial { position: relative; width: 44px; height: 44px; display: block; }
+  .st-dial svg { width: 44px; height: 44px; overflow: visible; }
+  .st-bg { fill: none; stroke: var(--surface-3); stroke-width: 4.5; }
+  .st-fg { fill: none; stroke: var(--accent); stroke-width: 4.5; stroke-linecap: round; stroke-dasharray: 0 100; transform: rotate(-90deg); transform-origin: 24px 24px; transition: stroke-dasharray var(--dur-hover) var(--ease-settle), stroke var(--dur-state) var(--ease-settle), fill var(--dur-state) var(--ease-settle); }
+  .st-tick { fill: none; stroke: #fff; stroke-width: 3.6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+  .st-x { fill: none; stroke: #fff; stroke-width: 3.6; stroke-linecap: round; opacity: 0; }
+  .st-n { position: absolute; inset: 0; display: grid; place-items: center; font: 800 10.5px/1 var(--font-sans); letter-spacing: -.02em; color: var(--text); transition: opacity var(--dur-pop) var(--ease-settle); }
+  .st-text { display: grid; gap: 1px; min-width: 0; }
+  .st-text > b { font: 700 14px/1.2 var(--font-sans); }
+  .st-text small { font-size: 11.5px; color: var(--text-3); max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .st-text small[data-st-detail] { color: var(--text-2); font-weight: 600; }
+  .st-text small[data-st-detail]:empty { display: none; }
+  .st-acts { display: grid; gap: 4px; justify-items: stretch; }
+  .st-btn { appearance: none; border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); font: 600 11px var(--font-sans); padding: 3px 8px; white-space: nowrap; border-radius: 999px; cursor: pointer; }
+  .st-btn:hover { border-color: var(--accent); }
+  .st-btn.fix { background: var(--accent); border-color: var(--accent); color: var(--on-accent, #fff); }
+  .st-btn[hidden] { display: none; }
+  .cw-state.is-ok { background: color-mix(in srgb, var(--green) 9%, var(--surface)); border-color: color-mix(in srgb, var(--green) 45%, var(--line)); }
+  .cw-state.is-ok .st-fg { stroke: var(--green); fill: var(--green); stroke-dasharray: 100 0; }
+  .cw-state.is-ok .st-n { opacity: 0; }
+  .cw-state.is-ok .st-tick { stroke-dashoffset: 0; transition: stroke-dashoffset var(--dur-enter) var(--ease-settle) var(--delay-enter, 120ms); }
+  .cw-state.is-ok .st-text > b { color: var(--green-ink); }
+  .cw-state.is-bad { background: color-mix(in srgb, var(--amber) 10%, var(--surface)); border-color: color-mix(in srgb, var(--amber) 55%, var(--line)); }
+  .cw-state.is-bad .st-fg { stroke: var(--amber); fill: var(--amber); stroke-dasharray: 100 0; }
+  .cw-state.is-bad .st-n { opacity: 0; }
+  .cw-state.is-bad .st-x { opacity: 1; transition: opacity var(--dur-pop) var(--ease-settle) var(--delay-enter, 120ms); }
+  .cw-state.is-bad .st-text > b { color: var(--amber-ink); }
+  .cw-state.is-empty .st-n { font-size: 12px; color: var(--text-3); }
+
+  /* Summary strip on the device profile */
+  .cws { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 18px; align-items: start; padding: 12px 18px 16px; border-top: 1px solid var(--line); }
+  .cws-h { margin: 0 0 6px; font: 700 10.5px/1 var(--font-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); }
+  .cws-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 2px; }
+  .cws-bar .b-s { background: var(--accent); } .cws-bar .b-v { background: var(--green); } .cws-bar .b-d { background: var(--surface-3); }
+  .cws-n { margin: 6px 0 0; font-size: 13px; color: var(--text-2); } .cws-n b { color: var(--text); }
+  .cws-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+  .cws-steps li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 6px; align-items: baseline; }
+  .cws-steps li > span:last-child { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .cws-steps .num { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; font: 800 11px/1 var(--font-mono); background: var(--surface-2); color: var(--text-2); }
+  .cws-steps .crit .num { background: var(--red); color: #fff; }
+  .cws-fs { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+  .cws-fs li { display: flex; gap: 7px; align-items: center; }
+  .cws-fs i { width: 9px; height: 9px; border-radius: 50%; background: var(--green); flex: none; transition: background var(--dur-state) var(--ease-settle); }
+  .cws-fs small { margin-left: auto; color: var(--text-3); font-size: 11.5px; }
+  .cws-fs .k-drift i { background: var(--amber); } .cws-fs .k-missing i { background: var(--red); }
+  .cws-fs .k-drift small, .cws-fs .k-missing small { color: var(--amber-ink); font-weight: 650; }
+  .cw.fixed .cws-fs small { color: var(--text-3); font-weight: 400; }
+  .cw.fixed .cws-fs li i { background: var(--green); }
+  .cws-go { display: grid; gap: 6px; justify-items: start; align-self: center; }
+  .cws-go small { font-size: 12px; max-width: 200px; }
+  .cws-open { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+
+  /* Settings */
+  .cw [data-n-all] { display: none !important; } .cw.all [data-n-all] { display: inline-grid !important; } .cw.all [data-n-applied] { display: none !important; }
+  .cw-all { display: inline-flex; align-items: center; gap: 8px; font: 600 12.5px var(--font-sans); color: var(--text-2); cursor: pointer; white-space: nowrap; padding: 6px 0; }
+  .cw-all input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .cw-all .sw { width: 30px; height: 18px; border-radius: 9px; background: var(--surface-3); position: relative; transition: background var(--dur-pop) var(--ease-settle); box-shadow: inset 0 0 0 1px var(--line-strong); flex: none; }
+  .cw-all .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow-sm); transition: transform var(--dur-state) var(--ease-settle); }
+  .cw-all input:checked + .sw { background: var(--accent); }
+  .cw-all input:checked + .sw::after { transform: translateX(12px); }
+  .cw-all input:focus-visible + .sw { outline: 2px solid var(--focus, var(--accent)); outline-offset: 2px; }
+  .cw-all:has(input:disabled) { opacity: .55; cursor: default; }
+  .cw-pane { min-width: 0; }
+  .cw-sum { margin: 0 0 10px; font-size: 14px; color: var(--text-2); max-width: 90ch; }
+  .cw-set-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; margin: 0 0 6px; }
+  .cw-set-bar .btn { display: inline-flex; gap: 6px; align-items: center; margin-left: auto; }
+  .cw-legend { margin: 0; font-size: 12px; color: var(--text-3); display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; }
+  .cw-legend > span { display: inline-flex; gap: 6px; align-items: center; }
+  .cw:not(.all) .lg-leave { display: none; }
+  .bdg { display: inline-block; font: 800 9.5px/1 var(--font-mono); font-style: normal; letter-spacing: .05em; text-transform: uppercase; padding: 4px 6px; border-radius: 5px; vertical-align: 1px; white-space: nowrap; }
+  .b-change { background: var(--accent); color: var(--on-accent, #fff); }
+  .b-verify { background: var(--green-soft); color: var(--green-ink); box-shadow: inset 0 0 0 1.5px var(--green); }
+  .b-leave { background: var(--surface-2); color: var(--text-3); box-shadow: inset 0 0 0 1px var(--line-strong); }
+  .unc { display: inline-block; font: 700 9.5px/1 var(--font-mono); font-style: normal; letter-spacing: .04em; text-transform: uppercase; padding: 3px 5px; border-radius: 4px; background: var(--amber-soft); color: var(--amber-ink); border: 1px dashed var(--amber); vertical-align: 1px; }
+  .cw:not(.all) .a-leave, .cw:not(.all) .only-leave { display: none; }
+  .cw-grp { margin-top: 8px; background: var(--surface); border: var(--border-card); border-radius: var(--radius-lg); padding: 0 16px 4px; }
+  /* Group headings follow the page while you read their settings (the page scrolls, nothing inside it does). */
+  .cw-gh { position: sticky; top: var(--mast-h, 60px); z-index: 1; margin: 0; padding: 12px 0 8px; background: var(--surface); display: flex; gap: 10px; align-items: baseline; border-bottom: 1.5px solid var(--line-strong); }
+  .cw-gh b { font: 700 14px var(--font-display); } .cw-gh span { font-size: 12px; color: var(--text-3); }
+  .cw-grp ul { list-style: none; margin: 0; padding: 0; }
+  .cs2 { display: grid; grid-template-columns: 22px minmax(170px, 1fr) minmax(140px, .8fr) minmax(0, 1.4fr); gap: 3px 14px; padding: 9px 4px 9px 0; border-bottom: 1px solid var(--line); font-size: 13px; align-items: start; transition: background var(--dur-state) var(--ease-settle); }
+  .cw-grp li.cs2:last-child { border-bottom: 0; }
+  .cs2.a-leave { color: var(--text-2); }
+  .cs2-n b { font-size: 13.5px; margin: 0 6px 0 7px; } .cs2.a-leave .cs2-n b { font-weight: 600; }
+  .cs2-n small { display: block; margin-top: 3px; font-size: 11.5px; color: var(--text-3); }
+  .cs2-v { display: grid; gap: 3px; justify-items: start; min-width: 0; overflow-wrap: anywhere; } .cs2-v .mono { font-size: 12.5px; } .cs2-v small { font-size: 11.5px; color: var(--text-3); }
+  .cs2-v .found { color: var(--red-ink); font-weight: 700; }
+  .cw.fixed .cs2-v .found { display: none; }
+  .cs2-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+  .ctag { font: 600 10.5px/1 var(--font-sans); padding: 3px 6px; border-radius: 4px; background: var(--surface-2); color: var(--text-3); }
+  .ctag.per { background: var(--blue-soft); color: var(--blue-ink); } .ctag.adv { background: var(--red-soft); color: var(--red-ink); }
+  .cs2-w { color: var(--text-2); font-size: 13px; line-height: 1.45; }
+  .cw .cite { margin-left: 6px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  /* The row tick: a ring while waiting, spinning while checked, a drawn tick when right, a cross when wrong. */
+  .tk { width: 20px; height: 20px; display: block; margin-top: -1px; }
+  .tk svg { width: 20px; height: 20px; overflow: visible; }
+  .tk circle { fill: none; stroke: var(--line-strong); stroke-width: 1.5; transition: fill var(--dur-pop) var(--ease-settle), stroke var(--dur-pop) var(--ease-settle); transform-origin: 10px 10px; }
+  .tk path { fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .tk .tk-ok { stroke-dasharray: 1; stroke-dashoffset: 1; }
+  .tk .tk-bad { opacity: 0; }
+  .cs2.checking .tk circle { stroke: var(--accent); stroke-dasharray: 14 40; animation: tk-spin 600ms linear infinite; }
+  .cs2.ok .tk circle { fill: var(--green); stroke: var(--green); }
+  .cs2.ok .tk .tk-ok { stroke-dashoffset: 0; transition: stroke-dashoffset var(--dur-state) var(--ease-settle); }
+  .cs2.bad .tk circle { fill: var(--red); stroke: var(--red); }
+  .cs2.bad .tk .tk-bad { opacity: 1; }
+  .cs2.bad { background: linear-gradient(90deg, color-mix(in srgb, var(--red) 10%, transparent), transparent 70%); }
+  .cs2.a-leave .tk::before { content: ""; display: block; width: 8px; height: 2px; margin: 9px 6px; border-radius: 1px; background: var(--line-strong); }
+  @keyframes tk-spin { to { transform: rotate(360deg); } }
+  .cw-gaps { margin-top: 14px; font-size: 13px; color: var(--text-2); } .cw-gaps summary { cursor: pointer; font-weight: 600; } .cw-gaps ul { margin: 6px 0 0; padding-left: 18px; }
+
+  /* Setup order: read down the first column, then the second. */
+  .su-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin: 0 0 12px; font-size: 13.5px; color: var(--text-2); }
+  .su-top p { margin: 0; flex: 1 1 360px; } .su-top b { color: var(--text); }
+  .su-prog { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; }
+  .su-bar { width: 120px; height: 6px; border-radius: 3px; background: var(--surface-3); overflow: hidden; }
+  .su-bar i { display: block; height: 100%; width: 0; background: var(--green); transition: width var(--dur-state) var(--ease-settle); }
+  .cw .linkish { appearance: none; border: 0; background: none; padding: 0; color: var(--accent-ink); font: inherit; font-size: 12px; font-weight: 650; text-decoration: underline; cursor: pointer; }
+  .su-req { margin: 0 0 12px; padding: 8px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); font-size: 12.5px; line-height: 1.5; color: var(--text-2); }
+  .su-req b { color: var(--text); margin-right: 8px; }
+  .su-req span + span::before { content: "·"; margin: 0 7px; color: var(--text-3); }
+  .su { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: 12px; }
+  .su-s { break-inside: avoid; margin-bottom: 10px; }
+  .su-b { width: 100%; appearance: none; text-align: left; display: grid; grid-template-columns: 28px minmax(0, 1fr) 22px; gap: 10px; align-items: start; padding: 10px 12px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--surface); color: var(--text); font: inherit; cursor: pointer; transition: border-color var(--dur-pop) var(--ease-settle), background var(--dur-state) var(--ease-settle); }
+  .su-b:hover { border-color: var(--line-strong); }
+  .su-n { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font: 800 12.5px/1 var(--font-mono); background: var(--surface-2); color: var(--text-2); transition: background var(--dur-state) var(--ease-settle), color var(--dur-state) var(--ease-settle); }
+  .crit .su-b { border-color: color-mix(in srgb, var(--red) 40%, var(--line)); }
+  .crit .su-n { background: var(--red); color: #fff; }
+  .su-t { display: grid; gap: 3px; font-size: 13px; min-width: 0; }
+  .su-tl { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+  .su-tl b { font-size: 14px; }
+  .su-t small { font-size: 11.5px; color: var(--text-3); }
+  .su-d { color: var(--text-2); font-size: 13px; line-height: 1.45; }
+  .crit-tag { font: 800 9.5px/1 var(--font-mono); font-style: normal; letter-spacing: .05em; text-transform: uppercase; padding: 3px 5px; border-radius: 4px; background: var(--red-soft); color: var(--red-ink); }
+  .su-after { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 6px; margin-top: 3px; padding: 6px 8px; border-radius: 8px; font-size: 12px; line-height: 1.4; color: var(--text-2); background: var(--surface-2); transition: background var(--dur-state) var(--ease-settle), color var(--dur-state) var(--ease-settle); }
+  .su-after svg { margin-top: 2px; color: var(--text-3); }
+  .su-after b { color: var(--text); font-weight: 650; }
+  .su-wait { display: none; }
+  .su-s.blocked .su-after { background: var(--amber-soft); color: var(--amber-ink); }
+  .su-s.blocked .su-after b, .su-s.blocked .su-after svg { color: var(--amber-ink); }
+  .su-s.blocked .su-wait { display: inline; }
+  .su-s.early .su-b { animation: su-nudge var(--dur-enter) var(--ease-settle); }
+  @keyframes su-nudge { 25% { transform: translateX(-4px); } 60% { transform: translateX(3px); } }
+  .su-tk { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--line-strong); display: grid; place-items: center; transition: background var(--dur-pop) var(--ease-settle), border-color var(--dur-pop) var(--ease-settle); }
+  .su-tk svg { width: 18px; height: 18px; } .su-tk path { fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset var(--dur-state) var(--ease-settle); }
+  .done .su-tk { background: var(--green); border-color: var(--green); } .done .su-tk path { stroke-dashoffset: 0; }
+  .done .su-b { border-color: var(--green); background: color-mix(in srgb, var(--green) 6%, var(--surface)); }
+  .done .su-n { background: var(--green); color: #fff; }
+  .done:not(.blocked) .su-after { display: none; }
+  .done.blocked .su-b { border-color: var(--amber); background: color-mix(in srgb, var(--amber) 7%, var(--surface)); }
+  .done.blocked .su-n, .done.blocked .su-tk { background: var(--amber); border-color: var(--amber); }
+
+  /* Web interface map: the menus as tiles on the left (they follow the page); the open menu beside them.
+     Both take their natural height; the page is what scrolls. */
+  .um2 { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 14px; align-items: start; }
+  .um2-stack { display: flex; flex-direction: column; gap: 6px; position: sticky; top: calc(var(--mast-h, 60px) + 16px); }
+  .um2-tile { appearance: none; display: grid; grid-template-columns: 32px minmax(0, 1fr); grid-template-rows: auto auto; gap: 3px 10px; align-items: center; text-align: left; padding: 8px 10px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--surface-2); color: var(--text); font: inherit; cursor: pointer; transition: border-color var(--dur-hover) var(--ease-settle), box-shadow var(--dur-hover) var(--ease-settle), transform var(--dur-hover) var(--ease-settle); }
+  .um2-tile[hidden] { display: none; }
+  .um2-tile:hover { border-color: var(--line-strong); box-shadow: var(--shadow-sm); transform: translateX(2px); }
+  .um2-tile.quiet { color: var(--text-2); }
+  .um2-i { grid-row: 1 / 3; width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: var(--surface); color: var(--text-2); border: 1px solid var(--line); }
+  .um2-i.big { width: 40px; height: 40px; border-radius: 11px; background: var(--ink); color: var(--on-ink); border: 0; flex: none; }
+  .um2-nm { min-width: 0; } .um2-nm b { display: block; font-size: 13px; } .um2-nm small { display: block; font-size: 11px; color: var(--text-3); }
+  .cw .nall { display: none; } .cw.all .nall { display: inline; } .cw.all .na { display: none; }
+  .um2-dots { grid-column: 2; display: flex; gap: 3px; flex-wrap: wrap; }
+  .um2-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--green); } .um2-dots i.change { background: var(--accent); } .um2-dots i.bad { background: var(--red); }
+  .cw.fixed .um2-dots i.bad { background: var(--accent); }
+  .um2-else { margin: 6px 0 0; padding: 8px 10px; font-size: 11.5px; color: var(--text-3); border-top: 1px dashed var(--line-strong); }
+  .um2-else b { display: block; color: var(--text-2); font-size: 11.5px; }
+  .um2-open { border-radius: 14px; border: 1.5px solid var(--line-strong); background: var(--surface); box-shadow: var(--shadow-md); overflow: clip; }
+  .um2-panel[hidden] { display: none; }
+  .um2-h { display: flex; gap: 12px; align-items: center; margin: 0; padding: 12px 16px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+  .um2-ht { display: grid; gap: 2px; min-width: 0; } .um2-ht b { font: var(--weight-display, 700) 19px/1.1 var(--font-display); } .um2-ht small { font-size: 12px; color: var(--text-2); }
+  .um2-hn { margin-left: auto; font-size: 12px; white-space: nowrap; }
+  .um2-pages { padding: 4px 16px 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 2px 24px; align-items: start; }
+  .um2-page { padding-top: 10px; }
+  .um2-path { margin: 0 0 4px; font: 600 11px var(--font-mono); color: var(--text-3); } .um2-path b { color: var(--text); }
+  .um2-page ul { list-style: none; margin: 0; padding: 0; }
+  .um2-page li { display: grid; grid-template-columns: 60px minmax(0, 1fr); gap: 1px 8px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 13px; align-items: baseline; }
+  .um2-page li .bdg { justify-self: start; }
+  .um2-page li .mono { grid-column: 2; font-size: 11.5px; color: var(--text-2); overflow-wrap: anywhere; }
+  .um2-sn .unc { margin-left: 6px; }
+  .um2-more { margin: 0; padding: 6px 16px 14px; font-size: 12.5px; color: var(--text-2); } .cw.all .um2-more { display: none; }
+  .um2-ghost { position: fixed; z-index: 60; margin: 0; pointer-events: none; box-shadow: var(--shadow-lg); border-color: var(--line-strong) !important; background: var(--surface-2) !important; overflow: hidden; align-content: start; }
+  .um2-ghost > * { animation: um2-fade var(--dur-exit) var(--ease-settle) forwards; }
+  @keyframes um2-fade { to { opacity: 0; } }
+
+  /* Configuration file state */
+  .fsx-top { margin: 0 0 12px; font-size: 13.5px; color: var(--text-2); display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; }
+  .fsx-top > span:first-child { flex: 1 1 360px; }
+  .fsx-key { display: inline-flex; gap: 6px; align-items: baseline; font-size: 11.5px; }
+  .fsx-key i { font: 700 11px var(--font-mono); padding: 1px 5px; border-radius: 3px; }
+  .fsx { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  .fsx-c { border-radius: 12px; border: 1.5px solid var(--line); background: var(--surface); overflow: hidden; display: grid; grid-template-rows: auto 1fr; transition: border-color var(--dur-state) var(--ease-settle); }
+  .fsx-c.st-drift { border-color: var(--amber); } .fsx-c.st-missing { border-color: var(--red); }
+  .cw.fixed .fsx-c { border-color: var(--line); }
+  .fsx-h { display: flex; align-items: center; gap: 9px; margin: 0; padding: 9px 11px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+  .fsx-h b { display: block; font-size: 13px; } .fsx-h small { display: block; font-size: 11px; color: var(--text-3); }
+  .fsx-i { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: var(--surface); border: 1px solid var(--line); color: var(--text-2); flex: none; }
+  .fsx-st { margin-left: auto; font: 700 10px/1 var(--font-mono); letter-spacing: .05em; text-transform: uppercase; padding: 4px 7px; border-radius: 999px; white-space: nowrap; transition: background var(--dur-state) var(--ease-settle), color var(--dur-state) var(--ease-settle); }
+  .s-sync { background: var(--green-soft); color: var(--green-ink); } .s-drift { background: var(--amber-soft); color: var(--amber-ink); } .s-missing { background: var(--red-soft); color: var(--red-ink); }
+  .cw.fixed .fsx-st { background: var(--green-soft); color: var(--green-ink); }
+  .fsx-f { margin: 0; padding: 8px 0 10px; font: 500 11.5px/1.55 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .fsx-f .ln, .fsx-file { display: block; padding: 0 11px 0 22px; text-indent: -12px; }
+  .fsx-f .pm { display: inline-block; width: 12px; font-style: normal; text-indent: 0; }
+  .cw.fixed .ln-add.fixable .pm { visibility: hidden; }
+  .fsx-f .fsx-file { color: var(--text-3); text-indent: 0; padding-left: 11px; }
+  .ln-del { background: color-mix(in srgb, var(--red) 12%, transparent); color: var(--red-ink); }
+  .ln-add { background: color-mix(in srgb, var(--green) 14%, transparent); color: var(--green-ink); }
+  .cw.fixed .ln-del.fixable { display: none !important; }
+  .cw.fixed .ln-add.fixable { background: none; color: inherit; }
+  .fsx-c.st-na { border-style: dashed; background: none; grid-template-rows: auto; align-self: start; }
+  .fsx-c.st-na .fsx-h { background: none; border-bottom-style: dashed; color: var(--text-3); }
+  .s-na { background: var(--surface-2); color: var(--text-3); }
+  .cw.fixed .fsx-st.s-na { background: var(--surface-2); color: var(--text-3); }
+  .fsx-nat { margin: 0; padding: 8px 11px 10px; font-size: 12px; color: var(--text-3); }
+
+  :root[data-look="classic"] .cw-summary, :root[data-look="classic"] .cw-grp { border: 2px solid var(--ink); box-shadow: var(--shadow-hard); }
+  :root[data-look="classic"] .su-b, :root[data-look="classic"] .um2-tile, :root[data-look="classic"] .fsx-c, :root[data-look="classic"] .um2-open { border-width: 2px; border-color: var(--ink); }
+  :root[data-look="draw"] .um2-open { box-shadow: none; }
+
+  @media (max-width: 1360px) {
+    .cw-head { grid-template-columns: 50px minmax(0, 1fr) auto; gap: 8px 12px; }
+    .cw-head .cw-spec { grid-column: 1 / -1; }
+    .cw-head .cw-icon { grid-row: 1; }
+    .cw-icon { width: 50px; height: 50px; border-radius: 13px; } .cw-icon svg { width: 38px; }
+    .cs2 { grid-template-columns: 22px minmax(0, 1fr) minmax(0, 1fr); } .cs2-w { grid-column: 2 / -1; }
+  }
+  @media (max-width: 1100px) {
+    .cw-head { grid-template-columns: 50px minmax(0, 1fr); } .cw-head .cw-icon { grid-row: 1; } .cw-head .cw-spec { grid-column: 1 / -1; } .cw-head .cw-state { grid-column: 1 / -1; grid-row: 3; justify-self: stretch; grid-template-columns: 44px minmax(0, 1fr) auto; }
+    .su { columns: 1; } .um2 { grid-template-columns: 190px minmax(0, 1fr); }
+    .cws { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 760px) {
+    .cw-head { padding: 12px 14px; grid-template-columns: 44px minmax(0, 1fr); } .cw-icon { width: 44px; height: 44px; } .cw-icon svg { width: 34px; }
+    .cw-grp { padding: 0 12px 4px; }
+    .cs2 { grid-template-columns: 22px minmax(0, 1fr); } .cs2-v, .cs2-w { grid-column: 2; }
+    .cw-set-bar .btn { margin-left: 0; }
+    .um2 { grid-template-columns: 1fr; } .um2-stack { position: static; flex-direction: row; flex-wrap: wrap; } .um2-tile { flex: 1 1 150px; } .um2-else { flex-basis: 100%; }
+    .um2-h { flex-wrap: wrap; } .um2-hn { margin-left: 0; white-space: normal; } .um2-pages { grid-template-columns: 1fr; }
+    .cws { grid-template-columns: 1fr; padding: 12px 14px 14px; }
+    .st-text small { max-width: 60vw; }
+    .cw-spec b { white-space: normal; }
+    .cw-title h2 { font-size: 19px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cs2.checking .tk circle { animation: none; } .su-tk path, .tk .tk-ok, .st-fg, .cw-state.is-ok .st-tick { transition: none; }
+    .su-s.early .su-b { animation: none; } .um2-tile:hover { transform: none; }
+  }
+</style>

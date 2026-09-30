@@ -1,0 +1,128 @@
+---
+// A region. Overview archetype (page-anatomy.md, D): offices open, rooms in use, problems
+// and open incidents in the band (live where they are live); a tile per office and one for the home offices;
+// then what needs attention, the work, the people who look after the region, and its vendors. Every count opens
+// the list it counts, filtered to the region (P10).
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import Section from '../../components/Section.astro';
+import OfficeCard from './_OfficeCard.astro';
+import { href, plural, PHASES, PHASE_LABEL, PROJECT_KIND, VENDOR_KIND, REGION_LABEL, projects, vendors } from '../../lib/data.mjs';
+import { PEOPLE } from '../../lib/demo.mjs';
+import { officesIn, office, homeOffices, incidentsAt, liveModelFor, REGION_SHORT, HOME_SITE, OPEN_Q, INC_WORD } from '../../lib/locations.mjs';
+
+interface Props { region: string }
+const { region } = Astro.props;
+const OFFICES = officesIn(region).map(office);
+const homes = homeOffices(region);
+const sitesHere = [...OFFICES.map((o) => o.id), HOME_SITE[region]];
+const inc = incidentsAt(sitesHere);
+const prj = Object.values(projects).filter((p) => sitesHere.includes(p.site) && p.phase !== 'closed').sort((a, b) => a.id.localeCompare(b.id, 'en', { numeric: true }));
+const vend = Object.values(vendors).filter((v) => (v.regions ?? []).includes(region) || (v.sites ?? []).some((s) => sitesHere.includes(s)));
+// Who looks after the region: the managers whose teams cover it, then the people based in it.
+const covers = (p) => (p.covers ?? (p.region ? [p.region] : [])).includes(region);
+const managers = PEOPLE.filter((p) => ['tech-manager', 'eng-manager', 'pm-manager', 'delivery-manager'].includes(p.roleId) && (covers(p) || p.roleId === 'delivery-manager'));
+const team = PEOPLE.filter((p) => !p.vendor && p.region === region && !managers.includes(p) && ['tech', 'delivery', 'pm', 'network'].includes(p.roleId));
+const twoWeeks = [...new Set(OFFICES.flatMap((o) => o.twoWeeks))].filter((w) => w.kind !== 'time-off');
+const NUMBERS = [
+  { id: 'loc-open', n: '–', label: 'Offices open', to: '#offices' },
+  { id: 'loc-use', n: '–', label: 'Rooms in use', to: `/locations/?region=${region}&status=use` },
+  { id: 'loc-problem', n: '–', label: 'Problems now', to: `/locations/?region=${region}&status=problem` },
+  { n: inc.length, label: 'Open incidents', to: `/incidents/?region=${region}&${OPEN_Q}`, tone: inc.length ? 'bad' as const : undefined },
+];
+const json = JSON.stringify({ ...liveModelFor(sitesHere), base: href('/') }).replace(/</g, '\\u003c');
+---
+<Shell title={REGION_SHORT[region]} section="region" crumbs={[{ label: 'Locations', to: '/locations/' }, { label: REGION_SHORT[region] }]} about={{ kind: 'region', label: REGION_SHORT[region], to: `/locations/${region}/` }}>
+  <PageBand overline="Region" title={REGION_LABEL[region]} lede={`${plural(OFFICES.length, 'office')} and ${plural(homes.rooms.length, 'home office')}.`} sim="live" numbers={NUMBERS} rec={`rg-${region}`} />
+
+  <div class="content rgn" data-loc="region">
+    <div class="rg-grid" id="offices">
+      {OFFICES.map((o) => <OfficeCard o={o} />)}
+      <a class="card rg-home" href={href(`/locations/${region}/home-offices/`)} data-vt-rec={`ho-${region}`} data-help="loc.homes">
+        <span class="code">{homes.s.code}</span>
+        <b>Home offices</b>
+        <span class="rg-home-n"><b>{homes.rooms.length}</b> home offices</span>
+        <span class:list={['rg-home-n', { bad: homes.inc.length > 0 }]}><b>{homes.inc.length}</b> open {homes.inc.length === 1 ? 'incident' : 'incidents'}</span>
+        <span class="faint">Working hours at home are 08:00 to 18:00.</span>
+        <span class="rg-go">Open the home offices →</span>
+      </a>
+    </div>
+
+    <Section title="Needs attention" id="attention" help="loc.attention" to={`/incidents/?region=${region}&${OPEN_Q}`} place="Incidents" showAll={6}>
+      {inc.length ? (
+        <ul class="tl" data-items>
+          {inc.map((v) => <li><a href={href(v.href)}><b>{v.inc.short_description}</b></a><small><span class={`ri-p p-${v.inc.priority}`}>P{v.inc.priority}</span> {v.inc.number} · {INC_WORD[v.inc.state]} · {v.where}</small></li>)}
+        </ul>
+      ) : <p class="faint">No open incidents in the region.</p>}
+    </Section>
+
+    <Section title="Work" id="work" help="loc.openwork" to={`/projects/?region=${region}&phase=${PHASES.filter((q) => q !== 'closed').join(',')}`} place="Projects" showAll={6}>
+      <span slot="aside" class="faint"><a href={href(`/work/schedule/?region=${region}`)}>{plural(twoWeeks.length, 'item')} in the next two weeks</a></span>
+      {prj.length ? (
+        <ul class="tl" data-items>
+          {prj.map((p) => <li><a href={href(`/projects/${p.id.toLowerCase()}/`)}><b>{p.name}</b></a><small>{p.id} · {PROJECT_KIND[p.kind] ?? p.kind} · {PHASE_LABEL[p.phase] ?? p.phase}</small></li>)}
+        </ul>
+      ) : <p class="faint">No open projects.</p>}
+    </Section>
+
+    <div class="g12">
+      <Section class="s-6" title="Who looks after it" id="people" help="loc.people" to={`/team/?region=${region}`} place="Team">
+        <ul class="rp">
+          {[...managers, ...team].map((p) => <li><a href={href(`/team/?p=${p.id}`)}><span class="avatar sm" aria-hidden="true">{p.initials}</span><span><b>{p.name}</b><small>{p.role}{p.site ? ` · ${p.scope}` : ''}</small></span></a></li>)}
+        </ul>
+      </Section>
+      <Section class="s-6" title="Vendors" id="vendors" help="loc.vendors" to={`/vendors/?region=${region}`} place="Vendors">
+        {vend.length ? (
+          <ul class="tl">
+            {vend.map((v) => <li><a href={href(`/vendors/?region=${region}&q=${encodeURIComponent(v.name)}`)}><b>{v.name}</b></a><small>{VENDOR_KIND[v.kind] ?? v.kind}{v.sites?.length ? ` · ${v.sites.filter((s) => sitesHere.includes(s)).length} offices here` : ''}</small></li>)}
+          </ul>
+        ) : <p class="faint">No vendors recorded for the region.</p>}
+      </Section>
+    </div>
+    <script type="application/json" data-loc-model set:html={json}></script>
+  </div>
+
+  <script>
+    import { startLocations } from '../../lib/locations-client.mjs';
+    function init() {
+      const root = document.querySelector('[data-loc="region"]') as any;
+      if (!root || root.__loc) return;
+      const stop = startLocations(root);
+      document.addEventListener('astro:before-swap', stop, { once: true });
+    }
+    init();
+    document.addEventListener('astro:page-load', init);
+  </script>
+</Shell>
+
+<style>
+  .rgn { display: grid; gap: var(--gutter); }
+  .rg-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gutter); }
+  @container content (max-width: 1099px) { .rg-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @container content (max-width: 599px) { .rg-grid { grid-template-columns: minmax(0, 1fr); } }
+  .rg-home { display: grid; gap: 8px; align-content: start; padding: 16px; color: inherit; text-decoration: none; background: var(--surface-2); transition: box-shadow var(--dur-state) var(--ease-settle); }
+  .rg-home:hover { box-shadow: var(--shadow-md); }
+  .rg-home > b { font: 700 17px/1.25 var(--font-display); }
+  .rg-home .code { justify-self: start; }
+  .rg-home-n { color: var(--text-2); font-size: 13px; }
+  .rg-home-n b { font: 700 19px/1 var(--font-display); color: var(--ink); font-variant-numeric: tabular-nums; }
+  .rg-home-n.bad b { color: var(--red-ink); }
+  .rg-home .faint { font-size: 12.5px; }
+  .rg-go { font-size: 13px; font-weight: 600; color: var(--accent); margin-top: auto; }
+  .tl { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .tl li { display: grid; gap: 2px; min-width: 0; }
+  .tl a { color: var(--ink); text-decoration: none; }
+  .tl a:hover { text-decoration: underline; }
+  .tl b { font-weight: 650; font-size: 13.5px; }
+  .tl small { color: var(--text-2); font-size: 12.5px; display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .ri-p { font: 700 10.5px/1 var(--font-mono); padding: 3px 5px; border-radius: 4px; background: var(--surface-2); }
+  .ri-p.p-1, .ri-p.p-2 { background: var(--red-soft); color: var(--red-ink); }
+  .rp { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
+  .rp a { display: flex; gap: 8px; align-items: center; color: var(--ink); text-decoration: none; padding: 5px 6px; border-radius: 8px; min-width: 0; transition: background var(--dur-state) var(--ease-settle); }
+  .rp a:hover { background: var(--surface-2); }
+  .rp a > span:last-child { display: grid; min-width: 0; }
+  .rp b { font-size: 13px; font-weight: 650; }
+  .rp small { color: var(--text-2); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  p.faint { margin: 0; font-size: 13px; }
+  @media (prefers-reduced-motion: reduce) { .rg-home, .rp a { transition: none; } }
+</style>

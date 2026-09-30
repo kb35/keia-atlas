@@ -1,0 +1,133 @@
+# Floor: one floor of an office building, for the 3D model and the floor map.
+# Files live in data/floors/<site>-<floor>.yaml. Metres, x east and y north from the outline's south-west
+# corner; heights above the floor's finished level. Rooms are placed by their own `geometry.on_floor`
+# (data/spaces); this file holds the building's fixed parts and the paths the network takes between them.
+# Made up for the demo (rule F9): every floor says so in `fictional`.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/floor
+title: Floor
+type: object
+additionalProperties: false
+required: [site, floor, name, fictional, level_m, slab_to_slab_m, ceiling_m, tray_m, outline, core, risers, racks, trays]
+$defs:
+  id: { type: string, pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
+  point: { type: array, items: { type: number }, minItems: 2, maxItems: 2 }
+  rect:
+    description: A box on the plan, [x0, y0, x1, y1] with x0 < x1 and y0 < y1.
+    type: array
+    items: { type: number }
+    minItems: 4
+    maxItems: 4
+properties:
+  site: { description: Site id (a file in data/sites/)., type: string, pattern: "^[a-z0-9]+$" }
+  floor: { description: Floor id from the site., type: string }
+  name: { type: string, minLength: 1 }
+  fictional: { description: "The label every map and model shows (rule F9).", type: string, minLength: 1 }
+  level_m: { description: The finished floor level above the ground floor., type: number }
+  slab_to_slab_m: { type: number, exclusiveMinimum: 0 }
+  ceiling_m: { description: Finished ceiling height in the open areas and corridors., type: number, exclusiveMinimum: 0 }
+  raised_floor_m: { description: Depth of the floor void that feeds floor boxes., type: number, minimum: 0 }
+  tray_m: { description: Height of the corridor trays in the ceiling void., type: number, exclusiveMinimum: 0 }
+  outline: { description: The floor plate as a polygon., type: array, minItems: 3, items: { $ref: "#/$defs/point" } }
+  core:
+    description: The building core. `circulation` marks the parts people walk through (the lift lobby), which count as open area.
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, kind, name, rect]
+      properties:
+        id: { $ref: "#/$defs/id" }
+        kind: { enum: [stair, lift, lift-lobby, riser, toilets, store, plant, shaft] }
+        name: { type: string }
+        rect: { $ref: "#/$defs/rect" }
+        count: { type: integer, minimum: 1 }
+        circulation: { type: boolean }
+  corridors:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, name, rect]
+      properties: { id: { $ref: "#/$defs/id" }, name: { type: string }, rect: { $ref: "#/$defs/rect" } }
+  areas:
+    description: Named zones in the open area. A town-hall area has its own Wi-Fi rule (one access point per 100 m²).
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, kind, name, rect]
+      properties:
+        id: { $ref: "#/$defs/id" }
+        kind: { enum: [town-hall, breakout, open-office, reception-lobby] }
+        name: { type: string }
+        rect: { $ref: "#/$defs/rect" }
+  risers:
+    description: Vertical cable paths between floors. The same riser appears on every floor it serves, with the same id.
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, name, rect, floors]
+      properties:
+        id: { $ref: "#/$defs/id" }
+        name: { type: string }
+        rect: { $ref: "#/$defs/rect" }
+        floors: { description: The floors (ids) it opens onto., type: array, items: { type: string }, minItems: 1 }
+        from_level_m: { type: number }
+        to_level_m: { type: number }
+        sleeves: { type: integer, minimum: 1 }
+        sleeve_mm: { type: number, exclusiveMinimum: 0 }
+        carries: { type: string }
+        notes: { type: string }
+  racks:
+    description: Where each rack stands (its centre) and which way its front faces.
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [rack, at, facing]
+      properties:
+        rack: { description: Rack id (data/racks)., type: string }
+        at: { $ref: "#/$defs/point" }
+        facing: { enum: [n, e, s, w] }
+  trays:
+    description: >-
+      Containment, as polylines on the plan at a height. A ladder runs over the racks in a comms room; trays run in the
+      corridors; a basket branches to each room's data entry (`feeds: room-<space id>`) or access point (`feeds: ap-<id>`).
+      Trays join where the end of one lies on another. `capacity` is the number of Cat6A cables at the house fill limit.
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, kind, name, path, z_m]
+      properties:
+        id: { $ref: "#/$defs/id" }
+        kind: { enum: [ladder, tray, basket] }
+        name: { type: string }
+        path: { type: array, minItems: 2, items: { $ref: "#/$defs/point" } }
+        z_m: { type: number }
+        width_mm: { type: number, exclusiveMinimum: 0 }
+        depth_mm: { type: number, exclusiveMinimum: 0 }
+        capacity: { type: integer, minimum: 0 }
+        feeds: { type: string, pattern: "^(room|ap)-[a-z0-9-]+$" }
+  access_points:
+    description: >-
+      Where each Wi-Fi access point hangs in the open areas and corridors, placed by the Wi-Fi standard's spacing
+      (data/standards/wifi.yaml): one per 150 m² of open area, one per 100 m² of a town-hall area. The access point
+      itself is a unit in the floor's "Open areas and corridors" install (`space`, `position`), with its serial, asset
+      tag and hostname there.
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, space, position, area, at, height_m]
+      properties:
+        id: { description: The access point's id on the plan (its hostname)., $ref: "#/$defs/id" }
+        space: { description: "The floor's open-area space (data/spaces), whose install holds the unit.", $ref: "#/$defs/id" }
+        position: { description: "The install position, access-point#n or town-hall-ap#n.", type: string, pattern: "^[a-z-]+(#[0-9]+)?$" }
+        area: { description: "open, or the id of the area it covers.", type: string }
+        at: { $ref: "#/$defs/point" }
+        height_m: { type: number, exclusiveMinimum: 0 }
+  notes: { type: array, items: { type: string } }

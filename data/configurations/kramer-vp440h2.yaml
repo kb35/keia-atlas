@@ -1,0 +1,67 @@
+# Configuration: VP-440H2 presentation switcher/scaler. Setting names, menu paths and defaults are the vendor's (cited per setting);
+# the values and reasons are Aigna's (demo). Researched from vendor documents, Sept 2026.
+id: kramer-vp440h2
+name: VP-440H2 presentation switcher/scaler
+models: [kramer-vp-440h2]
+mode: Room table/rack switcher-scaler, HDMI and HDBT inputs with a VGA legacy input
+version: '1.0'
+owner: sofia
+updated: '2026-09-28'
+summary: A half-rack scaler with both a front-panel OSD menu and an embedded web UI. Aigna joins it to the AV VLAN, password-protects the web pages (off
+  by default), and sets HDCP/EDID and auto-switching for a Google Meet room; scaling and audio processing are left at Kramer's defaults.
+managed_by: Device web interface
+steps: [Rack-mount VP-440H2 and connect the HDMI/HDBT/VGA/mic inputs and the HDMI and HDBT outputs., 'Connect Ethernet and, from the front-panel OSD or
+    web pages, set the network mode below.', Browse to the web pages and turn on password protection; it ships unsecured., Set HDCP per input/output and
+    manage EDID so every input matches the room's display., Set Auto Switching and Auto-Sync Off to match how the room's sources are used., Set the OSD
+    and audio/mic defaults for the room., Firmware is applied by uploading a file on the Device Settings web page; there is no automatic-update option to
+    turn off.]
+groups:
+- name: Network
+  where: Front panel OSD (Advanced > Ethernet) or Device Settings web page
+  settings:
+  - {derive: dhcp-reservation, name: IP MODE, path: Advanced > ETHERNET > IP MODE, value: 'DHCP, with a reservation on the AV VLAN', layer: naming-network, why: Aigna's AV devices
+      sit on a DHCP-reserved address on the AV VLAN rather than a hand-typed static one., action: change, source: kramer-vp-440h2-user-manual-p-n-2900}
+  - {name: CONTROL PORT, path: Advanced > ETHERNET > CONTROL PORT, value: Kramer's default IP control port, layer: profile, why: Left at the vendor default
+      unless a site's controller needs a different port., action: verify, source: kramer-vp-440h2-user-manual-p-n-2900}
+- name: Security
+  where: Device Settings web page > Authentication
+  settings:
+  - {name: Authenticate Web Pages access, path: Authentication, value: 'On', layer: profile, why: The web pages are not secured out of the box; Aigna
+      turns this on before the unit goes into service., action: change, source: kramer-vp-440h2-user-manual-p-n-2900}
+  - {derive: vault-site, name: Web pages user name and password, path: Authentication, value: 'From the password vault, per site', per_device: true, layer: profile, why: 'Set
+      alongside turning authentication on, so the unit is never left with a blank or shared login.', action: change, source: kramer-vp-440h2-user-manual-p-n-2900}
+- name: HDCP
+  where: HDCP web page (or Advanced > HDCP ON INPUT/OUTPUT on the OSD)
+  settings:
+  - {name: 'HDCP on inputs (HDBT, HDMI1-3)', path: Advanced > HDCP ON INPUT, value: ON for every input, layer: profile, why: Lets any HDCP-protected laptop
+      or source play through without per-room tweaking., action: change, source: kramer-vp-440h2-user-manual-p-n-2900}
+  - {name: 'HDCP on outputs (HDMI OUT, HDBT OUT)', path: Advanced > HDCP ON OUTPUT, value: Input (only encrypt the output when the active input is encrypted),
+    layer: profile, why: Keeps an unprotected source compatible with a display or extender that doesn't support HDCP., action: change, source: kramer-vp-440h2-user-manual-p-n-2900}
+- name: EDID
+  where: EDID web page (or Advanced > EDID MANAGE on the OSD)
+  settings:
+  - {derive: as-written, name: EDID source for each input, path: Advanced > EDID MANAGE, value: Copy the connected display's own EDID to every input, per_device: true, layer: room-type,
+    why: 'Matches every input''s reported resolution and audio format to what the room''s actual display supports, rather than a generic default EDID.',
+    action: change, source: kramer-vp-440h2-user-manual-p-n-2900}
+- name: Switching
+  where: Advanced menu (OSD) or Input Select web page
+  settings:
+  - {name: AUTO-SYNC OFF, path: Advanced > AUTO-SYNC OFF, value: SLOW (about 2 minutes), layer: profile, why: Lets the unit shut down after a meeting ends
+      without cutting out during a brief signal gap., action: change, source: kramer-vp-440h2-user-manual-p-n-2900}
+  - {name: AUTO SWITCHING, path: Advanced > AUTO SWITCHING, value: Last connected, layer: profile, why: Aigna's rooms are BYOM-first; whichever source
+      was just plugged in should take over automatically., action: change, source: kramer-vp-440h2-user-manual-p-n-2900}
+- name: OSD and audio
+  where: Front panel OSD
+  settings:
+  - {name: OSD DISPLAY, path: OSD > DISPLAY, value: INFO (shown for 10 seconds), layer: profile, why: Gives the room a brief on-screen confirmation of the
+      active source without leaving a permanent overlay., action: change, source: kramer-vp-440h2-user-manual-p-n-2900}
+  - {name: MIC MODE, path: Audio > MIC SETTINGS > MIC MODE, value: 'OFF', layer: profile, why: 'Aigna''s Google Meet rooms take audio from the Poly Studio
+      X bar, not this scaler''s mic input; left off unless a room specifically wires a mic here.', action: change, source: kramer-vp-440h2-user-manual-p-n-2900}
+- name: Firmware
+  where: Device Settings web page
+  settings:
+  - {name: Firmware update method, value: 'Manual upload only, no automatic-update toggle exists', layer: profile, why: 'There''s nothing to turn off; firmware
+      only changes when an installer manually uploads a file, which already matches Aigna''s Lab-first policy.', action: verify, source: kramer-vp-440h2-user-manual-p-n-2900}
+gaps: ['No factory default is stated for HDCP per input/output, EDID source, Auto Switching or Auto-Sync Off, so all are marked ''change'' rather than ''verify''.',
+  'The manual gives the total power draw only as 48V DC, about 850mA (about 41W); no separate figure for the up to 13W it can pass as PoE to a transmitter.',
+  No current firmware number is published; settings were checked against the manual's own P/N 2900-300644 Rev 5.]

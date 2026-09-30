@@ -1,0 +1,139 @@
+---
+// The Key beside a room drawing: every item, numbered as in the drawing, grouped by where it is, then
+// the outlet plates, lettered as in the drawing, each drawn front-on large enough to read its
+// sockets and jacks. Markers follow the drawing's rule: solid for what you can see in the room, dashed
+// for what is hidden. Hovering a row x-rays the drawing to that item (a plate also lights the devices
+// plugged into it); hovering the drawing lights the row.
+import { roomItems } from '../lib/scene.mjs';
+import { outletPlates, faceSketch, buildRoom } from '../lib/room3d.mjs';
+import { routeCables, cableWords, itemName } from '../lib/cableroute.mjs';
+import { sites, models, spaceTypes, className } from '../lib/data.mjs';
+const { option, fitted = null, space = null, uid = option.id, compact = false } = Astro.props;
+// The room profile this option belongs to (the page passes the option itself).
+const type = space?.space_type ?? Object.entries(spaceTypes).find(([, t]) => t.keia_atlas?.options?.includes(option))?.[0] ?? null;
+const items = roomItems(option, { fitted, space });
+const GROUPS = [
+  { id: 'seen', label: 'In the room', test: (it) => !['behind-display', 'below-table', 'wall-behind-storage', 'room-entrance', 'data-closet'].includes(it.loc) },
+  { id: 'behind', label: 'Hidden behind the display', test: (it) => it.loc === 'behind-display' },
+  { id: 'under', label: 'Hidden under the table', test: (it) => it.loc === 'below-table' },
+  { id: 'storage', label: 'Hidden behind the storage', test: (it) => it.loc === 'wall-behind-storage' },
+  { id: 'door', label: 'Outside the door', test: (it) => it.loc === 'room-entrance' },
+  { id: 'closet', label: 'In the comms room', test: (it) => it.loc === 'data-closet' },
+];
+// The plates, from the same data and rules as the drawing, so the letters match.
+const site = space ? sites[space.site] : null;
+const plugs = site?.mains?.plugs ?? null;
+const fitList = fitted ?? option.equipment.filter((e) => e.requirement === 'optional').map((e) => e.key);
+const PL = outletPlates(option, { fitted: fitList, plugs, country: space?.country ?? site?.country ?? null });
+const byKey = new Map(items.map((it) => [it.key, it]));
+const socketWord = PL.socket ? `Type ${PL.socket}` : 'plain';
+const n = (k, one, many = `${one}s`) => `${k} ${k === 1 ? one : many}`;
+const plates = PL.groups.map((g) => {
+  const sk = g.sk, f = faceSketch(g);
+  // Drawn at one scale for every plate (0.4 px a mm), a long row or a floor box smaller so it fits.
+  const s = Math.min(0.4, 120 / f.w, 52 / f.h);
+  const feeds = g.devs.map((d) => byKey.get(d)).filter(Boolean);
+  const spare = g.ports.filter((p) => !p.dev).length;
+  return {
+    g, sk, f, s,
+    what: [g.power.length && n(g.power.length, `${socketWord} socket`), g.data.length && n(g.data.length, 'data port'), g.runs.length && n(g.runs.length, 'direct run')].filter(Boolean).join(', '),
+    feeds: feeds.length ? `${feeds.map((it) => `${it.no} ${it.label}`).join(', ')}${spare ? `; ${spare} spare` : ''}` : spare ? `${spare} spare, for people in the room` : '',
+    rel: [...new Set(feeds.map((it) => it.key))].join(' ') || undefined,
+  };
+});
+// Every cable in words, along its route, in the same order and with the same ids as the drawing.
+const SIG_WORD = { power: 'Power', lan: 'Network', poe: 'Network with power (PoE)', hdbt: 'HDBaseT', hdmi: 'Video (HDMI or DisplayPort)', usb: 'USB', audio: 'Audio', other: 'Maker\'s own cable' };
+const eqName = (k) => { const e = option.equipment.find((x) => x.key === k); return (e?.role?.split(/[:,]/)[0] ?? className(e?.class ?? k)).toLowerCase(); };
+const cableList = (() => {
+  if (!type) return [];
+  const M = buildRoom(type, option, items, { plugs, country: space?.country ?? site?.country ?? null, fitted: fitList, models });
+  const nameOf = (k, closet) => (closet ? eqName(k) : byKey.get(k) ? itemName(byKey.get(k)) : k);
+  return routeCables(M, option, fitList, { models }).cables.filter((c) => !c.feed).map((c) => ({ id: c.id, sig: c.sig, a: c.a, b: c.b, drawn: !!c.pts, words: cableWords(c, { nameOf, models, option }), defaults: c.basis.some((x) => x !== 'model') }));
+})();
+const pts = (list, f, s) => list.map(([u, v]) => `${(u * s + 1).toFixed(1)},${((f.h - v) * s + 1).toFixed(1)}`).join(' ');
+---
+<div class:list={['room-key', { compact }]} data-key-for={uid}>
+  {GROUPS.map((g) => {
+    const list = items.filter(g.test);
+    return list.length > 0 && (
+      <section class="rk-g">
+        <h4>{g.label}</h4>
+        <ol>
+          {list.map((it) => (
+            <li class:list={['rk-row', { opt: it.optional }]} data-help="roomkey" data-help-name={it.label} data-sk={it.key} data-rel={plates.filter((p) => p.g.devs.includes(it.key)).map((p) => p.sk).join(' ') || undefined} data-scene-uid={uid} tabindex="0" title={`${it.e.role ?? it.label}: ${it.model ?? 'model set per project'}${it.optional ? ' (optional)' : ''}`}>
+              <b class:list={['rk-no', { hid: g.id !== 'seen' }]}>{it.no}</b>
+              <span class="rk-main">
+                {it.link ? <a href={it.link}>{it.label}</a> : <span>{it.label}</span>}
+                <small>{it.model ?? 'Model set per project'}{it.e.sizes_in ? ` · ${it.e.sizes_in.join(', ')} in` : ''}{it.pos?.hostname ? ` · ${it.pos.hostname}` : ''}</small>
+              </span>
+              <span class="rk-end">
+                {it.pos?.current ? <i class="hl" data-state={it.pos.legacy ? 'warn' : it.pos.current.stage === 'deploy' ? 'warn' : 'ok'} title={it.pos.legacy ? 'Being replaced' : it.pos.current.stage === 'deploy' ? 'Being installed: not verified yet' : 'Healthy'}></i> : it.optional ? <span class="pill info">Optional</span> : null}
+              </span>
+            </li>
+          ))}
+        </ol>
+      </section>
+    );
+  })}
+  {plates.length > 0 && (
+    <section class="rk-g">
+      <h4>Outlets</h4>
+      <ol>
+        {plates.map((p) => (
+          <li class="rk-row rk-plate" data-help="room.outlets" data-sk={p.sk} data-rel={p.rel} data-scene-uid={uid} tabindex="0">
+            <b class:list={['rk-no', 'tag', { hid: p.g.hid }]}>{p.g.id}</b>
+            <span class="rk-main">
+              <span>{p.g.name} {p.g.where}</span>
+              <small>{p.what}</small>
+              {p.feeds && <small>{p.g.devs.length ? 'Feeds ' : ''}{p.feeds}</small>}
+            </span>
+            <svg class="rk-face" viewBox={`0 0 ${(p.f.w * p.s + 2).toFixed(1)} ${(p.f.h * p.s + 2).toFixed(1)}`} width={(p.f.w * p.s + 2).toFixed(0)} height={(p.f.h * p.s + 2).toFixed(0)} aria-hidden="true">
+              {p.f.parts.map((x) => <polygon points={pts(x.pts, p.f, p.s)} class={`kf kf-${x.cls}${x.p?.svc === 'power' ? ' pt-power' : ''}${x.p ? ' pt' : ''}`} data-dev={x.p?.dev} />)}
+            </svg>
+          </li>
+        ))}
+      </ol>
+    </section>
+  )}
+  {cableList.length > 0 && (
+    <details class="rk-g rk-cables" data-help="wiring">
+      <summary><h4>Cables</h4><span class="rk-cn">{cableList.length}, each along its route</span></summary>
+      <ol>
+        {cableList.map((c) => (
+          <li class={`rk-cab sig-${c.sig}`} data-cab={c.id} data-a={c.a} data-b={c.b} data-scene-uid={uid} tabindex="0" title={`${SIG_WORD[c.sig] ?? 'Cable'}${c.defaults ? '. One end is at a house-default port position: the model data does not give it yet' : ''}`}>
+            <i class="rk-sw" aria-hidden="true"></i><span>{c.words}</span>
+          </li>
+        ))}
+      </ol>
+    </details>
+  )}
+</div>
+
+<style is:global>
+  .rk-plate { grid-template-columns: 24px minmax(0, 1fr) auto; }
+  .rk-plate .rk-main small { white-space: normal; }
+  .rk-face { display: block; overflow: visible; }
+  .rk-face .kf { stroke: rgba(28,26,23,.35); stroke-width: .5; }
+  .rk-face .kf-plate { fill: #FCFBF8; stroke: rgba(28,26,23,.55); stroke-width: .8; }
+  .rk-face .kf-mod { fill: #B9BCC2; } .rk-face .kf-lid { fill: #A7A298; } .rk-face .kf-fb-well { fill: #5B5750; }
+  .rk-face .kf-sock { fill: #EDEBE6; } .rk-face .kf-sock.pt-power { fill: color-mix(in srgb, var(--c-power, #C8102E) 22%, #FCFBF8); }
+  .rk-face .kf-hole { fill: #24252A; stroke: none; } .rk-face .kf-pin { fill: #9A968E; stroke: none; }
+  .rk-face .kf-rocker { fill: #E4E1DA; }
+  .rk-face .kf-jack-lan { fill: var(--c-lan, #7C766C); } .rk-face .kf-jack-poe { fill: var(--c-poe, #2D6B45); } .rk-face .kf-jack-hdbt { fill: var(--c-hdbt, #B0601C); } .rk-face .kf-jack-spare { fill: #D6D2C9; }
+  .rk-face .kf-conduit { fill: #8A857C; }
+  /* Cables in words: a short swatch in the signal's colour, the route beside it. */
+  .rk-cables summary { display: flex; align-items: baseline; gap: 8px; cursor: pointer; list-style: none; padding: 2px 0; }
+  .rk-cables summary::-webkit-details-marker { display: none; }
+  .rk-cables summary::before { content: ''; width: 6px; height: 6px; border-right: 1.5px solid var(--text-3); border-bottom: 1.5px solid var(--text-3); transform: rotate(-45deg); transition: transform var(--dur-state) var(--ease-settle); align-self: center; }
+  .rk-cables[open] summary::before { transform: rotate(45deg); }
+  .rk-cables summary h4 { margin: 0; }
+  .rk-cn { font-size: 12px; color: var(--text-3); }
+  .rk-cab { --cab: var(--grey, #8C857A); display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 4px 6px; border-radius: var(--radius); font-size: 12.5px; line-height: 1.4; color: var(--text-2); transition: background var(--dur-state), transform var(--dur-state) var(--ease-settle); }
+  .rk-cab + .rk-cab { border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+  .rk-cab:hover, .rk-cab.hit, .rk-cab:focus-visible { background: var(--accent-soft); color: var(--text); transform: translateX(3px); outline: none; }
+  .rk-sw { width: 14px; height: 3px; border-radius: 2px; background: var(--cab); transform: translateY(-3px); }
+  .rk-cab.sig-hdmi { --cab: var(--c-hdmi, #2A5B8F); } .rk-cab.sig-usb { --cab: var(--c-usb, #5E479B); } .rk-cab.sig-lan { --cab: var(--c-lan, #7C766C); } .rk-cab.sig-poe { --cab: var(--c-poe, #2D6B45); }
+  .rk-cab.sig-hdbt { --cab: var(--c-hdbt, #B0601C); } .rk-cab.sig-power { --cab: var(--c-power, #A2382F); } .rk-cab.sig-audio { --cab: var(--c-audio, #1F6F6A); }
+  @media (prefers-reduced-motion: reduce) { .rk-cab, .rk-cables summary::before { transition: none; } }
+  .rk-face .kf.pt.hit:is(.kf-sock, .kf-jack-lan, .kf-jack-poe, .kf-jack-hdbt, .kf-jack-spare, .kf-conduit) { stroke: var(--accent); stroke-width: 2.4; }
+</style>

@@ -1,0 +1,137 @@
+---
+import Shell from '../../layouts/Shell.astro';
+import RoomPlanSprite from '../../components/RoomPlanSprite.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import PageBand from '../../components/PageBand.astro';
+import Section from '../../components/Section.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import { spaceTypes, spaces, sites, models, className, modelName, REGION_LABEL, href } from '../../lib/data.mjs';
+
+const CATEGORY_ORDER = ['connect', 'focus', 'recharge', 'welcome', 'support', 'remote', 'infrastructure'];
+const CATEGORY_HEADING = {
+  connect: 'Meeting and collaboration',
+  focus: 'Focus',
+  recharge: 'Recharge',
+  welcome: 'Welcome',
+  support: 'Support',
+  remote: 'Remote',
+  infrastructure: 'Comms rooms',
+};
+
+function capacityLabel(cap) {
+  if (!cap) return '';
+  if (cap.min === cap.max) return `${cap.min} ${cap.min === 1 ? 'person' : 'people'}`;
+  return `${cap.min} to ${cap.max} people`;
+}
+
+const spacesUsing = (id) => Object.values(spaces).filter((s) => s.space_type === id);
+// Video: a video bar, codec, camera or desk video device, or a monitor with a camera built in.
+const VIDEO_CLASSES = new Set(['video-bar', 'codec', 'desk-video-device', 'camera']);
+const hasVideo = (t) => t.keia_atlas.options.some((o) => o.equipment.some((e) => VIDEO_CLASSES.has(e.class) || (e.model && /webcam|camera/i.test(models[e.model]?.summary ?? ''))));
+const CAPS = [
+  { v: '1', label: 'One person', min: 1, max: 1 },
+  { v: '2-5', label: '2 to 5 people', min: 2, max: 5 },
+  { v: '6-12', label: '6 to 12 people', min: 6, max: 12 },
+  { v: '13', label: '13 or more', min: 13, max: 999 },
+];
+
+const cards = Object.entries(spaceTypes).map(([id, t]) => {
+  const rs = t.keia_atlas;
+  const built = spacesUsing(id);
+  const regions = [...new Set(built.map((s) => sites[s.site]?.region).filter(Boolean))];
+  const caps = rs.capacity ? CAPS.filter((c) => rs.capacity.min <= c.max && rs.capacity.max >= c.min).map((c) => c.v) : [];
+  const kit = rs.options.flatMap((o) => o.equipment.map((e) => `${className(e.class)} ${e.role ?? ''} ${e.model ? modelName(e.model) : ''}`));
+  const q = [t.profile.name, t.profile.purpose, CATEGORY_HEADING[rs.category], ...rs.options.map((o) => `${o.name} ${o.summary ?? ''}`), ...kit].join(' ').toLowerCase().replace(/\s+/g, ' ');
+  return { id, t, rs, built: built.length, regions, caps, video: hasVideo(t), q };
+});
+const groups = CATEGORY_ORDER.map((cat) => ({
+  cat,
+  heading: CATEGORY_HEADING[cat],
+  cards: cards.filter((c) => c.rs.category === cat).sort((a, b) => a.t.profile.name.localeCompare(b.t.profile.name)),
+})).filter((g) => g.cards.length);
+
+const FACETS = [
+  { key: 'region', label: 'Region', options: Object.entries(REGION_LABEL).map(([value, label]) => ({ value, label: label.replace('Europe, Middle East and Africa', 'EMEA') })) },
+  { key: 'cat', label: 'Kind', options: groups.map((g) => ({ value: g.cat, label: g.heading })) },
+  { key: 'cap', label: 'Capacity', options: CAPS.map((c) => ({ value: c.v, label: c.label })) },
+  { key: 'video', label: 'Video', options: [{ value: 'yes', label: 'Has video' }, { value: 'no', label: 'No video' }] },
+];
+const SORT = { options: [{ value: 'name', label: 'By name' }, { value: 'rooms', label: 'Most rooms first' }, { value: 'options', label: 'Most build options first' }] };
+const roomsBuilt = cards.reduce((n, c) => n + c.built, 0);
+const NUMBERS = [
+  { n: cards.length, label: 'Room profiles', fact: true },
+  { n: Object.values(spaceTypes).reduce((n, t) => n + t.keia_atlas.options.length, 0), label: 'Build options', fact: true },
+  { n: roomsBuilt, label: 'Rooms built to them', to: '/rooms/' },
+  { n: cards.filter((c) => c.video).length, label: 'With video', to: '?video=yes' },
+];
+---
+<Shell title="Room profiles" section="types" crumbs={[{ label: 'Room profiles' }]}>
+  <PageBand overline="Catalogue" title="Room profiles" lede="What each kind of room needs and how it is wired, each drawn to scale." numbers={NUMBERS} />
+
+  <div class="content rti" data-rti>
+    <RoomPlanSprite />
+    <FilterBar facets={FACETS} placeholder="Find a room profile, kit or model" label="Find a room profile" noun={['room profile', 'room profiles']} scope=".rti" sort={SORT} />
+
+    {groups.map((g) => (
+      <div data-fb-group>
+      <Section title={g.heading} id={`cat-${g.cat}`}>
+        <span slot="aside" data-gn>{g.cards.length}</span>
+        <div class="rt-cards" data-rgrid>
+          {g.cards.map((c, i) => {
+            const t = c.t, optionCount = c.rs.options.length, a = c.rs.area?.m2;
+            return (
+              <a class="rt-card" href={href(`/room-profiles/${c.id}/`)} style={`--i:${i}`} data-id={c.id} data-name={t.profile.name} data-rooms={c.built} data-options={optionCount} data-fi data-find={c.q} data-f-cat={c.rs.category} data-f-cap={c.caps.join('|')} data-f-video={c.video ? 'yes' : 'no'} data-f-region={c.regions.join('|')}>
+                <span class="rt-plan" data-vt-rec={c.id}><svg class="rplan" viewBox="0 0 120 80" aria-hidden="true"><use href={`#rp-${c.id}`} /></svg></span>
+                <span class="rt-body">
+                  <b>{t.profile.name}</b>
+                  <small>{[capacityLabel(c.rs.capacity), a ? `${typeof a === 'object' ? `${a.min} to ${a.max}` : a} m²` : null, c.video ? 'video' : null].filter(Boolean).join(' · ') || 'Size set by the site'}</small>
+                  <small class="faint">{optionCount} build option{optionCount === 1 ? '' : 's'} · {c.built} room{c.built === 1 ? '' : 's'}</small>
+                  {c.rs.standard === 'house' && <small class="faint">House standard</small>}
+                </span>
+              </a>
+            );
+          })}
+        </div>
+      </Section>
+      </div>
+    ))}
+    <EmptyState text="No room profile matches these filters." />
+  </div>
+
+  <script is:inline data-astro-rerun>
+    (function () {
+      var bar = document.querySelector('[data-fb]');
+      // Each group heading says how many of its profiles show.
+      var count = function () {
+        document.querySelectorAll('.rti .sec').forEach(function (g) { var n = g.querySelector('[data-gn]'); if (n) n.textContent = g.querySelectorAll('.rt-card:not(.fb-out)').length; });
+      };
+      document.addEventListener('fb:change', count);
+      count();
+      // Sort: inside each group, so the groups stay in the same order.
+      if (!bar || bar.__rsort) return; bar.__rsort = true;
+      var by = {
+        name: function (a, b) { return a.dataset.name.localeCompare(b.dataset.name); },
+        rooms: function (a, b) { return +b.dataset.rooms - +a.dataset.rooms || a.dataset.name.localeCompare(b.dataset.name); },
+        options: function (a, b) { return +b.dataset.options - +a.dataset.options || a.dataset.name.localeCompare(b.dataset.name); }
+      };
+      var reorder = function (v) {
+        document.querySelectorAll('[data-rgrid]').forEach(function (g) { Array.prototype.slice.call(g.children).sort(by[v] || by.name).forEach(function (el) { g.appendChild(el); }); });
+      };
+      bar.addEventListener('fb:sort', function (e) { bar.rsFilter.run(true, function () { reorder(e.detail.value); }); });
+      var v0 = new URLSearchParams(location.search).get('sort'); if (v0 && by[v0] && v0 !== 'name') reorder(v0);
+    })();
+  </script>
+</Shell>
+<style>
+  .rt-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 10px; }
+  .rt-card { display: grid; grid-template-rows: auto 1fr; border-radius: var(--radius-lg); border: var(--border-card); background: var(--surface); color: inherit; text-decoration: none; overflow: hidden; animation: rise var(--dur-enter, 440ms) var(--ease-settle) both; animation-delay: calc(var(--i) * 30ms); transition: transform var(--dur-state) var(--ease-settle), box-shadow var(--dur-state); }
+  .rt-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+  .rt-plan { display: grid; place-items: center; height: 104px; padding: 4px 8px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+  .rt-plan svg { height: 96px; width: auto; transition: transform var(--dur-morph, 520ms) var(--ease-settle); }
+  .rt-card:hover .rt-plan svg { transform: scale(1.06); }
+  .rt-body { display: grid; gap: 1px; padding: 8px 10px 9px; align-content: start; }
+  .rt-body b { font-size: 13.5px; line-height: 1.25; }
+  .rt-body small { color: var(--text-2); font-size: 12px; line-height: 1.35; }
+  .rt-body small.faint { color: var(--text-3); }
+  @media (prefers-reduced-motion: reduce) { .rt-card { animation: none; transition: none; } }
+</style>

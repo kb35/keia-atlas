@@ -1,0 +1,70 @@
+# Circuits: the internet in and out of a site (data/circuits/<site>.yaml). Where each provider's fibre enters the
+# building, how it gets to the MDF, the provider's box (the handoff) and the firewall it meets. The patch cords
+# between them are in data/cables. Made up for the demo.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/circuits
+title: Circuits
+type: object
+additionalProperties: false
+required: [site, fictional, entry_points, circuits]
+$defs:
+  id: { type: string, pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
+properties:
+  site: { type: string, pattern: "^[a-z0-9]+$" }
+  fictional: { type: string, minLength: 1 }
+  entry_points:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, name, level_m, at]
+      properties:
+        id: { $ref: "#/$defs/id" }
+        name: { type: string }
+        level_m: { type: number }
+        at: { type: array, items: { type: number }, minItems: 2, maxItems: 2 }
+        notes: { type: string }
+  circuits:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, name, provider, role, type, bandwidth, entry, lead_in, panel, handoff, firewall]
+      properties:
+        id: { $ref: "#/$defs/id" }
+        name: { type: string }
+        provider: { description: The provider's name (made up)., type: string }
+        role: { enum: [primary, secondary] }
+        type: { type: string }
+        bandwidth: { description: 'The contracted bandwidth, or "Not recorded".', type: string }
+        entry: { description: The entry point (an id above)., type: string }
+        lead_in:
+          type: object
+          additionalProperties: false
+          required: [type, via]
+          properties:
+            type: { type: string }
+            cores: { type: integer, minimum: 1 }
+            length_m: { type: number }
+            via: { type: array, items: { type: string } }
+        panel:
+          description: The fibre panel ports in the MDF where the lead-in ends.
+          type: object
+          additionalProperties: false
+          required: [rack, u, ports]
+          properties: { rack: { type: string }, u: { type: integer }, ports: { type: string, pattern: "^[0-9]+(-[0-9]+)?$" } }
+        handoff:
+          description: The provider's box in the rack, and which of its ports are this provider's (customer side and network side).
+          type: object
+          additionalProperties: false
+          required: [rack, u, customer, network]
+          properties: { rack: { type: string }, u: { type: integer }, customer: { type: array, items: { type: integer } }, network: { type: array, items: { type: integer } } }
+        firewall:
+          type: object
+          additionalProperties: false
+          required: [rack, u, port]
+          properties: { rack: { type: string }, u: { type: integer }, port: { type: integer } }
+        cables: { description: "The patch cords (data/cables) between the panel, the box and the firewall.", type: array, items: { type: string } }
+        notes: { type: string }
+  notes: { type: array, items: { type: string } }

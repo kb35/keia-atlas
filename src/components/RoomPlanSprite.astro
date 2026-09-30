@@ -1,0 +1,39 @@
+---
+// Every room profile's little floor plan as a reusable symbol (<use href="#rp-type">), drawn once per page.
+// Rooms come from the same model as the drawing on the room profile page (src/lib/room3d.mjs), seen
+// from above, so a card and its drawing always agree. Comms rooms keep their rack sketch (src/lib/plan.mjs).
+import { spaceTypes } from '../lib/data.mjs';
+import { planSvg } from '../lib/plan.mjs';
+import { roomItems } from '../lib/scene.mjs';
+import { buildRoom, planView } from '../lib/room3d.mjs';
+// Inline styles, so the drawings keep their colours inside <use> and follow light and dark mode.
+const ST = {
+  'pl-room': 'fill:var(--pl-floor);stroke:var(--pl-wall);stroke-width:1.6', 'pl-open': 'fill:var(--pl-floor);stroke:var(--pl-wall);stroke-width:.6;stroke-dasharray:2 1.5',
+  'pl-gap': 'stroke:var(--pl-floor);stroke-width:2.6', 'pl-door': 'fill:none;stroke:var(--pl-wall);stroke-width:.7;stroke-dasharray:1.6 1.2',
+  'pl-chair': 'fill:var(--pl-chair)', 'pl-table': 'fill:var(--pl-table);stroke:var(--pl-table-2);stroke-width:.5', 'pl-counter': 'fill:var(--pl-counter);stroke:var(--pl-table-2);stroke-width:.4',
+  'pl-display': 'fill:var(--pl-display);stroke:var(--pl-display);stroke-width:1.4', 'pl-board': 'fill:#fff;stroke:var(--pl-wall);stroke-width:.5',
+  'pl-leaf': 'fill:#5E8C5A', 'pl-ghost': 'fill:var(--pl-ghost);stroke:var(--pl-table-2);stroke-width:.3', 'pl-scale': 'stroke:var(--pl-wall);stroke-width:.8;fill:none',
+  'pl-rack': 'fill:var(--pl-dev);stroke:var(--pl-wall);stroke-width:.8', 'pl-desk': 'fill:none;stroke:var(--pl-table-2);stroke-width:5;stroke-linecap:round',
+  'pl-dev': 'fill:var(--pl-dev)', 'pl-shelf': 'stroke:var(--pl-floor);stroke-width:.6;fill:none',
+};
+const styled = (s) => s.replace(/class="([a-z-]+)"/g, (_, c) => `style="${ST[c] ?? ''}"`);
+const draw = (id, t) => {
+  if (t.keia_atlas.category === 'infrastructure') return planSvg(id, t);
+  const opt = t.keia_atlas.options[0];
+  const model = buildRoom(id, opt, roomItems(opt));
+  // The tile is wide, so a room that is deeper than it is wide is turned a quarter turn anticlockwise:
+  // its long side runs across the tile and the display wall (the blue line) lands on the left.
+  // Wide rooms keep the wall at the top. Either way the drawing is to scale inside its own card.
+  if (model.room.D > model.room.W) return `<g transform="translate(0 80) rotate(-90)">${planView(model, { w: 80, h: 120 })}</g>`;
+  return planView(model);
+};
+---
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  {Object.entries(spaceTypes).map(([id, t]) => <symbol id={`rp-${id}`} viewBox="0 0 120 80" set:html={styled(draw(id, t))} />)}
+</svg>
+<style is:global>
+  :root { --pl-floor: #F4EFE5; --pl-wall: #2A2B31; --pl-chair: #6B7282; --pl-table: #D9C3A0; --pl-table-2: #A58761; --pl-counter: #E4DDD0; --pl-display: #1E5BFF; --pl-dev: #3B3D45; --pl-ghost: #E3DCCF; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --pl-floor: #2B2925; --pl-wall: #C9C3B6; --pl-chair: #8A91A0; --pl-table: #7D6A4E; --pl-table-2: #9C8560; --pl-counter: #4A463F; --pl-display: #6E96FF; --pl-dev: #8A8D96; --pl-ghost: #3A3731; } }
+  :root[data-theme="dark"] { --pl-floor: #2B2925; --pl-wall: #C9C3B6; --pl-chair: #8A91A0; --pl-table: #7D6A4E; --pl-table-2: #9C8560; --pl-counter: #4A463F; --pl-display: #6E96FF; --pl-dev: #8A8D96; --pl-ghost: #3A3731; }
+  .rplan { width: 100%; height: auto; display: block; aspect-ratio: 3 / 2; }
+</style>

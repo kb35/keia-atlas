@@ -1,0 +1,185 @@
+---
+// The office in 3D beside its path panel (decision 0030: one model shown two ways). A Record-style top: the picture
+// (7 of 12 columns) and a SidePanel (5). The picture is either the 3D model (three.js, src/lib/office3d-scene.mjs,
+// loaded only on a wide screen that can draw it) or the floor plans (FloorMap), the phone view, the keyboard
+// route and the fallback. The script is src/lib/office3d-client.mjs; the data is /locations/<site>/3d.json.
+//
+// Props: site (a site with floor files).
+import SidePanel from './SidePanel.astro';
+import FloorMap from './FloorMap.astro';
+import { building } from '../lib/floors.mjs';
+import { href } from '../lib/data.mjs';
+
+interface Props { site: string }
+const { site } = Astro.props;
+const M = building(site);
+const floorsTopFirst = [...M.floors].reverse();
+const std = M._raw.standards.cables;
+const hex = Object.fromEntries((std?.colours ?? []).map((c) => [c.id, c.hex]));
+const purposes = (std?.purposes ?? []).filter((p) => M.runs.some((r) => r.purpose === p.id)).map((p) => ({ id: p.id, n: p.name, hex: hex[p.colour] ?? null }));
+---
+<div class="g12 top o3" data-o3={site} data-o3-src={href(`/locations/${site}/3d.json`)} data-o3-view="3d" data-o3-colour="purpose">
+  <section class="s-7 o3-pic" aria-label={`${M.siteName} in 3D`}>
+    <div class="o3-bar" role="toolbar" aria-label="What the model shows">
+      <div class="o3-seg" role="group" aria-label="Show as" data-help="o3.view">
+        <button type="button" data-o3-view="3d" aria-pressed="true">3D model</button>
+        <button type="button" data-o3-view="plan" aria-pressed="false">Floor plan</button>
+      </div>
+      <div class="o3-seg" role="group" aria-label="Floors" data-help="o3.floors">
+        <button type="button" data-o3-floors="all" aria-pressed="true">All floors</button>
+        {M.floors.map((f) => <button type="button" data-o3-floors={f.id} aria-pressed="false" aria-label={f.name}>{`Floor ${f.id}`}</button>)}
+      </div>
+      <button type="button" class="o3-tog" data-o3-cables aria-pressed="true" data-help="o3.cables"><span class="o3-box" aria-hidden="true"></span>Cables</button>
+      <div class="o3-seg" role="group" aria-label="Colour the cables by" data-help="o3.colour">
+        <button type="button" data-o3-colour="purpose" aria-pressed="true">Purpose</button>
+        <button type="button" data-o3-colour="health" aria-pressed="false">Health</button>
+      </div>
+    </div>
+    <p class="o3-chosen" data-o3-chosen hidden><span></span> <a href="#o3-panel">Its path is below</a></p>
+
+    <div class="o3-views" data-o3-views>
+      <div class="o3-3d" data-o3-3d>
+        <div class="o3-stage" data-o3-stage tabindex="0" role="application" data-state="waiting" data-help="o3.scene"
+          aria-label={`${M.siteName}, the 3D model. Arrow keys turn it, Shift and arrows move it, plus and minus zoom, 0 goes back to the start. To choose things with the keyboard, use the floor plan.`}>
+          <div class="o3-labels" data-o3-labels aria-hidden="true"></div>
+          <div class="o3-cams" role="group" aria-label="Camera" data-help="o3.camera">
+            <button type="button" data-o3-cam="front">Front right</button>
+            <button type="button" data-o3-cam="top">Top</button>
+            {M.floors.map((f) => <button type="button" data-o3-cam={`f${f.id}`}>{`Floor ${f.id}`}</button>)}
+          </div>
+          <div class="o3-tip" data-o3-tip hidden aria-hidden="true"></div>
+          <p class="o3-hint" data-o3-hint hidden>Hold Ctrl and scroll, or pinch, to zoom</p>
+          <p class="o3-wait">Building the model</p>
+        </div>
+        <p class="o3-keys faint"><a href="#o3-plan" class="o3-skip" data-o3-to-plan>Choose with the keyboard on the floor plan</a> Drag to turn, Shift-drag to move, Ctrl and scroll to zoom.</p>
+      </div>
+      <div class="o3-plan" data-o3-plan id="o3-plan" hidden>
+        {floorsTopFirst.map((f) => (
+          <div class="o3-floor" data-o3-floor={f.id}>
+            <h3 class="o3-fname">{f.name}</h3>
+            <FloorMap site={site} floor={f.id} cables interactive />
+          </div>
+        ))}
+      </div>
+    </div>
+    <p class="o3-note faint" data-o3-note hidden></p>
+
+    <div class="o3-legend" data-help="o3.legend">
+      <p><b>Rooms</b>
+        <span><i class="sw" style="--c:var(--blue)"></i>In use</span><span><i class="sw" style="--c:var(--green)"></i>Free</span>
+        <span><i class="sw" style="--c:var(--red)"></i>Problem</span><span><i class="sw" style="--c:var(--grey)"></i>Closed</span>
+        <span><i class="sw" style="--c:var(--violet)"></i>Comms room</span></p>
+      <p class="o3-lg-purpose"><b>Cables by purpose</b>
+        {purposes.map((p) => <span><i class="sw line" style={`--c:${p.hex}`}></i>{p.n}</span>)}
+        <span><i class="sw line" style="--c:var(--yellow)"></i>Internet circuits</span></p>
+      <p class="o3-lg-health"><b>Cables by health</b>
+        <span><i class="sw line" style="--c:var(--green)"></i>Healthy</span><span><i class="sw line" style="--c:var(--amber)"></i>Alert</span>
+        <span><i class="sw line" style="--c:var(--red)"></i>Down</span><span><i class="sw line" style="--c:var(--grey)"></i>Spare or not monitored</span></p>
+      <p class="faint">Simulated live: room states and device health from the live simulation, a new moment every five seconds. Cables are drawn thicker than life.</p>
+    </div>
+    <p class="o3-fiction">{M.fictional}</p>
+  </section>
+
+  <SidePanel class="s-5" title="Path to the internet" id="o3-panel" help="o3.panel">
+    <div data-o3-panel class="o3-body"><p class="faint">Loading the paths.</p></div>
+  </SidePanel>
+</div>
+
+<script>
+  import { mount } from '../lib/office3d-client.mjs';
+  const init = () => document.querySelectorAll('[data-o3]').forEach((el) => mount(el));
+  init();
+  document.addEventListener('astro:page-load', init);
+</script>
+
+<style>
+  .o3-pic { display: grid; gap: 12px; min-width: 0; }
+  .o3-bar { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+  .o3-seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: var(--pill-radius); border: 1px solid var(--line); background: var(--surface); }
+  .o3-seg button, .o3-tog { appearance: none; border: 0; background: none; padding: 7px 12px; border-radius: var(--pill-radius); font: 600 13.5px/1 var(--font-sans); color: var(--text-2); cursor: pointer; white-space: nowrap;
+    transition: background var(--dur-state) var(--ease-settle), color var(--dur-state) var(--ease-settle); }
+  .o3-seg button:hover, .o3-tog:hover { color: var(--text); background: var(--surface-2); }
+  .o3-seg button[aria-pressed=true] { background: var(--ink); color: var(--on-ink); }
+  .o3-seg button:disabled { opacity: .45; cursor: default; }
+  .o3-tog { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--surface); padding: 9px 14px; }
+  .o3-box { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--line-strong); display: inline-grid; place-items: center; transition: background var(--dur-state) var(--ease-settle); }
+  .o3-tog[aria-pressed=true] .o3-box { background: var(--ink); border-color: var(--ink); }
+  .o3-tog[aria-pressed=true] .o3-box::after { content: ""; width: 7px; height: 4px; border: solid var(--on-ink); border-width: 0 0 2px 2px; transform: translateY(-1px) rotate(-45deg); }
+  .o3-cams { position: absolute; top: 10px; left: 10px; z-index: 2; display: flex; flex-wrap: wrap; gap: 4px; padding: 3px; border-radius: 10px; background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid var(--line); }
+  .o3-cams button { appearance: none; border: 0; background: none; padding: 6px 10px; border-radius: 7px; font: 600 12.5px/1 var(--font-sans); color: var(--text-2); cursor: pointer; white-space: nowrap; transition: background var(--dur-hover) var(--ease-settle), color var(--dur-hover) var(--ease-settle); }
+  .o3-cams button:hover { background: var(--surface-2); color: var(--text); }
+  .o3-3d { display: grid; gap: 10px; }
+  .o3-3d[hidden], .o3-plan[hidden] { display: none; }
+  .o3-stage { position: relative; aspect-ratio: 16 / 11; border-radius: var(--radius-lg, 12px); border: 1px solid var(--line); background: var(--stage-bg, var(--surface-2)); overflow: hidden; outline: none; }
+  .o3-stage:focus-visible { box-shadow: 0 0 0 3px var(--focus, var(--accent)); }
+  .o3-stage :global(.o3-canvas) { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .o3-wait { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; color: var(--text-2); font-size: 14px; }
+  .o3-stage[data-state=ready] .o3-wait { display: none; }
+  .o3-stage[data-state=failed] .o3-wait::after { content: ": not available here"; }
+  .o3-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .o3-labels :global(.o3-label) { position: absolute; left: 0; top: 0; font: 650 11.5px/1.2 var(--font-sans); color: var(--text); background: color-mix(in srgb, var(--surface) 82%, transparent); padding: 2px 6px; border-radius: 6px; white-space: nowrap; }
+  .o3-labels :global(.o3-label[hidden]) { display: none; }
+  .o3-labels :global(.o3-label-faint) { color: var(--text-2); font-weight: 550; }
+  .o3-labels :global(.o3-label-floor) { font-size: 12.5px; }
+  .o3-tip { position: absolute; left: 0; top: 0; pointer-events: none; max-width: 280px; font: 600 12.5px/1.3 var(--font-sans); background: var(--ink); color: var(--on-ink); padding: 6px 9px; border-radius: 8px; box-shadow: var(--shadow-md); }
+  .o3-hint { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); margin: 0; font: 600 13px/1 var(--font-sans); background: var(--ink); color: var(--on-ink); padding: 8px 12px; border-radius: var(--pill-radius); pointer-events: none; }
+  .o3-keys { margin: 0; font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+  .o3-skip { font-weight: 600; }
+  .o3-plan { display: grid; gap: 18px; }
+  .o3-fname { font-size: 14px; margin: 0 0 6px; }
+  .o3-chosen { margin: 0; font-size: 13.5px; padding: 8px 12px; border-radius: var(--radius); background: var(--accent-soft, var(--surface-2)); }
+  .o3-chosen span { font-weight: 650; }
+  .o3-chosen[hidden] { display: none; }
+  .o3-note { margin: 0; font-size: 13px; }
+  .o3-note[hidden] { display: none; }
+  .o3-legend { display: grid; gap: 6px; font-size: 12.5px; color: var(--text-2); }
+  .o3-legend p { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; }
+  .o3-legend b { color: var(--text); font-weight: 650; }
+  .o3-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .sw { width: 12px; height: 12px; border-radius: 3px; background: var(--c); display: inline-block; }
+  .sw.line { height: 4px; width: 16px; border-radius: 2px; }
+  .o3[data-o3-colour=purpose] .o3-lg-health, .o3[data-o3-colour=health] .o3-lg-purpose { display: none; }
+  .o3-fiction { margin: 0; font-size: 12.5px; color: var(--text-2); }
+  .o3[data-o3-view=plan] .o3-fiction { display: none; }
+
+  /* The panel */
+  .o3-body { display: grid; gap: 10px; font-size: 13.5px; }
+  .o3-body :global(p) { margin: 0; }
+  .o3-body :global(.o3-intro) { color: var(--text-2); }
+  .o3-body :global(.o3-h) { font-size: 13px; margin: 8px 0 0; display: flex; gap: 8px; align-items: baseline; }
+  .o3-body :global(.o3-h small) { color: var(--text-2); font-weight: 500; }
+  .o3-body :global(.o3-over) { font: 650 11.5px/1 var(--font-sans); text-transform: uppercase; letter-spacing: .06em; color: var(--text-2); }
+  .o3-body :global(.o3-title) { font-size: 18px; margin: 4px 0 6px; overflow-wrap: anywhere; }
+  .o3-body :global(.o3-state) { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .o3-body :global(.o3-clear) { margin-left: auto; }
+  .o3-body :global(.o3-why) { margin-top: 8px; color: var(--red-ink); font-weight: 600; }
+  .o3-body :global(.o3-sel) { display: grid; gap: 4px; }
+  .o3-body :global(.o3-facts) { display: grid; gap: 4px; margin: 8px 0 0; }
+  .o3-body :global(.o3-facts div) { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px; }
+  .o3-body :global(.o3-facts dt) { color: var(--text-2); }
+  .o3-body :global(.o3-facts dd) { margin: 0; overflow-wrap: anywhere; }
+  .o3-body :global(.o3-links) { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; font-weight: 600; }
+  .o3-body :global(.o3-small) { font-size: 12.5px; }
+  .o3-body :global(.o3-link) { appearance: none; border: 0; background: none; padding: 0; font: inherit; font-weight: 650; color: var(--accent-ink, var(--accent)); cursor: pointer; text-align: left; }
+  .o3-body :global(.o3-link:hover) { text-decoration: underline; }
+  .o3-body :global(.o3-att), .o3-body :global(.o3-outs) { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .o3-body :global(.o3-att li) { display: grid; grid-template-columns: 12px minmax(0, 1fr); gap: 10px; align-items: start; }
+  .o3-body :global(.o3-att li > .hl) { margin-top: 3px; }
+  .o3-body :global(.o3-att li span), .o3-body :global(.o3-outs li) { display: grid; gap: 2px; min-width: 0; }
+  .o3-body :global(.o3-outs li) { grid-template-columns: auto minmax(0, 1fr); align-items: baseline; column-gap: 10px; }
+  .o3-body :global(.o3-outs li > .hl) { align-self: center; }
+  .o3-body :global(small) { color: var(--text-2); font-size: 12px; }
+  .o3-body :global(.o3-inc) { display: grid; font-weight: 650; font-size: 12.5px; color: var(--red-ink); }
+  .o3-body :global(.o3-ok) { color: var(--green-ink); font-weight: 600; }
+  /* The path: one line from the thing to the internet, a light on each hop the feed reports on. */
+  .o3-body :global(.o3-path) { list-style: none; margin: 0; padding: 0; display: grid; }
+  .o3-body :global(.o3-path li) { position: relative; display: grid; grid-template-columns: 12px minmax(0, 1fr); column-gap: 12px; padding: 0 0 10px; }
+  .o3-body :global(.o3-path li::before) { content: ""; position: absolute; left: 5.5px; top: 12px; bottom: 0; width: 1px; background: var(--line-strong); }
+  .o3-body :global(.o3-path li:last-child::before) { display: none; }
+  .o3-body :global(.o3-path li > .hl), .o3-body :global(.o3-path li > .o3-dot) { grid-row: 1 / span 4; margin-top: 2px; position: relative; }
+  .o3-body :global(.o3-dot) { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line-strong); background: var(--surface); box-sizing: border-box; }
+  .o3-body :global(.o3-hk) { font: 650 11px/1.2 var(--font-sans); text-transform: uppercase; letter-spacing: .05em; color: var(--text-2); }
+  .o3-body :global(.o3-hl) { overflow-wrap: anywhere; }
+  .o3-body :global(.o3-path li:hover) { background: linear-gradient(90deg, transparent 0 20px, var(--surface-2) 20px); border-radius: 6px; }
+  .o3-body :global(.o3-bad) { color: var(--red-ink) !important; font-weight: 600; }
+</style>

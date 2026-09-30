@@ -1,0 +1,134 @@
+---
+/* LiveBar: the shared piece of the live layer (src/lib/live.mjs, decision 0025).
+   Shows who else has this page open and says honestly how far "live" reaches today, and holds the
+   History drawer for any item on the page.
+
+   How a page uses it:
+     <LiveBar page="project:PRJ-12" />
+   Then, from the page's own script, once window.rsLive exists (listen for "rs:live-ready" on document):
+     rsLive.live                    the live layer: record, subscribe, stateOf, historyOf, versions, undo
+     rsLive.who()                   the person id this window acts as (its own, even when another window
+                                    switches View as)
+     rsLive.name(id)                a person's name
+     rsLive.register(prefix, { base(item), describe(event) })
+                                    what an item was built as, and how to say a change in words
+     rsLive.history(item, title)    open the History drawer for an item, with Undo on each change */
+interface Props { page: string }
+const { page } = Astro.props;
+---
+<div class="livebar" data-help="live.bar" data-livebar data-page={page} role="status" aria-live="polite">
+  <span class="lb-pulse" aria-hidden="true"></span>
+  <span class="lb-label">Live between windows on this computer (demo)</span>
+  <span class="lb-here" data-lb-here></span>
+</div>
+<aside class="lb-drawer" data-help="live.drawer" data-lb-drawer hidden aria-labelledby="lb-h" tabindex="-1">
+  <header class="lb-dh">
+    <div><p class="overline">History</p><h2 id="lb-h" data-lb-title></h2></div>
+    <button type="button" class="btn small ghost" data-lb-close>Close</button>
+  </header>
+  <p class="faint lb-dn">Every change, newest first, with who made it and when. Undo adds a change that puts the old value back; nothing is deleted.</p>
+  <ol class="lb-list" data-lb-list></ol>
+</aside>
+
+<script>
+  import { browserLive } from '../lib/live.mjs';
+
+  type Ev = { id: string; at: string; who: string | null; item: string; field: string; before: unknown; after: unknown; note?: string; undoes?: string; undoneBy?: string | null };
+  const live = browserLive();
+  const W = window as any;
+  const people = () => (W.RS_PEOPLE || []) as { id: string; name: string; initials: string }[];
+  const name = (id: string | null) => (id ? people().find((p) => p.id === id)?.name ?? id : 'Someone');
+  const initials = (id: string) => people().find((p) => p.id === id)?.initials ?? id.slice(0, 2).toUpperCase();
+  // Each window keeps who it is acting as (rs5-who, kept by Shell.astro), so two windows can be two people side by side.
+  // In Everyone (overview) that is the labelled demo admin, never "everyone".
+  const who = (): string => (W.rsActorId ? W.rsActorId() : W.rsWhoId ? W.rsWhoId() : 'aoife');
+  document.addEventListener('rs:demo-change', () => bind());
+
+  const kinds: { prefix: string; base?: (item: string) => Record<string, unknown>; describe?: (e: Ev) => string }[] = [];
+  const kindOf = (item: string) => kinds.find((k) => item.startsWith(k.prefix));
+  const baseOf = (item: string) => kindOf(item)?.base?.(item) ?? {};
+  const say = (e: Ev) => kindOf(e.item)?.describe?.(e) ?? `${e.field}: ${String(e.before ?? 'none')} to ${String(e.after ?? 'none')}`;
+  const time = (at: string) => new Date(at).toLocaleString('en-IE', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
+  const esc = (s: unknown) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
+
+  let open: { item: string; title: string } | null = null;
+  function draw() {
+    const d = document.querySelector('[data-lb-drawer]') as HTMLElement | null;
+    if (!d || !open) return;
+    const { item } = open;
+    const versions = live.versions(item, baseOf(item));
+    const n = new Map(versions.filter((v) => v.event).map((v) => [v.event.id, v.n]));
+    const list = live.historyOf(item) as Ev[];
+    (d.querySelector('[data-lb-title]') as HTMLElement).textContent = open.title;
+    (d.querySelector('[data-lb-list]') as HTMLElement).innerHTML = list.length ? list.map((e) =>
+      `<li class="lb-ev${e.undoneBy ? ' undone' : ''}"><span class="av">${esc(initials(e.who ?? '?'))}</span><span class="lb-b"><b>${esc(say(e))}</b>` +
+      `<small>${esc(name(e.who))} · ${esc(time(e.at))} · version ${n.get(e.id)}${e.note ? ` · ${esc(e.note)}` : ''}${e.undoneBy ? ' · undone' : ''}</small></span>` +
+      (e.undoneBy ? '' : `<button type="button" class="btn small ghost" data-help="live.undo" data-lb-undo="${esc(e.id)}">Undo</button>`) + '</li>').join('')
+      : `<li class="faint">No changes yet. This is version 0, as the page was built.</li>`;
+  }
+  function history(item: string, title: string) {
+    open = { item, title };
+    const d = document.querySelector('[data-lb-drawer]') as HTMLElement | null;
+    if (!d) return;
+    d.hidden = false; draw(); d.focus({ preventScroll: true });
+  }
+  document.addEventListener('click', (ev) => {
+    const t = ev.target as HTMLElement;
+    if (t.closest('[data-lb-close]')) { const d = document.querySelector('[data-lb-drawer]') as HTMLElement; d.hidden = true; open = null; return; }
+    const u = t.closest('[data-lb-undo]') as HTMLElement | null;
+    if (u && open) live.undo(u.dataset.lbUndo!, { who: who(), base: baseOf(open.item) });
+  });
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && open) { const d = document.querySelector('[data-lb-drawer]') as HTMLElement | null; if (d) d.hidden = true; open = null; } });
+  live.subscribe('*', () => draw());
+
+  // Presence: say this window is on the page, and show everyone else who is.
+  let leave: (() => void) | null = null, stopWatch: (() => void) | null = null, refresh: (() => void) | null = null;
+  function bind() {
+    leave?.(); stopWatch?.();
+    const bar = document.querySelector('[data-livebar]') as HTMLElement | null;
+    if (!bar) { leave = stopWatch = refresh = null; return; }
+    // The drawer sits on the page itself, above the masthead, not inside the content's stacking.
+    const drawer = document.querySelector('[data-lb-drawer]');
+    if (drawer && drawer.parentElement !== document.body) document.body.appendChild(drawer);
+    const page = bar.dataset.page!;
+    const show = (list: { who: string }[]) => {
+      const others = [...new Set(list.map((h) => h.who))];
+      (bar.querySelector('[data-lb-here]') as HTMLElement).innerHTML = others.length
+        ? `<span class="lb-who">${others.map((id) => `<span class="av" title="${esc(name(id))}">${esc(initials(id))}</span>`).join('')}</span><span>${others.length === 1 ? `${esc(name(others[0]))} is` : `${others.length} others are`} here too</span>`
+        : '<span class="faint">Nobody else is on this page</span>';
+    };
+    leave = live.here(page, who());
+    stopWatch = live.onPresence(page, show);
+    refresh = () => show(live.whoIsHere(page));
+    refresh();
+  }
+  document.addEventListener('astro:page-load', bind);
+  document.addEventListener('astro:before-swap', () => { leave?.(); stopWatch?.(); leave = stopWatch = refresh = null; open = null; });
+  addEventListener('pagehide', () => leave?.());
+  // Drop people who closed their window without saying goodbye.
+  setInterval(() => refresh?.(), 5000);
+
+  W.rsLive = { live, who, name, history, register: (prefix: string, k: { base?: (item: string) => Record<string, unknown>; describe?: (e: Ev) => string }) => { const i = kinds.findIndex((x) => x.prefix === prefix); if (i >= 0) kinds.splice(i, 1); kinds.push({ prefix, ...k }); }, redraw: draw };
+  document.dispatchEvent(new CustomEvent('rs:live-ready'));
+</script>
+
+<style is:global>
+  .livebar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 13px; color: var(--text-2); padding: 6px 10px; border-radius: var(--radius); background: var(--surface-2); }
+  .lb-pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--green, #2f7a4f); box-shadow: 0 0 0 0 color-mix(in srgb, var(--green, #2f7a4f) 50%, transparent); animation: lb-pulse 2.4s ease-out infinite; }
+  @keyframes lb-pulse { 70% { box-shadow: 0 0 0 7px transparent; } }
+  .lb-label { font-weight: 600; }
+  .lb-here { display: inline-flex; align-items: center; gap: 8px; }
+  .lb-who { display: inline-flex; }
+  .lb-who .av + .av { margin-left: -6px; }
+  .lb-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(420px, 100vw); z-index: 60; background: var(--surface); border-left: 1px solid var(--line); box-shadow: var(--shadow-panel, 0 0 24px rgb(0 0 0 / .18)); padding: 18px 18px 24px; overflow: auto; display: grid; align-content: start; gap: 10px; animation: lb-in var(--dur-morph, 420ms) var(--ease-settle, ease) both; }
+  .lb-drawer[hidden] { display: none; }
+  @keyframes lb-in { from { transform: translateX(40px); opacity: 0; } }
+  .lb-dh { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+  .lb-dh h2 { margin: 2px 0 0; font-size: 18px; }
+  .lb-dn { margin: 0; font-size: 13px; }
+  .lb-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .lb-ev { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: var(--radius); background: var(--surface-2); }
+  .lb-ev.undone .lb-b b { text-decoration: line-through; color: var(--text-3); }
+  .lb-b { display: grid; gap: 2px; } .lb-b small { color: var(--text-3); font-size: 12px; }
+  @media (prefers-reduced-motion: reduce) { .lb-pulse, .lb-drawer { animation: none; } }
+</style>

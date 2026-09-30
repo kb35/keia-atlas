@@ -1,0 +1,89 @@
+---
+// The project's timeline: one row per phase, the planned span faint underneath, the actual span
+// filled on top (the part past the plan tinted as a slip), a diamond at the end of each phase for its
+// gate (filled once signed off), a line for today and a mark for the target date. Each phase's name is
+// the button that opens that phase's panel (data-phx), so the clickable phase rail is folded into the
+// picture: no second row of buttons. Under 600 px of content each name sits above its bar.
+import { timeline } from '../lib/project-status.mjs';
+import { fmtDate } from '../lib/data.mjs';
+const { project: p } = Astro.props;
+const T = timeline(p);
+const short = (d) => fmtDate(d, { day: 'numeric', month: 'short' });
+const w = (a, b) => Math.max(0.4, T.pct(b) - T.pct(a));
+const gateWord = (r) => (r.gate.ended && r.gate.signed ? `Gate signed off by ${r.gate.signedName}, ${short(r.gate.ended)}${r.gate.late ? ` (${r.slip} days late)` : ''}` : r.state === 'now' ? `Gate due ${short(r.gate.date)}${r.slip > 0 ? `, ${r.slip} days over` : ''}` : r.gate.ended ? `Ended ${short(r.gate.ended)}` : `Gate planned for ${short(r.gate.date)}`);
+const gateState = (r) => (r.gate.ended && r.gate.signed ? (r.gate.late ? 'late' : 'signed') : r.state === 'now' && r.slip > 0 ? 'over' : r.state === 'done' ? 'passed' : 'todo');
+---
+<div class="ptl" data-help="project.timeline" role="tablist" aria-label="Phases, planned against actual. Pick a phase to see it." style={`--today:${T.todayX ?? -10};--target:${T.targetX}`}>
+  <div class="ptl-head" aria-hidden="true">
+    <span class="ptl-lbl"></span>
+    <span class="ptl-scale">{T.ticks.map((t) => <i style={`left:${t.x}%`}>{t.label}</i>)}</span>
+  </div>
+  <div class="ptl-body">
+    {T.todayX != null && <i class="ptl-today" aria-hidden="true"><b>Today</b></i>}
+    <i class="ptl-target" aria-hidden="true" title={`Target ${short(p.target)}`}></i>
+    {T.rows.map((r) => (
+      <button type="button" role="tab" class:list={['ptl-row', `is-${r.state}`]} data-phx={r.phase} aria-selected={r.state === 'now' ? 'true' : 'false'} aria-current={r.state === 'now' ? 'step' : undefined} data-help="phase-rail" data-help-name={r.label}>
+        <span class="ptl-lbl"><i class="ptl-dot" aria-hidden="true"></i><b>{r.label}</b><small class:list={{ late: r.slip > 0 }}>{r.gate.ended ? short(r.gate.ended) : r.state === 'now' ? `due ${short(r.gate.date)}` : `plan ${short(r.gate.date)}`}</small></span>
+        <span class="ptl-track">
+          <i class="ptl-plan" style={`left:${T.pct(r.planStart)}%;width:${w(r.planStart, r.planEnd)}%`} title={`Planned ${short(r.planStart)} to ${short(r.planEnd)}`}></i>
+          {r.actStart && <i class:list={['ptl-act', { open: r.open }]} style={`left:${T.pct(r.actStart)}%;width:${w(r.actStart, r.actEnd)}%`} title={`Actual ${short(r.actStart)} to ${r.open ? 'today' : short(r.actEnd)}`}></i>}
+          {r.actEnd && r.actEnd > r.planEnd && <i class="ptl-over" style={`left:${T.pct(r.planEnd)}%;width:${w(r.planEnd, r.actEnd)}%`} title={`${r.slip} days past the plan`}></i>}
+          <i class="ptl-gate" data-gate={gateState(r)} style={`left:${T.pct(r.gate.date)}%`} title={gateWord(r)}></i>
+          <span class="sr-only">{gateWord(r)}</span>
+        </span>
+      </button>
+    ))}
+  </div>
+  <p class="ptl-key faint"><span><i class="k-plan"></i>Planned</span><span><i class="k-act"></i>Actual</span><span><i class="k-over"></i>Past the plan</span><span><i class="k-gate"></i>Gate, filled when signed off</span></p>
+</div>
+
+<style is:global>
+  .ptl { --lbl: 168px; --row: 34px; display: grid; gap: 0; font-size: 13px; }
+  .ptl-head { display: grid; grid-template-columns: var(--lbl) minmax(0, 1fr); height: 18px; }
+  .ptl-scale { position: relative; }
+  .ptl-scale i { position: absolute; top: 0; transform: translateX(-50%); font: 600 10.5px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); white-space: nowrap; }
+  .ptl-scale i:first-child { transform: none; }
+  .ptl-body { position: relative; display: grid; gap: 2px; padding: 4px 0 16px; }
+  .ptl-today, .ptl-target { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px dashed var(--amber, #E0A100); left: calc(var(--lbl) + (100% - var(--lbl)) * var(--today) / 100); z-index: 2; pointer-events: none; }
+  .ptl-today b { position: absolute; bottom: -2px; left: 4px; font: 700 10px/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--amber-ink); white-space: nowrap; }
+  .ptl-target { border-left: 2px solid var(--ink); left: calc(var(--lbl) + (100% - var(--lbl)) * var(--target) / 100); opacity: .55; }
+  .ptl-row { appearance: none; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; display: grid; grid-template-columns: var(--lbl) minmax(0, 1fr); align-items: center; min-height: var(--row); padding: 0; border-radius: var(--radius); transition: background var(--dur-state) var(--ease-settle); position: relative; z-index: 1; }
+  .ptl-row:hover { background: var(--surface-2); }
+  .ptl-row[aria-selected=true] { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+  .ptl-row:focus-visible { outline: 2px solid var(--focus, var(--ink)); outline-offset: 1px; }
+  .ptl-lbl { display: flex; align-items: center; gap: 8px; padding: 0 8px; min-width: 0; }
+  .ptl-lbl b { font-weight: 650; color: var(--text-2); white-space: nowrap; }
+  .ptl-row.is-now .ptl-lbl b { color: var(--text); font-weight: 750; }
+  .ptl-row[aria-selected=true] .ptl-lbl b { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
+  .ptl-lbl small { font: 500 10.5px/1.2 var(--font-mono); color: var(--text-3); white-space: nowrap; }
+  .ptl-lbl small.late { color: var(--red-ink); }
+  .ptl-dot { flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--surface); border: 2px solid var(--line-strong); }
+  .is-done .ptl-dot { background: var(--ph-done); border-color: var(--ph-done); }
+  .is-now .ptl-dot { background: var(--ph-now); border-color: var(--ph-now); }
+  .ptl-track { position: relative; height: var(--row); min-width: 0; }
+  .ptl-plan, .ptl-act, .ptl-over { position: absolute; top: 50%; height: 8px; transform: translateY(-50%); border-radius: 99px; }
+  .ptl-plan { height: 14px; background: color-mix(in srgb, var(--line-strong) 45%, transparent); border-radius: 4px; }
+  .ptl-act { background: var(--ph-done); box-shadow: 0 0 0 1px var(--surface); animation: ptl-grow var(--dur-fill) var(--ease-settle) both; transform-origin: left center; }
+  .ptl-act.open { background: var(--ph-now); border-radius: 99px 2px 2px 99px; }
+  .ptl-over { background: var(--red); animation: ptl-grow var(--dur-fill) var(--ease-settle) both; transform-origin: left center; }
+  @keyframes ptl-grow { from { transform: translateY(-50%) scaleX(0); } to { transform: translateY(-50%) scaleX(1); } }
+  .ptl-gate { position: absolute; top: 50%; width: 13px; height: 13px; margin: -6.5px 0 0 -6.5px; transform: rotate(45deg); background: var(--surface); border: 2px solid var(--line-strong); border-radius: 2px; z-index: 1; transition: background var(--dur-state), border-color var(--dur-state); }
+  .ptl-gate[data-gate=signed], .ptl-gate[data-gate=passed] { background: var(--ph-done); border-color: var(--ph-done); }
+  .ptl-gate[data-gate=late] { background: var(--amber, #E0A100); border-color: var(--amber, #E0A100); }
+  .ptl-gate[data-gate=over] { background: var(--red-soft); border-color: var(--red); }
+  .ptl-key { margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 11.5px; }
+  .ptl-key span { display: inline-flex; align-items: center; gap: 6px; }
+  .ptl-key i { display: inline-block; width: 16px; height: 8px; border-radius: 99px; }
+  .ptl-key .k-plan { height: 10px; border-radius: 3px; background: color-mix(in srgb, var(--line-strong) 45%, transparent); }
+  .ptl-key .k-act { background: var(--ph-done); } .ptl-key .k-over { background: var(--red); }
+  .ptl-key .k-gate { width: 9px; height: 9px; border-radius: 1px; transform: rotate(45deg); background: var(--ph-done); }
+  :root[data-look="classic"] .ptl-act { background: var(--ink); } :root[data-look="classic"] .ptl-gate[data-gate=signed], :root[data-look="classic"] .ptl-gate[data-gate=passed] { background: var(--ink); border-color: var(--ink); }
+  /* Narrow: each phase's name sits above its bar; the scale keeps its own line. */
+  @container content (max-width: 599px) {
+    .ptl { --lbl: 0px; --row: 30px; }
+    .ptl-head { grid-template-columns: minmax(0, 1fr); } .ptl-head .ptl-lbl { display: none; }
+    .ptl-row { grid-template-columns: minmax(0, 1fr); padding: 4px 0 2px; }
+    .ptl-lbl { padding: 0 4px 2px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .ptl-act, .ptl-over { animation: none; } }
+</style>

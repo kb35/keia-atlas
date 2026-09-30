@@ -1,0 +1,182 @@
+---
+// One office's IT store: what is below its minimum (first), the cabinets and shelves at a glance, then the
+// spare units (each opens its unit page) and the counted stock. The room itself is a room like any other,
+// linked from the band.
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import SidePanel from '../../components/SidePanel.astro';
+import Section from '../../components/Section.astro';
+import '../../styles/stock.css';
+import { sites, fmtDate, plural, href, DEMO_TODAY } from '../../lib/data.mjs';
+import { stores, SPARE_KIND, COUNT_OVERDUE_DAYS } from '../../lib/stock.mjs';
+import { recHere } from '../../lib/vt.mjs';
+
+export function getStaticPaths() {
+  return stores.map((st) => ({ params: { site: st.site }, props: { id: st.id } }));
+}
+const { id } = Astro.props;
+const st = stores.find((s) => s.id === id);
+const site = sites[st.site];
+const floor = site.floors?.find((f) => f.id === st.floor)?.name ?? `Floor ${st.floor}`;
+const lowModels = st.rules.filter((r) => r.low).length, lowLines = st.consumables.filter((c) => c.low).length;
+const pct = (have, min) => Math.min(100, Math.round((have / Math.max(min, 1)) * 100));
+const stateOf = (have, min) => (have === 0 && min > 0 ? { k: 'out', t: 'None left' } : have < min ? { k: 'low', t: 'Low' } : { k: 'ok', t: 'Enough' });
+const byModel = [...st.units].sort((a, b) => a.modelName.localeCompare(b.modelName) || a.cabinet.localeCompare(b.cabinet) || a.shelf.localeCompare(b.shelf, 'en', { numeric: true }) || a.tag.localeCompare(b.tag));
+const NUMBERS = [
+  { n: st.units.length, label: 'Spare units', to: '#units' },
+  { n: lowModels, label: lowModels === 1 ? 'Model below minimum' : 'Models below minimum', to: '#minimum', tone: lowModels ? 'bad' : undefined },
+  { n: lowLines, label: lowLines === 1 ? 'Counted line below minimum' : 'Counted lines below minimum', to: '#counted', tone: lowLines ? 'bad' : undefined },
+  { n: st.consumables.length, label: 'Counted lines', to: '#counted' },
+];
+const unitLabel = (n) => plural(n, 'unit');
+---
+<Shell about={{ kind: 'IT store', label: `${site.name} IT store`, to: st.href }} title={`${site.name} IT store`} section="spares" crumbs={[{ label: 'IT stores', to: '/spares/' }, { label: site.name }]}>
+  <PageBand overline="IT store" title={`${site.name} IT store`} sim numbers={NUMBERS}>
+    <Fragment slot="overline">
+      <a class="code" href={href(`/rooms/?site=${st.site}`)} style="text-decoration:none" title={`Every room at ${site.name}`}>{st.siteCode}</a>
+      <span>{st.city} · {floor}</span>
+    </Fragment>
+    <Fragment slot="lede">Room <a href={href(st.roomHref)}>{st.number}</a>, {st.optionName.toLowerCase()}. Spare units counted {fmtDate(st.lastCounted)}{st.countedDays > COUNT_OVERDUE_DAYS ? `, more than ${COUNT_OVERDUE_DAYS} days ago` : ''}.{st.overdue && st.countedDays <= COUNT_OVERDUE_DAYS ? ' A counted line is overdue for a recount.' : ''}</Fragment>
+  </PageBand>
+
+  <div class="content">
+    <div class="g12 top">
+      <div class="s-7" id="minimum" data-help="store.minimum">
+        <Section title="Minimum stock" aside={lowModels ? `${lowModels} below minimum` : 'All at or above minimum'}>
+          <div class="tablewrap">
+            <table class="to-cards sst-table">
+              <thead><tr><th scope="col">Model</th><th scope="col">On the shelf</th><th scope="col">Where</th></tr></thead>
+              <tbody>
+                {st.rules.map((r) => {
+                  const s = stateOf(r.have, r.minimum);
+                  return (
+                    <tr id={`sp-${r.id}`} class:list={[`sp-r-${s.k}`]}>
+                      <td data-label="Model" class="sp-what"><b><a class="stk-link" href={href(`/models/${r.model}/`)}>{r.modelName}</a></b>{r.notes && <small class="sp-note">{r.notes}</small>}</td>
+                      <td data-label="On the shelf" class="sp-stock">
+                        <span class="sp-q"><strong class="num">{r.have}</strong><small>of {r.minimum} minimum</small><span class={`sp-pill ${s.k}`}>{s.t}{r.low ? `, ${r.short} short` : ''}</span></span>
+                        <span class="sp-bar" aria-hidden="true"><i class={s.k} style={`width:${pct(r.have, r.minimum)}%`}></i></span>
+                      </td>
+                      <td data-label="Where" class="sp-where">{r.cabinet ? `${r.cabinet}, ${r.shelf}` : 'Nothing on a shelf'}</td>
+                    </tr>
+                  );
+                })}
+                {st.unruled.map((m) => (
+                  <tr>
+                    <td data-label="Model" class="sp-what"><b><a class="stk-link" href={href(`/models/${m.model}/`)}>{m.modelName}</a></b></td>
+                    <td data-label="On the shelf"><span class="sp-q"><strong class="num">{m.have}</strong><small>no minimum set</small></span></td>
+                    <td data-label="Where" class="sp-where">See the spare units</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+      </div>
+
+      <SidePanel title="Cabinets and shelves" meta={`${plural(st.cabinets.length, 'cabinet')} · ${plural(st.shelfCount, 'shelf', 'shelves')}`} class="s-5" help="store.cabinets">
+        <div class="sst-cabs" data-dd-fact {...recHere(st.id)}>
+          {st.cabinets.map((c) => (
+            <div class="sst-cab">
+              <b>{c.name}</b>
+              <ul>
+                {c.shelves.map((sh) => {
+                  const n = sh.units.length + sh.lines.length;
+                  return (
+                    <li class:list={{ empty: n === 0 }} title={n ? `${unitLabel(sh.units.length)}, ${plural(sh.lines.length, 'counted line')}` : 'Empty'}>
+                      <span>{sh.name}</span>
+                      <strong class="num">{sh.units.length}</strong>{sh.lines.length > 0 && <small>+{sh.lines.length} counted</small>}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </div>
+        <p class="faint sst-key">Spare units on each shelf, and counted lines beside them.</p>
+        <a class="stk-link sst-room" href={href(st.roomHref)}>Open room {st.number}</a>
+      </SidePanel>
+    </div>
+
+    <Section title="Spare units" id="units" aside={`${plural(st.units.length, 'unit')} with the status Spare`} help="store.units">
+      {st.units.length === 0 ? <div class="card pad muted">No spare units are on the shelves.</div> : (
+        <div class="tablewrap">
+          <table class="to-cards sst-table">
+            <thead><tr><th scope="col">Unit</th><th scope="col">Asset tag</th><th scope="col">Serial</th><th scope="col">Where</th><th scope="col">Arrived</th></tr></thead>
+            <tbody>
+              {byModel.map((u) => (
+                <tr id={u.tag.toLowerCase()}>
+                  <td data-label="Unit" class="sp-what"><b><a class="stk-link" href={href(u.unitHref)}>{u.modelName}</a></b><small>{u.className} · <span class="pill spare">{u.status}</span></small>{u.notes && <small class="sp-note">{u.notes}</small>}</td>
+                  <td data-label="Asset tag" class="mono">{u.tag}</td>
+                  <td data-label="Serial" class="mono">{u.serial}</td>
+                  <td data-label="Where" class="sp-where">{u.cabinet}, {u.shelf}</td>
+                  <td data-label="Arrived">{fmtDate(u.arrived, { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Section>
+
+    <Section title="Counted stock" id="counted" aside={lowLines ? `${lowLines} below minimum` : 'Cords, mounts and parts without serial numbers'} help="store.counted">
+      <div class="tablewrap">
+        <table class="to-cards sst-table">
+          <thead><tr><th scope="col">Item</th><th scope="col">Kind</th><th scope="col">In stock</th><th scope="col">Where</th><th scope="col">Last counted</th></tr></thead>
+          <tbody>
+            {st.consumables.map((c) => {
+              const s = stateOf(c.quantity, c.minimum);
+              return (
+                <tr id={`sp-${c.id}`} class:list={[`sp-r-${s.k}`]}>
+                  <td data-label="Item" class="sp-what"><b>{c.what}</b>{c.part_number && <small>{c.part_number}</small>}{c.notes && <small class="sp-note">{c.notes}</small>}</td>
+                  <td data-label="Kind"><span class="tag">{SPARE_KIND[c.kind]}</span></td>
+                  <td data-label="In stock" class="sp-stock">
+                    <span class="sp-q"><strong class="num">{c.quantity}</strong><small>of {c.minimum} minimum</small><span class={`sp-pill ${s.k}`}>{s.t}{c.low ? `, ${c.short} short` : ''}</span></span>
+                    <span class="sp-bar" aria-hidden="true"><i class={s.k} style={`width:${pct(c.quantity, c.minimum)}%`}></i></span>
+                  </td>
+                  <td data-label="Where" class="sp-where">{c.whereText}</td>
+                  <td data-label="Last counted" class="sp-counted"><span>{fmtDate(c.last_counted, { day: 'numeric', month: 'short' })}</span>{c.overdue && <small class="sp-late">Count overdue, {c.countedDays} days</small>}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Section>
+
+    {st.retired.length > 0 && (
+      <Section title="No longer stocked" id="retired" aside="Kept for the record, left out of the counts">
+        <div class="tablewrap">
+          <table class="to-cards sst-table">
+            <thead><tr><th scope="col">Item</th><th scope="col">Archived</th><th scope="col">Reason</th></tr></thead>
+            <tbody>
+              {st.retired.map((r) => (
+                <tr><td data-label="Item" class="sp-what"><b>{r.what}</b>{r.modelName && <small>{r.modelName}</small>}</td><td data-label="Archived">{fmtDate(r.archived.date)}</td><td data-label="Reason">{r.archived.reason}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+    )}
+    <p class="faint sst-foot">Figures as of {fmtDate(DEMO_TODAY)}. <a class="stk-link" href={href('/spares/')}>All IT stores</a>. Cables have their own list on the <a class="stk-link" href={href('/cables/')}>Cables tab</a>.</p>
+  </div>
+</Shell>
+
+<style is:global>
+  .sst-table .sp-what b { display: block; font-size: 14px; } .sst-table .sp-what small, .sst-table .sp-where { color: var(--text-2); font-size: 13px; }
+  .sst-table .sp-note { font-style: italic; } .sst-table .sp-what a { color: inherit; } .sst-table .sp-what a:hover { color: var(--accent-ink); }
+  .sst-table tr { scroll-margin-top: 150px; } .sst-table tr:target { background: var(--accent-soft); }
+  .sst-table tr.sp-r-low td:first-child { box-shadow: inset 3px 0 0 var(--amber); } .sst-table tr.sp-r-out td:first-child { box-shadow: inset 3px 0 0 var(--red); }
+  .tablewrap > table.sst-table { min-width: 0; }
+  .sst-table th, .sst-table td { padding-inline: 12px; }
+  .sst-table td.mono { white-space: nowrap; font-size: 12.5px; }
+  .sst-table .sp-stock { min-width: 170px; } .sst-table .sp-counted { white-space: nowrap; }
+  .sst-cabs { display: grid; gap: 12px; }
+  .sst-cab { display: grid; gap: 6px; }
+  .sst-cab > b { font-size: 13.5px; }
+  .sst-cab ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 6px; }
+  .sst-cab li { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 0 6px; padding: 6px 8px; border-radius: var(--radius-sm, 8px); background: var(--surface-2); border: 1px solid var(--line); font-size: 12px; color: var(--text-2); }
+  .sst-cab li strong { font-size: 15px; color: var(--text); } .sst-cab li small { grid-column: 1 / -1; font-size: 11px; color: var(--text-3); }
+  .sst-cab li.empty { opacity: .6; } .sst-cab li.empty strong { color: var(--text-3); }
+  .sst-key { margin: 10px 0 0; font-size: 12.5px; } .sst-room { display: inline-block; margin-top: 8px; font-weight: 650; }
+  .sst-foot { margin: 0; font-size: 13px; }
+</style>

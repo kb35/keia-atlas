@@ -1,0 +1,604 @@
+---
+// The rule book (docs/rules/*.md) as a page: one tab per chapter, each rule a card, and small live
+// examples beside the chapters where seeing it helps. The Markdown is the only copy of the words;
+// this page adds the examples and links rule numbers like "(M6)" to their rule.
+import Shell from '../../../layouts/Shell.astro';
+import Icon from '../../../components/Icon.astro';
+import DeviceArt from '../../../components/DeviceArt.astro';
+import DeviceGlyph from '../../../components/DeviceGlyph.astro';
+import { artParts, artSource } from '../../../lib/art.mjs';
+import { href, modelName } from '../../../lib/data.mjs';
+
+const files = import.meta.glob('../../../../docs/rules/*.md', { eager: true });
+const CH = [
+  { id: 'summary', file: 'README', label: 'Summary', icon: 'book' },
+  { id: 'motion', file: 'motion', label: 'Motion', icon: 'pulse' },
+  { id: 'layout', file: 'layout', label: 'Layout', icon: 'types' },
+  { id: 'devices', file: 'devices', label: 'Devices', icon: 'devices' },
+  { id: 'rooms', file: 'rooms', label: 'Rooms', icon: 'room' },
+  { id: 'platform', file: 'platform', label: 'Platform', icon: 'search' },
+  { id: 'words', file: 'words', label: 'Words', icon: 'edit' },
+  { id: 'looks', file: 'looks', label: 'Looks', icon: 'sun' },
+  { id: 'data', file: 'data', label: 'Data', icon: 'box' },
+  { id: 'gaps', file: 'gaps', label: 'Known gaps', icon: 'alert' },
+];
+const byFile = Object.fromEntries(CH.map((c) => [c.file, c.id]));
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+// Just enough Markdown for the summary's short paragraphs: code and links.
+const inline = (s) => esc(s)
+  .replace(/`([^`]+)`/g, '<code>$1</code>')
+  .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, t, u) => (byFile[u.replace(/\.md$/, '')] ? `<a href="#${byFile[u.replace(/\.md$/, '')]}" data-go="${byFile[u.replace(/\.md$/, '')]}">${t}</a>` : `<a href="${u}">${t}</a>`));
+
+const chapters = await Promise.all(CH.map(async (c) => {
+  const mod = Object.entries(files).find(([p]) => p.endsWith(`/${c.file}.md`))[1];
+  const raw = mod.rawContent();
+  let html = await mod.compiledContent();
+  html = html.replace(/<h1[^>]*>[\s\S]*?<\/h1>\s*/, '');
+  html = html.replace(/href="([a-z-]+)\.md"/g, (m, f) => (byFile[f] ? `href="#${byFile[f]}" data-go="${byFile[f]}"` : m));
+  html = html.replace(/<h3 id="([^"]+)">([A-Z]\d+)\.\s*/g, '<h3 id="$1"><span class="r-no">$2</span>');
+  html = html.replace(/<li><strong>(Why|Do|Don(?:'|’|&#39;|&#x27;|&rsquo;)t):<\/strong>/g, (m, w) => `<li class="r-${w === 'Why' ? 'why' : w === 'Do' ? 'do' : 'dont'}"><strong>${w}</strong>`);
+  html = html.replace(/(<li class="r-(?:why|do|dont)"><strong>[^<]*<\/strong>)([\s\S]*?)<\/li>/g, '$1<span>$2</span></li>');
+  // Short code stays on one line (a hyphen is a line break point); long code may wrap at spaces.
+  html = html.replace(/<code>([^<]{30,})<\/code>/g, '<code class="long">$1</code>');
+  // Each rule becomes its own card: split before every rule heading.
+  const parts = html.trim().split(/(?=<h3 id=)/);
+  const intro = parts[0].startsWith('<h3') ? '' : parts.shift();
+  const rulesHtml = parts.map((p) => `<article class="rule">${p}</article>`).join('');
+  const rules = [...raw.matchAll(/^###\s+([A-Z]\d+)\.\s+(.+)$/gm)].map((m) => ({ no: m[1], title: m[2] }));
+  const ids = [...html.matchAll(/<h3 id="([^"]+)"><span class="r-no">([A-Z]\d+)<\/span>/g)].map((m) => [m[2], m[1]]);
+  return { ...c, raw, intro, rulesHtml, rules, ids, title: (raw.match(/^#\s+(.+)$/m) ?? [])[1] ?? c.label };
+}));
+// Rule numbers in brackets, like "(M6)" or "(D3, M5)", link to their rule.
+const RULE_ID = Object.fromEntries(chapters.flatMap((c) => c.ids));
+const RULE_CH = Object.fromEntries(chapters.flatMap((c) => c.rules.map((r) => [r.no, c.id])));
+const linkRules = (h) => h.replace(/\(([A-Z]\d+(?:, [A-Z]\d+)*)\)/g, (m, list) => '(' + list.split(', ').map((n) => (RULE_ID[n] ? `<a href="#${RULE_ID[n]}" data-rule="${n}">${n}</a>` : n)).join(', ') + ')');
+chapters.forEach((c) => { c.intro = linkRules(c.intro); c.rulesHtml = linkRules(c.rulesHtml); });
+const main = chapters.filter((c) => c.rules.length);
+const ruleCount = main.reduce((n, c) => n + c.rules.length, 0);
+const gaps = chapters.find((c) => c.id === 'gaps');
+const gapCount = (gaps.raw.match(/^\d+\.\s/gm) ?? []).length;
+
+// The summary: the README's paragraphs, one card per chapter.
+const readme = chapters[0].raw;
+const onePage = [...readme.matchAll(/^\*\*(.+?)\.\*\*\s+(.+)$/gm)].map((m, i) => ({ label: m[1], text: m[2], ch: main[i] }));
+const using = (readme.split(/^## Using the book\s*$/m)[1] ?? '').trim();
+
+// Live examples. Devices: three video bars of one type, so one morphs into the next.
+const MODELS = ['poly-studio-x32', 'poly-studio-x52', 'logitech-meetup-2'];
+const MORPH = Object.fromEntries(MODELS.map((m) => {
+  const parts = artParts(m) ?? [];
+  const o = Object.fromEntries(parts.map((p) => [p.k, p.t === 'path' ? { t: 'path', cls: p.cls, d: p.d } : { t: p.t, cls: p.cls, g: p.g }]));
+  const body = parts.find((p) => p.k === 'body');
+  if (body) o['clip-body'] = { t: 'rect', cls: 'art-clip', g: body.g };
+  return [m, { parts: o, name: modelName(m), src: artSource(m) ?? '' }];
+}));
+const short = (m) => modelName(m).replace(/^(Poly|Logitech)\s+/, '').replace('Studio ', '');
+const POOL = [['display', 'Display'], ['video-bar', 'Video bar'], ['camera', 'Camera'], ['touch-controller', 'Touch panel'], ['microphone', 'Microphone'], ['loudspeaker', 'Speaker'], ['scheduler-panel', 'Room panel'], ['network-switch', 'Switch'], ['codec', 'Codec'], ['amplifier', 'Amplifier']];
+const SIGNALS = [['--c-hdmi', 'Video'], ['--c-usb', 'USB'], ['--c-lan', 'Network'], ['--c-poe', 'PoE'], ['--c-hdbt', 'HDBaseT'], ['--c-power', 'Power'], ['--c-audio', 'Audio']];
+const SEE = {
+  motion: [['/profiles/video-bar/', 'Switch models on a device profile', 'Parts and ports move, arrive and leave']],
+  layout: [['/rooms/', 'Rooms', 'The List archetype: band, filter bar, cards'], ['/rooms/nyc-20-10/', 'A room page', 'The Record archetype: drawing beside its sticky Key']],
+  devices: [['/profiles/video-bar/', 'Video bar profile', 'Drawing, ports and the model switcher'], ['/models/poly-studio-x52/', 'A model page', 'Every port, with sources']],
+  rooms: [['/rooms/nyc-20-05/', 'A room drawn to scale', 'Key, outlets in the site\'s plug type, wiring'], ['/room-profiles/conference-room-small/', 'A room profile', 'Build options that morph, never jump'], ['/rooms/dub-3-21/', 'A comms room', 'Racks drawn in millimetres']],
+  platform: [['/rooms/', 'Rooms', 'Find, filter and radiate red'], ['/search/', 'Search', 'Plain words become chips']],
+  words: [['/learn/#glossary', 'The glossary', 'Every Keia Atlas word in plain language']],
+  data: [['/about/#built', 'How it is built', 'YAML, schema, cross-checks, pages']],
+};
+---
+<Shell title="The rule book" section="about" crumbs={[{ label: 'About', to: '/about/' }, { label: 'The rule book' }]} about={{ kind: 'page', label: 'the rule book' }}>
+  <section class="band">
+    <div class="band-grid">
+      <div>
+        <div class="meta"><span class="overline">How Keia Atlas is built</span></div>
+        <h1>The rule book</h1>
+        <p class="lede">How Keia Atlas moves, lays out a page, draws devices and rooms, and words things. Short numbered rules, each with a why, a do and a don't, for anyone adding to Keia Atlas or building something alongside it.</p>
+      </div>
+      <dl class="band-stats">
+        <div><dt>Rules</dt><dd class="num">{ruleCount}</dd></div>
+        <div><dt>Chapters</dt><dd class="num">{main.length}</dd></div>
+        <div><a href="#gaps" data-go="gaps"><dt>Known gaps</dt><dd class="num">{gapCount}</dd></a></div>
+      </dl>
+    </div>
+  </section>
+
+  <div class="content rb">
+    <div class="tabs rb-tabs" role="tablist" aria-label="Chapters" data-rb-tabs>
+      {chapters.map((c, i) => (
+        <button type="button" role="tab" id={`rbt-${c.id}`} aria-controls={`rbp-${c.id}`} aria-selected={i === 0 ? 'true' : 'false'} tabindex={i === 0 ? 0 : -1} data-ch-tab={c.id}>
+{c.label}{c.rules.length > 0 && <span class="rb-n num">{c.rules.length}</span>}
+        </button>
+      ))}
+    </div>
+
+    <div class="rb-panels" data-rb-box>
+      {chapters.map((c, i) => (
+        <section class:list={['rb-panel', { 'has-aside': ['motion', 'devices', 'platform', 'looks'].includes(c.id) || SEE[c.id] }]} id={`rbp-${c.id}`} role="tabpanel" aria-labelledby={`rbt-${c.id}`} data-ch={c.id} hidden={i !== 0}>
+          {c.id === 'summary' ? (
+            <div class="rb-main">
+              <h2 class="sr-only">The book on one page</h2>
+              <ol class="rb-sum">
+                {onePage.map((s) => (
+                  <li>
+                    <button type="button" class="card rb-sc" data-go={s.ch.id}>
+                      <span class="rb-sc-top"><Icon name={s.ch.icon} size={16} /><b>{s.label}</b><span class="faint mono">{s.ch.rules[0].no} to {s.ch.rules[s.ch.rules.length - 1].no}</span></span>
+                      <span class="rb-sc-t" set:html={inline(s.text)} />
+                    </button>
+                  </li>
+                ))}
+              </ol>
+              <div class="rb-using card"><Icon name="check" size={18} /><p set:html={inline(using)} /></div>
+            </div>
+          ) : (
+            <div class="rb-main">
+              <div class="rb-intro" set:html={c.intro} />
+              <div class="rb-rules" set:html={c.rulesHtml} />
+            </div>
+          )}
+
+          <aside class="rb-aside" aria-label={`Examples: ${c.label}`}>
+            {c.id === 'motion' && (
+              <div class="card demo" data-demo="moves">
+                <p class="demo-h"><span class="overline">Try it</span> Persist, enter, exit <a href={`#${RULE_ID.M2}`} data-rule="M2" class="mono">M2</a></p>
+                <div class="dm-box" data-moves-box>
+                  <ul class="dm-chips" data-chips>
+                    {POOL.slice(0, 4).map(([cls, name]) => <li data-chip={cls}><DeviceGlyph cls={cls} size={26} /><span>{name}</span></li>)}
+                  </ul>
+                </div>
+                <div class="dm-btns"><button type="button" class="btn small" data-add><Icon name="plus" size={14} />Add a device</button><button type="button" class="btn small ghost" data-remove>Remove one</button></div>
+                <p class="demo-note">New ones grow from their own centre a beat later, leaving ones shrink to theirs, and the rest slide into place.</p>
+                <template data-pool>{POOL.map(([cls, name]) => <li data-chip={cls}><DeviceGlyph cls={cls} size={26} /><span>{name}</span></li>)}</template>
+              </div>
+            )}
+            {c.id === 'motion' && (
+              <>
+                <div class="card demo" data-demo="hold">
+                  <p class="demo-h"><span class="overline">Try it</span> Never jump <a href={`#${RULE_ID.M6}`} data-rule="M6" class="mono">M6</a></p>
+                  <div class="dm-seg" role="tablist" aria-label="Example tabs">
+                    <button type="button" role="tab" aria-selected="true" data-ht="long">Long tab</button>
+                    <button type="button" role="tab" aria-selected="false" data-ht="short">Short tab</button>
+                  </div>
+                  <div class="dm-hold" data-hold-box>
+                    <ul class="dm-lines" data-hp="long">{['Display', 'Video bar', 'Touch panel', 'Room panel', 'Switch'].map((t) => <li><span class="hl lit" data-state="ok"></span>{t}</li>)}</ul>
+                    <ul class="dm-lines" data-hp="short" hidden><li><span class="hl lit" data-state="warn"></span>Camera</li></ul>
+                  </div>
+                  <label class="dm-sw"><input type="checkbox" checked data-hold-on /> Follow the rule</label>
+                  <p class="demo-note" data-hold-note>Pick the short tab: the box keeps its height, so this switch stays under your pointer. Untick it and try again.</p>
+                </div>
+                <div class="card demo" data-demo="check">
+                  <p class="demo-h"><span class="overline">Try it</span> Lights come on in turn <a href={`#${RULE_ID.M8}`} data-rule="M8" class="mono">M8</a></p>
+                  <ul class="dm-checks">
+                    {['Firmware on the standard', 'Camera shutter open', 'Display input', 'Network reachable'].map((t) => <li><span class="hl" data-state="off" data-chk></span><span>{t}</span><small class="faint" data-chk-word>Not checked</small></li>)}
+                  </ul>
+                  <div class="dm-btns"><button type="button" class="btn small" data-run><Icon name="refresh" size={14} />Run the check</button></div>
+                </div>
+              </>
+            )}
+            {c.id === 'devices' && (
+              <>
+                <div class="card demo" data-demo="morph">
+                  <p class="demo-h"><span class="overline">Try it</span> One model morphs into the next <a href={`#${RULE_ID.D3}`} data-rule="D3" class="mono">D3</a></p>
+                  <div class="dm-seg dm-models" role="radiogroup" aria-label="Model" data-models>
+                    <span class="dm-thumb" aria-hidden="true" data-thumb></span>
+                    {MODELS.map((m) => <button type="button" role="radio" aria-checked={m === 'poly-studio-x52' ? 'true' : 'false'} data-model={m}>{short(m)}</button>)}
+                  </div>
+                  <div class="stage dm-stage" data-morph-stage><DeviceArt model="poly-studio-x52" cls="video-bar" label={modelName('poly-studio-x52')} /></div>
+                  <p class="demo-note" data-morph-note aria-live="polite">{MORPH['poly-studio-x52'].name}. Traced from the {MORPH['poly-studio-x52'].src}. Drawn at 0.35 px per mm, so sizes compare.</p>
+                </div>
+                <div class="card demo" data-demo="states">
+                  <p class="demo-h"><span class="overline">See it</span> State beside the drawing <a href={`#${RULE_ID.D6}`} data-rule="D6" class="mono">D6</a></p>
+                  <ul class="dm-states">
+                    <li><span class="dm-g"><DeviceGlyph cls="video-bar" size={34} /></span><span><b>Healthy</b><small>Every check passed</small></span><span class="hl" data-state="ok"></span></li>
+                    <li><span class="dm-g"><DeviceGlyph cls="video-bar" size={34} /></span><span><b>Needs attention</b><small>Firmware behind the standard</small></span><span class="hl" data-state="warn"></span></li>
+                    <li class="rs-radiate"><span class="dm-g"><DeviceGlyph cls="video-bar" size={34} /></span><span><b>Fault</b><small>Open incident: no picture</small></span><span class="hl" data-state="bad"></span></li>
+                    <li><span class="dm-g"><DeviceGlyph cls="video-bar" size={34} /></span><span><b>Not checked</b><small>Offline, or not checked yet</small></span><span class="hl" data-state="off"></span></li>
+                  </ul>
+                  <p class="dm-pills"><span class="pill plan">Plan</span><span class="pill procure">Procure</span><span class="pill deploy">Deploy</span><span class="pill manage">Manage</span><span class="pill retire">Retire</span></p>
+                </div>
+                <div class="card demo">
+                  <p class="demo-h"><span class="overline">See it</span> Ports coloured by signal <a href={`#${RULE_ID.D5}`} data-rule="D5" class="mono">D5</a></p>
+                  <div class="legend dm-sig">{SIGNALS.map(([t, n]) => <span style={`--c:var(${t})`}>{n}</span>)}</div>
+                </div>
+              </>
+            )}
+            {c.id === 'platform' && (
+              <>
+                <div class="card demo" data-demo="archive">
+                  <p class="demo-h"><span class="overline">Try it</span> Undo and archive <a href={`#${RULE_ID.P7}`} data-rule="P7" class="mono">P7</a></p>
+                  <div class="dm-box" data-arch-box>
+                    <ul class="dm-arch" data-arch-list>
+                      {['Spare HDMI cable, Level 3 store', 'Loan kit returned to the Lab', 'Old room panel, awaiting collection'].map((t, i) => <li data-arch={i}><span>{t}</span><button type="button" class="btn small ghost" data-arch-btn>Archive</button></li>)}
+                    </ul>
+                    <p class="dm-empty" data-arch-empty hidden>All archived. Archived things are kept, not deleted. <button type="button" class="linkish" data-arch-all>Bring them back</button></p>
+                  </div>
+                  <p class="dm-toast" role="status" aria-live="polite" data-arch-toast hidden><span data-arch-say></span><button type="button" class="btn small" data-arch-undo>Undo</button></p>
+                </div>
+                <div class="card demo">
+                  <p class="demo-h"><span class="overline">Try it</span> On every page <a href={`#${RULE_ID.P2}`} data-rule="P2" class="mono">P2 to P4</a></p>
+                  <div class="dm-btns">
+                    <button type="button" class="btn small ghost" data-open-search><Icon name="search" size={14} />Search</button>
+                    <button type="button" class="btn small ghost" data-open-report><Icon name="plus" size={14} />Report</button>
+                    <button type="button" class="btn small ghost" data-view-as><Icon name="team" size={14} />View as</button>
+                  </div>
+                </div>
+              </>
+            )}
+            {c.id === 'looks' && (
+              <div class="card demo">
+                <p class="demo-h"><span class="overline">See it</span> Colour has jobs <a href={`#${RULE_ID.T4}`} data-rule="T4" class="mono">T4</a></p>
+                <p class="dm-pills"><span class="pill manage">Healthy</span><span class="pill warn">Needs attention</span><span class="pill bad">Fault</span><span class="pill deploy">In progress</span><span class="pill plan">Planning</span><span class="pill">Off</span></p>
+                <p class="demo-note">The same words in every look. Change the look or the mode and they keep their jobs.</p>
+                <div class="dm-btns">
+                  <button type="button" class="btn small primary" data-open-settings><Icon name="gear" size={14} />Change the look</button>
+                  <button type="button" class="btn small ghost" data-toggle-mode><Icon name="auto" size={14} />Light or dark</button>
+                </div>
+              </div>
+            )}
+            {SEE[c.id] && (
+              <div class="card demo see">
+                <p class="demo-h"><span class="overline">See it in Keia Atlas</span></p>
+                <ul class="dm-see">
+                  {SEE[c.id].map(([to, t, s]) => <li><a href={href(to)}><b>{t}</b><small>{s}</small><Icon name="arrow" size={14} /></a></li>)}
+                </ul>
+              </div>
+            )}
+          </aside>
+
+          <nav class="rb-next" aria-label="Chapters">
+            {i > 0 ? <button type="button" class="btn small ghost" data-go={chapters[i - 1].id} data-go-top><Icon name="back" size={14} />{chapters[i - 1].label}</button> : <span></span>}
+            {i < chapters.length - 1 && <button type="button" class="btn small" data-go={chapters[i + 1].id} data-go-top>{chapters[i + 1].label}<Icon name="arrow" size={14} /></button>}
+          </nav>
+        </section>
+      ))}
+    </div>
+  </div>
+
+  <script is:inline data-astro-rerun define:vars={{ MORPH, RULE_CH }}>
+    (function () {
+      var root = document.querySelector('.rb'); if (!root) return;
+      var M = function () { return window.rsMotion ? window.rsMotion() : { reduced: true }; };
+      // Shell's helpers load after the page body on a first visit, so fall back to a plain swap until they exist.
+      var hold = function (b, swap) { if (window.rsHold) window.rsHold(b, swap); else swap(); };
+      var tabs = Array.prototype.slice.call(root.querySelectorAll('[data-ch-tab]'));
+      var ids = tabs.map(function (t) { return t.dataset.chTab; });
+      var box = root.querySelector('[data-rb-box]');
+      var now = ids[0];
+
+      /* ---------- Chapters: held box (M6), the next one comes from the side you moved towards (M5) ---------- */
+      function open(id, opts) {
+        opts = opts || {};
+        if (ids.indexOf(id) < 0) return;
+        var from = now, dir = ids.indexOf(id) >= ids.indexOf(from) ? 1 : -1;
+        var next = root.querySelector('[data-ch="' + id + '"]');
+        var swap = function () {
+          root.querySelectorAll('[data-ch]').forEach(function (p) { p.hidden = p.dataset.ch !== id; });
+          tabs.forEach(function (t) { var on = t.dataset.chTab === id; t.setAttribute('aria-selected', String(on)); t.tabIndex = on ? 0 : -1; });
+          now = id;
+        };
+        if (id === from) { swap(); }
+        else {
+          hold(box, swap);
+          var m = M();
+          if (opts.animate !== false && !m.reduced) {
+            next.animate([{ opacity: 0, transform: 'translateX(' + (24 * dir) + 'px)' }, { opacity: 1, transform: 'none' }], { duration: m.enter, easing: m.ease, fill: 'backwards' });
+          }
+        }
+        if (opts.hash !== false) history.replaceState(history.state, '', '#' + id);
+        if (opts.top) { var tb = root.querySelector('[data-rb-tabs]'); if (tb.getBoundingClientRect().top < 0) tb.scrollIntoView({ block: 'start', behavior: M().reduced ? 'auto' : 'smooth' }); }
+        if (id === 'devices') placeThumb();
+      }
+      tabs.forEach(function (t) {
+        t.addEventListener('click', function () { open(t.dataset.chTab); });
+        t.addEventListener('keydown', function (e) {
+          if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+          e.preventDefault();
+          var i = ids.indexOf(t.dataset.chTab), n = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+          n.focus(); open(n.dataset.chTab);
+        });
+      });
+      function goRule(no) {
+        var ch = RULE_CH[no]; if (!ch) return;
+        open(ch, { animate: false });
+        var h = root.querySelector('[data-ch="' + ch + '"] .r-no');
+        root.querySelectorAll('[data-ch="' + ch + '"] .r-no').forEach(function (x) { if (x.textContent === no) h = x; });
+        var card = h && h.closest('.rule'); if (!card) return;
+        card.scrollIntoView({ block: 'center', behavior: M().reduced ? 'auto' : 'smooth' });
+        card.classList.remove('flash'); void card.offsetWidth; card.classList.add('flash');
+      }
+      root.addEventListener('click', function (e) {
+        var g = e.target.closest('[data-go]');
+        if (g) { e.preventDefault(); open(g.dataset.go, { top: g.hasAttribute('data-go-top') }); return; }
+        var r = e.target.closest('[data-rule]');
+        if (r) { e.preventDefault(); goRule(r.dataset.rule); }
+      });
+      document.querySelectorAll('.band [data-go]').forEach(function (a) { a.addEventListener('click', function (e) { e.preventDefault(); open(a.dataset.go); root.scrollIntoView({ block: 'start' }); }); });
+      var h0 = (location.hash || '').slice(1);
+      if (ids.indexOf(h0) >= 0) open(h0, { animate: false, hash: false });
+      else if (h0) {
+        var el = document.getElementById(h0), p = el && el.closest('[data-ch]');
+        if (p) { open(p.dataset.ch, { animate: false, hash: false }); var card = el.closest('.rule') || el; setTimeout(function () { card.scrollIntoView({ block: 'start' }); card.classList.add('flash'); }, 60); }
+      }
+
+      /* ---------- Persist, enter, exit (M2) ---------- */
+      document.querySelectorAll('[data-demo="moves"]').forEach(function (d) {
+        var list = d.querySelector('[data-chips]'), pool = d.querySelector('[data-pool]'), mbox = d.querySelector('[data-moves-box]');
+        var rects = function () { var m = new Map(); list.querySelectorAll('li').forEach(function (li) { m.set(li, li.getBoundingClientRect()); }); return m; };
+        var slide = function (before, m) {
+          list.querySelectorAll('li').forEach(function (li) {
+            var a = before.get(li); if (!a) return; var b = li.getBoundingClientRect(), dx = a.left - b.left, dy = a.top - b.top;
+            if (Math.abs(dx) + Math.abs(dy) > 0.5) li.animate([{ transform: 'translate(' + dx + 'px,' + dy + 'px)' }, { transform: 'none' }], { duration: m.morph, easing: m.ease });
+          });
+        };
+        d.querySelector('[data-add]').addEventListener('click', function () {
+          var have = Array.prototype.map.call(list.children, function (li) { return li.dataset.chip; });
+          var free = Array.prototype.filter.call(pool.content.children, function (li) { return have.indexOf(li.dataset.chip) < 0; });
+          if (!free.length) return;
+          var li = free[Math.floor(Math.random() * free.length)].cloneNode(true), m = M(), before = rects();
+          var at = list.children[Math.floor(Math.random() * (list.children.length + 1))] || null;
+          hold(mbox, function () { list.insertBefore(li, at); });
+          if (m.reduced) return;
+          slide(before, m);
+          li.animate([{ transform: 'scale(0)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: m.enter, delay: m.delay, easing: m.ease, fill: 'backwards' });
+        });
+        d.querySelector('[data-remove]').addEventListener('click', function () {
+          var live = Array.prototype.filter.call(list.children, function (li) { return !li.classList.contains('leaving'); });
+          if (live.length < 2) return;
+          var li = live[Math.floor(Math.random() * live.length)], m = M();
+          var gone = function () { var before = rects(); hold(mbox, function () { li.remove(); }); if (!m.reduced) slide(before, m); };
+          if (m.reduced) { gone(); return; }
+          li.classList.add('leaving');
+          li.animate([{ transform: 'none', opacity: 1 }, { transform: 'scale(0)', opacity: 0 }], { duration: m.exit, easing: m.ease, fill: 'forwards' }).onfinish = gone;
+        });
+      });
+
+      /* ---------- Never jump (M6) ---------- */
+      var hd = document.querySelector('[data-demo="hold"]');
+      if (hd) {
+        var hbox = hd.querySelector('[data-hold-box]'), on = hd.querySelector('[data-hold-on]');
+        hd.querySelectorAll('[data-ht]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            var swap = function () {
+              hd.querySelectorAll('[data-hp]').forEach(function (p) { p.hidden = p.dataset.hp !== b.dataset.ht; });
+              hd.querySelectorAll('[data-ht]').forEach(function (x) { x.setAttribute('aria-selected', String(x === b)); });
+            };
+            if (on.checked) hold(hbox, swap); else { hbox.style.minHeight = ''; swap(); }
+          });
+        });
+        on.addEventListener('change', function () { if (!on.checked) hbox.style.minHeight = ''; });
+      }
+
+      /* ---------- Lights come on in turn (M8) ---------- */
+      var cd = document.querySelector('[data-demo="check"]');
+      if (cd) {
+        var runs = [['ok', 'ok', 'warn', 'ok'], ['ok', 'bad', 'ok', 'ok'], ['ok', 'ok', 'ok', 'ok']], run = 0;
+        var WORD = { ok: 'Healthy', warn: 'Needs attention', bad: 'Fault', off: 'Not checked' };
+        cd.querySelector('[data-run]').addEventListener('click', function () {
+          var res = runs[run++ % runs.length], m = M();
+          cd.querySelectorAll('[data-chk]').forEach(function (l, i) {
+            var w = l.parentElement.querySelector('[data-chk-word]');
+            l.classList.remove('lit'); l.dataset.state = 'off'; w.textContent = 'Checking';
+            setTimeout(function () { l.dataset.state = res[i]; void l.offsetWidth; l.classList.add('lit'); w.textContent = WORD[res[i]]; }, m.reduced ? 0 : 300 + i * 260);
+          });
+        });
+      }
+
+      /* ---------- A device drawing morphs from model to model (D3, M2) ---------- */
+      var md = document.querySelector('[data-demo="morph"]');
+      function placeThumb() {
+        if (!md) return;
+        var th = md.querySelector('[data-thumb]'), b = md.querySelector('[data-model][aria-checked="true"]');
+        if (th && b && b.offsetWidth) { th.style.width = b.offsetWidth + 'px'; th.style.transform = 'translateX(' + b.offsetLeft + 'px)'; }
+      }
+      if (md) {
+        var svg = md.querySelector('svg.model-art');
+        var KEYS = ['x', 'y', 'width', 'height', 'rx', 'cx', 'cy', 'r'];
+        var geom = function (el) { var g = {}; KEYS.forEach(function (k) { var v = el.style.getPropertyValue(k); if (v) g[k] = parseFloat(v); }); return g; };
+        var setG = function (el, g) { Object.keys(g).forEach(function (k) { el.style.setProperty(k, (+g[k]).toFixed(1) + 'px'); }); };
+        var zero = function (p) { return p.cls === 'art-none' || (p.t === 'rect' && (!p.g.width || !p.g.height)) || (p.t === 'circle' && !p.g.r); };
+        var morph = function (id) {
+          var T = MORPH[id].parts, m = M();
+          svg.querySelectorAll('[data-k]').forEach(function (el) {
+            var k = el.getAttribute('data-k'), t = T[k]; if (!t) return;
+            if (t.t === 'path') { el.setAttribute('d', t.d); el.setAttribute('class', t.cls); return; }
+            if (k === 'clip-body') { setG(el, t.g); return; }
+            var cur = geom(el), was = el.getAttribute('class') === 'art-none' || (el.tagName === 'circle' ? !cur.r : !cur.width || !cur.height);
+            var gone = zero(t);
+            if (!was && gone) {
+              // Exit: shrink to its own centre, quickly, then take its empty class.
+              el.style.transitionDuration = m.exit + 'ms';
+              setG(el, el.tagName === 'circle' ? { r: 0 } : { x: cur.x + cur.width / 2, y: cur.y + cur.height / 2, width: 0, height: 0 });
+              setTimeout(function () { el.setAttribute('class', 'art-none'); el.style.transitionDuration = ''; }, m.reduced ? 0 : m.exit);
+            } else if (was && !gone) {
+              // Enter: start as a point at its own centre, grow a beat after the moving parts.
+              el.style.transition = 'none';
+              setG(el, el.tagName === 'circle' ? { cx: t.g.cx, cy: t.g.cy, r: 0 } : { x: t.g.x + t.g.width / 2, y: t.g.y + t.g.height / 2, width: 0, height: 0, rx: t.g.rx || 0 });
+              el.getBoundingClientRect();
+              el.style.transition = '';
+              el.setAttribute('class', t.cls);
+              el.style.transitionDelay = m.delay + 'ms'; el.style.transitionDuration = m.enter + 'ms';
+              setG(el, t.g);
+              setTimeout(function () { el.style.transitionDelay = ''; el.style.transitionDuration = ''; }, m.delay + m.enter);
+            } else if (!gone) { el.setAttribute('class', t.cls); setG(el, t.g); }
+          });
+          svg.setAttribute('aria-label', MORPH[id].name);
+          md.querySelector('[data-morph-note]').textContent = MORPH[id].name + '. Traced from the ' + MORPH[id].src + '. Drawn at 0.35 px per mm, so sizes compare.';
+        };
+        md.querySelectorAll('[data-model]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            if (b.getAttribute('aria-checked') === 'true') return;
+            md.querySelectorAll('[data-model]').forEach(function (x) { x.setAttribute('aria-checked', String(x === b)); });
+            placeThumb(); morph(b.dataset.model);
+          });
+        });
+        placeThumb();
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(placeThumb);
+      }
+
+      /* ---------- Undo and archive (P7, P6) ---------- */
+      var ad = document.querySelector('[data-demo="archive"]');
+      if (ad) {
+        var alist = ad.querySelector('[data-arch-list]'), abox = ad.querySelector('[data-arch-box]'), toast = ad.querySelector('[data-arch-toast]');
+        var empty = ad.querySelector('[data-arch-empty]'), archived = [], timer = null;
+        var all = Array.prototype.slice.call(alist.children);
+        var place = function (li) { var n = +li.dataset.arch, after = null; Array.prototype.forEach.call(alist.children, function (x) { if (after === null && +x.dataset.arch > n) after = x; }); alist.insertBefore(li, after); };
+        var sync = function () { empty.hidden = alist.children.length > 0; alist.hidden = alist.children.length === 0; };
+        var grow = function (li) { var m = M(); if (!m.reduced) li.animate([{ transform: 'scale(.6)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: m.enter, easing: m.ease, fill: 'backwards' }); };
+        alist.addEventListener('click', function (e) {
+          var b = e.target.closest('[data-arch-btn]'); if (!b) return;
+          var li = b.closest('li'), m = M();
+          var done = function () {
+            hold(abox, function () { li.remove(); sync(); });
+            archived.push(li);
+            toast.querySelector('[data-arch-say]').textContent = 'Archived: ' + li.querySelector('span').textContent + '.';
+            toast.hidden = false; clearTimeout(timer); timer = setTimeout(function () { toast.hidden = true; }, 5000);
+          };
+          if (m.reduced) { done(); return; }
+          li.animate([{ transform: 'none', opacity: 1 }, { transform: 'scale(.6)', opacity: 0 }], { duration: m.exit, easing: m.ease, fill: 'forwards' }).onfinish = function () { li.getAnimations().forEach(function (a) { a.cancel(); }); done(); };
+        });
+        ad.querySelector('[data-arch-undo]').addEventListener('click', function () {
+          var li = archived.pop(); if (!li) return;
+          hold(abox, function () { place(li); sync(); }); grow(li);
+          toast.hidden = !archived.length; clearTimeout(timer); if (archived.length) timer = setTimeout(function () { toast.hidden = true; }, 5000);
+        });
+        ad.querySelector('[data-arch-all]').addEventListener('click', function () {
+          hold(abox, function () { all.forEach(place); archived = []; sync(); }); all.forEach(grow); toast.hidden = true;
+        });
+      }
+
+      /* View as: open the menu under your name (Settings on phones, where that corner is hidden). */
+      var va = document.querySelector('[data-view-as]');
+      if (va) va.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var b = document.querySelector('[data-acct-menu]');
+        if (b && b.offsetParent) b.click(); else { var s = document.querySelector('.mast [data-open-settings]'); if (s) s.click(); }
+      });
+      addEventListener('resize', placeThumb);
+    })();
+  </script>
+</Shell>
+
+<style is:global>
+  .rb { padding-top: 14px; gap: 16px; }
+  .rb-tabs { margin-bottom: 0; scroll-margin-top: calc(var(--mast-h) + 8px); }
+  .rb-tabs button { display: inline-flex; align-items: center; gap: 7px; padding: 11px 13px; font-size: 14px; }
+  .rb-tabs button svg { color: var(--text-3); }
+  .rb-tabs [aria-selected="true"] svg { color: var(--accent-ink); }
+  .rb-n { font: 600 11px/1 var(--font-mono); padding: 3px 6px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); }
+  .rb-panel { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px 24px; align-items: start; }
+  .rb-panel.has-aside { grid-template-columns: minmax(0, 1fr) 340px; }
+  .rb-panel[hidden] { display: none; }
+  .rb-main { min-width: 0; display: grid; gap: 14px; align-content: start; }
+  .rb-aside { display: grid; gap: 14px; align-content: start; min-width: 0; }
+  .rb-panel:not(.has-aside) .rb-aside { display: none; }
+  .rb-next { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 12px; padding-top: 4px; }
+
+  .rb-intro p { margin: 0; max-width: 78ch; color: var(--text-2); font-size: 15px; line-height: 1.55; }
+  .rb-h { font-size: var(--h2-size); }
+  .rb code { font: 500 .88em var(--font-mono); padding: 1px 5px; border-radius: 4px; background: var(--surface-2); color: var(--text); white-space: nowrap; }
+  .rb code.long { white-space: normal; overflow-wrap: anywhere; }
+  .band-stats div > a { display: grid; gap: 2px; }
+  .rb a[data-rule] { font: 600 .9em var(--font-mono); text-decoration: none; border-bottom: 1px dotted currentColor; }
+
+  /* Rules: one card each, flowing in columns. */
+  .rb-rules { columns: 330px 3; column-gap: 14px; }
+  .rb-panel.has-aside .rb-rules { columns: 330px 2; }
+  .rb h3[id] { scroll-margin-top: calc(var(--mast-h) + 40px); }
+  .rule { break-inside: avoid; margin: 0 0 14px; padding: 15px 18px 14px; background: var(--surface); border: var(--border-card); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); scroll-margin-top: calc(var(--mast-h) + 20px); }
+  .rule.flash { animation: rb-flash 1.6s var(--ease-settle); }
+  @keyframes rb-flash { 0%, 30% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+  .rule h3 { display: flex; align-items: baseline; gap: 10px; font-size: 16.5px; line-height: 1.25; margin: 0 0 8px; }
+  .r-no { flex: none; font: 700 11.5px/1 var(--font-mono); letter-spacing: .04em; padding: 4px 7px; border-radius: 5px; background: var(--accent-soft); color: var(--accent-ink); transform: translateY(-2px); }
+  .rule p { margin: 0 0 10px; font-size: 14px; line-height: 1.55; }
+  .rule ul { list-style: none; margin: 0; padding: 10px 0 0; border-top: var(--border-rule); display: grid; gap: 6px; }
+  .rule li { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; align-items: baseline; font-size: 13.5px; line-height: 1.45; color: var(--text-2); }
+  .rule li strong { font: 700 10.5px/1.9 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+  .rule li.r-do strong { color: var(--green-ink); }
+  .rule li.r-dont strong { color: var(--red-ink); }
+  .rule li.r-why { color: var(--text); }
+  /* Page sketches and ordered checks inside a rule (layout.md). */
+  .rule pre { margin: 0 0 10px; padding: 10px 12px; overflow-x: auto; border-radius: var(--radius); background: var(--surface-2) !important; font: 500 11px/1.45 var(--font-mono); color: var(--text-2); }
+  .rule pre code, .rule pre span { display: revert; white-space: pre; background: none !important; color: inherit !important; padding: 0; border: 0; font: inherit; }
+  .rule ol { margin: 0 0 10px; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; line-height: 1.5; }
+  .rule ol li { display: list-item; color: var(--text); font-size: 14px; }
+  .rb-panel[data-ch="gaps"] .rb-rules { display: none; }
+  .rb-panel[data-ch="gaps"] .rb-intro ol { margin: 14px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; counter-reset: gap; }
+  .rb-panel[data-ch="gaps"] .rb-intro li { counter-increment: gap; position: relative; padding: 14px 16px 14px 48px; background: var(--surface); border: var(--border-card); border-radius: var(--radius-lg); font-size: 13.5px; line-height: 1.5; color: var(--text-2); }
+  .rb-panel[data-ch="gaps"] .rb-intro li::before { content: counter(gap); position: absolute; left: 14px; top: 13px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 700 11px var(--font-mono); background: var(--amber-soft); color: var(--amber-ink); }
+  .rb-panel[data-ch="gaps"] .rb-intro li strong { color: var(--text); }
+
+  /* Summary */
+  .rb-sum { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 1240px) { .rb-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 560px) { .rb-sum { grid-template-columns: minmax(0, 1fr); } }
+  .rb-sc { appearance: none; width: 100%; height: 100%; text-align: left; display: grid; gap: 8px; align-content: start; padding: 14px 16px; color: var(--text); font: inherit; cursor: pointer; transition: border-color var(--dur-state) var(--ease-settle), transform var(--dur-hover) var(--ease-settle); }
+  .rb-sc:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .rb-sc-top { display: flex; align-items: center; gap: 8px; }
+  .rb-sc-top svg { color: var(--accent-ink); }
+  .rb-sc-top b { font-size: 15px; }
+  .rb-sc-top .faint { margin-left: auto; font-size: 11px; }
+  .rb-sc-t { font-size: 13.5px; line-height: 1.5; color: var(--text-2); }
+  .rb-using { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; }
+  .rb-using svg { flex: none; color: var(--green); margin-top: 2px; }
+  .rb-using p { margin: 0; font-size: 14px; color: var(--text-2); line-height: 1.55; }
+
+  /* Examples */
+  .demo { padding: 14px 16px; display: grid; gap: 10px; }
+  .demo-h { margin: 0; display: flex; align-items: baseline; gap: 8px; font-weight: 700; font-size: 14px; }
+  .demo-h .overline { white-space: nowrap; }
+  .demo-h a { margin-left: auto; font-size: 11px; }
+  .demo-note { margin: 0; font-size: 12.5px; color: var(--text-2); line-height: 1.45; }
+  .dm-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+  .dm-btns .btn { gap: 6px; }
+  .dm-box { border-radius: var(--radius); background: var(--surface-2); padding: 10px; }
+  .dm-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .dm-chips li { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 6px; border-radius: 999px; background: var(--surface); border: var(--border-card); font-size: 12.5px; font-weight: 600; color: var(--text); transform-origin: center; }
+  .dm-chips li svg { color: var(--art-line); }
+  .dm-chips li.leaving { pointer-events: none; }
+  .dm-seg { position: relative; isolation: isolate; display: flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--surface-2); width: max-content; max-width: 100%; }
+  .dm-seg button { appearance: none; border: 0; background: none; font: 600 12.5px/1 var(--font-sans); color: var(--text-2); padding: 7px 12px; border-radius: 999px; cursor: pointer; transition: color var(--dur-state) var(--ease-settle), background var(--dur-state) var(--ease-settle); }
+  .dm-seg:not(.dm-models) [aria-selected="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
+  .dm-models [aria-checked="true"] { color: var(--text); }
+  .dm-thumb { position: absolute; z-index: -1; top: 3px; bottom: 3px; left: 0; width: 0; border-radius: 999px; background: var(--surface); box-shadow: 0 0 0 1px var(--line); transition: transform var(--dur-morph) var(--ease-settle), width var(--dur-morph) var(--ease-settle); }
+  .dm-hold { border: var(--border-card); border-radius: var(--radius); padding: 8px 10px; background: var(--surface); }
+  .dm-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+  .dm-lines li { display: flex; align-items: center; gap: 8px; }
+  .dm-sw { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .dm-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+  .dm-checks li { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 13px; }
+  .dm-checks small { font-size: 11.5px; }
+  .dm-stage { padding: 6px 10px; }
+  .dm-stage .model-art { max-height: 150px; }
+  .dm-states { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .dm-states li { display: grid; grid-template-columns: 44px minmax(0, 1fr) 14px; gap: 10px; align-items: center; padding: 7px 10px; border-radius: var(--radius); border: var(--border-card); background: var(--surface); }
+  .dm-states li.rs-radiate { background: color-mix(in srgb, var(--red) 7%, var(--surface)); }
+  .dm-states .dm-g { color: var(--art-line); display: grid; place-items: center; }
+  .dm-states b { display: block; font-size: 13px; }
+  .dm-states small { display: block; font-size: 12px; color: var(--text-2); }
+  .dm-pills { margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .dm-sig { gap: 6px 14px; }
+  .dm-arch { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .dm-arch li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 6px 6px 10px; border-radius: var(--radius); background: var(--surface); border: var(--border-card); font-size: 13px; }
+  .rb .dm-arch .btn.btn { padding: 5px 10px; font-size: 12px; }
+  .dm-empty { margin: 0; font-size: 13px; color: var(--text-2); }
+  .dm-toast { margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 8px 8px 12px; border-radius: var(--radius); background: var(--ink); color: var(--on-ink); font-size: 13px; }
+  .rb .dm-toast .btn.btn { background: transparent; border-color: color-mix(in srgb, var(--on-ink) 55%, transparent); color: var(--on-ink); padding: 5px 10px; font-size: 12px; }
+  .rb .dm-toast .btn.btn:hover { background: color-mix(in srgb, var(--on-ink) 14%, transparent); color: var(--on-ink); }
+  .linkish { appearance: none; border: 0; background: none; padding: 0; color: var(--accent-ink); font: inherit; text-decoration: underline; cursor: pointer; }
+  .dm-see { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .dm-see a { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 8px; align-items: center; padding: 7px 9px; margin: 0 -9px; border-radius: var(--radius); color: var(--text); text-decoration: none; transition: background var(--dur-hover) var(--ease-settle); }
+  .dm-see a:hover { background: var(--surface-2); color: var(--text); }
+  .dm-see b { font-size: 13.5px; }
+  .dm-see small { grid-column: 1; font-size: 12px; color: var(--text-2); }
+  .dm-see svg { grid-row: 1 / 3; grid-column: 2; color: var(--text-3); }
+
+  @media (max-width: 1100px) {
+    .rb-panel.has-aside { grid-template-columns: minmax(0, 1fr); }
+    .rb-aside { position: static; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+  }
+  @media (max-width: 760px) {
+    .rb-tabs { margin-inline: -16px; padding-inline: 12px; }
+    .rb-rules, .rb-panel.has-aside .rb-rules { columns: 1; }
+    .rb-aside { grid-template-columns: minmax(0, 1fr); }
+    .rule li { grid-template-columns: 46px minmax(0, 1fr); }
+  }
+  @media (prefers-reduced-motion: reduce) { .dm-thumb, .rule.flash { transition: none; animation: none; } }
+</style>

@@ -1,0 +1,177 @@
+# House standard: the office network. Made up for the demo. VLAN numbers and names are Aigna's house choices.
+id: network
+name: Network
+area: network
+order: 4
+version: "1.0"
+effective: "2026-03-01"
+owner: Service manager, IT infrastructure
+summary: One network design in every office, with a VLAN for each purpose, PoE planned per port, redundant uplinks and one naming scheme.
+intro: >-
+  Every office's network looks the same, so a technician who knows one knows them all. Devices go on the VLAN for their
+  purpose, not the VLAN of the room they are in. The IT network is UniFi (comms rooms, gateway, Wi-Fi and home offices); the
+  in-room AV switch stays Netgear AV Line, because it is tested and set up for Dante and Q-SYS.
+scope:
+  - Switches, gateways and firewalls in comms rooms, and the in-room AV switch.
+  - VLANs, addressing, PoE, uplinks and names for every networked device in an office.
+  - Home offices follow the home offices standard, which uses the same names.
+related: [racks, cabling, wifi, displays, home-offices]
+applies_to:
+  classes: [network-switch, network-gateway]
+  models: [unifi-usw-pro-max-48-poe, unifi-usw-pro-aggregation, unifi-efg, netgear-m4250-gsm4210pd]
+  configurations: [netgear-m4250-gsm4210pd-av-switch]
+  space_types: [mdf, idf]
+figures:
+  - { n: "9", label: VLANs by purpose }
+  - { n: "2", label: Uplinks per switch }
+  - { n: "10 Gb/s", label: Least uplink speed }
+  - { n: "0", label: Devices on VLAN 1 }
+sections:
+  - id: vlans
+    title: VLANs by purpose
+    intro: A device goes on the VLAN for what it is. Rules between VLANs live in the firewall, so a room device can reach its cloud service without reaching a laptop.
+    figure: vlan-map
+    table:
+      caption: The VLAN plan, the same in every office (house choice)
+      columns: [VLAN, Name, What goes on it, Reaches]
+      rows:
+        - ["10", Management, "Switches, access points, gateways, power strips and the UPS, by their management address", Only the network team's tools and the controller]
+        - ["20", Corporate, "Staff wired desks and the staff Wi-Fi", Internal services and the internet]
+        - ["30", Room systems, "Video bars, codecs, touch controllers, cameras, microphones and scheduler panels", "Their cloud services, device management and the booking service"]
+        - ["31", Displays and signage, "Display network ports (control and fleet management) and signage players", "The display and signage management platforms, NTP and the room control system"]
+        - ["40", AV, "Dante and Q-SYS audio and AV over IP, on the in-room AV switch only", Nothing outside the room (not routed)]
+        - ["50", Building, "Sensors, meters and building management", The building management platform only]
+        - ["60", Security, "Door access and cameras", The security platforms only]
+        - ["70", Printers, Printers and multifunction devices, The print service]
+        - ["90", Guest, Visitors on the guest Wi-Fi, "The internet only, clients cannot see each other"]
+      note: Subnets are set per site from the address plan. VLAN 1 carries nothing.
+    rules:
+      - id: vlan-by-purpose
+        level: must
+        rule: Put every device on the VLAN for its purpose from the VLAN plan, set on the switch port or the Wi-Fi network, never on the device itself.
+        why: The firewall rules and monitoring are written per VLAN, so a device on the wrong one is either blocked or too exposed.
+        check: The switch port's native VLAN matches the plan for the device recorded on that port in Keia Atlas.
+        house: true
+        sources: [ieee-802-1q, unifi-vlans]
+      - id: no-vlan-1
+        level: must
+        rule: Leave VLAN 1 unused, and shut down or park unused switch ports on an empty VLAN.
+        why: VLAN 1 is every switch's default, so anything plugged in by accident lands on it.
+        check: No active port has VLAN 1 as its native VLAN; unused ports are disabled.
+        house: true
+      - id: av-not-routed
+        level: must
+        rule: Keep the AV VLAN (Dante, Q-SYS, AV over IP) on the in-room AV switch with its own IGMP querier, and do not route it.
+        why: AV multicast floods a network that is not set up for it; keeping it in the room keeps the office network quiet and the audio clean.
+        check: The AV switch's uplink does not carry VLAN 40; the room's audio runs with the uplink unplugged.
+        house: true
+        sources: [netgear-av]
+      - id: 802-1x
+        level: should
+        rule: Authenticate staff desk ports with 802.1X, and room device ports by MAC address against the device's record.
+        why: A port in a meeting room is in a public place; authentication stops a stranger's laptop joining the room systems VLAN.
+        check: Plug in an unknown laptop at a room device port; it gets no address.
+        house: true
+        sources: [ieee-802-1x]
+  - id: addressing
+    title: Addresses, names and time
+    rules:
+      - id: dhcp-reservation
+        level: must
+        rule: Give every fixed device its address by a DHCP reservation, not by typing a static address on the device.
+        why: The address can change centrally without a site visit, and the reservation proves the MAC address in the record is right.
+        check: The device shows DHCP on; the reservation's MAC address matches Keia Atlas.
+        house: true
+      - id: hostname
+        level: must
+        rule: "Name every device site-room-prefix and number, for example dub-321-sw01: the site code, the room number without its dot, the device class's prefix and its number in the room."
+        why: One name finds the device in DNS, device management, monitoring and Keia Atlas.
+        check: Forward and reverse DNS resolve the name; the same name is in every system.
+        house: true
+      - id: ntp
+        level: must
+        rule: Point every device at the site's NTP servers (handed out by DHCP), and set its time zone to the site's.
+        why: Logs line up only when clocks agree, and schedules (display timers, updates) run at the right hour.
+        check: The device's clock is within a second of the NTP server.
+        house: true
+  - id: poe-uplinks
+    title: PoE and uplinks
+    rules:
+      - id: poe-plan
+        level: must
+        rule: Plan PoE per port from the device's class (802.3at for access points, video bars and panels; 802.3bt where a device needs it) and keep the switch within its budget with 20% spare.
+        why: A switch over its PoE budget turns off the lowest priority ports without warning.
+        check: The switch's PoE use in the controller is under 80% of its budget at handover.
+        house: true
+        sources: [ieee-802-3bt]
+      - id: poe-priority
+        level: should
+        rule: Set PoE priority high for access points and room systems, and low for anything that can wait.
+        why: If the budget runs short, the switch keeps the Wi-Fi and the meeting rooms up.
+        check: Port profiles in the controller show the priority.
+        house: true
+      - id: dual-uplinks
+        level: must
+        rule: Connect every access switch to the core with two fibre uplinks of at least 10 Gb/s, bundled as one link (LACP).
+        why: One failed fibre, optic or port does not cut off a floor, and both links carry traffic.
+        check: Unplug one uplink during commissioning; nothing drops.
+        house: true
+        sources: [ieee-802-1ax]
+      - id: firmware
+        level: must
+        rule: Turn off automatic firmware updates and apply the release the Lab has passed, in a change window.
+        why: An update that restarts a switch drops every room on it; the Lab finds problems first.
+        check: The controller's update setting is manual, and every switch runs the fleet standard.
+        house: true
+        sources: [unifi-updates]
+references:
+  - id: ieee-802-1q
+    name: IEEE 802.1Q, Bridges and Bridged Networks
+    publisher: IEEE
+    kind: standard
+    summary: The standard for VLANs, which tags each frame with a VLAN number so one switch can carry several separate networks.
+    url: https://standards.ieee.org/ieee/802.1Q/10323/
+    checked: "2026-09-29"
+  - id: ieee-802-1x
+    name: IEEE 802.1X, Port-Based Network Access Control
+    publisher: IEEE
+    kind: standard
+    summary: How a switch port or Wi-Fi network asks a device to prove who it is (to an authentication server) before letting it on.
+    url: https://standards.ieee.org/ieee/802.1X/7345/
+    checked: "2026-09-29"
+  - id: ieee-802-1ax
+    name: IEEE 802.1AX, Link Aggregation
+    publisher: IEEE
+    kind: standard
+    summary: How several physical links between two switches are bundled into one logical link (LACP), sharing the traffic and surviving the loss of a member.
+    url: https://standards.ieee.org/ieee/802.1AX/6768/
+    checked: "2026-09-29"
+  - id: ieee-802-3bt
+    name: IEEE 802.3bt, Power over Ethernet over four pairs (with 802.3af and 802.3at)
+    publisher: IEEE
+    kind: standard
+    summary: The PoE types and classes and how much power a switch port gives for each.
+    url: https://standards.ieee.org/ieee/802.3bt/6749/
+    checked: "2026-09-29"
+  - id: unifi-vlans
+    name: "Creating Virtual Networks (VLANs), UniFi Help Center"
+    publisher: Ubiquiti
+    kind: vendor
+    summary: How to create a network with its own VLAN in the UniFi Network application and assign it to switch ports and Wi-Fi networks.
+    source: unifi-vlan-creating-virtual-networks
+    checked: "2026-09-29"
+  - id: unifi-updates
+    name: UniFi updates and release channels, UniFi Help Center
+    publisher: Ubiquiti
+    kind: vendor
+    summary: How UniFi devices and the control plane are updated, including release channels and turning automatic updates off.
+    source: unifi-updates-control-plane
+    checked: "2026-09-29"
+  - id: netgear-av
+    name: Netgear M4250 AV Line user manual
+    publisher: Netgear
+    kind: vendor
+    summary: The AV Line switch's preset AV profiles, including separate VLANs and an IGMP querier for Dante and other AV over IP.
+    source: netgear-m4250-av-user-manual
+    checked: "2026-09-29"
+demo: true

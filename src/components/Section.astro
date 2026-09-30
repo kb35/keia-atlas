@@ -1,0 +1,149 @@
+---
+/* Section: one full-width block of secondary detail, below the main area (docs/rules/layout.md, L1 and L6).
+   Props:  title    the h2. Leave it out for a block with no heading that only needs "Show all" (a list
+                    or table that already has its own card and title).
+           aside    a short note on the right of the heading
+           id       for links (#outlets) and the heading's id; made from the title when left out
+           showAll  n: show the first n items, then a "Show all" button (rule L6, "Show all" instead of a
+                    box that scrolls). The items are the children of the element marked data-items inside
+                    the section (a .list, a <tbody>, a grid). Only items that are showing count: one a
+                    filter bar has hidden (.fb-out) or that is [hidden] does not use up a place, and the
+                    button says how many are showing ("Show all 38"). It follows the bar's filters, search,
+                    sort and any change to the list.
+           to       the page that owns this list (rule P10, docs/rules/platform.md): a path ('/incidents/?status=new')
+                    or a filter on this page ('?status=problem'). With `to`, the section never expands in place:
+                    it shows the first `showAll` items (all of them when showAll is left out) and a link that says
+                    where it goes, "See all 288 in the Work list →", counting what shows, as the button does. Use it
+                    on every overview and summary; keep plain showAll for a list on its own page, or a short
+                    extra of a few rows inside a record. The count in the link flies into the destination's band
+                    title (data-vt-rec="dd-<path>", "dd-work-list" for /work/list/; the destination sets PageBand rec to it).
+           place    the words after "in": 'Incidents', 'the Work list'. Default: the section's title.
+           carry    true: the link also takes this page's filters from the address (?site=dub&q=hdmi), for a
+                    preview whose page has the same filter bar as the destination (the Work overview and list).
+                    A list of keys carries only those.
+           help     the help key for the heading (src/lib/help.mjs), when the block has words of its own; default "section"
+           class    added to the section
+           ...      any other attribute goes on the section (data-fb-group, data-min-stage, and so on), so a
+                    filter bar can hide the whole block when none of its items show.
+   Slots:  default  the content. It may hold its own button, .btn with data-sa-btn and hidden, to put
+                    "Show all" somewhere else than below the content (a card's footer). Otherwise the
+                    section adds one under the content.
+           aside    the right of the heading, when it needs a link or a button
+                    With `to`, an <a data-sa-to hidden> inside the content puts the "See all" link there instead.
+   Collapsing again keeps the button under the pointer (M6). */
+import { href } from '../lib/data.mjs';
+// The shared-element name for a drill-down to a page: '/work/list/?kind=task' -> 'dd-work-list'.
+const ddId = (to: string) => 'dd' + new URL(to, 'http://x').pathname.replace(/[^a-z0-9]+/gi, '-').replace(/-$/, '');
+interface Props { title?: string; aside?: string; id?: string; showAll?: number; to?: string; place?: string; carry?: boolean | string[]; class?: string; help?: string; [attr: string]: unknown }
+const { title, aside, showAll, to, place, carry, class: cls, id: idProp, help, ...rest } = Astro.props;
+const id = idProp ?? (title ? title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : undefined);
+const hid = title && id ? `${id}-h` : undefined;
+const toHref = to ? (to.startsWith('/') ? href(to) : to) : undefined;
+const where = place ?? title ?? 'the list';
+---
+<section class:list={['sec', cls]} id={id} aria-labelledby={hid} data-show-all={showAll ?? (to ? 100000 : undefined)} data-sa-place={to ? where : undefined} data-sa-carry={carry === true ? '*' : Array.isArray(carry) ? carry.join(',') : undefined} {...rest}>
+  {(title || aside || Astro.slots.has('aside')) && (
+    <header class="section-head" data-help={help ?? 'section'} data-help-name={title}>
+      {title && <h2 id={hid}>{title}</h2>}
+      {aside && <span class="aside faint">{aside}</span>}
+      {Astro.slots.has('aside') && <span class="aside"><slot name="aside" /></span>}
+    </header>
+  )}
+  <slot />
+  {to ? (
+    <a class="sec-all sec-to" href={toHref} data-help="section.seeall" data-sa-to data-sa-default data-vt-rec={to.startsWith('/') ? ddId(to) : undefined}><span data-sa-t>See all in {where}</span> <span aria-hidden="true">→</span></a>
+  ) : showAll && <button type="button" class="btn small ghost sec-all" data-help="section.showall" data-sa-btn data-sa-default hidden aria-expanded="false"></button>}
+</section>
+
+<script is:inline data-astro-rerun>
+  (function () {
+    function bind(sec) {
+      if (sec.__sa) return; sec.__sa = true;
+      var n = +sec.dataset.showAll, box = sec.querySelector('[data-items]');
+      var link = sec.querySelector('[data-sa-to]:not([data-sa-default])') || sec.querySelector('[data-sa-to]');
+      if (link) return bindTo(sec, n, box, link);
+      var btn = sec.querySelector('[data-sa-btn]:not([data-sa-default])') || sec.querySelector('[data-sa-btn]');
+      if (!box || !btn) return;
+      // A button the page put in the content wins; drop the one the section added.
+      sec.querySelectorAll('[data-sa-default]').forEach(function (d) { if (d !== btn) d.remove(); });
+      // Count what is showing, mark the ones past the limit, say how many there are.
+      var apply = function () {
+        var open = sec.classList.contains('sa-open'), seen = 0;
+        Array.prototype.forEach.call(box.children, function (el) {
+          if (el.classList.contains('fb-out') || el.hidden) { el.classList.remove('sa-x'); return; }
+          seen++; el.classList.toggle('sa-x', seen > n);
+        });
+        btn.hidden = seen <= n;
+        btn.textContent = open ? 'Show fewer' : 'Show all ' + seen.toLocaleString('en-IE');
+        btn.setAttribute('aria-expanded', String(open));
+      };
+      sec.__saApply = apply;
+      btn.addEventListener('click', function () {
+        var y0 = btn.getBoundingClientRect().top;
+        sec.classList.toggle('sa-open');
+        apply();
+        // Keep the button where the pointer is: showing fewer would otherwise pull the page up under it.
+        var dy = btn.getBoundingClientRect().top - y0;
+        if (Math.abs(dy) > 1) window.scrollBy(0, dy);
+      });
+      // Rows added, removed or re-ordered by the page (a sort, a live update) are counted again.
+      if (window.MutationObserver) {
+        var raf = 0;
+        new MutationObserver(function () { cancelAnimationFrame(raf); raf = requestAnimationFrame(apply); }).observe(box, { childList: true });
+      }
+      apply();
+    }
+    // Drill-down (rule P10): the first n items, then a link to the page that owns the list. Never expands here.
+    function bindTo(sec, n, box, link) {
+      sec.querySelectorAll('[data-sa-default]').forEach(function (d) { if (d !== link) d.remove(); });
+      // The link's own address is its base; a page script may change it later (Home adds who is signed in).
+      var place = sec.dataset.saPlace || 'the list';
+      if (!link.dataset.saBase) link.dataset.saBase = link.getAttribute('href') || '';
+      var carry = sec.dataset.saCarry ? sec.dataset.saCarry.split(',') : null;
+      // The link takes this page's filters from the address when asked (the address follows the filter bar).
+      var target = function () {
+        var u = new URL(link.dataset.saBase, location.href), here = new URLSearchParams(location.search);
+        here.forEach(function (v, k) { if ((carry[0] === '*' || carry.indexOf(k) >= 0) && !u.searchParams.has(k)) u.searchParams.set(k, v); });
+        return u.pathname + u.search.replace(/%2C/g, ",") + u.hash;
+      };
+      var apply = function () {
+        var seen = 0;
+        if (box) Array.prototype.forEach.call(box.children, function (el) {
+          if (el.classList.contains('fb-out') || el.hidden) { el.classList.remove('sa-x'); return; }
+          seen++; el.classList.toggle('sa-x', seen > n);
+        });
+        link.hidden = !!box && seen === 0;
+        var t = link.querySelector('[data-sa-t]') || link;
+        t.textContent = box ? 'See all ' + seen.toLocaleString('en-IE') + ' in ' + place : 'See all in ' + place;
+        if (carry) link.setAttribute('href', target());
+      };
+      sec.__saApply = apply;
+      // Right before the click is followed, the address may have changed (a filter picked since): read it again.
+      if (carry) link.addEventListener('click', function () { link.setAttribute('href', target()); });
+      if (box && window.MutationObserver) {
+        var raf = 0;
+        new MutationObserver(function () { cancelAnimationFrame(raf); raf = requestAnimationFrame(apply); }).observe(box, { childList: true });
+      }
+      apply();
+    }
+    document.querySelectorAll('.sec[data-show-all]').forEach(bind);
+    if (!window.__rsSaHook) {   // once per visit, not once per page
+      window.__rsSaHook = true;
+      var again = function () { document.querySelectorAll('.sec[data-show-all]').forEach(function (s) { if (s.__saApply) s.__saApply(); }); };
+      // The filter bar recounts after a filter, a search or a sort; a page can ask too ("rs:sa-refresh").
+      document.addEventListener('fb:change', again);
+      document.addEventListener('rs:sa-refresh', again);
+    }
+  })();
+</script>
+
+<style is:global>
+  .sec { min-width: 0; }
+  .sec > .sec-all { margin-top: 12px; }
+  /* The drill-down link: a quiet link, not a button, so it reads as "go there" (rule P10). */
+  .sec-to { display: inline-flex; align-items: center; gap: 6px; width: fit-content; font-weight: 600; font-size: 14px; text-decoration: none; }
+  .sec-to:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .sec-to[hidden] { display: none; }
+  .sec > .sec-to { margin-top: 12px; }
+  .sec:not(.sa-open) [data-items] > .sa-x { display: none !important; }
+</style>

@@ -1,0 +1,142 @@
+---
+// Playbooks (List): the repeatable way to run each kind of project. Eleven of them; each one may skip phases.
+import Shell from '../../layouts/Shell.astro';
+import Icon from '../../components/Icon.astro';
+import PageBand from '../../components/PageBand.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import { playbooks, projects, PHASE_LABEL, INTENSITY, href, plural } from '../../lib/data.mjs';
+
+const ORDER = ['av-refresh', 'workplace-refresh', 'infra-refresh', 'network-refresh', 'custom-room', 'new-office', 'rma', 'provision-devices', 'firmware-rollout', 'home-kit', 'decommission'];
+const list = ORDER.map((id) => playbooks[id]).filter(Boolean);
+const LEVEL = { light: 1, medium: 2, heavy: 3 };
+const using = (id) => Object.values(projects).filter((p) => p.playbook === id);
+const steps = (pb) => pb.phases.reduce((n, ph) => n + ph.steps.length, 0);
+const longLead = (pb) => pb.phases.reduce((n, ph) => n + ph.steps.filter((s) => s.long_lead).length, 0);
+const maxSteps = Math.max(...list.flatMap((pb) => pb.phases.map((ph) => ph.steps.length)));
+const weeks = (pb) => (pb.weeks.min === pb.weeks.max ? `${pb.weeks.min}` : `${pb.weeks.min} to ${pb.weeks.max}`);
+const P = list.map((pb, i) => ({ id: pb.id, i, name: pb.name, used: using(pb.id).length, steps: steps(pb), min: pb.weeks.min, max: pb.weeks.max, level: LEVEL[pb.intensity] }));
+const inUse = list.filter((pb) => using(pb.id).length > 0).length;
+
+const FACETS = [
+  { key: 'status', label: 'Status', options: [{ value: 'in-use', label: 'In use' }, { value: 'unused', label: 'Not in use' }] },
+  { key: 'intensity', label: 'Intensity', options: Object.entries(INTENSITY).map(([value, label]) => ({ value, label })) },
+];
+const TOGGLES = [{ key: 'lead', label: 'Long-lead steps', title: 'Only playbooks with steps that need ordering well ahead' }];
+const VIEWS = [{ value: 'cards', label: 'Cards', show: '[data-grid]' }, { value: 'list', label: 'List', show: '[data-list]' }];
+const SORT = { options: [
+  { value: 'used', label: 'Most used first' }, { value: 'name', label: 'By name' },
+  { value: 'weeks', label: 'Shortest first' }, { value: 'steps', label: 'Most steps first' }, { value: 'intensity', label: 'Heaviest first' },
+] };
+const NUMBERS = [
+  { n: list.length, label: 'Playbooks', fact: true },
+  { n: inUse, label: 'In use', to: '?status=in-use' },
+  { n: list.length - inUse, label: 'Not in use', to: '?status=unused' },
+];
+const findText = (pb) => [pb.name, pb.summary, INTENSITY[pb.intensity], ...pb.phases.flatMap((ph) => [PHASE_LABEL[ph.phase], ...ph.steps.map((s) => s.title)])].filter(Boolean).join(' ');
+const shapeLabel = (pb) => pb.phases.map((ph) => `${PHASE_LABEL[ph.phase]}: ${plural(ph.steps.length, 'step')}`).join(', ');
+---
+<Shell title="Playbooks" section="playbooks" minStage={3} crumbs={[{ label: 'Playbooks' }]}>
+  <PageBand overline="Catalogue" title="Playbooks" lede="The repeatable way to run each kind of project: the steps in every phase, who does them, and who signs off each gate." sim numbers={NUMBERS}>
+    <a slot="action" class="btn primary" href={href('/edit/?kind=playbook')}><Icon name="plus" size={16} />New playbook</a>
+  </PageBand>
+
+  <div class="content playbooks">
+    <FilterBar facets={FACETS} toggles={TOGGLES} placeholder="Find a playbook, phase or step" label="Find a playbook" noun={['playbook', 'playbooks']} scope=".content.playbooks" views={VIEWS} viewKey="rs5-playbooks-view" sort={SORT} />
+
+    <div class="pb-list" data-grid>
+      {list.map((pb, i) => (
+        <a class={`card pb-card pb-${pb.intensity}`} href={href(`/playbooks/${pb.id}/`)} data-id={pb.id} data-vk={pb.id} data-fi data-find={findText(pb)} data-f-status={using(pb.id).length ? 'in-use' : 'unused'} data-f-intensity={pb.intensity} data-t-lead={longLead(pb) > 0 ? '1' : undefined}>
+          <span class="pb-top">
+            <span class="overline">Playbook</span>
+            <span class="pb-int" aria-label={`Intensity: ${INTENSITY[pb.intensity]}`}>{[1, 2, 3].map((n) => <i class={n <= LEVEL[pb.intensity] ? 'on' : ''}></i>)}<b>{INTENSITY[pb.intensity]}</b></span>
+          </span>
+          <span class="pb-name">{pb.name}</span>
+          <span class="muted pb-sum">{pb.summary}</span>
+          <span class="pb-shape" data-vt-rec={pb.id} role="img" aria-label={shapeLabel(pb)} style={`--pb-n:${pb.phases.length}`}>
+            {pb.phases.map((ph) => (
+              <span class="pbs">
+                <span class="pbs-bar"><i style={`height:${(ph.steps.length / maxSteps) * 100}%`}></i></span>
+                <small>{PHASE_LABEL[ph.phase]}</small>
+              </span>
+            ))}
+          </span>
+          <span class="pb-foot">
+            <span><b class="mono">{weeks(pb)}</b> weeks</span>
+            <span><b class="mono">{steps(pb)}</b> steps</span>
+            {longLead(pb) > 0 && <span class="ll"><b class="mono">{longLead(pb)}</b> long lead</span>}
+            <span class="faint pb-used">{using(pb.id).length ? `Used by ${using(pb.id).map((p) => p.id).join(', ')}` : 'Not in use'}</span>
+          </span>
+        </a>
+      ))}
+    </div>
+
+    <div class="list" data-list hidden>
+      {list.map((pb) => (
+        <a class="row pb-row" href={href(`/playbooks/${pb.id}/`)} data-id={pb.id} data-fi data-find={findText(pb)} data-f-status={using(pb.id).length ? 'in-use' : 'unused'} data-f-intensity={pb.intensity} data-t-lead={longLead(pb) > 0 ? '1' : undefined}>
+          <span class="pb-int" aria-label={`Intensity: ${INTENSITY[pb.intensity]}`}>{[1, 2, 3].map((n) => <i class={n <= LEVEL[pb.intensity] ? 'on' : ''}></i>)}</span>
+          <span>
+            <b class="name">{pb.name}</b>
+            <span class="sub">{pb.phases.map((ph) => PHASE_LABEL[ph.phase]).join(', ')}</span>
+          </span>
+          <span class="end">
+            <span class="faint">{weeks(pb)} weeks · {steps(pb)} steps</span>
+            <span class={`pill ${using(pb.id).length ? 'manage' : ''}`}>{using(pb.id).length ? `${plural(using(pb.id).length, 'project')}` : 'Not in use'}</span>
+          </span>
+        </a>
+      ))}
+    </div>
+
+    <EmptyState text="No playbooks match these filters." />
+  </div>
+
+  <script is:inline data-astro-rerun define:vars={{ P }} slot="end">
+    (function () {
+      var grid = document.querySelector('[data-grid]'), listEl = document.querySelector('[data-list]'), bar = document.querySelector('[data-fb]'); if (!grid || !listEl || !bar) return;
+      var cards = new Map(Array.prototype.map.call(grid.children, function (el) { return [el.dataset.id, el]; }));
+      var rows = new Map(Array.prototype.map.call(listEl.children, function (el) { return [el.dataset.id, el]; }));
+      var sort = bar.rsFilter ? bar.rsFilter.sort() : (new URLSearchParams(location.search).get('sort') || 'used');
+      var nat = function (x, y) { return String(x).localeCompare(String(y), 'en', { numeric: true }); };
+      function reorder() {
+        P.slice().sort(function (a, b) {
+          var c = 0;
+          if (sort === 'name') c = nat(a.name, b.name);
+          else if (sort === 'weeks') c = (a.max - b.max) || (a.min - b.min);
+          else if (sort === 'steps') c = b.steps - a.steps;
+          else if (sort === 'intensity') c = b.level - a.level;
+          else c = b.used - a.used;
+          return c || a.i - b.i;
+        }).forEach(function (p) { grid.appendChild(cards.get(p.id)); listEl.appendChild(rows.get(p.id)); });
+      }
+      bar.addEventListener('fb:sort', function (e) { sort = e.detail.value; bar.rsFilter.run(true, reorder); });
+      reorder();
+    })();
+  </script>
+</Shell>
+<style is:global>
+  .pb-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 20px; }
+  .pb-list[hidden], .list[data-list][hidden] { display: none; }
+  .pb-card { display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; color: inherit; text-decoration: none; transition: transform var(--dur-hover) var(--ease-settle), box-shadow var(--dur-hover) var(--ease-settle); }
+  .pb-card:hover { color: inherit; transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  :root[data-look="classic"] .pb-card { border: 2px solid var(--ink); }
+  .pb-top { display: flex; justify-content: space-between; align-items: center; }
+  .pb-int { display: inline-flex; align-items: center; gap: 3px; }
+  .pb-int i { width: 7px; height: 14px; border-radius: 2px; background: var(--surface-3); }
+  .pb-int i.on { background: var(--ink); }
+  .pb-heavy .pb-int i.on { background: var(--red); }
+  .pb-int b { margin-left: 6px; font: 700 11px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }
+  .pb-name { font: var(--weight-display) 24px/1.1 var(--font-display); letter-spacing: -.02em; }
+  .pb-sum { font-size: 14px; }
+  .pb-shape { display: grid; grid-template-columns: repeat(var(--pb-n, 6), minmax(0, 1fr)); gap: 6px; align-items: end; margin-top: auto; }
+  .pbs { display: grid; gap: 4px; justify-items: center; min-width: 0; }
+  .pbs-bar { display: flex; align-items: flex-end; width: 100%; height: 46px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+  .pbs-bar i { display: block; width: 100%; background: var(--blue); border-radius: 4px 4px 0 0; transform-origin: bottom; }
+  .pb-heavy .pbs-bar i { background: var(--red); }
+  .pbs small { font-size: 10.5px; line-height: 1.15; text-align: center; color: var(--text-3); max-width: 100%; overflow-wrap: anywhere; }
+  .pb-foot { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--text-2); align-items: baseline; }
+  .pb-foot b { color: var(--text); }
+  .ll { color: var(--amber-ink); }
+  .pb-used { margin-left: auto; font-size: 12.5px; }
+  .pb-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+  @media (max-width: 760px) { .pb-row { grid-template-columns: auto minmax(0, 1fr); } }
+</style>

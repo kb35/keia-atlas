@@ -1,0 +1,444 @@
+---
+/* Global search: the overlay behind the search button in the top bar, "/" and Cmd or Ctrl+K.
+   Also defines window.rsSearch, the small UI library the full results page (/search/) uses too.
+
+   What it is: faceted search plus a small rule-based query parser (src/lib/search-query.mjs), not
+   an AI model. The parser spots what you want back (rooms, devices, configurations...), the things
+   you named (a region, a site, a model, a status, an age) and how they relate ("with", "without"),
+   and shows each as a chip you can remove or change. The same words always give the same answer.
+
+   The engine is inlined here from src/lib/search-query.mjs (exports stripped) so the unit tests and
+   the browser run the same code. The index (/search/index.json) loads the first time search opens. */
+import Icon from './Icon.astro';
+import { href } from '../lib/data.mjs';
+import engineRaw from '../lib/search-query.mjs?raw';
+
+const API = ['load', 'parse', 'search', 'alternatives', 'canon', 'removeSpan', 'replaceSpan', 'addToQuery', 'setKind', 'KINDS'];
+const body = engineRaw
+  .replace(/^export \{[^}]*\};?\s*$/m, '')
+  .split('\n').filter((l) => !/^\s*\/\//.test(l) && l.trim()).map((l) => l.trim()).join('\n');
+const engine = `if(!window.KeiaSearch){(function(){\n${body}\nwindow.KeiaSearch={${API.map((k) => `${k}:${k}`).join(',')}};})();}`;
+const ICONS = { room: 'room', unit: 'barcode', model: 'box', dp: 'devices', rp: 'types', cfg: 'sliders', set: 'sliders', fw: 'chip', prj: 'project', task: 'check', pb: 'playbook',
+  inc: 'alert', lab: 'flask', adv: 'shield', person: 'team', ven: 'kit', site: 'sites', rack: 'rack', plan: 'calendar', spare: 'box', cable: 'wire', svc: 'devices', ki: 'shield', recent: 'refresh', try: 'search' };
+const EXAMPLES = ['EMEA rooms with X52', 'x52 in Dublin', 'retired codecs', 'configurations for poly', 'projects at the Dublin office', 'displays older than 7 years', 'who is on site in APAC', 'cafeteria'];
+---
+<template data-ks-icons>{Object.entries(ICONS).map(([k, n]) => <span data-icon={k}><Icon name={n} size={16} /></span>)}</template>
+<div class="ks" data-ks hidden data-index={href('/search/index.json')} data-page={href('/search/')}>
+  <div class="ks-back" data-ks-close></div>
+  <div class="ks-panel" role="dialog" aria-modal="true" aria-label="Search Keia Atlas" data-ks-root data-mode="overlay">
+    <div class="ks-top">
+      <label class="ks-field">
+        <Icon name="search" size={20} />
+        <span class="sr-only">Search Keia Atlas</span>
+        <input type="text" data-ks-input placeholder="Rooms with an X52 in EMEA, a serial, a person…" autocomplete="off" autocapitalize="off" spellcheck="false"
+          role="combobox" aria-expanded="true" aria-controls="ks-results" aria-autocomplete="list" enterkeyhint="search" />
+        <button type="button" class="ks-clear" data-ks-clear aria-label="Clear" hidden>×</button>
+      </label>
+      <button type="button" class="ks-esc" data-ks-close aria-label="Close search"><kbd>Esc</kbd><span>Close</span></button>
+    </div>
+    <div class="ks-chips" data-ks-chips aria-label="What Keia Atlas understood"></div>
+    <p class="ks-note" data-ks-note hidden></p>
+    <div class="ks-body" data-ks-scroll>
+      <div class="ks-results" id="ks-results" role="listbox" aria-label="Results" data-ks-results></div>
+      <div class="ks-empty" data-ks-empty>
+        <section data-ks-recent-wrap hidden>
+          <header><span class="overline">Recent</span><button type="button" class="ks-link" data-ks-recent-clear>Clear</button></header>
+          <div class="ks-list" data-ks-recent></div>
+        </section>
+        <section>
+          <header><span class="overline">Try</span></header>
+          <div class="ks-try">{EXAMPLES.map((q) => <button type="button" class="ks-ex" data-ks-q={q}>{q}</button>)}</div>
+        </section>
+        <p class="ks-how faint">Type the way you would ask a colleague. Keia Atlas picks out what you want, where, which model and which status, and shows each as a chip you can remove or change.</p>
+      </div>
+    </div>
+    <footer class="ks-foot">
+      <span class="ks-keys"><kbd>↑</kbd><kbd>↓</kbd> move <kbd>↵</kbd> open <kbd data-ks-mod>Ctrl</kbd><kbd>↵</kbd> all results</span>
+      <a class="ks-all" data-ks-all href={href('/search/')}>All results</a>
+    </footer>
+  </div>
+</div>
+
+<script is:inline data-astro-rerun set:html={engine}></script>
+<script is:inline data-astro-rerun>
+  (function () {
+    /* The shared UI: loading the index, links, recent searches, and binding a search box to results.
+       Defined once per visit; everything it touches is looked up in the current page each time. */
+    if (!window.rsSearch) {
+      var S = window.KeiaSearch;
+      var RECENT = 'rs4-search-recent';
+      var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+      var reduced = function () { return matchMedia('(prefers-reduced-motion: reduce)').matches; };
+      var host = function () { return document.querySelector('[data-ks]'); };
+      var indexUrl = function () { var h = host(); return new URL(h ? h.getAttribute('data-index') : 'search/index.json', location.href); };
+      var lib = window.rsSearch = {
+        esc: esc,
+        ready: function () {
+          if (!window.__rsSearchIndex) {
+            window.__rsSearchIndex = fetch(indexUrl()).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (raw) { return S.load(raw); });
+            window.__rsSearchIndex.catch(function () { window.__rsSearchIndex = null; });
+          }
+          return window.__rsSearchIndex;
+        },
+        // A path inside the site ("rooms/dub-3-01/") as a link that works on the server and in the file preview.
+        url: function (path) {
+          var root = new URL('../', indexUrl());
+          var m = /^([^?#]*)([?#].*)?$/.exec(path), p = m[1], rest = m[2] || '';
+          if (window.__rsRelative && (p === '' || p.slice(-1) === '/')) p += 'index.html';
+          return new URL(p + rest, root).href;
+        },
+        page: function (q) { return lib.url('search/' + (q ? '?q=' + encodeURIComponent(q) : '')); },
+        icon: function (k) { var t = document.querySelector('template[data-ks-icons]'); var el = t && t.content.querySelector('[data-icon="' + k + '"]'); return el ? el.innerHTML : ''; },
+        recent: {
+          get: function () { try { var v = JSON.parse(localStorage.getItem(RECENT) || '[]'); return Array.isArray(v) ? v : []; } catch (_) { return []; } },
+          add: function (q) { q = String(q || '').trim(); if (q.length < 2) return; var l = lib.recent.get().filter(function (x) { return x.toLowerCase() !== q.toLowerCase(); }); l.unshift(q); try { localStorage.setItem(RECENT, JSON.stringify(l.slice(0, 8))); } catch (_) {} },
+          clear: function () { try { localStorage.removeItem(RECENT); } catch (_) {} },
+        },
+        // Mark the words you typed inside a title.
+        hl: function (text, terms) {
+          var out = esc(text);
+          (terms || []).forEach(function (t) {
+            (t.alts || []).forEach(function (a) {
+              if (!a || a.length < 2) return;
+              var re = new RegExp('(^|[\\s(,.-])(' + a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig');
+              out = out.replace(re, '$1<mark>$2</mark>');
+            });
+          });
+          return out;
+        },
+        VENDOR_KINDS: { model: 1, dp: 1, cfg: 1, set: 1, fw: 1, adv: 1 },
+        bind: bind,
+      };
+
+      // Binds one search UI (the overlay or the results page). Each needs [data-ks-input],
+      // [data-ks-chips], [data-ks-note], [data-ks-results] and [data-ks-empty]; the page adds facets.
+      function bind(root, opts) {
+        opts = opts || {};
+        var $ = function (s) { return root.querySelector(s); };
+        var input = $('[data-ks-input]'), chipsEl = $('[data-ks-chips]'), note = $('[data-ks-note]'), list = $('[data-ks-results]'), empty = $('[data-ks-empty]');
+        var facetsEl = $('[data-ks-facets]'), countEl = $('[data-ks-count]'), allLink = root.querySelector('[data-ks-all]') || (root.parentElement && root.parentElement.querySelector('[data-ks-all]'));
+        var clearBtn = $('[data-ks-clear]');
+        var I = null, last = null, prevKeys = new Set(), active = -1, expanded = {}, menu = null;
+        var per = opts.perGroup || 4;
+        var ctl = { root: root, input: input };
+
+        function renderRecent() {
+          var wrap = $('[data-ks-recent-wrap]'), box = $('[data-ks-recent]'); if (!wrap || !box) return;
+          var l = lib.recent.get(); wrap.hidden = !l.length;
+          box.innerHTML = l.map(function (q) { return '<button type="button" class="ks-rec" data-ks-q="' + esc(q) + '"><span class="ks-ic">' + lib.icon('recent') + '</span><span>' + esc(q) + '</span></button>'; }).join('');
+        }
+        function row(r, i, P) {
+          var it = r.it, k = S.KINDS.find(function (x) { return x.code === it.k; });
+          var tag = it.z && it.z.indexOf('retired') >= 0 ? 'Retired' : it.z && it.z.indexOf('legacy') >= 0 && it.k === 'unit' ? 'Older kit' : it.st && it.st.length === 1 && I.sites[it.st[0]] ? I.sites[it.st[0]][0] : '';
+          var key = it.k + '|' + it.u + '|' + it.t;
+          return '<a class="ks-row" role="option" id="' + root.id + '-o' + i + '" data-i="' + i + '" data-key="' + esc(key) + '" href="' + esc(lib.url(it.u)) + '">' +
+            '<span class="ks-ic" title="' + esc(k ? k.one : '') + '">' + lib.icon(it.k) + '</span>' +
+            '<span class="ks-tx"><b>' + lib.hl(it.t, P.terms) + '</b><small>' + esc(it.s) + '</small></span>' +
+            (tag ? '<span class="ks-tag">' + esc(tag) + '</span>' : '') + '</a>';
+        }
+        function chipHtml(c, i) {
+          var editable = c.type !== 'term' && c.type !== 'age' && c.type !== 'year' && c.type !== 'floor';
+          return '<span class="ks-chip t-' + c.type + (c.neg ? ' neg' : '') + '" style="--i:' + i + '">' +
+            (editable ? '<button type="button" class="ks-chip-l" data-chip="' + i + '" aria-haspopup="menu" title="Change">' + esc(c.label) + '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>'
+              : '<span class="ks-chip-l">' + esc(c.label) + '</span>') +
+            '<button type="button" class="ks-chip-x" data-chip-x="' + i + '" aria-label="Remove ' + esc(c.label) + '">×</button></span>';
+        }
+        function facetHtml(F, P) {
+          var block = function (title, key, vals, max) {
+            if (!vals || !vals.length || (vals.length < 2 && !vals.some(function (v) { return v.on; }))) return '';
+            return '<section class="ks-fc"><p class="overline">' + title + '</p>' + vals.slice(0, max || 8).map(function (v) {
+              return '<button type="button" class="ks-fv' + (v.on ? ' on' : '') + '" aria-pressed="' + (v.on ? 'true' : 'false') + '" data-facet="' + key + '" data-v="' + esc(v.v) + '" data-q="' + esc(v.q) + '"><span>' + esc(v.label) + '</span><span class="num">' + v.n + '</span></button>';
+            }).join('') + '</section>';
+          };
+          return block('Show', 'kind', F.kind, 21) + block('Region', 'region', F.region) + block('Office', 'site', F.site, 11) + block('Status', 'status', F.status) +
+            block('Device kind', 'class', F.class) + block('Make', 'make', F.make) + block('Room profile', 'profile', F.profile);
+        }
+        function setActive(n) {
+          var rows = list.querySelectorAll('.ks-row');
+          if (!rows.length || n < 0) { active = -1; input.removeAttribute('aria-activedescendant'); rows.forEach(function (r) { r.setAttribute('aria-selected', 'false'); }); return; }
+          active = Math.max(0, Math.min(n, rows.length - 1));
+          rows.forEach(function (r, i) { r.setAttribute('aria-selected', i === active ? 'true' : 'false'); });
+          input.setAttribute('aria-activedescendant', rows[active].id);
+          var scroller = root.querySelector('[data-ks-scroll]');
+          if (opts.mode === 'page') rows[active].scrollIntoView({ block: 'nearest' });
+          else if (scroller) { var r = rows[active].getBoundingClientRect(), b = scroller.getBoundingClientRect(); if (r.bottom > b.bottom - 8) scroller.scrollTop += r.bottom - b.bottom + 8; else if (r.top < b.top + 30) scroller.scrollTop -= b.top + 30 - r.top; }
+        }
+        function run() {
+          var q = input.value;
+          if (clearBtn) clearBtn.hidden = !q;
+          if (allLink) allLink.href = lib.page(q.trim());
+          if (!I) { list.innerHTML = q.trim() ? '<p class="ks-wait faint">Loading the index…</p>' : ''; empty.hidden = !!q.trim(); renderRecent(); return; }
+          var R = S.search(I, q, { facets: !!facetsEl });
+          var vendor = document.documentElement.getAttribute('data-who-kind') === 'vendor';
+          if (vendor) { R.top = R.top.filter(function (r) { return lib.VENDOR_KINDS[r.it.k]; }); R.groups = R.groups.filter(function (g) { return lib.VENDOR_KINDS[g.k]; }); R.total = R.top.length + R.groups.reduce(function (n, g) { return n + g.total; }, 0); }
+          last = R;
+          var P = R.P, has = !!q.trim();
+          empty.hidden = has; if (!has) renderRecent();
+          chipsEl.innerHTML = P.chips.map(chipHtml).join('');
+          chipsEl.hidden = !P.chips.length;
+          // Did you mean: a correction already applied, or a suggestion to try.
+          var bits = [];
+          if (P.corrected && !P.suggest && P.corrected.trim().toLowerCase() !== q.trim().toLowerCase()) bits.push('Read as <b>' + esc(P.corrected) + '</b>');
+          if (P.suggest) bits.push('Did you mean <button type="button" class="ks-link" data-ks-q="' + esc(P.suggest) + '">' + esc(P.suggest) + '</button>?');
+          if (has && !R.total && !P.suggest) bits.push('Nothing matches. Remove a chip, or try <button type="button" class="ks-link" data-ks-q="rooms with x52">rooms with x52</button>.');
+          note.innerHTML = bits.join(' · '); note.hidden = !bits.length;
+          if (countEl) countEl.textContent = has ? (R.total ? R.total.toLocaleString('en-IE') + (R.total === 1 ? ' result' : ' results') : '') : '';
+          var html = '', i = 0, keys = new Set();
+          // One kind asked for: show more of it before sending you to the full page.
+          var cap = R.groups.length === 1 && !R.top.length ? Math.max(per, 10) : per;
+          var emit = function (label, n, items, kind) {
+            var shown = items.slice(0, expanded[kind] ? items.length : cap);
+            html += '<section class="ks-grp" role="group" aria-label="' + esc(label) + '"><header><span class="overline">' + esc(label) + '</span>' + (n ? '<span class="faint num">' + n.toLocaleString('en-IE') + '</span>' : '') + '</header>';
+            shown.forEach(function (r) { keys.add(r.it.k + '|' + r.it.u + '|' + r.it.t); html += row(r, i++, P); });
+            if (kind && items.length > shown.length) {
+              html += opts.mode === 'page'
+                ? '<button type="button" class="ks-more" data-more="' + kind + '">Show all ' + items.length.toLocaleString('en-IE') + ' ' + esc(label.toLowerCase()) + '</button>'
+                : '<a class="ks-more" href="' + esc(lib.page(S.setKind(P, kind))) + '">' + (items.length - shown.length).toLocaleString('en-IE') + ' more ' + esc(label.toLowerCase()) + '</a>';
+            }
+            html += '</section>';
+          };
+          if (R.top.length) emit('Best match', 0, R.top, null);
+          R.groups.forEach(function (g) { emit(g.label, g.total, g.items, g.k); });
+          list.innerHTML = html;
+          // Rule book, enter: only rows that weren't there a keystroke ago grow in.
+          if (!reduced()) list.querySelectorAll('.ks-row').forEach(function (el, n) { if (!prevKeys.has(el.dataset.key)) { el.classList.add('ks-in'); el.style.setProperty('--i', Math.min(n, 12)); } });
+          prevKeys = keys;
+          if (facetsEl) facetsEl.innerHTML = has && R.facets ? facetHtml(R.facets, P) : '';
+          setActive(opts.mode === 'page' ? -1 : 0);
+          if (opts.onRun) opts.onRun(q, R);
+        }
+        ctl.run = run;
+        ctl.set = function (q, focus) { input.value = q; closeMenu(); run(); if (focus !== false) { input.focus(); try { input.setSelectionRange(q.length, q.length); } catch (_) {} } };
+        ctl.last = function () { return last; };
+
+        function closeMenu() { if (menu) { menu.remove(); menu = null; } }
+        function openMenu(btn, chip) {
+          closeMenu();
+          var alts = S.alternatives(I, last.P, chip);
+          menu = document.createElement('div');
+          menu.className = 'ks-menu'; menu.setAttribute('role', 'menu');
+          menu.innerHTML = alts.map(function (a) { return '<button type="button" role="menuitemradio" aria-checked="' + (a.on ? 'true' : 'false') + '" data-alt="' + esc(a.q) + '">' + esc(a.label) + '</button>'; }).join('') +
+            '<hr><button type="button" role="menuitem" data-alt-words>Search these words as text</button><button type="button" role="menuitem" data-alt-remove>Remove</button>';
+          root.appendChild(menu);
+          var r = btn.getBoundingClientRect(), rr = root.getBoundingClientRect();
+          menu.style.left = Math.max(8, Math.min(r.left - rr.left, rr.width - 268)) + 'px';
+          menu.style.top = (r.bottom - rr.top + 6) + 'px';
+          menu.__chip = chip;
+          var on = menu.querySelector('[aria-checked=true]') || menu.querySelector('button');
+          if (on) { on.focus(); on.scrollIntoView({ block: 'nearest' }); }
+        }
+        root.addEventListener('click', function (e) {
+          var t = e.target;
+          var qb = t.closest('[data-ks-q]'); if (qb) { e.preventDefault(); ctl.set(qb.getAttribute('data-ks-q')); return; }
+          var x = t.closest('[data-chip-x]'); if (x) { var c = last.P.chips[+x.getAttribute('data-chip-x')]; ctl.set(S.removeSpan(input.value, c.span)); return; }
+          var cb = t.closest('[data-chip]'); if (cb) { var ch = last.P.chips[+cb.getAttribute('data-chip')]; if (menu && menu.__chip === ch) closeMenu(); else openMenu(cb, ch); return; }
+          if (menu && t.closest('.ks-menu')) {
+            var chip = menu.__chip, a = t.closest('[data-alt]');
+            if (a) ctl.set(S.replaceSpan(input.value, chip.core, a.getAttribute('data-alt')));
+            else if (t.closest('[data-alt-words]')) ctl.set(S.replaceSpan(input.value, chip.core, '"' + input.value.slice(chip.core[0], chip.core[1]) + '"'));
+            else if (t.closest('[data-alt-remove]')) ctl.set(S.removeSpan(input.value, chip.span));
+            return;
+          }
+          closeMenu();
+          var fv = t.closest('[data-facet]');
+          if (fv) {
+            var type = fv.getAttribute('data-facet'), v = fv.getAttribute('data-v'), P = last.P, next;
+            if (fv.classList.contains('on')) {
+              var hit = P.chips.filter(function (c) { return c.type === type && c.v && c.v.indexOf(v) >= 0; })[0];
+              next = hit ? S.removeSpan(input.value, hit.span) : input.value;
+            } else next = type === 'kind' ? S.setKind(P, v) : S.addToQuery(input.value, fv.getAttribute('data-q'));
+            ctl.set(next, false); return;
+          }
+          var more = t.closest('[data-more]'); if (more) { var box = root.querySelector('[data-ks-results]'); window.rsHold(box, function () { expanded[more.getAttribute('data-more')] = true; run(); }); return; }
+          if (t.closest('[data-ks-recent-clear]')) { lib.recent.clear(); renderRecent(); return; }
+          if (clearBtn && t.closest('[data-ks-clear]')) { ctl.set(''); return; }
+          var rowEl = t.closest('.ks-row'); if (rowEl) { lib.recent.add(input.value); if (opts.onOpen) opts.onOpen(); }
+        });
+        root.addEventListener('keydown', function (e) {
+          if (menu && e.target.closest('.ks-menu')) {
+            var items = Array.prototype.slice.call(menu.querySelectorAll('button')), n = items.indexOf(document.activeElement);
+            if (e.key === 'ArrowDown') { e.preventDefault(); items[(n + 1) % items.length].focus(); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); items[(n - 1 + items.length) % items.length].focus(); }
+            else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeMenu(); input.focus(); }
+            return;
+          }
+          if (e.target !== input) return;
+          var rows = list.querySelectorAll('.ks-row');
+          if (e.key === 'ArrowDown') { e.preventDefault(); setActive(active < 0 ? 0 : active + 1); }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(active - 1); }
+          else if (e.key === 'Enter') {
+            e.preventDefault();
+            var q = input.value.trim(); if (!q) return;
+            lib.recent.add(q);
+            if (e.metaKey || e.ctrlKey || active < 0 || !rows[active]) { if (opts.onSubmit) opts.onSubmit(q); return; }
+            if (opts.onOpen) opts.onOpen();
+            rows[active].click();
+          }
+        });
+        var raf = 0;
+        input.addEventListener('input', function () { closeMenu(); expanded = {}; cancelAnimationFrame(raf); raf = requestAnimationFrame(run); });
+        lib.ready().then(function (idx) { I = idx; run(); }, function () { list.innerHTML = '<p class="ks-wait faint">Could not load the search index.</p>'; });
+        renderRecent();
+        return ctl;
+      }
+    }
+
+    /* This page's overlay. */
+    var ks = document.querySelector('[data-ks]'); if (!ks) return;
+    var panel = ks.querySelector('[data-ks-root]');
+    panel.id = 'ks';
+    var opener = null, closing = 0;
+    var mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+    ks.querySelectorAll('[data-ks-mod]').forEach(function (k) { k.textContent = mac ? '⌘' : 'Ctrl'; });
+    document.querySelectorAll('[data-search-kbd]').forEach(function (k) { k.textContent = mac ? '⌘K' : 'Ctrl K'; });
+    var ctl = window.rsSearch.bind(panel, {
+      mode: 'overlay', perGroup: 4,
+      onOpen: function () { close(true); },
+      onSubmit: function (q) { close(true); var a = document.createElement('a'); a.href = window.rsSearch.page(q); document.body.appendChild(a); a.click(); a.remove(); },
+    });
+    function open(q) {
+      if (!ks.hidden && !ks.classList.contains('ks-out')) { ctl.input.focus(); ctl.input.select(); return; }
+      clearTimeout(closing);
+      opener = document.activeElement;
+      ks.hidden = false; ks.classList.remove('ks-out');
+      document.documentElement.classList.add('ks-lock');
+      if (typeof q === 'string') ctl.input.value = q;
+      ctl.run(); ctl.input.focus(); ctl.input.select();
+    }
+    function close(navigating) {
+      if (ks.hidden) return;
+      document.documentElement.classList.remove('ks-lock');
+      var done = function () { ks.hidden = true; ks.classList.remove('ks-out'); };
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches || navigating) done(); else { ks.classList.add('ks-out'); closing = setTimeout(done, window.rsMotion ? window.rsMotion().exit : 240); }
+      if (!navigating && opener && opener.focus) opener.focus();
+    }
+    window.rsSearchOpen = open; window.rsSearchClose = close;
+    ks.querySelectorAll('[data-ks-close]').forEach(function (b) { b.addEventListener('click', function () { close(); }); });
+    ks.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); close(); return; }
+      if (e.key === 'Tab') {   // keep focus inside the dialog
+        var f = Array.prototype.filter.call(panel.querySelectorAll('input, button:not([hidden]), a[href]'), function (el) { return el.offsetParent !== null; });
+        if (!f.length) return;
+        var i = f.indexOf(document.activeElement);
+        if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); } else if (!e.shiftKey && i === f.length - 1) { e.preventDefault(); f[0].focus(); }
+      }
+    });
+    var allA = ks.querySelector('[data-ks-all]'); if (allA) allA.addEventListener('click', function () { window.rsSearch.recent.add(ctl.input.value); close(true); });
+    document.querySelectorAll('[data-open-search]').forEach(function (b) {
+      b.addEventListener('click', function () { open(); });
+      b.addEventListener('pointerenter', function () { window.rsSearch.ready(); }, { once: true });
+    });
+    if (!window.__rsSearchKeyHook) {   // once per visit: the shortcuts, and closing before a page change
+      window.__rsSearchKeyHook = true;
+      document.addEventListener('keydown', function (e) {
+        var t = e.target, typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+        if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === 'k' || e.key === 'K')) {
+          e.preventDefault();
+          var h = document.querySelector('[data-ks]');
+          if (h && !h.hidden && !h.classList.contains('ks-out')) window.rsSearchClose(); else window.rsSearchOpen();
+          return;
+        }
+        if (e.key === '/' && !typing && !e.metaKey && !e.ctrlKey && !e.altKey && !document.querySelector('dialog[open]')) { e.preventDefault(); window.rsSearchOpen(); }
+      });
+      document.addEventListener('astro:before-swap', function () { document.documentElement.classList.remove('ks-lock'); });
+    }
+  })();
+</script>
+
+<style is:global>
+  /* The search button in the top bar. */
+  .search-btn { appearance: none; display: inline-flex; align-items: center; gap: 8px; height: 34px; min-width: 220px; padding: 0 8px 0 11px; border-radius: var(--pill-radius); border: 1px solid var(--mast-line); background: var(--mast-2, var(--surface)); color: var(--mast-text-2); font: 500 13.5px/1 var(--font-sans); cursor: pointer; transition: border-color var(--dur-state), color var(--dur-state), box-shadow var(--dur-state); }
+  @media (hover: hover) { .search-btn:hover { border-color: var(--accent); color: var(--mast-text); } }
+  .search-btn:focus-visible { outline: 2px solid var(--focus, var(--accent)); outline-offset: 2px; }
+  .search-btn span { flex: 1; text-align: left; }
+  .search-btn kbd, .ks kbd { font: 600 11px/1 var(--font-mono); padding: 4px 6px; border-radius: 5px; border: 1px solid var(--line); background: var(--surface); color: var(--text-2); }
+  @media (max-width: 1100px) { .search-btn { min-width: 0; } .search-btn kbd { display: none; } }
+  @media (max-width: 760px) { .search-btn { width: 34px; padding: 0; justify-content: center; border-color: transparent; background: none; color: var(--mast-text); } .search-btn span { display: none; } }
+
+  /* The overlay. */
+  .ks { position: fixed; inset: 0; z-index: 100; display: grid; justify-items: center; align-items: start; padding: min(12vh, 110px) 16px 16px; }
+  .ks[hidden] { display: none; }
+  .ks-back { position: absolute; inset: 0; background: color-mix(in srgb, var(--ink, #111) 38%, transparent); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); animation: ks-fade var(--dur-pop) var(--ease-settle) both; }
+  .ks-panel { position: relative; width: min(760px, 100%); max-height: min(76vh, 720px); display: flex; flex-direction: column; background: var(--surface); color: var(--text); border: var(--border-card); border-radius: calc(var(--radius-lg) + 4px); box-shadow: var(--shadow-lg), 0 30px 80px -30px rgba(0, 0, 0, .45); overflow: hidden; animation: ks-in var(--dur-pop) var(--ease-settle) both; transform-origin: 50% 0; }
+  .ks.ks-out .ks-back { animation: ks-fade-out var(--dur-exit) var(--ease-settle) both; }
+  .ks.ks-out .ks-panel { animation: ks-out var(--dur-exit) var(--ease-settle) both; }
+  @keyframes ks-fade { from { opacity: 0; } }
+  @keyframes ks-fade-out { to { opacity: 0; } }
+  @keyframes ks-in { from { opacity: 0; transform: translateY(-10px) scale(.985); } }
+  @keyframes ks-out { to { opacity: 0; transform: translateY(-6px) scale(.985); } }
+  :root.ks-lock, :root.ks-lock body { overflow: hidden; }
+  .ks-top { display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 16px; border-bottom: var(--border-rule); }
+  .ks-field { flex: 1; display: flex; align-items: center; gap: 12px; color: var(--text-3); min-width: 0; }
+  .ks-field input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--text); font: 450 18px/1.3 var(--font-sans); padding: 8px 0; }
+  .ks-field input::placeholder { color: var(--text-3); }
+  .ks-clear { appearance: none; border: 0; background: var(--surface-2); color: var(--text-2); width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 15px; line-height: 1; }
+  .ks-esc { appearance: none; display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; color: var(--text-3); cursor: pointer; font: 500 12px var(--font-sans); padding: 6px; border-radius: var(--radius); }
+  .ks-esc span { display: none; }
+  .ks-esc:hover { background: var(--surface-2); color: var(--text); }
+  .ks-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px 0; }
+  .ks-chips[hidden] { display: none; }
+  .ks-chip { display: inline-flex; align-items: stretch; border-radius: var(--pill-radius); background: var(--accent-soft); color: var(--accent-ink); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); font: 600 12.5px/1 var(--font-sans); animation: ks-chip var(--dur-state) var(--ease-settle) both; animation-delay: calc(var(--i, 0) * 30ms); }
+  .ks-chip.t-kind { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+  .ks-chip.t-term { background: var(--surface-2); color: var(--text); border-color: var(--line); }
+  .ks-chip.neg { background: var(--red-soft); color: var(--red-ink); border-color: color-mix(in srgb, var(--red) 35%, transparent); }
+  .ks-chip-l { appearance: none; display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; color: inherit; font: inherit; padding: 6px 4px 6px 11px; cursor: pointer; border-radius: var(--pill-radius) 0 0 var(--pill-radius); }
+  span.ks-chip-l { cursor: default; }
+  .ks-chip-x { appearance: none; border: 0; background: none; color: inherit; font: 600 15px/1 var(--font-sans); padding: 0 10px 0 5px; cursor: pointer; opacity: .7; border-radius: 0 var(--pill-radius) var(--pill-radius) 0; }
+  .ks-chip-x:hover, .ks-chip-l:hover { opacity: 1; background: color-mix(in srgb, currentColor 10%, transparent); }
+  @keyframes ks-chip { from { opacity: 0; transform: scale(.8); } }
+  .ks-note { margin: 8px 16px 0; font-size: 13px; color: var(--text-2); }
+  .ks-note b { color: var(--text); }
+  .ks-link { appearance: none; border: 0; background: none; padding: 0; color: var(--accent-ink, var(--accent)); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .ks-body { flex: 1 1 auto; overflow: auto; overscroll-behavior: contain; padding: 6px 8px 10px; min-height: 0; }
+  .ks-top, .ks-chips, .ks-note, .ks-foot { flex: none; }
+  .ks-grp { padding: 6px 0 2px; }
+  .ks-grp > header { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 10px 4px; }
+  .ks-row { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 7px 10px; border-radius: var(--radius); color: inherit; text-decoration: none; transition: background var(--dur-hover); }
+  .ks-row:hover { background: var(--surface-2); color: inherit; }
+  .ks-row[aria-selected="true"] { background: var(--accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); }
+  .ks-row.ks-in { animation: ks-row var(--dur-enter) var(--ease-settle) both; animation-delay: calc(var(--i, 0) * var(--stagger)); }
+  @keyframes ks-row { from { opacity: 0; transform: translateY(4px); } }
+  .ks-ic { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; background: var(--surface-2); color: var(--text-2); }
+  .ks-row[aria-selected="true"] .ks-ic { background: var(--surface); color: var(--accent-ink); }
+  .ks-tx { min-width: 0; }
+  .ks-tx b { display: block; font-weight: 600; font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ks-tx b::first-letter { text-transform: uppercase; }
+  .ks-tx small { display: block; font-size: 12.5px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ks-tx mark { background: none; color: var(--accent-ink, var(--accent)); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+  .ks-tag { font: 600 10.5px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); padding: 4px 7px; border: 1px solid var(--line); border-radius: 5px; }
+  .ks-more { display: inline-block; appearance: none; border: 0; background: none; margin: 2px 0 4px 50px; padding: 4px 0; color: var(--accent-ink, var(--accent)); font: 600 12.5px var(--font-sans); cursor: pointer; text-decoration: none; }
+  .ks-more:hover { text-decoration: underline; }
+  .ks-wait { padding: 18px 12px; margin: 0; }
+  .ks-empty { display: grid; gap: 16px; padding: 10px 8px 6px; }
+  .ks-empty[hidden] { display: none; }
+  .ks-empty header { display: flex; justify-content: space-between; align-items: baseline; padding: 0 2px 6px; }
+  .ks-list { display: grid; gap: 2px; }
+  .ks-rec { appearance: none; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; align-items: center; border: 0; background: none; color: var(--text); font: 500 14px var(--font-sans); text-align: left; padding: 5px 2px; border-radius: var(--radius); cursor: pointer; }
+  .ks-rec:hover { background: var(--surface-2); }
+  .ks-try { display: flex; flex-wrap: wrap; gap: 8px; }
+  .ks-ex { appearance: none; border: 1px solid var(--line); background: var(--surface); color: var(--text); font: 500 13px var(--font-sans); padding: 8px 12px; border-radius: var(--pill-radius); cursor: pointer; transition: border-color var(--dur-state), transform var(--dur-state) var(--ease-settle); }
+  .ks-ex:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .ks-how { font-size: 12.5px; margin: 0 2px; max-width: 62ch; }
+  .ks-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 16px; border-top: var(--border-rule); background: var(--surface-2); font-size: 12px; color: var(--text-3); }
+  .ks-keys kbd { margin-right: 2px; }
+  .ks-all { font-weight: 600; color: var(--accent-ink, var(--accent)); text-decoration: none; }
+  .ks-all:hover { text-decoration: underline; }
+  .ks-menu { position: absolute; z-index: 5; width: 260px; max-height: 300px; overflow: auto; padding: 6px; background: var(--surface); border: var(--border-card); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); animation: ks-in var(--dur-pop) var(--ease-settle) both; }
+  .ks-menu button { display: block; width: 100%; appearance: none; border: 0; background: none; text-align: left; color: var(--text); font: 500 13px var(--font-sans); padding: 7px 10px; border-radius: 6px; cursor: pointer; }
+  .ks-menu button:hover, .ks-menu button:focus-visible { background: var(--surface-2); outline: none; }
+  .ks-menu button[aria-checked="true"] { color: var(--accent-ink, var(--accent)); font-weight: 700; }
+  .ks-menu hr { border: 0; border-top: var(--border-rule); margin: 5px 0; }
+  :root[data-look="classic"] .ks-panel { border: 2px solid var(--ink); box-shadow: 6px 6px 0 var(--ink); }
+  :root[data-look="classic"] .ks-chip.t-kind { background: var(--yellow); color: var(--ink); border-color: var(--ink); }
+  :root[data-contrast="high"] .ks-row[aria-selected="true"] { outline: 2px solid var(--focus); }
+  @media (max-width: 760px) {
+    .ks { padding: 0; }
+    .ks-panel { width: 100%; height: 100dvh; max-height: none; border-radius: 0; border: 0; padding-top: env(safe-area-inset-top, 0px); }
+    .ks-field input { font-size: 16px; }
+    .ks-esc kbd { display: none; } .ks-esc span { display: inline; font-size: 14px; color: var(--accent-ink, var(--accent)); font-weight: 600; }
+    .ks-keys { display: none; }
+    .ks-foot { justify-content: flex-end; padding-bottom: calc(9px + env(safe-area-inset-bottom, 0px)); }
+    .ks-row { padding: 9px 8px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .ks-back, .ks-panel, .ks.ks-out .ks-back, .ks.ks-out .ks-panel, .ks-chip, .ks-row.ks-in, .ks-menu { animation: none !important; } }
+</style>

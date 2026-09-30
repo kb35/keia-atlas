@@ -1,0 +1,279 @@
+---
+// One configuration: the standard way to set up a model (Record archetype, docs/standards/page-anatomy.md).
+// Band: the kind, the mode and the firmware, then the figures. Under it, one clear line: configuring
+// happens in a project's Deploy page, with the projects doing it now. Then the detail in tabs, in the
+// order people need it: Setup order, Settings, Provisioning, Web interface map, File state, In use.
+// The check on the example unit and the drift are simulated (src/lib/cfgstate.mjs, ./_use.mjs).
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import DetailTabs from '../../components/DetailTabs.astro';
+import Section from '../../components/Section.astro';
+import Icon from '../../components/Icon.astro';
+import DeviceArt from '../../components/DeviceArt.astro';
+import ConfigView from '../../components/ConfigView.astro';
+import ConfigScript from '../../components/ConfigScript.astro';
+import { recHere } from '../../lib/vt.mjs';
+import { configurations, models, href, fmtDate, plural, modelName } from '../../lib/data.mjs';
+import { useOf, factsOf, provisioningOf, mapOf, ROOM_STATE } from './_use.mjs';
+
+export function getStaticPaths() {
+  return Object.values(configurations).map((cfg) => ({ params: { id: cfg.id }, props: { cfg } }));
+}
+const { cfg } = Astro.props;
+const f = factsOf(cfg), u = useOf(cfg), pv = provisioningOf(cfg), mp = mapOf(cfg);
+const fs = u.fs, drift = fs.systems.filter((s) => s.state === 'drift' || s.state === 'missing').length;
+const profileTo = (m) => href(`/profiles/${models[m].class}/${m}/`);
+const TABS = [
+  { id: 'setup', label: 'Setup order', count: f.steps },
+  { id: 'settings', label: 'Settings', count: f.applied },
+  { id: 'provisioning', label: 'Provisioning', count: pv.systems.filter((s) => s.applies).length },
+  mp.hasMap && { id: 'map', label: mp.webUi ? 'Web interface map' : 'Where it is set', count: mp.liveMenus.length },
+  { id: 'files', label: 'File state', count: drift || undefined },
+  { id: 'in-use', label: 'In use', count: u.units.length + u.now.length + u.soon.length || undefined },
+].filter(Boolean);
+const NUMBERS = [
+  { n: f.steps, label: f.steps === 1 ? 'Setup step' : 'Setup steps', to: '#setup' },
+  { n: f.applied, label: 'To set or verify', to: '#settings' },
+  { n: u.configuring, label: u.configuring === 1 ? 'Device to configure' : 'Devices to configure', to: '#in-use' },
+  { n: u.drifted, label: u.drifted === 1 ? 'Unit drifted' : 'Units drifted', to: '#in-use', tone: u.drifted ? 'warn' : undefined },
+];
+const pct = (p) => (p.total ? Math.round((p.done / p.total) * 100) : 0);
+const STATE_PILL = { done: 'manage', doing: 'deploy', todo: 'plain', blocked: 'bad' };
+---
+<Shell vendorOk title={cfg.name} section="configurations" about={{ kind: 'configuration', label: cfg.name, to: `/configurations/${cfg.id}/` }}
+  crumbs={[{ label: 'Configurations', to: '/configurations/' }, { label: f.kind, to: `/configurations/?cls=${f.cls}` }, { label: cfg.name }]}>
+  <PageBand overline="Configuration" title={cfg.name} numbers={NUMBERS} sim>
+    <Fragment slot="overline">
+      <a href={href(`/profiles/${f.cls}/`)}>{f.kind}</a>
+      <span class="pill info plain" title={cfg.mode}>{cfg.mode.length > 30 ? f.mode : cfg.mode}</span>
+      {f.fwShort && <span title={f.fwFull}>Firmware <span class="mono">{f.fwShort}</span></span>}
+    </Fragment>
+    <Fragment slot="lede">{`For ${f.maker} ${f.modelList}. Version ${cfg.version}, updated ${fmtDate(cfg.updated)}.`}</Fragment>
+    {u.now.length === 1 && <a slot="action" class="btn primary" href={u.now[0].integrate}>Open in a project</a>}
+    {u.now.length > 1 && (
+      <details slot="action" class="cf-open">
+        <summary class="btn primary">Open in a project<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg></summary>
+        <div class="cf-menu" role="menu">
+          {u.now.map((p) => <a role="menuitem" href={p.integrate}><b><span class="mono">{p.id}</span> {p.name}</b><small>{p.site} · {p.done} of {p.total} configured</small></a>)}
+        </div>
+      </details>
+    )}
+  </PageBand>
+
+  <div class="content cfr">
+    <div class="cw cw-full" data-cw data-cfg={cfg.id}>
+      <div class="g12">
+        <section class="card cf-how s-8" aria-labelledby="cf-how-h">
+          <span class="cf-art stage" {...recHere(cfg.id)}><DeviceArt model={cfg.models[0]} cls={f.cls} small label={modelName(cfg.models[0])} /></span>
+          <div class="cf-how-t">
+            <h2 id="cf-how-h">Configuring happens in a project's Deploy page</h2>
+            <p class="muted">Each device is provisioned, installed, configured in this setup order and commissioned there, ticked off with who and when. This page is the standard it follows.</p>
+            {u.now.length > 0 ? (
+              <ul class="cf-prj">
+                {u.now.map((p) => (
+                  <li>
+                    <a class="cf-prj-a" href={p.integrate}>
+                      <span class="cf-prj-n"><b><span class="mono">{p.id}</span> {p.name}</b><small>{p.site} · {plural(p.rooms.length, 'room')} · {p.total} {p.total === 1 ? 'device' : 'devices'}</small></span>
+                      <span class="cf-prog" aria-label={`${p.done} of ${p.total} configured`}><span class="cf-prog-bar"><i class="d" style={`width:${pct(p)}%`}></i><i class="g" style={`width:${p.total ? Math.round((p.doing / p.total) * 100) : 0}%`}></i></span><small>{p.done} of {p.total} configured</small></span>
+                      <span class="cf-prj-go">Open<Icon name="arrow" size={14} /></span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p class="cf-none">No project is configuring it now. {u.soon.length > 0 ? <a href="#in-use">{plural(u.soon.length, 'project')} will, later.</a> : <a href={href('/projects/')}>Every project</a>}</p>
+            )}
+          </div>
+        </section>
+        <section class="card side-card cf-chk s-4" aria-labelledby="cf-chk-h">
+          <h3 id="cf-chk-h">On the units running it</h3>
+          <ConfigView cfg={cfg} pane="check" />
+          <dl class="kv">
+            <div><dt>Units in service</dt><dd class="num">{u.live ? <a href="#in-use">{u.live}</a> : u.live}</dd></div>
+            <div><dt>Records drifted</dt><dd>{u.drifted ? <a href="#in-use">{plural(u.drifted, 'unit')}</a> : u.live ? 'None' : 'No units yet'}</dd></div>
+          </dl>
+        </section>
+      </div>
+
+      <DetailTabs tabs={TABS} label="Configuration">
+        <ConfigView slot="setup" cfg={cfg} pane="setup" />
+        <ConfigView slot="settings" cfg={cfg} pane="settings" />
+        <div slot="provisioning" class="pv">
+          <p class="pv-lede">Provision is the first step of Deploy: before or as each {f.kind.toLowerCase()} arrives, every system gets its record, so the device is known the moment it is plugged in. It is ticked in the project's Deploy page; this is what each record needs.</p>
+          <div class="g12">
+            {pv.hostnames && (
+              <div class="card side-card s-4">
+                <h3>Hostname</h3>
+                <p class="pv-big mono">&lt;site&gt;-&lt;room&gt;-{pv.prefix}NN</p>
+                <p class="muted pv-note">{pv.example ? <>For example <span class="mono">{pv.example}</span>: the site, the room number without its dot, <span class="mono">{pv.prefix}</span> for {f.kind.toLowerCase()}, and the number in the room.</> : <>The site, the room number without its dot, <span class="mono">{pv.prefix}</span> for {f.kind.toLowerCase()}, and the number in the room.</>} Full name: <span class="mono">…aigna.example</span>.</p>
+              </div>
+            )}
+            <div class="card side-card s-4">
+              <h3>Firmware</h3>
+              <p class="pv-big mono">{pv.fw?.version ?? f.fwShort ?? 'Not versioned'}</p>
+              <p class="muted pv-note">{pv.fw ? <>The Aigna standard on {pv.fwLine.name}. Check it before configuring; a different version can change menus and defaults.</> : f.fwFull ? <>{f.fwFull}. Check it before configuring.</> : <>No version is named for this configuration.</>}</p>
+            </div>
+            <div class="card side-card s-4">
+              <h3>Licence and management</h3>
+              {pv.licence.length ? <p class="pv-note">{pv.licence.join('. ')}.</p> : <p class="muted pv-note">No licence named in this configuration.</p>}
+              {cfg.managed_by && <p class="muted pv-note">Managed in: {cfg.managed_by}.</p>}
+            </div>
+          </div>
+          <div class="pv-sys">
+            {pv.systems.map((sy) => (
+              <div class:list={['pv-c', { na: !sy.applies }]}>
+                <p class="pv-h"><span class="pv-i"><Icon name={sy.icon} size={15} /></span><span><b>{sy.name}</b><small>{sy.does}</small></span>{!sy.applies && <span class="pv-na">Not used</span>}</p>
+                {sy.applies ? (
+                  <>
+                    <p class="pv-file mono">{sy.file}</p>
+                    <p class="pv-k">Needs</p>
+                    <ul class="pv-f">{sy.fields.map((x) => <li>{x}</li>)}</ul>
+                    {sy.healthy.length > 0 && <p class="pv-ok"><Icon name="check" size={12} />Healthy when {sy.healthy.join('; ')}.</p>}
+                  </>
+                ) : <p class="muted pv-note">No record: {f.kind.toLowerCase()} units are not kept in {sy.name}.</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+        {mp.hasMap && <ConfigView slot="map" cfg={cfg} pane="map" />}
+        <ConfigView slot="files" cfg={cfg} pane="files" />
+        <div slot="in-use" class="iu">
+          <Section title="Being configured now" id="iu-now" aside="In each project's Deploy page">
+            {u.now.length ? (
+              <div class="iu-grid">
+                {u.now.map((p) => (
+                  <article class="card iu-p">
+                    <header class="iu-ph">
+                      <a href={p.href}><span class="mono">{p.id}</span> <b>{p.name}</b></a>
+                      <small class="faint">{p.site}{p.target ? ` · due ${fmtDate(p.target)}` : ''}</small>
+                    </header>
+                    <span class="cf-prog"><span class="cf-prog-bar"><i class="d" style={`width:${pct(p)}%`}></i><i class="g" style={`width:${p.total ? Math.round((p.doing / p.total) * 100) : 0}%`}></i></span><small>{p.done} of {p.total} configured</small></span>
+                    <ul class="iu-rooms">
+                      {p.rooms.map((r) => <li><a href={r.href}>{r.title}</a><small class="faint">{r.devices} {r.devices === 1 ? 'device' : 'devices'}</small><span class={`pill ${STATE_PILL[r.state]}`}>{ROOM_STATE[r.state]}</span></li>)}
+                    </ul>
+                    <a class="btn small iu-go" href={p.integrate}>Open in Deploy<Icon name="arrow" size={14} /></a>
+                  </article>
+                ))}
+              </div>
+            ) : <p class="muted iu-empty">No project is configuring it now.</p>}
+          </Section>
+          {u.soon.length > 0 && (
+            <Section title="Coming up" id="iu-soon" aside="Projects that will configure it in Deploy">
+              <div class="list">
+                {u.soon.map((p) => (
+                  <a class="row plain iu-row" href={p.href}>
+                    <span><span class="name"><span class="mono">{p.id}</span> {p.name}</span><span class="sub">{p.site} · {p.rooms.map((r) => r.title).join(', ')}</span></span>
+                    <span class="end"><span class="pill plain">{p.phase}</span><span class="faint">{p.total} {p.total === 1 ? 'device' : 'devices'}</span></span>
+                  </a>
+                ))}
+              </div>
+            </Section>
+          )}
+          <Section title="Units running it" id="iu-units" aside={u.units.length ? `${u.live} in service · ${u.drifted} drifted · simulated check` : undefined} showAll={10}>
+            {u.units.length ? (
+              <div class="tablewrap">
+                <table class="iu-t">
+                  <thead><tr><th scope="col">Unit</th><th scope="col">Room</th><th scope="col">Office</th><th scope="col">Model</th><th scope="col">Status</th><th scope="col">Records</th></tr></thead>
+                  <tbody data-items>
+                    {u.units.map((x) => (
+                      <tr class:list={{ drift: x.drift }}>
+                        <td><a href={x.href}><b>{x.name}</b></a>{x.host && <small class="mono faint">{x.host}</small>}</td>
+                        <td><a href={href(`/rooms/${x.roomId}/`)}>{x.room}</a></td>
+                        <td>{x.site}</td>
+                        <td>{x.model}</td>
+                        <td><span class={`pill ${x.stage}`}>{x.status}</span></td>
+                        <td>{x.drift ? <span class="iu-dr"><i class="hl" data-state="warn"></i>{x.drift}</span> : x.live ? <span class="iu-ok"><i class="hl" data-state="ok"></i>In sync</span> : <span class="faint">Checked when live</span>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : <p class="muted iu-empty">No unit of {f.modelList} yet.</p>}
+          </Section>
+        </div>
+      </DetailTabs>
+    </div>
+  </div>
+  <ConfigScript />
+</Shell>
+
+<style>
+  .cfr { gap: 24px; }
+  /* The clear line: where configuring happens, and the projects doing it now. */
+  .cf-how { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 18px; padding: 16px 20px; align-items: start; }
+  .cf-art { display: grid; place-items: center; height: 110px; padding: 8px 12px; }
+  .cf-art :global(.model-art) { max-height: 94px; width: auto; max-width: 100%; }
+  .cf-how-t { display: grid; gap: 6px; min-width: 0; }
+  .cf-how-t h2 { margin: 0; font-size: 19px; }
+  .cf-how-t > p { margin: 0; font-size: 13.5px; max-width: 72ch; }
+  .cf-prj { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+  .cf-prj-a { display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, 220px) auto; gap: 14px; align-items: center; padding: 9px 12px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface-2); color: inherit; text-decoration: none; transition: border-color var(--dur-hover) var(--ease-settle), background var(--dur-hover) var(--ease-settle); }
+  .cf-prj-a:hover { border-color: var(--accent); color: inherit; }
+  .cf-prj-n { display: grid; gap: 2px; min-width: 0; }
+  .cf-prj-n b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cf-prj-n small, .cf-prog small { font-size: 12px; color: var(--text-3); }
+  .cf-prog { display: grid; gap: 4px; }
+  .cf-prog-bar { display: flex; height: 7px; border-radius: 4px; background: var(--surface-3); overflow: hidden; }
+  .cf-prog-bar .d { background: var(--green); } .cf-prog-bar .g { background: var(--blue); opacity: .7; }
+  .cf-prj-go { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 650; color: var(--accent-ink); }
+  .cf-none { margin: 4px 0 0; font-size: 13.5px; }
+  .cf-chk .cw-state { justify-self: stretch; grid-template-columns: 44px minmax(0, 1fr) auto; }
+  /* "Open in a project" with several projects: a short menu that drops from the button. */
+  .cf-open { position: relative; }
+  .cf-open > summary { list-style: none; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .cf-open > summary::-webkit-details-marker { display: none; }
+  .cf-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: 320px; display: grid; gap: 2px; padding: 6px; border-radius: var(--radius-lg); background: var(--surface); border: var(--border-card); box-shadow: var(--shadow-lg); transform-origin: top right; }
+  .cf-open[open] .cf-menu { animation: cf-drop var(--dur-pop) var(--ease-settle); }
+  .cf-menu a { display: grid; gap: 2px; padding: 8px 10px; border-radius: var(--radius); color: inherit; text-decoration: none; }
+  .cf-menu a:hover { background: var(--surface-2); color: inherit; }
+  .cf-menu b { font-size: 13.5px; } .cf-menu small { font-size: 12px; color: var(--text-3); }
+  @keyframes cf-drop { from { opacity: 0; transform: translateY(-4px) scaleY(.96); } }
+
+  /* Provisioning */
+  .pv { display: grid; gap: 16px; }
+  .pv-lede { margin: 0; font-size: 14px; color: var(--text-2); max-width: 90ch; }
+  .pv-big { margin: 0; font-size: 17px; font-weight: 650; overflow-wrap: anywhere; }
+  .pv-note { margin: 0; font-size: 13px; line-height: 1.45; }
+  .pv-sys { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  .pv-c { display: grid; gap: 6px; align-content: start; padding: 0 0 12px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--surface); overflow: hidden; }
+  .pv-c > :not(.pv-h) { margin-left: 12px; margin-right: 12px; }
+  .pv-c.na { border-style: dashed; background: none; }
+  .pv-h { display: flex; align-items: center; gap: 9px; margin: 0; padding: 9px 11px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+  .pv-c.na .pv-h { background: none; color: var(--text-3); border-bottom-style: dashed; }
+  .pv-h b { display: block; font-size: 13.5px; } .pv-h small { display: block; font-size: 11.5px; color: var(--text-3); }
+  .pv-i { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: var(--surface); border: 1px solid var(--line); color: var(--text-2); flex: none; }
+  .pv-na { margin-left: auto; font: 700 10px/1 var(--font-mono); letter-spacing: .05em; text-transform: uppercase; padding: 4px 7px; border-radius: 999px; background: var(--surface-2); color: var(--text-3); }
+  .pv-file { margin-top: 4px; font-size: 12px; color: var(--text-2); overflow-wrap: anywhere; }
+  .pv-k { margin-bottom: 0; font: 700 10.5px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+  .pv-f { list-style: none; padding: 0; margin-top: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+  .pv-f li { font-size: 12px; padding: 3px 8px; border-radius: var(--pill-radius); background: var(--surface-2); border: 1px solid var(--line); }
+  .pv-ok { margin-bottom: 0; display: flex; gap: 6px; align-items: baseline; font-size: 12.5px; color: var(--text-2); line-height: 1.45; }
+  .pv-ok :global(svg) { flex: none; color: var(--green-ink); transform: translateY(1px); }
+
+  /* In use */
+  .iu { display: grid; gap: 24px; }
+  .iu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+  .iu-p { display: grid; gap: 10px; align-content: start; padding: 14px 16px; }
+  .iu-ph { display: grid; gap: 2px; }
+  .iu-ph a { color: inherit; text-decoration: none; font-size: 15px; } .iu-ph a:hover { text-decoration: underline; }
+  .iu-rooms { list-style: none; margin: 0; padding: 0; display: grid; }
+  .iu-rooms li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 7px 0; border-top: 1px solid var(--line); font-size: 13.5px; }
+  .iu-rooms .pill { font-size: 11.5px; padding: 4px 8px; }
+  .iu-go { justify-self: start; display: inline-flex; gap: 6px; align-items: center; }
+  .iu-empty { margin: 0; }
+  .iu-row .end { display: flex; gap: 10px; align-items: center; }
+  .iu-t { width: 100%; }
+  .iu-t td small { display: block; font-size: 11.5px; }
+  .iu-t td a { color: inherit; } .iu-t td a:hover { color: var(--accent-ink); }
+  .iu-t tr.drift td { background: color-mix(in srgb, var(--amber) 7%, transparent); }
+  .iu-dr, .iu-ok { display: inline-flex; gap: 8px; align-items: center; font-size: 13px; }
+  .iu-dr { color: var(--amber-ink); font-weight: 600; }
+  @media (max-width: 1100px) { .cf-prj-a { grid-template-columns: minmax(0, 1fr) auto; } .cf-prog { grid-column: 1 / -1; grid-row: 2; } }
+  @media (max-width: 760px) {
+    .cf-how { grid-template-columns: minmax(0, 1fr); padding: 14px; }
+    .cf-art { height: 72px; padding: 4px; } .cf-art :global(.model-art) { max-height: 60px; }
+    .cf-menu { width: min(320px, calc(100vw - 32px)); left: 0; right: auto; }
+    .iu-grid { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (prefers-reduced-motion: reduce) { .cf-open[open] .cf-menu { animation: none; } }
+</style>

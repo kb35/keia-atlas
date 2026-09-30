@@ -1,0 +1,80 @@
+---
+/* PageBand: the top of every page (docs/rules/layout.md, L1 and L9; docs/standards/page-anatomy.md).
+   One short band, about 100 px tall at 1440 wide:
+     left   overline row (the kind of thing, then any status, then a SimTag), the title, one line
+     right  KeyNumbers (3 or 4 figures, each may link), then one primary action
+   Props:  overline  the kind of thing: "Room", "Unit", "Project PRJ-09", "Catalogue" (not an audience or a count)
+           title     the page title (h1; it morphs into the next page's title)
+           lede      one line; longer text is cut with an ellipsis, so keep it to one line
+           sim       true when the figures are made up ("Simulated"); "live" when they are made up and change
+                     as you watch ("Simulated live")
+           stage     the adoption stage this page arrives at ("Stage n")
+           numbers   optional shortcut for the numbers slot: [{ n, label, to?, tone? }] (each may have an `id`, so a
+                     script can change it: window.rsKeyNumber(id, value), see KeyNumbers)
+           rec       the record this page is, for the shared element that flies in from the list or the
+                     schedule (recHere in src/lib/vt.mjs). The title takes the name, so a card or chip
+                     marked data-vt-rec="<same id>" flies into the title, and back again.
+   Slots:  overline  more overline items after the kind (a site code, a status pill)
+           lede      the line, when it needs a link (instead of the lede prop)
+           numbers   KeyNumbers, or anything the same height
+           action    one primary button (.btn.primary). Never a button under the lede.
+   The band names itself `band` for page transitions, so between two pages that both have one it stays
+   in place and only its words change (motion.css, M5). */
+import KeyNumbers from './KeyNumbers.astro';
+import SimTag from './SimTag.astro';
+import { recHere } from '../lib/vt.mjs';
+interface Num { n: string | number; label: string; to?: string; tone?: 'bad' | 'warn' | 'good'; id?: string }
+interface Props { overline: string; title: string; lede?: string; sim?: boolean | 'live'; stage?: number; numbers?: Num[]; rec?: string }
+const { overline, title, lede, sim = false, stage, numbers, rec } = Astro.props;
+const hasLede = !!lede || Astro.slots.has('lede');
+const hasSide = Astro.slots.has('numbers') || Astro.slots.has('action') || (numbers?.length ?? 0) > 0;
+---
+<section class="band pb" aria-labelledby="pb-title">
+  <div class="pb-main" data-help="page">
+    <p class="pb-over">
+      <span class="overline">{overline}</span>
+      <slot name="overline" />
+      {stage && <SimTag kind={`stage:${stage}`} />}
+      {sim && <SimTag kind={sim === 'live' ? 'live' : 'simulated'} />}
+    </p>
+    <h1 id="pb-title" {...(rec ? recHere(rec) : {})}>{title}</h1>
+    {hasLede && <p class="pb-lede" title={lede}>{lede ?? <slot name="lede" />}</p>}
+  </div>
+  {hasSide && (
+    <div class="pb-side">
+      {Astro.slots.has('numbers') ? <slot name="numbers" /> : numbers && <KeyNumbers items={numbers} />}
+      {Astro.slots.has('action') && <div class="pb-act" data-help="page.action"><slot name="action" /></div>}
+    </div>
+  )}
+</section>
+
+<style is:global>
+  .band.pb { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 24px; align-items: center; padding: 14px var(--pad-x) 14px; view-transition-name: band; }
+  .pb-main { min-width: 0; }
+  .pb-over { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: 20px; margin: 0 0 4px; font-size: 13px; color: var(--text-2); }
+  .pb-over .overline { font-size: 11px; }
+  .pb-over > :not(.overline):not(.sim-t) { font-size: 12.5px; }
+  .pb-over .pill { padding: 3px 8px; font-size: 11.5px; }
+  .pb-over .code { padding: 3px 6px; font-size: 11px; }
+  .band.pb h1 { font-size: min(var(--title-size), 30px); line-height: 1.12; overflow-wrap: anywhere; }
+  .pb-lede { margin: 4px 0 0; font-size: 14px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pb-side { display: flex; align-items: center; gap: 12px 20px; }
+  .pb-act { display: flex; gap: 8px; }
+  .pb-act .btn { white-space: nowrap; }
+  /* Responsive (layout.md L10), by the width of main:
+       900 px and wider  the title on the left, the numbers and the action on the right
+       600 to 899 px     the numbers go under the title, the action at the right end of their row
+       under 600 px      the numbers make a 2 by 2 grid, the action takes the full width under them */
+  @container main (max-width: 899px) {
+    .band.pb { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    .pb-side { justify-content: space-between; flex-wrap: wrap; gap: 10px 20px; }
+    .pb-side .kn { margin-left: -10px; }
+  }
+  @container main (max-width: 599px) {
+    .band.pb { padding: 12px var(--pad-x) 14px; }
+    .pb-lede { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .pb-side { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    .pb-act { display: flex; }
+    .pb-act .btn { flex: 1; justify-content: center; }
+  }
+</style>

@@ -1,0 +1,111 @@
+---
+// One room of a project's Deploy work: commissioning.
+// Record archetype. The room test (a few lines, Pass or Fail, "All passed" in one tap) beside the units
+// in the room and where each stands. A vendor sees the installs here instead. What needs a person in
+// this room follows.
+import Shell from '../../../../../layouts/Shell.astro';
+import PageBand from '../../../../../components/PageBand.astro';
+import SidePanel from '../../../../../components/SidePanel.astro';
+import Section from '../../../../../components/Section.astro';
+import LiveBar from '../../../../../components/LiveBar.astro';
+import IntegrateLive from '../../../../../components/IntegrateLive.astro';
+import { projects, PHASE_LABEL, STEP_LABEL, phasesOf, href } from '../../../../../lib/data.mjs';
+import { integratePlan, buildModel, roomHref, batchHref } from '../../../../../lib/integrate.mjs';
+import { cellHtml, needsHtml, testsHtml } from '../../../../../lib/integrate-view.mjs';
+
+export function getStaticPaths() {
+  return Object.values(projects).filter((p) => phasesOf(p).includes('integrate')).flatMap((p) => {
+    const plan = integratePlan(p);
+    return plan.rooms.filter((r) => r.units.length).map((r) => ({ params: { id: p.id.toLowerCase(), room: r.id }, props: { pid: p.id, plan, rid: r.id } }));
+  });
+}
+const { pid, plan, rid } = Astro.props;
+const p = Object.values(projects).find((x) => x.id === pid);
+const M = buildModel(plan);
+const r = M.R.get(rid);
+const s = M.roomSum(rid);
+const PHASE = PHASE_LABEL.integrate;
+const home = `/projects/${p.id.toLowerCase()}/`;
+const rooms = plan.rooms.filter((x) => x.units.length);
+const next = rooms[rooms.findIndex((x) => x.id === rid) + 1] ?? null;
+const kept = plan.kept.filter((k) => k.room === rid);
+const units = r.units.map((id) => M.U.get(id));
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many ?? `${one}s`}`;
+---
+<Shell title={`${r.name}: ${p.name}`} section="projects" minStage={3} vendorOk about={{ kind: 'room', label: `${r.name}, ${p.id} ${PHASE}`, to: `${home}integrate/room/${rid}/` }}
+  crumbs={[{ label: 'Projects', to: '/projects/' }, { label: p.name, to: home }, { label: PHASE, to: `${home}integrate/` }, { label: r.name }]}>
+  <PageBand overline={`Room · Project ${p.id} · ${STEP_LABEL.commission}`} title={r.name} lede={`${r.profile}. A short room test once every unit is set up, then sign it off.`} sim="live" rec={`int-r-${rid}`}
+    numbers={[
+      { n: `${s.setUp}/${s.total}`, label: 'Units set up', to: '#in-room', id: 'int-setup' },
+      { n: kept.length, label: 'Kept as they are', to: '#in-room' },
+      { n: `${s.passed}/${s.tests.length}`, label: 'Room test passed', to: '#room-test', tone: s.failed.length ? 'warn' : s.signed ? 'good' : undefined, id: 'int-tests' },
+    ]}>
+    <a slot="action" class="btn primary" data-help="integrate.next-room" href={next ? roomHref(plan, next.id) : `${plan.base}`}>{next ? 'Open the next room' : `Back to ${PHASE}`}</a>
+  </PageBand>
+
+  <div class="content integrate ir" data-int data-page="room" data-focus={rid}>
+    <LiveBar page={`integrate:${p.id}`} />
+    <div class="g12 top">
+      <section class="card s-7 ir-test" id="room-test" aria-labelledby="ir-test-h" data-engineer-only>
+        <header class="ir-h" data-help="integrate.roomtest"><h2 id="ir-test-h">Room test</h2><span class="faint">Test it the way people will use it</span></header>
+        <div data-slot="tests" data-r={rid} set:html={testsHtml(M, rid)} />
+      </section>
+      <section class="card s-7 ir-test" data-vendor-only aria-labelledby="ir-inst-h">
+        <header class="ir-h" data-help="integrate.installs"><h2 id="ir-inst-h">Your installs in this room</h2><span class="faint">One action per unit</span></header>
+        <div data-slot="vinstall" data-r={rid}></div>
+      </section>
+
+      <SidePanel class="s-5" id="in-room" title="In this room" meta={`${plural(units.length, 'to set up', 'to set up')}${kept.length ? ` · ${kept.length} kept` : ''}`} help="integrate.inroom">
+        <ul class="ir-units">
+          {units.map((u) => (
+            <li>
+              <a class="ir-u" href={`${batchHref(plan, u.batch)}#u=${encodeURIComponent(u.id)}`}><b>{u.short}</b><small>{[u.modelName, u.host].filter(Boolean).join(' · ')}</small></a>
+              <a class="ir-sheet" href={u.sheet} data-help="integrate.sheet-open">Build sheet</a>
+              <span class="ir-cells">{u.steps.map((st) => <span set:html={cellHtml(M, u.id, st)} />)}</span>
+            </li>
+          ))}
+        </ul>
+        {kept.length > 0 && (
+          <details class="ir-kept">
+            <summary>{plural(kept.length, 'device')} kept as they are</summary>
+            <p>Not changed by this project; the room test covers them.</p>
+            <ul>{kept.map((k) => <li>{k.short}{k.model ? <small> · {k.model}</small> : null}</li>)}</ul>
+          </details>
+        )}
+        {r.commissionTask && <p class="ir-task"><a href={r.commissionTask.href}>{r.commissionTask.id} {r.commissionTask.title}</a></p>}
+        <p class="ir-room"><a href={href(`/rooms/${rid}/`)}>The room's own page</a></p>
+      </SidePanel>
+    </div>
+
+    <Section title="Needs you in this room" help="integrate.needs" data-engineer-only>
+      <div class="card ir-needs" data-slot="needs" data-room={rid} set:html={needsHtml(M, { room: rid })} />
+    </Section>
+
+    <IntegrateLive plan={plan} />
+  </div>
+</Shell>
+
+<style>
+  .content.integrate :global(.livebar) { margin-bottom: 14px; }
+  .ir-test { padding: 16px 20px; display: grid; gap: 12px; align-content: start; }
+  .ir-test[data-vendor-only] { display: none; }
+  :global([data-mode=vendor]) .ir-test[data-vendor-only] { display: grid; }
+  .ir-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+  .ir-h h2 { margin: 0; font-size: 16px; }
+  .ir-h span { font-size: 12.5px; }
+  .ir-units { list-style: none; margin: 0; padding: 0; display: grid; }
+  .ir-units > li { display: grid; gap: 4px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .ir-units > li:first-child { border-top: 0; padding-top: 0; }
+  .ir-u { display: grid; color: inherit; text-decoration: none; }
+  .ir-u b { font-size: 13.5px; }
+  .ir-u small { font-size: 12px; color: var(--text-3); }
+  .ir-u:hover b { text-decoration: underline; }
+  .ir-sheet { justify-self: start; font-size: 12px; font-weight: 600; }
+  .ir-cells { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; margin-left: -8px; }
+  .ir-kept { margin-top: 12px; font-size: 13px; }
+  .ir-kept summary { cursor: pointer; font-weight: 600; }
+  .ir-kept p { margin: 6px 0; color: var(--text-2); }
+  .ir-kept ul { margin: 0; padding-left: 18px; color: var(--text-2); }
+  .ir-task, .ir-room { margin: 10px 0 0; font-size: 13px; }
+  .ir-needs { padding: 14px 18px; }
+</style>

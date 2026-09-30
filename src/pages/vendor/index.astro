@@ -1,0 +1,331 @@
+---
+// Vendor portal: a vendor signs in and sees only their installation, the device reference they need,
+// and a form to record serial numbers and MAC addresses. Their records wait for Aigna's review.
+// A Record page (docs/standards/page-anatomy.md): the band with the vendor's own key numbers, then their
+// work (rooms to record, or tickets on covered devices) beside a sticky side panel with the project or
+// contract, then the rest in full-width sections. Aigna staff see a preview of each vendor, one tab
+// each; a signed-in vendor sees only their own, with no tabs. Nothing is saved or sent.
+import Shell from '../../layouts/Shell.astro';
+import Icon from '../../components/Icon.astro';
+import DeviceArt from '../../components/DeviceArt.astro';
+import PageBand from '../../components/PageBand.astro';
+import KeyNumbers from '../../components/KeyNumbers.astro';
+import SidePanel from '../../components/SidePanel.astro';
+import Section from '../../components/Section.astro';
+import DetailTabs from '../../components/DetailTabs.astro';
+import { models, projects, spaces, sites, classes, spaceTypes, modelName, className, roomWords, href, vendors as VENDORS, playbooks, PHASE_LABEL, PHASES, configFor, advisoriesFor, incidents, commsRooms, INC_STATE, ADV_LEVEL } from '../../lib/data.mjs';
+import { PEOPLE, person, ROLES } from '../../lib/demo.mjs';
+
+const vendors = PEOPLE.filter((p) => p.vendor);
+const PACK = ['plan', 'design', 'integrate', 'handover'];
+const projectModels = (prj) => [...new Set(prj.spaces.flatMap((ps) => spaces[ps.space].positions.map((p) => p.model).filter(Boolean)))];
+const covered = (v) => {
+  const c = VENDORS[v.vendor]?.contract.covers_models ?? [];
+  const n = {}; for (const s of Object.values(spaces)) for (const p of s.positions) if (c.includes(p.model)) n[p.model] = (n[p.model] ?? 0) + p.units.length;
+  return n;
+};
+const networked = (cls) => Boolean(classes[cls]?.platforms?.dhcp_dns);
+// Made-up MACs in the locally administered range (02:...), so they can never be a real device's.
+const fakeMac = (serial) => { let h = 0; for (const c of serial) h = (h * 31 + c.charCodeAt(0)) >>> 0; const b = [2, 0x52, 0x53, (h >> 16) & 255, (h >> 8) & 255, h & 255]; return b.map((x) => x.toString(16).padStart(2, '0').toUpperCase()).join(':'); };
+const roomName = (id) => (spaces[id]?.number ? `${spaces[id].number} ${spaces[id].name}` : spaces[id]?.name ?? id);
+const STATE = { done: 'accepted', snags: 'review', 'in-progress': 'todo', 'not-started': 'todo' };
+const STATE_LABEL = { accepted: 'Accepted by Aigna', review: 'Recorded, waiting for review', todo: 'To record' };
+const whoCss = vendors.map((v) => `:root[data-who-kind="vendor"]:not([data-who="${v.id}"]) [data-for="${v.id}"]{display:none !important}`).join('');
+
+// Everything each vendor's view needs, worked out once.
+const VIEW = vendors.map((v) => {
+  if (v.roleId === 'service-vendor') {
+    const V = VENDORS[v.vendor], cov = covered(v);
+    const advs = [...new Map(Object.keys(cov).flatMap((m) => advisoriesFor(m)).map((a) => [a.id, a])).values()];
+    const tickets = Object.values(incidents).filter((i) => i.state !== 'resolved' && spaces[i.room]?.positions.some((p) => p.position === i.position && cov[p.model]));
+    const units = Object.values(cov).reduce((a, b) => a + b, 0);
+    return {
+      v, kind: 'service', V, cov, advs, tickets,
+      numbers: [
+        { n: units, label: 'Devices covered', to: `#${v.id}-covered` },
+        { n: tickets.length, label: tickets.length === 1 ? 'Open ticket' : 'Open tickets', tone: tickets.length ? 'bad' : undefined, to: `#${v.id}-tickets` },
+        { n: advs.length, label: advs.length === 1 ? 'Advisory' : 'Advisories', tone: advs.length ? 'warn' : undefined, to: advs.length ? `#${v.id}-advs` : undefined, fact: !advs.length },
+      ],
+    };
+  }
+  const prjs = v.projects.map((pid) => {
+    const prj = Object.values(projects).find((x) => x.id === pid);
+    const rooms = prj.spaces.map((ps) => { const s = spaces[ps.space]; return { s, st: STATE[ps.state], rows: s.positions.filter((p) => p.current) }; });
+    return { prj, rooms };
+  });
+  const rooms = prjs.flatMap((x) => x.rooms);
+  const count = (st) => rooms.filter((r) => r.st === st).reduce((n, r) => n + r.rows.length, 0);
+  return {
+    v, kind: 'project', prjs,
+    numbers: [
+      { n: rooms.length, label: rooms.length === 1 ? 'Room' : 'Rooms', to: `#${v.id}-rooms` },
+      { n: count('todo'), label: 'Devices to record', tone: count('todo') ? 'warn' : undefined, to: `#${v.id}-rooms` },
+      { n: count('review'), label: 'Waiting for review', to: `#${v.id}-rooms` },
+      { n: rooms.filter((r) => r.st === 'accepted').length, label: 'Rooms accepted', tone: 'good', to: `#${v.id}-rooms` },
+    ],
+  };
+});
+const TABS = vendors.map((v) => ({ id: v.id, label: `${v.name}, ${v.vendorName}` }));
+---
+<Shell vendorOk title="Your installation" section="vendor" crumbs={[{ label: 'Your installation' }]}>
+  <PageBand overline="Vendor portal" title="Your installation" rec="dd-vendor" lede="Your project, each room's design, and where to record serial numbers and MACs." sim>
+    <Fragment slot="numbers">
+      {VIEW.map((x, i) => <div class="vp-num" data-for={x.v.id} data-vp-num={x.v.id} hidden={i > 0}><KeyNumbers items={x.numbers} /></div>)}
+    </Fragment>
+  </PageBand>
+
+  <div class="content vp">
+    <div class="vp-tabs">
+      <DetailTabs tabs={TABS} label="Preview as">
+        {VIEW.map((x) => (
+          <div slot={x.v.id}>
+            {x.kind === 'service' ? (
+              <div class="vendor-view" data-for={x.v.id}>
+                <div class="g12 top">
+                  <div class="s-7 vp-main">
+                    <section class="card pad" id={`${x.v.id}-tickets`}>
+                      <h2 class="vp-h">Open tickets on covered devices</h2>
+                      {x.tickets.length ? <ul class="v-tix">{x.tickets.map((t) => <li><span class="mono">{t.number}</span> <b>{t.short_description}</b><small>P{t.priority} · {INC_STATE[t.state]} · {spaces[t.room].name}, {sites[spaces[t.room].site].name}. Keia Atlas found: {t.keia_atlas.evidence[0]?.says}</small></li>)}</ul> : <p class="faint">None open.</p>}
+                    </section>
+                    {x.advs.length > 0 && (
+                      <section class="card pad" id={`${x.v.id}-advs`}>
+                        <h2 class="vp-h"><Icon name="alert" size={16} />Before you touch a covered device</h2>
+                        <ul class="v-advs">{x.advs.map((a) => <li class={`lv-${a.level}`}><b>{ADV_LEVEL[a.level]}</b> {a.title}. <span class="faint">{a.action}</span></li>)}</ul>
+                      </section>
+                    )}
+                  </div>
+                  <SidePanel class="s-5" title="Maintenance contract" meta={x.V.contract.ref}>
+                    <div class="vp-side">
+                      <div class="v-id"><span class="av big">{x.v.initials}</span><span><b>{x.v.name}</b><small>{x.V.name} · {ROLES[x.v.roleId].name}</small></span></div>
+                      <p class="faint vp-sum">{x.V.summary}</p>
+                      <p class="rs-sub">Your Aigna contact</p>
+                      <span class="pp"><span class="av">{person(x.V.owner).initials}</span><span><b>{person(x.V.owner).name}</b><small>{person(x.V.owner).role}</small></span></span>
+                      <p class="rs-sub">Service levels</p>
+                      <ul class="v-sla">{x.V.contract.sla.map((s) => <li><span>{s.what}</span><b>{s.target}</b></li>)}</ul>
+                      <a class="btn small" href={href('/device/')}>Find a device by asset tag</a>
+                    </div>
+                  </SidePanel>
+                </div>
+                <Section title="Devices under your contract" id={`${x.v.id}-covered`} aside={`${Object.keys(x.cov).length} models`}>
+                  <div class="card pad"><ul class="v-cov">{Object.entries(x.cov).sort((a, b) => b[1] - a[1]).map(([m, n]) => <li><a href={href(`/models/${m}/`)}>{modelName(m)}</a><b class="num">{n}</b></li>)}</ul></div>
+                </Section>
+              </div>
+            ) : x.prjs.map(({ prj, rooms }) => {
+              const lead = prj.roles?.find((r) => r.as === 'lead');
+              const V = VENDORS[x.v.vendor], pb = playbooks[prj.playbook], site = sites[prj.site];
+              const at = PHASES.indexOf(prj.phase);
+              const comms = commsRooms.filter((c) => c.site === prj.site);
+              const mine = pb ? pb.phases.flatMap((ph) => ph.steps.filter((st) => st.role === 'vendor').map((st) => ({ ph: ph.phase, ...st }))) : [];
+              const reviewer = lead ? person(lead.person).name : person(prj.owner).name;
+              return (
+                <div class="vendor-view" data-for={x.v.id}>
+                  <div class="g12 top">
+                    <section class="s-7 vp-main" id={`${x.v.id}-rooms`} aria-label="Rooms to record">
+                      {rooms.map(({ s, st, rows }) => (
+                        <section class={`card v-room vr-${st}`} data-room>
+                          <header class="vr-head">
+                            <span><b>{roomName(s.id)}</b><small>{roomWords(s.type.profile?.name ?? spaceTypes[s.space_type]?.profile?.name ?? s.space_type)}</small></span>
+                            <span class={`vr-state s-${st}`} data-room-state>{STATE_LABEL[st]}</span>
+                            <a class="btn small" href={href(`/room-profiles/${s.space_type}/`)} data-staff-only>Room design</a>
+                          </header>
+                          <div class="vr-table" role="table" aria-label={`Devices in ${roomName(s.id)}`}>
+                            <div class="vr-row vr-th" role="row"><span role="columnheader">Position</span><span role="columnheader">Serial number</span><span role="columnheader">MAC address</span><span role="columnheader"><span class="sr-only">Check</span></span></div>
+                            {rows.map((p) => {
+                              const net = networked(p.cls);
+                              const done = st !== 'todo';
+                              return (
+                                <div class="vr-row" role="row" data-pos>
+                                  <span class="vr-pos" role="cell">
+                                    <span class="vr-art">{p.model ? <DeviceArt model={p.model} cls={p.cls} small /> : <Icon name="devices" size={22} />}</span>
+                                    <span><b>{p.role ?? className(p.cls)}</b><small>{p.model ? <a href={href(`/models/${p.model}/`)}>{modelName(p.model)}</a> : 'Model per project'}{p.hostname ? ` · ${p.hostname}` : ''}</small></span>
+                                  </span>
+                                  <span role="cell">{done ? <span class="mono rec">{p.current.serial}</span> : <input class="vr-in" name="serial" placeholder="From the label" autocomplete="off" spellcheck="false" aria-label="Serial number" />}</span>
+                                  <span role="cell">{!net ? <span class="faint na">Not networked</span> : done ? <span class="mono rec">{fakeMac(p.current.serial)}</span> : <input class="vr-in mono" name="mac" placeholder="00:00:00:00:00:00" autocomplete="off" spellcheck="false" aria-label="MAC address" />}</span>
+                                  <span role="cell" class="vr-ok">{done ? <Icon name="check" size={16} /> : <span class="vr-msg" aria-live="polite"></span>}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          {st === 'todo' && <p class="vr-foot"><button type="button" class="btn primary small" data-submit-room data-reviewer={reviewer}>Send for review</button><span class="faint">Photograph each label before mounting; the review checks the photo against what you typed.</span></p>}
+                        </section>
+                      ))}
+                    </section>
+                    <SidePanel class="s-5" title={prj.name} meta={prj.id}>
+                      <div class="vp-side">
+                        <div class="v-id"><span class="av big">{x.v.initials}</span><span><b>{x.v.name}</b><small>{x.v.vendorName} · {x.v.role}</small></span></div>
+                        <p class="faint vp-sum">{site.name}, {site.city ?? ''}. The project is in {PHASE_LABEL[prj.phase].toLowerCase()}.</p>
+                        <p class="rs-sub">Your Aigna contacts</p>
+                        <span class="pp"><span class="av">{person(prj.owner).initials}</span><span><b>{person(prj.owner).name}</b><small>Project manager: dates and site access</small></span></span>
+                        {lead && <span class="pp"><span class="av">{person(lead.person).initials}</span><span><b>{person(lead.person).name}</b><small>Lead engineer: design questions and reviews</small></span></span>}
+                        <p class="rs-sub">The site</p>
+                        <dl class="vp-dl">
+                          <div><dt>Floors</dt><dd>{site.floors?.map((f) => f.name).join(', ')}</dd></div>
+                          <div><dt>Mains</dt><dd>{site.mains.volts} V, {site.mains.hz} Hz, plug {site.mains.plugs.join(', ')}</dd></div>
+                          <div><dt>Time zone</dt><dd>{site.time_zone}</dd></div>
+                          <div><dt>Comms room</dt><dd>{comms.length ? comms.map((c) => `${c.name}, ${c.number}`).join('; ') : 'Ask the network engineer'}</dd></div>
+                          <div><dt>Access</dt><dd>Weekdays 07:00 to 19:00; sign in at reception</dd></div>
+                          <div><dt>Deliveries</dt><dd>Book the loading bay two working days ahead</dd></div>
+                        </dl>
+                        <div class="va-grid">
+                          <div class="va va-yes"><p class="rs-sub"><Icon name="check" size={14} />You can see</p><ul><li>This project's rooms and designs</li><li>Device profiles, configurations and models</li><li>Your own records and their review</li></ul></div>
+                          <div class="va va-no"><p class="rs-sub"><Icon name="lock" size={14} />Stays with Aigna</p><ul><li>Other sites and projects</li><li>Incidents, costs and the year plan</li><li>People and hours</li></ul></div>
+                        </div>
+                      </div>
+                    </SidePanel>
+                  </div>
+
+                  <Section title="Your pack for this project" id={`${x.v.id}-pack`} aside="What Aigna gives you at each phase">
+                    <div class="card pad v-pack">
+                      <ol class="pack-steps">
+                        {PACK.map((ph) => (
+                          <li class:list={{ done: PHASES.indexOf(ph) < at, now: ph === prj.phase }}>
+                            <b>{PHASE_LABEL[ph]}</b>
+                            <span>{(V?.gets ?? []).filter((g) => g.when === ph).map((g) => g.what).join('. ') || 'Nothing at this phase'}</span>
+                          </li>
+                        ))}
+                      </ol>
+                      <div class="pack-grid">
+                        <div class="pk">
+                          <h3>Rooms and their designs</h3>
+                          <ul>{prj.spaces.map((ps) => { const r = spaces[ps.space]; return <li><a href={href(`/room-profiles/${r.space_type}/`)}>{roomName(r.id)}</a><small>{roomWords(r.type.profile.name)}, {r.option.name}</small></li>; })}</ul>
+                        </div>
+                        <div class="pk">
+                          <h3>Models and how to set them up</h3>
+                          <ul>{projectModels(prj).map((m) => { const c = configFor(m), a = advisoriesFor(m); return <li><a href={href(`/profiles/${models[m].class}/${m}/`)}>{modelName(m)}</a><small>{c ? `${c.name}, version ${c.version}` : 'Vendor defaults'}{a.length ? ` · ${a.length} ${a.length === 1 ? 'advisory' : 'advisories'}` : ''}</small></li>; })}</ul>
+                        </div>
+                        <div class="pk">
+                          <h3>Your steps in the {pb?.name.toLowerCase()} playbook</h3>
+                          <ol>{mine.map((st) => <li>{st.title}<small>{PHASE_LABEL[st.ph]}{st.note ? ` · ${st.note}` : ''}</small></li>)}</ol>
+                        </div>
+                      </div>
+                    </div>
+                  </Section>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </DetailTabs>
+    </div>
+    <p class="faint vp-staff" data-staff-only><Icon name="about" size={15} />You are signed in as Aigna staff, so this is a preview of each vendor. To see Keia Atlas exactly as a vendor does, pick them in the switcher under your name, bottom left.</p>
+  </div>
+
+  <script is:inline data-astro-rerun slot="end">
+    (function () {
+      /* The band's key numbers follow the vendor on show. A signed-in vendor only ever sees their own (CSS). */
+      var tabs = document.querySelector('.vp-tabs [data-dt]'); if (!tabs || tabs.__vp) return; tabs.__vp = true;
+      var show = function (id) { document.querySelectorAll('[data-vp-num]').forEach(function (n) { n.hidden = n.dataset.vpNum !== id; }); };
+      tabs.addEventListener('dt:change', function (e) { show(e.detail.id); });
+      if (tabs.rsTabs) show(tabs.rsTabs.current());
+    })();
+    (function () {
+      var MAC = /^([0-9a-f]{2})[:\-]?([0-9a-f]{2})[:\-]?([0-9a-f]{2})[:\-]?([0-9a-f]{2})[:\-]?([0-9a-f]{2})[:\-]?([0-9a-f]{2})$/i;
+      document.querySelectorAll('[data-submit-room]').forEach(function (btn) {
+        if (btn.__vr) return; btn.__vr = true;
+        btn.addEventListener('click', function () {
+          var room = btn.closest('[data-room]'), ok = true;
+          room.querySelectorAll('[data-pos]').forEach(function (row) {
+            var msg = row.querySelector('.vr-msg'), bad = [];
+            var s = row.querySelector('[name=serial]'), m = row.querySelector('[name=mac]');
+            if (s && !s.value.trim()) bad.push('serial');
+            if (m) { var x = m.value.trim().match(MAC); if (!x) bad.push('MAC'); else m.value = x.slice(1).join(':').toUpperCase(); }
+            [s, m].forEach(function (i) { if (i) i.classList.remove('bad'); });
+            if (bad.length) { ok = false; if (s && bad.indexOf('serial') >= 0) s.classList.add('bad'); if (m && bad.indexOf('MAC') >= 0) m.classList.add('bad'); }
+            if (msg) msg.textContent = bad.length ? 'Check the ' + bad.join(' and ') : '';
+          });
+          if (!ok) return;
+          room.classList.remove('vr-todo'); room.classList.add('vr-review');
+          var st = room.querySelector('[data-room-state]'); st.textContent = 'Recorded, waiting for review'; st.className = 'vr-state s-review';
+          var who = btn.dataset.reviewer || 'Aigna';
+          btn.parentNode.innerHTML = '<span class="note-done">Sent to ' + who + ' for review (nothing was saved: this is a simulation)</span>';
+          room.querySelectorAll('input').forEach(function (i) { i.readOnly = true; });
+        });
+      });
+    })();
+  </script>
+</Shell>
+<style is:global set:html={whoCss}></style>
+<style is:global>
+  :root[data-who-kind="vendor"] [data-staff-only] { display: none !important; }
+  /* A signed-in vendor: no tabs, their own view and numbers whatever the tab says. */
+  :root[data-who-kind="vendor"] .vp-tabs .dt-list { display: none; }
+  :root[data-who-kind="vendor"] .vp-tabs .dt-panel[hidden], :root[data-who-kind="vendor"] .vp-num[hidden] { display: block !important; }
+  .vendor-view { display: grid; gap: 28px; }
+  .vp-main { display: grid; gap: 16px; align-content: start; }
+  .vp-h { margin: 0 0 10px; font-size: 17px; display: flex; align-items: center; gap: 8px; }
+  .vp-side { display: grid; gap: 10px; }
+  .vp-sum { margin: 0; font-size: 13px; }
+  .vp-side .rs-sub { margin: 8px 0 0; }
+  .vp-dl { margin: 0; display: grid; gap: 5px; font-size: 13px; }
+  .vp-dl div { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px; }
+  .vp-dl dt { color: var(--text-3); }
+  .vp-dl dd { margin: 0; }
+  .vp-staff { display: flex; gap: 8px; align-items: center; margin: 0; font-size: 13px; }
+  .pack-steps { list-style: none; margin: 0 0 16px; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .pack-steps li { position: relative; display: grid; align-content: start; gap: 4px; padding: 10px 12px; border-radius: var(--radius); background: var(--surface-2); font-size: 12.5px; color: var(--text-2); }
+  .pack-steps li b { font-size: 13.5px; color: var(--text); }
+  .pack-steps li.done b::after { content: " ✓"; color: var(--green-ink); }
+  .pack-steps li.now { background: var(--yellow-soft); box-shadow: inset 0 0 0 2px var(--ink); }
+  .pack-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .pk { padding: 12px 14px; border-radius: var(--radius); border: 1px solid var(--line); }
+  .pk h3 { margin: 0 0 8px; font-size: 14.5px; }
+  .pk ul, .pk ol { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13px; }
+  .pk small { display: block; font-size: 11.5px; color: var(--text-3); }
+  .v-advs { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13px; }
+  .v-advs .lv-do-not-install b { color: var(--red-ink); }
+  .v-cov, .v-sla { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+  .v-cov { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); column-gap: 24px; }
+  .v-cov li, .v-sla li { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); padding-top: 4px; }
+  .v-cov a { color: var(--text); }
+  .v-tix { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; font-size: 13px; }
+  .v-tix small { display: block; color: var(--text-3); font-size: 12px; }
+  .av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; flex: none; font: 700 10.5px/1 var(--font-mono); background: var(--surface-3); color: var(--text); }
+  .av.big { width: 46px; height: 46px; font-size: 14px; }
+  :root[data-look="classic"] .av { background: var(--yellow); color: #15161B; border: 1.5px solid var(--ink); }
+  .pp { display: flex; align-items: center; gap: 8px; }
+  .pp b, .v-id b { display: block; font-size: 13.5px; }
+  .pp small, .v-id small { display: block; font-size: 12px; color: var(--text-3); }
+  .rs-sub { margin: 0 0 8px; font: 700 10.5px/1.3 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); display: flex; gap: 6px; align-items: center; }
+  .v-id { display: flex; gap: 10px; align-items: center; }
+  .va-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
+  .va { padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--line); }
+  .va .rs-sub { margin: 0 0 6px; }
+  .va ul { margin: 0; padding-left: 16px; font-size: 12.5px; display: grid; gap: 3px; }
+  .va-yes .rs-sub { color: var(--green-ink); }
+  .va-no { background: repeating-linear-gradient(135deg, var(--surface) 0 10px, var(--surface-2) 10px 20px); }
+  .v-room { padding: 0; overflow: hidden; }
+  :root[data-look="classic"] .v-room { border: 2px solid var(--ink); }
+  .vr-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  .vr-head b { display: block; font-size: 16px; }
+  .vr-head small { display: block; font-size: 12px; color: var(--text-3); }
+  .vr-head > span:first-child { margin-right: auto; }
+  .vr-state { font: 700 10.5px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; padding: 5px 8px; border-radius: 999px; transition: background var(--dur-state) var(--ease-settle), color var(--dur-state) var(--ease-settle); }
+  .s-accepted { background: var(--green-soft); color: var(--green-ink); }
+  .s-review { background: var(--violet-soft); color: var(--violet-ink); }
+  .s-todo { background: var(--amber-soft); color: var(--amber-ink); }
+  .vr-table { display: grid; }
+  .vr-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) minmax(0, 1.2fr) 40px; gap: 12px; align-items: center; padding: 8px 18px; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+  .vr-row:last-child { border-bottom: 0; }
+  .vr-th { font: 700 10px/1.2 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); padding-top: 10px; padding-bottom: 6px; }
+  .vr-pos { display: flex; gap: 10px; align-items: center; min-width: 0; }
+  .vr-pos b { display: block; font-size: 13.5px; }
+  .vr-pos small { display: block; font-size: 12px; color: var(--text-2); }
+  .vr-art { flex: none; width: 56px; height: 34px; display: grid; place-items: center; color: var(--text-3); }
+  .vr-art svg { max-width: 100%; max-height: 100%; }
+  .rec { font-size: 12.5px; overflow-wrap: anywhere; }
+  .na { font-size: 12px; }
+  .vr-in { width: 100%; font: 500 13px/1.2 var(--font-mono); padding: 8px 10px; border-radius: 8px; border: 1.5px solid var(--line-strong); background: var(--surface); color: var(--text); }
+  .vr-in:focus { outline: 3px solid var(--focus); outline-offset: 1px; }
+  .vr-in.bad { border-color: var(--red); background: var(--red-soft); }
+  .vr-in[readonly] { border-style: dashed; }
+  .vr-ok { color: var(--green-ink); font-size: 12px; }
+  .vr-msg { color: var(--red-ink); font-weight: 600; }
+  .vr-foot { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 0; padding: 12px 18px; font-size: 12.5px; border-top: 1px solid var(--line); }
+  .note-done { font: 600 12.5px/1.3 var(--font-sans); color: var(--green-ink); }
+  @media (prefers-reduced-motion: reduce) { .vr-state { transition: none; } }
+  @media (max-width: 1100px) { .pack-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 760px) {
+    .pack-steps, .pack-grid, .va-grid { grid-template-columns: 1fr; }
+    .vr-row { grid-template-columns: 1fr 1fr; } .vr-th { display: none; } .vr-pos { grid-column: 1 / -1; } .vr-ok:empty { display: none; }
+  }
+</style>

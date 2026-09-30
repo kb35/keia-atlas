@@ -1,0 +1,215 @@
+# House standard: structured cabling. Made up for the demo (Aigna is a made-up company).
+# Public standards are named and summarised in our own words; nothing is quoted from them.
+# The cable colours and the label format live in cables.yaml (the colour and label standard), which this one points to.
+id: cabling
+name: Structured cabling
+area: cabling
+order: 1
+version: "1.0"
+effective: "2026-03-01"
+owner: Service manager, IT infrastructure
+summary: Every data outlet is a tested Cat6A permanent link, run and terminated the same way in every office, and labelled at both ends.
+intro: >-
+  For integrators and cabling contractors. Follow each rule, then prove it with the check beside it. The rules lean on the
+  TIA cabling standards (named, not quoted); where Aigna has made its own choice it says House choice. Cable colours and
+  labels have their own page, the colour and label standard, and every cable in Keia Atlas is checked against it.
+scope:
+  - The permanent cabling from the comms room patch panel to every wall, floor, table and ceiling outlet.
+  - Patch cords in comms rooms and at outlets.
+  - Fibre between comms rooms (risers) and to the building's entry point.
+  - "Not in scope: room leads (HDMI, USB-C) inside a meeting room, which are in the meeting room AV standard."
+related: [cables, racks, network, wifi]
+applies_to:
+  space_types: [mdf, idf]
+figures:
+  - { n: "Cat6A", label: Every new copper run }
+  - { n: "90 m", label: Longest link }
+  - { n: "100%", label: Links certified }
+  - { n: 2, label: Labels per cable }
+sections:
+  - id: media
+    title: What to install
+    intro: One cable type everywhere, so any outlet can take any device, including a Wi-Fi 7 access point or a PoE display.
+    rules:
+      - id: cat6a-horizontal
+        level: must
+        rule: Install Cat6A (Class EA) for every new copper run from the patch panel to an outlet.
+        why: Cat6A carries 10 Gb/s over the full 100 m channel and runs cooler with high-power PoE, so the cable outlives two or three generations of the devices on it.
+        check: The cable jacket print and the certification report both say Category 6A for every link.
+        sources: [tia-568-2, tia-tsb-162]
+      - id: shielding
+        level: should
+        rule: Use unshielded (U/UTP) Cat6A unless the site survey finds strong interference or the country's practice is shielded, then use F/UTP end to end with bonded panels.
+        why: Mixing shielded and unshielded parts, or shielding without bonding, is worse than either done properly.
+        check: Panels, outlets and cable are all the same type on the link's test report; shielded panels are bonded to the rack.
+        house: true
+        sources: [tia-607]
+      - id: fire-rating
+        level: must
+        rule: Use cable with the fire rating the building needs, and at least Euroclass Cca-s1b,d1,a1 in Europe or CMP or CMR in the Americas where cable runs in air-handling spaces or risers.
+        why: Cable is a large fire load in ceilings and risers; building control and insurers check the rating.
+        check: The rating printed on the jacket matches the building specification, and the declaration of performance is in the handover pack.
+        sources: [eu-cpr, nec-800]
+      - id: fibre-backbone
+        level: must
+        rule: Run OM4 multimode fibre between comms rooms in the same building, and OS2 singlemode between buildings or for runs over 150 m, with at least 12 cores each way.
+        why: OM4 carries 10 and 25 Gb/s uplinks inside a building; singlemode has no practical length limit for a campus. Spare cores make a failed core a patch change, not a new run.
+        check: The fibre test report shows each core's loss within budget, and the panel label says OM4 or OS2 with the core count.
+        house: true
+        sources: [tia-568-3]
+  - id: runs
+    title: Running the cable
+    rules:
+      - id: length
+        level: must
+        rule: Keep every permanent link at 90 m or less, and the patch cords at both ends at 10 m or less in total.
+        why: The 100 m channel limit is what the performance figures assume; a longer link fails at 10 Gb/s even if it passes a continuity test.
+        check: The certification report's length for every link is 90 m or less.
+        sources: [tia-568-2]
+      - id: support
+        level: must
+        rule: Support cable on J-hooks, tray or basket no more than 1.5 m apart, never on the ceiling grid, pipes or other services.
+        why: Unsupported cable sags and stretches, which changes its twist and its performance; ceilings are opened by other trades.
+        check: Walk the route with the ceiling tiles out before handover; photograph each run.
+        sources: [tia-569]
+      - id: bend-and-pull
+        level: must
+        rule: Keep the bend radius at least four times the cable's diameter and pull with no more than 110 N (about 11 kg) on a four-pair cable.
+        why: Tight bends and hard pulls deform the pairs; the damage does not show until the link is tested.
+        check: No kinks at hooks or in back boxes; any link that fails return loss is re-run, not re-terminated.
+        sources: [tia-568-2]
+      - id: power-separation
+        level: must
+        rule: Keep data cable apart from mains power cable as the local wiring rules require, and cross it at right angles.
+        why: Running beside power adds noise, and in many countries it breaks the wiring regulations.
+        check: Inspect the route before the ceiling closes; no shared containment with power unless it is segregated.
+        sources: [tia-569, en-50174]
+      - id: fire-stopping
+        level: must
+        rule: Reseal every wall, floor and riser the cable passes through with a fire-stop product rated for that barrier.
+        why: An open penetration lets fire and smoke through a fire compartment.
+        check: Each penetration has a fire-stop label and a photo in the handover pack.
+        sources: [tia-569]
+  - id: termination
+    title: Terminating and testing
+    rules:
+      - id: t568b
+        level: must
+        rule: Terminate every jack and panel to T568B, the same at both ends, everywhere.
+        why: One scheme means any patch cord works and nobody has to check which scheme a site used. T568A is equally valid; mixing them is what breaks links.
+        check: The wire map on the certification report passes for every link.
+        house: true
+        sources: [tia-568-2]
+      - id: untwist
+        level: must
+        rule: Keep the pairs twisted to within 13 mm of the termination point and keep the jacket on up to the jack.
+        why: Untwisted pairs cause crosstalk, which is the most common reason a Cat6A link fails its test.
+        check: The certification report passes NEXT with margin; spot check terminations by eye.
+        sources: [tia-568-2]
+      - id: certify
+        level: must
+        rule: Certify every permanent link to Cat6A with a calibrated certification tester (not a continuity tester), and save the native results file.
+        why: Only a certification test proves the link carries 10 Gb/s; the results are the evidence for the maker's warranty.
+        check: The handover pack has one results file per outlet, all Pass, with no Pass* (marginal) results, and the tester's calibration date.
+        sources: [tia-1152]
+      - id: warranty
+        level: should
+        rule: Install one maker's cable, panels and outlets as a system and register the maker's system warranty (usually 20 years or more).
+        why: A registered system warranty covers the parts and the performance of every link for its life.
+        check: The warranty certificate is in the handover pack and lists every comms room.
+        house: true
+  - id: labels
+    title: Colours and labels
+    intro: The colour of a patch cord says what it is for, and a label at both ends says where it goes. The full rules, with every colour and an example rack, are in the colour and label standard.
+    rules:
+      - id: colour-by-purpose
+        level: must
+        rule: Use the patch cord colour for the cable's purpose from the colour and label standard (blue user data, green AV, yellow uplinks and singlemode, red critical, aqua multimode, grey management and feed B power, purple console, black feed A power, orange temporary).
+        why: A rack can be read from the door, and a critical cable is never unplugged by mistake.
+        check: Keia Atlas checks every recorded cable's colour against its purpose; on site, compare the rack against the standard's colours.
+        house: true
+      - id: label-format
+        level: must
+        rule: Label both ends of every cable, and every panel port and outlet, in the format SITE-ROOM-RACK-UNIT-PORT, printed on a white self-laminating wrap within 50 mm of the plug.
+        why: The other end can be found by reading, not tracing, and the record in Keia Atlas uses the same name.
+        check: Pick ten cables at random in each rack; both ends read correctly and match Keia Atlas.
+        house: true
+        sources: [tia-606]
+      - id: outlet-label
+        level: must
+        rule: Label each outlet face plate with the panel port it goes to, and the matching panel port with the room and outlet.
+        why: Moves and faults start at the outlet; the label takes a technician straight to the right port.
+        check: The outlet schedule in the handover pack matches the labels on a walk of the floor.
+        sources: [tia-606]
+references:
+  - id: tia-568-2
+    name: ANSI/TIA-568.2-D, Balanced Twisted-Pair Telecommunications Cabling and Components Standard
+    publisher: Telecommunications Industry Association
+    kind: standard
+    summary: Sets the performance categories for copper cabling (including Category 6A), the 90 m link and 100 m channel lengths, the T568A and T568B pin assignments, and installation limits such as bend radius, pulling tension and pair untwist.
+    url: https://tiaonline.org/products-and-services/tia-standards/
+    checked: "2026-09-29"
+  - id: tia-568-3
+    name: ANSI/TIA-568.3-D, Optical Fiber Cabling and Components Standard
+    publisher: Telecommunications Industry Association
+    kind: standard
+    summary: Covers fibre cable types (multimode OM3, OM4 and singlemode OS2), connectors, polarity and loss budgets for building and campus fibre.
+    url: https://tiaonline.org/products-and-services/tia-standards/
+    checked: "2026-09-29"
+  - id: tia-569
+    name: ANSI/TIA-569-E, Telecommunications Pathways and Spaces
+    publisher: Telecommunications Industry Association
+    kind: standard
+    summary: Describes the rooms, risers, trays, conduits and supports that cabling runs through, including support spacing, fill, separation from other services and fire-stopping of penetrations.
+    url: https://tiaonline.org/products-and-services/tia-standards/
+    checked: "2026-09-29"
+  - id: tia-606
+    name: ANSI/TIA-606-D, Administration Standard for Telecommunications Infrastructure
+    publisher: Telecommunications Industry Association
+    kind: standard
+    summary: Sets out how cabling is identified and recorded, with identifiers for spaces, racks, panels, ports and cables, and the records kept about them. It does not fix one set of patch cord colours.
+    url: https://tiaonline.org/products-and-services/tia-standards/
+    checked: "2026-09-29"
+  - id: tia-607
+    name: ANSI/TIA-607-D, Generic Telecommunications Bonding and Grounding (Earthing) for Customer Premises
+    publisher: Telecommunications Industry Association
+    kind: standard
+    summary: Describes how racks, cable trays and shielded cabling are bonded to a telecommunications earthing busbar and on to the building's main earth.
+    url: https://tiaonline.org/products-and-services/tia-standards/
+    checked: "2026-09-29"
+  - id: tia-1152
+    name: ANSI/TIA-1152-A, Requirements for Field Test Instruments and Measurements for Balanced Twisted-Pair Cabling
+    publisher: Telecommunications Industry Association
+    kind: standard
+    summary: Sets the accuracy levels for cabling certification testers and how field tests of permanent links and channels are made.
+    url: https://tiaonline.org/products-and-services/tia-standards/
+    checked: "2026-09-29"
+  - id: tia-tsb-162
+    name: TIA TSB-162-B, Telecommunications Cabling Guidelines for Wireless Access Points
+    publisher: Telecommunications Industry Association
+    kind: guide
+    summary: Guidance on planning cabling for wireless access points, including a pre-cabled square grid of outlet locations over the ceiling (cells up to about 18 m across) and Category 6A cable to each location.
+    url: https://www.tiafotc.org/tia-standards-update/tsb-162-b/
+    checked: "2026-09-29"
+  - id: en-50174
+    name: EN 50174-2, Information technology, Cabling installation, Installation planning and practices inside buildings
+    publisher: CENELEC
+    kind: standard
+    summary: The European counterpart for installation practice, including how far data cabling must be kept from power cabling depending on the cable types and any barrier between them.
+    url: https://www.cenelec.eu/
+    checked: "2026-09-29"
+  - id: eu-cpr
+    name: Construction Products Regulation (EU) No 305/2011 and EN 50575
+    publisher: European Union and CENELEC
+    kind: regulation
+    summary: Cables fixed in buildings in the EU carry a reaction-to-fire class (Euroclass, from Aca to Fca with smoke, droplet and acidity classes), declared by the maker in a declaration of performance.
+    url: https://single-market-economy.ec.europa.eu/sectors/construction/construction-products-regulation-cpr_en
+    checked: "2026-09-29"
+  - id: nec-800
+    name: NFPA 70, National Electrical Code, Article 800
+    publisher: National Fire Protection Association
+    kind: regulation
+    summary: In the United States, sets which communications cable ratings (such as CMP for air-handling spaces and CMR for risers) may be used where.
+    url: https://www.nfpa.org/codes-and-standards/nfpa-70-standard-development/70
+    checked: "2026-09-29"
+demo: true

@@ -1,0 +1,399 @@
+---
+import Shell from '../../layouts/Shell.astro';
+import Icon from '../../components/Icon.astro';
+import DeviceGlyph from '../../components/DeviceGlyph.astro';
+import StageBar from '../../components/StageBar.astro';
+import Wiring from '../../components/Wiring.astro';
+import RoomScene from '../../components/RoomScene.astro';
+import RoomKey from '../../components/RoomKey.astro';
+import PageBand from '../../components/PageBand.astro';
+import SidePanel from '../../components/SidePanel.astro';
+import Section from '../../components/Section.astro';
+import LiveBar from '../../components/LiveBar.astro';
+import { issues as knownIssues } from '../../lib/knownissues-view.mjs';
+import { recHere } from '../../lib/vt.mjs';
+import RackView from '../../components/RackView.astro';
+import CommsSummary from '../../components/CommsSummary.astro';
+import RackPatching from '../../components/RackPatching.astro';
+import CommsServes from '../../components/CommsServes.astro';
+import CommsSizing from '../../components/CommsSizing.astro';
+import { commsFacts, standardPill, sizeFor, HOUSE_NETWORK } from '../../lib/comms.mjs';
+import { cableTotal, storeOf } from '../../lib/stock.mjs';
+import { spaces, sites, KIND, LOC_LABEL, OS_LABEL, STAGE_LABEL, className, modelName, plural, href, countryName } from '../../lib/data.mjs';
+import { PEOPLE } from '../../lib/demo.mjs';
+import { incidentList, byUrgency, when, HOLD_LABEL, RES_LABEL } from '../../lib/incidents.mjs';
+// Room guide and QR: the employee page this room's table card opens, and what was sent from it.
+import RoomQR from '../../components/RoomQR.astro';
+import GuideLive from '../../components/GuideLive.astro';
+import { GUIDE_KINDS } from '../../lib/guide.mjs';
+import { base } from '../../lib/data.mjs';
+
+export function getStaticPaths() {
+  return Object.keys(spaces).map((id) => ({ params: { id } }));
+}
+const { id } = Astro.params;
+const x = spaces[id];
+const site = sites[x.site];
+const kind = KIND(x);
+const floor = site.floors?.find((f) => f.id === x.floor);
+// A home office (decision 0025): its town, the office it is near, and whose it is when it is a team member's.
+const owner = PEOPLE.find((p) => p.base === x.id) ?? null;
+const nearSite = x.near ? sites[x.near] : null;
+const title = x.number ? `${x.number} ${x.name}` : x.name;
+const label = (p) => p.role ?? className(p.cls);
+const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not yet');
+
+// Repeated spaces (desks, kits) carry a unit prefix such as desk-07/.
+const repeated = (x.count ?? 1) > 1;
+const groups = [];
+if (repeated) {
+  const m = new Map();
+  for (const p of x.positions) {
+    const g = p.position.split('/')[0];
+    if (!m.has(g)) m.set(g, []);
+    m.get(g).push(p);
+  }
+  for (const [g, ps] of m) groups.push({ id: g, label: g.replace('desk-', 'Desk ').replace('kit-', 'Kit '), positions: ps });
+}
+const replacing = x.positions.filter((p) => p.legacy);
+// Columns for repeated spaces: one per distinct position within a desk or kit.
+const cols = [];
+if (repeated) {
+  for (const p of groups[0]?.positions ?? []) {
+    const n = p.position.split('#')[1] ?? '1';
+    cols.push({ key: p.key, n, cls: p.cls, model: p.model, label: `${label(p)}${p.position.includes('#') ? ` ${n}` : ''}` });
+  }
+}
+
+// Compared against: what the option needs versus what is recorded here.
+const required = x.option.equipment.filter((e) => e.requirement === 'required' && !(e.quantity === 'tbd' && !e.model));
+const optional = x.option.equipment.filter((e) => e.requirement === 'optional');
+const recordedKeys = new Set(x.positions.map((p) => p.key));
+const missing = required.filter((e) => !recordedKeys.has(e.key));
+const qty = (q) => (typeof q === 'number' ? q : q === 'tbd' ? 'Set per project' : `${q.min} to ${q.max}`);
+const SERVICE = { power: 'Power', data: 'Data', 'direct-run': 'Direct cable run' };
+const unitCount = x.positions.reduce((n, p) => n + p.units.length, 0);
+// A comms room (MDF or IDF) is a Record like any room: the band says what it serves and whether it is to
+// standard, the rack is the picture with its key beside it (the device list), four tiles answer space,
+// ports, power and uplinks, and Patching follows (src/lib/comms.mjs).
+const isComms = kind === 'comms';
+const cf = isComms ? commsFacts(x) : null;
+const std = isComms ? standardPill(x) : null;
+const size = isComms ? sizeFor(x, cf) : null;
+// An IT store (decision 0009): its spare units are not installed kit, so the room shows its stock and links to the store's page.
+const store = kind === 'stores' ? storeOf(x.site) : null;
+const showElev = !repeated && !isComms && kind !== 'kits' && kind !== 'open';   // open areas: the floor plan and 3D model show them
+// Incidents for this room, open first (decision 0024). Each opens its own page.
+const roomInc = incidentList.filter((v) => v.inc.room === x.id).sort(byUrgency);
+const incLine = (v) => {
+  const last = v.steps.list[v.steps.list.length - 1];
+  if (v.inc.state === 'on-hold') return `On hold: ${HOLD_LABEL[last.hold].toLowerCase()}`;
+  if (v.inc.state === 'resolved') return `${RES_LABEL[v.resolution.code]}, ${when(v.closed, { time: false })}`;
+  return `${v.inc.state === 'new' ? 'New' : 'In progress'}, opened ${when(v.inc.opened, { time: false })}`;
+};
+// The band (Record archetype, docs/standards/page-anatomy.md): the kind of room, its status, and four figures.
+const KIND_ONE = { meeting: 'Meeting room', small: 'Room', shared: 'Shared room', desks: 'Desks', kits: 'Home office kits', comms: 'Comms room' };
+const status = replacing.length ? ['deploy', 'Being replaced'] : x.stages.deploy ? ['deploy', 'Being installed'] : (x.stages.plan || x.stages.procure) && !x.stages.manage ? ['plan', 'Planned'] : ['manage', 'In service'];
+const openCount = roomInc.filter((v) => v.open).length;
+const profileTo = `/room-profiles/${x.space_type}/#${x.option.id}`;
+const NUMBERS = store ? [
+  { n: store.units.length, label: store.units.length === 1 ? 'Spare unit' : 'Spare units', to: '#spares' },
+  { n: store.lowRules.length, label: store.lowRules.length === 1 ? 'Model below minimum' : 'Models below minimum', to: `/spares/${x.site}/#minimum`, tone: store.lowRules.length ? 'bad' : undefined },
+  { n: store.consumables.length, label: 'Counted stock lines', to: `/spares/${x.site}/#counted` },
+  { n: openCount, label: openCount === 1 ? 'Open incident' : 'Open incidents', to: '#incidents', tone: openCount ? 'bad' : undefined },
+] : isComms ? [
+  { n: cf.serves.roomCount, label: cf.serves.roomCount === 1 ? 'Room served' : 'Rooms served', to: cf.serves.roomCount ? '#rooms-served' : undefined },
+  cf.ports?.known ? { n: cf.ports.total - cf.ports.used, label: 'Free access ports', to: '#patching' } : null,
+  cf.rackSpace ? { n: `${cf.rackSpace.free}U`, label: 'Free rack space', to: '#rack' } : null,
+  { n: openCount, label: openCount === 1 ? 'Open incident' : 'Open incidents', to: '#incidents', tone: openCount ? 'bad' : undefined },
+].filter(Boolean) : [
+  { n: unitCount, label: unitCount === 1 ? 'Unit' : 'Units', to: showElev ? undefined : '#kit', fact: showElev },
+  missing.length ? { n: missing.length, label: 'Missing', tone: 'bad', to: profileTo }
+    : x.stages.deploy ? { n: x.stages.deploy, label: 'Being installed', to: showElev ? undefined : '#kit', fact: showElev, tone: 'warn' }
+    : { n: '✓', label: 'Matches its profile', tone: 'good', to: profileTo },
+  x.type.keia_atlas.capacity ? { n: x.type.keia_atlas.capacity.max, label: 'Seats', fact: true } : null,
+  { n: openCount, label: openCount === 1 ? 'Open incident' : 'Open incidents', to: '#incidents', tone: openCount ? 'bad' : undefined },
+].filter(Boolean);
+const kiTitles = JSON.stringify(Object.fromEntries(knownIssues.map((i) => [i.id, i.title])));
+const deskWord =kind === 'kits' ? 'kit' : 'desk';
+---
+<Shell about={{ kind: kind === 'comms' ? 'comms' : 'room', label: `${title}, ${site.name}`, to: `/rooms/${x.id}/` }} title={title} section="rooms" crumbs={[{ label: 'Rooms', to: '/rooms/' }, { label: site.name, to: `/rooms/?site=${x.site}` }, { label: title }]}>
+  <PageBand overline={KIND_ONE[kind] ?? 'Room'} title={title} numbers={NUMBERS}>
+    <Fragment slot="overline">
+      <a class="code" data-help="room.site" href={href(`/rooms/?site=${x.site}`)} style="text-decoration:none" title={`Every room at ${site.name}`}>{site.code}</a>
+      <span>{site.name}{floor ? ` · ${floor.name}` : ''}</span>
+      <span class={`pill ${status[0]}`} data-help="room.status">{status[1]}</span>
+      {std && <span class={`pill ${std.tone}`} data-help="room.standard">{std.text}</span>}
+    </Fragment>
+    <Fragment slot="lede">{isComms ? <>{cf.servesLine} · Built to <a href={href(profileTo)}>{x.type.profile.name}</a>.</> : <>Built to <a href={href(profileTo)}>{x.type.profile.name}</a> · {x.option.name}{x.count ? `, ${plural(x.count, deskWord)}` : ''}.</>}</Fragment>
+  </PageBand>
+  {x.town && <p class="faint home-where">A home office in {x.town}, {countryName(x.country)}, near <a href={href(`/rooms/?site=${x.near}`)}>{nearSite?.name}</a>{owner ? <>. {owner.name} ({owner.role}) works from here and goes in to the office on {owner.office_days.map((d) => ({ mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday' })[d]).join(', ').replace(/, ([^,]*)$/, ' and $1')}</> : ''}.</p>}
+  <div class="content">
+    <section class="card pad rn" data-room-notes data-room={x.id} data-titles={kiTitles} data-ki-base={href('/known-issues/')} data-help="room.team-notes" aria-label="Notes from the team" hidden>
+      <h2 class="rn-h">Notes from the team</h2>
+      <ul class="rn-list" data-rn-list></ul>
+    </section>
+    {isComms && (
+      <>
+        {cf.racks.length > 0 ? (
+          <div id="rack">{cf.racks.map((r, i) => <RackView rack={r} space={x} uid={`rm-${r.id}`} patching="patching" rec={i === 0 ? recHere(x.id) : {}} />)}</div>
+        ) : <p class="card pad muted" {...recHere(x.id)}>No rack is recorded for this comms room yet.</p>}
+        <CommsSummary facts={cf} size={size} />
+      </>
+    )}
+    {store && (
+      <Section title="Spare units" id="spares" help="room.spares">
+        <span slot="aside"><span class="pill spare">{plural(store.units.length, 'spare unit')}</span> <a href={href(`/spares/${x.site}/`)}>Open the {site.name} IT store</a></span>
+        <div class="tablewrap">
+          <table class="to-cards">
+            <thead><tr><th scope="col">Model</th><th scope="col">On the shelf</th><th scope="col">Minimum</th><th scope="col">Where</th></tr></thead>
+            <tbody>
+              {store.rules.map((r) => (
+                <tr>
+                  <td data-label="Model"><a href={href(`/models/${r.model}/`)}>{r.modelName}</a></td>
+                  <td data-label="On the shelf" class="num">{r.have} <span class:list={['pill', r.out ? 'bad' : r.low ? 'warn' : 'manage']}>{r.out ? 'None left' : r.low ? `${r.short} short` : 'Enough'}</span></td>
+                  <td data-label="Minimum" class="num">{r.minimum}</td>
+                  <td data-label="Where">{r.cabinet ? `${r.cabinet}, ${r.shelf}` : 'Nothing on a shelf'}</td>
+                </tr>
+              ))}
+              {store.unruled.map((r) => (
+                <tr>
+                  <td data-label="Model"><a href={href(`/models/${r.model}/`)}>{r.modelName}</a></td>
+                  <td data-label="On the shelf" class="num">{r.have}</td>
+                  <td data-label="Minimum" class="faint">None set</td>
+                  <td data-label="Where">See the store</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+    )}
+    {showElev && (
+      <RoomScene option={x.option} type={x.space_type} fitted={x.fitted} space={x} uid={`rm-${x.id}`} pair help="room.picture" rec={recHere(x.id)}>
+        <SidePanel slot="side" title="What's installed" meta={`${plural(unitCount, 'device')} · hover to find one`}>
+          <RoomKey option={x.option} fitted={x.fitted} space={x} uid={`rm-${x.id}`} />
+        </SidePanel>
+      </RoomScene>
+    )}
+    {!isComms && replacing.map((p) => (
+      <section class="card banner" data-help="room.banner" aria-label="Replacement in progress">
+        <span class="badge deploy" aria-hidden="true"><Icon name="refresh" size={24} /></span>
+        <span>
+          <h2>{label(p)} being replaced</h2>
+          <p>
+            Old unit <span class="mono">{p.legacy.serial}</span> is {STAGE_LABEL.retire.toLowerCase()}; new unit <span class="mono">{p.current.serial}</span> went in on {fmtDate(p.current.installed)}.
+            They share the position and hostname <span class="mono">{p.hostname}</span> until the old one is removed.
+          </p>
+        </span>
+        <span class="pill deploy">{STAGE_LABEL.deploy}</span>
+      </section>
+    ))}
+
+    {!showElev && !isComms && (
+      <Section title="What's installed" help="room.kit" id="kit" aside={plural(unitCount, 'device')} showAll={repeated ? 12 : 8}>
+        {x.positions.length === 0 && <div class="card pad muted">Nothing here is tracked by unit. {x.notes[0]}</div>}
+        {!repeated && x.positions.length > 0 && (
+          <div class="list rise" data-items>
+            {x.positions.map((p) => (
+              <div class="row">
+                <span class="glyph"><DeviceGlyph cls={p.cls} /></span>
+                <span>
+                  <a class="name dev-link" href={href(`/device/?tag=${p.current.asset_tag}`)}>{label(p)}{p.position.includes('#') && <span class="faint"> {p.position.split('#')[1]}</span>}</a>
+                  <span class="sub">
+                    {p.model ? <a href={href(`/models/${p.model}/`)}>{modelName(p.model)}</a> : 'Model set per project'}
+                    {p.equipment?.location && ` · ${LOC_LABEL[p.equipment.location]}`}
+                  </span>
+                  <span class="sub mono faint" style="font-size:12px">
+                    {p.hostname && <>{p.hostname} · </>}{p.current.serial} · {p.current.asset_tag}
+                  </span>
+                </span>
+                <span class="end">
+                  <span class="faint" style="font-size:12.5px">{p.current.installed ? `Installed ${fmtDate(p.current.installed)}` : 'Install date to come'}</span>
+                  <span class={`pill ${p.current.stage}`}>{STAGE_LABEL[p.current.stage]}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        {repeated && (
+          <>
+            <div class="card pad" style="margin-bottom:12px;display:grid;gap:10px">
+              <p class="overline" style="margin:0">Each {deskWord} has</p>
+              <div style="display:flex;flex-wrap:wrap;gap:18px">
+                {cols.map((c) => (
+                  <span style="display:flex;gap:10px;align-items:center">
+                    <span class="glyph" style="width:40px"><DeviceGlyph cls={c.cls} /></span>
+                    <span><span class="name" style="font-size:14.5px;display:block">{c.label}</span><span class="sub" style="display:block">{c.model ? <a href={href(`/models/${c.model}/`)}>{modelName(c.model)}</a> : 'Model set per project'}</span></span>
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div class="tablewrap">
+              <table>
+                <thead><tr><th scope="col">{kind === 'kits' ? 'Kit' : 'Desk'}</th>{cols.map((c) => <th scope="col">{c.label}</th>)}<th scope="col">Stage</th></tr></thead>
+                <tbody data-items>
+                  {groups.map((g) => {
+                    const st = [...new Set(g.positions.map((p) => p.current.stage))];
+                    return (
+                      <tr>
+                        <th scope="row" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--text);white-space:nowrap">{g.label}</th>
+                        {cols.map((c) => {
+                          const p = g.positions.find((q) => q.key === c.key && (q.position.split('#')[1] ?? '1') === c.n);
+                          return <td class="mono" style="white-space:nowrap">{p ? <>{p.current.serial}<small style="color:var(--text-3)">{p.current.asset_tag}</small></> : <span class="faint">None</span>}</td>;
+                        })}
+                        <td>{st.map((k) => <span class={`pill ${k}`}>{STAGE_LABEL[k]}</span>)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </Section>
+    )}
+
+    <div class="g12">
+      <div class:list={['card side-card ri-card s-4', { 'rs-radiate': openCount > 0 }]} id="incidents">
+        <h3 data-help="room.incidents">Incidents</h3>
+        {roomInc.length === 0 ? <p class="muted" style="margin:0;font-size:13.5px">No incidents recorded for this room.</p> : (
+          <ul class="ri-list">
+            {roomInc.map((v) => (
+              <li>
+                <a class:list={['ri', { past: !v.open }]} href={href(v.href)}>
+                  <span class={`ri-p p-${v.inc.priority}`}>P{v.inc.priority}</span>
+                  <span class="ri-t"><b>{v.inc.short_description}</b><small>{v.inc.number} · {v.inc.subject.kind === 'room' ? 'Whole room' : v.role}</small><small class={`ri-s s-${v.inc.state}`}>{incLine(v)}</small></span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+        <a class="ri-all" href={href(`/incidents/?site=${x.site}`)}>All incidents at {site.name}</a>
+      </div>
+      <div class="card side-card s-4">
+        <h3 data-help="room.compared">Compared against</h3>
+        <div>
+          <a href={href(profileTo)} style="font:700 17px/1.3 var(--font-display)">{x.type.profile.name}</a>
+          <p class:list={['muted', { 'clamp-3': isComms }]} style="margin:4px 0 0;font-size:13.5px">{x.option.name}: {x.option.summary}</p>
+        </div>
+        <dl class="kv">
+          {std && <div><dt>Network standard</dt><dd>{std.st.matches ? <span class="pill manage">{HOUSE_NETWORK.name}</span> : std.st.hasRack ? <span class="pill warn">{std.st.due ? `Older kit, due ${std.st.due}` : 'Older kit'}</span> : <span class="faint">No rack</span>}</dd></div>}
+          <div><dt>Required devices</dt><dd>{missing.length ? <span class="pill warn">{missing.length} missing</span> : <span class="pill manage">All recorded</span>}</dd></div>
+          {optional.length > 0 && <div><dt>Optional fitted</dt><dd>{x.fitted.length ? x.fitted.length : 'None'} of {optional.length}</dd></div>}
+          {!isComms && <div><dt>Wiring</dt><dd><span class="pill manage">Checks pass</span></dd></div>}
+          {x.option.clients && <div><dt>Laptops</dt><dd>{x.option.clients.map((c) => OS_LABEL[c]).join(', ')}</dd></div>}
+        </dl>
+        {x.fitted.length > 0 && <p class="muted" style="margin:0;font-size:13px">Fitted: {x.fitted.map((k) => optional.find((e) => e.key === k)).map((e) => e?.role ?? className(e?.class)).join(', ')}.</p>}
+        {std && !std.st.matches && std.st.older.length > 0 && <p class="muted" style="margin:0;font-size:13px">Older kit: {std.st.older.join(', ')}.{std.st.supersededBy ? ` Moves to ${std.st.supersededBy} when refreshed.` : ''}</p>}
+      </div>
+      <div class="card side-card s-4">
+        <h3 data-help="room.lifecycle">Lifecycle</h3>
+        <StageBar stages={x.stages} />
+        <dl class="kv">{Object.entries(x.stages).filter(([, n]) => n).map(([k, n]) => <div><dt>{STAGE_LABEL[k]}</dt><dd class="num"><a href="#kit">{n}</a></dd></div>)}</dl>
+      </div>
+    </div>
+
+    {GUIDE_KINDS.includes(kind) && (
+      <Section title="Room guide and QR" id="room-guide" help="room.guide" aside="What people in the room see">
+        <div class="rg" data-guide-host="room" data-room={x.id} data-base={base}>
+          <div class="rg-qr card pad" data-help="room.guide-qr">
+            <RoomQR room={x.id} label={title} size={132} />
+            <div class="rg-qr-t">
+              <p>The code on the table opens this room's guide: how to start a meeting and share a screen, and a two-tap way to report a problem or ask for something.</p>
+              <p class="rg-links"><a href={href(`/guide/${x.id}/`)}>Open the guide</a><a href={href(`/guide/${x.id}/card/`)}>Print the table card</a></p>
+            </div>
+          </div>
+          <div class="rg-sent card pad" data-help="room.guide-sent">
+            <h3>Sent from the guide</h3>
+            <ul class="rg-list" data-guide-sent></ul>
+            <p class="faint rg-none" data-guide-none>Nothing sent from this room's guide yet. Reports appear here, on the Incidents board and on Home as they arrive.</p>
+          </div>
+        </div>
+        <GuideLive />
+      </Section>
+    )}
+    {isComms && (
+      <Section title="Sized for what it serves" id="sizing" help="room.sizing">
+        <span slot="aside" class="faint">{plural(size.rooms, 'room')}{size.workspaces ? `, ${size.workspaces} desks` : ''}{size.videoRooms ? `, ${plural(size.videoRooms, 'video room')}` : ''} · <a href={href(`/room-profiles/${x.space_type}/#sizing`)}>How a comms room is sized</a></span>
+        <CommsSizing size={size} />
+      </Section>
+    )}
+    {isComms && cf.cables.length > 0 && (
+      <Section title="Patching" id="patching" help="room.patching">
+        <span slot="aside" class="faint">{cableTotal(cf.cables)} cables in {cf.cables.length} runs, coloured by the <a href={href('/standards/cables/')}>house cable standard</a> · <a href={href(`/cables/?site=${x.site}`)}>All cables at {site.name}</a></span>
+        <RackPatching facts={cf} />
+      </Section>
+    )}
+    {x.option.infrastructure?.length > 0 && (
+      <Section title="Outlets" help="room.outlets" aside={repeated ? `Per ${deskWord}` : 'For this room'}>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th scope="col">Service</th><th scope="col">Where</th><th scope="col">How many</th><th scope="col">Serves</th><th scope="col">Provided by</th></tr></thead>
+            <tbody>
+              {x.option.infrastructure.map((o) => (
+                <tr>
+                  <td>{SERVICE[o.service]}</td>
+                  <td>{LOC_LABEL[o.location] ?? o.location}</td>
+                  <td class="num">{qty(o.quantity)}</td>
+                  <td>{o.serves?.join(', ')}{o.notes && <small>{o.notes}</small>}</td>
+                  <td>{o.provided_by === 'it' ? 'IT' : 'Facilities'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+    )}
+    <Wiring option={x.option} fitted={x.fitted} note={repeated ? `The same at every ${deskWord}.` : x.fitted.length ? 'Includes the optional kit fitted here.' : ''} />
+    {isComms && cf.serves.roomCount > 0 && (
+      <Section title="Rooms it serves" id="rooms-served" aside={plural(cf.serves.roomCount, 'room')}>
+        <CommsServes facts={cf} />
+      </Section>
+    )}
+    {x.notes.length > 0 && (
+      <Section title="Notes" help="room.notes">
+        <ul class="note-list">{x.notes.map((n) => <li>{n}</li>)}</ul>
+      </Section>
+    )}
+    <LiveBar page={`room:${x.id}`} />
+  </div>
+  <script>
+    import { bootRoomNotes } from '../../lib/knownissues-client.mjs';
+    bootRoomNotes();
+  </script>
+</Shell>
+
+<style>
+  .rn[hidden] { display: none; }
+  .rn-h { margin: 0 0 8px; font-size: 18px; }
+  .rn-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .rn-list :global(li) { display: grid; gap: 2px; padding-top: 10px; border-top: var(--border-rule); }
+  .rn-list :global(li:first-child) { padding-top: 0; border-top: 0; }
+  .rn-list :global(p) { margin: 0; font-size: 14px; }
+  .rn-list :global(small) { font-size: 12.5px; }
+  .home-where { margin: 0 0 16px; max-width: 80ch; }
+  .ri-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .ri { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; padding: 7px 8px; margin: 0 -8px; border-radius: var(--radius); color: inherit; text-decoration: none; transition: background var(--dur-state); }
+  .ri:hover { background: var(--surface-2); color: inherit; }
+  .ri.past { opacity: .8; }
+  .ri-p { font: 700 10.5px/1 var(--font-mono); padding: 4px 6px; border-radius: 4px; background: var(--surface-3); margin-top: 1px; }
+  .ri-p.p-1, .ri-p.p-2 { background: var(--red); color: #fff; } .ri-p.p-3 { background: var(--amber-soft); color: var(--amber-ink); }
+  .ri-t { display: grid; gap: 1px; min-width: 0; }
+  .ri-t b { font-size: 13.5px; line-height: 1.3; }
+  .ri-t small { font-size: 12px; color: var(--text-3); }
+  .ri-s.s-on-hold { color: var(--amber-ink); } .ri-s.s-new, .ri-s.s-in-progress { color: var(--red-ink); font-weight: 600; } .ri-s.s-resolved { color: var(--green-ink); }
+  .ri-all { font-size: 13px; font-weight: 600; }
+  .rg { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: var(--gutter); align-items: stretch; }
+  .rg-qr { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: center; }
+  .rg-qr-t p { margin: 0; font-size: 14px; color: var(--text-2); max-width: 60ch; }
+  .rg-links { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 10px !important; font-weight: 600; }
+  .rg-sent h3 { margin: 0 0 8px; font-size: 15px; }
+  .rg-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .rg-list li { display: grid; gap: 1px; font-size: 13.5px; }
+  .rg-list small { font-size: 12px; color: var(--text-3); }
+  .rg-none { margin: 0; font-size: 13.5px; }
+  @container content (max-width: 839px) { .rg { grid-template-columns: minmax(0, 1fr); } }
+  @container content (max-width: 459px) { .rg-qr { grid-template-columns: minmax(0, 1fr); justify-items: start; } }
+  .clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+</style>

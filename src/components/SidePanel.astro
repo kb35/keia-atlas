@@ -1,0 +1,80 @@
+---
+/* SidePanel: the detail column beside a picture (the room Key, a person, a device), 5 of 12 columns
+   (docs/rules/layout.md, L1 and L8).
+   It is sticky, so it follows the page while you look at the picture beside it, and it never scrolls
+   inside itself: a panel taller than the window scrolls with the page until its foot is in view, then
+   stays. The page is what scrolls.
+   Props:  title   the panel's heading (h2)
+           meta    a short note beside the heading ("12 devices · hover to find one")
+           label   the accessible name, when it differs from the title
+           sticky  true (default)
+           id
+           help    the help key for the heading (src/lib/help.mjs), when the panel has words of its own; default "sidepanel"
+   Slots:  default the content; head: controls on the right of the heading
+   Changing what it shows: call window.rsPanelSwap(panel, update). The old content cross-fades into the new
+   in place and the panel eases to its new height; the panel itself never slides (motion M2, M7). */
+interface Props { title: string; meta?: string; label?: string; sticky?: boolean; id?: string; class?: string; help?: string }
+const { title, meta, label, sticky = true, id, class: cls, help } = Astro.props;
+---
+<aside class:list={['card', 'sp', { 'sp-sticky': sticky }, cls]} id={id} aria-label={label ?? title} data-side-panel>
+  <header class="sp-h" data-help={help ?? 'sidepanel'} data-help-name={title}>
+    <h2>{title}</h2>
+    {meta && <span class="sp-meta faint">{meta}</span>}
+    {Astro.slots.has('head') && <span class="sp-tools"><slot name="head" /></span>}
+  </header>
+  <div class="sp-body" data-sp-body><slot /></div>
+</aside>
+
+<script is:inline data-astro-rerun>
+  (function () {
+    /* Sticky without an inner scroller: a panel that fits the window sticks under the top bar; a taller one
+       sticks by its foot instead (a negative top), so every part of it can be reached by scrolling the page. */
+    var fit = function (el) {
+      var mast = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mast-h')) || 60;
+      var room = window.innerHeight - mast - 32, h = el.offsetHeight;
+      if (h > room) el.style.setProperty('--sp-top', Math.round(window.innerHeight - h - 16) + 'px');
+      else el.style.removeProperty('--sp-top');
+    };
+    var panels = document.querySelectorAll('.sp-sticky');
+    panels.forEach(function (el) {
+      if (el.__sp) return; el.__sp = true;
+      fit(el);
+      if (window.ResizeObserver) new ResizeObserver(function () { fit(el); }).observe(el);
+    });
+    if (!window.__rsSpHook) {
+      window.__rsSpHook = true;
+      window.addEventListener('resize', function () { document.querySelectorAll('.sp-sticky').forEach(fit); });
+    }
+    window.rsPanelSwap = window.rsPanelSwap || function (panel, update) {
+      var body = panel && panel.querySelector('[data-sp-body]');
+      var M = window.rsMotion ? window.rsMotion() : { reduced: true };
+      if (!body || M.reduced) { update(); return; }
+      var h0 = panel.offsetHeight;
+      // The old content stays on top, exactly where it was, while the new content fades in beneath it.
+      var ghost = body.cloneNode(true);
+      ghost.removeAttribute('data-sp-body'); ghost.setAttribute('aria-hidden', 'true'); ghost.inert = true;
+      ghost.classList.add('sp-ghost');
+      ghost.style.top = body.offsetTop + 'px'; ghost.style.left = body.offsetLeft + 'px'; ghost.style.width = body.offsetWidth + 'px';
+      panel.appendChild(ghost);
+      update();
+      var h1 = panel.offsetHeight;
+      if (Math.abs(h1 - h0) > 2) panel.animate([{ height: h0 + 'px', overflow: 'clip' }, { height: h1 + 'px', overflow: 'clip' }], { duration: M.morph, easing: M.ease });
+      ghost.animate([{ opacity: 1 }, { opacity: 0 }], { duration: M.exit, easing: M.ease, fill: 'forwards' }).onfinish = function () { ghost.remove(); };
+      body.animate([{ opacity: 0 }, { opacity: 1 }], { duration: M.enter, delay: M.exit / 2, easing: M.ease, fill: 'backwards' });   // the same timing as every view swap (M12)
+    };
+  })();
+</script>
+
+<style is:global>
+  .sp { position: relative; padding: 14px 16px 16px; min-width: 0; }
+  .sp-sticky { position: sticky; top: var(--sp-top, calc(var(--mast-h, 60px) + 16px)); align-self: start; }
+  .sp-h { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .sp-h h2 { font-size: 18px; margin: 0; }
+  .sp-meta { font-size: 12px; }
+  .sp-tools { margin-left: auto; display: flex; gap: 6px; }
+  .sp-h .sp-meta { margin-left: auto; }
+  .sp-h .sp-meta + .sp-tools { margin-left: 8px; }
+  .sp-ghost { position: absolute; pointer-events: none; }
+  /* Under 840 px of content the panel sits below the picture (the grid stacks them) and scrolls with the page. */
+  @container content (max-width: 839px) { .sp-sticky { position: static; } }
+</style>

@@ -1,0 +1,157 @@
+---
+// Services, Overview: the AV service, the network and IT infrastructure side by side. Overview
+// archetype (page-anatomy.md, D). Each card has the service's light, its owner, its four figures and its three worst
+// items right now; every figure opens the service page with that filter. The figures are simulated live
+// (src/lib/livesim.mjs), the same as the service pages.
+//   band      services running well, units needing attention, open incidents
+//   main      one card per service
+//   below     what belongs to each service (kinds of kit, each opening the service filtered to it)
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import Section from '../../components/Section.astro';
+import { href } from '../../lib/data.mjs';
+import { serviceModel, SERVICE_ORDER, SERVICES } from '../../lib/services-view.mjs';
+import { devicesModel } from '../../lib/livemodel.mjs';
+import { PEOPLE } from '../../lib/demo.mjs';
+
+const models = Object.fromEntries(SERVICE_ORDER.map((id) => [id, serviceModel(id)]));
+const openIncidents = devicesModel().incs.length;
+const NUMBERS = [
+  { id: 'svo-1', n: '–', label: 'Services running well', to: '#services' },
+  { id: 'svo-2', n: '–', label: 'Units needing attention', to: '#services' },
+  { id: 'svo-3', n: openIncidents, label: 'Open incidents', to: '/incidents/?state=new,in-progress,on-hold' },
+];
+// The four figures on each card: the same labels and drill-downs as the service page's band.
+const FIGURES = {
+  av: [['Rooms working now', '/rooms/overview/?status=use,free'], ['Units alerting', 'services/av/?status=alert,offline#units'], ['Firmware behind the standard', 'services/av/?fw=1#units', models.av.behind], ['Open incidents', 'services/av/#incidents', models.av.incidents.length]],
+  network: [['Offices online', 'services/network/#health'], ['Home gateways online', 'services/network/?kind=home-gateway&status=online,alert#units'], ['Switches alerting', 'services/network/?kind=switch&status=alert,offline#units'], ['Circuits up', 'services/network/?kind=circuit&status=online,alert#units']],
+  infrastructure: [['Comms rooms to standard', 'services/infrastructure/#commsrooms', models.infrastructure.statics.toStandard], ['UPS and power strip alerts', 'services/infrastructure/?kind=ups,pdu&status=alert,offline#units'], ['Rack space short', 'services/infrastructure/#commsrooms', models.infrastructure.statics.short], ['Links with a fault', 'services/infrastructure/?kind=link&status=alert,offline#units']],
+};
+const figureHref = (to) => (to.startsWith('/') ? href(to) : href(`/${to}`));
+const client = {
+  base: href('/'),
+  services: Object.fromEntries(SERVICE_ORDER.map((id) => [id, { sim: models[id].sim, statics: models[id].statics, incCount: models[id].incidents.length, name: SERVICES[id].name }])),
+};
+const json = JSON.stringify(client).replace(/</g, '\\u003c');
+const ownerOf = (id) => PEOPLE.find((p) => p.id === SERVICES[id].owner);
+---
+<Shell title="Services" section="services-overview" crumbs={[{ label: 'Services' }]} about={{ kind: 'page', label: 'Services' }}>
+  <PageBand overline="Services" title="Services" lede="The AV service, the network and IT infrastructure: how each is doing now, who owns it and what to review." sim="live" numbers={NUMBERS}>
+    <span slot="overline" class="lv-live" data-lv-live title="A new moment every five seconds, the same in every window"><span class="lv-dot" aria-hidden="true"></span>Live</span>
+  </PageBand>
+
+  <div class="content svo" data-svo>
+    <div class="g12 sv-cards" id="services">
+      {SERVICE_ORDER.map((id) => {
+        const m = models[id], svc = SERVICES[id], o = ownerOf(id);
+        return (
+          <article class="card sv-card s-4" data-svc={id} data-l="none" aria-labelledby={`sc-${id}`} data-help="services.card" data-help-name={svc.title} data-steady>
+            <header class="sv-ch">
+              <h2 id={`sc-${id}`}><a href={href(svc.path)} data-vt-rec={`svc-${id}`}>{svc.title}</a></h2>
+              <span class="sv-light" data-light data-l="none" data-help="services.light"></span>
+            </header>
+            <p class="sv-own"><a href={href(`/team/?p=${o.id}`)}>{o.name}</a> owns it. <span class="faint">{m.shown.length.toLocaleString('en-IE')} {id === 'av' ? 'units' : 'items'} across {m.sites.length} {m.sites.length === 1 ? 'place' : 'places'}</span></p>
+            <ul class="sv-figs">
+              {FIGURES[id].map(([label, to, first], k) => (
+                <li data-n={k + 1} data-help={`number:${label}`} data-help-name={label}>
+                  <a href={figureHref(to)}><b>{first ?? '–'}</b><span>{label}</span></a>
+                </li>
+              ))}
+            </ul>
+            <div class="sv-topbox">
+              <h3>Needs attention</h3>
+              <ol class="sv-toplist" data-top aria-live="polite"></ol>
+              <p class="sv-topnone" data-top-none hidden>Nothing needs attention right now.</p>
+            </div>
+            <a class="sv-more" data-more href={href(svc.path)}>Open the {svc.name} service →</a>
+          </article>
+        );
+      })}
+    </div>
+
+    <Section title="What belongs to each service" id="belongs" aside="Each kind opens that service, filtered to it" help="services.belongs">
+      <div class="g12">
+        {SERVICE_ORDER.map((id) => (
+          <div class="card side-card s-4">
+            <h3>{SERVICES[id].title}</h3>
+            <ul class="sv-kinds">
+              {models[id].kinds.map((k) => (
+                <li><a href={href(`${SERVICES[id].path}?kind=${k.k}#units`)}><span>{k.label}</span><b>{k.n.toLocaleString('en-IE')}</b></a></li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+      <p class="sv-note">The switch inside a room is AV; a switch in a comms room is the network. Printers belong to no service here. Access points are units in the open areas and corridors of each floor.</p>
+    </Section>
+
+    <p class="sv-note sv-clock"><span class="lv-dot" aria-hidden="true"></span><span data-clock>Updating</span>. Simulated from each kind of kit and the open incidents, the same in every window. Real feeds replace this with the same shape.</p>
+    <script type="application/json" data-lv-model set:html={json}></script>
+  </div>
+
+  <script>
+    import { initOverview } from '../../lib/services-client.mjs';
+    let stop = () => {};
+    function init() {
+      const root = document.querySelector('.content.svo[data-svo]');
+      if (root) stop = initOverview(root);
+    }
+    init();
+    document.addEventListener('astro:before-swap', () => stop(), { once: true });
+    document.addEventListener('astro:page-load', init);
+  </script>
+</Shell>
+
+<style>
+  .lv-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex: none; animation: pulse var(--dur-pulse) ease-in-out infinite; --accent: var(--green); }
+  .lv-live { display: inline-flex; align-items: center; gap: 6px; font: 700 11px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--green-ink); }
+  :global(.lv-paused) .lv-dot { animation: none; background: var(--grey); }
+  @media (prefers-reduced-motion: reduce) { .lv-dot { animation: none; } }
+  .sv-cards { align-items: stretch; }
+  .sv-card { padding: 20px 22px; display: grid; gap: 14px; align-content: start; min-width: 0; container: svcard / inline-size; }
+  .sv-ch { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .sv-ch h2 { margin: 0; font-size: var(--h2-size); }
+  .sv-ch h2 a { color: inherit; text-decoration: none; }
+  .sv-ch h2 a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .sv-light { display: inline-flex; align-items: center; gap: 6px; font: 700 12.5px/1 var(--font-sans); color: var(--text-2); }
+  .sv-light:empty { display: none; }
+  .sv-light :global(.sv-lt) { width: 10px; height: 10px; border-radius: 50%; background: var(--grey); flex: none; transition: background-color var(--dur-state) var(--ease-settle); }
+  .sv-light :global(.sv-lt[data-l=good]) { background: var(--green); }
+  .sv-light :global(.sv-lt[data-l=warn]) { background: var(--amber); }
+  .sv-light :global(.sv-lt[data-l=bad]) { background: var(--red); }
+  .sv-own { margin: 0; font-size: 13.5px; color: var(--text-2); }
+  .sv-own a { color: var(--accent-ink); font-weight: 650; }
+  .sv-figs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .sv-figs li { min-width: 0; border-radius: var(--radius); background: var(--surface-2); }
+  .sv-figs a { display: grid; gap: 2px; padding: 9px 11px; color: inherit; text-decoration: none; border-radius: var(--radius); height: 100%; align-content: start; }
+  .sv-figs a:hover { background: var(--surface-3); }
+  .sv-figs b { font: 700 24px/1.1 var(--font-display, var(--font-sans)); font-variant-numeric: tabular-nums; }
+  .sv-figs span { font-size: 12.5px; line-height: 1.3; color: var(--text-2); }
+  .sv-figs li[data-tone=bad] b { color: var(--red-ink); } .sv-figs li[data-tone=warn] b { color: var(--amber-ink); }
+  .sv-topbox { display: grid; gap: 6px; }
+  .sv-topbox h3 { margin: 0; font: 700 var(--overline-size)/1.2 var(--font-sans); letter-spacing: var(--overline-track); text-transform: var(--overline-case); color: var(--text-3); }
+  .sv-toplist { list-style: none; margin: 0; padding: 0; display: grid; }
+  .sv-toplist :global(.sv-top) { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 4px 10px; align-items: start; padding: 8px 0; border-top: var(--border-rule); }
+  .sv-toplist :global(.sv-top:first-child) { border-top: 0; }
+  .sv-toplist :global(.sv-top > i) { width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; background: var(--red); }
+  .sv-toplist :global(.sv-top > i[data-r="1"]), .sv-toplist :global(.sv-top > i[data-r="2"]) { background: var(--amber); }
+  .sv-toplist :global(.sv-top > span) { min-width: 0; display: grid; gap: 1px; }
+  .sv-toplist :global(.sv-top a) { color: inherit; font-weight: 650; font-size: 13.5px; line-height: 1.3; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sv-toplist :global(.sv-top a:hover) { text-decoration: underline; text-underline-offset: 2px; }
+  .sv-toplist :global(.sv-top small) { font-size: 12.5px; line-height: 1.35; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sv-toplist :global(.sv-top small b) { font-weight: 650; color: var(--text); }
+  .sv-toplist :global(.sv-top em) { font-style: normal; font-size: 12px; color: var(--text-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .sv-topnone { margin: 0; padding: 12px; border: 1px dashed var(--line-strong); border-radius: var(--radius); font-size: 13.5px; color: var(--text-2); text-align: center; }
+  .sv-topnone[hidden] { display: none; }
+  .sv-more { align-self: end; margin-top: auto; font-size: 13.5px; font-weight: 650; color: var(--accent-ink); text-decoration: none; }
+  .sv-more:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .sv-kinds { list-style: none; margin: 0; padding: 0; display: grid; }
+  .sv-kinds li { border-top: var(--border-rule); }
+  .sv-kinds li:first-child { border-top: 0; }
+  .sv-kinds a { display: flex; justify-content: space-between; gap: 12px; padding: 8px 2px; color: inherit; text-decoration: none; font-size: 14px; }
+  .sv-kinds a:hover span { text-decoration: underline; text-underline-offset: 2px; }
+  .sv-kinds b { font-variant-numeric: tabular-nums; }
+  .sv-note { margin: 10px 2px 0; font-size: 12.5px; line-height: 1.5; color: var(--text-3); max-width: 78ch; }
+  .sv-clock { display: flex; align-items: center; gap: 8px; margin-top: 20px; }
+  @container svcard (max-width: 300px) { .sv-figs { grid-template-columns: minmax(0, 1fr); } }
+</style>

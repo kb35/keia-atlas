@@ -1,0 +1,38 @@
+---
+import { layoutPorts, FACE_LABEL } from '../lib/ports.mjs';
+const { model, faces, width, height } = Astro.props;
+import { models } from '../lib/data.mjs';
+// Only this model's faces get a row, so a model with rear ports only has no empty rows.
+// Every row is centred in a frame as wide as the widest model of the class, so switching models
+// grows or shrinks the chassis from its centre and shared ports slide sideways into place.
+const own = faces.filter((f) => (models[model]?.ports ?? []).some((p) => (p.face ?? 'none') === f));
+const L = layoutPorts(model, own);
+const W = width ?? L.w, H = L.h;
+const off = (r) => Math.max(0, (W - r.w) / 2);
+const SCALE = 1.2;
+---
+{/* Drawn at one fixed scale for every model, so a one-port device never balloons to fill the width. */}
+<svg class="ports-panel" viewBox={`0 0 ${W} ${H}`} width={Math.round(W * SCALE)} height={Math.round(H * SCALE)} role="img" aria-label="Port panel" data-k="ports-svg">
+  {/* Ports are clipped to their chassis, which morphs on the same curve, so no port can pass outside it. */}
+  <defs data-k="ports-defs"><clipPath id="ports-clip" data-k="ports-clip">
+    {L.rows.map((r) => <rect data-k={`clip-ch-${r.face}`} class="chassis" style={`x:${(off(r) + 4).toFixed(1)}px;y:${r.y - 12}px;width:${Math.max(r.w - 8, 0)}px;height:${r.w ? 72 : 0}px;rx:8px`} />)}
+  </clipPath></defs>
+  {L.rows.map((r) => (
+    <>
+      <rect data-k={`ch-${r.face}`} class="chassis" style={`x:${(off(r) + 4).toFixed(1)}px;y:${r.y - 12}px;width:${Math.max(r.w - 8, 0)}px;height:${r.w ? 72 : 0}px;rx:8px`} />
+      <text data-k={`lb-${r.face}`} class="grp-l" x={(W / 2).toFixed(1)} y={r.y - 18} text-anchor="middle" style={`opacity:${r.w ? 1 : 0}`}>{FACE_LABEL[r.face].toUpperCase()}</text>
+    </>
+  ))}
+  <g clip-path="url(#ports-clip)" data-k="ports-inner">
+  {L.rows.flatMap((r) => r.items.map((it) => ({ ...it, o: off(r) }))).map(({ p, x, cx, y, sh, colour, name, o }) => (
+    <g class="pt" data-k={`port-${p.id}`} style={`transform:translate(${(x + o).toFixed(1)}px,${y.toFixed(1)}px);--pc:${colour}`}>
+      <title>{`${p.id}: ${name}`}</title>
+      <g class="pt-in">
+        <rect class="kindbar" x="0" y="-9" width={sh.w} height="4" rx="2" />
+        <g set:html={sh.svg} />
+        <text x={(cx - x).toFixed(1)} y="42" text-anchor="middle">{p.id}</text>
+      </g>
+    </g>
+  ))}
+  </g>
+</svg>

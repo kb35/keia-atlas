@@ -1,0 +1,44 @@
+---
+// Report a problem from the room guide: a symptom tile, then Send. The room is known from the QR
+// code and the likely device from the symptom (src/lib/guide.mjs); the incident goes through the live
+// layer and shows on the Incidents board, the office page and Home in other windows.
+import Guide from '../../../layouts/Guide.astro';
+import GuideForm from '../../../components/GuideForm.astro';
+import GuideLive from '../../../components/GuideLive.astro';
+import { href } from '../../../lib/data.mjs';
+import { SYMPTOMS, knownWords } from '../../../lib/guide.mjs';
+import { guidePaths, guideRoom } from '../_room.mjs';
+
+export const getStaticPaths = guidePaths;
+const R = guideRoom(Astro.params.room);
+const ICON = {
+  picture: '<rect x="4" y="6" width="24" height="16" rx="2"/><path d="M12 27h8M16 22v5"/><path d="M7 4l18 21"/>',
+  sound: '<path d="M5 12h5l7-6v20l-7-6H5z"/><path d="M22 12.5l6 7M28 12.5l-6 7"/>',
+  join: '<rect x="3" y="9" width="18" height="14" rx="3"/><path d="M21 14l8-4v12l-8-4"/><path d="M9.5 13.5l5 5M14.5 13.5l-5 5"/>',
+  camera: '<path d="M4 10h5l2-3h10l2 3h5v15H4z"/><circle cx="16" cy="17" r="5"/>',
+  other: '<circle cx="16" cy="16" r="12"/><path d="M12.5 12.5a3.5 3.5 0 1 1 5 3.2c-1 .5-1.5 1.2-1.5 2.3"/><path d="M16 22.5v.3"/>',
+};
+const options = SYMPTOMS.map((s) => ({ id: s.id, label: s.label, hint: s.hint, icon: ICON[s.id] }));
+---
+<Guide title={`Report a problem, ${R.title}`} office={R.office} home={R.home}>
+  <GuideForm
+    kind="report" room={R.forClient}
+    back={href(R.home)} backLabel={R.title}
+    heading="What's not working?" lede={`In ${R.title}. Pick one, then Send. We fill in the room for you.`}
+    options={options}
+    noteLabel="Anything else" notePlaceholder="For example: only the left screen"
+    doneHeading="Thanks, it's sent"
+    doneLines={[`Someone at the ${R.office} will see this now.`, 'A technician picks it up and comes to the room if it needs a visit.', 'In a meeting? Carry on from your laptop for now.']}
+    staff={{ to: R.staffBoard, label: 'For IT staff: see it on the Incidents board' }}
+    notice="A demo: it goes to the Incidents board in Keia Atlas, in this browser.">
+    {R.known.length > 0 && (
+      <p slot="before" class="gr-known" data-guide-before><b>We already know:</b> {R.known[0].inc.short_description}. {knownWords({ state: R.known[0].inc.state, priority: R.known[0].inc.priority, hold: R.known[0].hold?.hold })} You can still tell us about anything else.</p>
+    )}
+  </GuideForm>
+  <GuideLive />
+</Guide>
+
+<style>
+  .gr-known { margin: 0; padding: 12px 14px; border-radius: var(--radius-lg); background: var(--amber-soft); color: var(--text); font-size: 15px; line-height: 1.45; }
+  .gr-known b { color: var(--amber-ink); }
+</style>

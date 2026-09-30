@@ -1,0 +1,79 @@
+# Site: one office building (or the remote workers' group) of the made-up company.
+# The file name is the site id, for example nyc.yaml.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/site
+title: Site
+type: object
+additionalProperties: false
+required: [company, code, name, kind, role, sources]
+properties:
+  company: { type: string, minLength: 1 }
+  code:
+    description: Short site code used in room numbers and device names.
+    type: string
+    pattern: "^[A-Z]{3}$"
+  name:
+    description: How people say it, by city ("Dublin office"), or "Remote EMEA" for a remote site.
+    type: string
+    minLength: 1
+  building:
+    description: The made-up name of the building. Kept for the record and never shown; people say the city.
+    type: string
+  meaning:
+    description: Why the site exists or what its name refers to (a note for the record).
+    type: string
+  kind: { enum: [office, remote] }
+  role: { enum: [headquarters, regional, office, satellite, remote] }
+  city: { type: string }
+  country:
+    description: ISO 3166-1 two-letter country code.
+    type: string
+    pattern: "^[A-Z]{2}$"
+  region: { enum: [amer, emea, apac] }
+  time_zone:
+    description: IANA time zone, for example America/New_York.
+    type: string
+    pattern: "^[A-Za-z_]+/[A-Za-z_]+$"
+  mains:
+    description: The local mains supply, which decides power supplies and plugs.
+    type: object
+    additionalProperties: false
+    required: [volts, hz, plugs]
+    properties:
+      volts: { type: integer, minimum: 100, maximum: 240 }
+      hz: { enum: [50, 60] }
+      plugs:
+        type: array
+        minItems: 1
+        items: { type: string, pattern: "^[A-N]$" }
+  floors:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id:
+          description: Floor number as used in room numbers.
+          type: string
+          pattern: "^[0-9]{1,3}$"
+        name: { type: string, minLength: 1 }
+  sources:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [source, provides]
+      properties:
+        source: { type: string, pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
+        provides: { type: string, minLength: 1 }
+  notes:
+    type: array
+    items: { type: string }
+allOf:
+  - if: { properties: { kind: { const: office } } }
+    then:
+      required: [city, country, region, time_zone, mains, floors]
+      properties: { city: true, country: true, region: true, time_zone: true, mains: true, floors: true }

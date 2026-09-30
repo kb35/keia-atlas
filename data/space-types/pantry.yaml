@@ -1,0 +1,200 @@
+# Space type: Pantry
+# Based on public industry guidance (data/sources/room-guidance.yaml, decision 0006); house assumptions say so.
+# Keia part (profile to verification_model): which classes of device belong here.
+# Keia Atlas part: build options, the models each option names, and the outlets.
+
+schema: composite-profile
+
+profile:
+  name: Pantry
+  space_type: pantry
+  version: "2.0"
+  last_updated: "2026-09-30"
+  owner: Keia Atlas maintainers
+  purpose: >-
+    Space for people to gather and eat. Technology is only needed where the site wants digital
+    signage.
+
+sources:
+  - file: data/sources/room-guidance.yaml
+    provides: 'Public guidance for this space type: size, capacity, display size, kit class and outlets'
+  - file: data/device-classes/display.yaml
+    provides: Healthy state for the display class
+  - file: data/device-classes/av-extender.yaml
+    provides: Healthy state for the AV extender class
+  - file: data/device-classes/signage-player.yaml
+    provides: Healthy state for the signage player class
+  - file: data/device-classes/adapter.yaml
+    provides: Healthy state for the adapter class
+
+equipment_categories:
+  - category: display
+    description: Screens for the far end and shared content
+    object_profile: data/device-classes/display.yaml
+    quantity: "1"
+  - category: signal_extension
+    description: HDBaseT transmitters and receivers carrying video, USB, network and power
+    object_profile: data/device-classes/av-extender.yaml
+    quantity: "2"
+    notes: Optional in every build of this space type
+  - category: digital_signage
+    description: Player that drives the signage display
+    object_profile: data/device-classes/signage-player.yaml
+    quantity: "1"
+  - category: adapters
+    description: Scalers, converters, PoE injectors and single-cable USB-C adapters
+    object_profile: data/device-classes/adapter.yaml
+    quantity: "1"
+    notes: Optional in every build of this space type
+
+verification_model:
+  platforms_to_check:
+    - platform: keia_atlas
+      check: every required device in the chosen option is recorded in the space and wired
+        as the option says
+    - platform: inventory
+      check: every device has an active record in this space
+    - platform: dhcp_dns
+      check: every networked device has an address reservation and DNS records
+    - platform: device_management
+      check: meeting devices are online, paired and on standard firmware
+
+keia_atlas:
+  standard: industry
+  guideline: avixa-v202-display-image-size
+  category: recharge
+  area:
+    sq_ft: 600
+    m2: 55.7
+  geometry:
+    # The room shell for a floor-level 3D model; basis says where each value comes from.
+    width_m: 8.5
+    depth_m: 6.55
+    ceiling_m: 2.6
+    display_wall: back
+    door: { wall: left, from_m: 4.55, to_m: 5.95 }
+    data_entry: { via: ceiling, wall: left, at: above the door }
+    containment: [display-track, wall-riser, ceiling-basket, skirting]
+    basis:
+      size: chosen
+      ceiling: house-default
+      door: house-default
+      data_entry: house-default
+      containment: house-default
+    notes:
+      - 600 sq ft (house assumption).
+  options:
+    - id: signage
+      name: Digital signage
+      summary: A signage display with a BrightSign player behind it, fitted only where the site wants it.
+      equipment:
+        - key: display
+          class: display
+          quantity: 1
+          requirement: required
+          location: display-wall
+          sizes_in: [43, 50, 55, 65, 75, 85]
+        - key: signage-player
+          class: signage-player
+          model: brightsign-xt1145
+          quantity: 1
+          requirement: required
+          location: behind-display
+          notes: PoE powered; includes a 64 GB microSD card
+        - key: wall-plate
+          class: av-extender
+          model: kramer-wp-20ct
+          role: Wall plate where a laptop plugs in (HDMI or USB-C); sends to the display over
+            HDBaseT
+          quantity: 1
+          requirement: optional
+          location: tbd
+          notes: Needs its own power supply to run and to charge laptops
+        - key: wall-plate-rx
+          class: av-extender
+          model: kramer-tp-580rxr
+          role: HDBaseT receiver at the display
+          quantity: 1
+          requirement: optional
+          location: behind-display
+        - key: scaler
+          class: adapter
+          model: kramer-vp-440h2
+          role: Switcher and scaler between the signage player and a laptop
+          quantity: 1
+          requirement: optional
+          location: behind-display
+      infrastructure:
+        - service: power
+          provided_by: it
+          quantity: 4
+          location: behind-display
+          serves: [display, signage player, spare, spare]
+        - service: data
+          provided_by: it
+          quantity: 3
+          location: behind-display
+          serves: [display, signage player, spare]
+        - service: data
+          provided_by: it
+          quantity: 1
+          location: tbd
+          serves: [wall plate for a laptop (optional)]
+          notes: Terminated as a plug so the installer can test it
+        - service: power
+          provided_by: it
+          quantity: 1
+          location: tbd
+          serves: [wall plate (optional)]
+          notes: The wall plate draws 5 V DC at 390 mA
+      wiring:
+        - from: signage-player.hdmi-out-1
+          to: display.hdmi-in-1
+          cable: hdmi
+          unless: scaler
+        - from: signage-player.hdmi-out-1
+          to: scaler.hdmi-in-1
+          cable: hdmi
+          when: scaler
+        - from: scaler.hdmi-out-1
+          to: display.hdmi-in-1
+          cable: hdmi
+          when: scaler
+        - from: wall-plate.hdbaset-1
+          to: wall-plate-rx.hdbaset-1
+          cable: cat6a
+          when: wall-plate
+        - from: wall-plate-rx.hdmi-out-1
+          to: scaler.hdmi-in-2
+          cable: hdmi
+          when: scaler
+        - from: wall-plate.usb-c-1
+          to: laptop
+          cable: usb-c
+          when: wall-plate
+        - from: display.lan-1
+          to: outlet:data/behind-display#1
+          cable: cat6
+        - from: signage-player.lan-1
+          to: outlet:data/behind-display#2
+          cable: cat6
+          notes: PoE+ powers the player
+        - from: display.power-in
+          to: outlet:power/behind-display#1
+          cable: power
+        - from: scaler.power-in
+          to: outlet:power/behind-display#3
+          cable: power
+          when: scaler
+        - from: wall-plate-rx.power-in
+          to: outlet:power/behind-display#4
+          cable: power
+          when: wall-plate-rx
+        - from: wall-plate.power-in
+          to: outlet:power/tbd#1
+          cable: power
+          when: wall-plate
+  notes:
+    - 'Display size: signage text is set large, so AVIXA DISCAS allows a smaller display for the
+      distance than for meeting content; the site picks 43 to 85 in for where people read it (house
+      assumption).'

@@ -1,0 +1,248 @@
+---
+// Vendors (stage 3): the companies Aigna works with, what each contract covers, the service levels,
+// how the last year went, and what each vendor gets from Keia Atlas at each phase. A List page
+// (docs/standards/page-anatomy.md): the band, the filter bar, the vendors as cards or rows, then who
+// does what across them. Companies, contracts and figures are made up.
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import Section from '../../components/Section.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import { vendors, sites, VENDOR_KIND, DEMO_TODAY, SITE_ORDER, modelName, fmtDate, href } from '../../lib/data.mjs';
+import { person, REGION_SHORT } from '../../lib/demo.mjs';
+const ORDER = ['integration', 'service', 'manufacturer'];
+const list = Object.values(vendors).sort((a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind) || a.name.localeCompare(b.name));
+const days = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000);
+const leftOf = (v) => days(DEMO_TODAY, v.contract.end);
+// Who does what, at a glance. R: they do it. C: they help. Blank: not theirs. Hover a letter for why.
+const WORK = [
+  { what: 'Site survey and design detail', v: { northlight: ['R', 'Surveys the site and details the design with the delivery engineer'], brightwave: ['R', 'Surveys and details custom designs'] } },
+  { what: 'Install and cabling in the room', v: { northlight: ['R', 'Installs to the room profile, Americas'], brightwave: ['R', 'Installs custom rooms, EMEA and APAC'] } },
+  { what: 'Serial numbers and MACs recorded', v: { northlight: ['R', 'Through the vendor portal, with a label photo'], brightwave: ['R', 'Through the vendor portal, with a label photo'] } },
+  { what: 'Commissioning and snags on their work', v: { northlight: ['C', 'Fixes snags; the delivery engineer runs commissioning'], brightwave: ['C', 'Tunes microphones and cameras on a test call'] } },
+  { what: 'As-built drawings', v: { northlight: ['R', 'At handover'], brightwave: ['R', 'At handover, with control programming files'] } },
+  { what: 'Repairs when a room is down', v: { keystone: ['R', 'Under the maintenance contract, after the on-site technician'] } },
+  { what: 'Advance replacement of a failed unit', v: { keystone: ['R', 'Ships a replacement before the faulty unit comes back'], 'hp-poly': ['C', 'Supplies the replacement unit under warranty'] } },
+  { what: 'Firmware and software releases', v: { 'hp-poly': ['R', 'Publishes releases and notes; Aigna tests in the Lab first'] } },
+  { what: 'Warranty and returns', v: { 'hp-poly': ['R', 'Handles returns for Poly models'], keystone: ['C', 'Raises the return for Aigna'] } },
+];
+const GETS = { plan: 'Plan', design: 'Design', integrate: 'Deploy', handover: 'Hand over', service: 'Service' };
+
+// ---------- The band ----------
+const jobs = list.reduce((n, v) => n + (v.record?.jobs ?? 0), 0);
+const snags = list.reduce((n, v) => n + (v.record?.snags_open ?? 0), 0);
+const ending = list.filter((v) => leftOf(v) >= 0 && leftOf(v) < 183).length;
+const portal = list.reduce((n, v) => n + (v.people?.length ?? 0), 0);
+const NUMBERS = [
+  { n: jobs, label: 'Jobs in the last year', fact: true },
+  { n: snags, label: snags === 1 ? 'Snag open' : 'Snags open', to: '?snags=1', tone: snags ? 'warn' : undefined },
+  { n: ending, label: 'Ending within 6 months', to: '?ending=1', tone: ending ? 'warn' : undefined },
+  { n: portal, label: 'In the vendor portal', to: '/vendor/' },
+];
+
+// ---------- The filter bar ----------
+const siteList = (v) => (v.sites?.length ? v.sites : ['all']);
+const FACETS = [
+  { key: 'region', label: 'Region', options: ['amer', 'emea', 'apac'].map((r) => ({ value: r, label: REGION_SHORT[r] })) },
+  { key: 'site', label: 'Office', options: [...SITE_ORDER.filter((s) => list.some((v) => v.sites?.includes(s))).map((s) => ({ value: s, label: sites[s].name, sub: sites[s].city })), { value: 'all', label: 'Every site', sub: 'Not tied to named sites' }] },
+  { key: 'kind', label: 'Kind', options: ORDER.map((k) => ({ value: k, label: VENDOR_KIND[k] })) },
+];
+const SORT = { options: [{ value: 'kind', label: 'By kind' }, { value: 'name', label: 'By name' }, { value: 'ending', label: 'Ending first' }] };
+// Switches the band's figures open (rule P10): vendors with a snag open, contracts ending within six months.
+const TOGGLES = [
+  { key: 'snags', label: 'Snags open', title: 'Only vendors with a snag still open' },
+  { key: 'ending', label: 'Ending soon', title: 'Only contracts ending within six months' },
+];
+const VIEWS = [{ value: 'cards', label: 'Cards', show: '[data-grid]' }, { value: 'list', label: 'List', show: '[data-list]' }];
+const find = (v) => `${v.name} ${VENDOR_KIND[v.kind]} ${v.contract.ref} ${v.summary} ${(v.contract.covers_models ?? []).map(modelName).join(' ')} ${(v.sites ?? []).map((s) => sites[s]?.name).join(' ')}`;
+const fattrs = (v) => ({ 'data-fi': '', 'data-id': v.id, 'data-find': find(v), 'data-f-region': v.regions.join('|'), 'data-f-site': siteList(v).join('|'), 'data-f-kind': v.kind,
+  'data-t-snags': v.record?.snags_open ? '1' : undefined, 'data-t-ending': leftOf(v) >= 0 && leftOf(v) < 183 ? '1' : undefined });
+const ROWS = list.map((v, i) => ({ id: v.id, i, name: v.name, left: leftOf(v) }));
+---
+<Shell title="Vendors" section="vendors" minStage={3} crumbs={[{ label: 'Team', to: '/team/' }, { label: 'Vendors' }]}>
+  <PageBand overline="Directory" title="Vendors" lede="What each contract covers, its service levels, and how the last year went." sim numbers={NUMBERS} />
+
+  <div class="content vendors">
+    <FilterBar facets={FACETS} toggles={TOGGLES} placeholder="Find a vendor, contract or model" label="Find a vendor" noun={['vendor', 'vendors']} scope=".content.vendors" views={VIEWS} viewKey="rs5-vendors-view" sort={SORT} />
+
+    <div class="vd-list" data-grid>
+      {list.map((v) => {
+        const total = days(v.contract.start, v.contract.end), gone = Math.max(0, Math.min(total, days(v.contract.start, DEMO_TODAY)));
+        const left = leftOf(v);
+        return (
+          <article class={`card vd vd-${v.kind}`} {...fattrs(v)} data-vk={v.id}>
+            <header class="vd-head">
+              <span class="kind">{VENDOR_KIND[v.kind]}</span>
+              <span class="faint">{v.regions.map((r) => REGION_SHORT[r]).join(', ')}</span>
+              {v.sites && <span class="vd-sites">{v.sites.map((s) => <a class="code" href={href(`/rooms/?site=${s}`)} title={sites[s]?.name}>{sites[s]?.code}</a>)}</span>}
+            </header>
+            <h2>{v.name}</h2>
+            <p class="muted">{v.summary}</p>
+            <div class="vd-contract">
+              <p class="vd-ref"><span class="mono">{v.contract.ref}</span><span class="faint">{fmtDate(v.contract.start)} to {fmtDate(v.contract.end)}</span><span class:list={['vd-left', { soon: left < 183 }]}>{left < 0 ? 'Ended' : `${left} days left`}</span></p>
+              <span class="vd-bar" role="img" aria-label={`${Math.round((gone / total) * 100)}% of the contract term gone`}><i style={`width:${(gone / total) * 100}%`}></i></span>
+            </div>
+            <div class="vd-cols">
+              <div>
+                <h3>Covers</h3>
+                <ul>{v.contract.scope.map((x) => <li>{x}</li>)}</ul>
+                {v.contract.excludes && <><h3>Doesn't cover</h3><ul class="faint">{v.contract.excludes.map((x) => <li>{x}</li>)}</ul></>}
+                {v.contract.covers_models && <><h3>Models</h3><p class="vd-models">{v.contract.covers_models.map((m) => <a class="tag" href={href(`/models/${m}/`)}>{modelName(m)}</a>)}</p></>}
+              </div>
+              <div>
+                {v.contract.sla && <><h3>Service levels</h3><ul class="vd-sla">{v.contract.sla.map((x) => <li><span>{x.what}</span><b>{x.target}</b></li>)}</ul></>}
+                {v.record && (
+                  <>
+                    <h3>Last twelve months</h3>
+                    <p class="vd-rec">
+                      {v.record.jobs != null && <span><b class="num">{v.record.jobs}</b> jobs</span>}
+                      {v.record.on_time != null && <span><span class="ring" style={`--p:${v.record.on_time}`}></span><b class="num">{v.record.on_time}%</b> on time</span>}
+                      {v.record.snags_open != null && <span><b class="num">{v.record.snags_open}</b> snags open</span>}
+                    </p>
+                    {v.record.note && <p class="faint vd-note">{v.record.note}</p>}
+                  </>
+                )}
+              </div>
+            </div>
+            {v.gets && (
+              <div class="vd-gets">
+                <h3>What they get from Keia Atlas</h3>
+                <ol>{v.gets.map((g) => <li><b>{GETS[g.when]}</b><span>{g.what}</span></li>)}</ol>
+              </div>
+            )}
+            <footer class="vd-foot">
+              {v.owner && <span>Managed by <a href={href(`/team/?p=${v.owner}`)}>{person(v.owner).name}</a></span>}
+              {v.people?.length > 0 && <span>Portal: {v.people.map((p) => person(p).name).join(', ')} · <a href={href('/vendor/')}>See their view</a></span>}
+            </footer>
+          </article>
+        );
+      })}
+    </div>
+
+    <div class="card vd-table" data-list hidden>
+      <table class="vt">
+        <thead><tr><th scope="col">Vendor</th><th scope="col">Kind</th><th scope="col">Regions</th><th scope="col">Contract</th><th scope="col">Ends</th><th scope="col">Last year</th><th scope="col">Managed by</th></tr></thead>
+        <tbody>
+          {list.map((v) => (
+            <tr {...fattrs(v)}>
+              <td><b>{v.name}</b></td>
+              <td>{VENDOR_KIND[v.kind]}</td>
+              <td>{v.regions.map((r) => REGION_SHORT[r]).join(', ')}</td>
+              <td class="mono">{v.contract.ref}</td>
+              <td>{fmtDate(v.contract.end)} <span class:list={['vd-left', { soon: leftOf(v) < 183 }]}>{leftOf(v) < 0 ? 'Ended' : `${leftOf(v)} days`}</span></td>
+              <td>{v.record?.jobs ?? 0} jobs{v.record?.on_time != null ? `, ${v.record.on_time}% on time` : ''}{v.record?.snags_open ? `, ${v.record.snags_open} snags open` : ''}</td>
+              <td>{v.owner ? person(v.owner).name : ''}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <EmptyState text="No vendors match these filters." />
+
+    <Section title="Who does what" id="who" aside="R does it · C helps · hover or focus a letter for why">
+      <div class="card vd-who">
+        <div class="vw-wrap"><table class="vw">
+          <thead><tr><th scope="col">Work</th>{list.map((v) => <th scope="col"><span class={`vw-k vk-${v.kind}`}>{VENDOR_KIND[v.kind]}</span>{v.name}</th>)}</tr></thead>
+          <tbody>
+            {WORK.map((w) => (
+              <tr><th scope="row">{w.what}</th>{list.map((v) => { const c = w.v[v.id]; return <td>{c && <span class={`vw-c vc-${c[0]}`} tabindex="0" aria-label={`${v.name}: ${c[0] === 'R' ? 'does it' : 'helps'}. ${c[1]}`}>{c[0]}<span class="vw-tip" role="tooltip">{c[1]}</span></span>}</td>; })}</tr>
+            ))}
+          </tbody>
+        </table></div>
+      </div>
+    </Section>
+  </div>
+
+  <script is:inline data-astro-rerun define:vars={{ ROWS }} slot="end">
+    (function () {
+      var grid = document.querySelector('.content.vendors [data-grid]'), bar = document.querySelector('.content.vendors [data-fb]');
+      if (!grid || !bar || grid.__vd) return; grid.__vd = true;
+      var tbody = document.querySelector('.content.vendors [data-list] tbody');
+      var cards = {}, rows = {};
+      Array.prototype.forEach.call(grid.children, function (el) { cards[el.dataset.id] = el; });
+      Array.prototype.forEach.call(tbody.children, function (el) { rows[el.dataset.id] = el; });
+      function reorder(by) {
+        ROWS.slice().sort(function (a, b) {
+          var c = by === 'name' ? a.name.localeCompare(b.name) : by === 'ending' ? a.left - b.left : 0;
+          return c || a.i - b.i;
+        }).forEach(function (r) { grid.appendChild(cards[r.id]); tbody.appendChild(rows[r.id]); });
+      }
+      bar.addEventListener('fb:sort', function (e) { bar.rsFilter.run(true, function () { reorder(e.detail.value); }); });
+      var s0 = bar.rsFilter ? bar.rsFilter.sort() : new URLSearchParams(location.search).get('sort');
+      if (s0 && s0 !== 'kind') reorder(s0);
+    })();
+  </script>
+</Shell>
+<style is:global>
+  /* Cards in a row share a height (L6). */
+  .vd-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr)); gap: 20px; align-items: stretch; }
+  .vd { display: flex; flex-direction: column; gap: 10px; padding: 20px 22px; }
+  :root[data-look="classic"] .vd { border: 2px solid var(--ink); }
+  .vd-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .vd-sites { margin-left: auto; display: flex; gap: 4px; flex-wrap: wrap; }
+  .vd-sites .code { text-decoration: none; }
+  .vd h2 { margin: 0; font-size: 22px; }
+  .vd > .muted { margin: 0; font-size: 14px; }
+  .vd h3 { margin: 10px 0 4px; font: 700 10.5px/1.2 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+  .vd ul { margin: 0; padding-left: 18px; font-size: 13px; display: grid; gap: 2px; }
+  .vd-contract { display: grid; gap: 6px; }
+  .vd-ref { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; font-size: 13px; }
+  .vd-left { margin-left: auto; font: 700 11px/1 var(--font-mono); padding: 4px 7px; border-radius: 999px; background: var(--green-soft); color: var(--green-ink); white-space: nowrap; }
+  .vd-left.soon { background: var(--amber-soft); color: var(--amber-ink); }
+  .vd-bar { display: block; height: 6px; border-radius: 99px; background: var(--surface-3); overflow: hidden; }
+  .vd-bar i { display: block; height: 100%; background: var(--ink); }
+  .vd-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .vd-models { margin: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+  .vd-sla { list-style: none; padding: 0 !important; }
+  .vd-sla li { display: grid; gap: 1px; border-top: 1px solid var(--line); padding-top: 4px; }
+  .vd-sla b { font-size: 13px; }
+  .vd-rec { margin: 0; display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; align-items: center; }
+  .vd-rec span { display: inline-flex; align-items: center; gap: 5px; }
+  .vd-rec b { font: var(--weight-display) 18px/1 var(--font-display); }
+  .ring { width: 20px; height: 20px; border-radius: 50%; background: conic-gradient(var(--green) calc(var(--p) * 1%), var(--surface-3) 0); mask: radial-gradient(circle, transparent 5px, #000 6px); -webkit-mask: radial-gradient(circle, transparent 5px, #000 6px); }
+  .vd-note { margin: 4px 0 0; font-size: 12.5px; }
+  .vd-gets ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+  .vd-gets li { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 8px; }
+  .vd-gets b { font-size: 12px; color: var(--text-2); }
+  /* The footer sits at the foot of the card, so feet line up across a row. */
+  .vd-foot { margin-top: auto; display: flex; flex-wrap: wrap; gap: 6px 18px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--text-2); }
+  .vd-foot a { color: inherit; }
+
+  /* The list view. */
+  .vd-table { overflow-x: auto; }
+  .vt { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .vt th, .vt td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .vt thead th { font: 700 10.5px/1.2 var(--font-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); background: var(--surface-2); }
+  .vt tbody tr:last-child td { border-bottom: 0; }
+  .vt tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--text) 3%, var(--surface)); }
+  .vt .vd-left { margin-left: 6px; }
+
+  /* Who does what. */
+  .vd-who { padding: 8px 18px 12px; }
+  @media (max-width: 900px) { .vw-wrap { overflow-x: auto; } }
+  .vw { width: 100%; border-collapse: collapse; font-size: 14px; }
+  /* From tablet width the table fits its card (L10): headings wrap between words instead of pushing it wider,
+     and the tips of the last two columns open towards the left, so a hidden tip never widens the page. */
+  @container content (min-width: 560px) {
+    .vw { table-layout: fixed; }
+    .vw th, .vw td { white-space: normal; }
+    .vw thead th:first-child, .vw tbody th { width: 28%; }
+  }
+  .vw td:nth-last-child(-n+2) .vw-tip { left: auto; right: -8px; transform: translateY(4px); }
+  .vw td:nth-last-child(-n+2) .vw-c:hover .vw-tip, .vw td:nth-last-child(-n+2) .vw-c:focus .vw-tip { transform: none; }
+  .vw th, .vw td { padding: 9px 10px; border-top: 1px solid var(--line); text-align: center; }
+  :root[data-look] .vw th, :root[data-look] .vw td { font-family: var(--font-sans); text-transform: none; letter-spacing: 0; }
+  :root[data-look] .vw thead th { border-top: 0; font-size: 13.5px; font-weight: 700; color: var(--text); vertical-align: bottom; }
+  :root[data-look] .vw thead th:first-child { text-align: left; font: 700 10.5px/1.2 var(--font-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); }
+  :root[data-look] .vw tbody th { text-align: left; font-weight: 600; font-size: 14px; color: var(--text); }
+  .vw-k { display: block; font: 700 10px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); margin-bottom: 2px; }
+  .vw-c { position: relative; display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; font: 800 13px var(--font-mono); cursor: default; transition: box-shadow var(--dur-hover) var(--ease-settle); }
+  .vc-R { background: var(--ink); color: var(--on-ink); } .vc-C { background: var(--surface-3); color: var(--text); }
+  .vw-c:hover, .vw-c:focus { outline: none; box-shadow: 0 0 0 3px var(--focus); }
+  .vw-tip { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(4px); width: 230px; padding: 8px 10px; border-radius: var(--radius); background: var(--ink); color: var(--on-ink); font: 500 12.5px/1.35 var(--font-sans); text-align: left; opacity: 0; visibility: hidden; z-index: 5; pointer-events: none;
+    transition: opacity var(--dur-exit) var(--ease-settle), transform var(--dur-exit) var(--ease-settle), visibility 0s var(--dur-exit); }
+  .vw-c:hover .vw-tip, .vw-c:focus .vw-tip { opacity: 1; visibility: visible; transform: translateX(-50%); transition: opacity var(--dur-pop) var(--ease-settle), transform var(--dur-pop) var(--ease-settle), visibility 0s; }
+  @media (prefers-reduced-motion: reduce) { .vw-c, .vw-tip { transition: none !important; } }
+  @media (max-width: 700px) { .vd-cols { grid-template-columns: 1fr; } .vd { padding: 16px; } }
+</style>

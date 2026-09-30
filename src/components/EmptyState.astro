@@ -1,0 +1,22 @@
+---
+/* EmptyState: what an empty list or a filter with no match says (rule P6). One sentence, one button,
+   in the main area where the list would be.
+   Props:  text    one sentence: "No rooms match."
+           action  the button's words (default "Clear the filters")
+           to      a link for the button instead (for "Add the first one" and the like)
+           filter  true (default): hidden until the FilterBar finds nothing (it is the bar's data-fb-none),
+                   and the button clears the filters. false: always shown, for a list with nothing in it. */
+import { href } from '../lib/data.mjs';
+interface Props { text: string; action?: string; to?: string; filter?: boolean }
+const { text, action = 'Clear the filters', to, filter = true } = Astro.props;
+---
+<div class="empty" data-help="empty" data-fb-none={filter ? '' : undefined} hidden={filter} role="status">
+  <p>{text}</p>
+  {to ? <a class="btn small" href={to.startsWith('/') ? href(to) : to}>{action}</a> : filter && <button type="button" class="btn small" data-fb-clear>{action}</button>}
+</div>
+
+<style is:global>
+  .empty { display: grid; justify-items: center; gap: 12px; padding: 40px 20px; border: 1px dashed var(--line-strong); border-radius: var(--radius-lg); text-align: center; color: var(--text-2); }
+  .empty[hidden] { display: none; }
+  .empty p { margin: 0; font-size: 15px; }
+</style>

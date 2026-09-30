@@ -1,0 +1,81 @@
+# Device class: In-room network switch
+# A Keia object profile: what a healthy device of this class looks like on every
+# platform that knows about it. Specific models are in data/device-models/ (step 3).
+
+schema: object-profile
+
+profile:
+  name: In-room network switch
+  object_role: Small network switch that serves the AV devices in one space. Usually configured
+    by the network team, not the AV team
+  naming_prefixes:
+    - sw
+  version: "1.0"
+  last_updated: "2026-09-27"
+  owner: Keia Atlas maintainers
+
+sources:
+  - file: data/sources/room-guidance.yaml
+    provides: Which space types use this class of device, and where it goes
+
+platforms:
+  keia_atlas:
+    required_fields:
+      - space
+      - model
+      - serial
+      - lifecycle_state
+    healthy_indicators:
+      - recorded in the space its space type expects
+      - every port wired as the space type says
+  inventory:
+    required_fields:
+      - asset_tag
+      - serial
+      - model
+      - space
+      - status
+      - hostname
+    healthy_indicators:
+      - status is active
+      - space matches where the device is installed
+  dhcp_dns:
+    required_fields:
+      - hostname
+      - mac_address
+      - ip_address
+    healthy_indicators:
+      - address reservation matches the MAC address
+      - forward and reverse DNS records resolve
+  monitoring:
+    required_fields:
+      - monitor_name
+    healthy_indicators:
+      - reporting
+      - no open critical alerts
+
+consistency:
+  - check: serial match
+    compare:
+      - keia_atlas.serial
+      - inventory.serial
+  - check: space match
+    compare:
+      - keia_atlas.space
+      - inventory.space
+  - check: hostname match
+    compare:
+      - inventory.hostname
+      - dhcp_dns.hostname
+
+discrimination:
+  several_room_devices_offline:
+    likely_causes:
+      - switch without power
+      - uplink down
+      - PoE budget exceeded
+    first_check: monitoring
+
+not_applicable:
+  - device_management
+  - room_booking

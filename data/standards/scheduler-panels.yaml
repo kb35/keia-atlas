@@ -1,0 +1,108 @@
+# House standard: scheduler (room booking) panels. Made up for the demo.
+id: scheduler-panels
+name: Scheduler panels
+area: scheduler-panels
+order: 9
+version: "1.0"
+effective: "2026-03-01"
+owner: Service manager, AV
+summary: A booking panel outside every bookable room, at a height everyone can reach, on one PoE cable, showing that room's calendar.
+intro: >-
+  A scheduler panel tells people whether a room is free and lets them book it at the door. It only works if it is the same
+  room as the calendar says, it is where people look, and anyone can reach it.
+scope:
+  - Booking panels outside meeting rooms, huddle rooms and focus rooms.
+related: [meeting-av, network, cabling]
+applies_to:
+  classes: [scheduler-panel]
+  models: [logitech-tap-scheduler]
+  configurations: [logitech-tap-scheduler-room-booking]
+figures:
+  - { n: "1,220 mm", label: Highest touch point }
+  - { n: "Latch", label: Side of the door }
+  - { n: 1, label: PoE cable per panel }
+  - { n: 1, label: Calendar per panel }
+sections:
+  - id: mounting
+    title: Where it goes
+    rules:
+      - id: latch-side
+        level: must
+        rule: Mount the panel outside the room on the latch side of the door, on the wall or the glass mullion, facing the corridor.
+        why: People read it as they reach for the handle; on the hinge side it is hidden when the door opens.
+        check: Photo of the door with the panel at handover.
+        house: true
+      - id: reach
+        level: must
+        rule: Mount it so its highest touch point is no more than 1,220 mm and its lowest no less than 380 mm above the floor, with its centre about 1,150 mm up.
+        why: Keeps the touch screen within reach of someone in a wheelchair, as accessibility rules on reach ranges set out.
+        check: Measure from the finished floor to the top and the bottom of the screen.
+        sources: [ada-308]
+      - id: glass-mount
+        level: should
+        rule: On glass walls, use the maker's glass or mullion mount and bring the cable down inside the mullion, never across the glass.
+        why: A cable on the glass looks unfinished and gets caught.
+        check: No visible cable at handover.
+        house: true
+        sources: [logitech-tap-scheduler-specs]
+  - id: power-network
+    title: Power and network
+    rules:
+      - id: poe
+        level: must
+        rule: Power the panel from one PoE data outlet behind it (802.3af class 3 or as its data sheet says), on the room systems VLAN.
+        why: One cable, no power adapter at the door, and the switch can restart it remotely.
+        check: The switch shows the port powering the panel at its class; the panel is on VLAN 30.
+        house: true
+        sources: [logitech-tap-scheduler-specs]
+      - id: name
+        level: must
+        rule: Name the panel with the room's hostname and prefix (for example dub-305-sch01) and match its record in device management.
+        why: The same name finds it in every system.
+        check: Device management and Keia Atlas show the same name.
+        house: true
+  - id: calendar
+    title: The room and its calendar
+    rules:
+      - id: one-calendar
+        level: must
+        rule: Link the panel to exactly one room calendar, the room's own resource, whose name and capacity match the room in Keia Atlas.
+        why: A panel on the wrong calendar shows a free room as busy, or books the wrong room.
+        check: Book the room from the panel; the booking appears on the room's calendar and on its video bar.
+        house: true
+        sources: [logitech-room-booking]
+      - id: check-in
+        level: should
+        rule: Turn on check-in with automatic release of no-show bookings after 10 minutes.
+        why: Rooms booked and not used go back to people who need them.
+        check: Book the room and do not check in; it is released after 10 minutes.
+        house: true
+      - id: brightness
+        level: should
+        rule: Let the panel dim outside office hours but not turn off, and keep its LED status bar on.
+        why: The status light is what people see from down the corridor.
+        check: Walk past after hours; the light shows the room's status.
+        house: true
+references:
+  - id: ada-308
+    name: 2010 ADA Standards for Accessible Design, section 308 (Reach Ranges)
+    publisher: United States Access Board and Department of Justice
+    kind: regulation
+    summary: Sets the forward and side reach ranges for controls people must operate, broadly between 15 and 48 inches (380 to 1,220 mm) above the floor.
+    url: https://www.access-board.gov/ada/#ada-308
+    checked: "2026-09-29"
+  - id: logitech-tap-scheduler-specs
+    name: Logitech Tap Scheduler specifications
+    publisher: Logitech
+    kind: vendor
+    summary: The panel's size, mounts (glass, drywall, mullion) and PoE power.
+    source: logitech-tap-scheduler-specs
+    checked: "2026-09-29"
+  - id: logitech-room-booking
+    name: Logitech Room Booking setup
+    publisher: Logitech
+    kind: vendor
+    summary: How a room's calendar is connected through Logitech Sync and assigned to a panel.
+    source: logitech-room-booking-setup
+    checked: "2026-09-29"
+demo: true

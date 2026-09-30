@@ -1,0 +1,233 @@
+# Device model: one specific product, with its physical facts and every port.
+#
+# The file name is the model id (for example poly-studio-x52.yaml), and that id
+# is what space types name in their options.
+#
+# What lives here: facts from the vendor's public datasheets and manuals.
+# What doesn't: how the model is drawn (device-look, later) and how it is
+# configured (Keia configuration profiles, later). Where a datasheet is silent,
+# the field is left out and the gap is listed in `gaps`, never guessed.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/device-model
+title: Device model
+type: object
+additionalProperties: false
+required: [manufacturer, model, class, summary, sources, ports]
+properties:
+  manufacturer: { type: string, minLength: 1 }
+  model:
+    description: The product name as the vendor writes it.
+    type: string
+    minLength: 1
+  part_numbers:
+    description: Vendor part numbers (SKUs) for this model.
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [number]
+      properties:
+        number: { type: string, minLength: 1 }
+        notes: { type: string }
+  class:
+    description: Id of the device class (a file in data/device-classes/).
+    $ref: "#/$defs/slug"
+  summary: { type: string, minLength: 1 }
+
+  dimensions_mm:
+    description: Outside size as the datasheet gives it, in millimetres.
+    type: object
+    additionalProperties: false
+    required: [width, height, depth]
+    properties:
+      width: { $ref: "#/$defs/positive" }
+      height: { $ref: "#/$defs/positive" }
+      depth: { $ref: "#/$defs/positive" }
+      notes: { type: string }
+  weight_kg: { $ref: "#/$defs/positive" }
+
+  power:
+    type: object
+    additionalProperties: false
+    required: [inputs]
+    properties:
+      inputs:
+        description: Every way the device can be powered. The first is the usual one.
+        type: array
+        minItems: 1
+        items: { $ref: "#/$defs/powerInput" }
+      consumption_w:
+        type: object
+        additionalProperties: false
+        properties:
+          typical: { $ref: "#/$defs/positive" }
+          max: { $ref: "#/$defs/positive" }
+      poe_budget_w:
+        description: Total PoE the device can give to others (switches, injectors, extenders).
+        $ref: "#/$defs/positive"
+      notes: { type: string }
+
+  client_os:
+    description: >
+      Laptop operating systems the vendor says this model works with. Only for
+      devices a laptop connects to directly (monitors, docks, adapters, USB video bars).
+    type: array
+    uniqueItems: true
+    items: { enum: [macos, windows, linux] }
+
+  mounting:
+    type: array
+    items:
+      enum: [table, wall, display-mount, ceiling, under-table, rack, vesa, desk-clamp, freestanding]
+
+  lifecycle:
+    description: Only dates the vendor has published.
+    type: object
+    additionalProperties: false
+    properties:
+      announced: { type: string, format: date }
+      end_of_sale: { type: string, format: date }
+      end_of_support: { type: string, format: date }
+
+  sources:
+    description: Source entry ids (in data/sources/) this model's facts come from.
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [source, provides]
+      properties:
+        source: { $ref: "#/$defs/slug" }
+        provides: { type: string, minLength: 1 }
+
+  ports:
+    type: array
+    items: { $ref: "#/$defs/port" }
+
+  gaps:
+    description: Facts the sources don't state, so they are left out rather than guessed.
+    type: array
+    items: { type: string }
+  notes:
+    type: array
+    items: { type: string }
+
+$defs:
+  slug:
+    type: string
+    pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
+  positive:
+    type: number
+    exclusiveMinimum: 0
+
+  poe:
+    type: object
+    additionalProperties: false
+    required: [role, standard]
+    properties:
+      role:
+        description: powered means the port takes power in; source means it gives power out.
+        enum: [powered, source]
+      standard:
+        description: IEEE 802.3af (PoE), 802.3at (PoE+), 802.3bt (PoE++ Type 3 or 4), a vendor scheme, or HDBaseT's own PoH.
+        enum: [802.3af, 802.3at, 802.3bt-type3, 802.3bt-type4, hdbaset-poh, proprietary]
+      class: { type: integer, minimum: 0, maximum: 8 }
+      watts: { $ref: "#/$defs/positive" }
+
+  powerInput:
+    type: object
+    additionalProperties: false
+    required: [type]
+    properties:
+      type:
+        enum: [poe, dc, ac, usb-c, hdbaset, from-host]
+      port:
+        description: Id of the port the power arrives on, if it is one of the listed ports.
+        $ref: "#/$defs/slug"
+      poe: { $ref: "#/$defs/poe" }
+      volts: { type: string, description: 'As printed, for example "48V DC" or "100-240V AC".' }
+      watts: { $ref: "#/$defs/positive" }
+      supplied: { type: boolean, description: Power supply or injector included in the box. }
+      notes: { type: string }
+
+  port:
+    type: object
+    additionalProperties: false
+    required: [id, connector, signals, direction]
+    properties:
+      id:
+        description: Unique within the model, for wiring (for example hdmi-out-1).
+        $ref: "#/$defs/slug"
+      label:
+        description: The label printed on the device, if the source shows it.
+        type: string
+      connector:
+        description: >
+          The physical connector. not-stated means the sources confirm the port
+          exists but don't say what connector it uses (listed in gaps too).
+        enum:
+          - hdmi
+          - displayport
+          - vga
+          - usb-a
+          - usb-b
+          - usb-c
+          - micro-usb
+          - rj45
+          - rj11
+          - sfp
+          - sfp-plus
+          - sfp28
+          - 3.5mm
+          - 6.35mm
+          - xlr
+          - terminal-block
+          - db9
+          - dc-barrel
+          - iec-c14
+          - iec-c8
+          - iec-c6
+          - proprietary
+          - not-stated
+      signals:
+        description: >
+          What travels over the port. HDMI lists video and audio. A PoE port lists
+          ethernet and poe (poe already means it carries power). power is for
+          power-only ports and for USB ports that charge a device.
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          enum:
+            - video
+            - audio
+            - usb
+            - ethernet
+            - hdbaset
+            - poe
+            - power
+            - rs232
+            - ir
+            - gpio
+            - microphone
+            - speaker-level
+      direction:
+        description: >
+          For AV ports (HDMI, HDBaseT, audio), the way the picture or sound flows:
+          a transmitter's HDBaseT port is out, a receiver's is in. Network and USB
+          data ports are bidirectional.
+        enum: [in, out, bidirectional]
+      poe: { $ref: "#/$defs/poe" }
+      usb_power_w:
+        description: Power the port can deliver to a laptop or device over USB.
+        $ref: "#/$defs/positive"
+      face:
+        description: Which side of the device the port is on, as installed normally. Left out when the sources do not show it (and listed in gaps).
+        enum: [front, rear, left, right, top, bottom]
+      order:
+        description: Position along its face, counting from the left as the vendor's panel drawing shows it (1 = leftmost).
+        type: integer
+        minimum: 1
+      notes: { type: string }

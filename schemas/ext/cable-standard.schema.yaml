@@ -1,0 +1,85 @@
+# The house cable colour and labelling standard. One file, data/standards/cables.yaml, and the page at /standards/cables/ is drawn from it.
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/cable-standard
+title: Cable colour and labelling standard
+type: object
+additionalProperties: false
+required: [id, name, version, effective, owner, summary, scope, colours, cable_types, purposes, labelling, lengths_m, tia606, sources, demo]
+properties:
+  id: { type: string }
+  name: { type: string }
+  version: { type: string }
+  effective: { type: string, format: date }
+  owner: { description: "The Aigna role that owns the standard.", type: string }
+  summary: { type: string }
+  scope: { type: array, items: { type: string } }
+  demo: { const: true }
+  colours:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, name, hex, ink]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        hex: { type: string, pattern: "^#[0-9A-Fa-f]{6}$" }
+        ink: { description: "The text colour that reads on this swatch.", enum: [dark, light] }
+  cable_types:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, label, group, connectors]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        group: { enum: [copper, fibre, av, power, console] }
+        connectors: { type: string }
+  purposes:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, name, colour, media, carries, examples, rule]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        colour: { description: "The colour id used for this purpose.", type: string }
+        media: { description: "The cable types that may carry this purpose.", type: array, items: { type: string } }
+        carries: { type: string }
+        examples: { type: array, items: { type: string } }
+        rule: { description: "The one rule that matters for this colour.", type: string }
+        coded: { description: "False when the purpose is not colour coded (room leads).", type: boolean }
+  labelling:
+    type: object
+    additionalProperties: false
+    required: [format, parts, example, rules]
+    properties:
+      format: { type: string }
+      parts:
+        type: array
+        items: { type: object, additionalProperties: false, required: [token, meaning, example], properties: { token: { type: string }, meaning: { type: string }, example: { type: string } } }
+      example: { type: string }
+      example_reads: { type: string }
+      rules: { type: array, items: { type: string } }
+  lengths_m: { description: "The lengths Aigna stocks, in metres.", type: array, items: { type: number } }
+  tia606:
+    description: What the TIA-606 standard covers, and whether we could check what it says about patch cord colours.
+    type: object
+    additionalProperties: false
+    required: [covers, checked, status, finding, sources]
+    properties:
+      covers: { type: string }
+      checked: { type: string, format: date }
+      status: { enum: [verified, not-verified] }
+      finding: { type: string }
+      limits: { type: string }
+      sources: { type: array, minItems: 1, items: { type: object, additionalProperties: false, required: [title, url, says], properties: { title: { type: string }, url: { type: string }, says: { type: string } } } }
+  sources:
+    description: Other public documents the standard leans on (fibre jacket colours).
+    type: array
+    items: { type: object, additionalProperties: false, required: [title, url, says], properties: { title: { type: string }, url: { type: string }, says: { type: string } } }

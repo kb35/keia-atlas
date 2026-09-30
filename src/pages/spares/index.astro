@@ -1,0 +1,146 @@
+---
+// IT stores: each office's storage room, with the spare units on its shelves, the counted stock (cords, mounts,
+// modules) and the least to keep of each model. A store below a minimum is one switch in the bar and a red
+// number in the band. Each card opens the store's own page (/spares/<office>/). This page used to be the
+// Spares list, and the old address still lands here.
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import '../../styles/stock.css';
+import { sites, fmtDate, plural, href, className, DEMO_TODAY } from '../../lib/data.mjs';
+import { stores, spareUnits } from '../../lib/stock.mjs';
+import { COUNT_OVERDUE_DAYS } from '../../lib/cablecore.mjs';
+
+const REGION = { amer: 'Americas', emea: 'EMEA', apac: 'APAC' };
+const floorName = (st) => sites[st.site].floors?.find((f) => f.id === st.floor)?.name ?? `Floor ${st.floor}`;
+const lowCount = stores.filter((s) => s.low > 0).length;
+const overdue = stores.filter((s) => s.overdue).length;
+const STATUS = { ok: 'Stocked', low: 'Below minimum' };
+const stateOf = (st) => (st.low > 0 ? 'low' : 'ok');
+const classes = [...new Set(spareUnits.map((u) => u.cls))].sort((a, b) => className(a).localeCompare(className(b)));
+const FACETS = [
+  { key: 'region', label: 'Region', options: ['amer', 'emea', 'apac'].map((value) => ({ value, label: REGION[value] })) },
+  { key: 'site', label: 'Office', options: stores.map((s) => ({ value: s.site, label: s.siteName, sub: s.city })) },
+  { key: 'kind', label: 'Kind', options: classes.map((value) => ({ value, label: className(value) })) },
+  { key: 'status', label: 'Status', options: Object.entries(STATUS).map(([value, label]) => ({ value, label })) },
+];
+const TOGGLES = [
+  { key: 'low', label: 'Below minimum', title: 'Only stores with a model or a counted line below its minimum' },
+  { key: 'overdue', label: 'Count overdue', title: `Only stores with a count older than ${COUNT_OVERDUE_DAYS} days` },
+];
+const VIEWS = [{ value: 'cards', label: 'Cards', show: '[data-grid]' }, { value: 'list', label: 'List', show: '[data-list]' }];
+const SORT = { options: [{ value: 'site', label: 'By office' }, { value: 'low', label: 'Below minimum first' }, { value: 'units', label: 'Most units first' }, { value: 'counted', label: 'Longest since counted first' }] };
+const NUMBERS = [
+  { n: stores.length, label: 'IT stores', fact: true },
+  { n: spareUnits.length, label: 'Spare units', to: '/devices/?state=spare' },
+  { n: lowCount, label: 'Stores below minimum', to: '?low=1', tone: lowCount ? 'bad' : undefined },
+  { n: overdue, label: 'Count overdue', to: '?overdue=1', tone: overdue ? 'warn' : undefined },
+];
+const S = stores.map((st, i) => {
+  const cls = [...new Set(st.units.map((u) => u.cls))];
+  const flags = [...st.lowRules.map((r) => `${r.modelName} ${r.have} of ${r.minimum}`), ...st.lowLines.map((c) => `${c.what} ${c.quantity} of ${c.minimum}`)];
+  return {
+    st, i, cls, flags, state: stateOf(st), floor: floorName(st), models: new Set(st.units.map((u) => u.model)).size,
+    find: [st.siteName, st.siteCode, st.city, REGION[st.region], st.number, st.name, st.optionName, st.id, ...st.units.flatMap((u) => [u.tag, u.serial, u.modelName, u.cabinet, u.shelf]),
+      ...st.rules.flatMap((r) => [r.id, r.modelName, r.model]), ...st.consumables.flatMap((c) => [c.id, c.what, c.part_number]), st.low ? 'low below minimum reorder' : ''].filter(Boolean).join(' ').toLowerCase(),
+  };
+});
+const R = S.map(({ st, i }) => ({ id: st.id, i, name: st.siteName, low: st.low, units: st.units.length, counted: st.lastCounted }));
+---
+<Shell title="IT stores" section="spares" crumbs={[{ label: 'Devices', to: '/profiles/' }, { label: 'IT stores' }]}>
+  <PageBand overline="Stock" title="IT stores" lede="Each office's storage room: the spare units on its shelves, the counted stock, and the least to keep." sim numbers={NUMBERS} />
+
+  <div class="content stores">
+    <FilterBar facets={FACETS} toggles={TOGGLES} placeholder="Find a store, model or serial" label="Find a store" noun={['store', 'stores']} scope=".content.stores" views={VIEWS} viewKey="rs4-stores-view" sort={SORT} />
+
+    <div class="st-grid" data-grid>
+      {S.map(({ st, i, flags, state, floor, models, cls, find }) => (
+        <a class:list={['card st-card', { 'st-low': st.low > 0 }]} href={href(st.href)} data-id={st.id} data-i={i} data-vk={st.id} data-fi data-help="store.card" data-find={find} data-f-region={st.region} data-f-site={st.site} data-f-kind={cls.join('|')} data-f-status={state} data-t-low={st.low ? '1' : '0'} data-t-overdue={st.overdue ? '1' : '0'}>
+          <span class="st-pic" data-vt-rec={st.id} aria-hidden="true">
+            <svg viewBox="0 0 96 64" width="96" height="64">
+              {st.cabinets.map((c, k) => {
+                const w = 88 / st.cabinets.length;
+                return <g transform={`translate(${4 + k * w},4)`}><rect class="st-cab" x="1" y="0" width={w - 2} height="56" rx="3" />{[14, 28, 42].map((y) => <line class="st-shelf" x1="4" x2={w - 5} y1={y} y2={y} />)}</g>;
+              })}
+            </svg>
+          </span>
+          <span class="st-body">
+            <span class="st-top"><span class="code">{st.siteCode}</span><span class="mono st-no">{st.number}</span>{st.low > 0 && <span class="sp-pill low">{plural(st.low, 'line')} low</span>}{st.overdue && <span class="sp-late" title={`Not counted in the last ${COUNT_OVERDUE_DAYS} days`}>Count overdue</span>}</span>
+            <b>{st.siteName}</b>
+            <small>{st.name} · {floor} · {st.optionName.toLowerCase()}</small>
+            <span class="st-facts"><span><strong class="num">{st.units.length}</strong> spare {st.units.length === 1 ? 'unit' : 'units'}</span><span><strong class="num">{models}</strong> {models === 1 ? 'model' : 'models'}</span><span><strong class="num">{st.consumables.length}</strong> counted {st.consumables.length === 1 ? 'line' : 'lines'}</span></span>
+            {flags.length > 0 && (
+              <span class="st-flags">
+                {flags.slice(0, 3).map((f) => <span class="sp-pill low">{f}</span>)}
+                {flags.length > 3 && <span class="faint st-more">+{flags.length - 3} more</span>}
+              </span>
+            )}
+          </span>
+        </a>
+      ))}
+    </div>
+
+    <div class="tablewrap" data-list hidden>
+      <table class="to-cards st-table">
+        <thead><tr><th scope="col">Office</th><th scope="col">Room</th><th scope="col">Spare units</th><th scope="col">Models</th><th scope="col">Below minimum</th><th scope="col">Counted lines</th><th scope="col">Last counted</th></tr></thead>
+        <tbody>
+          {S.map(({ st, i, models, cls, find, state }) => (
+            <tr data-id={st.id} data-fi data-find={find} data-f-region={st.region} data-f-site={st.site} data-f-kind={cls.join('|')} data-f-status={state} data-t-low={st.low ? '1' : '0'} data-t-overdue={st.overdue ? '1' : '0'}>
+              <td data-label="Office"><a href={href(st.href)}><b>{st.siteName}</b></a><small>{st.city}</small></td>
+              <td data-label="Room" class="mono">{st.number}</td>
+              <td data-label="Spare units" class="num">{st.units.length}</td>
+              <td data-label="Models" class="num">{models}</td>
+              <td data-label="Below minimum">{st.low > 0 ? <span class="sp-pill low">{plural(st.low, 'line')}</span> : <span class="sp-pill">None</span>}</td>
+              <td data-label="Counted lines" class="num">{st.consumables.length}</td>
+              <td data-label="Last counted">{fmtDate(st.lastCounted, { day: 'numeric', month: 'short' })}{st.overdue && <small class="sp-late">Count overdue</small>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <EmptyState text="No stores match these filters." />
+
+    <p class="faint st-foot">Counts as of {fmtDate(DEMO_TODAY)}. A spare is a unit with the status Spare: it has a serial number and its own page, and it is one of the <a class="stk-link" href={href('/devices/?state=spare')}>Units</a>. Cables have their own list on the <a class="stk-link" href={href('/cables/')}>Cables tab</a>.</p>
+  </div>
+
+  <script is:inline data-astro-rerun define:vars={{ R }} slot="end">
+    (function () {
+      var grid = document.querySelector('[data-grid]'), bar = document.querySelector('[data-fb]'); if (!grid || !bar || bar.__srt) return; bar.__srt = true;
+      var cards = new Map(Array.prototype.map.call(grid.children, function (el) { return [el.dataset.id, el]; }));
+      var tbody = document.querySelector('[data-list] tbody');
+      var rows = new Map(Array.prototype.map.call(tbody.children, function (el) { return [el.dataset.id, el]; }));
+      var nat = function (a, b) { return String(a).localeCompare(String(b), 'en', { numeric: true }); };
+      /* Sort: cards and rows are put in order inside the bar's own run, so they slide into place. */
+      function reorder(by) {
+        R.slice().sort(function (a, b) {
+          var c = 0;
+          if (by === 'low') c = b.low - a.low;
+          else if (by === 'units') c = b.units - a.units;
+          else if (by === 'counted') c = nat(a.counted, b.counted);
+          return c || a.i - b.i;
+        }).forEach(function (r) { grid.appendChild(cards.get(r.id)); tbody.appendChild(rows.get(r.id)); });
+      }
+      bar.addEventListener('fb:sort', function (e) { bar.rsFilter.run(true, function () { reorder(e.detail.value); }); });
+      var s0 = bar.rsFilter ? bar.rsFilter.sort() : new URLSearchParams(location.search).get('sort');
+      if (s0 && s0 !== 'site') reorder(s0);
+    })();
+  </script>
+</Shell>
+
+<style is:global>
+  .st-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: var(--gutter, 16px); }
+  .st-card { min-width: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 14px; align-items: start; padding: 16px; color: inherit; text-decoration: none; transition: box-shadow var(--dur-state), transform var(--dur-state); }
+  .st-card:hover { box-shadow: var(--shadow-2, 0 6px 20px rgb(0 0 0 / .12)); }
+  .st-card.st-low { box-shadow: inset 3px 0 0 var(--amber); }
+  .st-pic { display: block; color: var(--text-3); } .st-pic svg { display: block; width: 96px; height: auto; }
+  .st-cab { fill: var(--surface-2); stroke: currentColor; stroke-width: 1.5; } .st-shelf { stroke: currentColor; stroke-width: 1; opacity: .55; }
+  .st-body { display: grid; gap: 4px; min-width: 0; }
+  .st-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; } .st-no { color: var(--text-2); font-size: 12.5px; }
+  .st-body > b { font: 700 17px/1.25 var(--font-display); } .st-body > small { color: var(--text-2); font-size: 13px; }
+  .st-facts { display: flex; flex-wrap: wrap; gap: 2px 14px; margin-top: 4px; font-size: 13px; color: var(--text-2); } .st-facts strong { color: var(--text); font-size: 15px; }
+  .st-flags .sp-pill { white-space: normal; max-width: 100%; line-height: 1.25; }
+  .st-flags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; } .st-more { font-size: 12.5px; }
+  .st-table td small { display: block; }
+  .st-foot { margin: 0; font-size: 13px; }
+</style>

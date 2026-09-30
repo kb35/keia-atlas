@@ -1,0 +1,151 @@
+---
+// One person's details in the Team page's side panel: role and where they work, who they report to,
+// their week (from the shared work list, src/lib/work.mjs), their projects and hours, what they own
+// and decide, and their letters in the RACI. Everything is worked out at build time on the Team page
+// and handed in as `info`. The panel's heading carries the name. Styles live with the Team page (.tm-p).
+import Icon from './Icon.astro';
+import { ROLES } from '../lib/demo.mjs';
+import { href } from '../lib/data.mjs';
+const { p, info, hidden = true } = Astro.props;
+const role = ROLES[p.roleId];
+const first = p.name.split(' ')[0];
+const WORD = { A: 'Signs it off', R: 'Does the work', C: 'Is asked first', I: 'Is told after' };
+const byLetter = ['A', 'R', 'C', 'I'].map((L) => ({ L, rows: info.raci.filter((r) => r.letter === L) })).filter((g) => g.rows.length);
+const SHOW = 5;
+const pct = (a, b) => (b ? Math.min(100, Math.round((a / b) * 100)) : 0);
+---
+<article class="tm-p" data-person={p.id} data-name={p.name} data-team={info.teamName} hidden={hidden} aria-label={p.name}>
+  <header class="tm-p-id">
+    <span class="tm-p-av" aria-hidden="true">{p.initials}</span>
+    <div class="tm-p-who">
+      <p class="tm-p-role">{p.role}</p>
+      <p class="tm-p-tags">
+        <span class={`tag tm-p-today t-${info.today.kind}`}>{info.today.label}</span>
+        <span class="tag">{info.where}</span>
+      </p>
+    </div>
+  </header>
+
+  <div class="tm-p-links">
+    <a class="btn small" href={href(`/work/schedule/?who=${p.id}`)}><Icon name="schedule" size={15} />{first}'s schedule</a>
+    {info.raci.length > 0 && <a class="btn small ghost" href="#raci" data-to-raci={p.roleId}><Icon name="team" size={15} />Letters in the RACI</a>}
+  </div>
+
+  <dl class="tm-p-line">
+    <div>
+      <dt>Base</dt>
+      <dd>{info.base.to ? <a href={href(info.base.to)}>{info.base.label}</a> : info.base.label}<small>{info.base.sub}</small></dd>
+    </div>
+    <div>
+      <dt>Reports to</dt>
+      <dd>{info.manager ? <button type="button" data-help="team.pick" class="tm-p-pick" data-pick={info.manager.id} title={`${info.manager.name}, ${info.manager.role}`}><span class="pc-av" aria-hidden="true">{info.manager.initials}</span><span><b>{info.manager.name}</b><small>{info.manager.role}</small></span></button> : <span class="tm-p-none">{info.outside ?? 'Nobody: top of the chart'}</span>}</dd>
+    </div>
+    {info.reports.length > 0 && (
+      <div>
+        <dt>Manages <span class="num">{info.reports.length}</span></dt>
+        <dd class="tm-p-picks">{info.reports.map((r) => <button type="button" data-help="team.pick" class="tm-p-pick sm" data-pick={r.id} title={`${r.name}, ${r.role}`}><span class="pc-av" aria-hidden="true">{r.initials}</span><span><b>{r.name}</b></span></button>)}</dd>
+      </div>
+    )}
+    {info.worksWith && (
+      <div>
+        <dt>Works with</dt>
+        <dd class="tm-p-picks">{info.worksWith.map((r) => <button type="button" data-help="team.pick" class="tm-p-pick sm" data-pick={r.id} title={`${r.name}, ${r.role}`}><span class="pc-av" aria-hidden="true">{r.initials}</span><span><b>{r.name}</b></span></button>)}</dd>
+      </div>
+    )}
+    {p.scope && (
+      <div>
+        <dt>Covers</dt>
+        <dd>{p.scope}</dd>
+      </div>
+    )}
+  </dl>
+
+  <section class="tm-p-sec" aria-label="This week">
+    <h3>This week <span>{info.week.label}</span></h3>
+    <ol class="tm-p-days" data-help="team.week" aria-label="Where they are, Monday to Friday">
+      {info.week.days.map((d) => (
+        <li class:list={[`w-${d.where}`, { today: d.today }]} title={d.title}>
+          <span>{d.dow}</span><b>{d.num}</b><i>{d.label}</i>{d.n > 0 && <em class="num">{d.n}</em>}
+        </li>
+      ))}
+    </ol>
+    {info.week.items.length > 0 ? (
+      <ul class="tm-p-items">
+        {info.week.items.slice(0, SHOW).map((x) => (
+          <li>
+            <span class="tm-p-when">{x.when}</span>
+            <span class="tm-p-what">{x.to ? <a href={x.to}>{x.text}</a> : x.text}<small>{x.sub}</small></span>
+            <span class={`tm-p-state s-${x.status}`}>{x.state}</span>
+          </li>
+        ))}
+      </ul>
+    ) : <p class="tm-p-none">Nothing booked this week.</p>}
+    {info.week.items.length > SHOW && <a class="tm-p-more" href={href(`/work/schedule/?who=${p.id}`)}>{info.week.items.length - SHOW} more this week on {first}'s schedule<Icon name="arrow" size={14} /></a>}
+    {info.week.plan && <p class="tm-p-plan"><Icon name="refresh" size={14} /><a href={href('/refresh/')}>{info.week.plan}</a></p>}
+    {info.week.team.length > 0 && (
+      <>
+        <p class="tm-p-sub">Away from their team</p>
+        <ul class="tm-p-items">
+          {info.week.team.map((x) => (
+            <li>
+              <span class="tm-p-when">{x.when}</span>
+              <span class="tm-p-what">{<button type="button" data-help="team.pick" class="tm-p-pick sm" data-pick={x.person.id} title={`${x.person.name}, ${x.person.role}`}><span class="pc-av" aria-hidden="true">{x.person.initials}</span><span><b>{x.person.name}</b></span></button>}</span>
+              <span class="tm-p-state s-away">Away</span>
+            </li>
+          ))}
+        </ul>
+      </>
+    )}
+    {info.week.next.length > 0 && (
+      <>
+        <p class="tm-p-sub">Coming up</p>
+        <ul class="tm-p-items">
+          {info.week.next.map((x) => (
+            <li>
+              <span class="tm-p-when">{x.when}</span>
+              <span class="tm-p-what">{x.to ? <a href={x.to}>{x.text}</a> : x.text}<small>{x.sub}</small></span>
+              <span class={`tm-p-state s-${x.status}`}>{x.state}</span>
+            </li>
+          ))}
+        </ul>
+      </>
+    )}
+  </section>
+
+  <section class="tm-p-sec" aria-label="Projects and hours">
+    <h3>Projects and hours {info.projects.length > 0 && <span>{info.hours.logged} of {info.hours.planned} h logged</span>}</h3>
+    {info.projects.length > 0 ? (
+      <ul class="tm-p-prj">
+        {info.projects.slice(0, 4).map((j) => (
+          <li>
+            <a href={href(`/projects/${j.id.toLowerCase()}/`)}><span class="mono">{j.id}</span> {j.name}</a>
+            <small>{j.as} · {j.phase}</small>
+            <span class="tm-p-bar" aria-hidden="true"><i style={`width:${pct(j.logged, j.hours)}%`}></i></span>
+            <span class="tm-p-h num">{j.logged}/{j.hours} h</span>
+          </li>
+        ))}
+      </ul>
+    ) : <p class="tm-p-none">Not on a project right now.</p>}
+    {info.projects.length > 0 && <a class="tm-p-more" href={href('/work/schedule/capacity/')}>{info.projects.length > 4 ? `${info.projects.length - 4} more, week by week, on the capacity plan` : 'Week by week on the capacity plan'}<Icon name="arrow" size={14} /></a>}
+  </section>
+
+  <section class="tm-p-sec" aria-label="Owns and decides">
+    <h3>Owns</h3>
+    <ul class="tm-p-list">{role.owns.map((o) => <li>{o}</li>)}</ul>
+    <h3>Decides</h3>
+    <ul class="tm-p-list">{role.decides.map((o) => <li>{o}</li>)}</ul>
+    <p class="tm-p-hands">{role.hands}</p>
+    {info.vendorLinks && <p class="tm-p-hands"><a href={href('/vendors/')}>{p.vendorName} contract</a> · <a href={href('/vendor/')}>See what {first} sees</a></p>}
+  </section>
+
+  <section class="tm-p-sec" aria-label="In the RACI">
+    <h3>In the RACI {info.raci.length > 0 && <span>{byLetter.map((g) => `${g.L} ${g.rows.length}`).join(' · ')}</span>}</h3>
+    {byLetter.length > 0 ? (
+      <ul class="tm-p-raci">
+        {byLetter.map((g) => (
+          <li><span class={`rc rc-${g.L}`} aria-hidden="true">{g.L}</span><span><small>{WORD[g.L]}</small>{g.rows.map((r) => r.label).join(', ')}</span></li>
+        ))}
+      </ul>
+    ) : <p class="tm-p-none">No letters in the delivery RACI.</p>}
+  </section>
+</article>

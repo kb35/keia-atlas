@@ -1,0 +1,241 @@
+---
+// Settings: look, light or dark, and the two demo controls (stage and agents), all on one short screen.
+// Who you're viewing as moved to the switcher under your name, bottom left.
+// Choices are saved in this browser (localStorage keys rs4-skin, rs4-theme, rs4-stage and rs4-agents) and applied
+// by the boot script in the page head before first paint.
+// Motion (docs/rules/motion.md, M12): it grows from the button that opened it and shrinks back to it; it keeps
+// one size whatever you pick (every note is laid out in the same place, so nothing below moves); the choice
+// markers slide; the page behind changes in one move (a look cross-fades, a stage or agents grows and shrinks
+// what it adds and removes, View as re-orders the sidebar).
+const LOOKS = [
+  { id: 'studio', name: 'Studio', note: 'Calm and warm. The default.', sw: ['#12110F', '#F6F3EE', '#E27A3A', '#7BC49A'] },
+  { id: 'enterprise', name: 'Enterprise', note: 'Dense, slate and blue.', sw: ['#16233A', '#FFFFFF', '#1D5BB8', '#DCA614'] },
+  { id: 'contrast', name: 'High contrast', note: 'Stronger text and focus.', sw: ['#000000', '#FFFFFF', '#004D99', '#73480B'] },
+  { id: 'drawing', name: 'Drawing set', note: 'Ink on drafting paper.', sw: ['#111111', '#F3F3EE', '#0B2A4C', '#B8860B'] },
+  { id: 'classic', name: 'Playful', note: 'Ink outlines, bold colour.', sw: ['#15161B', '#F3F0E8', '#FFCB2E', '#1E5BFF'] },
+];
+import { STAGES_DEMO, PEOPLE, TEAMS } from '../lib/demo.mjs';
+const GROUPS = ['delivery', 'onsite', 'av-it', 'it-infra', 'service-desk', 'leadership', 'vendor'].map((tm) => ({ tm, ps: PEOPLE.filter((p) => p.team === tm) })).filter((g) => g.ps.length);
+const MODES = [
+  { id: 'system', name: 'Auto' },
+  { id: 'light', name: 'Light' },
+  { id: 'dark', name: 'Dark' },
+];
+---
+<dialog class="settings" id="settings" aria-labelledby="settings-title" tabindex="-1" autofocus>
+  <form method="dialog">
+    <header>
+      <h2 id="settings-title">Settings</h2>
+      <button type="button" class="icon-btn" data-settings-close aria-label="Close settings">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      </button>
+    </header>
+    <label class="who-phone"><span class="overline">View as</span>
+      <select name="who" data-who-select>
+        <optgroup label="Overview"><option value="everyone">Everyone (overview) · Every role at once</option></optgroup>
+        {GROUPS.map((g) => <optgroup label={TEAMS[g.tm]}>{g.ps.map((p) => <option value={p.id}>{p.role} · {p.where}</option>)}</optgroup>)}
+      </select>
+    </label>
+    <fieldset>
+      <legend class="overline">Look</legend>
+      <div class="looks">
+        <span class="look-mark" aria-hidden="true"></span>
+        {LOOKS.map((l) => (
+          <label class="look" title={l.note}>
+            <input type="radio" name="skin" value={l.id} />
+            <span class="swatch" aria-hidden="true">{l.sw.map((c) => <i style={`background:${c}`}></i>)}</span>
+            <b>{l.name}</b>
+          </label>
+        ))}
+      </div>
+      <div class="notes" aria-live="polite">
+        {LOOKS.map((l) => <p class="faint" data-look-note={l.id}>{l.name}: {l.note}</p>)}
+      </div>
+    </fieldset>
+    <div class="set-row">
+      <fieldset>
+        <legend class="overline">Mode</legend>
+        <div class="seg-s" data-seg>
+          {MODES.map((m) => (<label><input type="radio" name="mode" value={m.id} /><span>{m.name}</span></label>))}
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend class="overline">Agents</legend>
+        <div class="seg-s" data-seg>
+          <label><input type="radio" name="agents" value="on" /><span>Show</span></label>
+          <label><input type="radio" name="agents" value="off" /><span>Hide</span></label>
+        </div>
+      </fieldset>
+    </div>
+    <fieldset>
+      <legend class="overline">Demo: how far Keia Atlas is switched on</legend>
+      <div class="stages" data-stages>
+        <span class="st-rail" aria-hidden="true"><i class="st-fill"></i></span>
+        <span class="st-ring" aria-hidden="true"></span>
+        {STAGES_DEMO.map((st, i) => (
+          <label class="stage-opt" data-n={st.n} style={`--i:${i}`} title={`${st.name}: ${st.adds}`}><input type="radio" name="stage" value={String(st.n)} /><span class="sn">{st.n}</span></label>
+        ))}
+      </div>
+      <div class="notes" aria-live="polite">
+        {STAGES_DEMO.map((st) => (
+          <p class="stage-note" data-stage-note={st.n}><b>Stage {st.n}: {st.name}.</b> {st.adds}{st.real ? '.' : '. Simulated.'} Every stage up to it is on.</p>
+        ))}
+      </div>
+    </fieldset>
+    <p class="faint">Saved in this browser only. On a computer, switch who you're viewing as from under your name, bottom left.</p>
+  </form>
+</dialog>
+
+<script is:inline data-astro-rerun>
+  (function () {
+    // (a page can have its own #settings, such as a Settings tab, so look for the dialog itself)
+    var dlg = document.querySelector('dialog#settings');
+    if (!dlg) return;
+    var opener = null, lastStage = null;
+    function get(k, d) { try { return localStorage.getItem(k) || d; } catch (_) { return d; } }
+    function put(k, v) { try { localStorage.setItem(k, v); } catch (_) {} }
+    // The marker on the chosen look: a ring that slides from card to card (and row to row on a phone).
+    function markLook() {
+      var box = dlg.querySelector('.looks'), mk = box.querySelector('.look-mark'), on = box.querySelector('.look:has(input:checked)');
+      if (!on) { mk.classList.remove('on'); return; }
+      var first = !mk.classList.contains('on');
+      if (first) mk.style.transition = 'none';
+      mk.style.width = on.offsetWidth + 'px'; mk.style.height = on.offsetHeight + 'px';
+      mk.style.transform = 'translate(' + on.offsetLeft + 'px,' + on.offsetTop + 'px)';
+      if (first) { mk.classList.add('on'); void mk.offsetWidth; mk.style.transition = ''; }
+    }
+    function markSegs() {
+      dlg.querySelectorAll('[data-seg]').forEach(function (g) {
+        if (window.rsMarker) window.rsMarker(g, function () { var i = g.querySelector('input:checked'); return i && i.closest('label'); });
+      });
+    }
+    // Stages are cumulative: the rail fills to the chosen stage and each number lights as the fill reaches it.
+    function markStages(st) {
+      var box = dlg.querySelector('[data-stages]'), was = lastStage == null ? st : lastStage;
+      box.style.setProperty('--k', st);
+      dlg.querySelectorAll('.stage-opt').forEach(function (l) {
+        var n = +l.dataset.n, on = n <= st, changed = on !== l.classList.contains('on');
+        l.style.setProperty('--d', changed ? Math.abs(n - was) - (on ? 1 : 0) : 0);
+        l.classList.toggle('on', on);
+      });
+      lastStage = st;
+    }
+    function sync() {
+      var s = get('rs4-skin', 'studio'), t = get('rs4-theme', 'system'), st = get('rs4-stage', '6'), ag = get('rs4-agents', 'on');
+      dlg.querySelectorAll('input[name=skin]').forEach(function (i) { i.checked = i.value === s; });
+      dlg.querySelectorAll('input[name=mode]').forEach(function (i) { i.checked = i.value === t; });
+      dlg.querySelectorAll('input[name=stage]').forEach(function (i) { i.checked = i.value === st; });
+      dlg.querySelectorAll('input[name=agents]').forEach(function (i) { i.checked = i.value === ag; });
+      dlg.querySelectorAll('[data-stage-note]').forEach(function (p) { p.classList.toggle('on', p.dataset.stageNote === st); });
+      dlg.querySelectorAll('[data-look-note]').forEach(function (p) { p.classList.toggle('on', p.dataset.lookNote === s); });
+      var ws = dlg.querySelector('[data-who-select]'); if (ws) ws.value = window.rsWhoId ? window.rsWhoId() : get('rs4-who', 'aoife');
+      markStages(+st); markLook(); markSegs();
+    }
+    // Open beside the button that opened it, top edge fixed, so nothing moves under the pointer as you choose.
+    function place() {
+      var vw = document.documentElement.clientWidth, vh = window.innerHeight, g = 12, w = dlg.offsetWidth;
+      var r = opener && opener.getClientRects().length ? opener.getBoundingClientRect() : null;
+      var left = r ? r.left : (vw - w) / 2;
+      left = Math.max(g, Math.min(left, vw - w - g));
+      var h = dlg.scrollHeight, top;
+      if (!r) top = Math.max(g, (vh - h) / 2);
+      else if (r.top > vh / 2) top = Math.max(g, r.top - 8 - h);   // the button is low: open upwards
+      else top = Math.min(r.bottom + 8, Math.max(g, vh - h - g));
+      dlg.style.left = Math.round(left) + 'px'; dlg.style.top = Math.round(top) + 'px';
+      dlg.style.maxHeight = (vh - top - g) + 'px';
+    }
+    function open(from) {
+      opener = from || null;
+      if (dlg.open) return;
+      if (window.rsPreloadLooks) window.rsPreloadLooks();
+      dlg.classList.remove('closing'); dlg.getAnimations().forEach(function (a) { a.cancel(); });
+      lastStage = null;
+      dlg.showModal(); sync(); place(); markLook(); markSegs();
+      if (window.rsPopIn) window.rsPopIn(dlg, opener);
+    }
+    function close() {
+      if (!dlg.open || dlg.classList.contains('closing')) return;
+      dlg.classList.add('closing');
+      var done = function () { dlg.classList.remove('closing'); dlg.close(); if (opener && opener.focus && opener.getClientRects().length) opener.focus({ preventScroll: true }); };
+      if (window.rsPopOut) window.rsPopOut(dlg, opener, done); else done();
+    }
+    dlg.addEventListener('change', function (e) {
+      var i = e.target, v = i.value;
+      if (i.name === 'skin') { put('rs4-skin', v); window.rsTheme(function () { window.rsApplyTheme(); }, v); }
+      if (i.name === 'mode') { put('rs4-theme', v); window.rsTheme(function () { window.rsApplyTheme(); if (window.rsSyncMode) window.rsSyncMode(); }); }
+      if (i.name === 'stage') window.rsSetStage(v);
+      if (i.name === 'agents') window.rsSetAgents(v);
+      if (i.name === 'who') window.rsPickWho(v);
+      sync();
+    });
+    document.querySelectorAll('[data-open-settings]').forEach(function (b) {
+      b.addEventListener('click', function () { var a = document.querySelector('[data-acct-menu]'); open(b.closest('.acct-menu') ? a : b); });
+    });
+    dlg.querySelector('[data-settings-close]').addEventListener('click', close);
+    dlg.addEventListener('cancel', function (e) { e.preventDefault(); close(); });
+    dlg.addEventListener('click', function (e) { if (e.target === dlg) close(); });
+    if (!window.__rsSettingsHook) {
+      window.__rsSettingsHook = true;
+      window.addEventListener('resize', function () { var d = document.querySelector('dialog#settings'); if (d && d.open && d.__rsPlace) d.__rsPlace(); });
+    }
+    dlg.__rsPlace = function () { place(); markLook(); markSegs(); };
+  })();
+</script>
+
+<style is:global>
+  .settings { position: fixed; inset: auto; margin: 0; width: min(470px, calc(100vw - 24px)); max-height: calc(100vh - 24px); padding: 0; border: var(--border-card); border-radius: var(--radius-lg); background: var(--surface); color: var(--text); box-shadow: var(--shadow-lg); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+  .settings:focus { outline: none; }   /* it takes focus itself on opening, so no control lights up unasked */
+  .settings::backdrop { background: color-mix(in srgb, #000 32%, transparent); animation: rs-fade-in var(--dur-pop) var(--ease-settle); }
+  .settings.closing::backdrop { animation: rs-fade-out var(--dur-exit) var(--ease-settle) forwards; }
+  .settings form { padding: 16px 18px 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .settings header { display: flex; align-items: center; justify-content: space-between; }
+  .settings h2 { font-size: 20px; margin: 0; }
+  .settings fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; min-width: 0; }
+  .settings legend { margin-bottom: 8px; padding: 0; }
+  .settings input[type=radio] { position: absolute; opacity: 0; pointer-events: none; }
+  /* Looks: the chosen card is marked by one ring that slides between cards (never a border that jumps). */
+  .settings .looks { position: relative; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+  .settings .look { position: relative; z-index: 1; display: grid; gap: 6px; justify-items: center; padding: 8px 4px 7px; border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer; text-align: center; transition: background var(--dur-hover) var(--ease-settle), border-color var(--dur-state) var(--ease-settle); }
+  .settings .look:hover { background: var(--surface-2); }
+  .settings .look:has(input:checked) { border-color: transparent; background: transparent; }
+  .settings .look:has(input:checked) b { color: var(--accent-ink); }
+  .settings .look:focus-within { outline: 2px solid var(--focus); outline-offset: 1px; }
+  .settings .look b { font-size: 12px; line-height: 1.15; transition: color var(--dur-state) var(--ease-settle); }
+  .settings .look-mark { position: absolute; left: 0; top: 0; z-index: 0; border-radius: var(--radius); background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); pointer-events: none; transition: transform var(--dur-morph) var(--ease-settle), width var(--dur-morph) var(--ease-settle), height var(--dur-morph) var(--ease-settle); }
+  .settings .look-mark:not(.on) { opacity: 0; }
+  .settings .swatch { display: grid; grid-template-columns: repeat(2, 1fr); width: 36px; height: 36px; border-radius: 50%; overflow: hidden; border: 1px solid var(--line); transform: rotate(45deg); }
+  /* Notes: every note sits in the same cell, so the dialog is as tall as the longest and never resizes. */
+  .settings .notes { display: grid; }
+  .settings .notes > p { grid-area: 1 / 1; opacity: 0; visibility: hidden; transition: opacity var(--dur-exit) var(--ease-settle), visibility 0s linear var(--dur-exit); }
+  .settings .notes > p.on { opacity: 1; visibility: visible; transition: opacity var(--dur-state) var(--ease-settle) var(--dur-exit), visibility 0s; }
+  .settings .set-row { display: grid; grid-template-columns: 1fr auto; gap: 14px; }
+  .settings .seg-s { display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); width: max-content; }
+  .settings .seg-s .rs-mark { background: var(--surface); box-shadow: 0 1px 2px rgba(0, 0, 0, .14), 0 0 0 1px var(--line); }
+  .settings .seg-s label { cursor: pointer; }
+  .settings .seg-s span { display: block; padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--text-2); transition: color var(--dur-state) var(--ease-settle); }
+  .settings .seg-s label:has(input:checked) span { color: var(--text); }
+  .settings .seg-s label:focus-within span { outline: 2px solid var(--focus); }
+  .settings p { margin: 0; font-size: 12.5px; }
+  /* Stages read as a ladder: a rail that fills to the chosen stage, each number lighting as the fill
+     reaches it (--d, set by the script, counts the steps from the last choice), and one ring that slides. */
+  .settings .stages { --k: 6; display: grid; grid-template-columns: repeat(6, 1fr); position: relative; }
+  .settings .st-rail { position: absolute; left: calc(100% / 12); right: calc(100% / 12); top: 50%; height: 2px; margin-top: -1px; background: var(--line); }
+  .settings .st-fill { position: absolute; inset: 0; background: var(--ink); transform-origin: left center; transform: scaleX(calc((var(--k) - 1) / 5)); transition: transform var(--dur-morph) var(--ease-settle); }
+  .settings .st-ring { position: absolute; top: 50%; left: calc((var(--k) - .5) * 100% / 6); width: 42px; height: 42px; margin: -21px 0 0 -21px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--accent); pointer-events: none; transition: left var(--dur-morph) var(--ease-settle); }
+  .settings .stage-opt { position: relative; display: grid; place-items: center; padding: 5px 0; cursor: pointer; }
+  .settings .sn { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-3); color: var(--text-2); font: 700 13px/1 var(--font-mono); position: relative; transition: background var(--dur-state) var(--ease-settle), color var(--dur-state) var(--ease-settle), transform var(--dur-hover) var(--ease-settle); transition-delay: calc(var(--d, 0) * var(--stagger) * 3), calc(var(--d, 0) * var(--stagger) * 3), 0s; }
+  .settings .stage-opt:hover .sn { transform: scale(1.06); }
+  .settings .stage-opt.on .sn { background: var(--ink); color: var(--on-ink); }
+  .settings .stage-opt:focus-within .sn { outline: 2px solid var(--focus); outline-offset: 5px; }
+  .settings .stage-note { color: var(--text-2); }
+  .settings .who-phone { display: none; gap: 6px; }
+  .settings .who-phone select { width: 100%; min-width: 0; font: inherit; font-size: 15px; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); }
+  /* While the page cross-fades to a new look, the markers in here still slide (motion.css turns other easing off). */
+  @media (prefers-reduced-motion: no-preference) {
+    :root.rs-theming .settings .look-mark { transition: transform var(--dur-morph) var(--ease-settle), width var(--dur-morph) var(--ease-settle), height var(--dur-morph) var(--ease-settle) !important; }
+    :root.rs-theming .settings .rs-mark { transition: transform var(--dur-morph) var(--ease-settle), width var(--dur-morph) var(--ease-settle) !important; }
+  }
+  @media (max-width: 760px) { .settings .who-phone { display: grid; } }
+  @media (max-width: 420px) { .settings .looks { grid-template-columns: repeat(3, 1fr); } .settings .set-row { grid-template-columns: 1fr; } }
+  @media (prefers-reduced-motion: reduce) { .settings::backdrop, .settings.closing::backdrop { animation: none; } }
+</style>

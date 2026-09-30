@@ -1,0 +1,69 @@
+# Known issues: what one maker publishes about faults in its own firmware, one file per maker and firmware
+# line (decision 0029). Keia Atlas reads the maker's feed when it fetches the firmware list, keeps each issue
+# as the maker wrote it, and matches it to the fleet and to incidents. Aigna's own words (a workaround the
+# maker didn't publish, a note on why no unit is exposed) are marked as Aigna's.
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/known-issues
+title: Known issues feed
+type: object
+additionalProperties: false
+required: [id, maker, feed, route, checked, every, issues]
+$defs:
+  version: { type: string, pattern: "^[0-9A-Za-z][0-9A-Za-z.x-]*$" }
+  issue:
+    type: object
+    additionalProperties: false
+    required: [id, title, models, affected, status, symptom, published, source]
+    properties:
+      id: { type: string, pattern: "^[A-Z0-9][A-Z0-9-]*$", description: "The maker's own reference when it publishes one (PVENG-35985); otherwise a Keia Atlas id (POLY-TC10-RESTART)." }
+      ref: { type: string, description: "The maker's reference, exactly as published. Left out when the maker publishes none." }
+      title: { type: string, description: "The issue in plain words, close to the maker's own." }
+      models: { type: array, items: { type: string }, description: "Models in data/device-models the maker names. Empty when the maker names only models Aigna doesn't have." }
+      maker_models: { type: array, items: { type: string }, description: "Products the maker names that are not in Aigna's catalogue, as the maker names them." }
+      affected: { type: array, minItems: 1, items: { $ref: "#/$defs/version" }, description: "The firmware versions the maker says have the issue." }
+      affected_note: { type: string, description: "When the maker doesn't list the versions: how Aigna read it." }
+      fixed_in: { $ref: "#/$defs/version", description: "The version the maker says fixes it." }
+      status: { enum: [open, fixed, wont-fix] }
+      symptom: { type: string, description: "What people in the room notice, in plain words." }
+      symptoms: { type: array, items: { type: string }, description: "Symptoms from the device profiles' guides (discrimination keys in data/device-classes) that look like this issue. Used for matching." }
+      signs: { type: array, items: { type: string }, description: "Words a ticket about this issue tends to use, in lower case. Used for matching when a ticket has no symptom." }
+      needs:
+        description: "A condition the maker names, such as an external camera being connected. A unit only counts as exposed when its room meets it."
+        type: object
+        additionalProperties: false
+        required: [text]
+        properties:
+          text: { type: string }
+          with_models: { type: array, items: { type: string }, description: "The room must also have one of these models." }
+          never: { type: string, description: "Why no Aigna room meets the condition, in Aigna's words (for a condition Keia Atlas can't see, such as Wi-Fi being in use)." }
+      workaround:
+        type: object
+        additionalProperties: false
+        required: [text, from]
+        properties:
+          text: { type: string }
+          from: { enum: [maker, aigna], description: "maker: published with the issue. aigna: Aigna's own, not the maker's." }
+      advisory: { type: string, description: "An Aigna advisory about this issue (data/advisories)." }
+      published: { type: string, pattern: "^[0-9]{4}-[0-9]{2}(-[0-9]{2})?$", description: "When the maker first listed it (a month when the notes give only a month)." }
+      source: { type: string, description: "The release note or post it is listed in (data/sources)." }
+      demo: { const: true, description: "Made up for the demo, not from a real release note." }
+properties:
+  id: { type: string, pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
+  maker: { type: string }
+  vendor: { type: string, description: "The maker's record in data/vendors, when Aigna has a contract with it." }
+  firmware: { type: string, description: "The firmware line in data/firmware these issues belong to, when Keia Atlas tracks it." }
+  feed: { type: string, description: "Where the maker publishes its known issues." }
+  route: { type: string, description: "How Keia Atlas reads the feed (stage 2), and how often." }
+  checked: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$", description: "When Keia Atlas last read the feed (simulated)." }
+  every: { type: string, description: "How often Keia Atlas reads it, in words." }
+  support: { type: string, description: "How to raise a case with the maker, when there is no vendor record with a contract." }
+  follows:
+    description: "Accessories that take their firmware from the system they are paired to, so they run its version."
+    type: object
+    additionalProperties: false
+    required: [models, source]
+    properties:
+      models: { type: array, items: { type: string } }
+      source: { type: string }
+  demo: { const: true, description: "The whole feed is made up for the demo." }
+  issues: { type: array, items: { $ref: "#/$defs/issue" } }

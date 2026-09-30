@@ -1,0 +1,41 @@
+---
+import Shell from '../../../layouts/Shell.astro';
+import Icon from '../../../components/Icon.astro';
+import { decisions } from '../../../lib/decisions.mjs';
+import { href } from '../../../lib/data.mjs';
+
+export function getStaticPaths() {
+  return decisions.map((d) => ({ params: { slug: d.slug } }));
+}
+const { slug } = Astro.params;
+const i = decisions.findIndex((d) => d.slug === slug);
+const d = decisions[i];
+const prev = decisions[i - 1];
+const next = decisions[i + 1];
+---
+<Shell title={`${d.no} ${d.title}`} section="decisions" crumbs={[{ label: 'About', to: '/about/' }, { label: 'Decision records', to: '/about/#decisions' }, { label: d.no }]}>
+  <section class="band">
+    <div class="meta"><span class="code">{d.no}</span><span class="pill manage">{d.status}</span><span class="faint">{d.date}</span></div>
+    <h1>{d.title}</h1>
+  </section>
+  <div class="content">
+    <article class="card pad prose">
+      <d.Content />
+    </article>
+    <nav style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap" aria-label="Other decisions">
+      {prev ? <a class="btn small" href={href(`/about/decisions/${prev.slug}/`)}><Icon name="back" size={16} />{prev.no} {prev.title}</a> : <span></span>}
+      {next && <a class="btn small" href={href(`/about/decisions/${next.slug}/`)}>{next.no} {next.title}<Icon name="arrow" size={16} /></a>}
+    </nav>
+  </div>
+</Shell>
+<style is:global>
+  .prose { max-width: 78ch; font-size: 15.5px; line-height: 1.65; }
+  .prose > h1:first-child, .prose > ul:first-of-type:nth-child(2) { display: none; }
+  .prose h2 { font-size: 20px; margin: 26px 0 8px; }
+  .prose h2:first-of-type { margin-top: 0; }
+  .prose p { margin: 0 0 12px; }
+  .prose ul, .prose ol { margin: 0 0 12px; padding-left: 22px; }
+  .prose li { margin-bottom: 4px; }
+  .prose code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+  .prose table { min-width: 0; margin-bottom: 12px; }
+</style>

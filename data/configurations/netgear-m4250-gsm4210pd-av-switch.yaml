@@ -1,0 +1,57 @@
+# Configuration: M4250 AV-over-IP switch (GSM4210PD). Setting names, menu paths and defaults are the vendor's (cited per setting);
+# the values and reasons are Aigna's (demo). Researched from vendor documents, Sept 2026.
+id: netgear-m4250-gsm4210pd-av-switch
+name: M4250 AV-over-IP switch (GSM4210PD)
+models: [netgear-m4250-gsm4210pd]
+mode: AV-over-IP switch, small meeting rooms
+version: '1.0'
+owner: marco
+updated: '2026-09-28'
+firmware: 13.0.5.26
+summary: The network team sets the M4250 from its own web interface, using the AV UI's Network Profiles to keep each room's AV-over-IP protocol on its own
+  VLAN with an IGMP querier, and the switch's PoE budget for its endpoints.
+managed_by: Device web interface
+steps: [Mount the switch under the desk or on the wall and connect the out-of-band management port to the management VLAN., Log in over HTTPS (no password
+    is required on first login) and set the admin password., Set the SNTP server for the switch's clock., 'Apply the Network Profile that matches the room''s
+    AV-over-IP protocol, or leave Default if the room has none.', Assign each port's untagged/tagged/excluded status for that profile and check its IGMP
+    querier is enabled., Set the PoE power allocation for the room's endpoints within the 110 W budget., Leave automatic firmware checks off; update manually
+    once the Lab has passed a release., Run the room's verification.]
+groups:
+- name: Management access
+  where: Device web interface
+  settings:
+  - {derive: vault-site, name: Admin password, value: 'From the password vault, per site', per_device: true, action: change, layer: profile, why: 'No password is required on
+      first login; Aigna sets one immediately, 8 to 64 characters with an uppercase letter, a lowercase letter and a number.', source: netgear-m4250-av-user-manual}
+  - {name: Management access protocol, value: HTTPS, action: verify, layer: profile, why: 'The switch defaults to HTTPS for its web interface, which Aigna
+      keeps rather than allowing plain HTTP.', source: netgear-m4250-av-user-manual}
+- name: Date and time
+  where: Device web interface
+  settings:
+  - {derive: time-server-1, name: SNTP server, path: Configure > Date and time settings, value: ntp1.aigna.example, action: change, layer: naming-network, why: 'Uses Aigna''s
+      time server instead of manual entry, so the switch''s logs line up with everything else on the site.', source: netgear-m4250-av-user-manual}
+- name: Network Profiles (AV UI)
+  where: Device web interface
+  settings:
+  - {derive: on-site, name: Network Profile, path: Configure > Network Profiles, value: 'The room''s AV protocol profile (e.g. Dante, NDI or Kramer AV), Default if the room
+      has none', per_device: true, action: change, layer: room-type, why: Each preconfigured profile carries its own VLAN separation and querier settings
+      for that protocol; picking the wrong one can cut a device off from its controller., source: netgear-m4250-av-user-manual}
+  - {derive: as-written, name: Port assignment (untagged/tagged/excluded), path: 'Configure > Network Profiles > [profile] > ports', value: AV endpoints untagged on the profile's
+      VLAN; the uplink tagged, per_device: true, action: change, layer: room-type, why: Matches how the room's AV-over-IP protocol expects its VLAN to reach
+      each device., source: netgear-m4250-av-user-manual}
+  - {name: Querier Election Participate, path: 'Configure > Network Profiles > [profile] > Querier', value: 'On', action: verify, layer: profile, why: Already
+      on by default for the Default profile; a multicast AV stream needs a querier on its VLAN to keep flowing to every receiver., source: netgear-m4250-av-user-manual}
+- name: Power over Ethernet
+  where: Device web interface
+  settings:
+  - {derive: as-written, name: PoE port power allocation, path: Configure > Power over Ethernet, value: 'Per the connected device''s power class, within the 110 W total budget',
+    per_device: true, action: change, layer: room-type, why: The 8 PoE+ ports share one 110 W budget; setting each port's allocation stops one device starving
+      another when the room is full., source: netgear-m4250-av-user-manual}
+- name: Updates
+  where: Device web interface
+  settings:
+  - {name: Firmware update, path: Manage and Monitor, value: 'Manual, downloaded from netgear.com/support/download and applied after the Lab passes it',
+    action: change, layer: profile, why: No automatic-update toggle is documented for this series; Aigna checks and applies a release by hand regardless.,
+    source: netgear-m4250-av-user-manual}
+gaps: [The manual doesn't name a default admin username in the excerpts read; NETGEAR switches conventionally use admin., No documented automatic-update
+    on/off toggle for this model; only the manual download-and-apply path., Per-port PoE class and priority field names weren't confirmed beyond the 110
+    W total budget and a general power-allocation setting.]

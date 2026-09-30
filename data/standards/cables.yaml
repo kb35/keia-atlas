@@ -1,0 +1,184 @@
+# Aigna's cable colour and labelling standard. Made up for the demo: the colours are Aigna's own house choice.
+# The page at /standards/cables/ is drawn from this file, and the validator checks every cable in data/cables against it.
+id: aigna-cabling
+name: Cable colour and labelling standard
+version: "1.0"
+effective: "2026-03-01"
+owner: Service manager, IT infrastructure
+summary: >-
+  Every patch cable in an Aigna comms room has a colour that says what it is for, and a label at both ends
+  that says exactly where it plugs in. Someone standing in front of a rack for the first time can tell a user
+  cable from an uplink, a critical link or a management cable without following it, and can find the other end
+  by reading it.
+scope:
+  - Patch cables and patch cords in every comms room (MDF and IDF), including the spare cables kept for them.
+  - Power cords inside a rack, to the rack power strips.
+  - Room leads (HDMI, USB-C, DisplayPort, audio) are not colour coded, but they carry the same two-ended label when they are fixed in place.
+  - The permanent cabling behind the walls is installed by the contractor to the building specification. It is labelled at the patch panel and the outlet with this same format.
+
+colours:
+  - { id: blue, name: Blue, hex: "#1F6FE0", ink: light }
+  - { id: green, name: Green, hex: "#2E9E4F", ink: light }
+  - { id: yellow, name: Yellow, hex: "#F2C200", ink: dark }
+  - { id: red, name: Red, hex: "#D6312B", ink: light }
+  - { id: aqua, name: Aqua, hex: "#22BFD6", ink: dark }
+  - { id: grey, name: Grey, hex: "#8C929B", ink: dark }
+  - { id: black, name: Black, hex: "#1B1B1F", ink: light }
+  - { id: purple, name: Purple, hex: "#7B4FD0", ink: light }
+  - { id: orange, name: Orange, hex: "#F08A1C", ink: dark }
+
+cable_types:
+  - { id: cat6, label: Cat6, group: copper, connectors: "RJ45 to RJ45, 1 Gb/s" }
+  - { id: cat6a, label: Cat6A, group: copper, connectors: "RJ45 to RJ45, 10 Gb/s and PoE" }
+  - { id: fibre-om3, label: "Fibre OM3", group: fibre, connectors: "LC duplex, multimode" }
+  - { id: fibre-om4, label: "Fibre OM4", group: fibre, connectors: "LC duplex, multimode" }
+  - { id: fibre-os2, label: "Fibre OS2", group: fibre, connectors: "LC duplex, singlemode" }
+  - { id: dac, label: "Direct attach (DAC)", group: fibre, connectors: "SFP+ to SFP+ copper, short runs in a rack" }
+  - { id: console, label: Console, group: console, connectors: "RJ45 to serial, or USB-C to RJ45" }
+  - { id: hdmi, label: HDMI, group: av, connectors: "HDMI to HDMI" }
+  - { id: displayport, label: DisplayPort, group: av, connectors: "DisplayPort to DisplayPort" }
+  - { id: usb-c, label: USB-C, group: av, connectors: "USB-C to USB-C" }
+  - { id: power-c13-c14, label: "Power C13 to C14", group: power, connectors: "IEC C13 to IEC C14, 10 A" }
+  - { id: power-c19-c20, label: "Power C19 to C20", group: power, connectors: "IEC C19 to IEC C20, 16 A" }
+
+purposes:
+  - id: user-data
+    name: User data
+    colour: blue
+    media: [cat6, cat6a]
+    carries: "The everyday network: desks, meeting room wall outlets, phones and printers."
+    examples: ["Access switch port to patch panel port for a desk outlet", "Access switch to a wall outlet patch panel"]
+    rule: If in doubt about a copper cable, it is blue.
+  - id: av
+    name: AV and room systems
+    colour: green
+    media: [cat6, cat6a]
+    carries: "Devices that belong to a room's AV system: video bars, codecs, touch controllers, AV over network extenders and their switch."
+    examples: ["AV switch to the AV outlets patch panel", "Codec network port to the AV VLAN outlet"]
+    rule: Green is only ever the AV system's own network, never a general user connection in a meeting room.
+  - id: uplink
+    name: Uplinks and trunks
+    colour: yellow
+    media: [cat6a, dac]
+    carries: "Copper links between network devices: switch to firewall, switch to wireless controller, and the internet handoff."
+    examples: ["Core switch to firewall", "Firewall to the internet provider's handoff"]
+    rule: Fibre uplinks take the fibre colour below, so a yellow copper cable is always a trunk between two pieces of network kit.
+  - id: critical
+    name: Critical and security systems
+    colour: red
+    media: [cat6, cat6a]
+    carries: "Links that must never be unplugged by accident: firewall failover, door access, CCTV and fire or life-safety interfaces."
+    examples: ["Firewall A to firewall B failover link", "Door controller to its switch port"]
+    rule: A red cable is never moved, re-used or unplugged without a change record.
+  - id: fibre-mm
+    name: Multimode fibre
+    colour: aqua
+    media: [fibre-om3, fibre-om4]
+    carries: "Short fibre runs inside the building: switch uplinks, core interconnects and the risers between floors."
+    examples: ["Core switch to the floor riser fibre panel", "Access switch uplink to the core"]
+    rule: Aqua is the jacket colour that fibre makers use for OM3 and OM4, so it is never re-used for anything else.
+  - id: fibre-sm
+    name: Singlemode fibre
+    colour: yellow
+    media: [fibre-os2]
+    carries: "Long fibre runs and the internet providers' fibre."
+    examples: ["Provider fibre from the fibre panel to the internet handoff"]
+    rule: Yellow is the jacket colour that fibre makers use for singlemode, so a yellow fibre must never be plugged into a multimode port.
+  - id: management
+    name: Management
+    colour: grey
+    media: [cat6, cat6a]
+    carries: "The management network: each device's own management port, and the power strips' network cards."
+    examples: ["Firewall management port to the out-of-band router", "Core switch management port to the out-of-band router"]
+    rule: Grey copper is management. A grey power cord is a different thing (feed B) and is told apart by its plug.
+  - id: console
+    name: Console and out-of-band
+    colour: purple
+    media: [console, cat6, cat6a]
+    carries: "The way in when the network is down: console cables to the console server, and the out-of-band router's links."
+    examples: ["Console server port to a core switch console port", "Out-of-band router to the console server"]
+    rule: Purple cables must still work when everything else is down, so nothing else is ever run through a purple cable.
+  - id: power-a
+    name: Power, feed A
+    colour: black
+    media: [power-c13-c14, power-c19-c20]
+    carries: "Power from the A feed's power strip or UPS."
+    examples: ["Core switch A power cord to power strip A"]
+    rule: Every device with two power supplies has one black cord and one grey cord, never two of the same.
+  - id: power-b
+    name: Power, feed B
+    colour: grey
+    media: [power-c13-c14, power-c19-c20]
+    carries: "Power from the B feed's power strip."
+    examples: ["Core switch A second power cord to power strip B"]
+    rule: A power cord is grey for feed B. It is never mistaken for a management cable because it ends in a power plug, not an RJ45.
+  - id: temporary
+    name: Temporary
+    colour: orange
+    media: [cat6, cat6a, fibre-om3, fibre-om4, fibre-os2, console, power-c13-c14]
+    carries: "Anything patched for a short time: a test, a move, a project cut-over."
+    examples: ["A laptop patched into a switch during a commissioning"]
+    rule: An orange cable has a remove-by date on its label, never more than 30 days ahead.
+  - id: room-lead
+    name: Room leads
+    colour: black
+    media: [hdmi, displayport, usb-c]
+    carries: "Leads in meeting rooms and desks, and the spares kept for them. Not colour coded."
+    examples: ["HDMI from a wall plate to a display", "USB-C from a table box to a laptop"]
+    rule: Room leads are the maker's colour (black). They are labelled at both ends when they are fixed in place, and they do not enter a comms room.
+    coded: false
+
+labelling:
+  format: "SITE-ROOM-RACK-UNIT-PORT"
+  parts:
+    - { token: SITE, meaning: "The site's three-letter code.", example: DUB }
+    - { token: ROOM, meaning: "The room number as it is on the door.", example: "3.21" }
+    - { token: RACK, meaning: "R and the rack's number in that room.", example: R1 }
+    - { token: UNIT, meaning: "U and the lowest rack unit of the device or panel, counted from the bottom of the rack, two digits.", example: U15 }
+    - { token: PORT, meaning: "P and the port number, two digits. A duplex fibre pair counts as one port.", example: P07 }
+  example: DUB-3.21-R1-U15-P07
+  example_reads: "Dublin office, comms room 3.21, rack 1, unit 15 (the first access switch), port 7."
+  rules:
+    - "Both ends of every cable carry a label. Line one says where this end plugs in. Line two says where the other end goes."
+    - "Power cords use the same format with the power strip in place of the unit and the outlet in place of the port, for example DUB-3.21-R1-PDUA-O05."
+    - "Labels are printed, never handwritten, on a self-laminating wrap that goes round the cable so it reads from any side."
+    - "Put the label on the cable within 50 mm of the plug, not on the plug's boot and not on a tag that can slide."
+    - "Choose the shortest stocked length that leaves a gentle loop. Never leave a coil of spare cable behind a cable manager."
+    - "When a cable moves, both labels change the same day and the record in Keia changes with them."
+    - "Spare cables are kept in bundles of ten by type, length and colour, with a tag that says which. They carry no port label until they are patched."
+    - "The colour is on the cable jacket. Labels are always white, so a label is never mistaken for a colour code."
+
+lengths_m: [0.3, 0.5, 1, 1.5, 2, 3, 5]
+
+tia606:
+  covers: "TIA-606 is the industry standard for the administration of telecommunications cabling: how cables, patch panel ports, racks and rooms are identified, labelled and recorded. It is a labelling and records standard. It is not a cable specification."
+  checked: "2026-09-29"
+  status: not-verified
+  finding: "We could not confirm what the standard itself says about patch cord colours. The standard is sold, not published free, and we did not have a copy. Every secondary source we could read says the same thing: colour coding is a recommendation, it applies to labels and termination fields, coloured cords are accepted as an extra alongside labels, and none of them says patch cord colours are mandatory. Treat that as likely, not proven."
+  limits: "This is not checked against the standard's own text. Before anyone quotes TIA-606 to a customer or an auditor, read the current edition. Aigna's colours are a house choice and do not claim to be TIA-606 colours."
+  sources:
+    - title: "Fiber Optics Tech Consortium: ANSI/TIA-606-D"
+      url: "https://www.tiafotc.org/tia-standards-update/tia-606-d/"
+      says: "Confirms the fourth edition was published in October 2021 and that it is the administration standard for telecommunications infrastructure. Its contents list includes a section on colour-coding identification. It does not say which items are coloured."
+    - title: "Silver Fox: TIA-606 cable labeling compliance guide"
+      url: "https://silverfoxlabeling.com/blogs/article/tia-606-cable-labeling-compliance-guide"
+      says: "Says the standard does not mandate coloured jackets or patch cords, that colour is a visual supplement to labels, and that colour-coded patch cords in place of colour-coded labels are acceptable if the port labels still carry unique identifiers."
+    - title: "Silver Fox: Data center cable labeling and TIA-606-D"
+      url: "https://silverfoxlabeling.com/blogs/article/data-center-cable-labeling-patch-panels-structured-cabling-and-tia-606-d"
+      says: "Says every cable, patch panel port, rack and space should carry a unique identifier, with labels at both ends of every link, and that colour-coding of labels is recommended and not mandatory."
+    - title: "Cabling Installation & Maintenance: Color-coding cabling"
+      url: "https://www.cablinginstall.com/home/article/16467013/color-coding-cabling"
+      says: "Describes TIA/EIA-606 colour coding as applying to termination fields and labels (for example orange for the provider side of the demarcation point and blue for horizontal cabling), and does not address patch cord jacket colours."
+    - title: "Brady: TIA-606-C cable labeling standards"
+      url: "https://www.bradyid.com/resources/tia-606-c-cable-labeling-standards"
+      says: "Says the earlier edition, TIA-606-B, recommended colour-coding of cables, cords, termination fields, labels and pathways, and lists a termination-field colour table. It does not describe a rule for patch cord colours."
+
+sources:
+  - title: "Wikipedia: Multi-mode optical fiber"
+    url: "https://en.wikipedia.org/wiki/Multi-mode_optical_fiber"
+    says: "Says aqua is recommended for OM3 and OM4 laser-optimised 50/125 fibre, orange for OM1 and OM2, and that yellow is kept for singlemode fibre."
+  - title: "Brady: Fiber optic color code"
+    url: "https://www.bradyid.com/resources/fiber-optic-color-code"
+    says: "Lists the jacket colours by fibre type under TIA-598: orange for OM1 and OM2, aqua for OM3 and OM4, and yellow for OS1 and OS2."
+
+demo: true

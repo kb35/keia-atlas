@@ -1,0 +1,557 @@
+---
+/* TaskBoard: a project's tasks as a board (only the columns that have work, each sized to its
+   content) or a list; a closed project gets a summary of what was done by phase, with the captured
+   fixes as lessons learned, instead of a board. Cards are compact: title, room, due, status and the
+   owner's avatar. The avatar is a button that opens the people picker (PeoplePicker) anchored to it;
+   the status word opens a small menu; cards can be dragged between columns. Every change is an
+   event in the live layer (src/lib/live.mjs): who, when, undo, live between windows.
+   "Add a task" (for work the playbook does not list) is kept in this browser (rs4-added-tasks);
+   a suggestion for the playbook becomes a proposed change on the Changes page. */
+import Icon from './Icon.astro';
+import PeoplePicker from './PeoplePicker.astro';
+import { spaces, playbooks, PHASE_LABEL, phasesOf, TASK_STATUS, DEMO_TODAY, PHASES, fmtDate, href, plural, className } from '../lib/data.mjs';
+import { person, PEOPLE, PROJECT_ROLE, TASK_ADDERS } from '../lib/demo.mjs';
+import { pickable, byPhase, lessons } from '../lib/project-status.mjs';
+const { project: p } = Astro.props;
+const home = `/projects/${p.id.toLowerCase()}/`;
+const closed = p.phase === 'closed';
+const COLS = ['todo', 'doing', 'blocked', 'done'];
+const short = (d) => fmtDate(d, { day: 'numeric', month: 'short' });
+const spaceName = (id) => (spaces[id]?.number ? `${spaces[id].number} ${spaces[id].name}` : spaces[id]?.name ?? id);
+const tHref = (t) => href(`${home}tasks/${t.id.toLowerCase()}/`);
+const people = pickable(p);
+const open = p.tasks.filter((t) => t.status !== 'done').length;
+const order = (t) => `${PHASES.indexOf(t.phase ?? 'closed')}-${t.status === 'done' ? 1 : 0}-${t.due ?? '9'}`;
+const listed = [...p.tasks].sort((a, b) => order(a).localeCompare(order(b)));
+const groups = closed ? byPhase(p) : [];
+const LL = closed ? lessons(p) : [];
+const pb = playbooks[p.playbook];
+// "Add a task": rooms and devices come from this project's rooms; the people are the project team; a
+// suggestion for the playbook goes to its owners (programme manager with the service manager).
+const roomOpts = (p.spaces ?? []).map((s) => ({ id: s.space, label: spaceName(s.space), devices: (spaces[s.space]?.positions ?? []).filter((x) => x.model || x.hostname).map((x) => ({ id: `${s.space}/${x.position}`, label: `${spaces[s.space].name}: ${(x.role ?? className(x.cls)).replace(/:.*$/, '').replace(/^./, (c) => c.toLowerCase())}` })) }));
+const teamOpts = (p.roles ?? []).map((r) => ({ id: r.person, label: `${person(r.person).name} (${PROJECT_ROLE[r.as]})` }));
+const ownerRoles = ['infra-refresh', 'network-refresh'].includes(pb?.kind) ? ['programme', 'sm-infra'] : ['programme', 'sm-av'];
+const approvers = ownerRoles.map((r) => PEOPLE.find((x) => x.roleId === r)).filter(Boolean);
+const bump = (v) => String(v).replace(/(\d+)$/, (n) => String(+n + 1));
+const dueDefault = new Date(new Date(DEMO_TODAY).getTime() + 7 * 864e5).toISOString().slice(0, 10);
+const atCfg = { project: p.id, name: p.name, phase: p.phase, phaseLabel: PHASE_LABEL[p.phase], pb: pb?.id ?? '', pbName: pb?.name ?? '', ver: pb?.version ?? '', next: pb ? bump(pb.version) : '', approver: approvers.map((x) => `${x.name}, ${x.role}`).join(' with '), approverNames: approvers.map((x) => x.name).join(' and '), changes: href('/changes/'), owner: p.owner };
+const adderCss = TASK_ADDERS.map((r) => `:root[data-role="${r}"] .at-open`).join(',') + ' { display: inline-flex !important; }';
+---
+<div class="tb" data-tb data-project={p.id} data-closed={closed ? '' : undefined} data-people={JSON.stringify(people)} data-today={DEMO_TODAY}>
+  <div class="tb-bar">
+    <div class="tb-views" role="group" aria-label="View" data-help="project.taskviews">
+      <button type="button" class="tb-view" data-tv="board" aria-pressed="true">{closed ? 'Summary' : 'Board'}</button>
+      <button type="button" class="tb-view" data-tv="list" aria-pressed="false">List</button>
+    </div>
+    <span class="faint tb-count" data-tb-count>{closed ? `${plural(p.tasks.length, 'task')}, all done` : `${open} open of ${p.tasks.length}`}</span>
+    <button type="button" class="btn small at-open" data-at-open aria-expanded="false" aria-controls="at-form" data-help="project.addtask"><Icon name="plus" size={15} />Add a task</button>
+  </div>
+  <div class="at-wrap" data-at-wrap>
+    <form class="card at-form" id="at-form" data-at-form novalidate data-cfg={JSON.stringify(atCfg)} inert>
+      <div class="at-h"><h3>Add a task</h3><p class="faint">For work this project needs that the playbook does not list. It is added straight away, and you can undo it.</p></div>
+      <label class="ef"><span class="ef-l">What needs doing?</span><input name="title" maxlength="120" placeholder="For example: Label both ends of every patch cable" autocomplete="off" required /></label>
+      <label class="ef"><span class="ef-l">What is it about?</span>
+        <select name="about">
+          <option value="">Nothing in particular</option>
+          <optgroup label="Rooms">{roomOpts.map((r) => <option value={`room:${r.id}`} data-label={r.label}>{r.label}</option>)}</optgroup>
+          <optgroup label="Devices">{roomOpts.flatMap((r) => r.devices).map((d) => <option value={`device:${d.id}`} data-label={d.label}>{d.label}</option>)}</optgroup>
+        </select>
+      </label>
+      <div class="ef-2">
+        <label class="ef"><span class="ef-l">Who will do it?</span><select name="owner">{teamOpts.map((o) => <option value={o.id} data-label={person(o.id).name}>{o.label}</option>)}</select></label>
+        <label class="ef"><span class="ef-l">Due</span><input type="date" name="due" value={dueDefault} /></label>
+      </div>
+      <fieldset class="at-modes">
+        <legend class="ef-l">How should it count?</legend>
+        <label class="at-mode"><input type="radio" name="mode" value="one-off" checked /><span><b>Just for this project</b><small>A one-off. It does not change the playbook.</small></span></label>
+        <label class="at-mode"><input type="radio" name="mode" value="optional" /><span><b>Optional</b><small>Shows as optional. Anyone can skip it.</small></span></label>
+        {pb && <label class="at-mode"><input type="radio" name="mode" value="suggest" /><span><b>Suggest adding it to the playbook</b><small>Also sends it to {atCfg.approverNames} to approve for every {pb.name} project.</small></span></label>}
+      </fieldset>
+      <p class="at-err" data-at-err role="alert" hidden>Say what needs doing first.</p>
+      <div class="at-acts"><button type="submit" class="btn primary">Add task</button><button type="button" class="btn ghost" data-at-cancel>Cancel</button></div>
+    </form>
+  </div>
+  <p class="at-note" data-at-note role="status" hidden></p>
+
+  <div data-view-board>
+    {closed ? (
+      <div class="tb-sum">
+        {LL.length > 0 && (
+          <div class="card tb-less" data-help="project.lessons">
+            <p class="tb-less-h"><Icon name="check" size={15} />Lessons learned<span class="faint">{plural(LL.length, 'captured fix')}{LL.filter((x) => x.inPlaybook).length ? `, ${LL.filter((x) => x.inPlaybook).length} now in the ${pb?.name ?? ''} playbook` : ''}</span></p>
+            <ul class="tb-less-l">
+              {LL.map((x) => <li><q>{x.fix}</q><small><a href={tHref(x.task)}>{x.task.id}</a> · {x.phase} · {x.owner.name}{x.inPlaybook ? <> · <a href={href(`/playbooks/${pb.id}/`)}>in the playbook since {short(x.inPlaybook.date)}</a></> : ''}</small></li>)}
+            </ul>
+          </div>
+        )}
+        <div class="g12 tb-phases">
+          {groups.map((g) => (
+            <section class="card side-card s-4 tb-ph" aria-label={g.label} data-help="project.phasedone">
+              <h3>{g.label}<span class="num faint">{g.tasks.length ? plural(g.tasks.length, 'task') : ''}</span></h3>
+              {g.history && <p class="tb-ph-w">{g.history.ended ? `Ended ${short(g.history.ended)}` : `Due ${short(g.history.planned)}`}{g.history.signed_off_by ? `, signed off by ${person(g.history.signed_off_by).name}` : ''}</p>}
+              <ul class="tb-ph-l">
+                {g.tasks.map((t) => <li><i class="tk-dot" data-s={t.status} aria-hidden="true"></i><span><a href={tHref(t)}>{t.title}</a><small>{[t.space ? spaceName(t.space) : null, person(t.owner).name].filter(Boolean).join(' · ')}</small>{t.captured_fix && <small class="tb-fix">Fix: {t.captured_fix}</small>}</span></li>)}
+              </ul>
+            </section>
+          ))}
+        </div>
+      </div>
+    ) : (
+      <div class="board" data-board style={`--cols:${COLS.filter((st) => p.tasks.some((t) => t.status === st)).length || 1}`}>
+        {COLS.map((st) => {
+          const ts = p.tasks.filter((t) => t.status === st);
+          return (
+            <div class={`col col-${st}`} data-col={st} hidden={ts.length === 0} data-help="project.column" data-help-name={TASK_STATUS[st]}>
+              <p class="col-h"><span>{TASK_STATUS[st]}</span><span class="num" data-count>{ts.length}</span></p>
+              <div class="col-cards" data-cards>
+                {ts.map((t) => (
+                  <article class="tk" data-live-task={t.id} data-status={t.status} data-owner={t.owner} data-title={t.title} data-blocked={t.blocked_by} draggable="true" data-help="project.card">
+                    <a class="tk-t" href={tHref(t)}>{t.title}</a>
+                    <span class="tk-m">{t.space && <span class="tk-room"><Icon name="room" size={12} />{spaceName(t.space)}</span>}{t.due && <span class:list={['mono', { late: t.status !== 'done' && t.due < DEMO_TODAY }]}>{t.status === 'done' ? short(t.due) : `Due ${short(t.due)}`}</span>}</span>
+                    <span class="tk-end">
+                      <button type="button" class="tk-st" data-lt-status aria-haspopup="menu" aria-expanded="false" data-help="project.status" title={t.blocked_by}><i class="tk-dot" aria-hidden="true"></i><span data-st-word>{TASK_STATUS[t.status]}</span></button>
+                      <button type="button" class="av tk-av" data-lt-owner aria-haspopup="dialog" aria-expanded="false" data-help="project.assign" aria-label={`Assigned to ${person(t.owner).name}. Change`} title={person(t.owner).name}>{person(t.owner).initials}</button>
+                    </span>
+                    <small class="tk-note" data-lt-note hidden></small>
+                  </article>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </div>
+
+  <div class="list tb-list" data-view-list hidden>
+    {listed.map((t) => (
+      <div class="row plain tk-row" data-live-task={t.id} data-status={t.status} data-owner={t.owner} data-title={t.title} data-help="project.card">
+        <span class="tk-rm">
+          <span class="tk-rt"><i class="tk-dot" aria-hidden="true"></i><a class="name" href={tHref(t)}>{t.title}</a></span>
+          <span class="sub">{[PHASE_LABEL[t.phase], t.space ? spaceName(t.space) : null].filter(Boolean).join(' · ')}</span>
+        </span>
+        <span class="end">
+          {t.due && <span class:list={['mono faint tk-due', { late: t.status !== 'done' && t.due < DEMO_TODAY }]}>{t.status === 'done' ? short(t.due) : `Due ${short(t.due)}`}</span>}
+          <button type="button" class="tk-st" data-lt-status aria-haspopup="menu" aria-expanded="false" data-help="project.status" title={t.blocked_by}><i class="tk-dot" aria-hidden="true"></i><span data-st-word>{TASK_STATUS[t.status]}</span></button>
+          <button type="button" class="av tk-av" data-lt-owner aria-haspopup="dialog" aria-expanded="false" data-help="project.assign" aria-label={`Assigned to ${person(t.owner).name}. Change`} title={person(t.owner).name}>{person(t.owner).initials}</button>
+        </span>
+      </div>
+    ))}
+  </div>
+  <details class="at-arch" data-at-arch hidden><summary>Archived tasks <span class="num" data-at-arch-n>0</span></summary><div data-at-arch-list></div></details>
+  <div class="tk-menu" data-tk-menu hidden role="menu" aria-label="Status"></div>
+</div>
+<PeoplePicker />
+
+<script is:inline data-astro-rerun>
+  (function () {
+    var tb = document.querySelector('[data-tb]'); if (!tb) return;
+    var STATUS = { todo: 'To do', doing: 'Doing', blocked: 'Blocked', done: 'Done' }, ORDER = ['todo', 'doing', 'blocked', 'done'];
+    var board = tb.querySelector('[data-board]'), menu = tb.querySelector('[data-tk-menu]');
+    var people = JSON.parse(tb.dataset.people || '[]');
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+    var M = function () { return window.rsMotion ? window.rsMotion() : { reduced: true, pop: 0, exit: 0, enter: 0, morph: 0, ease: 'ease', stagger: 0 }; };
+    var person = function (id) { return people.filter(function (x) { return x.id === id; })[0] || (window.RS_PEOPLE || []).filter(function (x) { return x.id === id; })[0] || { id: id, name: id, initials: String(id).slice(0, 2).toUpperCase() }; };
+    var elsOf = function (id) { return Array.prototype.slice.call(tb.querySelectorAll('[data-live-task="' + id + '"]')); };
+    var base = function (id) { var el = elsOf(id)[0]; return el ? { status: el.dataset.status, owner: el.dataset.owner } : {}; };
+    var time = function (at) { return new Date(at).toLocaleTimeString('en-IE', { hour: '2-digit', minute: '2-digit' }); };
+    var hold = function (fn) { if (window.rsHold) window.rsHold(tb, fn); else fn(); };
+
+    /* Columns: only the ones with work show; each says how many. While a card is being dragged every
+       column shows, so an empty one can take it. The band's Open tasks figure follows. */
+    var syncCols = function () {
+      if (!board) return;
+      board.querySelectorAll('[data-col]').forEach(function (c) {
+        var n = c.querySelectorAll('.tk:not(.leaving)').length;
+        c.querySelector('[data-count]').textContent = n;
+        c.hidden = n === 0 && !board.classList.contains('dragging');
+      });
+      board.style.setProperty('--cols', String(board.querySelectorAll('[data-col]:not([hidden])').length || 1));
+      var all = board.querySelectorAll('.tk:not(.leaving)').length, open = all - board.querySelectorAll('[data-col="done"] .tk:not(.leaving)').length;
+      var c = tb.querySelector('[data-tb-count]'); if (c) c.textContent = open + ' open of ' + all;
+      var blocked = board.querySelectorAll('[data-col="blocked"] .tk:not(.leaving)').length;
+      if (window.rsKeyNumber) window.rsKeyNumber('open', open, { label: blocked ? 'Open tasks, ' + blocked + ' blocked' : 'Open tasks', tone: blocked ? 'bad' : '' });
+    };
+    /* FLIP: remember where every card is, change the DOM, then slide each moved card from its old place. */
+    var flip = function (change) {
+      var m = M();
+      if (m.reduced || !board) { hold(function () { change(); syncCols(); }); return; }
+      var before = new Map();
+      board.querySelectorAll('.tk').forEach(function (c) { before.set(c, c.getBoundingClientRect()); });
+      var shown = new Set(); board.querySelectorAll('[data-col]:not([hidden])').forEach(function (c) { shown.add(c); });
+      hold(function () { change(); syncCols(); });
+      board.querySelectorAll('[data-col]:not([hidden])').forEach(function (c) { if (!shown.has(c)) c.animate([{ opacity: 0, transform: 'scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: m.enter, easing: m.ease }); });
+      board.querySelectorAll('.tk').forEach(function (c) {
+        var a = before.get(c), b = c.getBoundingClientRect(); if (!a) { c.animate([{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'none' }], { duration: m.enter, easing: m.ease }); return; }
+        var dx = a.left - b.left, dy = a.top - b.top, sx = a.width / b.width;
+        if (Math.abs(dx) + Math.abs(dy) < 1 && Math.abs(sx - 1) < 0.01) return;
+        c.style.transformOrigin = '0 0';
+        c.animate([{ transform: 'translate(' + dx + 'px,' + dy + 'px) scale(' + sx + ',1)' }, { transform: 'none' }], { duration: m.morph, easing: m.ease });
+      });
+    };
+    var placeCard = function (card, st) {
+      var col = board && board.querySelector('[data-col="' + st + '"] [data-cards]');
+      if (col && card.parentElement !== col) col.insertBefore(card, col.querySelector('.tk.added'));
+    };
+
+    var describe = function (e) {
+      var what = e.field === 'status' ? (e.after === 'done' ? 'Ticked done' : e.before === 'done' ? 'Reopened, back to ' + STATUS[e.after] : 'Moved to ' + STATUS[e.after])
+        : e.field === 'owner' ? 'Assigned to ' + person(e.after).name : e.field + ' changed';
+      return e.undoes ? e.note + ': ' + what.charAt(0).toLowerCase() + what.slice(1) : what;
+    };
+    var paint = function (L, id, fresh, remote) {
+      var item = 'task:' + id, st = L.live.stateOf(item, base(id)), els = elsOf(id);
+      var last = L.live.historyOf(item)[0];
+      var apply = function () {
+        els.forEach(function (el) {
+          el.setAttribute('data-status', st.status);
+          var w = el.querySelector('[data-st-word]'); if (w) w.textContent = STATUS[st.status];
+          var av = el.querySelector('[data-lt-owner]'); if (av) { av.textContent = person(st.owner).initials; av.title = person(st.owner).name; av.setAttribute('aria-label', 'Assigned to ' + person(st.owner).name + '. Change'); }
+          var note = el.querySelector('[data-lt-note]'); if (note) { note.hidden = !last; if (last) note.textContent = describe(last) + ': ' + person(last.who).name + ', ' + time(last.at); }
+        });
+      };
+      var card = els.filter(function (el) { return el.classList.contains('tk'); })[0];
+      var moves = card && board && card.closest('[data-col]') && card.closest('[data-col]').dataset.col !== st.status;
+      if (moves && fresh) flip(function () { apply(); placeCard(card, st.status); });
+      else { apply(); if (moves) { placeCard(card, st.status); syncCols(); } }
+      if (fresh && remote && window.rsMarkChanged) els.forEach(function (el) { window.rsMarkChanged(el, last ? person(last.who).name : ''); });
+      else if (fresh) els.forEach(function (el) { el.classList.remove('lt-flash'); void el.offsetWidth; el.classList.add('lt-flash'); });
+    };
+
+    /* The status menu grows from the status word; a pick records the change. */
+    var menuFor = null, closing = null;
+    var closeMenu = function (back) {
+      if (menu.hidden) return; var m = M(), b = menuFor; menuFor = null;
+      if (b) b.setAttribute('aria-expanded', 'false');
+      var done = function () { menu.hidden = true; closing = null; if (back && b) b.focus({ preventScroll: true }); };
+      if (m.reduced) done(); else { closing = menu.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.7)' }], { duration: m.exit, easing: m.ease, fill: 'forwards' }); closing.onfinish = done; }
+    };
+    var openMenu = function (btn, current, opts) {
+      if (closing) { closing.cancel(); closing = null; }
+      if (menuFor === btn) { closeMenu(true); return; }
+      menuFor = btn; btn.setAttribute('aria-expanded', 'true');
+      menu.innerHTML = ORDER.map(function (s) { return '<button type="button" role="menuitemradio" aria-checked="' + (s === current) + '" data-tk-set="' + s + '"><i class="tk-dot" data-s="' + s + '"></i>' + STATUS[s] + '</button>'; }).join('') + (opts && opts.extra ? opts.extra : '');
+      menu.hidden = false;
+      var r = btn.getBoundingClientRect(), h = menu.offsetHeight, below = innerHeight - r.bottom > h + 10;
+      var left = Math.max(8, Math.min(r.left, innerWidth - menu.offsetWidth - 8));
+      menu.style.left = left + 'px'; menu.style.top = (below ? r.bottom + 4 : r.top - h - 4) + 'px';
+      menu.style.transformOrigin = (r.left - left + 12) + 'px ' + (below ? '0' : '100%');
+      var m = M(); if (!m.reduced) menu.animate([{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'none' }], { duration: m.pop, easing: m.ease });
+      setTimeout(function () { var c = menu.querySelector('[aria-checked=true]') || menu.querySelector('button'); if (c) c.focus({ preventScroll: true }); }, 0);
+    };
+
+    var stop = null, L = null;
+    var go = function () {
+      L = window.rsLive; if (!L || !document.body.contains(tb)) return;
+      L.register('task:', { base: function (item) { return base(item.replace(/^task:/, '')); }, describe: describe });
+      var ids = {}; tb.querySelectorAll('[data-live-task]').forEach(function (el) { ids[el.dataset.liveTask] = 1; });
+      Object.keys(ids).forEach(function (id) { paint(L, id, false); });
+      syncCols();
+      if (stop) stop();
+      stop = L.live.subscribe('task:', function (e, info) { var id = e.item.replace(/^task:/, ''); if (elsOf(id).length) paint(L, id, true, info && info.remote); });
+      document.addEventListener('astro:before-swap', function () { if (stop) stop(); stop = null; }, { once: true });
+    };
+    var record = function (id, field, after) {
+      if (!L) return; var item = 'task:' + id, now = L.live.stateOf(item, base(id));
+      if (now[field] === after) return;
+      L.live.record({ item: item, field: field, before: now[field], after: after, who: L.who() });
+    };
+    var handle = {
+      paint: paint, syncCols: syncCols, flip: flip, record: record, openMenu: openMenu, closeMenu: closeMenu, menu: menu, tb: tb, board: board, people: people, person: person, esc: esc, M: M, hold: hold,
+      state: function (id) { return L ? L.live.stateOf('task:' + id, base(id)) : base(id); }, live: function () { return L; },
+    };
+    window.__rsTb = handle;
+    if (window.rsLive) go(); else document.addEventListener('rs:live-ready', go, { once: true });
+
+    /* The view switch: Board (or Summary) | List, remembered. */
+    var VKEY = 'rs5-project-tasks-view';
+    var setView = function (v, animate) {
+      var swap = function () {
+        tb.querySelectorAll('[data-tv]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.tv === v)); });
+        tb.querySelector('[data-view-board]').hidden = v !== 'board'; tb.querySelector('[data-view-list]').hidden = v !== 'list';
+      };
+      if (animate && window.rsMorphPanels) { var cur = tb.querySelector('[data-view-board]:not([hidden]), [data-view-list]:not([hidden])'), next = tb.querySelector(v === 'board' ? '[data-view-board]' : '[data-view-list]'); if (cur !== next) window.rsMorphPanels(cur, next, swap); else swap(); } else swap();
+      try { localStorage.setItem(VKEY, v); } catch (_) {}
+    };
+    var v0 = 'board'; try { v0 = localStorage.getItem(VKEY) || 'board'; } catch (_) {}
+    if (v0 === 'list') setView('list', false);
+
+    if (!window.__rsTbHook) {
+      window.__rsTbHook = true;
+      document.addEventListener('click', function (e) {
+        var H = window.__rsTb; if (!H || !document.body.contains(H.tb)) return;
+        var t = e.target;
+        var tv = t.closest('[data-tv]'); if (tv && H.tb.contains(tv)) { setView(tv.dataset.tv, true); return; }
+        var set = t.closest('[data-tk-set]');
+        if (set && H.menu.contains(set)) { var id = menuFor && menuFor.closest('[data-live-task]') ? menuFor.closest('[data-live-task]').dataset.liveTask : null; var added = menuFor && menuFor.closest('[data-added-id]'); closeMenu(true); if (added && window.__rsAt) window.__rsAt.setStatus(added.dataset.addedId, set.dataset.tkSet); else if (id) H.record(id, 'status', set.dataset.tkSet); return; }
+        var act = t.closest('[data-tk-act]'); if (act && H.menu.contains(act)) { var host = menuFor && menuFor.closest('[data-added-id]'); closeMenu(true); if (host && window.__rsAt) window.__rsAt.act(host.dataset.addedId, act.dataset.tkAct); return; }
+        if (!H.menu.hidden && !H.menu.contains(t) && !(menuFor && menuFor.contains(t))) closeMenu(false);
+        var stb = t.closest('[data-lt-status]');
+        if (stb && H.tb.contains(stb)) {
+          var host2 = stb.closest('[data-live-task]'), added2 = stb.closest('[data-added-id]');
+          var cur = host2 ? H.state(host2.dataset.liveTask).status : added2 ? added2.dataset.status : 'todo';
+          H.openMenu(stb, cur, added2 ? { extra: '<span class="tk-menu-rule"></span><button type="button" role="menuitem" data-tk-act="archive">Archive</button>' } : null); return;
+        }
+        var ob = t.closest('[data-lt-owner]');
+        if (ob && H.tb.contains(ob) && window.rsPeoplePicker) {
+          var host3 = ob.closest('[data-live-task]'), added3 = ob.closest('[data-added-id]');
+          var curO = host3 ? H.state(host3.dataset.liveTask).owner : added3 ? added3.dataset.owner : null;
+          window.rsPeoplePicker.open(ob, { people: H.people, current: curO, title: 'Assign to', onPick: function (pid) { if (host3) H.record(host3.dataset.liveTask, 'owner', pid); else if (added3 && window.__rsAt) window.__rsAt.setOwner(added3.dataset.addedId, pid); } });
+          return;
+        }
+        var hb = t.closest('[data-lt-history]'); if (hb && H.tb.contains(hb) && H.live()) { var h = hb.closest('[data-live-task]'); H.live().history('task:' + h.dataset.liveTask, h.dataset.liveTask + ' ' + h.dataset.title); }
+      });
+      document.addEventListener('keydown', function (e) {
+        var H = window.__rsTb; if (!H || H.menu.hidden) return;
+        if (e.key === 'Escape') { e.preventDefault(); closeMenu(true); }
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { var items = Array.prototype.slice.call(H.menu.querySelectorAll('button')), i = items.indexOf(document.activeElement); e.preventDefault(); items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus(); }
+      });
+      /* Drag a card to another column. Every column shows while dragging. */
+      var dragId = null;
+      document.addEventListener('dragstart', function (e) {
+        var H = window.__rsTb; var card = e.target.closest && e.target.closest('.tk'); if (!H || !card || !H.board || !H.board.contains(card)) return;
+        dragId = card.dataset.liveTask || card.dataset.addedId; card.classList.add('dragging');
+        try { e.dataTransfer.setData('text/plain', dragId); e.dataTransfer.effectAllowed = 'move'; } catch (_) {}
+        H.hold(function () { H.board.classList.add('dragging'); H.syncCols(); });
+      });
+      document.addEventListener('dragover', function (e) { var H = window.__rsTb; var col = e.target.closest && e.target.closest('[data-col]'); if (!H || !dragId || !col) return; e.preventDefault(); H.board.querySelectorAll('.over').forEach(function (c) { if (c !== col) c.classList.remove('over'); }); col.classList.add('over'); });
+      document.addEventListener('dragleave', function (e) { var col = e.target.closest && e.target.closest('[data-col]'); if (col && !col.contains(e.relatedTarget)) col.classList.remove('over'); });
+      document.addEventListener('drop', function (e) {
+        var H = window.__rsTb; var col = e.target.closest && e.target.closest('[data-col]'); if (!H || !dragId || !col) return;
+        e.preventDefault(); var id = dragId, st = col.dataset.col;
+        var card = H.board.querySelector('.tk.dragging'); var added = card && card.dataset.addedId;
+        if (added && window.__rsAt) window.__rsAt.setStatus(added, st); else H.record(id, 'status', st);
+      });
+      document.addEventListener('dragend', function () {
+        var H = window.__rsTb; if (!H || !H.board) return; dragId = null;
+        H.board.querySelectorAll('.dragging, .over').forEach(function (c) { c.classList.remove('dragging', 'over'); });
+        H.hold(function () { H.syncCols(); });
+      });
+    }
+  })();
+  (function () {
+    /* Added tasks: kept in this browser (rs4-added-tasks); a suggestion for the playbook is a proposed
+       change on the Changes page (rs4-changes). Archive, never delete. */
+    var KEY = 'rs4-added-tasks', form = document.querySelector('[data-at-form]'), tb = document.querySelector('[data-tb]');
+    if (!form || !tb) return;
+    var cfg = JSON.parse(form.dataset.cfg), wrap = document.querySelector('[data-at-wrap]'), noteEl = document.querySelector('[data-at-note]'), board = tb.querySelector('[data-board]'), list = tb.querySelector('[data-view-list]');
+    var S = window.rsStore, H = function () { return window.__rsTb; };
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+    var all = function () { return S.get(KEY, []); };
+    var mine = function () { return all().filter(function (t) { return t.project === cfg.project; }); };
+    var save = function (l) { S.put(KEY, l); };
+    var byId = function (id) { return mine().filter(function (t) { return t.id === id; })[0]; };
+    var upd = function (id, fn) { var l = all(); l.forEach(function (t) { if (t.id === id && t.project === cfg.project) fn(t); }); save(l); };
+    var fmt = function (d) { return d ? new Date(d).toLocaleDateString('en-IE', { day: 'numeric', month: 'short' }) : ''; };
+    var STATUS = { todo: 'To do', doing: 'Doing', blocked: 'Blocked', done: 'Done' };
+    var changeState = function (t) { var c = t.changeId ? S.get('rs4-changes', []).filter(function (x) { return x.id === t.changeId; })[0] : null; return c ? c.status : null; };
+    var CH = { review: 'waiting for review', approved: 'approved', merged: 'in the playbook', changes: 'changes asked for', withdrawn: 'withdrawn' };
+    var pName = function (id) { return H() ? H().person(id) : { name: id, initials: '' }; };
+    var st = function (t) { return STATUS[t.status] ? t.status : 'todo'; };
+    var cardHtml = function (t) {
+      var cs = t.mode === 'suggest' ? changeState(t) : null, s = st(t);
+      return '<article class="tk added" data-added-id="' + esc(t.id) + '" data-status="' + s + '" data-owner="' + esc(t.owner) + '" draggable="true" data-help="project.card">' +
+        '<span class="tk-t">' + esc(t.title) + '<span class="t-badge added">Added</span>' + (t.mode === 'optional' ? '<span class="t-badge opt">Optional</span>' : '') + '</span>' +
+        '<span class="tk-m">' + (t.aboutLabel ? '<span class="tk-room">' + esc(t.aboutLabel) + '</span>' : '') + (t.due ? '<span class="mono">Due ' + fmt(t.due) + '</span>' : '') + '</span>' +
+        (t.mode === 'suggest' ? '<small class="tk-sugg">Suggested for the playbook' + (cs ? ': ' + esc(CH[cs] || cs) : '') + '</small>' : '') +
+        '<span class="tk-end"><button type="button" class="tk-st" data-lt-status aria-haspopup="menu" aria-expanded="false" data-help="project.status"><i class="tk-dot" aria-hidden="true"></i><span data-st-word>' + STATUS[s] + '</span></button>' +
+        '<button type="button" class="av tk-av" data-lt-owner aria-haspopup="dialog" aria-expanded="false" data-help="project.assign" aria-label="Assigned to ' + esc(pName(t.owner).name) + '. Change" title="' + esc(pName(t.owner).name) + '">' + esc(pName(t.owner).initials) + '</button></span>' +
+        '<small class="tk-note">Added by ' + esc(t.addedBy) + '</small></article>';
+    };
+    var rowHtml = function (t) {
+      var s = st(t);
+      return '<div class="row plain tk-row added" data-added-id="' + esc(t.id) + '" data-status="' + s + '" data-owner="' + esc(t.owner) + '"><span class="tk-rm"><span class="tk-rt"><i class="tk-dot" aria-hidden="true"></i><span class="name">' + esc(t.title) + '<span class="t-badge added">Added</span></span></span><span class="sub">' + esc(t.aboutLabel || 'Added by ' + t.addedBy) + '</span></span>' +
+        '<span class="end">' + (t.due ? '<span class="mono faint tk-due">Due ' + fmt(t.due) + '</span>' : '') + '<button type="button" class="tk-st" data-lt-status aria-haspopup="menu" aria-expanded="false" data-help="project.status"><i class="tk-dot" aria-hidden="true"></i><span data-st-word>' + STATUS[s] + '</span></button><button type="button" class="av tk-av" data-lt-owner aria-haspopup="dialog" aria-expanded="false" data-help="project.assign" aria-label="Assigned to ' + esc(pName(t.owner).name) + '. Change">' + esc(pName(t.owner).initials) + '</button></span></div>';
+    };
+    var render = function () {
+      tb.querySelectorAll('.added').forEach(function (n) { n.remove(); });
+      var live = mine().filter(function (t) { return !t.archived; }), arch = mine().filter(function (t) { return t.archived; });
+      live.forEach(function (t) {
+        if (board) { var col = board.querySelector('[data-col="' + st(t) + '"] [data-cards]'); if (col) col.insertAdjacentHTML('beforeend', cardHtml(t)); }
+        if (list) list.insertAdjacentHTML('beforeend', rowHtml(t));
+      });
+      var box = tb.querySelector('[data-at-arch]');
+      box.hidden = !arch.length; box.querySelector('[data-at-arch-n]').textContent = arch.length;
+      box.querySelector('[data-at-arch-list]').innerHTML = arch.map(function (t) { return '<div class="at-ar" data-added-id="' + esc(t.id) + '"><span><b>' + esc(t.title) + '</b><small>' + esc(t.id) + (t.mode === 'suggest' ? ' · playbook suggestion withdrawn' : '') + '</small></span><button type="button" class="btn small ghost" data-at-act="restore">Put back</button></div>'; }).join('');
+      if (H()) H().syncCols();
+    };
+    var say = function (html, undoId) {
+      noteEl.hidden = false; noteEl.innerHTML = html + (undoId ? ' <button type="button" class="at-undo" data-at-undo="' + esc(undoId) + '">Undo</button>' : '');
+      noteEl.classList.remove('pop'); void noteEl.offsetWidth; noteEl.classList.add('pop');
+    };
+    var setOpen = function (open) {
+      wrap.classList.toggle('open', open); form.inert = !open;
+      var b = document.querySelector('[data-at-open]'); if (b) b.setAttribute('aria-expanded', String(open));
+      if (open) { var w = window.rsWho(), o = form.querySelector('[name=owner]'), me = o.querySelector('[value="' + w.id + '"]');
+        if (!me) { me = document.createElement('option'); me.value = w.id; me.dataset.label = w.name; me.textContent = w.name + ' (you)'; o.insertBefore(me, o.firstChild); }
+        o.value = w.id; setTimeout(function () { form.querySelector('[name=title]').focus({ preventScroll: true }); }, 120); }
+    };
+    var rerender = function () { if (H()) H().flip(render); else render(); };
+    window.__rsAt = {
+      open: setOpen, render: render, form: form, cfg: cfg, save: save, all: all, mine: mine, byId: byId, upd: upd, say: say, S: S,
+      setStatus: function (id, s) { upd(id, function (x) { x.status = s; if (s === 'done') { x.doneAt = new Date().toISOString().slice(0, 10); x.doneBy = window.rsWho().name; } }); rerender(); },
+      setOwner: function (id, pid) { upd(id, function (x) { x.owner = pid; x.ownerName = pName(pid).name; x.ownerInitials = pName(pid).initials; }); rerender(); },
+      act: function (id, act) {
+        var t = byId(id); if (!t) return;
+        if (act === 'archive') { upd(id, function (x) { x.archived = true; }); if (t.changeId) window.rsSetChange(t.changeId, 'withdrawn'); rerender(); say('Archived "' + esc(t.title) + '". You can put it back from Archived tasks below.'); }
+        else if (act === 'restore') { upd(id, function (x) { x.archived = false; }); if (t.changeId) window.rsSetChange(t.changeId, 'review'); rerender(); }
+      },
+    };
+    render();
+    if (!window.__rsAddedTasksHook) {
+      window.__rsAddedTasksHook = true;
+      document.addEventListener('click', function (e) {
+        var A = window.__rsAt; if (!A || !document.body.contains(A.form)) return;
+        var t = e.target;
+        if (t.closest('[data-at-open]')) { A.open(!A.form.closest('[data-at-wrap]').classList.contains('open')); return; }
+        if (t.closest('[data-at-cancel]')) { A.open(false); return; }
+        var u = t.closest('[data-at-undo]');
+        if (u) { var id = u.dataset.atUndo, task = A.byId(id); if (task) { A.upd(id, function (x) { x.archived = true; }); if (task.changeId) window.rsSetChange(task.changeId, 'withdrawn'); } A.render(); A.say('Undone. "' + (task ? esc(task.title) : 'The task') + '" is in Archived tasks if you want it back.'); return; }
+        var b = t.closest('[data-at-act]'); if (!b) return;
+        A.act(b.closest('[data-added-id]').dataset.addedId, b.dataset.atAct);
+      });
+      document.addEventListener('submit', function (e) {
+        var A = window.__rsAt; if (!A || e.target !== A.form) return;
+        e.preventDefault();
+        var f = A.form, title = f.querySelector('[name=title]').value.trim(), err = f.querySelector('[data-at-err]');
+        if (!title) { err.hidden = false; f.querySelector('[name=title]').focus(); return; }
+        err.hidden = true;
+        var aboutSel = f.querySelector('[name=about]'), aboutOpt = aboutSel.options[aboutSel.selectedIndex], ownerSel = f.querySelector('[name=owner]');
+        var ownerId = ownerSel.value, owner = (window.RS_PEOPLE || []).filter(function (p) { return p.id === ownerId; })[0] || { name: ownerSel.options[ownerSel.selectedIndex].dataset.label, initials: '' };
+        var mode = f.querySelector('[name=mode]:checked').value, who = window.rsWho();
+        var l = A.all(), n = l.filter(function (t) { return t.project === A.cfg.project; }).length + 1;
+        var task = { id: 'ADD-' + n, project: A.cfg.project, title: title, about: aboutSel.value, aboutLabel: aboutSel.value ? aboutOpt.dataset.label : '', owner: ownerId, ownerName: owner.name, ownerInitials: owner.initials, due: f.querySelector('[name=due]').value, mode: mode, status: 'todo', archived: false, addedBy: who.name, addedAt: new Date().toISOString(), phase: A.cfg.phase };
+        if (mode === 'suggest' && A.cfg.pb) {
+          var role = ((window.RS_PEOPLE || []).filter(function (p) { return p.id === ownerId; })[0] || {}).roleId || 'delivery';
+          var stepRole = { 'eng-manager': 'delivery', 'pm-manager': 'pm', 'tech-manager': 'tech', 'delivery-manager': 'pm' }[role] || role;
+          var ch = window.rsPropose({ kind: 'playbook', title: 'Add a step to the ' + A.cfg.pbName + ' playbook: ' + title, path: 'data/playbooks/' + A.cfg.pb + '.yaml', change: 'adds a step to ' + A.cfg.phaseLabel + ', version ' + A.cfg.ver + ' to ' + A.cfg.next,
+            approver: A.cfg.approver, project: A.cfg.project, note: 'Suggested from ' + A.cfg.project + ' ' + A.cfg.name + (task.aboutLabel ? ', about ' + task.aboutLabel : '') + '. It is already on that project as a one-off.',
+            text: '  - phase: ' + A.cfg.phase + '\n    steps:\n+     - { title: "' + title.replace(/"/g, "'") + '", role: ' + stepRole + (task.aboutLabel ? ', note: "' + task.aboutLabel.replace(/"/g, "'") + '"' : '') + ' }\n' });
+          task.changeId = ch.id;
+        }
+        l.push(task); A.save(l);
+        if (window.__rsTb) window.__rsTb.flip(A.render); else A.render();
+        f.reset(); A.open(false);
+        A.say('Added "' + esc(title) + '" to To do.' + (task.changeId ? ' Sent to ' + esc(A.cfg.approverNames) + ' as ' + task.changeId + '. <a href="' + A.cfg.changes + '#' + task.changeId.toLowerCase() + '">See it on Changes</a>.' : ''), task.id);
+      });
+      document.addEventListener('rs:demo-change', function () { var A = window.__rsAt; if (!A || !document.body.contains(A.form)) return; window.rsHold(A.form.closest('[data-tb]'), function () { A.open(false); A.render(); }); });
+    }
+  })();
+</script>
+<style is:global set:html={`.btn.at-open { display: none; } ${adderCss}`}></style>
+<style is:global>
+  .tb { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .tb > * { min-width: 0; }
+  .tb-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+  .tb-views { display: inline-flex; height: 34px; padding: 3px; gap: 2px; border-radius: var(--pill-radius); border: 1px solid var(--line); background: var(--surface); }
+  .tb-view { appearance: none; border: 0; background: none; padding: 0 12px; border-radius: var(--pill-radius); font: 600 13px/1 var(--font-sans); color: var(--text-2); cursor: pointer; transition: background var(--dur-state) var(--ease-settle), color var(--dur-state) var(--ease-settle); }
+  .tb-view:hover { color: var(--text); background: var(--surface-2); }
+  .tb-view[aria-pressed=true] { background: var(--ink); color: var(--on-ink); }
+  .tb-count { font-size: 13px; }
+  .at-open { margin-left: auto; gap: 6px; align-items: center; }
+  /* The board: only columns with work, each as wide as the room allows up to a card's comfortable width. */
+  .board { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; max-width: calc(var(--cols, 4) * 350px + (var(--cols, 4) - 1) * 10px); }
+  .board.dragging .col[hidden] { display: grid; border: 2px dashed var(--line-strong); background: transparent; }
+  .col { display: grid; gap: 8px; align-content: start; padding: 10px; border-radius: var(--radius-lg); background: var(--surface-2); transition: background var(--dur-state), box-shadow var(--dur-state); }
+  .col.over { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+  .col-h { margin: 0 0 2px; display: flex; justify-content: space-between; font: 700 11px/1.2 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); }
+  .col-blocked .col-h { color: var(--red-ink); }
+  .col-cards { display: grid; gap: 8px; }
+  .tk { display: grid; gap: 6px; padding: 10px 12px; background: var(--surface); border: var(--border-card); border-radius: var(--radius); position: relative; transition: box-shadow var(--dur-state) var(--ease-settle), opacity var(--dur-state); cursor: grab; }
+  .tk:hover { box-shadow: var(--shadow-md, var(--shadow-sm)); }
+  .tk.dragging { opacity: .45; cursor: grabbing; }
+  :root[data-look="classic"] .tk { border: 1.5px solid var(--ink); box-shadow: 2px 2px 0 var(--ink); }
+  .tk.added { border-style: dashed; }
+  .tk-t { font-weight: 650; font-size: 13.5px; line-height: 1.3; color: inherit; text-decoration: none; }
+  .tk-t:hover { text-decoration: underline; color: inherit; }
+  [data-status=done] .tk-t, [data-status=done] .name { color: var(--text-2); }
+  .tk-m { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11.5px; color: var(--text-3); align-items: center; }
+  .tk-room { display: inline-flex; align-items: center; gap: 4px; color: var(--text-2); }
+  .tk-m .late, .tk-due.late { color: var(--red-ink); font-weight: 700; }
+  .tk-end { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .tk-st { appearance: none; border: 1px solid var(--line); background: var(--surface); padding: 4px 9px 4px 7px; border-radius: 999px; font: 600 11.5px/1 var(--font-sans); color: var(--text-2); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: background var(--dur-hover), border-color var(--dur-hover), color var(--dur-state); }
+  .tk-st:hover, .tk-st[aria-expanded=true] { background: var(--surface-2); border-color: var(--line-strong); color: var(--text); }
+  .tk-st:focus-visible, .tk-av:focus-visible { outline: 2px solid var(--focus, var(--ink)); outline-offset: 2px; }
+  .tk-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--surface); box-shadow: inset 0 0 0 1.5px var(--line-strong); flex: none; transition: background var(--dur-state) var(--ease-settle), box-shadow var(--dur-state); }
+  [data-status=doing] .tk-dot, .tk-dot[data-s=doing] { background: var(--ph-now); box-shadow: none; }
+  [data-status=blocked] .tk-dot, .tk-dot[data-s=blocked] { background: var(--red); box-shadow: none; }
+  [data-status=done] .tk-dot, .tk-dot[data-s=done] { background: var(--ph-done); box-shadow: none; }
+  [data-status=blocked] .tk-st { color: var(--red-ink); border-color: color-mix(in srgb, var(--red) 40%, transparent); }
+  .tk-av { appearance: none; border: 2px solid var(--surface); width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; padding: 0; font: 700 10px/1 var(--font-mono); background: var(--surface-3); color: var(--text); cursor: pointer; transition: transform var(--dur-hover) var(--ease-settle), box-shadow var(--dur-hover); }
+  .tk-av:hover, .tk-av[aria-expanded=true] { transform: scale(1.1); box-shadow: 0 0 0 2px var(--accent); }
+  :root[data-look="classic"] .tk-av { background: var(--yellow); color: #15161B; border-color: var(--ink); border-width: 1.5px; }
+  .tk-note { font-size: 11px; color: var(--text-3); } .tk-note[hidden] { display: none; }
+  .tk-sugg { font-size: 11.5px; color: var(--violet-ink); }
+  .tk.lt-flash, .tk-row.lt-flash { animation: lt-flash var(--dur-linger) var(--ease-settle); }
+  @keyframes lt-flash { 0% { box-shadow: 0 0 0 3px var(--ph-now, #e0a100); } 100% { box-shadow: 0 0 0 0 transparent; } }
+  .tk .rs-changed-mark { position: absolute; top: -9px; right: 8px; }
+  /* The list: one row per task, status and owner at the end, the same controls as the card. */
+  .tk-row { grid-template-columns: minmax(0, 1fr) auto; padding: 10px 18px; }
+  .tk-rm { display: grid; gap: 2px; min-width: 0; }
+  .tk-rt { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .tk-rt .name { color: inherit; text-decoration: none; }
+  .tk-rt .name:hover { text-decoration: underline; }
+  .tk-row .end { gap: 10px; }
+  .tk-due { font-size: 12px; }
+  .tk-row .rs-changed-mark { margin-left: 0; }
+  /* The status menu, grown from the status word. */
+  .tk-menu { position: fixed; z-index: 70; display: grid; gap: 2px; min-width: 150px; padding: 6px; background: var(--surface); border: var(--border-card); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); }
+  .tk-menu[hidden] { display: none; }
+  :root[data-look="classic"] .tk-menu { border: 2px solid var(--ink); }
+  .tk-menu button { appearance: none; border: 0; background: none; font: 600 13px/1.2 var(--font-sans); color: var(--text); text-align: left; display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: var(--radius); cursor: pointer; }
+  .tk-menu button:hover, .tk-menu button:focus-visible { background: var(--surface-2); outline: none; }
+  .tk-menu button[aria-checked=true] { background: var(--accent-soft); color: var(--accent-ink); }
+  .tk-menu-rule { display: block; height: 1px; margin: 4px 6px; background: var(--line); }
+  /* A closed project: what was done, by phase, and the lessons learned. */
+  .tb-sum { display: grid; gap: 14px; }
+  .tb-less { padding: 14px 18px; display: grid; gap: 8px; background: var(--green-soft); border-color: color-mix(in srgb, var(--green) 35%, transparent); }
+  .tb-less-h { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font: 700 14px/1.2 var(--font-sans); color: var(--green-ink); }
+  .tb-less-h .faint { font: 500 12.5px/1.2 var(--font-sans); }
+  .tb-less-l { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .tb-less-l li { display: grid; gap: 2px; padding-left: 12px; border: 1px solid color-mix(in srgb, var(--green) 55%, transparent); }
+  .tb-less-l q { quotes: '"' '"'; font-size: 14px; color: var(--text); }
+  .tb-less-l small { font-size: 12px; color: var(--text-2); } .tb-less-l small a { color: inherit; }
+  .tb-ph { gap: 8px; }
+  .tb-ph h3 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .tb-ph h3 .num { font: 500 11px/1.2 var(--font-mono); letter-spacing: 0; text-transform: none; }
+  .tb-ph-w { margin: 0; font-size: 12.5px; color: var(--text-2); }
+  .tb-ph-l { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .tb-ph-l li { display: grid; grid-template-columns: 9px minmax(0, 1fr); gap: 9px; align-items: start; font-size: 13.5px; }
+  .tb-ph-l li .tk-dot { margin-top: 5px; }
+  .tb-ph-l a { color: inherit; text-decoration: none; font-weight: 600; } .tb-ph-l a:hover { text-decoration: underline; }
+  .tb-ph-l small { display: block; font-size: 12px; color: var(--text-3); }
+  .tb-ph-l small.tb-fix { color: var(--green-ink); }
+  /* Add a task. */
+  .at-wrap { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--dur-morph) var(--ease-settle), margin var(--dur-morph) var(--ease-settle); margin: 0; }
+  .at-wrap.open { grid-template-rows: 1fr; margin: 0 0 4px; }
+  .at-wrap > .at-form { min-height: 0; overflow: hidden; visibility: hidden; opacity: 0; transition: opacity var(--dur-state), padding var(--dur-morph) var(--ease-settle), visibility 0s linear var(--dur-morph); display: grid; gap: 12px; padding: 0 18px; border-width: 0; box-shadow: none; }
+  .at-wrap.open > .at-form { visibility: visible; opacity: 1; padding: 16px 18px; border-width: 1px; box-shadow: var(--shadow-sm); transition: opacity var(--dur-state) 80ms, padding var(--dur-morph) var(--ease-settle), visibility 0s; }
+  :root[data-look="classic"] .at-wrap.open > .at-form { border: 2px solid var(--ink); }
+  .at-h h3 { margin: 0 0 2px; font-size: 18px; } .at-h p { margin: 0; font-size: 13.5px; }
+  .at-form .ef { display: grid; gap: 4px; }
+  .at-form .ef-l { font: 700 11px/1.2 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }
+  .at-form input:not([type=radio]), .at-form select { width: 100%; box-sizing: border-box; font: 500 14px/1.35 var(--font-sans); padding: 9px 10px; border-radius: 8px; border: 1.5px solid var(--line-strong); background: var(--surface); color: var(--text); }
+  .at-form input:focus, .at-form select:focus { outline: 3px solid var(--focus); outline-offset: 1px; }
+  .at-form .ef-2 { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 10px; }
+  .at-modes { border: 0; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .at-modes legend { padding: 0; margin-bottom: 2px; }
+  .at-mode { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 10px; align-items: start; padding: 9px 12px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--surface); cursor: pointer; transition: border-color var(--dur-state), background var(--dur-state); }
+  .at-mode:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+  .at-mode:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 1px; }
+  .at-mode b { display: block; font-size: 14px; } .at-mode small { display: block; font-size: 12.5px; color: var(--text-2); }
+  .at-mode input { margin-top: 3px; accent-color: var(--accent); }
+  .at-err { margin: 0; font-size: 13px; color: var(--red-ink); }
+  .at-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+  .at-note { margin: 0; padding: 9px 12px; border-radius: 10px; background: var(--green-soft); color: var(--green-ink); font-size: 13.5px; }
+  .at-note[hidden] { display: none; }
+  .at-note.pop { animation: rise var(--dur-enter, 440ms) var(--ease-settle); }
+  .at-note a { color: inherit; text-decoration: underline; font-weight: 650; }
+  .at-undo { appearance: none; border: 0; background: none; padding: 0 2px; font: 700 13.5px var(--font-sans); color: inherit; text-decoration: underline; cursor: pointer; }
+  .t-badge { display: inline-block; margin-left: 6px; padding: 2px 6px; border-radius: 999px; font: 700 9.5px/1.2 var(--font-sans); letter-spacing: .04em; text-transform: uppercase; vertical-align: 1px; }
+  .t-badge.added { background: var(--accent-soft); color: var(--accent-ink); border: 1px dashed var(--accent); }
+  .t-badge.opt { background: var(--surface-2); color: var(--text-2); border: 1px solid var(--line-strong); }
+  .at-arch { font-size: 13px; color: var(--text-2); } .at-arch summary { cursor: pointer; } .at-arch[hidden] { display: none; }
+  .at-ar { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); } .at-ar small { display: block; color: var(--text-3); }
+  @container content (max-width: 599px) { .at-form .ef-2 { grid-template-columns: 1fr; } .board { grid-template-columns: minmax(0, 1fr); } .tk-row { grid-template-columns: minmax(0, 1fr); } .tk-row .end { justify-content: flex-start; } }
+  @media (prefers-reduced-motion: reduce) { .at-wrap, .at-wrap > .at-form { transition: none; } .at-note.pop { animation: none; } .tk.lt-flash, .tk-row.lt-flash { animation: none; } }
+</style>

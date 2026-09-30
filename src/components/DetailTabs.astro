@@ -1,0 +1,144 @@
+---
+/* DetailTabs: secondary detail in tabs, when a page has more than four sections of it
+   (docs/rules/layout.md, L1). Pages never write their own tab script again.
+   Props:  tabs     [{ id, label, count? }]; `id` is the panel's slot name and its address (#id)
+           label    what the tabs are, for screen readers (default "Details")
+           initial  the tab shown first (default: the first)
+           param    a query name that can also open a tab: with param="kind", /edit/?kind=profile opens the
+                    "profile" tab (default "tab", so ?tab=wiring works everywhere). The #id wins if both are
+                    there. A value that is not a tab is ignored.
+   Slots:  one per tab, named by its id:  <div slot="wiring">...</div>  (or slot="wiring" on a component)
+   Behaviour:
+     - The address follows the tab (#wiring), without a jump or a history entry; opening the page at
+       #wiring (or ?tab=wiring), following a link to it (a KeyNumbers item with to: '#wiring'), or Back,
+       shows that tab.
+     - Switching holds the page still (window.rsHold, M6: the box keeps its height through the swap, then
+       eases to the new tab's height) and morphs the panels (window.rsMorphPanels): shared things keyed by
+       data-vk move, new ones grow in, the next panel comes from the side you moved towards (M5). The
+       marker slides (--dur-morph, like every selection marker, M12). Reduced motion: it all changes at once (M7).
+     - Arrow keys, Home and End move between tabs.
+   Events: the element fires "dt:change" with detail { id }; el.rsTabs.select(id) switches from a script. */
+interface Tab { id: string; label: string; count?: number | string }
+interface Props { tabs: Tab[]; label?: string; initial?: string; param?: string; class?: string }
+const { tabs = [], label = 'Details', initial, param = 'tab', class: cls } = Astro.props;
+const first = initial ?? tabs[0]?.id;
+const panels = await Promise.all(tabs.map(async (t) => ({ ...t, html: Astro.slots.has(t.id) ? await Astro.slots.render(t.id) : '' })));
+---
+<div class:list={['dt', cls]} data-dt data-dt-param={param}>
+  <div class="dt-list" role="tablist" aria-label={label}>
+    {tabs.map((t) => (
+      <button type="button" role="tab" class="dt-tab" data-help="detailtabs" data-help-name={t.label} id={`${t.id}-tab`} aria-controls={t.id} aria-selected={t.id === first ? 'true' : 'false'} tabindex={t.id === first ? 0 : -1} data-dt-tab={t.id}>
+        {t.label}{t.count !== undefined && t.count !== null && <span class="dt-n num">{t.count}</span>}
+      </button>
+    ))}
+    <span class="dt-on" aria-hidden="true"></span>
+  </div>
+  <div class="dt-panels" data-dt-box>
+    {panels.map((p) => (
+      <div class="dt-panel" role="tabpanel" id={p.id} aria-labelledby={`${p.id}-tab`} tabindex="0" data-dt-panel={p.id} hidden={p.id !== first}>
+        <Fragment set:html={p.html} />
+      </div>
+    ))}
+  </div>
+</div>
+
+<script is:inline data-astro-rerun>
+  (function () {
+    function bind(root) {
+      if (root.__dt) return; root.__dt = true;
+      var tabs = Array.prototype.slice.call(root.querySelectorAll('[data-dt-tab]'));
+      var box = root.querySelector('[data-dt-box]'), marker = root.querySelector('.dt-on');
+      var ids = tabs.map(function (t) { return t.dataset.dtTab; });
+      var panel = function (id) { return root.querySelector('[data-dt-panel="' + id + '"]'); };
+      var current = function () { var t = root.querySelector('[data-dt-tab][aria-selected=true]'); return t ? t.dataset.dtTab : ids[0]; };
+      // Tabs that do not fit on one line wrap into rows of pills instead of scrolling sideways (L10).
+      var list = root.querySelector('.dt-list');
+      var fits = function () {
+        list.classList.remove('dt-wrap');
+        if (list.scrollWidth > list.clientWidth + 1) list.classList.add('dt-wrap');
+      };
+      var place = function () {
+        fits();
+        var t = root.querySelector('[data-dt-tab][aria-selected=true]'); if (!t || !marker) return;
+        marker.style.width = t.offsetWidth + 'px'; marker.style.transform = 'translateX(' + t.offsetLeft + 'px)';
+      };
+      function select(id, animate, focus) {
+        var was = current(); if (ids.indexOf(id) < 0) return;
+        var cur = panel(was), next = panel(id), M = window.rsMotion ? window.rsMotion() : { reduced: true };
+        var swap = function () {
+          tabs.forEach(function (t) { var on = t.dataset.dtTab === id; t.setAttribute('aria-selected', String(on)); t.tabIndex = on ? 0 : -1; });
+          root.querySelectorAll('[data-dt-panel]').forEach(function (p) { p.hidden = p.dataset.dtPanel !== id; });
+          place();
+        };
+        var held = function () { if (window.rsHold) window.rsHold(box, swap); else swap(); };
+        if (animate && cur && next && cur !== next && !M.reduced) {
+          if (window.rsMorphPanels) window.rsMorphPanels(cur, next, held); else held();
+          // The next tab comes from the side you moved towards (M5).
+          var dir = ids.indexOf(id) > ids.indexOf(was) ? 1 : -1;
+          next.animate([{ opacity: 0, transform: 'translateX(' + dir * 24 + 'px)' }, { opacity: 1, transform: 'none' }], { duration: M.enter, easing: M.ease });
+        } else held();
+        if (focus) { var t = tabs[ids.indexOf(id)]; if (t) t.focus(); }
+        if (location.hash !== '#' + id && (animate || location.hash)) { try { history.replaceState(history.state, '', location.pathname + location.search + '#' + id); } catch (_) {} }
+        if (id !== was) root.dispatchEvent(new CustomEvent('dt:change', { bubbles: true, detail: { id: id } }));
+      }
+      tabs.forEach(function (t, i) {
+        t.addEventListener('click', function () { select(t.dataset.dtTab, true); });
+        t.addEventListener('keydown', function (e) {
+          var k = e.key, n = tabs.length, j = k === 'ArrowRight' ? (i + 1) % n : k === 'ArrowLeft' ? (i + n - 1) % n : k === 'Home' ? 0 : k === 'End' ? n - 1 : -1;
+          if (j < 0) return; e.preventDefault(); select(ids[j], true, true);
+        });
+      });
+      root.rsTabs = { select: function (id) { select(id, true); }, current: current };
+      // Open on the tab the address names (a link from another page, or Back).
+      var want = ((window.__rsNavTo && window.__rsNavTo.hash) || location.hash || '').slice(1);
+      if (ids.indexOf(want) < 0) {
+        // Or a query name (?tab=wiring, or the page's own: ?kind=profile).
+        var q = new URLSearchParams(window.__rsNavTo ? window.__rsNavTo.search : location.search).get(root.dataset.dtParam || 'tab');
+        if (ids.indexOf(q) >= 0) want = q;
+      }
+      if (ids.indexOf(want) >= 0 && want !== current()) select(want, false);
+      place();
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(place);
+      if (window.ResizeObserver) new ResizeObserver(function () { requestAnimationFrame(place); }).observe(root.querySelector('.dt-list'));
+    }
+    document.querySelectorAll('[data-dt]').forEach(bind);
+    if (!window.__rsDtHook) {
+      window.__rsDtHook = true;
+      // A link to #tab on the same page (a key number, a "see wiring" link) opens that tab and brings it into view.
+      var open = function (id) {
+        if (!id) return;
+        document.querySelectorAll('[data-dt]').forEach(function (root) {
+          var t = root.querySelector('[data-dt-tab="' + CSS.escape(id) + '"]'); if (!t || !root.rsTabs) return;
+          root.rsTabs.select(id);
+          var M = window.rsMotion ? window.rsMotion() : { reduced: true };
+          root.scrollIntoView({ behavior: M.reduced ? 'auto' : 'smooth', block: 'start' });
+        });
+      };
+      window.addEventListener('hashchange', function () { open(location.hash.slice(1)); });
+      // The client router changes the address itself for same-page links, so hashchange may not fire: watch the click.
+      document.addEventListener('click', function (e) {
+        var a = e.target.closest && e.target.closest('a[href*="#"]'); if (!a) return;
+        var u = new URL(a.href, location.href); if (u.pathname !== location.pathname || u.search !== location.search) return;
+        setTimeout(function () { open(u.hash.slice(1)); }, 0);
+      });
+    }
+  })();
+</script>
+
+<style is:global>
+  .dt { min-width: 0; scroll-margin-top: calc(var(--mast-h, 60px) + 16px); }
+  .dt-list { position: relative; display: flex; gap: 2px; margin-bottom: 16px; border-bottom: var(--border-rule); overflow: hidden; }
+  /* Too many tabs for the width: they wrap into rows of pills, the chosen one filled (no sideways scroll). */
+  .dt-list.dt-wrap { flex-wrap: wrap; gap: 6px; padding-bottom: 12px; overflow: visible; }
+  .dt-list.dt-wrap .dt-tab { padding: 8px 12px; border-radius: var(--pill-radius); border: 1px solid var(--line); background: var(--surface); }
+  .dt-list.dt-wrap .dt-tab[aria-selected=true] { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
+  .dt-list.dt-wrap .dt-tab[aria-selected=true] .dt-n { background: color-mix(in srgb, var(--on-ink) 18%, transparent); color: var(--on-ink); }
+  .dt-list.dt-wrap .dt-on { display: none; }
+  .dt-tab { appearance: none; border: 0; background: none; display: inline-flex; align-items: center; gap: 8px; padding: 11px 14px 12px; font: 600 14.5px/1 var(--font-sans); color: var(--text-2); white-space: nowrap; cursor: pointer; border-radius: var(--radius) var(--radius) 0 0; transition: color var(--dur-state) var(--ease-settle), background var(--dur-hover) var(--ease-settle); }
+  .dt-tab:hover { color: var(--text); background: var(--surface-2); }
+  .dt-tab[aria-selected=true] { color: var(--text); }
+  .dt-n { font: 600 11.5px/1 var(--font-mono); padding: 3px 6px; border-radius: var(--pill-radius); background: var(--surface-2); color: var(--text-2); }
+  .dt-on { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; border-radius: 3px 3px 0 0; background: var(--accent); pointer-events: none; transition: transform var(--dur-morph) var(--ease-settle), width var(--dur-morph) var(--ease-settle); }
+  .dt-panel { min-width: 0; }
+  .dt-panel:focus-visible { outline-offset: 6px; }
+</style>

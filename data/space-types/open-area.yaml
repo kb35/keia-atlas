@@ -1,0 +1,59 @@
+# Space type: Open areas and corridors
+# Keia Atlas house standard, not from a published guideline. See docs/decisions/0009-house-standard.md.
+# Keia part (profile to verification_model): what belongs here. One space per office floor: everything on the floor
+# that is not an enclosed room or the building core (the desks' open plan, breakout and town-hall areas, corridors,
+# the lift lobby), so the Wi-Fi access points that cover it are units in an install like any other device.
+# Keia Atlas part: one build option, the UniFi access points of the Wi-Fi standard (data/standards/wifi.yaml).
+# Where each access point hangs is on the floor plan (data/floors/<site>-<floor>.yaml, `access_points`), which
+# names the install position; the unit (serial, asset tag, hostname, stage) is in data/installs/<site>/.
+
+schema: composite-profile
+
+profile:
+  name: Open areas and corridors
+  space_type: open-area
+  version: "1.0"
+  last_updated: "2026-09-30"
+  owner: Keia Atlas maintainers
+  purpose: >-
+    The open part of an office floor: desks in the open plan, breakout and town-hall areas, corridors and the lift
+    lobby. It holds the ceiling-mounted Wi-Fi access points that cover the floor, placed by the Wi-Fi standard's
+    spacing on the floor plan.
+
+sources:
+  - file: data/device-classes/wireless-access-point.yaml
+    provides: Healthy state for the access point class
+  - file: data/standards/wifi.yaml
+    provides: The spacing, models and mounting of access points (house standard)
+
+equipment_categories:
+  - category: wireless
+    description: Ceiling-mounted Wi-Fi access points, one per 150 m² of open area and one per 100 m² of a town-hall area
+    object_profile: data/device-classes/wireless-access-point.yaml
+    quantity: varies
+
+verification_model:
+  platforms_to_check:
+    - platform: keia_atlas
+      check: every access point is on the floor plan, cabled to a patched panel port, and enough of them for the Wi-Fi standard
+    - platform: inventory
+      check: every access point has an active record on this floor
+    - platform: monitoring
+      check: every access point reports healthy with clients spread across the floor
+
+keia_atlas:
+  standard: house
+  category: support
+  bookable: false
+  notes:
+    - Not a room people book or walk into as such. The room drawing does not apply; the floor plan and the 3D model show it.
+    - A meeting room of 12 or more seats should have its own access point (Wi-Fi standard), but no room profile has one yet, so those rooms are listed as gaps on the floor plan.
+  options:
+    - id: unifi
+      name: UniFi
+      standard: house
+      since: "2026-09-29"
+      summary: "UniFi U7 Pro access points on the ceiling across the open area and corridors, and U7 Pro Max where people gather (a town-hall area), each on one Cat6A with PoE+ from the floor's comms room."
+      equipment:
+        - { key: access-point, role: Access point, class: wireless-access-point, model: unifi-u7-pro, quantity: tbd, requirement: required, location: ceiling }
+        - { key: town-hall-ap, role: Access point for a town-hall area, class: wireless-access-point, model: unifi-u7-pro-max, quantity: tbd, requirement: optional, location: ceiling }

@@ -1,0 +1,333 @@
+---
+// Equipment usage (stage 2, simulated). Archetype D: band, filter bar, the five kinds as tiles that work
+// the Kind filter, then one section per kind with its own table, then a roll-up by site. How hard each kind
+// of device is worked: video bars and codecs by call hours and calls (and the calls that failed); displays by
+// hours switched on against the meetings in the room; signage players against their set on and off
+// schedule; switches by uptime, availability, ports and power over Ethernet; older projectors by lamp
+// hours. Open incidents sit on each row and link to the ticket. Every number is made up, generated from
+// each unit's serial (src/lib/usage.mjs, and ../_engineer.mjs for failed calls).
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import FilterBar from '../../../components/FilterBar.astro';
+import Section from '../../../components/Section.astro';
+import EmptyState from '../../../components/EmptyState.astro';
+import DeviceCell from '../_DeviceCell.astro';
+import Signals from '../_Signals.astro';
+import { href, sites, modelName, fmtDate, SITE_ORDER, REGION_LABEL } from '../../../lib/data.mjs';
+import { REGION_SHORT } from '../../../lib/demo.mjs';
+import { equipment, EQUIP_KIND, SOURCE, PANEL_LIFE, roomUse } from '../../../lib/usage.mjs';
+import { incByDevice, failed, failing, isHome, WHERE } from '../_engineer.mjs';
+import '../../../styles/viz.css';
+import '../_usage.css';
+
+const of = (k) => equipment.filter((e) => e.kind === k);
+const n = (v, d = 0) => v.toLocaleString('en-IE', { maximumFractionDigits: d });
+const sum = (l, f) => l.reduce((t, x) => t + f(x), 0);
+const pctW = (v, max) => `${Math.max(0, Math.min(100, (v / max) * 100)).toFixed(1)}%`;
+const siteIx = Object.fromEntries(SITE_ORDER.map((id, i) => [id, i]));
+const HOME = equipment.some((e) => isHome(e.site));
+
+// Each kind: its devices, the number that says "how hard is it worked" (use), and the order it starts in.
+const USE = { video: (e) => e.callH, display: (e) => e.onH, signage: (e) => e.actualH, switch: (e) => e.used / e.ports, projector: (e) => e.lampPct };
+const score = (e) => (incByDevice[e.tag] ? 2 : 0) + (e.flag ? 1 : 0) + (failing(e) ? 1 : 0);
+const sorted = (k) => of(k).sort((a, b) => USE[k](b) - USE[k](a)).map((e, i) => ({ ...e, i })).sort((a, b) => score(b) - score(a) || a.i - b.i);
+const video = sorted('video'), displays = sorted('display'), signage = sorted('signage'), switches = sorted('switch'), projectors = sorted('projector');
+
+// Row attributes: what the filter bar and Sort read.
+const row = (e) => ({
+  'data-fi': '', class: 'ut-row', tabindex: 0,
+  'data-find': `${e.name} ${e.roomName} ${sites[e.site].name} ${sites[e.site].code} ${e.model ? modelName(e.model) : ''} ${e.tag}`.toLowerCase(),
+  'data-f-region': sites[e.site].region ?? 'remote', 'data-f-site': e.site, 'data-f-kind': e.kind, 'data-f-status': e.flag || failing(e) ? 'flagged' : 'ok', 'data-f-where': HOME ? (isHome(e.site) ? 'home' : 'office') : undefined,
+  'data-t-issues': incByDevice[e.tag] ? '1' : undefined, 'data-t-failed': failing(e) ? '1' : undefined,
+  'data-i': e.i, 'data-flag': score(e), 'data-inc': (incByDevice[e.tag]?.length ?? 0) * 1000 + (failed[e.tag] ?? 0), 'data-use': Math.round(USE[e.kind](e) * 100), 'data-name': e.name, 'data-site': siteIx[e.site],
+});
+
+// Video
+const vSites = SITE_ORDER.map((id) => { const l = video.filter((v) => v.site === id); return { id, n: l.length, h: sum(l, (x) => x.callH), per: l.length ? sum(l, (x) => x.callH) / l.length : 0 }; }).filter((x) => x.n);
+const callMax = Math.max(...video.map((v) => v.callH));
+const vCalls = sum(video, (v) => v.calls), vHours = sum(video, (v) => v.callH);
+const vFailed = sum(video, (v) => failed[v.tag] ?? 0);
+// Displays
+const dLeftOn = displays.filter((d) => d.flag);
+const dWaste = Math.round(sum(dLeftOn, (d) => Math.max(0, d.onH - d.expected)) * 52);
+const dMax = 168;
+// Signage
+const sNever = signage.filter((s) => s.mode === 'never');
+const sExtra = sum(signage, (s) => s.extraYear);
+// Switches
+const swFlag = switches.filter((s) => s.flag);
+const swPorts = sum(switches, (s) => s.used), swAll = sum(switches, (s) => s.ports);
+const avail = (sum(switches, (s) => +s.avail) / switches.length).toFixed(2);
+// Projectors
+const pjEos = projectors.filter((p) => p.eos && p.eos < '2026-09-28').length;
+
+const KINDS = [
+  { id: 'video', key: 'video', list: video, head: `${n(vHours)} call hours a week`, extra: vFailed ? `${vFailed} failed calls` : '' },
+  { id: 'displays', key: 'display', list: displays, head: `${dLeftOn.length} left on, ${n(dWaste)} hours a year for nobody`, extra: '' },
+  { id: 'signage', key: 'signage', list: signage, head: `${sNever.length} never switch off`, extra: '' },
+  { id: 'switches', key: 'switch', list: switches, head: `${avail}% available, ${n(swPorts)} of ${n(swAll)} ports used`, extra: '' },
+  { id: 'projectors', key: 'projector', list: projectors, head: `${pjEos} past end of support`, extra: '' },
+].map((k) => ({ ...k, label: EQUIP_KIND[k.key], count: k.list.length, flagged: k.list.filter((e) => e.flag || failing(e)).length, inc: k.list.filter((e) => incByDevice[e.tag]).length }));
+
+const flaggedAll = equipment.filter((e) => e.flag || failing(e)).length;
+const withInc = equipment.filter((e) => incByDevice[e.tag]).length;
+
+const sitesWith = SITE_ORDER.filter((id) => equipment.some((e) => e.site === id));
+const REGS = ['amer', 'emea', 'apac'].filter((r) => equipment.some((e) => sites[e.site].region === r));
+const FACETS = [
+  { key: 'region', label: 'Region', options: REGS.map((r) => ({ value: r, label: REGION_SHORT[r] })) },
+  { key: 'site', label: 'Office', options: sitesWith.map((id) => ({ value: id, label: sites[id].name, sub: sites[id].kind === 'remote' ? 'Home offices' : sites[id].city })) },
+  { key: 'kind', label: 'Kind', options: KINDS.map((k) => ({ value: k.key, label: k.label })) },
+  { key: 'status', label: 'Status', options: [{ value: 'flagged', label: 'Flagged' }, { value: 'ok', label: 'No flag' }] },
+  ...(HOME ? [{ key: 'where', label: 'Where', options: WHERE }] : []),
+];
+const TOGGLES = [
+  { key: 'issues', label: 'Open incidents', title: 'Only devices with an open incident' },
+  { key: 'failed', label: 'Failed calls', title: 'Only video devices whose calls keep failing' },
+];
+const SORT = { options: [{ value: 'flagged', label: 'Flagged first' }, { value: 'issues', label: 'Incidents first' }, { value: 'use', label: 'Busiest first' }, { value: 'site', label: 'By office' }, { value: 'name', label: 'By name' }] };
+const NUMBERS = [
+  { n: flaggedAll, label: 'Flagged', to: '?status=flagged', tone: flaggedAll ? 'warn' : undefined },
+  { n: withInc, label: 'With open incidents', to: '?issues=1', tone: withInc ? 'bad' : undefined },
+  { n: video.filter((v) => failing(v)).length, label: 'With failed calls', to: '?failed=1' },
+  { n: `${avail}%`, label: 'Switch availability', fact: true },
+];
+const rollup = sitesWith.map((id) => {
+  const l = equipment.filter((e) => e.site === id), v = video.filter((e) => e.site === id);
+  return { id, count: l.length, per: v.length ? sum(v, (x) => x.callH) / v.length : null, flagged: l.filter((e) => e.flag || failing(e)).length, failed: sum(v, (x) => failed[x.tag] ?? 0), inc: l.filter((e) => incByDevice[e.tag]).length };
+});
+const perMax = Math.max(...rollup.map((x) => x.per ?? 0));
+const HOURS24 = Array.from({ length: 24 }, (_, i) => i);
+---
+<Shell title="Equipment usage" section="equipment-usage" minStage={2} crumbs={[{ label: 'Devices', to: '/profiles/' }, { label: 'Usage' }]}>
+  <PageBand overline="Fleet" title="Equipment usage" lede="How hard the kit is worked, and what is worn out early, barely used or left running for nobody." sim numbers={NUMBERS} />
+
+  <div class="content eu" data-eu>
+    <FilterBar facets={FACETS} toggles={TOGGLES} placeholder="Find a device, room or office" label="Find a device" noun={['device', 'devices']} scope=".content.eu" sort={SORT} />
+
+    <div class="ut-tiles" data-fb-facet="kind" role="group" aria-label="Kind of equipment">
+      {KINDS.map((k) => (
+        <button type="button" class="ut-tile" data-fopt data-v={k.key} data-label={k.label} aria-pressed="false">
+          <h3>{k.label}</h3>
+          <span class="big num">{n(k.count)}<small>{k.count === 1 ? 'device' : 'devices'}</small></span>
+          <span class="sub">{k.head}</span>
+          <span class="ut-sig">
+            {k.flagged > 0 ? <span class="uc warn">{k.flagged} flagged</span> : <span class="uc">None flagged</span>}
+            {k.inc > 0 && <span class="uc bad">{k.inc} with incidents</span>}
+            {k.extra && <span class="uc warn">{k.extra}</span>}
+          </span>
+        </button>
+      ))}
+    </div>
+
+    <div data-fb-group>
+      <Section title="Video calls" id="video" aside={`${n(video.length)} devices`} showAll={8}>
+        <p class="ut-how">Call hours a week, calls and average length. A failed call did not connect or dropped in the first minute. Little used is under four call hours a week; heavy use is over twenty-six.</p>
+        <div class="card ut-card ut-eq">
+          <div class="ut-scroll">
+            <table class="ut">
+              <thead><tr><th scope="col">Device</th><th scope="col">Call hours a week</th><th scope="col" class="r">Calls</th><th scope="col" class="r">Failed</th><th scope="col" class="r">Average</th><th scope="col" class="r">Meetings on a call</th><th scope="col">Signals</th></tr></thead>
+              <tbody data-items>
+                {video.map((v) => (
+                  <tr {...row(v)}>
+                    <td><DeviceCell e={v} /></td>
+                    <td><span class="ub-row wide"><span class="ub" aria-hidden="true"><i class="ub-o" style={`width:${pctW(v.callH, callMax)}`}></i></span><span class="num ub-v">{n(v.callH, 1)}</span></span></td>
+                    <td class="r num">{v.calls}</td>
+                    <td class="r num">{failing(v) ? <span class="uc warn">{failed[v.tag]}</span> : failed[v.tag]}</td>
+                    <td class="r num">{v.avgMin} min</td>
+                    <td class="r num">{roomUse[v.room] ? `${v.share}%` : 'Desk'}</td>
+                    <td><Signals e={v} />{failing(v) && !v.flag && <span class="ut-sig"><span class="uflag ghost">Calls failing</span></span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div class="ut-foot"><p class="src-note"><b>Source:</b> {SOURCE.calls}</p><button type="button" class="btn small ghost" data-sa-btn hidden></button></div>
+        </div>
+      </Section>
+    </div>
+
+    <div data-fb-group>
+      <Section title="Displays" id="displays" aside={`${n(displays.length)} devices`} showAll={8}>
+        <p class="ut-how">A meeting room display should be on for about as long as the room is in use. One that is on much longer is not going to sleep: check its power setting before it wears out early. Wear is panel hours since install against a rated {n(PANEL_LIFE)} hours for a commercial display.</p>
+        <div class="card ut-card ut-eq">
+          <div class="ut-scroll">
+            <table class="ut">
+              <thead><tr><th scope="col">Display</th><th scope="col">On a week, against room use</th><th scope="col" class="r">Panel hours</th><th scope="col">Wear</th><th scope="col">Signals</th></tr></thead>
+              <tbody data-items>
+                {displays.map((d) => (
+                  <tr {...row(d)}>
+                    <td><DeviceCell e={d} cls="display" /></td>
+                    <td><span class="ub-row wide" title={`On ${n(d.onH, 1)} h a week; room in use ${n(d.expected, 1)} h`}><span class="ub mk"><i class="ub-o" style={`width:${pctW(d.onH, dMax)}`}></i><b style={`left:${pctW(d.expected, dMax)}`}></b></span><span class="num ub-v">{n(d.onH)} h</span></span></td>
+                    <td class="r num">{n(d.panelH)}</td>
+                    <td><span class="ub-row"><span class="ub wear"><i style={`width:${pctW(d.wear, 100)}`} class={d.wear >= 80 ? 'hi' : ''}></i></span><span class="num ub-v">{d.wear}%</span></span></td>
+                    <td><Signals e={d} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div class="ut-foot"><p class="src-note"><b>Source:</b> {SOURCE.display}</p><button type="button" class="btn small ghost" data-sa-btn hidden></button></div>
+        </div>
+        <ul class="ut-key" aria-hidden="true"><li><i class="k-on"></i>Hours on a week</li><li><i class="k-exp"></i>Hours the room is in use</li></ul>
+      </Section>
+    </div>
+
+    <div data-fb-group>
+      <Section title="Signage" id="signage" aside={`${n(signage.length)} players`} showAll={8}>
+        <p class="ut-how">Each player has a set on and off time. The strip shows a weekday: the outline is the schedule, the fill is when the panel was actually on. A panel that never switches off does nearly three times the hours, and reaches the end of its rated {n(PANEL_LIFE)} hours in under six years. That is {n(sExtra)} panel hours a year past schedule across all players.</p>
+        <div class="card ut-card ut-eq">
+          <div class="ut-scroll">
+            <table class="ut">
+              <thead><tr><th scope="col">Player</th><th scope="col"><span class="sig-axis">{[0, 6, 12, 18, 24].map((h) => <b style={`left:${(h / 24) * 100}%`}>{String(h).padStart(2, '0')}</b>)}</span></th><th scope="col" class="r">Hours a week</th><th scope="col">Panel wear</th><th scope="col">Signals</th></tr></thead>
+              <tbody data-items>
+                {signage.map((s) => (
+                  <tr {...row(s)}>
+                    <td><DeviceCell e={s} cls="signage-player" title={`${sites[s.site].name}${s.older ? `, older player (${s.installed.slice(0, 4)})` : ''}`} /></td>
+                    <td>
+                      <span class="sig" title={`Set ${s.schedule.label}. Actually ${s.mode === 'never' ? 'on around the clock' : `off at ${s.offAt}:00${s.weekends ? ', and on at weekends' : ''}`}.`}>
+                        {HOURS24.map((h) => <i class:list={[{ on: s.mode === 'never' || (h >= s.schedule.on && h < s.offAt) }]}></i>)}
+                        <b class="sig-sch" style={`left:${(s.schedule.on / 24) * 100}%;width:${((s.schedule.off - s.schedule.on) / 24) * 100}%`}></b>
+                      </span>
+                    </td>
+                    <td class="r num"><b>{s.actualH}</b><small> of {s.setH} set</small></td>
+                    <td><span class="ub-row"><span class="ub wear"><i style={`width:${pctW(s.wear, 100)}`} class={s.wear >= 80 ? 'hi' : ''}></i></span><span class="num ub-v">{s.wear}%</span></span></td>
+                    <td><Signals e={s} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div class="ut-foot"><p class="src-note"><b>Source:</b> {SOURCE.signage} Wear: {n(sum(signage, (s) => s.panelH))} panel hours since install across all players, against {n(PANEL_LIFE)} rated.</p><button type="button" class="btn small ghost" data-sa-btn hidden></button></div>
+        </div>
+        <ul class="ut-key" aria-hidden="true"><li><i class="k-sch"></i>Set schedule</li><li><i class="k-on"></i>Actually on</li></ul>
+      </Section>
+    </div>
+
+    <div data-fb-group>
+      <Section title="Switches" id="switches" aside={`${n(switches.length)} devices`} showAll={8}>
+        <p class="ut-how">Uptime is days since the last restart. A switch that has not restarted in over a year has not taken a firmware update. Ports nearly full leave no room for another device in the room. {swFlag.length} of {switches.length} are flagged.</p>
+        <div class="card ut-card ut-eq">
+          <div class="ut-scroll">
+            <table class="ut">
+              <thead><tr><th scope="col">Switch</th><th scope="col" class="r">Uptime</th><th scope="col" class="r">Available</th><th scope="col">Ports in use</th><th scope="col">Power over Ethernet</th><th scope="col">Signals</th></tr></thead>
+              <tbody data-items>
+                {switches.map((s) => (
+                  <tr {...row(s)}>
+                    <td><DeviceCell e={s} cls="network-switch" /></td>
+                    <td class="r num">{s.uptimeD} d</td>
+                    <td class="r num">{s.avail}%</td>
+                    <td><span class="ub-row wide"><span class={`ub ${s.used / s.ports >= 0.9 ? 'hi' : ''}`}><i class="ub-o" style={`width:${pctW(s.used, s.ports)}`}></i></span><span class="num ub-v">{s.used}/{s.ports}</span></span></td>
+                    <td><span class="ub-row wide"><span class={`ub ${s.poeW / s.budget > 0.85 ? 'hi' : ''}`}><i class="ub-o" style={`width:${pctW(s.poeW, s.budget)}`}></i></span><span class="num ub-v">{s.poeW}/{s.budget} W</span></span></td>
+                    <td><Signals e={s} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div class="ut-foot"><p class="src-note"><b>Source:</b> {SOURCE.switch}</p><button type="button" class="btn small ghost" data-sa-btn hidden></button></div>
+        </div>
+      </Section>
+    </div>
+
+    <div data-fb-group>
+      <Section title="Projectors" id="projectors" aside={`${n(projectors.length)} still in service`} showAll={8}>
+        <p class="ut-how">Older kit: lamp projectors from before today's standard, still in a few rooms. A lamp past its rated hours dims, can fail suddenly, and runs hot. These rooms are in the <a href={href('/refresh/')}>work plan</a>, which says when each is replaced.</p>
+        <div class="card ut-card ut-eq">
+          <div class="ut-scroll">
+            <table class="ut">
+              <thead><tr><th scope="col">Projector</th><th scope="col">Lamp hours, against rated</th><th scope="col" class="r">On a week</th><th scope="col" class="r">Lamps since install</th><th scope="col" class="r">End of support</th><th scope="col">Signals</th></tr></thead>
+              <tbody data-items>
+                {projectors.map((p) => (
+                  <tr {...row(p)}>
+                    <td><DeviceCell e={p} cls="display" /></td>
+                    <td><span class="ub-row wide"><span class="ub wear"><i style={`width:${pctW(p.lampH, p.life)}`} class={p.lampPct >= 90 ? 'hi' : ''}></i></span><span class="num ub-v">{n(p.lampH)}/{n(p.life)}</span></span></td>
+                    <td class="r num">{n(p.onH)} h</td>
+                    <td class="r num">{p.lampsFitted}</td>
+                    <td class="r num">{p.eos ? fmtDate(p.eos, { month: 'short', year: 'numeric' }) : ''}</td>
+                    <td><Signals e={p} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div class="ut-foot"><p class="src-note"><b>Source:</b> {SOURCE.lamp}</p><button type="button" class="btn small ghost" data-sa-btn hidden></button></div>
+        </div>
+      </Section>
+    </div>
+
+    <EmptyState text="No devices match these filters." />
+
+    <Section title="By office" aside="Video call hours a week per device, and what needs a look. Pick a site to filter the tables.">
+      <div class="card ut-card">
+        <div class="ut-scroll">
+          <table class="ut ut-sites">
+            <thead><tr><th scope="col">Office</th><th scope="col" class="r">Devices</th><th scope="col">Call hours a week per device</th><th scope="col" class="r">Flagged</th><th scope="col" class="r">Failed calls</th><th scope="col" class="r">Open incidents</th></tr></thead>
+            <tbody>
+              {rollup.map((x) => (
+                <tr>
+                  <th scope="row" class="ut-sub"><button type="button" class="ut-pick" data-pick="site" data-v={x.id} title={`${sites[x.id].name}, ${sites[x.id].city ?? ''}`}>{sites[x.id].name}</button><small>{sites[x.id].kind === 'remote' ? 'Home offices' : sites[x.id].city}</small></th>
+                  <td class="r num">{x.count}</td>
+                  <td>{x.per == null ? '' : <span class="ub-row wide"><span class="ub" aria-hidden="true"><i class="ub-o" style={`width:${pctW(x.per, perMax)}`}></i></span><span class="num ub-v">{n(x.per, 1)}</span></span>}</td>
+                  <td class="r num">{x.flagged || ''}</td><td class="r num">{x.failed || ''}</td><td class="r num">{x.inc ? <span class="uc bad">{x.inc}</span> : ''}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </Section>
+  </div>
+
+  <script is:inline data-astro-rerun slot="end">
+    (function () {
+      var root = document.querySelector('[data-eu]'), bar = document.querySelector('[data-fb]'); if (!root || !bar) return;
+      var reduced = function () { return window.rsMotion ? window.rsMotion().reduced : matchMedia('(prefers-reduced-motion: reduce)').matches; };
+      var whenBar = function (fn) { if (bar.rsFilter) fn(); else document.addEventListener('DOMContentLoaded', fn, { once: true }); };
+      var nat = function (a, b) { return String(a).localeCompare(String(b), 'en', { numeric: true }); };
+
+      /* Sort: within each table, the rows slide to their new order. */
+      var bodies = Array.prototype.slice.call(root.querySelectorAll('[data-items]'));
+      var sort = bar.rsFilter ? bar.rsFilter.sort() : (new URLSearchParams(location.search).get('sort') || 'flagged');
+      var CMP = {
+        flagged: function (a, b) { return b.dataset.flag - a.dataset.flag; },
+        issues: function (a, b) { return b.dataset.inc - a.dataset.inc || b.dataset.flag - a.dataset.flag; },
+        use: function (a, b) { return b.dataset.use - a.dataset.use; },
+        site: function (a, b) { return a.dataset.site - b.dataset.site; },
+        name: function (a, b) { return nat(a.dataset.name, b.dataset.name); },
+      };
+      var reorder = function () {
+        var c = CMP[sort] || CMP.flagged;
+        bodies.forEach(function (tb) {
+          Array.prototype.slice.call(tb.children).sort(function (a, b) { return c(a, b) || a.dataset.i - b.dataset.i; }).forEach(function (tr) { tb.appendChild(tr); });
+        });
+      };
+      bar.addEventListener('fb:sort', function (e) { sort = e.detail.value; bar.rsFilter.run(true, reorder); });
+      whenBar(function () { sort = bar.rsFilter.sort(); if (sort !== 'flagged') bar.rsFilter.run(false, reorder); });
+
+      /* A row opens its device, like its name does. */
+      root.addEventListener('click', function (e) {
+        if (e.target.closest('a, button')) return;
+        var tr = e.target.closest('.ut-row'), a = tr && tr.querySelector('.ut-main'); if (a) a.click();
+      });
+      root.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && e.target.matches('.ut-row')) { var a = e.target.querySelector('.ut-main'); if (a) a.click(); }
+      });
+
+      /* A site in the roll-up filters the tables above it. */
+      root.querySelectorAll('[data-pick]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!bar.rsFilter) return;
+          bar.rsFilter.clear();
+          var opt = document.querySelector('[data-fb-facet="' + b.dataset.pick + '"] [data-fopt][data-v="' + b.dataset.v + '"]'); if (opt) opt.click();
+          bar.scrollIntoView({ behavior: reduced() ? 'auto' : 'smooth', block: 'start' });
+        });
+      });
+      /* Home offices are one click away: start on offices when there are both. */
+      if (root.querySelector('[data-fb-facet="where"]')) whenBar(function () {
+        if (new URLSearchParams(location.search).has('where')) return;
+        var opt = document.querySelector('[data-fb-facet="where"] [data-fopt][data-v="office"]'); if (opt) opt.click();
+      });
+    })();
+  </script>
+</Shell>

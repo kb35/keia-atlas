@@ -1,0 +1,306 @@
+# Space type: a Keia composite profile plus a `keia_atlas:` block.
+#
+# Keia's part says which classes of device belong in the space and how to
+# verify it. Keia deliberately avoids naming models, because standards change.
+# The `keia_atlas:` block adds what a workplace technology console needs on top:
+# the public guidance it is based on, capacity and size as numbers, the
+# build options, the exact models each option calls for, and the power and data
+# outlets the space needs.
+#
+# `unevaluatedProperties: false` closes the top level: only Keia's fields and
+# `keia_atlas` are allowed.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/space-type
+title: Space type
+type: object
+$ref: https://kb35.github.io/keia-atlas/schemas/keia/composite-profile
+required: [keia_atlas]
+properties:
+  keia_atlas: { $ref: "#/$defs/keia_atlas" }
+unevaluatedProperties: false
+
+$defs:
+  slug:
+    type: string
+    pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
+
+  range:
+    description: A single number, or a range with min and max.
+    oneOf:
+      - { type: number, exclusiveMinimum: 0 }
+      - type: object
+        additionalProperties: false
+        required: [min, max]
+        properties:
+          min: { type: number, exclusiveMinimum: 0 }
+          max: { type: number, exclusiveMinimum: 0 }
+
+  quantity:
+    description: How many. "tbd" means the guideline leaves it to the integrator per project.
+    oneOf:
+      - { type: integer, minimum: 1 }
+      - { const: tbd }
+
+  location:
+    enum:
+      - behind-display
+      - below-table
+      - table-top
+      - wall-below-table
+      - wall-behind-storage
+      - floor-box
+      - room-entrance
+      - ceiling
+      - display-wall
+      - wall
+      - data-closet
+      - tbd
+
+  keia_atlas:
+    type: object
+    additionalProperties: false
+    required: [standard, category, options]
+    properties:
+      standard:
+        description: >
+          Where this space type comes from. industry means it is based on public
+          industry guidance (decision 0006), with the main source named in `guideline`
+          and house assumptions marked in its notes. house means it is Keia Atlas's
+          own standard (see docs/decisions/0009-house-standard.md).
+        enum: [industry, house]
+      guideline:
+        description: Id of the source entry for the main public guidance this space type is based on.
+        $ref: "#/$defs/slug"
+      category:
+        description: The guideline's grouping of spaces, plus remote for the house standard's home setups.
+        enum: [connect, focus, recharge, welcome, support, remote, infrastructure]
+      bookable:
+        description: Whether people reserve the space in advance. Left out when the guideline doesn't say.
+        type: boolean
+      capacity:
+        description: Left out when the guideline says it varies.
+        type: object
+        additionalProperties: false
+        required: [min, max]
+        properties:
+          min: { type: integer, minimum: 1 }
+          max: { type: integer, minimum: 1 }
+      area:
+        description: Left out when the guideline says it varies.
+        type: object
+        additionalProperties: false
+        required: [sq_ft, m2]
+        properties:
+          sq_ft: { $ref: "#/$defs/range" }
+          m2: { $ref: "#/$defs/range" }
+      geometry: { $ref: "#/$defs/geometry" }
+      options:
+        description: Ways the space can be built. At least one.
+        type: array
+        minItems: 1
+        items: { $ref: "#/$defs/option" }
+      notes:
+        type: array
+        items: { type: string }
+
+  geometry:
+    description: >
+      The room's shell as the drawing models it, for a floor-level 3D model.
+      Width runs along the display wall (the back wall), depth away from it; doors are measured along
+      their wall from the corner with the display wall. `basis` says where each value comes from:
+      published (the guideline states it), inferred (read from the guideline's plan), chosen (picked to fit
+      the published area) or house-default (Keia Atlas's rule until a real room says otherwise).
+      tests/cableroute.test.mjs checks the drawing (src/lib/room3d.mjs) agrees with it.
+    type: object
+    additionalProperties: false
+    required: [width_m, depth_m, ceiling_m, display_wall, containment, basis]
+    properties:
+      width_m: { type: number, exclusiveMinimum: 0 }
+      depth_m: { type: number, exclusiveMinimum: 0 }
+      ceiling_m: { type: number, exclusiveMinimum: 0 }
+      display_wall:
+        description: back when the room has a display wall (the drawing's back wall), none otherwise.
+        enum: [back, none]
+      door:
+        type: object
+        additionalProperties: false
+        required: [wall, from_m, to_m]
+        properties:
+          wall: { enum: [back, left] }
+          from_m: { type: number, minimum: 0 }
+          to_m: { type: number, exclusiveMinimum: 0 }
+      data_entry:
+        description: Where the building's data cabling reaches the room from its comms room.
+        type: object
+        additionalProperties: false
+        required: [via, at]
+        properties:
+          via: { enum: [ceiling, floor, home-broadband] }
+          wall: { enum: [back, left] }
+          at: { type: string, minLength: 1 }
+      containment:
+        description: The cable containment the room uses (house rule R7 in docs/rules/rooms.md).
+        type: array
+        uniqueItems: true
+        items:
+          enum: [display-track, wall-riser, ceiling-drop, ceiling-basket, skirting, wall-pass-through, table-tray, desk-tray, cable-spine, table-leg, desk-leg, floor-cover, floor-box, floor-duct, sideboard-trunking, floor-void, in-wall]
+      basis:
+        type: object
+        additionalProperties: false
+        required: [size, ceiling, door, data_entry, containment]
+        properties:
+          size: { $ref: "#/$defs/basis" }
+          ceiling: { $ref: "#/$defs/basis" }
+          door: { $ref: "#/$defs/basis" }
+          data_entry: { $ref: "#/$defs/basis" }
+          containment: { $ref: "#/$defs/basis" }
+      notes:
+        type: array
+        items: { type: string }
+
+  basis:
+    enum: [published, inferred, chosen, house-default, none]
+
+  option:
+    type: object
+    additionalProperties: false
+    required: [id, name, equipment]
+    properties:
+      id: { $ref: "#/$defs/slug" }
+      name: { type: string, minLength: 1 }
+      standard:
+        description: Set to house when this option is Keia Atlas's own addition to an industry space type.
+        enum: [industry, house]
+      clients:
+        description: Laptop operating systems this option is meant to serve. Each device model in it must list them in client_os.
+        type: array
+        uniqueItems: true
+        items: { enum: [macos, windows, linux] }
+      summary: { type: string }
+      since:
+        description: The day this option became the way to build the space.
+        type: string
+        format: date
+      superseded_by:
+        description: >
+          For an older way of building the space: the option that replaced it. It is kept so the rooms
+          built to it stay recorded; they are due for replacement to the named option when refreshed.
+        $ref: "#/$defs/slug"
+      equipment:
+        description: The kit built into the room. Empty for a store, which holds spare units and counted stock instead (see storage).
+        type: array
+        items: { $ref: "#/$defs/equipment" }
+      storage:
+        description: >
+          For an IT store: its cabinets, each with the shelves a spare unit or counted stock can be put on.
+          A place is written cabinet/shelf. Furniture, so nothing here carries a serial number.
+        type: array
+        minItems: 1
+        items:
+          type: object
+          additionalProperties: false
+          required: [key, name, shelves]
+          properties:
+            key: { $ref: "#/$defs/slug" }
+            name: { type: string, minLength: 1 }
+            shelves:
+              type: array
+              minItems: 1
+              uniqueItems: true
+              items: { type: string, minLength: 1 }
+      infrastructure:
+        type: array
+        items: { $ref: "#/$defs/outlet" }
+      wiring:
+        description: >
+          How the equipment connects, port to port. The guideline gives outlet
+          assignments, not a port-by-port plan, so this is Keia Atlas's
+          engineering reading of it (see docs/decisions/0011-wiring-and-installs.md).
+        type: array
+        items: { $ref: "#/$defs/link" }
+
+  link:
+    description: One cable.
+    type: object
+    additionalProperties: false
+    required: [from, to, cable]
+    properties:
+      from: { $ref: "#/$defs/endpoint" }
+      to: { $ref: "#/$defs/endpoint" }
+      cable:
+        enum: [hdmi, displayport, usb, usb-c, thunderbolt, cat6, cat6a, audio, poly-mic, speaker, power, proprietary]
+      when:
+        description: Only when this optional equipment key is fitted.
+        $ref: "#/$defs/slug"
+      unless:
+        description: Only when this optional equipment key is not fitted.
+        $ref: "#/$defs/slug"
+      notes: { type: string }
+
+  endpoint:
+    description: >
+      key.port (a port on an equipment line; key#2.port for the second of several),
+      outlet:service/location#n (the nth outlet of that kind in the space),
+      laptop (the person's own laptop), or home-router (the home broadband router).
+    type: string
+    pattern: "^(laptop|home-router|outlet:(power|data|direct-run)/[a-z-]+#[0-9]+|[a-z0-9-]+(#[0-9]+)?\\.[a-z0-9-]+)$"
+
+  equipment:
+    description: One line of kit in an option.
+    type: object
+    additionalProperties: false
+    required: [key, class, quantity, requirement]
+    properties:
+      key:
+        description: Name of this equipment line within the option, used by wiring (for example video-bar).
+        $ref: "#/$defs/slug"
+      class:
+        description: Id of the device class (a file in data/device-classes/).
+        $ref: "#/$defs/slug"
+      model:
+        description: Id of the device model, where the guideline names one (a file in data/device-models/, added in step 3).
+        $ref: "#/$defs/slug"
+      role:
+        description: What this unit does here, when the class alone doesn't say (for example "transmitter under the table").
+        type: string
+      quantity: { $ref: "#/$defs/quantity" }
+      requirement: { enum: [required, optional] }
+      location: { $ref: "#/$defs/location" }
+      sizes_in:
+        description: Screen sizes allowed, in inches.
+        type: array
+        minItems: 1
+        items: { type: integer, minimum: 10 }
+      notes: { type: string }
+
+  outlet:
+    description: A group of power or data outlets the space needs.
+    type: object
+    additionalProperties: false
+    required: [service, provided_by, quantity, location]
+    properties:
+      service:
+        description: >
+          power; data (a network outlet cabled back to the comms room); or
+          direct-run (a cable run inside the room, for example from the table
+          floor box to the display wall for an HDBaseT link).
+        enum: [power, data, direct-run]
+      provided_by:
+        description: Which team the guideline makes responsible.
+        enum: [it, facilities]
+      quantity:
+        oneOf:
+          - { $ref: "#/$defs/range" }
+          - { const: tbd }
+      location: { $ref: "#/$defs/location" }
+      height_mm:
+        description: >
+          Height of the outlets' centre above the floor, where the guideline gives it (a range when it
+          gives one). Left out otherwise: the drawing then uses the house default, 450 mm.
+        $ref: "#/$defs/range"
+      serves:
+        description: What the outlets are for, in order. "spare" for spares.
+        type: array
+        items: { type: string }
+      notes: { type: string }

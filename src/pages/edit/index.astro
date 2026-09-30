@@ -1,0 +1,398 @@
+---
+// Propose a change (demo). Keia Atlas's knowledge lives in YAML files under version control, so an edit here
+// never changes the data directly: it becomes a proposed change with the file it would write, checked
+// against the rules, and routed to the person who approves that kind of change. In the real system it
+// opens a pull request; approving and merging it rebuilds Keia Atlas. Here proposals stay in this browser.
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import DetailTabs from '../../components/DetailTabs.astro';
+import SidePanel from '../../components/SidePanel.astro';
+import { classes, models, sites, spaces, playbooks, configurations, firmwareLines, projects, PHASES, PHASE_LABEL, className, modelName, roomWords } from '../../lib/data.mjs';
+import { ROLES, PEOPLE, PROJECT_ROLE } from '../../lib/demo.mjs';
+
+const DATA = {
+  classes: Object.fromEntries(Object.entries(classes).map(([id, c]) => [id, { name: c.profile.name, role: c.profile.object_role, version: c.profile.version, prefixes: c.profile.naming_prefixes ?? [], platforms: Object.fromEntries(Object.entries(c.platforms ?? {}).filter(([, p]) => p && typeof p === 'object').map(([k, p]) => [k, { fields: p.required_fields ?? [], healthy: p.healthy_indicators ?? [] }])), symptoms: Object.entries(c.discrimination ?? {}).map(([k, d]) => ({ key: k, causes: d.likely_causes, first: d.first_check })) }])),
+  models: Object.fromEntries(Object.entries(models).map(([id, m]) => [id, { name: modelName(id), cls: m.class }])),
+  roles: Object.fromEntries(Object.entries(ROLES).map(([id, r]) => [id, r.name])),
+  people: PEOPLE.map((p) => ({ id: p.id, name: p.name, roleId: p.roleId, role: p.role })),
+  projectRoles: PROJECT_ROLE,
+  sites: Object.fromEntries(Object.entries(sites).filter(([, s]) => s.kind === 'office').map(([id, s]) => [id, { name: s.name, rooms: Object.values(spaces).filter((x) => x.site === id && !['mdf', 'idf'].includes(x.space_type)).map((x) => ({ id: x.id, name: `${x.number ?? ''} ${x.name}`.trim(), type: roomWords(x.type.profile.name) })) }])),
+  playbooks: Object.fromEntries(Object.entries(playbooks).map(([id, p]) => [id, p])),
+  configs: Object.fromEntries(Object.entries(configurations).map(([id, c]) => [id, { name: c.name, version: c.version, groups: c.groups.map((g) => g.name), models: c.models }])),
+  firmware: Object.fromEntries(Object.entries(firmwareLines).map(([id, f]) => [id, { name: f.name, models: f.models, latest: f.releases[0]?.version }])),
+  phases: PHASES.map((p) => ({ id: p, name: PHASE_LABEL[p] })),
+  nextProject: Math.max(...Object.values(projects).map((p) => +p.id.slice(4))) + 1,
+  enums: {
+    connector: ['hdmi', 'displayport', 'vga', 'usb-a', 'usb-b', 'usb-c', 'micro-usb', 'rj45', 'rj11', 'sfp', 'sfp-plus', '3.5mm', '6.35mm', 'xlr', 'terminal-block', 'db9', 'dc-barrel', 'iec-c14', 'iec-c8', 'iec-c6', 'proprietary', 'not-stated'],
+    signals: ['video', 'audio', 'usb', 'ethernet', 'hdbaset', 'poe', 'power', 'rs232', 'ir', 'gpio', 'microphone', 'speaker-level'],
+    face: ['front', 'rear', 'left', 'right', 'top', 'bottom'],
+    direction: ['in', 'out', 'bidirectional'],
+    kinds: { refresh: 'AV refresh', 'infra-refresh': 'Comms room refresh', 'fit-out': 'New office', upgrade: 'Upgrade', 'custom-design': 'Custom design', 'workplace-refresh': 'Workplace IT refresh', 'network-refresh': 'Network refresh', rma: 'RMA', provision: 'Provision new devices', 'firmware-rollout': 'Firmware rollout', 'home-kit': 'Home and remote kit', decommission: 'Move out and decommission' },
+  },
+};
+// What to change: one tab each. The text at the top of the form says what that kind of change is for.
+const TABS = [
+  { id: 'project', label: 'New project', intro: 'The playbook gives the phases, the steps and the gates. Each step becomes a task for the person you put in that role.' },
+  { id: 'playbook', label: 'Playbook', intro: 'Start from a template, then change what this kind of project needs. Steps are done by a role, not a person, so the playbook outlives the team.' },
+  { id: 'profile', label: 'Device profile', intro: "What a healthy device of this kind looks like on every platform, and where to look first when it isn't. One line per item." },
+  { id: 'model', label: 'New device model', intro: "Only what the vendor's documents state. Anything they don't say is left out and listed as a gap. It goes to the Lab before it can enter a room profile." },
+  { id: 'config', label: 'Configuration setting', intro: "Found a setting that matters while installing or fixing a device? Add it with the reason and where it's documented, so the next person doesn't have to find it again." },
+  { id: 'firmware', label: 'Firmware release', intro: "Log a new release from the vendor's notes. It starts in the Lab (or blocked, if an advisory says so); only the service manager makes it the standard. Every device of these models shows it straight away." },
+];
+DATA.intro = Object.fromEntries(TABS.map((t) => [t.id, t.intro]));
+---
+<Shell title="Propose a change" section="changes" crumbs={[{ label: 'Changes', to: '/changes/' }, { label: 'Propose a change' }]}>
+  <PageBand overline="Changes" title="Propose a change" lede="It becomes the file it would write, is checked against the same rules as the rest of the data, and goes to the person who approves it." sim />
+
+  <div class="content">
+    <DetailTabs tabs={TABS.map((t) => ({ id: t.id, label: t.label }))} label="What to change" />
+    <div class="g12 top">
+      <form class="card pad ed-form s-7" data-ed-form autocomplete="off" onsubmit="return false"></form>
+      <SidePanel class="s-5" title="Review" meta="Nothing changes until it is approved">
+        <div class="ed-review">
+          <p class="ed-k">Goes to</p>
+          <p class="ed-who" data-ed-who></p>
+          <p class="ed-k">Checks</p>
+          <ul class="ed-checks" data-ed-checks></ul>
+          <button type="button" class="btn primary" data-ed-propose>Propose this change</button>
+          <p class="faint ed-note">Signed in as <b data-who-name>Aoife Byrne</b>. Proposals are saved in this browser for the demo.</p>
+        </div>
+        <div class="ed-file">
+          <p class="ed-k ed-file-h"><span data-ed-path>file.yaml</span><span class="faint" data-ed-kind>new file</span></p>
+          <pre class="ed-yaml" data-ed-yaml></pre>
+        </div>
+      </SidePanel>
+    </div>
+  </div>
+
+  <script is:inline data-astro-rerun define:vars={{ DATA }}>
+    window.RS_EDIT = DATA;
+  </script>
+  <script is:inline data-astro-rerun slot="end">
+    (function () {
+      var D = window.RS_EDIT, form = document.querySelector('[data-ed-form]'); if (!D || !form) return;
+      var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+      var slug = function (s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); };
+      var who = function () { return (window.rsActorId && window.rsActorId()) || (window.rsWhoId && window.rsWhoId()) || 'aoife'; };
+      var me = function () { return D.people.find(function (p) { return p.id === who(); }) || (who() === 'demo-admin' ? Object.assign({}, D.people[0], { id: 'demo-admin', name: 'Demo admin (Everyone view)', role: 'Demo admin' }) : D.people[0]); };
+      var holder = function (role) { var p = D.people.find(function (x) { return x.roleId === role; }); return p ? p.name + ', ' + D.roles[role] : D.roles[role]; };
+      var opts = function (list, sel) { return list.map(function (o) { var v = typeof o === 'string' ? o : o[0], l = typeof o === 'string' ? o : o[1]; return '<option value="' + esc(v) + '"' + (v === sel ? ' selected' : '') + '>' + esc(l) + '</option>'; }).join(''); };
+      var today = new Date().toISOString().slice(0, 10);
+
+      /* A small YAML writer: enough for these files (maps, lists, strings, numbers, booleans). */
+      function q(v) { if (typeof v === 'number' || typeof v === 'boolean') return String(v); var s = String(v); return /^[A-Za-z0-9][A-Za-z0-9 .,'()\/+-]*$/.test(s) && !/: |^(yes|no|on|off|true|false|null)$/i.test(s) && !/^\d/.test(s) ? s : JSON.stringify(s); }
+      function yaml(o, ind) {
+        ind = ind || '';
+        if (Array.isArray(o)) {
+          if (!o.length) return ' []';
+          if (o.every(function (x) { return typeof x !== 'object'; })) return ' [' + o.map(q).join(', ') + ']';
+          return '\n' + o.map(function (x) { var y = yaml(x, ind + '  '); return ind + '- ' + y.replace(/^\n\s*/, ''); }).join('\n');
+        }
+        if (o && typeof o === 'object') {
+          return '\n' + Object.keys(o).filter(function (k) { return o[k] !== undefined && o[k] !== '' && !(Array.isArray(o[k]) && !o[k].length && k !== 'tasks'); }).map(function (k) {
+            var v = o[k];
+            if (v && typeof v === 'object') return ind + k + ':' + yaml(v, ind + '  ');
+            return ind + k + ': ' + q(v);
+          }).join('\n');
+        }
+        return ' ' + q(o);
+      }
+      var Y = function (o) { return yaml(o).replace(/^\n/, '') + '\n'; };
+
+      var state = { tab: 'project' };
+      var FORMS = {};
+      var out = { path: '', kind: '', text: '', checks: [], approver: '', title: '' };
+
+      function field(label, html, hint) { return '<label class="ef"><span class="ef-l">' + label + '</span>' + html + (hint ? '<small>' + hint + '</small>' : '') + '</label>'; }
+      function val(name) { var el = form.querySelector('[name="' + name + '"]'); return el ? (el.type === 'checkbox' ? el.checked : el.value.trim()) : ''; }
+      function lines(name) { return val(name).split('\n').map(function (s) { return s.trim(); }).filter(Boolean); }
+
+      /* 1. Project from a playbook: pick the playbook, the site and rooms, the people; tasks come from the playbook's steps. */
+      FORMS.project = {
+        render: function () {
+          var pbs = Object.keys(D.playbooks).map(function (k) { return [k, D.playbooks[k].name]; });
+          var siteOpts = Object.keys(D.sites).map(function (k) { return [k, D.sites[k].name]; });
+          var roleRows = ['pm', 'lead', 'engineer', 'technician', 'network', 'vendor', 'service-owner'].map(function (r) {
+            var cands = D.people.filter(function (p) { return ({ pm: ['pm'], lead: ['delivery'], engineer: ['delivery', 'innovation'], technician: ['tech'], network: ['network'], vendor: ['vendor'], 'service-owner': ['sm-av', 'sm-infra'] })[r].indexOf(p.roleId) >= 0; });
+            return '<div class="ef-row"><span>' + esc(D.projectRoles[r]) + '</span><select name="r-' + r + '"><option value="">Nobody</option>' + opts(cands.map(function (p) { return [p.id, p.name]; }), r === 'pm' ? 'ruth' : r === 'lead' ? me().roleId === 'delivery' ? me().id : 'aoife' : '') + '</select><input name="h-' + r + '" type="number" min="0" step="1" placeholder="Hours" value="' + ({ pm: 40, lead: 60, technician: 40, engineer: 16, network: 8, vendor: 0, 'service-owner': 6 })[r] + '" /></div>';
+          }).join('');
+          return '' +
+            field('Playbook', '<select name="pb">' + opts(pbs, new URLSearchParams(location.search).get('pb') || 'av-refresh') + '</select>', 'Templates: every playbook can start a project.') +
+            field('Name', '<input name="name" placeholder="London office video bar refresh" />') +
+            '<div class="ef-2">' + field('Office', '<select name="site">' + opts(siteOpts, 'lon') + '</select>') + field('Start', '<input type="date" name="start" value="' + today + '" />') + '</div>' +
+            '<fieldset class="ef-set"><legend>Rooms</legend><div data-rooms class="ef-rooms"></div></fieldset>' +
+            '<fieldset class="ef-set"><legend>People and hours</legend>' + roleRows + '</fieldset>' +
+            field('Why', '<textarea name="summary" rows="2" placeholder="What this project is for, in a sentence or two."></textarea>');
+        },
+        after: function () {
+          var fill = function () {
+            var s = D.sites[val('site')], box = form.querySelector('[data-rooms]');
+            box.innerHTML = s.rooms.map(function (r) { return '<label class="ef-chk"><input type="checkbox" name="room" value="' + r.id + '" /><span>' + esc(r.name) + '<small>' + esc(r.type) + '</small></span></label>'; }).join('');
+          };
+          form.querySelector('[name=site]').addEventListener('change', function () { fill(); update(); }); fill();
+        },
+        build: function () {
+          var pb = D.playbooks[val('pb')], id = 'PRJ-' + D.nextProject, rooms = Array.from(form.querySelectorAll('[name=room]:checked')).map(function (x) { return x.value; });
+          var roles = [], byRole = {};
+          ['pm', 'lead', 'engineer', 'technician', 'network', 'vendor', 'service-owner'].forEach(function (r) { var p = val('r-' + r); if (p) { roles.push({ person: p, as: r, hours: +val('h-' + r) || 0, logged: 0 }); byRole[r] = p; } });
+          var PR = { pm: 'pm', delivery: 'lead', tech: 'technician', network: 'network', vendor: 'vendor', 'sm-av': 'service-owner', 'sm-infra': 'service-owner', programme: 'pm', innovation: 'engineer', head: 'pm' };
+          var n = 0, tasks = pb.phases.slice(0, 2).flatMap(function (ph) { return ph.steps.map(function (st) { n++; return { id: 'T-' + (D.nextProject * 100 + n), title: st.title, owner: byRole[PR[st.role]] || byRole.pm || me().id, status: 'todo' }; }); });
+          var obj = { id: id, name: val('name') || '(name needed)', kind: pb.kind, playbook: pb.id, site: val('site'), phase: 'plan', owner: byRole.pm || me().id, start: val('start'), target: (function () { var d = new Date(val('start') || today); d.setDate(d.getDate() + 7 * pb.weeks.max); return d.toISOString().slice(0, 10); })(), demo: true, summary: val('summary') || '(a sentence on why)', roles: roles, spaces: rooms.map(function (r) { return { space: r, state: 'not-started' }; }), tasks: tasks };
+          out.path = 'data/projects/' + id.toLowerCase() + '.yaml'; out.kind = 'new file';
+          out.text = '# Proposed ' + today + ' by ' + me().name + '. Tasks for the first two phases come from the ' + pb.name + ' playbook; later phases are added at each gate.\n' + Y(obj);
+          out.title = 'New project: ' + obj.name; out.approver = holder('programme');
+          out.checks = [[!!val('name'), 'Has a name'], [rooms.length > 0, 'At least one room'], [!!byRole.pm, 'Has a project manager'], [!!byRole.lead || ['infra-refresh', 'network-refresh'].includes(pb.kind), 'Has a lead engineer'], [tasks.length > 0, tasks.length + ' tasks from the playbook, each with an owner']];
+        },
+      };
+
+      /* 2. Playbook: start from a template (any playbook, or blank), then edit phases, steps and gates. */
+      FORMS.playbook = {
+        render: function () {
+          var pbs = [['', 'Blank']].concat(Object.keys(D.playbooks).map(function (k) { return [k, D.playbooks[k].name]; }));
+          return '' +
+            '<div class="ef-2">' + field('Start from', '<select name="tpl">' + opts(pbs, new URLSearchParams(location.search).get('pb') || 'av-refresh') + '</select>') + field('Kind of project', '<select name="kind">' + opts(Object.keys(D.enums.kinds).map(function (k) { return [k, D.enums.kinds[k]]; }), 'refresh') + '</select>') + '</div>' +
+            '<div class="ef-2">' + field('Name', '<input name="name" />') + field('Intensity', '<select name="intensity">' + opts(['light', 'medium', 'heavy'], 'light') + '</select>') + '</div>' +
+            field('When to use it', '<textarea name="when" rows="2"></textarea>') +
+            '<div data-phases class="ef-phases"></div>';
+        },
+        after: function () {
+          var load = function () {
+            var t = D.playbooks[val('tpl')] || { name: '', kind: 'refresh', intensity: 'light', when: '', phases: D.phases.map(function (p) { return { phase: p.id, weeks: '1', steps: [], gate: { by: ['pm'], checks: [] } }; }) };
+            form.querySelector('[name=name]').value = t.id ? t.name + ' (copy)' : '';
+            form.querySelector('[name=kind]').value = t.kind; form.querySelector('[name=intensity]').value = t.intensity; form.querySelector('[name=when]').value = t.when || '';
+            var roleOpts = Object.keys(D.roles).map(function (k) { return [k, D.roles[k]]; });
+            form.querySelector('[data-phases]').innerHTML = t.phases.map(function (ph, pi) {
+              var name = (D.phases.find(function (x) { return x.id === ph.phase; }) || {}).name;
+              return '<details class="ef-ph" ' + (pi < 2 ? 'open' : '') + ' data-phase="' + ph.phase + '"><summary><b>' + name + '</b><input class="ef-weeks" data-weeks value="' + esc(ph.weeks) + '" aria-label="Weeks" /> weeks<span class="faint" data-count>' + ph.steps.length + ' steps</span></summary>' +
+                '<ol class="ef-steps">' + ph.steps.map(function (st) { return stepRow(st, roleOpts); }).join('') + '</ol>' +
+                '<button type="button" class="btn small" data-add-step>Add a step</button>' +
+                '<div class="ef-gate"><span>Gate, signed off by</span><select data-gate-by>' + opts(roleOpts, ph.gate.by[0]) + '</select><input data-gate-checks value="' + esc(ph.gate.checks.join('; ')) + '" placeholder="What must be true, separated by semicolons" /></div></details>';
+            }).join('');
+          };
+          form.querySelector('[name=tpl]').addEventListener('change', function () { load(); update(); }); load();
+          form.addEventListener('click', function (e) {
+            var roleOpts = Object.keys(D.roles).map(function (k) { return [k, D.roles[k]]; });
+            if (e.target.closest('[data-add-step]')) { var ol = e.target.closest('.ef-ph').querySelector('.ef-steps'); ol.insertAdjacentHTML('beforeend', stepRow({ title: '', role: 'delivery' }, roleOpts)); ol.lastElementChild.querySelector('input').focus(); update(); }
+            var b = e.target.closest('[data-step-act]'); if (!b) return;
+            var li = b.closest('li'), act = b.dataset.stepAct;
+            if (act === 'up' && li.previousElementSibling) li.parentNode.insertBefore(li, li.previousElementSibling);
+            if (act === 'down' && li.nextElementSibling) li.parentNode.insertBefore(li.nextElementSibling, li);
+            if (act === 'del') li.remove();
+            update();
+          });
+        },
+        build: function () {
+          var phases = Array.from(form.querySelectorAll('.ef-ph')).map(function (d) {
+            var steps = Array.from(d.querySelectorAll('.ef-steps li')).map(function (li) { var st = { title: li.querySelector('[data-title]').value.trim(), role: li.querySelector('[data-role]').value }; if (li.querySelector('[data-ll]').checked) st.long_lead = true; return st; }).filter(function (s) { return s.title; });
+            d.querySelector('[data-count]').textContent = steps.length + ' steps';
+            return { phase: d.dataset.phase, weeks: d.querySelector('[data-weeks]').value || '1', steps: steps, gate: { by: [d.querySelector('[data-gate-by]').value], checks: d.querySelector('[data-gate-checks]').value.split(';').map(function (s) { return s.trim(); }).filter(Boolean) } };
+          });
+          var tpl = D.playbooks[val('tpl')], id = slug(val('name')) || 'new-playbook', editing = tpl && val('name') === tpl.name;
+          var obj = { id: editing ? tpl.id : id, name: val('name'), kind: val('kind'), version: editing ? tpl.version.replace(/(\d+)$/, function (n) { return +n + 1; }) : '0.1', intensity: val('intensity'), weeks: tpl ? tpl.weeks : { min: 4, max: 8 }, summary: tpl ? tpl.summary : '(what this playbook is for)', when: val('when'), phases: phases };
+          out.path = 'data/playbooks/' + obj.id + '.yaml'; out.kind = editing ? 'changes ' + tpl.id + '.yaml' : 'new file';
+          out.text = '# Proposed ' + today + ' by ' + me().name + (tpl ? ', starting from the ' + tpl.name + ' playbook' : '') + '.\n' + Y(obj);
+          out.title = (editing ? 'Update playbook: ' : 'New playbook: ') + (obj.name || '(name needed)');
+          out.approver = holder('programme') + ' with ' + holder('sm-av');
+          var empty = phases.filter(function (p) { return !p.steps.length && p.phase !== 'closed'; }).length;
+          out.checks = [[!!obj.name, 'Has a name'], [empty === 0, empty ? empty + ' phases have no steps' : 'Every phase has steps'], [phases.every(function (p) { return p.gate.checks.length; }), 'Every gate says what must be true']];
+        },
+      };
+      function stepRow(st, roleOpts) {
+        return '<li><input data-title value="' + esc(st.title) + '" placeholder="What gets done" /><select data-role>' + opts(roleOpts, st.role) + '</select><label class="ef-ll"><input type="checkbox" data-ll ' + (st.long_lead ? 'checked' : '') + ' />Long lead</label><span class="ef-acts"><button type="button" data-step-act="up" aria-label="Move up">↑</button><button type="button" data-step-act="down" aria-label="Move down">↓</button><button type="button" data-step-act="del" aria-label="Remove">×</button></span></li>';
+      }
+
+      /* 3. Device profile: what healthy means, per platform, and the troubleshooting guide. */
+      FORMS.profile = {
+        render: function () {
+          var cls = new URLSearchParams(location.search).get('cls') || 'video-bar';
+          return '' +
+            field('Profile', '<select name="cls">' + opts(Object.keys(D.classes).map(function (k) { return [k, D.classes[k].name]; }), cls) + '</select>') + '<div data-prof></div>';
+        },
+        after: function () {
+          var fill = function () {
+            var c = D.classes[val('cls')];
+            form.querySelector('[data-prof]').innerHTML = field('What it does', '<textarea name="role" rows="2">' + esc(c.role) + '</textarea>') +
+              Object.keys(c.platforms).map(function (k) { var p = c.platforms[k]; return '<fieldset class="ef-set"><legend>' + esc({ keia_atlas: 'Keia Atlas', inventory: 'Asset register', dhcp_dns: 'Addresses and DNS', device_management: 'Device management', room_booking: 'Room booking', monitoring: 'Monitoring' }[k] || k) + '</legend>' + field('Healthy when', '<textarea name="h-' + k + '" rows="' + (p.healthy.length + 1) + '">' + esc(p.healthy.join('\n')) + '</textarea>') + field('Fields it must hold', '<input name="f-' + k + '" value="' + esc(p.fields.join(', ')) + '" />') + '</fieldset>'; }).join('') +
+              field('Troubleshooting: add a symptom', '<input name="sym" placeholder="Picture freezes when a laptop is shared" />', 'Likely causes, one per line, below') + '<textarea name="sym-causes" rows="2" placeholder="HDMI cable too long for 4K&#10;Laptop output set to a mode the bar can\'t take"></textarea>';
+          };
+          form.querySelector('[name=cls]').addEventListener('change', function () { fill(); update(); }); fill();
+        },
+        build: function () {
+          var id = val('cls'), c = D.classes[id], diff = [], changed = 0;
+          if (val('role') !== c.role) { diff.push('  object_role:', '-   ' + c.role, '+   ' + val('role')); changed++; }
+          Object.keys(c.platforms).forEach(function (k) {
+            var before = c.platforms[k].healthy, after = lines('h-' + k);
+            before.filter(function (x) { return after.indexOf(x) < 0; }).forEach(function (x) { diff.push('  ' + k + '.healthy_indicators', '-   ' + x); changed++; });
+            after.filter(function (x) { return before.indexOf(x) < 0; }).forEach(function (x) { diff.push('  ' + k + '.healthy_indicators', '+   ' + x); changed++; });
+            var bf = c.platforms[k].fields.join(', '), af = val('f-' + k);
+            if (bf !== af) { diff.push('  ' + k + '.required_fields', '-   ' + bf, '+   ' + af); changed++; }
+          });
+          if (val('sym')) { diff.push('  discrimination:', '+   ' + slug(val('sym')).replace(/-/g, '_') + ':', '+     likely_causes: [' + lines('sym-causes').join('; ') + ']'); changed++; }
+          out.path = 'data/device-classes/' + id + '.yaml'; out.kind = 'changes, version ' + c.version + ' to ' + c.version.replace(/(\d+)$/, function (n) { return +n + 1; });
+          out.text = changed ? diff.join('\n') + '\n' : '(No changes yet. Edit a line on the left.)';
+          out.title = 'Update device profile: ' + c.name; out.approver = holder('sm-av');
+          out.checks = [[changed > 0, changed ? changed + ' changes' : 'Nothing changed yet'], [!val('sym') || lines('sym-causes').length > 0, 'A new symptom has at least one cause']];
+        },
+      };
+
+      /* 4. New device model: facts from the vendor's documents, each port as a row, and the source. */
+      FORMS.model = {
+        render: function () {
+          var e = D.enums;
+          return '' +
+            '<div class="ef-2">' + field('Maker', '<input name="mfr" placeholder="Poly" />') + field('Model', '<input name="model" placeholder="Studio X32" />') + '</div>' +
+            '<div class="ef-2">' + field('Device profile', '<select name="cls">' + opts(Object.keys(D.classes).map(function (k) { return [k, D.classes[k].name]; }), 'video-bar') + '</select>') + field('Part number', '<input name="part" />') + '</div>' +
+            field('Summary', '<textarea name="summary" rows="2"></textarea>') +
+            '<div class="ef-3">' + field('Width mm', '<input name="w" type="number" />') + field('Height mm', '<input name="h" type="number" />') + field('Depth mm', '<input name="d" type="number" />') + '</div>' +
+            '<fieldset class="ef-set"><legend>Ports</legend><ol class="ef-ports" data-ports></ol><button type="button" class="btn small" data-add-port>Add a port</button></fieldset>' +
+            field('Source document (URL)', '<input name="src" type="url" placeholder="https://… data sheet or admin guide" />', 'Required: every fact needs a vendor source.');
+        },
+        after: function () {
+          var e = D.enums, list = form.querySelector('[data-ports]');
+          var add = function (p) { list.insertAdjacentHTML('beforeend', '<li><input data-pid value="' + (p.id || '') + '" placeholder="hdmi-in-1" /><select data-conn>' + opts(e.connector, p.connector || 'hdmi') + '</select><select data-sig multiple size="1" title="Hold Ctrl or Cmd to pick more than one">' + opts(e.signals, '') + '</select><select data-face>' + opts(e.face, p.face || 'rear') + '</select><select data-dir>' + opts(e.direction, p.direction || 'in') + '</select><button type="button" data-port-del aria-label="Remove">×</button></li>'); };
+          add({ id: 'lan-1', connector: 'rj45', direction: 'bidirectional' }); add({ id: 'hdmi-out-1', connector: 'hdmi', direction: 'out' });
+          form.querySelector('[data-add-port]').addEventListener('click', function () { add({}); update(); });
+          list.addEventListener('click', function (ev) { if (ev.target.closest('[data-port-del]')) { ev.target.closest('li').remove(); update(); } });
+        },
+        build: function () {
+          var id = slug(val('mfr') + ' ' + val('model'));
+          var ports = Array.from(form.querySelectorAll('[data-ports] li')).map(function (li, i) {
+            var sig = Array.from(li.querySelector('[data-sig]').selectedOptions).map(function (o) { return o.value; });
+            var conn = li.querySelector('[data-conn]').value;
+            if (!sig.length) sig = conn === 'rj45' ? ['ethernet'] : conn === 'hdmi' ? ['video', 'audio'] : conn.indexOf('usb') === 0 ? ['usb'] : ['power'];
+            return { id: li.querySelector('[data-pid]').value || ('port-' + (i + 1)), connector: conn, signals: sig, direction: li.querySelector('[data-dir]').value, face: li.querySelector('[data-face]').value, order: i + 1 };
+          });
+          var obj = { manufacturer: val('mfr'), model: val('model'), part_numbers: val('part') ? [{ number: val('part') }] : undefined, class: val('cls'), summary: val('summary'), dimensions_mm: val('w') ? { width: +val('w'), height: +val('h'), depth: +val('d') } : undefined, sources: val('src') ? [{ source: 'new-' + id, provides: 'Specifications and ports' }] : [], ports: ports, gaps: ['Read by one person so far; needs a second reading before it counts'] };
+          out.path = 'data/device-models/' + (id || 'new-model') + '.yaml'; out.kind = 'new file';
+          out.text = '# Device model: ' + val('mfr') + ' ' + val('model') + '\n# Proposed ' + today + ' by ' + me().name + '. Facts from ' + (val('src') || '(source needed)') + '\n' + Y(obj);
+          out.title = 'New device model: ' + (val('mfr') + ' ' + val('model')).trim(); out.approver = holder('sm-av') + ', after a Lab check by ' + holder('innovation');
+          out.checks = [[!!val('mfr') && !!val('model'), 'Maker and model'], [!D.models[id], D.models[id] ? 'Already in Keia Atlas' : 'Not already in Keia Atlas'], [!!val('src'), 'Has a vendor source'], [ports.length > 0, ports.length + ' ports'], [!!val('summary'), 'Has a summary']];
+        },
+      };
+
+      /* 5. Configuration setting: add what you learned while setting a device up. */
+      FORMS.config = {
+        render: function () {
+          var cfgs = Object.keys(D.configs).map(function (k) { return [k, D.configs[k].name]; });
+          return '' +
+            field('Configuration', '<select name="cfg">' + opts(cfgs, 'poly-x-google-meet') + '</select>') +
+            '<div class="ef-2">' + field('Group', '<select name="group"></select>') + field('Setting name, as the device shows it', '<input name="sname" placeholder="Enable Automatic Updates" />') + '</div>' +
+            '<div class="ef-2">' + field('Where it is', '<input name="spath" placeholder="General Settings > Device Management" />') + field('Value', '<input name="sval" placeholder="Off" />') + '</div>' +
+            field('Why', '<textarea name="why" rows="2" placeholder="What goes wrong without it."></textarea>') +
+            '<div class="ef-2">' + field('Source (URL)', '<input name="src" type="url" placeholder="https://… admin guide page" />') + field('Differs per device', '<select name="per"><option value="">No, the same everywhere</option><option value="1">Yes, from the device\'s record</option></select>') + '</div>';
+        },
+        after: function () {
+          var fill = function () { form.querySelector('[name=group]').innerHTML = opts(D.configs[val('cfg')].groups, D.configs[val('cfg')].groups[0]); };
+          form.querySelector('[name=cfg]').addEventListener('change', function () { fill(); update(); }); fill();
+        },
+        build: function () {
+          var c = D.configs[val('cfg')], st = { name: val('sname'), path: val('spath') || undefined, value: val('sval'), per_device: val('per') ? true : undefined, why: val('why') };
+          out.path = 'data/configurations/' + val('cfg') + '.yaml'; out.kind = 'adds to "' + val('group') + '", version ' + c.version + ' to ' + c.version.replace(/(\d+)$/, function (n) { return +n + 1; });
+          out.text = '  - name: ' + val('group') + '\n    settings:\n      ...\n' + Y([st]).split('\n').map(function (l) { return l ? '+     ' + l : l; }).join('\n') + '+       source: ' + (val('src') ? '(new source entry for ' + val('src') + ')' : '(source needed)') + '\n';
+          out.title = 'Add setting "' + (val('sname') || '…') + '" to ' + c.name; out.approver = holder('sm-av');
+          out.checks = [[!!val('sname'), 'Setting name'], [!!val('sval'), 'Value'], [!!val('why'), 'Reason'], [!!val('src'), 'Vendor source']];
+        },
+      };
+
+      /* 6. Firmware release: log a new release; it starts in the Lab or blocked, never as the standard. */
+      FORMS.firmware = {
+        render: function () {
+          var lines_ = Object.keys(D.firmware).map(function (k) { return [k, D.firmware[k].name]; });
+          return '' +
+            field('Firmware line', '<select name="line">' + opts(lines_, 'poly-videoos') + '</select>') +
+            '<div class="ef-2">' + field('Version', '<input name="ver" placeholder="4.7.1" />') + field('Released', '<input type="date" name="rel" value="' + today + '" />') + '</div>' +
+            field('Status', '<select name="status"><option value="lab">In the Lab: test before use</option><option value="blocked">Do not install</option><option value="available">Available, not tested</option></select>') +
+            field('What\'s new', '<textarea name="heads" rows="3" placeholder="One line each"></textarea>') +
+            field('Known issues', '<textarea name="issues" rows="2" placeholder="One line each"></textarea>') +
+            field('Release notes (URL)', '<input name="src" type="url" />');
+        },
+        build: function () {
+          var f = D.firmware[val('line')], r = { version: val('ver'), released: val('rel'), status: val('status'), headlines: lines('heads'), known_issues: lines('issues'), source: val('src') ? '(new source entry)' : undefined };
+          out.path = 'data/firmware/' + val('line') + '.yaml'; out.kind = 'adds a release above ' + f.latest;
+          out.text = 'releases:\n' + Y([r]).split('\n').map(function (l) { return l ? '+ ' + l : l; }).join('\n');
+          out.title = f.name + ' ' + (val('ver') || '…') + ' logged'; out.approver = holder('innovation') + ' (Lab), then ' + holder('sm-av');
+          out.checks = [[!!val('ver'), 'Version'], [lines('heads').length > 0, "What's new"], [!!val('src'), 'Release notes link'], [val('status') !== 'standard', 'Not the standard until it passes the Lab']];
+        },
+      };
+
+      function update() {
+        try { FORMS[state.tab].build(); } catch (e) { out.text = '(' + e.message + ')'; }
+        document.querySelector('[data-ed-path]').textContent = out.path;
+        document.querySelector('[data-ed-kind]').textContent = out.kind;
+        document.querySelector('[data-ed-yaml]').innerHTML = esc(out.text).replace(/^(\+.*)$/gm, '<ins>$1</ins>').replace(/^(-.*)$/gm, '<del>$1</del>').replace(/^(#.*)$/gm, '<i>$1</i>');
+        document.querySelector('[data-ed-who]').textContent = out.approver;
+        document.querySelector('[data-ed-checks]').innerHTML = out.checks.map(function (c) { return '<li class="' + (c[0] ? 'ok' : 'no') + '">' + esc(c[1]) + '</li>'; }).join('');
+        document.querySelector('[data-ed-propose]').disabled = out.checks.some(function (c) { return !c[0]; });
+      }
+      function show(tab) {
+        state.tab = tab;
+        form.innerHTML = '<p class="ed-intro faint">' + esc(D.intro[tab]) + '</p>' + FORMS[tab].render(); if (FORMS[tab].after) FORMS[tab].after(); update();
+        history.replaceState(history.state, '', '?kind=' + tab + (tab === 'profile' ? '&cls=' + val('cls') : ''));
+      }
+      form.addEventListener('input', update); form.addEventListener('change', update);
+      // The tabs are the shared DetailTabs; picking one shows that kind of form.
+      var tabs = document.querySelector('[data-dt]');
+      if (tabs) tabs.addEventListener('dt:change', function (e) { if (FORMS[e.detail.id]) show(e.detail.id); });
+      document.querySelector('[data-ed-propose]').addEventListener('click', function () {
+        var list = []; try { list = JSON.parse(localStorage.getItem('rs4-changes') || '[]'); } catch (_) {}
+        var id = 'CHG-' + (list.reduce(function (m, x) { return Math.max(m, parseInt(String(x.id).replace(/\D/g, ''), 10) || 0); }, 40) + 1);
+        list.unshift({ id: id, title: out.title, kind: state.tab, path: out.path, change: out.kind, text: out.text, by: me().name, byRole: me().role, approver: out.approver, date: today, status: 'review' });
+        try { localStorage.setItem('rs4-changes', JSON.stringify(list)); } catch (_) {}
+        window.__rsNewChange = list[0];
+        var a = document.createElement('a'); a.href = (/\.html$/.test(location.pathname) ? '../changes/index.html' : '../changes/') + '#' + id.toLowerCase(); document.body.appendChild(a); a.click();
+      });
+      var want = new URLSearchParams(location.search).get('kind') || location.hash.slice(1) || 'project';
+      if (!FORMS[want]) want = 'project';
+      if (tabs && tabs.rsTabs && tabs.rsTabs.current() !== want) tabs.rsTabs.select(want); // fires dt:change, which shows the form
+      else show(want);
+    })();
+  </script>
+</Shell>
+<style is:global>
+  .ed-form > .ed-intro { margin: 0; font-size: 13.5px; }
+  .ed-form { display: grid; gap: 12px; }
+  .ef { display: grid; gap: 4px; }
+  .ef-l { font: 700 11px/1.2 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }
+  .ef small { font-size: 11.5px; color: var(--text-3); }
+  .ed-form input:not([type=checkbox]), .ed-form select, .ed-form textarea { width: 100%; font: 500 14px/1.35 var(--font-sans); padding: 8px 10px; border-radius: 8px; border: 1.5px solid var(--line-strong); background: var(--surface); color: var(--text); }
+  .ed-form textarea { resize: vertical; }
+  .ed-form input:focus, .ed-form select:focus, .ed-form textarea:focus { outline: 3px solid var(--focus); outline-offset: 1px; }
+  .ef-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } .ef-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .ef-set { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; display: grid; gap: 8px; margin: 0; }
+  .ef-set legend { font: 700 11px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); padding: 0 4px; }
+  .ef-row { display: grid; grid-template-columns: 150px minmax(0, 1fr) 90px; gap: 8px; align-items: center; font-size: 13px; }
+  .ef-rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; }
+  .ef-chk { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; padding: 6px 8px; border-radius: 8px; background: var(--surface-2); }
+  .ef-chk small { display: block; font-size: 11px; color: var(--text-3); }
+  .ef-phases { display: grid; gap: 8px; }
+  .ef-ph { border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 0 12px; }
+  .ef-ph summary { display: flex; gap: 8px; align-items: center; padding: 10px 0; cursor: pointer; font-size: 13px; }
+  .ef-ph summary b { font-size: 15px; min-width: 90px; }
+  .ef-ph summary .faint { margin-left: auto; }
+  .ed-form .ef-weeks { width: 70px !important; padding: 4px 6px !important; font-size: 12.5px !important; }
+  .ef-steps { margin: 0 0 8px; padding: 0 0 0 20px; display: grid; gap: 6px; }
+  .ef-steps li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
+  .ef-steps li [data-title] { grid-column: 1 / -1; }
+  .ef-ll { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; color: var(--text-2); white-space: nowrap; }
+  .ef-acts { display: inline-flex; gap: 2px; }
+  .ef-acts button, .ef-ports button { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--text-2); cursor: pointer; }
+  .ef-gate { display: grid; grid-template-columns: auto 190px minmax(0, 1fr); gap: 6px; align-items: center; padding: 8px 0 12px; font-size: 12.5px; color: var(--text-2); border-top: 1px dashed var(--line-strong); }
+  .ef-ports { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+  .ef-ports li { display: grid; grid-template-columns: minmax(0, 1fr) 110px 120px 90px 120px 26px; gap: 6px; align-items: center; }
+  .ed-k { margin: 0; font: 700 10.5px/1.2 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+  .ed-review { display: grid; gap: 8px; }
+  .ed-who { margin: 0 0 6px; font-weight: 650; }
+  .ed-checks { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+  .ed-checks li::before { content: "✓"; display: inline-grid; place-items: center; width: 18px; height: 18px; margin-right: 8px; border-radius: 50%; background: var(--green); color: #fff; font-size: 11px; font-weight: 700; }
+  .ed-checks li.no::before { content: "!"; background: var(--amber); }
+  .ed-checks li.no { color: var(--amber-ink); }
+  .ed-review .btn[disabled] { opacity: .45; cursor: not-allowed; }
+  .ed-note { margin: 0; font-size: 12px; }
+  .ed-file { margin-top: 14px; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); }
+  .ed-file-h { display: flex; justify-content: space-between; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); text-transform: none; letter-spacing: 0; font-size: 12px; }
+  .ed-yaml { margin: 0; padding: 12px 14px; font: 500 12px/1.55 var(--font-mono); white-space: pre-wrap; word-break: break-word; background: var(--surface-2); }
+  .ed-yaml ins { text-decoration: none; color: var(--green-ink); background: var(--green-soft); display: inline-block; width: 100%; }
+  .ed-yaml del { text-decoration: none; color: var(--red-ink); background: var(--red-soft); display: inline-block; width: 100%; }
+  .ed-yaml i { font-style: normal; color: var(--text-3); }
+  @media (max-width: 1100px) { .ef-ports li, .ef-steps li { grid-template-columns: 1fr 1fr; } }
+</style>

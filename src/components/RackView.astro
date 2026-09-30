@@ -1,0 +1,478 @@
+---
+// A comms room rack in the Record shape every room and device page uses (decision 0028, rule R5;
+// docs/standards/page-anatomy.md): the picture on the left (7 columns), its key on the right (5).
+//
+// The picture: the whole rack small and to scale (about 12 px a unit), every item drawn from its
+// product's front with a bar in its group's colour, free space dashed; beside it the chosen item large,
+// every port on it, and under that its facts (model, health, hostname, ports, uplinks, PoE, unit, what it
+// replaced) and its links. Point at an item to see its name; click, tap or Enter chooses it; Up, Down,
+// Home and End move through the items. The choice is kept in the address (#u19). Point at a port, or use
+// Left and Right, to see where its cable goes; click keeps it.
+//
+// The key: "What's in the rack", one row per item, top of the rack first, with its model, hostname and
+// health. It is the device list: pointing at a row lights the item in the small rack, choosing a row shows
+// it large. Older kit still installed sits at the foot as a short note.
+//
+// Motion: the chosen slot grows into the large drawing and the words cross-fade inside a frame that only
+// grows, so the page never moves under the pointer. Reduced motion switches at once. A screen reader gets
+// the items as a list box (visually hidden). A rack with a recorded replacement can be shown as it was.
+import SidePanel from './SidePanel.astro';
+import { FACES, faceOf, U, FACE } from '../lib/rackfaces.mjs';
+import { rackItems, GROUP_LABEL, KIND_LABEL } from '../lib/comms.mjs';
+import { rackGear, modelName, href, plural } from '../lib/data.mjs';
+const { rack, space = null, uid = rack.id, patching = null, rec = {}, help = 'room.rack', keyTitle = "What's in the rack", note = null } = Astro.props;
+const X0 = 60, TOP = 10;                       // the 19-inch face starts after the unit numbers
+const H = rack.height_u * U, VBW = X0 + FACE + 12, VBH = TOP + H + 10;
+const SCALE = 0.27;                            // px per mm in the small rack: 12 px a unit
+const yOf = (it) => TOP + (rack.height_u - (it.u + it.size - 1)) * U;
+const info = rackItems(rack, space);
+const quiet = (k) => k === 'blank' || k === 'cable-manager';
+const items = rack.items.map((it, i) => {
+  const d = info[i], g = it.gear ? rackGear[it.gear] : null;
+  const face = it.kind === 'reserved' ? null : faceOf(it, g);
+  const was = d.before && FACES[d.before.face] ? d.before.face : null;
+  return { it, d, y: yOf(it), h: it.size * U, face, was, ctx: { used: d.used } };
+});
+const used = rack.items.filter((i) => !['blank', 'reserved'].includes(i.kind)).reduce((n, i) => n + i.size, 0);
+const free = rack.height_u - used;
+const pdus = rack.side_pdus ?? [];
+const groups = [...new Set([...info.map((x) => x.grp), ...(pdus.length ? ['power'] : [])])].sort((a, b) => Object.keys(GROUP_LABEL).indexOf(a) - Object.keys(GROUP_LABEL).indexOf(b));
+// The first selection: an item that needs attention, else the top recorded device, else the top network item.
+const top = [...items].sort((a, b) => b.it.u - a.it.u);
+const pick = top.find((x) => x.d.health && ['bad', 'warn'].includes(x.d.health.state))
+  ?? top.find((x) => x.d.unit) ?? top.find((x) => x.d.network) ?? top.find((x) => !quiet(x.it.kind) && x.it.kind !== 'reserved') ?? top[0];
+// What the page script needs per item (the drawing's used-port maps stay here).
+const data = { rack: rack.id, x0: X0, face: FACE, first: pick.d.i, items: items.map(({ d, y, h }) => { const { used: _u, ...rest } = d; return { ...rest, y, h }; }) };
+const sel = (x) => x.d.i === pick.d.i;
+// The key: every item that is a thing (not a blank, cable manager or free space), top first, by group.
+const keyed = top.filter((x) => !quiet(x.it.kind) && x.it.kind !== 'reserved');
+const keyGroups = Object.keys(GROUP_LABEL).map((g) => ({ g, list: keyed.filter((x) => x.d.grp === g) })).filter((k) => k.list.length);
+const older = (space?.olderKit ?? []).map((p) => ({ p, model: p.model ? modelName(p.model) : null }));
+const fmt = (d) => (d ? new Date(d).toLocaleDateString('en-IE', { day: 'numeric', month: 'short', year: 'numeric' }) : null);
+const nKey = keyed.length + pdus.length;
+---
+<div class="g12 top rackv" data-rack-root={uid} data-rack-id={rack.id} data-when="now" data-patching={patching ?? ''}>
+  <section class="card rv-pic s-7 stick" aria-label={`${rack.name}, from the front`} data-help={help} {...rec}>
+    <div class="rv-bar">
+      <ul class="rv-key" aria-label="Key">
+        {groups.map((g) => <li class={`g-${g}`}><i></i>{GROUP_LABEL[g]}</li>)}
+      </ul>
+      <p class="rv-sum faint">{rack.height_u}U · {used}U used, {free}U free</p>
+    </div>
+
+    <div class="rv-body">
+      <div class="rv-overview">
+        <div class="rv-mini" tabindex="0" role="listbox" aria-label={`${rack.name}, ${rack.height_u}U, top to bottom. Up and Down choose an item.`} aria-activedescendant={`${uid}-o${pick.d.i}`} data-help="rack.labels">
+          <svg class="rv-svg rv-small" viewBox={`0 0 ${VBW} ${VBH}`} style={`width:${Math.round(VBW * SCALE)}px`} aria-hidden="true">
+            <rect x="0" y="0" width={VBW} height={VBH} rx="10" class="cab" />
+            <rect x={X0 - 4} y={TOP - 4} width="18" height={H + 8} class="rail" />
+            <rect x={X0 + FACE - 14} y={TOP - 4} width="18" height={H + 8} class="rail" />
+            {Array.from({ length: rack.height_u }, (_, i) => {
+              const u = rack.height_u - i, y = TOP + i * U;
+              return (<><rect x={X0} y={y} width={FACE} height={U} class={`slot ${u % 2 ? '' : 'alt'}`} />{(u % 2 === 1 || rack.height_u <= 24) && <text x={X0 - 22} y={y + U / 2 + 9} class="un" text-anchor="end">{u}</text>}</>);
+            })}
+            {items.map(({ it, d, y, h, face, was, ctx }) => (
+              <g class:list={['ri', `ri-${it.kind}`, `g-${d.grp}`, { quiet: quiet(it.kind), sel: sel({ d }) }]} data-ri={d.i}>
+                <g class="rf">
+                  {face ? (
+                    <>
+                      <g class={was ? 'f-now' : ''}><Fragment set:html={FACES[face](X0, y + 0.6, h - 1.2, ctx)} /></g>
+                      {was && <g class="f-before"><Fragment set:html={FACES[was](X0, y + 0.6, h - 1.2, ctx)} /></g>}
+                    </>
+                  ) : <rect x={X0 + 2} y={y + 2} width={FACE - 4} height={h - 4} rx="4" class="resv" />}
+                </g>
+                {!quiet(it.kind) && <rect x={X0 - 14} y={y + 3} width="7" height={h - 6} rx="3" class="gbar" />}
+                <rect x={X0 - 5} y={y - 2} width={FACE + 10} height={h + 4} rx="5" class="ri-ring" />
+              </g>
+            ))}
+          </svg>
+          <span class="rv-peek" aria-hidden="true" hidden></span>
+          <ol class="sr-only">
+          {items.filter((x) => !quiet(x.it.kind)).map(({ it, d }) => (
+            <li role="option" id={`${uid}-o${d.i}`} data-ri={d.i} aria-selected={String(sel({ d }))}>{d.uText}: {it.label}{d.short ? `, ${d.short}` : ''}{d.health ? `, ${d.health.text}` : ''}</li>
+          ))}
+          </ol>
+        </div>
+      </div>
+
+      <div class="rv-detail" aria-live="polite" aria-label="The chosen item">
+        <header class="rv-dhead" data-d-head></header>
+        <div class="rv-front">
+          <svg class="rv-svg rv-big" tabindex="0" role="img" data-help="rack.front" preserveAspectRatio="xMidYMid meet" aria-label="The chosen item's front. Left and Right move through its ports." data-d-big></svg>
+          <div class="rv-tip" role="status" hidden></div>
+        </div>
+        <div class="rv-dbody" data-d-body></div>
+      </div>
+    </div>
+    {note && <p class="rv-note faint">{note}</p>}
+  </section>
+
+  <SidePanel class="s-5" title={keyTitle} meta={`${plural(nKey, 'item')} · choose one to see it large`} help="rack.key">
+    <div class="rk-list" data-rack-key={uid}>
+      {keyGroups.map(({ g, list }) => (
+        <section class={`rkg g-${g}`}>
+          <h4>{GROUP_LABEL[g]}</h4>
+          <ol>
+            {list.map(({ it, d }) => (
+              <li>
+                <button type="button" class:list={['rkr', { sel: sel({ d }) }]} data-rk-row={d.i} aria-pressed={String(sel({ d }))} data-help="rack.item" data-help-name={it.label}>
+                  <i class="rk-bar" aria-hidden="true"></i>
+                  <span class="rk-main">
+                    <span class="rk-name">{it.label}</span>
+                    <small>{d.short ?? (it.kind === 'shelf' ? 'Shelf' : KIND_LABEL[it.kind])}{d.unit?.host ? ` · ${d.unit.host}` : ''}</small>
+                  </span>
+                  <span class="rk-end">
+                    {d.older && <span class="pill warn rk-old" title={`Older kit, ${d.older.text}`}>Older</span>}
+                    {d.health ? <i class="hl" data-state={d.health.state} title={d.health.text}></i> : <span class="rk-u mono">{d.uText}</span>}
+                  </span>
+                </button>
+              </li>
+            ))}
+            {g === 'power' && pdus.map((p) => (
+              <li>
+                <span class="rkr rk-still">
+                  <i class="rk-bar" aria-hidden="true"></i>
+                  <span class="rk-main"><span class="rk-name">Power strip, feed {p.feed}</span><small>{rackGear[p.gear] ? `${rackGear[p.gear].manufacturer.split(' ')[0]} ${rackGear[p.gear].model}` : 'Power strip'} · upright at the back</small></span>
+                  <span class="rk-end"><span class="rk-u mono">0U</span></span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ))}
+      {older.length > 0 && (
+        <section class="rkg rk-older" data-help="rack.older">
+          <h4>Older kit still installed</h4>
+          <ol>
+            {older.map(({ p, model }) => (
+              <li>
+                <span class="rkr rk-still">
+                  <i class="rk-bar" aria-hidden="true"></i>
+                  <span class="rk-main">
+                    <span class="rk-name">{p.current ? <a href={href(`/device/?tag=${p.current.asset_tag}`)}>{p.role}</a> : p.role}</span>
+                    <small>{model ?? 'Model not recorded'}{p.hostname ? ` · ${p.hostname}` : ''}{p.current?.installed ? ` · since ${fmt(p.current.installed)}` : ''}</small>
+                  </span>
+                  <span class="rk-end"><span class="pill warn">Outside the standard</span></span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+    </div>
+  </SidePanel>
+  <script type="application/json" data-rv-data set:html={JSON.stringify(data)} />
+</div>
+
+<script is:inline data-astro-rerun>
+  (function () {
+    function init(root) {
+      if (root.__rv) return; root.__rv = true;
+      var D = JSON.parse(root.querySelector('[data-rv-data]').textContent), items = D.items;
+      var M = window.rsMotion ? window.rsMotion() : { reduced: true };
+      var mini = root.querySelector('.rv-mini'), peek = root.querySelector('.rv-peek');
+      var big = root.querySelector('[data-d-big]'), front = root.querySelector('.rv-front'), tip = root.querySelector('.rv-tip');
+      var head = root.querySelector('[data-d-head]'), bodyEl = root.querySelector('[data-d-body]'), detail = root.querySelector('.rv-detail');
+      var key = root.querySelector('[data-rack-key]');
+      var order = items.filter(function (d) { return d.kind !== 'blank' && d.kind !== 'cable-manager'; }).sort(function (a, b) { return b.u - a.u; }).map(function (d) { return d.i; });
+      var cur = null, port = null, portPinned = false;
+      var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+      var before = function () { return root.getAttribute('data-when') === 'before'; };
+      var slot = function (i) { return mini.querySelector('[data-ri="' + i + '"]'); };
+      var row = function (i) { return key ? key.querySelector('[data-rk-row="' + i + '"]') : null; };
+
+      function headHTML(d) {
+        var b = before() && d.before, model = b ? d.before.model : d.model;
+        var hs = b && d.unit && d.unit.outgoing ? { state: 'off', text: 'Retired, waiting to be collected' } : d.health;
+        return '<p class="rv-over">' + esc(d.kindLabel) + ' · ' + esc(d.uText) + (d.owner && d.owner !== 'IT infrastructure' ? ' · ' + esc(d.owner) : '') + '</p>' +
+          '<h3 class="rv-title">' + esc(d.label) + '</h3>' +
+          '<p class="rv-model">' + (model ? esc(model) + (!b && d.part ? ' <span class="mono faint">' + esc(d.part) + '</span>' : '') : d.kind === 'reserved' ? esc(d.size) + 'U free' : '<span class="faint">No product recorded</span>') + '</p>' +
+          (hs ? '<p class="rv-health"><i class="hl lit" data-state="' + hs.state + '"></i><span>' + esc(hs.text) + '</span>' + (d.unit && d.unit.host ? '<span class="mono faint">' + esc(d.unit.host) + '</span>' : '') + '</p>' : '');
+      }
+      function bodyHTML(d) {
+        var b = before() && d.before, rows = '';
+        if (d.older) rows += '<div class="rv-was">Older kit, being replaced by UniFi in <a href="' + d.older.link + '">' + (d.older.year ? 'the network refresh' : esc(d.older.short)) + '</a>' + (d.older.year ? ', due ' + d.older.year : '') + '.</div>';
+        if (b) rows += '<div class="rv-was">Here until ' + esc(d.before.date) + ', then replaced by the ' + esc(d.short) + (d.before.reason ? ' (' + esc(d.before.reason) + ')' : '') + '.</div>';
+        if (d.ports) {
+          var p = d.ports, panel = /panel/.test(d.kind);
+          rows += '<div><dt>' + (panel ? 'Outlets' : 'Ports') + '</dt><dd>' + (p.known ? '<b>' + p.used + '</b> ' + (panel ? 'patched' : 'in use') + ', <b>' + p.free + '</b> free of ' + p.total + '<span class="rv-meter"><i style="width:' + Math.round(p.used / p.total * 100) + '%"></i></span>' : p.total + (panel ? ' outlets' : ' ports') + '. Patching not recorded') + '</dd></div>';
+        }
+        if (d.uplinks.length) rows += '<div><dt>Uplinks</dt><dd>' + d.uplinks.map(esc).join('<br>') + '</dd></div>';
+        if (d.poe && !b) rows += '<div><dt>PoE</dt><dd>' + esc(d.poe) + '</dd></div>';
+        if (d.unit && d.unit.tag && !b) rows += '<div><dt>Unit</dt><dd><span class="mono">' + esc(d.unit.tag) + '</span>' + (d.unit.serial ? ' · <span class="mono">' + esc(d.unit.serial) + '</span>' : '') + (d.unit.since ? ', since ' + esc(d.unit.since) : '') + '</dd></div>';
+        if (d.does && !b) rows += '<div><dt>Does</dt><dd>' + esc(d.does) + '</dd></div>';
+        if (d.detail) rows += '<div><dt>Note</dt><dd>' + esc(d.detail) + '</dd></div>';
+        if (!b && d.before) rows += '<div class="rv-was">Replaced the ' + esc(d.before.short) + ' on ' + esc(d.before.date) + '.' + (d.unit && d.unit.outgoing ? ' The old unit, <a href="' + d.unit.outgoing.link + '">' + esc(d.unit.outgoing.tag) + '</a>, is waiting to be collected.' : '') + '</div>';
+        var acts = [];
+        if (d.unit && d.unit.link && !b) acts.push('<a class="btn small" href="' + d.unit.link + '">Open the unit</a>');
+        if (b && d.unit && d.unit.outgoing) acts.push('<a class="btn small" href="' + d.unit.outgoing.link + '">Open the old unit</a>');
+        if (d.modelPage && !b) acts.push('<a class="btn small ghost" href="' + d.modelPage + '">About the model</a>');
+        var pid = root.getAttribute('data-patching');
+        if (pid && d.cables.length) acts.push('<a class="btn small ghost" href="#' + esc(pid) + '">Patching (' + d.cables.length + ')</a>');
+        var more = '';
+        var leds = Object.keys(d.leds || {}); if (leds.length && !b) more += '<dl class="rv-kv"><div><dt>Lights</dt><dd>' + leds.map(function (k) { return '<b>' + esc(k.replace(/_/g, ' ')) + '</b>: ' + esc(d.leds[k]); }).join('<br>') + '</dd></div></dl>';
+        var facts = Object.keys(d.facts || {}); if (facts.length && !b) more += '<dl class="rv-kv">' + facts.map(function (k) { return '<div><dt>' + esc(k) + '</dt><dd>' + esc(d.facts[k]) + '</dd></div>'; }).join('') + '</dl>';
+        if (d.sources.length && !b) more += '<p class="rv-src faint">Sources: ' + d.sources.map(function (s) { return '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(s.title.split(':')[0]) + '</a>'; }).join(', ') + '</p>';
+        return '<dl class="rv-kv rv-facts">' + rows + '</dl>' + (acts.length ? '<p class="rv-actions">' + acts.join('') + '</p>' : '') +
+          (more ? '<details class="rv-more"><summary>About this product</summary>' + more + '</details>' : '');
+      }
+      function drawBig(d) {
+        big.innerHTML = '';
+        var g = slot(d.i), rf = g && g.querySelector('.rf');
+        if (rf) big.appendChild(rf.cloneNode(true));
+        big.setAttribute('viewBox', (D.x0 - 1) + ' ' + (d.y - 1) + ' ' + (D.face + 2) + ' ' + (d.h + 2));
+        big.setAttribute('aria-label', d.label + ', front. ' + (Object.keys(d.portInfo).length ? 'Left and Right move through its ports.' : ''));
+      }
+      function lightRows(i, on) {
+        var d = items[i]; if (!d) return;
+        document.querySelectorAll('[data-rp-ends~="' + D.rack + ':' + d.u + '"]').forEach(function (r) { r.classList.toggle('is-lit', on); });
+        if (on) document.dispatchEvent(new CustomEvent('rs:rack-pick', { detail: { rack: D.rack, u: d.u } }));
+        d.links.forEach(function (j) { var s = slot(j); if (s) s.classList.toggle('linked', on); });
+      }
+      function select(i, how) {
+        var d = items[i]; if (!d || d.kind === 'blank' || d.kind === 'cable-manager') return;
+        var prev = cur, animate = how === 'user' && prev !== i && !M.reduced;
+        var from = animate ? slot(i).getBoundingClientRect() : null;
+        if (prev != null) { lightRows(prev, false); var ps = slot(prev); if (ps) ps.classList.remove('sel'); var pr = row(prev); if (pr) { pr.classList.remove('sel'); pr.setAttribute('aria-pressed', 'false'); } }
+        cur = i; hideTip(true);
+        slot(i).classList.add('sel'); lightRows(i, true);
+        var r = row(i); if (r) { r.classList.add('sel'); r.setAttribute('aria-pressed', 'true'); }
+        root.querySelectorAll('[role="option"]').forEach(function (o) { o.setAttribute('aria-selected', String(+o.getAttribute('data-ri') === i)); });
+        mini.setAttribute('aria-activedescendant', root.getAttribute('data-rack-root') + '-o' + i);
+        var swap = function () { head.innerHTML = headHTML(d); bodyEl.innerHTML = bodyHTML(d); drawBig(d); };
+        // The frame only grows, and the scroll position is kept, so the page never moves.
+        if (window.rsHold) window.rsHold(detail, swap); else swap();
+        if (how === 'user' && history.replaceState) history.replaceState(history.state, '', '#u' + d.u);
+        if (animate) {
+          // The slot grows into the large drawing (shared element), and the words cross-fade in place.
+          var to = big.getBoundingClientRect(), vb = big.viewBox.baseVal, k = Math.min(to.width / vb.width, to.height / vb.height);
+          var w = vb.width * k, h = vb.height * k, x = to.left + (to.width - w) / 2, y = to.top + (to.height - h) / 2;
+          var sx = from.width / w, sy = from.height / h;
+          big.animate([{ transformOrigin: (x - to.left) + 'px ' + (y - to.top) + 'px', transform: 'translate(' + (from.left - x) + 'px,' + (from.top - y) + 'px) scale(' + sx + ',' + sy + ')', opacity: 0.6 },
+            { transformOrigin: (x - to.left) + 'px ' + (y - to.top) + 'px', transform: 'none', opacity: 1 }], { duration: M.morph, easing: M.ease });
+          [head, bodyEl].forEach(function (el) { el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: M.state, easing: M.ease }); });
+        }
+      }
+
+      // ---- The small rack: point to see the name, click or Enter to choose, Up and Down to move. ----
+      function hot(i, on) {
+        mini.querySelectorAll('.hot').forEach(function (x) { x.classList.remove('hot'); });
+        if (key) key.querySelectorAll('.hit').forEach(function (x) { x.classList.remove('hit'); });
+        if (!on || i == null) return;
+        var s = slot(i); if (s) s.classList.add('hot');
+        var r = row(i); if (r) r.classList.add('hit');
+      }
+      function showPeek(i) {
+        var d = items[i], s = slot(i); if (!d || !s || d.kind === 'blank' || d.kind === 'cable-manager') { peek.hidden = true; return; }
+        var mr = mini.getBoundingClientRect(), r = s.getBoundingClientRect();
+        peek.textContent = d.uText + '  ' + d.label; peek.hidden = false;
+        peek.style.top = (r.top - mr.top + r.height / 2) + 'px';
+      }
+      mini.addEventListener('pointerover', function (e) { var g = e.target.closest('[data-ri]'); if (!g) return; hot(+g.getAttribute('data-ri'), true); showPeek(+g.getAttribute('data-ri')); });
+      mini.addEventListener('pointerleave', function () { hot(null, false); peek.hidden = true; });
+      mini.addEventListener('click', function (e) { var g = e.target.closest('[data-ri]'); if (g) select(+g.getAttribute('data-ri'), 'user'); });
+      mini.addEventListener('keydown', function (e) {
+        var k = order.indexOf(cur), n = null;
+        if (e.key === 'ArrowDown') n = order[Math.min(order.length - 1, k + 1)];
+        else if (e.key === 'ArrowUp') n = order[Math.max(0, k - 1)];
+        else if (e.key === 'Home') n = order[0];
+        else if (e.key === 'End') n = order[order.length - 1];
+        else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); big.focus({ preventScroll: true }); return; }
+        if (n == null) return;
+        e.preventDefault(); select(n, 'user'); showPeek(n);
+      });
+      mini.addEventListener('blur', function () { peek.hidden = true; });
+
+      // ---- The key: point at a row to find the item in the rack, choose it to see it large. ----
+      if (key) {
+        key.addEventListener('pointerover', function (e) { var r = e.target.closest('[data-rk-row]'); if (r) { hot(+r.getAttribute('data-rk-row'), true); } });
+        key.addEventListener('pointerleave', function () { hot(null, false); });
+        key.addEventListener('click', function (e) { var r = e.target.closest('[data-rk-row]'); if (r) select(+r.getAttribute('data-rk-row'), 'user'); });
+        key.addEventListener('focusin', function (e) { var r = e.target.closest('[data-rk-row]'); if (r) hot(+r.getAttribute('data-rk-row'), true); });
+        key.addEventListener('focusout', function () { hot(null, false); });
+      }
+
+      // ---- The large front: point at a port, or Left and Right, to see where its cable goes. ----
+      function portsOf() { return Array.prototype.slice.call(big.querySelectorAll('.pt')).filter(function (p) { return before() ? !p.closest('.f-now') : !p.closest('.f-before'); }).sort(function (a, b) { return +a.getAttribute('data-p') - +b.getAttribute('data-p'); }); }
+      function tipHTML(d, n) {
+        var c = d.portInfo[n], note = d.portNotes && d.portNotes[n];
+        var h = '<p class="rv-tip-h"><b>Port ' + esc(n) + '</b>' + (note ? ' <span class="faint">' + esc(note) + '</span>' : '') + '</p>';
+        if (!c) return h + '<p class="faint">Free: no patch cable recorded.</p>';
+        h += '<p class="rv-tip-c"><i class="rv-sw" style="--sw:' + esc(c.hex) + '"></i>' + esc(c.type) + ', ' + esc(String(c.colour).toLowerCase()) + (c.length ? ', ' + esc(c.length) : '') + ' · ' + esc(c.purpose) + '</p>';
+        h += '<p>To <b>' + esc(c.to) + '</b>' + (c.note ? '<br><span class="faint">' + esc(c.note) + '</span>' : '') + '</p>';
+        h += '<p class="rv-tip-a"><a href="' + c.cable + '">In the cable list</a>' + (c.toLink ? '<a href="' + c.toLink + '">Open what it reaches</a>' : '') + '</p>';
+        return h;
+      }
+      function showTip(p, pin) {
+        var d = items[cur]; if (!d || !p) return;
+        big.querySelectorAll('.pt-on').forEach(function (x) { x.classList.remove('pt-on'); });
+        p.classList.add('pt-on'); port = +p.getAttribute('data-p'); portPinned = !!pin;
+        tip.innerHTML = tipHTML(d, port); tip.hidden = false; tip.classList.toggle('pinned', !!pin);
+        var fr = front.getBoundingClientRect(), r = p.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+        var left = Math.max(0, Math.min(r.left - fr.left + r.width / 2 - tw / 2, fr.width - tw));
+        var top = r.bottom - fr.top + 8, side = 'below';
+        if (top + th > fr.height + 140 && r.top - fr.top - th - 8 > -60) { top = r.top - fr.top - th - 8; side = 'above'; }
+        tip.style.left = left + 'px'; tip.style.top = top + 'px'; tip.dataset.side = side;
+      }
+      function hideTip(force) { if (portPinned && !force) return; tip.hidden = true; portPinned = false; port = null; big.querySelectorAll('.pt-on').forEach(function (x) { x.classList.remove('pt-on'); }); }
+      big.addEventListener('pointerover', function (e) { var p = e.target.closest('.pt'); if (p && !portPinned) showTip(p, false); });
+      big.addEventListener('pointerleave', function () { if (!portPinned) hideTip(); });
+      big.addEventListener('click', function (e) { var p = e.target.closest('.pt'); if (!p) { hideTip(true); return; } if (portPinned && port === +p.getAttribute('data-p')) hideTip(true); else showTip(p, true); });
+      big.addEventListener('keydown', function (e) {
+        var list = portsOf(); if (!list.length) return;
+        var k = list.findIndex(function (p) { return +p.getAttribute('data-p') === port; });
+        if (e.key === 'ArrowRight') { e.preventDefault(); showTip(list[Math.min(list.length - 1, k + 1)], false); }
+        else if (e.key === 'ArrowLeft') { e.preventDefault(); showTip(list[Math.max(0, k < 0 ? 0 : k - 1)], false); }
+        else if (e.key === 'Enter' && k >= 0) { e.preventDefault(); showTip(list[k], !portPinned); }
+        else if (e.key === 'Escape') { hideTip(true); mini.focus({ preventScroll: true }); }
+      });
+      big.addEventListener('blur', function (e) { if (!portPinned && !front.contains(e.relatedTarget)) hideTip(); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && portPinned && !root.contains(e.target)) hideTip(true); });
+
+      // First selection: the address (#u19) if it names an item here, else the one the page chose.
+      var m = /^#u(\d+)$/.exec(location.hash), start = D.first;
+      if (m) { var hit = items.find(function (d) { return +m[1] >= d.u && +m[1] < d.u + d.size && d.kind !== 'blank' && d.kind !== 'cable-manager'; }); if (hit) start = hit.i; }
+      select(start, 'load');
+      // The Patching list comes after the rack on the page: light its rows once it is there.
+      var relight = function () { if (cur != null) lightRows(cur, true); };
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', relight, { once: true }); else setTimeout(relight, 0);
+    }
+    document.querySelectorAll('[data-rack-root]').forEach(init);
+  })();
+</script>
+
+<style is:global>
+  /* The rack's own colours, from the art tokens (they hold in every look, like every device drawing). */
+  .rackv { --g-patch: var(--blue); --g-switch: var(--green); --g-edge: var(--red); --g-mgmt: var(--violet); --g-power: var(--amber); --g-space: var(--grey); }
+  .rackv .g-patch { --gc: var(--g-patch); } .rackv .g-switch { --gc: var(--g-switch); } .rackv .g-edge { --gc: var(--g-edge); } .rackv .g-mgmt { --gc: var(--g-mgmt); } .rackv .g-power { --gc: var(--g-power); } .rackv .g-space { --gc: var(--g-space); }
+  .rv-pic { container: rackv / inline-size; padding: 14px 16px 16px; display: grid; gap: 12px; align-content: start; min-width: 0; }
+  .rv-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+  .rv-key { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: var(--text-2); }
+  .rv-key li { display: flex; align-items: center; gap: 6px; }
+  .rv-key i { width: 4px; height: 13px; border-radius: 2px; background: var(--gc); }
+  .rv-key .g-space i { background: repeating-linear-gradient(180deg, var(--gc) 0 3px, transparent 3px 5px); }
+  .rv-sum { margin: 0 0 0 auto; font-size: 12.5px; white-space: nowrap; }
+  .rv-note { margin: 0; font-size: 12.5px; }
+
+  /* Overview beside the detail. */
+  .rv-body { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: start; }
+  .rv-overview { position: relative; }
+  .rv-mini { position: relative; display: inline-block; border-radius: 10px; cursor: pointer; }
+  .rv-mini:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .rv-svg { display: block; height: auto; }
+  .rv-small .pt { pointer-events: none; }
+  .rv-peek { position: absolute; left: calc(100% + 8px); transform: translateY(-50%); z-index: 4; padding: 4px 9px; border-radius: var(--radius); background: var(--text); color: var(--surface); font: 600 12px/1.3 var(--font-sans); white-space: nowrap; pointer-events: none; box-shadow: var(--shadow-sm); }
+  .rv-peek[hidden] { display: none; }
+
+  .rv-svg .cab { fill: var(--art-gloss); }
+  .rv-svg .rail { fill: var(--art-port-edge); } .rv-svg .slot { fill: var(--art-grille); stroke: var(--art-podline); stroke-width: .8; } .rv-svg .slot.alt { fill: var(--art-tile); }
+  .rv-svg .un { font: 700 26px var(--font-mono); fill: var(--art-ring); }
+  .rv-svg .gbar { fill: var(--gc); }
+  .rv-svg .chassis { fill: var(--art-body); stroke: var(--art-podline); stroke-width: .8; } .rv-svg .chassis-2 { fill: var(--art-tile); stroke: var(--art-tile-edge); stroke-width: .8; }
+  .rv-svg .ear { fill: var(--art-grille-edge); } .rv-svg .ear-tray, .rv-svg .ear-dark { fill: var(--art-podline); } .rv-svg .ear-silver { fill: var(--art-vent); } .rv-svg .screw { fill: var(--art-metal); }
+  .rv-svg .silver { fill: var(--art-metal); stroke: var(--art-vent); stroke-width: .8; } .rv-svg .silver-lip { fill: var(--art-vent); }
+  .rv-svg .strip { fill: var(--art-gloss); opacity: .75; }
+  .rv-svg .screen { fill: var(--art-screen); stroke: var(--art-screen-edge); stroke-width: .8; } .rv-svg .screen-ring { fill: none; stroke: var(--art-ring); stroke-width: 1; } .rv-svg .screen-dot { fill: var(--art-metal); } .rv-svg .screen-ui { fill: var(--art-lens); }
+  .rv-svg .mark-dark { font: 700 4.6px var(--font-sans); fill: var(--art-gloss); } .rv-svg .pnum-dark { font: 700 3.8px var(--font-mono); fill: var(--art-podline); }
+  .rv-svg .reset { fill: var(--art-gloss); }
+  .rv-svg .jack, .rv-svg .kjack { fill: var(--art-gloss); stroke: var(--art-port-edge); stroke-width: .5; } .rv-svg .jack-in { fill: var(--art-gloss); }
+  .rv-svg .jack.eth { stroke-width: 1.3; }
+  .rv-svg .plug { stroke: var(--art-gloss); stroke-width: .35; } .rv-svg .plug-latch { fill: var(--art-gloss); opacity: .45; }
+  .rv-svg .plink { fill: var(--art-on); }
+  .rv-svg .cage { fill: var(--art-gloss); stroke: var(--art-ring); stroke-width: .6; } .rv-svg .cage-in { fill: var(--art-gloss); }
+  .rv-svg .xcvr { fill: var(--art-metal); }
+  .rv-svg .usb { fill: var(--art-gloss); stroke: var(--art-port-edge); stroke-width: .5; } .rv-svg .vent { fill: var(--art-grille); }
+  .rv-svg .module { fill: var(--art-tile); stroke: var(--art-tile-edge); stroke-width: .6; }
+  .rv-svg .tray { fill: var(--art-grille-edge); } .rv-svg .fw { fill: var(--art-tile); stroke: var(--art-tile-edge); stroke-width: .8; }
+  .rv-svg .ntu { fill: var(--art-cream); stroke: var(--art-bronze); stroke-width: .8; }
+  .rv-svg .door { fill: color-mix(in srgb, var(--art-lens) 22%, transparent); stroke: var(--art-ring); stroke-width: 1; } .rv-svg .fpanel { fill: var(--art-grille); }
+  .rv-svg .lc { fill: var(--art-lens); stroke: var(--art-gloss); stroke-width: .3; } .rv-svg .lc-on { stroke: var(--art-metal); stroke-width: .6; }
+  .rv-svg .patch { fill: var(--art-grille); stroke: var(--art-podline); stroke-width: .6; } .rv-svg .pnum { font: 700 7px var(--font-mono); fill: var(--art-console); }
+  .rv-svg .cord { stroke: var(--art-gloss); stroke-width: .3; }
+  .rv-svg .cmgr { fill: var(--art-gloss); } .rv-svg .finger { fill: var(--art-podline); }
+  .rv-svg .lcd { fill: var(--art-screen); stroke: var(--art-lens); stroke-width: 1; } .rv-svg .lcd-t { font: 700 13px var(--font-mono); fill: color-mix(in srgb, var(--art-lens) 60%, white); } .rv-svg .lcd-s { font: 600 7px var(--font-mono); fill: var(--art-ring); }
+  .rv-svg .btn-c { fill: var(--art-podline); stroke: var(--art-port-edge); stroke-width: .6; }
+  .rv-svg .blankp { fill: var(--art-grille); stroke: var(--art-podline); stroke-width: .6; }
+  .rv-svg .resv { fill: none; stroke: var(--art-port-edge); stroke-width: 2; stroke-dasharray: 8 6; }
+  .rv-svg .led-g { fill: var(--art-on); } .rv-svg .led-b { fill: var(--art-lens); } .rv-svg .led-off { fill: var(--art-podline); }
+  .rv-svg .brand { font: 800 8px var(--font-sans); fill: var(--art-ring); letter-spacing: .06em; } .rv-svg .tiny { font: 600 5.5px var(--font-mono); fill: var(--art-ring); } .rv-svg .tiny-dark { font: 700 7px var(--font-mono); fill: var(--art-podline); }
+  .rv-svg .antenna { stroke: var(--art-ring); stroke-width: 3; stroke-linecap: round; fill: none; }
+  .rv-svg .blink { animation: rv-blink var(--dur-blink) steps(2, end) infinite; animation-delay: var(--d, 0s); }
+  @keyframes rv-blink { 50% { opacity: .25; } }
+
+  /* Rings: pointing, chosen, and what the chosen item's cables reach. Nothing dims. */
+  .rv-small .ri { cursor: pointer; } .rv-small .ri.quiet { cursor: default; }
+  .rv-small .ri-ring { fill: none; stroke: var(--accent); stroke-width: 7; opacity: 0; transition: opacity var(--dur-hover) var(--ease-settle); pointer-events: none; }
+  .rv-small .ri.hot:not(.quiet) .ri-ring { opacity: .55; }
+  .rv-small .ri.sel .ri-ring { opacity: 1; stroke-width: 10; }
+  .rv-small .ri.linked .ri-ring { opacity: 1; stroke-dasharray: 16 10; stroke-width: 6; }
+  /* Now or before: the replaced fronts cross-fade in place. */
+  .rv-svg .f-before { opacity: 0; transition: opacity var(--dur-state) var(--ease-settle); }
+  .rv-svg .f-now { transition: opacity var(--dur-state) var(--ease-settle); }
+  .rackv[data-when="before"] .rv-svg .f-before { opacity: 1; } .rackv[data-when="before"] .rv-svg .f-now { opacity: 0; }
+  .rackv[data-when="before"] .rv-big .f-now .pt { pointer-events: none; }
+  .rackv:not([data-when="before"]) .rv-big .f-before .pt { pointer-events: none; }
+
+  /* The detail: the chosen item large, then its facts, in the same compact type as the room key. */
+  .rv-detail { display: grid; gap: 10px; min-width: 0; align-content: start; }
+  .rv-dhead { display: grid; gap: 2px; }
+  .rv-dhead p, .rv-dbody p { margin: 0; }
+  .rv-over { font: 700 10.5px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+  .rv-title { margin: 0; font-size: 17px; line-height: 1.2; }
+  .rv-model { font-weight: 600; font-size: 13.5px; }
+  .rv-health { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; } .rv-health .mono { font-size: 12px; }
+  .rv-front { position: relative; aspect-ratio: 482.6 / 100; background: var(--art-gloss); border-radius: var(--radius); }
+  .rv-big { width: 100%; height: 100%; border-radius: var(--radius); }
+  .rv-big:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .rv-big .pt { cursor: pointer; }
+  .rv-big .pt > rect:first-child, .rv-big .pt > circle:first-child { transition: stroke var(--dur-hover) var(--ease-settle); }
+  .rv-big .pt:hover > :first-child, .rv-big .pt.pt-on > :first-child { stroke: var(--accent); stroke-width: 1.4; }
+  .rv-tip { position: absolute; z-index: 5; width: min(300px, 100%); padding: 10px 12px; border-radius: var(--radius-lg); background: var(--surface); border: var(--border-card); box-shadow: var(--shadow-lg); font: 400 13px/1.4 var(--font-sans); color: var(--text); pointer-events: none; display: grid; gap: 4px; }
+  .rv-tip.pinned { pointer-events: auto; box-shadow: var(--shadow-lg), 0 0 0 2px var(--accent); }
+  .rv-tip[hidden] { display: none; }
+  .rv-tip p { margin: 0; }
+  .rv-tip-c { display: flex; align-items: center; gap: 8px; color: var(--text-2); }
+  .rv-sw { flex: 0 0 auto; width: 22px; height: 9px; border-radius: 5px; background: var(--sw); box-shadow: inset 0 0 0 1px rgba(128, 128, 128, .55); }
+  .rv-tip-a { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; }
+  .rv-dbody { display: grid; gap: 8px; }
+  .rv-kv { display: grid; gap: 5px; margin: 0; font-size: 13px; }
+  .rv-kv > div { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 10px; }
+  .rv-kv dt { color: var(--text-3); text-transform: capitalize; } .rv-kv dd { margin: 0; }
+  .rv-meter { display: block; max-width: 240px; height: 5px; margin-top: 5px; border-radius: 3px; background: var(--surface-2); overflow: hidden; } .rv-meter i { display: block; height: 100%; background: var(--green); border-radius: 3px; }
+  .rv-kv > .rv-was, .rv-was { display: block; grid-template-columns: none; font-size: 12.5px; color: var(--amber-ink); background: var(--amber-soft); border-radius: var(--radius); padding: 6px 10px; }
+  .rv-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  .rv-more { font-size: 12.5px; display: grid; gap: 6px; } .rv-more summary { cursor: pointer; font-weight: 650; color: var(--text-2); }
+  .rv-more .rv-kv { font-size: 12.5px; }
+  .rv-src { font-size: 12px; }
+
+  /* The key beside the picture: one row per item, the same shape as a room's key. */
+  .rk-list { display: grid; gap: 10px; }
+  .rkg h4 { margin: 0 0 3px; font: 700 10.5px/1.2 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); }
+  .rkg ol { list-style: none; margin: 0; padding: 0; }
+  .rkr { display: grid; grid-template-columns: 4px minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%; padding: 5px 6px; border: 0; border-radius: var(--radius); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background var(--dur-state) var(--ease-settle), transform var(--dur-state) var(--ease-settle); }
+  .rk-still { cursor: default; }
+  .rkg li + li .rkr { border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent); border-radius: 0 0 var(--radius) var(--radius); }
+  button.rkr:hover, .rkr.hit, button.rkr:focus-visible { background: var(--accent-soft); transform: translateX(3px); outline: none; }
+  .rkr.sel { background: var(--accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); }
+  .rk-bar { display: block; width: 4px; height: 28px; border-radius: 2px; background: var(--gc, var(--line-strong)); }
+  .rk-older .rk-bar { background: var(--amber); }
+  .rk-main { min-width: 0; }
+  .rk-name { display: block; font-weight: 650; font-size: 13.5px; line-height: 1.25; }
+  .rk-main small { display: block; font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rk-end { display: flex; align-items: center; gap: 8px; }
+  .rk-u { font-size: 11.5px; color: var(--text-3); }
+  .rk-old { font-size: 10.5px; padding: 2px 7px; }
+
+  /* Narrow: the small rack above the detail. */
+  @container rackv (max-width: 559px) {
+    .rv-body { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+    .rv-overview { justify-self: center; }
+    .rv-sum { margin-left: 0; }
+    .rv-peek { left: 50%; transform: translate(-50%, calc(-100% - 12px)); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rv-svg .blink { animation: none; }
+    .rv-small .ri-ring, .rv-svg .f-before, .rv-svg .f-now, .rv-big .pt > :first-child, .rkr { transition: none; }
+    button.rkr:hover, .rkr.hit { transform: none; }
+  }
+</style>

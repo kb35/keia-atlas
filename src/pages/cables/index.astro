@@ -1,0 +1,166 @@
+---
+// Cables: patch cables in comms room racks (what each end plugs into) and spare cables in stores, by colour
+// and type. Colours follow the house standard at /standards/cables/.
+import Shell from '../../layouts/Shell.astro';
+import Icon from '../../components/Icon.astro';
+import PageBand from '../../components/PageBand.astro';
+import Section from '../../components/Section.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import '../../styles/stock.css';
+import { sites, SITE_ORDER, fmtDate, plural, href, DEMO_TODAY } from '../../lib/data.mjs';
+import { activeCables, patchCables, spareCables, cableTotal, cableStandard, colours, cableTypes, purposes, rackNumber } from '../../lib/stock.mjs';
+
+const REGION = { amer: 'Americas', emea: 'EMEA', apac: 'APAC' };
+const siteIds = SITE_ORDER.filter((s) => activeCables.some((x) => x.site === s));
+const usedTypes = [...new Set(activeCables.map((c) => c.type))];
+const usedPurposes = cableStandard.purposes.filter((p) => activeCables.some((c) => c.purpose === p.id));
+const lowCables = spareCables.filter((c) => c.low);
+const FACETS = [
+  { key: 'region', label: 'Region', options: ['amer', 'emea', 'apac'].map((value) => ({ value, label: REGION[value] })) },
+  { key: 'site', label: 'Office', options: siteIds.map((value) => ({ value, label: sites[value].name, sub: sites[value].city })) },
+  { key: 'kind', label: 'Kind', options: cableStandard.cable_types.filter((t) => usedTypes.includes(t.id)).map((t) => ({ value: t.id, label: t.label })) },
+  { key: 'purpose', label: 'Colour', options: usedPurposes.map((p) => ({ value: p.id, label: p.name, sub: colours[p.colour].name, swatch: colours[p.colour].hex })) },
+  { key: 'role', label: 'Where', options: [{ value: 'patch', label: 'Patched in a rack' }, { value: 'spare', label: 'Spare in a store' }] },
+];
+const SORT = { options: [{ value: 'place', label: 'By place' }, { value: 'colour', label: 'By colour' }, { value: 'type', label: 'By cable type' }, { value: 'most', label: 'Most first' }] };
+const TOGGLES = [{ key: 'low', label: 'Below minimum', title: 'Only spare cables with fewer than the minimum on the shelf' }];
+const blob = (c) => [c.typeLabel, c.type, c.colourName, c.purposeName, c.purpose, c.lengthText, c.length_m + 'm', c.from, c.to, c.where.room, c.where.cabinet, c.where.shelf, c.siteName, c.siteCode, c.city, REGION[c.region], c.role === 'patch' ? 'patch cable in rack' : 'spare cable store', c.id, c.notes, c.low ? 'low below minimum' : ''].filter(Boolean).join(' ').toLowerCase();
+const groupsOf = (sid) => {
+  const list = activeCables.filter((c) => c.site === sid);
+  const out = [];
+  for (const rack of [...new Set(list.filter((c) => c.role === 'patch').map((c) => c.where.rack))]) {
+    const first = list.find((c) => c.where.rack === rack && c.role === 'patch');
+    out.push({ key: rack, title: `Patched in rack ${rackNumber(rack).slice(1)}`, sub: first.where.room, list: list.filter((c) => c.role === 'patch' && c.where.rack === rack) });
+  }
+  const spares = list.filter((c) => c.role === 'spare');
+  if (spares.length) out.push({ key: `${sid}-spare`, title: 'Spares in stores', sub: [...new Set(spares.map((c) => c.where.room))].join(' and '), list: spares });
+  return out;
+};
+const NUMBERS = [
+  // Stock lines, as the list counts them, so each figure opens a list showing the same number (rule P10).
+  { n: patchCables.length, label: 'Patched lines', to: '?role=patch' },
+  { n: spareCables.length, label: 'Spare lines', to: '?role=spare' },
+  { n: lowCables.length, label: 'Below minimum', to: '?low=1', tone: lowCables.length ? 'bad' : undefined },
+];
+const pct = (c) => Math.min(100, Math.round((c.quantity / Math.max(c.minimum, 1)) * 100));
+---
+<Shell title="Cables" section="cables" crumbs={[{ label: 'Devices', to: '/profiles/' }, { label: 'Cables' }]}>
+  <PageBand overline="Stock" title="Cables" lede="Patch cables in the comms room racks, with what each end plugs into, and the spare cables kept in stores." sim numbers={NUMBERS}>
+    <a slot="action" class="btn primary" href={href('/standards/cables/')}><Icon name="book" size={16} />Read the cable standard</a>
+  </PageBand>
+
+  <div class="content cb">
+    <FilterBar facets={FACETS} toggles={TOGGLES} placeholder="Find a cable, colour or port label" label="Find a cable" noun={['cable line', 'cable lines']} scope=".cb-sites" sort={SORT} />
+
+    <div class="cb-sites">
+      {siteIds.map((sid) => {
+        const list = activeCables.filter((c) => c.site === sid);
+        return (
+          <div data-fb-group data-vk={`cbsite-${sid}`}>
+          <Section title={sites[sid].name} id={`site-${sid}`} aside={`${sites[sid].city} · ${REGION[sites[sid].region]} · ${cableTotal(list.filter((c) => c.role === 'patch'))} patched, ${cableTotal(list.filter((c) => c.role === 'spare'))} spare${list.some((c) => c.low) ? `, ${list.filter((c) => c.low).length} below minimum` : ''}`}>
+          <div class="card cb-site">
+            {groupsOf(sid).map((g) => (
+              <div class="cb-scroll" data-fb-group>
+                <div class="cb-cap"><b>{g.title}</b><span>{g.sub}</span></div>
+                <table class="cb-table">
+                  <thead><tr><th scope="col">Colour</th><th scope="col">Cable</th><th scope="col">How many</th><th scope="col">{g.list[0].role === 'patch' ? 'Both ends' : 'Stock'}</th><th scope="col">{g.list[0].role === 'patch' ? 'Where' : 'Where exactly'}</th></tr></thead>
+                  <tbody>
+                    {g.list.map((c, i) => (
+                      <tr id={`cb-${c.id}`} class:list={[{ 'cb-r-low': c.low }]} data-fi data-vk={c.id} data-i={i} data-colour={c.colourName} data-type={c.typeLabel} data-qty={c.quantity} data-find={blob(c)} data-f-site={c.site} data-f-region={c.region} data-f-kind={c.type} data-f-role={c.role} data-f-purpose={c.purpose} data-t-low={c.low ? '1' : '0'}>
+                        <td data-label="Colour"><div class="cb-col"><i class="cb-sw wide" style={`--sw:${c.hex}`} aria-hidden="true"></i><span><b>{c.colourName}</b><small>{c.purposeName}</small></span></div></td>
+                        <td data-label="Cable"><div class="cb-what"><b>{c.typeLabel}</b><small>{c.lengthText}</small></div></td>
+                        <td data-label="How many"><div class="cb-qty"><strong class="num">{c.quantity}</strong></div></td>
+                        {c.role === 'patch' ? (
+                          <td data-label="Both ends"><div class="cb-ends"><code>{c.from}</code><span class="cb-arrow" aria-label="to"><Icon name="arrow" size={12} /></span><code>{c.to}</code>{c.notes && <small>{c.notes}</small>}</div></td>
+                        ) : (
+                          <td data-label="Stock"><div class="cb-stock">
+                            <span class="sp-q"><small>minimum {c.minimum}</small><span class={`sp-pill ${c.low ? 'low' : 'ok'}`}>{c.low ? `Low, ${c.short} short` : 'In stock'}</span></span>
+                            <span class="sp-bar" aria-hidden="true"><i class={c.low ? 'low' : ''} style={`width:${pct(c)}%`}></i></span>
+                            <small class:list={['cb-cnt', { 'sp-late': c.overdue }]}>Counted {fmtDate(c.last_counted, { day: 'numeric', month: 'short' })}{c.overdue ? ', overdue' : ''}</small>
+                            {c.notes && <small>{c.notes}</small>}
+                          </div></td>
+                        )}
+                        <td data-label="Where"><div class="cb-where">
+                          {c.role === 'patch'
+                            ? <><b>{c.roomHref ? <a class="stk-link" href={href(c.roomHref)}>{c.where.room}</a> : c.where.room}</b><small>Rack {rackNumber(c.where.rack).slice(1)}</small></>
+                            : <><b>{c.roomHref ? <a class="stk-link" href={href(c.roomHref)}>{c.where.room}</a> : c.where.room}</b><small>{c.where.cabinet}, {c.where.shelf}</small></>}
+                        </div></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </div>
+          </Section>
+          </div>
+        );
+      })}
+      <EmptyState text="No cables match these filters." />
+    </div>
+    <p class="faint cb-foot">Figures as of {fmtDate(DEMO_TODAY)}. A patch cable line can be a bundle of identical cables in a row of ports. Spare lines below their minimum also count in the totals above; the <a class="stk-link" href={href('/spares/')}>Spares tab</a> covers devices and parts.</p>
+  </div>
+
+  <script is:inline data-astro-rerun slot="end">
+    (function () {
+      var bar = document.querySelector('[data-fb]'); if (!bar || bar.__srt) return; bar.__srt = true;
+      var nat = function (a, b) { return String(a).localeCompare(String(b), 'en', { numeric: true }); };
+      var num = function (el, k) { return +el.dataset[k] || 0; };
+      /* Sort: rows re-order inside each table, in the bar's own run so they slide into place. */
+      function reorder(by) {
+        document.querySelectorAll('.cb-sites tbody').forEach(function (tb) {
+          var rows = Array.prototype.slice.call(tb.children);
+          rows.sort(function (a, b) {
+            var c = 0;
+            if (by === 'colour') c = nat(a.dataset.colour, b.dataset.colour);
+            else if (by === 'type') c = nat(a.dataset.type, b.dataset.type);
+            else if (by === 'most') c = num(b, 'qty') - num(a, 'qty');
+            return c || num(a, 'i') - num(b, 'i');
+          });
+          rows.forEach(function (r) { tb.appendChild(r); });
+        });
+      }
+      bar.addEventListener('fb:sort', function (e) { bar.rsFilter.run(true, function () { reorder(e.detail.value); }); });
+      var s0 = bar.rsFilter ? bar.rsFilter.sort() : new URLSearchParams(location.search).get('sort');
+      if (s0 && s0 !== 'place') reorder(s0);
+    })();
+  </script>
+</Shell>
+
+<style is:global>
+  .cb-sw { display: inline-block; flex: none; width: 26px; height: 12px; border-radius: 6px; background: var(--sw); box-shadow: inset 0 0 0 1px rgba(128, 128, 128, .55), inset 0 -3px 3px rgba(0, 0, 0, .18), inset 0 2px 2px rgba(255, 255, 255, .25); }
+  .cb-sw.wide { width: 40px; height: 14px; border-radius: 7px; margin-top: 2px; }
+  .cb-sites { display: grid; gap: 28px; }
+  .cb-site { overflow: hidden; }
+  .cb-scroll { overflow-x: auto; }
+  .cb-scroll + .cb-scroll { border-top: 1px solid var(--line-strong); }
+  .cb-table { width: 100%; min-width: 0; border-collapse: collapse; font-size: 13.5px; }
+  .cb-cap { text-align: left; padding: 10px 14px 6px; display: flex; gap: 10px; align-items: baseline; }
+  .cb-cap b { font-size: 13.5px; } .cb-cap span { font-size: 12.5px; color: var(--text-3); }
+  .cb-table th { text-align: left; padding: 8px 14px; font: 700 11px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); background: var(--surface-2); border-block: 1px solid var(--line); white-space: nowrap; }
+  .cb-table td { padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .cb-table tbody tr { scroll-margin-top: 150px; transition: background var(--dur-state); }
+  .cb-table tbody tr:target { background: var(--accent-soft); }
+  .cb-table tbody:last-child tr:last-child td, .cb-table tbody tr:last-child td { border-bottom: 0; }
+  .cb-table tbody tr:hover { background: color-mix(in srgb, var(--text) 4%, transparent); }
+  .cb-r-low td:first-child { box-shadow: inset 3px 0 0 var(--amber); }
+  .cb-col { display: flex; gap: 10px; align-items: flex-start; min-width: 150px; } .cb-col b { display: block; } .cb-col small, .cb-what small, .cb-where small, .cb-ends small { display: block; color: var(--text-2); font-size: 12.5px; margin-top: 1px; }
+  .cb-what b { font-size: 14px; } .cb-qty strong { font: 800 18px/1 var(--font-sans); } .cb-qty strong::before { content: '\00D7'; font-weight: 500; color: var(--text-3); margin-right: 2px; }
+  .cb-ends { display: grid; gap: 3px; min-width: 300px; justify-items: start; }
+  .cb-ends code { font: 600 12px/1.3 var(--font-mono); padding: 2px 7px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); color: var(--text); }
+  .cb-arrow { color: var(--text-3); display: inline-flex; margin-left: 4px; transform: rotate(90deg); }
+  .cb-stock { min-width: 190px; }
+  .cb-cnt { display: block; color: var(--text-3); margin-top: 4px; font-size: 12px; }
+  .cb-where { min-width: 160px; } .cb-where b { font-weight: 650; } .cb-where a { color: inherit; } .cb-where a:hover { color: var(--accent-ink); }
+  .cb-foot { margin: 0; font-size: 13px; }
+  @media (max-width: 760px) {
+      .cb-table thead { display: none; }
+    .cb-table, .cb-table tbody, .cb-table tr, .cb-table td { display: block; width: 100%; }
+    .cb-table tr { padding: 10px 14px; border-bottom: 1px solid var(--line); }
+    .cb-table td { padding: 3px 0; border: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px; min-width: 0; }
+    .cb-table td::before { content: attr(data-label); font: 700 10.5px/1.6 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+    .cb-r-low td:first-child { box-shadow: none; } .cb-r-low { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--amber) 55%, transparent); }
+      .cb-ends code { font-size: 11px; word-break: break-all; }
+  }
+</style>

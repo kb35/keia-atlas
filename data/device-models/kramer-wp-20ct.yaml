@@ -1,0 +1,149 @@
+# Device model: Kramer WP-20CT
+# Facts from the vendor's public documentation (two independent readings, reconciled).
+# Anything the sources don't state is left out and listed under gaps.
+
+manufacturer: Kramer
+
+model: WP-20CT
+
+class: av-extender
+
+summary: A 1-gang in-wall auto-switching transmitter that takes HDMI or USB-C (DisplayPort Alt Mode) sources
+  and sends 4K60 4:2:0 video plus bidirectional RS-232 and analog audio over long-reach HDBaseT, powered
+  locally or accepting PoE from a compatible HDBaseT receiver.
+
+dimensions_mm:
+  width: 69.8
+  height: 114.3
+  depth: 31.0
+  notes: 'US-D (Decora) faceplate variant: vendor gives 6.98cm x 3.10cm x 11.43cm labeled ''W, D, H'';
+    mapped to width/depth/height accordingly. The EU/UK faceplate variant is a different size: 8.00cm
+    x 3.10cm x 8.00cm (W,D,H).'
+
+weight_kg: 0.1
+
+power:
+  inputs:
+    - type: dc
+      volts: 12V
+      watts: 24
+      supplied: true
+      notes: 'Included 12V DC 2A power adapter connects here; GND to GND, +12V/20V to +12/20V. Connects
+        at: 2-pin terminal block (12V/20V Power Supply connector).'
+    - type: dc
+      volts: 20V
+      watts: 120
+      supplied: false
+      notes: 'Optional Kramer 20V/6A power supply (PS-2006-O), required only to enable up to 60W USB-C
+        Power Delivery charging of a connected source. Connects at: 2-pin terminal block (12V/20V Power
+        Supply connector), optional 20V supply.'
+    - type: poe
+      poe:
+        role: powered
+        standard: hdbaset-poh
+      notes: 'Auto-senses HDBaseT-line PoE status and accepts power from a remote PoE-providing receiver
+        (e.g. TP-789R); vendor does not state an IEEE 802.3 standard/class, describing it only as PoE
+        over the HDBaseT link. Connects at: HDBT OUT RJ-45 (accepts PoE from a remote receiver).'
+
+mounting:
+  - wall
+
+sources:
+  - source: kramer-wp-20ct-4k60-4-2-0-hdmi
+    provides: Specifications
+  - source: kramer-wp-20ct-quick-start-guide
+    provides: Port labels, faces and panel layout
+  - source: kramer-wp-20ct-product-page-us
+    provides: Specifications
+  - source: kramer-wp-20ct-user-manual-hosted-mirror
+    provides: Port labels, faces and panel layout
+
+ports:
+  - id: hdmi-in-1
+    label: HDMI IN Connector
+    connector: hdmi
+    signals:
+      - video
+      - audio
+    direction: in
+    face: front
+    order: 1
+    notes: Front (room-side) faceplate connector; connects to an HDMI source.
+  - id: usb-c-1
+    label: USB-C IN Port
+    connector: usb-c
+    signals:
+      - video
+      - usb
+      - power
+    direction: bidirectional
+    usb_power_w: 60
+    face: front
+    order: 2
+    notes: Front faceplate connector; DisplayPort Alt Mode video input, also used to reach the WP-20CT's
+      internal web pages via a connected browser; charges a connected USB-PD 2.0 source up to 60W when
+      the optional 20V supply is fitted.
+  - id: power-in
+    label: 12V/20V Power Supply 2-pin Terminal Block Connector
+    connector: terminal-block
+    signals:
+      - power
+    direction: in
+    face: rear
+    order: 5
+    notes: Inside the wall box; required if USB-C charging is used and no PoE-providing receiver is present.
+  - id: hdbaset-1
+    label: HDBT OUT PoE RJ-45 Connector
+    connector: rj45
+    signals:
+      - hdbaset
+      - video
+      - audio
+      - poe
+    direction: out
+    poe:
+      role: powered
+      standard: hdbaset-poh
+    face: rear
+    order: 6
+    notes: Connects to the HDBT IN port on a receiver (e.g. TP-580R) or a PoE-providing receiver (e.g.
+      TP-789R); when connected to a PoE-providing receiver a local power supply is not required (except
+      for USB-C charging).
+  - id: rs232-1
+    label: CONTROL RS-232 3-pin Terminal Block Connector
+    connector: terminal-block
+    signals:
+      - rs232
+    direction: bidirectional
+    face: rear
+    order: 7
+    notes: Local control of the WP-20CT itself (Tx, Rx, common G); 115200 baud, 8 data bits, 1 stop bit,
+      no parity, ASCII command format.
+  - id: rs232-2
+    label: EXTD RS-232 3-pin Terminal Block Connector
+    connector: terminal-block
+    signals:
+      - rs232
+    direction: bidirectional
+    face: rear
+    order: 8
+    notes: Extends a bidirectional RS-232 signal to the far end over the HDBaseT link, even with no A/V
+      signal present; baud rate 300 to 115200.
+  - id: audio-out-1
+    label: AUDIO OUT 3-pin Terminal Block Connector
+    connector: terminal-block
+    signals:
+      - audio
+    direction: out
+    face: rear
+    order: 9
+    notes: Connects to an unbalanced analog audio acceptor.
+
+gaps:
+  - No PoE standard stated for power over the HDBaseT cable.
+  - The left-right order of the rear connectors is not certain.
+
+notes:
+  - Draws 0.6 A on the 12 V supply, or 3.7 A on the optional 20 V supply that enables 60 W laptop charging
+    over USB-C.
+  - Kramer's own manual download failed; faces come from a copy of the manual hosted elsewhere.

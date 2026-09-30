@@ -1,0 +1,38 @@
+# Runs on every push and pull request: checks all data against its schemas,
+# then runs the validator's own tests. A red X on GitHub means one of them failed.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get the code, including the pinned Keia submodule
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          submodules: true
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install exact dependency versions
+        run: npm ci
+
+      - name: Validate data
+        run: npm run validate
+
+      - name: Test the validator
+        run: npm test
+
+      - name: Build the console site (fails if any page breaks)
+        run: npx astro build

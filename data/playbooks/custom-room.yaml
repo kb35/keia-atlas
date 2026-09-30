@@ -1,0 +1,53 @@
+# Demo playbook. Aigna's own way of working; not taken from any real company.
+id: custom-room
+name: Custom room design
+kind: custom-design
+version: "1.1"
+intensity: medium
+weeks: { min: 16, max: 26 }
+summary: Build a room the standard room types don't cover, such as a divisible town hall, on top of the nearest room types, with Lab testing for anything new.
+when: Use when no room type fits. If the design is used twice, it becomes a room type.
+phases:
+  - phase: plan
+    weeks: "1 to 2"
+    steps:
+      - { title: "Brief with the people who will use the room", role: pm, output: Brief }
+      - { title: "Pick the room types it builds on", role: delivery }
+    gate: { by: [programme], checks: [Brief and budget agreed] }
+  - phase: design
+    weeks: "4 to 8"
+    steps:
+      - { title: "Custom design and signal routes", role: delivery, output: Design }
+      - { title: "Test anything new in the Lab", role: innovation, output: Lab result }
+      - { title: "Check the design against the house standard", role: sm-av }
+      - { title: "Vendor site survey and a review of the design", role: vendor, output: Survey notes and questions }
+    gate: { by: [sm-av], checks: [Design signed off, Lab tests passed] }
+  - phase: procure
+    weeks: "4 to 8"
+    steps:
+      - { title: "Orders, including building works", role: pm, long_lead: true }
+    gate: { by: [pm], checks: [Everything ordered] }
+  - phase: integrate
+    weeks: 4 to 6
+    steps:
+      - { title: "Vendor installs to the design; record serial and MAC for each position, with a label photo", role: vendor, note: Through the vendor portal, step: provision }
+      - { title: Building works, role: pm, step: install }
+      - { title: Install to the design, role: tech, step: install }
+      - { title: Vendor tunes microphones and cameras with the delivery engineer on a test call, role: vendor, step: configure }
+      - { title: Verification in every mode the room has, role: delivery, step: commission }
+      - { title: Trial week with the people who use it, role: pm, step: commission }
+    gate: { by: [delivery], checks: [Installed to the design, Every mode passes] }
+  - phase: handover
+    weeks: "1"
+    steps:
+      - { title: "One-page guide for the room", role: delivery, output: Room guide }
+      - { title: "Handover to the service desk", role: pm }
+      - { title: "As-built drawings and control programming files from the vendor", role: vendor, output: As-built pack }
+    gate: { by: [sm-av], checks: [Records and guide complete] }
+  - phase: closed
+    weeks: "-"
+    steps:
+      - { title: "Decide whether this should become a room type", role: sm-av }
+    gate: { by: [programme], checks: [Decision recorded] }
+changes:
+  - { date: "2026-09-29", change: "Install and Commission merged into one Deploy phase, with Provision, Install, Configure and Commission steps for each device (decision 0025)." }

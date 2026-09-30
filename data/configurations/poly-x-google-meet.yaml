@@ -1,0 +1,267 @@
+# Configuration: Poly Studio X in Google Meet mode. Setting names, menu paths and defaults are the vendor's
+# (cited per setting, VideoOS 4.6.x); the values and reasons are Aigna's (demo).
+# action change: set it. verify: the default is right, check it. leave: left at the vendor default, listed so
+# the whole web interface is on record. Anything marked unconfirmed has not been checked on a real unit.
+id: poly-x-google-meet
+name: Studio X in Google Meet mode
+models: [poly-studio-x52, poly-studio-x32, poly-studio-x72]
+mode: Google Meet
+version: "3.0"
+owner: sofia
+updated: "2026-09-29"
+firmware: "4.6.2"
+firmware_min: "4.1 (X52), stay on 4.6.x"
+requires:
+  - Google Meet hardware licence, one per device
+  - "Wired Ethernet with DHCP and NTP; Wi-Fi is not supported as primary"
+  - "Outbound TCP 443 to zto.poly.com, lens.poly.com and swupdate.lens.poly.com"
+  - "One TC10 on the same subnet and VLAN"
+managed_by: "Device web interface, or the site's Poly Lens policy"
+summary: The X52 is confirmed for Google Meet from 4.1; the X32 and X72 are not confirmed yet. Aigna sets or checks the settings marked Set and Verify; every other setting stays at Poly's default and is listed so the whole web interface is on record.
+menus: [Dashboard, General Settings, Servers, Network, Audio/Video, Security, Diagnostics]
+steps:
+  - Patch into the room's AV port and power on; the device takes its reserved address.
+  - Set the admin password, then turn off automatic updates before anything else.
+  - "Set Provider to Google Meet. The device restarts and shows an activation code."
+  - "In the Google Admin console, enrol it with the code, name it the hostname, and assign the room calendar."
+  - Pair the touch controller, register to Poly Lens, then recheck automatic updates.
+  - Run the room's verification.
+setup:
+  - id: preflight
+    title: Pre-flight
+    critical: true
+    detail: "Confirm the model is supported and a Google Meet licence is free. The port gives DHCP and NTP and reaches zto.poly.com, lens.poly.com and swupdate.lens.poly.com on 443. Stage on a port without 802.1X. In Poly Lens, set the site policy to no automatic updates before the device arrives."
+    source: poly-partner-mode-ag-4-6-0
+  - id: connect
+    title: Connect HDMI, Ethernet, then power
+    critical: true
+    after: [preflight]
+    why_order: "The first boot goes straight to Poly's zero touch service. On a port without the right access it stalls or picks the wrong mode."
+    detail: Note the IP address shown on screen. The default login is admin with the last six characters of the serial number.
+    source: poly-partner-mode-ag-4-6-0
+  - id: prompts
+    title: Complete the setup prompts
+    critical: true
+    detail: The device contacts Poly's zero touch service to choose its mode. Do not pick a provider yet.
+    source: poly-partner-mode-ag-4-6-0
+  - id: admin-password
+    title: Log in and set the admin password
+    critical: true
+    path: Security > Local Accounts
+    after: [prompts]
+    why_order: "From 4.6.0 setup forces a new password, and every later step needs the admin login."
+    detail: "Use the site's password from the vault. Do this before pairing the TC10."
+    source: poly-partner-mode-ag-4-6-0
+  - id: updates-off
+    title: Turn off automatic updates
+    critical: true
+    path: General Settings > Device Management
+    after: [admin-password]
+    why_order: "Device Management is behind the admin login."
+    detail: "Clear Enable Automatic Updates, and check Only Check for Updates During Maintenance Hours is not quietly on. Do this before choosing Google Meet and before Poly Lens."
+    source: poly-config-params-ref-4-1-0
+  - id: location-time
+    title: Country, time zone and time server
+    path: General Settings > My Information > Location, then Date and Time
+    detail: The default zone is US Central. Dublin and London share one zone value.
+    unconfirmed: true
+    source: poly-video-mode-ag-4-6-0
+  - id: names
+    title: Device name, room name and contact
+    path: General Settings > System Settings
+    detail: The hostname, the room number and name, and the site's AV team as contact.
+    source: poly-video-mode-ag-4-6-0
+  - id: provider
+    title: Choose Google Meet as the provider
+    critical: true
+    path: General Settings > Provider
+    after: [updates-off]
+    why_order: "Automatic updates are on by default in Google Meet mode. Left on, the device can fetch VideoOS 5 as soon as it restarts, and version 5 has no Google Meet and cannot be rolled back."
+    detail: Save, and the device restarts. Needs 4.0 or later (4.1 on the X52).
+    source: poly-partner-mode-ag-4-6-0
+  - id: enrol
+    title: Enrol in the Google Admin console
+    path: Devices > Google Meet hardware
+    after: [provider]
+    why_order: "The enrolment code only appears after the restart into Google Meet."
+    detail: Use the code on screen, name it the hostname and assign the room calendar.
+    source: google-meet-enroll
+  - id: pair-tc10
+    title: Pair one TC10
+    path: General Settings > Device Management > Available Devices
+    after: [admin-password]
+    why_order: "Poly's guide has the admin password set before the TC10 pairs."
+    detail: Same subnet and VLAN as the video bar. Pair it by its MAC address.
+    source: poly-partner-mode-ag-4-6-0
+  - id: lens
+    title: Register to Poly Lens, then recheck updates
+    critical: true
+    path: Servers > Cloud
+    after: [updates-off]
+    why_order: "Lens provisioning can turn automatic updates back on and make the device's own control read-only. With updates already off and the site policy set in pre-flight, nothing downloads in between."
+    detail: Open Device Management again after registering and check updates are still off.
+    source: poly-lens-provisioning-video
+  - id: hardening
+    title: Hardening
+    path: Security
+    detail: Password rules, account lockout, idle timeout, Telnet and SSH off, SNMP v3 only if SNMP is ever used.
+    source: poly-video-mode-ag-4-6-0
+  - id: network-extras
+    title: Network extras last
+    path: Network > LAN Network > LAN Options
+    after: [lens]
+    why_order: "A wrong VLAN or 802.1X setting cuts the device off. Do it once everything else is saved, and install the 802.1X certificate first."
+    detail: "LLDP, then proxy or VLAN tagging only at a site that needs them. 802.1X only where the site uses it, after its certificate is installed."
+    source: poly-video-mode-ag-4-6-0
+  - id: verify
+    title: Verify
+    path: Diagnostics > System Status
+    detail: "Check System Status, Servers > Cloud, the Google Admin console and Device Management. Then run the room's verification."
+    source: poly-partner-mode-ag-4-6-0
+groups:
+  - name: Dashboard
+    where: Device web interface
+    settings:
+      - { action: verify, name: System details, path: Dashboard, value: "Model, serial, software 4.6.x, Google Meet", layer: profile, why: "The first page after login. A glance confirms you are on the right device and the right software line.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: Dashboard tiles, path: Dashboard, default: "Poly's standard tiles", value: "As they come", layer: profile, unconfirmed: true, why: "Shortcuts only; nothing on them changes how the room works. Which tiles show in Google Meet mode is not confirmed.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: "Video-mode pages (Call Configuration, Directory, Calendaring)", path: Dashboard, value: "Not used", layer: profile, unconfirmed: true, why: "Probably hidden in Google Meet mode. Not confirmed which pages disappear.", source: poly-video-mode-ag-4-6-0 }
+  - name: System Settings
+    where: Device web interface
+    settings:
+      - { derive: hostname, action: change, name: Device Name, path: General Settings > System Settings, default: "Model plus part of the serial", value: "The hostname", per_device: true, layer: naming-network, why: "Matches DNS, device management and monitoring, so one name finds the device everywhere. 40 characters at most.", source: poly-video-mode-ag-4-4-0 }
+      - { derive: room-name, action: change, name: Room Name, path: General Settings > System Settings, value: "Room number and name", per_device: true, layer: naming-network, why: "Shown to people at the far end. 32 characters at most.", source: poly-video-mode-ag-4-4-0 }
+      - { action: leave, name: Sleep timeout, path: General Settings > System Settings, default: "Off", value: "Off", layer: profile, why: "Google Meet manages the display and wakes on motion; the device's own sleep is not used.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: Mute microphones in sleep, path: General Settings > System Settings, default: "False", value: "False", layer: profile, why: "Only matters with the device's own sleep, which is off.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: Scheduled Auto Restart, path: General Settings > System Settings, default: "False (weekly, Saturday 00:00 when on)", value: "False", layer: profile, why: "The Google Admin console already restarts it nightly, so a second schedule would only overlap.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: System Language, path: General Settings > System Settings, default: "English (US)", value: "English (US)", layer: profile, why: "Only the admin pages use it; the room screens follow Google Meet's language.", source: poly-video-mode-ag-4-6-0 }
+  - name: My Information
+    where: Device web interface
+    settings:
+      - { derive: country, action: change, name: Location, path: General Settings > My Information > Location, param: device.local.country, default: "Not set", value: "The site's country", per_device: true, layer: country, why: "Sets the power-line frequency, which stops the camera flickering under the room's lights.", source: poly-partner-mode-ag-4-6-0 }
+      - { derive: contact, action: change, name: Contact details, path: General Settings > My Information, default: "Blank", value: "The site's AV team and support address", layer: country, why: "Anyone who opens the web interface knows who looks after the room.", source: poly-video-mode-ag-4-6-0 }
+  - name: Date and Time
+    where: Device web interface
+    settings:
+      - { derive: time-zone, action: change, name: Time Zone, path: General Settings > Date and Time, param: device.local.timezone, default: "CST6CDT (US Central)", value: "The site's time zone", per_device: true, layer: country, unconfirmed: true, why: "Meeting times on the touch controller must match the room calendar. The label Dublin shows under is not confirmed; it shares a value with London.", source: poly-video-mode-ag-4-4-0 }
+      - { action: change, name: Time Server, path: General Settings > Date and Time, default: "Auto (DHCP option 42, else ntp.polycom.com)", value: Manual, layer: naming-network, why: "Use Aigna's time servers, not whatever the network offers.", source: poly-video-mode-ag-4-4-0 }
+      - { derive: time-server-1, action: change, name: Primary Time Server Address, path: General Settings > Date and Time, value: ntp1.aigna.example, layer: naming-network, why: "A working time server is needed to reach Poly's zero touch onboarding.", source: poly-partner-mode-ag-4-6-0 }
+      - { derive: time-server-2, action: change, name: Secondary Time Server Address, path: General Settings > Date and Time, value: ntp2.aigna.example, layer: naming-network, why: "A second server, so one failure doesn't stop onboarding.", source: poly-video-mode-ag-4-4-0 }
+      - { action: change, name: Auto Adjust for Daylight Saving Time, path: General Settings > Date and Time, value: "On", layer: profile, why: "No one has to touch the clock twice a year.", source: poly-video-mode-ag-4-4-0 }
+      - { action: leave, name: Date format and clock, path: General Settings > Date and Time, default: "mm/dd/yyyy, 12-hour", value: "As they come", layer: profile, why: "Only the admin pages show it; Google Meet uses the room's locale on screen.", source: poly-video-mode-ag-4-6-0 }
+  - name: Provider
+    where: Device web interface
+    settings:
+      - { action: change, default: "Poly Video Mode", name: Provider, path: General Settings > Provider, value: Google Meet, layer: profile, why: "Aigna meets on Google Meet. Choose it only after updates are off.", source: poly-partner-mode-ag-4-6-0 }
+  - name: Device Management
+    where: Device web interface
+    settings:
+      - { action: change, name: Enable Automatic Updates, path: General Settings > Device Management, default: "On in Google Meet mode", value: "Off", layer: profile, advisory: ADV-001, unconfirmed: true, why: "Version 5 drops Google Meet and can't be rolled back. Firmware changes only after the Lab passes it. The on-device default is from the parameter reference, not tested on a unit.", source: poly-config-params-ref-4-1-0 }
+      - { action: verify, name: Only Check for Updates During Maintenance Hours, path: General Settings > Device Management, value: "Off", layer: profile, unconfirmed: true, why: "If this is on, the device still checks for updates at night. Check it is off. Its default is not documented.", source: poly-partner-mode-ag-4-6-0 }
+      - { action: change, name: Maintenance Hours Begin and End, path: General Settings > Device Management, default: "01:00 to 05:00", value: "01:00 to 04:00, local time", layer: profile, why: "Any restart happens when no one is in the room.", source: poly-partner-mode-ag-4-6-0 }
+      - { action: verify, default: "Poly Online Support Center", name: Download Update From, path: General Settings > Device Management, value: Poly Online Support Center, layer: profile, why: "Updates come from Poly, but only when Aigna chooses to apply one.", source: poly-partner-mode-ag-4-6-0 }
+      - { action: leave, name: New Device Auto-Pairing, path: General Settings > Device Management, default: "Enabled", value: "Enabled", layer: profile, why: "Lets the TC10 find the video bar. Pairing is still done by MAC, so it can't pair next door.", source: poly-partner-mode-ag-4-6-0 }
+  - name: Provisioning Server
+    where: Device web interface
+    settings:
+      - { action: leave, name: Provisioning Server, path: Servers > Provisioning Server, default: "Disabled; discovery order zero touch, Lens, DHCP option 160, then 66", value: "Disabled", layer: profile, why: "Aigna provisions through Poly Lens, not a file server.", source: poly-video-mode-ag-4-6-0 }
+  - name: Cloud
+    where: Device web interface
+    settings:
+      - { derive: management, action: change, name: Cloud registration, path: Servers > Cloud, default: "Not registered", value: "Registered to Aigna's Poly Lens account", layer: profile, why: "Poly Lens holds the site policy and shows the fleet. Recheck updates afterwards.", source: poly-lens-provisioning-video }
+      - { action: leave, name: Send usage data, path: Servers > Cloud, default: "On", value: "On", layer: profile, why: "Anonymous usage data to Poly; Aigna's privacy review allowed it.", source: poly-video-mode-ag-4-6-0 }
+  - name: SNMP
+    where: Device web interface
+    settings:
+      - { action: verify, name: Enable SNMP, path: Servers > SNMP, default: "Off", value: "Off", layer: profile, why: "Monitoring uses Poly Lens and pings, so SNMP stays off.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: SNMP version and community, path: Servers > SNMP, default: "Community public", value: "Not used", layer: profile, why: "Only matters if SNMP is turned on. Then: v3 only, and never the default community public.", source: poly-video-mode-ag-4-6-0 }
+  - name: LAN
+    where: Device web interface
+    settings:
+      - { derive: dhcp-reservation, action: verify, name: IP address, path: Network > LAN Network > IP Addresses, default: "DHCP", value: "DHCP (reserved)", layer: naming-network, why: "The address is reserved on the DHCP server, so the device stays on DHCP.", source: poly-video-mode-ag-4-6-0 }
+      - { derive: hostname, action: change, default: "SystemType-xxxxxx if no name is found during setup", name: Host Name, path: Network > LAN Network > LAN Options, value: "The hostname", per_device: true, layer: naming-network, why: "The same name as the DNS record.", source: poly-video-mode-ag-4-4-0 }
+      - { derive: domain, action: change, name: Domain Name, path: Network > LAN Network > LAN Options, value: aigna.example, layer: naming-network, why: "Completes the full name the certificate and monitoring use.", source: poly-video-mode-ag-4-4-0 }
+      - { action: change, name: Enable LLDP, path: Network > LAN Network > LAN Options, default: "Off", value: "On", layer: naming-network, why: "The switch learns what is plugged into each port, which keeps the port map true.", source: poly-video-mode-ag-4-4-0 }
+      - { action: verify, name: 802.1p/Q, path: Network > LAN Network > LAN Options, default: "Off (VLAN ID 1, priorities 0)", value: "Off", layer: naming-network, why: "The switch port puts the device on the AV VLAN, so the device doesn't tag its own traffic.", source: poly-video-mode-ag-4-4-0 }
+      - { action: verify, name: Enable EAP/802.1X, path: Network > LAN Network > LAN Options, default: "Off", value: "Off", layer: naming-network, why: "Aigna's AV ports authenticate devices at the switch instead.", source: poly-video-mode-ag-4-4-0 }
+      - { action: leave, name: Autonegotiation, path: Network > LAN Network > LAN Options, default: "On", value: "On", layer: naming-network, why: "Forcing speed and duplex causes more faults than it fixes.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: DNS servers, path: Network > LAN Network > DNS, default: "From DHCP, up to four", value: "From DHCP", layer: naming-network, why: "DHCP hands out the site's resolvers.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: Web Proxy, path: Network > Web Proxy, default: "Off", value: "Off", layer: naming-network, why: "AV VLANs go straight out on 443; set it only at a site that forces a proxy.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: Wi-Fi, path: Network > Wi-Fi, default: "Off", value: "Off", layer: naming-network, why: "Not supported as the primary network for Google Meet.", source: poly-partner-mode-ag-4-6-0 }
+  - name: Audio
+    where: Device web interface
+    settings:
+      - { action: leave, name: NoiseBlockAI, path: Audio/Video > Audio, default: "On", value: "On", layer: profile, why: "Removes typing and other noise when no one is talking.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: Acoustic Fence, path: Audio/Video > Audio, default: "Off (sensitivity 5)", value: "Off", layer: room-type, why: "Only useful in open spaces; a room profile can turn it on.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: Join and leave tones, path: Audio/Video > Audio, default: "On", value: "On", layer: profile, why: "People in the room hear when someone joins.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: Mute reminder, path: Audio/Video > Audio, default: "On", value: "On", layer: profile, why: "Tells people they are talking while muted.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: Microphone gain, path: Audio/Video > Audio, default: "0 dB", value: "0 dB", layer: profile, why: "Changed only by a room exception after an audio check.", source: poly-video-mode-ag-4-6-0 }
+  - name: Monitors
+    where: Device web interface
+    settings:
+      - { action: leave, name: Output resolution, path: Audio/Video > Monitors, default: "Automatic", value: "Automatic", layer: profile, why: "The bar reads what the display supports. Dual 1080p on the X52 in Google Meet mode.", source: poly-partner-mode-ag-4-6-0 }
+      - { action: leave, name: CEC, path: Audio/Video > Monitors, default: "Off", value: "Off", layer: profile, why: "Some displays wake and switch inputs badly over CEC; the room's display is set up on its own.", source: poly-video-mode-ag-4-6-0 }
+  - name: Video Inputs
+    where: Device web interface
+    settings:
+      - { action: leave, name: Tracking mode, path: Audio/Video > Video Inputs, default: "Frame Group", value: "Frame Group", layer: profile, why: "Frames everyone in the room; right for most meeting rooms.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: Framing size, path: Audio/Video > Video Inputs, default: "Medium", value: "Medium", layer: room-type, why: "A room profile can change it for long or wide rooms.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: White balance, path: Audio/Video > Video Inputs, default: "Auto", value: "Auto", layer: profile, why: "Follows the room's light through the day.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: Maximum zoom, path: Audio/Video > Video Inputs, default: "3x", value: "3x", layer: profile, why: "More zoom looks soft on the built-in camera.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: Camera sleep, path: Audio/Video > Video Inputs, default: "Not set", value: "Not set", layer: profile, why: "Poly says not to configure it in partner mode.", source: poly-partner-mode-ag-4-6-0 }
+  - name: Local Accounts
+    where: Device web interface
+    settings:
+      - { derive: vault-site, action: change, default: "The last six characters of the serial number", name: Admin password, path: Security > Local Accounts, param: sec.auth.admin.password, value: "From the password vault, per site", per_device: true, layer: profile, why: "The default is printed on the device. From 4.6.0 setup forces a new one.", source: poly-partner-mode-ag-4-6-0 }
+      - { derive: vault-site, action: change, name: Room password, path: Security > Local Accounts, default: "The last six characters of the serial number", value: "From the password vault, per site", per_device: true, layer: profile, why: "Protects the room's settings on the TC10. Same reason as the admin password.", source: poly-video-mode-ag-4-6-0 }
+  - name: Password Requirements
+    where: Device web interface
+    settings:
+      - { action: change, name: Password rules and lockout, path: Security > Password Requirements, default: "All off", value: "12 characters minimum, lockout after 5 tries", layer: profile, why: "Stops guessing the admin password from the AV VLAN.", source: poly-video-mode-ag-4-6-0 }
+  - name: Access
+    where: Device web interface
+    settings:
+      - { action: verify, name: Web access, path: Security > Access, default: "On", value: "On", layer: profile, why: "Turning it off breaks TC10 pairing.", source: poly-video-mode-ag-4-6-0 }
+      - { action: verify, name: Idle session timeout, path: Security > Access, default: "10 minutes", value: "10 minutes", layer: profile, why: "An open admin session closes itself.", source: poly-video-mode-ag-4-6-0 }
+      - { action: verify, name: Minimum TLS version, path: Security > Access, default: "1.2", value: "1.2", layer: profile, why: "Older TLS is refused.", source: poly-video-mode-ag-4-6-0 }
+      - { action: verify, name: SSH, path: Security > Access, default: "Off", value: "Off", layer: profile, why: "No remote shell on room devices.", source: poly-video-mode-ag-4-6-0 }
+      - { action: verify, name: Telnet, path: Security > Access, value: "Off", layer: profile, why: "Telnet sends the password in clear text. Check it is off.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: Allow list, path: Security > Access, default: "Off", value: "Off", layer: profile, why: "Saving it without your own address locks you out; the AV VLAN's firewall does this job.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: USB ports, path: Security > Access, default: "Enabled", value: "Enabled", layer: profile, why: "Needed for the expansion microphone and for USB content.", source: poly-video-mode-ag-4-6-0 }
+  - name: Certificates
+    where: Device web interface
+    settings:
+      - { action: leave, name: Revocation method, path: Security > Certificates, default: "CRL", value: "CRL", layer: profile, why: "Only matters once 802.1X certificates are in use.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: SCEP, path: Security > Certificates, default: "Off", value: "Off", layer: profile, why: "Certificates are installed by hand at the few sites that need them.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: Security Banner, path: Security > Security Banner, default: "Off", value: "Off", layer: profile, why: "No login banner is required for room devices.", source: poly-video-mode-ag-4-6-0 }
+  - name: Diagnostics
+    where: Device web interface
+    settings:
+      - { action: verify, name: System Status, path: Diagnostics > System Status, value: "All green", layer: profile, why: "The last check before the room goes back into service.", source: poly-partner-mode-ag-4-6-0 }
+      - { action: leave, name: Log level, path: Diagnostics > Logs, default: "Debug, remote logging off", value: "Debug, remote logging off", layer: profile, why: "Logs are pulled through Poly Lens when a fault needs them.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: System Reset, path: Diagnostics > System Reset, value: "Not used", layer: profile, why: "A tool, not a setting. A factory reset puts every default back, automatic updates included.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: Video Capture, path: Diagnostics > Video Capture, value: "Not used", layer: profile, why: "A tool for fault finding. It records the room, so use it only with the room's agreement.", source: poly-video-mode-ag-4-6-0 }
+      - { action: leave, name: Remote Monitoring, path: Diagnostics > Remote Monitoring, default: "Off", value: "Off", layer: profile, why: "Shows the room screen to an admin; not used, for privacy.", source: poly-video-mode-ag-4-6-0 }
+  - name: Poly Lens
+    where: Poly Lens (cloud)
+    settings:
+      - { action: verify, default: "Zero Touch Onboarding over DHCP once the system reaches the network", name: Onboarding method, path: Poly Lens (cloud) > Onboarding, value: "DHCP, not a PIN or QR code", layer: profile, why: "Poly Lens policies don't apply to devices onboarded with a PIN or QR code.", source: poly-lens-quickstart-video }
+      - { derive: management, action: change, name: Policy level, path: Poly Lens (cloud) > Policies, value: Site, layer: country, why: "Policies apply device first, then group, site and account; per-site policies carry each site's time zone and country.", source: poly-lens-quickstart-video }
+      - { action: change, name: Software updates in the policy, path: Poly Lens (cloud) > Policies, value: "Off", layer: profile, advisory: ADV-001, why: "Lens provisioning can turn updates back on and lock the device's own controls.", source: poly-lens-provisioning-video }
+  - name: Google Meet
+    where: Google Admin console > Devices > Google Meet hardware
+    settings:
+      - { derive: hostname, action: change, default: "Not enrolled", name: Enroll a device with a code, path: Google Admin console > Devices, value: "Device name: the hostname", per_device: true, layer: naming-network, why: "Each device uses one Meet hardware licence; the same name as everywhere else.", source: google-meet-enroll }
+      - { derive: calendar, action: change, default: "No calendar assigned", name: Room calendar, path: Google Admin console > Device settings > Calendar, value: "The room's calendar resource", per_device: true, layer: room-type, why: "The touch controller shows the room's meetings and joins them in one tap.", source: google-meet-calendar }
+      - { derive: time-zone, action: change, name: Time zone, path: Google Admin console > Device settings, value: "The site's time zone", per_device: true, layer: country, why: "Must match the device and the calendar.", source: google-meet-device-settings }
+      - { action: change, name: Scheduled reboot, path: Google Admin console > Device settings, value: "Daily, inside the maintenance hours", layer: profile, why: "A fresh start each night, when no one is in the room.", source: google-meet-device-settings }
+  - name: Outbound access
+    where: Firewall (network team)
+    settings:
+      - { action: change, name: Outbound access, path: Firewall (network team), value: "443 to zto.poly.com, lens.poly.com and swupdate.lens.poly.com", layer: naming-network, unconfirmed: true, why: "Onboarding, Poly Lens and software downloads all need these. Not confirmed whether blocking the update host also blocks the Meet package.", source: poly-partner-mode-ag-4-6-0 }
+      - { action: leave, name: TC10 pairing ports, path: Firewall (network team), default: "Open inside the VLAN", value: "TCP 18888, UDP 2000, multicast 224.0.0.200", layer: naming-network, why: "Pairing traffic stays inside the AV VLAN, so no firewall rule is needed.", source: poly-partner-mode-ag-4-6-0 }
+gaps:
+  - "Google Meet on the X32 and X72 with VideoOS 4.x is not confirmed: the guides list the X30, X50, X52 and X70."
+  - The on-device default for automatic updates in Google Meet mode comes from the parameter reference; not tested on a unit.
+  - Whether blocking swupdate.lens.poly.com also blocks the Google Meet package download.
+  - The time zone label Dublin appears under.
+  - Which Video-mode pages are hidden in Google Meet mode.

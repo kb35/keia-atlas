@@ -1,0 +1,82 @@
+---
+// A comms room rack drawn front-on, U1 at the bottom. Each item is drawn by kind: ports on patch
+// panels and switches, a display on the UPS, the provider's box marked as theirs. Recorded devices
+// link to their device page.
+import { href } from '../lib/data.mjs';
+const { rack, space } = Astro.props;
+const U = 18, W = 300, PAD = 30, H = rack.height_u * U;
+const yOf = (it) => (rack.height_u - (it.u + it.size - 1)) * U;
+const pos = (it) => it.position && space?.positions.find((p) => p.position === it.position);
+const unitHref = (it) => { const p = pos(it); return p?.current ? href(`/device/?tag=${p.current.asset_tag}`) : null; };
+const dots = (n, w, rows = 1) => { const per = Math.ceil(n / rows); const gap = Math.min(9, (w - 20) / per); return Array.from({ length: n }, (_, i) => ({ x: 10 + (i % per) * gap, r: Math.floor(i / per) })); };
+const KIND = { 'patch-panel': 'Patch panel', 'fibre-panel': 'Fibre', switch: 'Switch', firewall: 'Firewall', isp: 'Provider', ups: 'UPS', pdu: 'Power', 'cable-manager': '', shelf: 'Shelf', codec: 'Codec', blank: '', reserved: 'Reserved' };
+---
+<figure class="rack-fig">
+  <svg viewBox={`0 0 ${W + PAD * 2 + 240} ${H + 24}`} class="rack" role="img" aria-label={`${rack.name}, ${rack.height_u} units. The same items are listed below.`}>
+    <rect class="rk-frame" x={PAD - 8} y="4" width={W + 16} height={H + 16} rx="4" />
+    {Array.from({ length: rack.height_u }, (_, i) => (
+      <>
+        <rect class="rk-slot" x={PAD} y={12 + i * U} width={W} height={U} />
+        <text class="rk-u" x={PAD - 12} y={12 + i * U + U / 2 + 3}>{rack.height_u - i}</text>
+      </>
+    ))}
+    {rack.items.map((it, n) => {
+      const y = 12 + yOf(it), h = it.size * U, link = unitHref(it);
+      const body = (
+        <g class={`rk-item rk-${it.kind}`} style={`--i:${n}`}>
+          <rect class="rk-body" x={PAD + 1} y={y + 1} width={W - 2} height={h - 2} rx="2" />
+          {(it.kind === 'patch-panel' || it.kind === 'fibre-panel') && dots(it.ports ?? 24, W - 60, it.size > 1 ? 2 : 1).map((d) => <rect class="rk-port" x={PAD + 30 + d.x} y={y + 5 + d.r * (h / 2 - 1)} width="5" height="5" />)}
+          {(it.kind === 'switch' || it.kind === 'firewall' || it.kind === 'shelf') && (
+            <>
+              {dots(Math.min(it.ports ?? 24, 48), W - 110, (it.ports ?? 24) > 24 ? 2 : 1).map((d, k) => <rect class={`rk-lan${k % 5 === 0 ? ' blink' : ''}`} x={PAD + 60 + d.x} y={y + (it.size > 1 || (it.ports ?? 0) > 24 ? 3 + d.r * 7 : 6)} width="6" height="5" style={`--d:${(k * 0.37) % 2}s`} />)}
+              <circle class="rk-led" cx={PAD + 14} cy={y + h / 2} r="2.5" />
+            </>
+          )}
+          {it.kind === 'ups' && (<><rect class="rk-lcd" x={PAD + 16} y={y + 10} width="46" height="18" rx="2" /><text class="rk-lcd-t" x={PAD + 20} y={y + 23}>100%</text>{Array.from({ length: 14 }, (_, k) => <rect class="rk-vent" x={PAD + 90 + k * 13} y={y + 8} width="7" height={h - 16} rx="2" />)}</>)}
+          {it.kind === 'pdu' && Array.from({ length: 8 }, (_, k) => <rect class="rk-sock" x={PAD + 40 + k * 28} y={y + 5} width="14" height="8" rx="2" />)}
+          {it.kind === 'cable-manager' && Array.from({ length: 10 }, (_, k) => <rect class="rk-ring" x={PAD + 14 + k * 28} y={y + 4} width="12" height="10" rx="3" />)}
+          {it.kind === 'isp' && <text class="rk-isp" x={PAD + 14} y={y + 13}>PROVIDER</text>}
+          {it.kind === 'reserved' && <text class="rk-res" x={PAD + W / 2} y={y + h / 2 + 4}>{it.label}</text>}
+          <line class="rk-lead" x1={PAD + W + 8} y1={y + h / 2} x2={PAD + W + 22} y2={y + h / 2} />
+          <text class="rk-label" x={PAD + W + 28} y={y + h / 2 + 4}>{it.kind === 'cable-manager' ? '' : it.label}{pos(it)?.hostname ? ` · ${pos(it).hostname}` : ''}</text>
+        </g>
+      );
+      return link ? <a href={link}>{body}</a> : body;
+    })}
+  </svg>
+  <figcaption class="faint">{rack.name}, {rack.height_u}U. U1 is at the bottom. Devices recorded in Keia Atlas link to their page.</figcaption>
+</figure>
+<style is:global>
+  .rack-fig { margin: 0; display: grid; gap: 8px; }
+  .rack { width: 100%; max-width: 640px; height: auto; font-family: var(--font-mono); }
+  .rk-frame { fill: #1D1E22; }
+  .rk-slot { fill: #2A2B31; stroke: #1D1E22; stroke-width: 1; }
+  .rk-u { font-size: 8px; fill: var(--text-3); text-anchor: end; }
+  .rk-body { fill: #3A3C44; stroke: #111; stroke-width: 1; }
+  .rk-item { animation: rk-in var(--dur-morph, .5s) var(--ease-settle) both; animation-delay: calc(var(--i) * var(--stagger, 24ms)); }
+  @keyframes rk-in { from { opacity: 0; transform: translateX(-10px); } }
+  .rk-patch-panel .rk-body, .rk-fibre-panel .rk-body { fill: #2F3036; }
+  .rk-port { fill: #0E0F12; }
+  .rk-fibre-panel .rk-port { fill: #1E5BFF; }
+  .rk-switch .rk-body { fill: #4A4E58; }
+  .rk-firewall .rk-body { fill: #6B2F2F; }
+  .rk-lan { fill: #0E0F12; }
+  .rk-lan.blink { fill: #3FB86B; animation: rk-blink 1.6s steps(2) infinite; animation-delay: var(--d); }
+  @keyframes rk-blink { 50% { fill: #0E0F12; } }
+  .rk-led { fill: #3FB86B; }
+  .rk-ups .rk-body { fill: #202126; }
+  .rk-lcd { fill: #7FB8FF; } .rk-lcd-t { font-size: 10px; font-weight: 700; fill: #0B2A4C; }
+  .rk-vent { fill: #111216; }
+  .rk-pdu .rk-body { fill: #202126; } .rk-sock { fill: #0E0F12; stroke: #555; }
+  .rk-cable-manager .rk-body { fill: #18191D; } .rk-ring { fill: none; stroke: #555; stroke-width: 1.5; }
+  .rk-isp .rk-body, .rk-item.rk-isp .rk-body { fill: #E9E3D2; stroke: #8A7F60; stroke-dasharray: 3 2; }
+  .rk-isp { font-size: 9px; font-weight: 700; fill: #6E6242; letter-spacing: .1em; }
+  .rk-reserved .rk-body { fill: transparent; stroke: #6B6F7A; stroke-dasharray: 4 3; }
+  .rk-res { font-size: 9px; fill: #9AA0AD; text-anchor: middle; }
+  .rk-shelf .rk-body { fill: #2F3036; }
+  .rk-lead { stroke: var(--line-strong); stroke-width: 1; }
+  .rk-label { font-size: 10.5px; fill: var(--text); font-family: var(--font-sans); }
+  .rack a:hover .rk-body { stroke: var(--yellow); stroke-width: 2; }
+  .rack a:hover .rk-label { text-decoration: underline; }
+  @media (prefers-reduced-motion: reduce) { .rk-item, .rk-lan.blink { animation: none; } }
+</style>

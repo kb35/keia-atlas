@@ -1,0 +1,83 @@
+# Space type: IT store
+# Keia Atlas house standard, not from a published guideline. See docs/decisions/0009-house-standard.md.
+# Keia part (profile to verification_model): what belongs here. A store holds spare units and counted stock,
+# not installed kit: there is no AV in it, and no rack.
+# Keia Atlas part: build options. Each option is a number of cabinets, and each cabinet has the same shelves.
+# A place in the store is written cabinet/shelf (cabinet-a/shelf-2). Spare units sit in the room's install
+# (data/installs/<site>/), the least to keep and the counted stock in data/spares/<site>.yaml.
+
+schema: composite-profile
+
+profile:
+  name: IT store
+  space_type: it-store
+  version: "1.0"
+  last_updated: "2026-09-30"
+  owner: Keia Atlas maintainers
+  purpose: >-
+    The office's IT storage room: locked cabinets with numbered shelves where the spare units, the parts
+    and the cords are kept, so an RMA or a failed unit can be swapped the same day.
+
+sources:
+  - file: data/sources/reference.yaml
+    provides: Keia Atlas house standard, where the IT store is defined
+
+equipment_categories:
+  - category: storage_cabinets
+    description: Lockable cabinets, each with three shelves, a bottom shelf and a drawer
+    object_profile: null
+    quantity: "2 to 4"
+    notes: Furniture, not devices, so nothing here has a serial number or a refresh date.
+  - category: spare_units
+    description: Spare units of the models the office runs, each with its own serial and asset tag
+    object_profile: null
+    quantity: varies
+    notes: Kept in the room's install as units with the status Spare.
+  - category: counted_stock
+    description: Cords, mounts, power supplies and modules that carry no serial number, counted against a minimum
+    object_profile: null
+    quantity: varies
+
+verification_model:
+  platforms_to_check:
+    - platform: keia_atlas
+      check: every spare unit is on a real shelf of this store, and every model with a minimum has at least that many units
+    - platform: inventory
+      check: every spare unit has an active record with the status Spare
+    - platform: stock
+      check: counted stock was counted in the last 90 days and is not below its minimum
+
+keia_atlas:
+  standard: house
+  category: infrastructure
+  bookable: false
+  notes:
+    - No devices are built into an IT store. Its options only say how many cabinets it has.
+  options:
+    - id: compact
+      name: Two cabinets
+      standard: house
+      summary: "Cabinet A and Cabinet B, each with Shelf 1 to 3, a bottom shelf and a drawer. For an office that holds its spares for one floor."
+      equipment: []
+      storage:
+        - { key: cabinet-a, name: Cabinet A, shelves: [Shelf 1, Shelf 2, Shelf 3, Bottom shelf, Drawer 1] }
+        - { key: cabinet-b, name: Cabinet B, shelves: [Shelf 1, Shelf 2, Shelf 3, Bottom shelf, Drawer 1] }
+    - id: standard
+      name: Three cabinets
+      standard: house
+      summary: "Cabinets A to C, each with Shelf 1 to 3, a bottom shelf and a drawer. For an office with several floors of meeting rooms."
+      equipment: []
+      storage:
+        - { key: cabinet-a, name: Cabinet A, shelves: [Shelf 1, Shelf 2, Shelf 3, Bottom shelf, Drawer 1] }
+        - { key: cabinet-b, name: Cabinet B, shelves: [Shelf 1, Shelf 2, Shelf 3, Bottom shelf, Drawer 1] }
+        - { key: cabinet-c, name: Cabinet C, shelves: [Shelf 1, Shelf 2, Shelf 3, Bottom shelf, Drawer 1] }
+    - id: large
+      name: Four cabinets
+      standard: house
+      summary: "Cabinets A to D, each with Shelf 1 to 3, a bottom shelf and a drawer. For the largest office, which also stocks for its neighbours."
+      equipment: []
+      storage:
+        - { key: cabinet-a, name: Cabinet A, shelves: [Shelf 1, Shelf 2, Shelf 3, Bottom shelf, Drawer 1] }
+        - { key: cabinet-b, name: Cabinet B, shelves: [Shelf 1, Shelf 2, Shelf 3, Bottom shelf, Drawer 1] }
+        - { key: cabinet-c, name: Cabinet C, shelves: [Shelf 1, Shelf 2, Shelf 3, Bottom shelf, Drawer 1] }
+        - { key: cabinet-d, name: Cabinet D, shelves: [Shelf 1, Shelf 2, Shelf 3, Bottom shelf, Drawer 1] }

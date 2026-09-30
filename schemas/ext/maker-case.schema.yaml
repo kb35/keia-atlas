@@ -1,0 +1,38 @@
+# Maker case: something Aigna raised with a maker, through its support route, and tracked until the maker
+# answers or publishes a known issue (decision 0029). A person always reviews and sends it; Keia Atlas prepares
+# the evidence. Demo data.
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/maker-case
+title: Maker case
+type: object
+additionalProperties: false
+required: [id, maker, title, summary, models, raised, raised_by, owner, status, history, demo]
+properties:
+  id: { type: string, pattern: "^MC-[0-9]{3}$" }
+  maker: { type: string, description: "The known-issues feed of the maker (data/known-issues), which names the maker and its support route." }
+  title: { type: string }
+  summary: { type: string, description: "What Aigna told the maker, in plain words." }
+  models: { type: array, minItems: 1, items: { type: string } }
+  firmware: { type: array, items: { type: string }, description: "The versions the fault was seen on." }
+  incidents: { type: array, items: { type: string, pattern: "^INC[0-9]{7}$" } }
+  ref: { type: string, description: "The maker's case number, once it gives one (made up)." }
+  known_issue: { type: string, description: "The known issue the maker published for it, once it does." }
+  status: { enum: [sent, acknowledged, investigating, published, closed] }
+  raised: { type: string, format: date }
+  raised_by: { type: string }
+  owner: { type: string }
+  ask: { type: string, description: "What Aigna is asking the maker for." }
+  history:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [at, note]
+      properties:
+        at: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2})?$" }
+        by: { type: string, description: "A demo person, for Aigna's own entries." }
+        maker: { type: boolean, description: "True for what the maker said." }
+        status: { enum: [sent, acknowledged, investigating, published, closed] }
+        note: { type: string }
+  demo: { const: true }

@@ -1,0 +1,173 @@
+# Project: a piece of delivery work at one site (a fit-out, a refresh, an upgrade, a custom design),
+# with its phase, thin tasks and, in the demo, the agents working alongside people.
+# Stage 3 (Process). Everything in these files is demo data.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/project
+title: Project
+type: object
+additionalProperties: false
+required: [id, name, kind, site, phase, owner, summary, spaces, tasks, demo]
+properties:
+  id: { type: string, pattern: "^PRJ-[0-9]+$" }
+  name: { type: string, minLength: 1 }
+  kind: { enum: [refresh, infra-refresh, fit-out, upgrade, custom-design, workplace-refresh, network-refresh, rma, provision, firmware-rollout, home-kit, decommission] }
+  site: { type: string, pattern: "^[a-z]{3}$" }
+  phase: { enum: [plan, design, procure, integrate, handover, closed] }
+  owner: { description: "The project manager: a person id from the demo people.", type: string }
+  playbook: { description: The playbook this project follows (data/playbooks)., type: string }
+  roles:
+    description: Who is on the project, as what, and how many hours they have been given for it.
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [person, as, hours]
+      properties:
+        person: { type: string }
+        as: { enum: [programme, pm, lead, engineer, network, lab, technician, service-owner, vendor] }
+        hours: { description: "Hours allocated to this person for the whole project.", type: number, minimum: 0 }
+        logged: { description: Hours logged so far., type: number, minimum: 0 }
+        does: { description: "Their responsibility on this project, in one line.", type: string }
+  history:
+    description: One entry per phase reached, oldest first. What was planned against what happened, and what was handed on.
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [phase, planned, summary]
+      properties:
+        phase: { enum: [plan, design, procure, integrate, handover, closed] }
+        planned: { description: Planned end of the phase., type: string, format: date }
+        ended: { description: Actual end; absent while the phase is open., type: string, format: date }
+        summary: { type: string }
+        signed_off_by: { type: string }
+        artefacts: { description: What the phase handed to the next one., type: array, items: { type: string } }
+        steps:
+          description: "Deploy only: how each device step went (provision, install, configure, commission). Projects from before decision 0025 keep their old Install and Commission records here."
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [step, summary]
+            properties:
+              step: { enum: [provision, install, configure, commission] }
+              planned: { type: string, format: date }
+              ended: { type: string, format: date }
+              summary: { type: string }
+              signed_off_by: { type: string }
+              artefacts: { type: array, items: { type: string } }
+  budget:
+    description: Money for the project (demo figures). Lines move from estimate to committed (ordered) to spent (invoiced).
+    type: object
+    additionalProperties: false
+    required: [approved, currency, lines]
+    properties:
+      approved: { type: number, minimum: 0 }
+      currency: { enum: [EUR, USD, GBP, CAD, SGD, AUD, JPY, DKK] }
+      lines:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [item, amount, status]
+          properties:
+            item: { type: string }
+            amount: { type: number }
+            status: { enum: [estimate, committed, spent] }
+            supplier: { type: string }
+  start: { type: string, format: date }
+  target: { type: string, format: date }
+  summary: { type: string, minLength: 1 }
+  demo: { description: Always true; these projects are made up., const: true }
+  spaces:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [space, state]
+      properties:
+        space: { type: string }
+        state: { enum: [not-started, in-progress, snags, done] }
+        note: { type: string }
+  tasks:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, title, owner, status]
+      properties:
+        id: { type: string, pattern: "^T-[0-9]+$" }
+        title: { type: string }
+        phase: { description: The phase the task belongs to., enum: [plan, design, procure, integrate, handover, closed] }
+        kind: { description: "What sort of work it is; picks the steps shown on the task page. Provision is the system records (asset, address and DNS, device management, booking, monitoring); configure is setting the device up.", enum: [survey, design, order, network, facilities, install, provision, configure, commission, records, handover, review, budget] }
+        steps: { description: Steps written for this task; otherwise the task page uses the steps for its kind., type: array, items: { type: string } }
+        notes: { type: string }
+        space: { type: string }
+        owner: { type: string }
+        due: { type: string, format: date }
+        start: { description: "When the work starts. Left out, it is worked back from the due date at six hours a day (src/lib/work.mjs).", type: string, format: date }
+        where: { description: "On site or remote. Left out, survey, install, configure, commission and records work is on site; the rest is remote.", enum: [onsite, remote] }
+        hours: { description: Estimated hours., type: number, minimum: 0 }
+        team: { description: A contributing team the task waits on or belongs to., enum: [av-it, it-network, facilities, it-security, procurement, vendor] }
+        status: { enum: [todo, doing, blocked, done] }
+        blocked_by: { type: string }
+        captured_fix: { description: The one-sentence fix captured when the task closed., type: string }
+        nothing_new: { description: Why a closed task had no fix to capture., enum: [guide-was-right, not-device-related, one-off] }
+  charter:
+    description: "Why the project exists and what success looks like, agreed at the start. Left out, the summary is the why and the playbook's final gate is the measure."
+    type: object
+    additionalProperties: false
+    properties:
+      why: { type: string, minLength: 1 }
+      success: { description: What must be true for the project to count as a success., type: array, items: { type: string } }
+  log:
+    description: "One log for the things a project manager watches: risks (might happen), issues (has happened), decisions (agreed) and dependencies (waiting on someone else). Each may link a task, a room or an incident."
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, kind, title, status, owner, raised]
+      properties:
+        id: { type: string, pattern: "^(R|I|D|X)-[0-9]+$" }
+        kind: { enum: [risk, issue, decision, dependency] }
+        title: { type: string, minLength: 1 }
+        status: { description: "open (watching, open, pending, waiting) or closed (closed, resolved, decided, met).", enum: [open, closed] }
+        owner: { description: The person who holds it., type: string }
+        raised: { type: string, format: date }
+        due: { description: When it needs an answer., type: string, format: date }
+        decided: { description: "Decisions and closed items: when.", type: string, format: date }
+        note: { description: One line on what it means or what was decided., type: string }
+        task: { description: A task on this project it relates to., type: string, pattern: "^T-[0-9]+$" }
+        room: { type: string }
+        incident: { description: An incident number (INC...)., type: string }
+  changes:
+    description: Change requests for scope. Proposed by anyone on the project; the approver (usually the sponsor) decides.
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, title, proposed_by, approver, status, raised]
+      properties:
+        id: { type: string, pattern: "^CR-[0-9]+$" }
+        title: { type: string, minLength: 1 }
+        why: { type: string }
+        days: { description: "Effect on the end date, in days (negative brings it forward).", type: integer }
+        cost: { description: "Effect on the budget, in the budget's currency (negative saves).", type: number }
+        proposed_by: { type: string }
+        approver: { type: string }
+        status: { enum: [proposed, approved, declined] }
+        raised: { type: string, format: date }
+        decided: { type: string, format: date }
+  agents:
+    description: Simulated background agents (stage 6). They propose; people confirm.
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [name, status, says]
+      properties:
+        name: { type: string }
+        status: { enum: [working, proposed, waiting, done] }
+        says: { type: string }
+        proposes: { type: string }

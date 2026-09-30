@@ -1,0 +1,178 @@
+---
+// Incidents (stage 2 reads, stage 4 writes back; demo, decision 0024): every ServiceNow incident Keia Atlas
+// has matched to a room or device, as a board by state. Each card opens the incident's own page.
+import Shell from '../../layouts/Shell.astro';
+import Icon from '../../components/Icon.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import DeviceGlyph from '../../components/DeviceGlyph.astro';
+import PageBand from '../../components/PageBand.astro';
+import Section from '../../components/Section.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import GuideLive from '../../components/GuideLive.astro';
+import { sites, SITE_ORDER, INC_STATE, REGION_LABEL, href } from '../../lib/data.mjs';
+import { incidentList, byUrgency, when, spoken, HOLD_LABEL, RES_LABEL, PRIORITY_LABEL, STATE_ORDER } from '../../lib/incidents.mjs';
+import { person } from '../../lib/demo.mjs';
+
+const list = [...incidentList].sort(byUrgency);
+const open = list.filter((v) => v.open);
+const cols = STATE_ORDER.map((st) => ({ st, label: INC_STATE[st], items: list.filter((v) => v.inc.state === st) }));
+const siteIds = SITE_ORDER.filter((id) => list.some((v) => v.inc.subject && v.space.site === id));
+const FACETS = [
+  { key: 'region', label: 'Region', options: ['amer', 'emea', 'apac'].filter((g) => siteIds.some((id) => sites[id].region === g)).map((value) => ({ value, label: REGION_LABEL[value].replace('Europe, Middle East and Africa', 'EMEA') })) },
+  { key: 'site', label: 'Office', options: siteIds.map((id) => ({ value: id, label: sites[id].name, sub: sites[id].kind === 'remote' ? 'Home offices' : sites[id].city })) },
+  { key: 'state', label: 'Status', options: STATE_ORDER.map((value) => ({ value, label: INC_STATE[value] })) },
+  { key: 'prio', label: 'Priority', options: [1, 2, 3, 4].map((n) => ({ value: String(n), label: `P${n} ${PRIORITY_LABEL[n]}` })) },
+];
+const SORT = { options: [{ value: 'urgent', label: 'Most urgent first' }, { value: 'oldest', label: 'Oldest first' }, { value: 'site', label: 'By office' }] };
+// Each figure filters the board to what it counts (rule P10); Home and the Work overview link here the same way.
+const OPEN_STATES = STATE_ORDER.filter((s) => s !== 'resolved').join(',');
+const NUMBERS = [
+  { n: open.length, label: 'Open', to: `?state=${OPEN_STATES}` },
+  { n: open.filter((v) => v.inc.priority <= 2).length, label: 'High priority', to: `?state=${OPEN_STATES}&prio=1,2`, tone: open.some((v) => v.inc.priority <= 2) ? 'bad' : undefined },
+  { n: open.filter((v) => v.inc.state === 'on-hold').length, label: 'On hold', to: '?state=on-hold' },
+];
+const STEPS = [
+  ['A ticket arrives in ServiceNow', 'The service desk works it there, as today.', null],
+  ['Keia Atlas reads it', "Through ServiceNow's Table API, or ServiceNow pushes it on change.", 2],
+  ['Matches the room and device', "From the ticket's location, the caller's booking or a named room.", 2],
+  ['Adds evidence', 'From device management, monitoring, the calendar and open project work.', 2],
+  ['Writes a work note back', 'Only once someone approves; ServiceNow stays the record.', 4],
+];
+const findOf = (v) => [v.inc.number, v.inc.short_description, v.inc.caller, v.title, v.roomTitle, v.model, sites[v.space.site].name, sites[v.space.site].city, v.inc.assignment_group, v.inc.keia_atlas.assigned ? person(v.inc.keia_atlas.assigned).name : ''].filter(Boolean).join(' ');
+const SUMMARY = 'Tickets stay in ServiceNow. Keia Atlas matches each to a room or device and adds what it knows.';
+const SITE_I = Object.fromEntries(SITE_ORDER.map((id, i) => [id, i]));
+const stateLine = (v) => {
+  const last = v.steps.list[v.steps.list.length - 1];
+  if (v.inc.state === 'on-hold') return `${HOLD_LABEL[last.hold]} · ${spoken(last.minutes)}`;
+  if (v.inc.state === 'resolved') return `${RES_LABEL[v.resolution.code]} · ${when(v.closed, { time: false })}`;
+  if (v.inc.state === 'in-progress') return `${v.reopened ? 'Reopened · ' : ''}Working for ${spoken(last.minutes)}`;
+  return `Opened ${spoken(v.age)} ago`;
+};
+---
+<Shell title="Incidents" section="incidents" minStage={2} crumbs={[{ label: 'Incidents' }]}>
+  <PageBand overline="Work" title="Incidents" rec="dd-incidents" lede={SUMMARY} sim numbers={NUMBERS} />
+
+  <div class="content incs">
+    <FilterBar facets={FACETS} placeholder="Find an incident, room or caller" label="Find an incident" noun={['incident', 'incidents']} scope=".content.incs" sort={SORT} />
+
+    <div class="board" data-board>
+      {cols.map((c) => (
+        <section class={`bcol bc-${c.st}`} data-col={c.st} aria-labelledby={`col-${c.st}`}>
+          <header class="bcol-h"><h2 id={`col-${c.st}`}><span class={`bdot d-${c.st}`} aria-hidden="true"></span>{c.label}</h2><span class="bcol-n" data-col-n>{c.items.length}</span></header>
+          <div class="bcol-list" data-col-list>
+            {c.items.map((v, k) => {
+              const who = v.inc.keia_atlas.assigned ? person(v.inc.keia_atlas.assigned) : null;
+              return (
+                <a class:list={['icard', `pr-${v.inc.priority}`, { 'rs-radiate': v.open && v.inc.priority <= 2 }]} href={href(v.href)} data-fi data-i={k} data-opened={v.inc.opened} data-s={SITE_I[v.space.site]} data-find={findOf(v)} data-f-state={v.inc.state} data-f-prio={String(v.inc.priority)} data-f-site={v.space.site} data-f-region={sites[v.space.site].region}>
+                  <span class="ic-top">
+                    <span class="mono ic-no" data-vt-rec={v.inc.number}>{v.inc.number}</span>
+                    <span class={`prio p-${v.inc.priority}`} title={PRIORITY_LABEL[v.inc.priority]}>P{v.inc.priority}</span>
+                    {v.reopened && <span class="ic-flag">Reopened</span>}
+                    {who && <span class="av ic-av" title={`Assigned to ${who.name}`}>{who.initials}</span>}
+                  </span>
+                  <b class="ic-t">{v.inc.short_description}</b>
+                  <span class="ic-what">
+                    <span class="ic-gl" aria-hidden="true">{v.pos ? <DeviceGlyph cls={v.pos.cls} /> : <Icon name="room" size={18} />}</span>
+                    <span><span class="ic-dev">{v.title}</span><small>{v.roomTitle === v.title.replace(/, the whole room$/, '') ? '' : `${v.roomTitle}, `}{sites[v.space.site].name}{sites[v.space.site].city ? `, ${sites[v.space.site].city}` : ''}</small></span>
+                  </span>
+                  <span class="ic-state">{stateLine(v)}</span>
+                </a>
+              );
+            })}
+            <p class="bcol-none" data-col-none hidden={c.items.length > 0}>None{c.items.length ? ' match' : ''}</p>
+          </div>
+        </section>
+      ))}
+    </div>
+    <EmptyState text="No incidents match these filters." />
+    <GuideLive where="board" />
+
+    <Section title="How it connects" id="connects" aside="ServiceNow stays the record">
+      <ol class="snf">
+        {STEPS.map(([h, t, stage], i) => (
+          <li class:list={{ 'snf-sn': i === 0 }}><span class="snf-n mono">{i + 1}</span><b>{h}</b><span>{t}</span>{stage && <span class="stg">Stage {stage}</span>}</li>
+        ))}
+      </ol>
+    </Section>
+  </div>
+
+  <script is:inline data-astro-rerun slot="end">
+    (function () {
+      var bar = document.querySelector('[data-fb]'), board = document.querySelector('[data-board]'); if (!bar || !board) return;
+      // Each column shows how many of its cards are left; a status filter dims the columns it leaves out.
+      var sync = function (e) {
+        var active = e ? e.detail.active : false, states = bar.rsFilter ? bar.rsFilter.get('state') : [];
+        board.querySelectorAll('[data-col]').forEach(function (col) {
+          var n = col.querySelectorAll('[data-fi]:not(.fb-out)').length;
+          col.querySelector('[data-col-n]').textContent = n;
+          var none = col.querySelector('[data-col-none]'); none.hidden = n > 0;
+          none.textContent = active && col.querySelector('[data-fi]') ? 'None match' : 'None';
+          col.classList.toggle('off', states.length > 0 && states.indexOf(col.dataset.col) < 0);
+        });
+      };
+      bar.addEventListener('fb:change', sync);
+      // Sort re-orders the cards inside each column, inside the bar's run, so they slide into place.
+      var num = function (el, k) { return +el.dataset[k] || 0; };
+      var order = function () {
+        var v = bar.rsFilter ? bar.rsFilter.sort() : 'urgent';
+        board.querySelectorAll('[data-col-list]').forEach(function (list) {
+          var none = list.querySelector('[data-col-none]');
+          Array.prototype.slice.call(list.querySelectorAll('[data-fi]')).sort(function (a, b) {
+            var c = 0;
+            if (v === 'oldest') c = String(a.dataset.opened).localeCompare(String(b.dataset.opened));
+            else if (v === 'site') c = num(a, 's') - num(b, 's');
+            return c || num(a, 'i') - num(b, 'i');
+          }).forEach(function (el) { list.insertBefore(el, none); });
+        });
+      };
+      bar.addEventListener('fb:sort', function () { bar.rsFilter.run(true, order); });
+      var s0 = new URLSearchParams(location.search).get('sort');
+      if (s0 && s0 !== 'urgent') order();
+      if (bar.rsFilter) bar.rsFilter.run(false);
+    })();
+  </script>
+</Shell>
+
+<style>
+  .incs { gap: 20px; padding-top: 18px; }
+  /* The board: one column per status, each as tall as its cards. The page scrolls. */
+  .board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; align-items: stretch; }
+  .bcol { display: grid; grid-template-rows: auto 1fr; border-radius: var(--radius-lg); background: color-mix(in srgb, var(--surface-2) 70%, transparent); border: 1px solid var(--line); transition: opacity var(--dur-state) var(--ease-settle); }
+  .bcol.off { opacity: .35; }
+  .bcol-h { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 8px; }
+  .bcol-h h2 { margin: 0; font-size: 14px; display: flex; gap: 8px; align-items: center; }
+  .bcol-n { font: 700 12px/1 var(--font-mono); color: var(--text-2); padding: 4px 7px; border-radius: 999px; background: var(--surface); }
+  .bdot { width: 10px; height: 10px; border-radius: 50%; }
+  .d-new { background: var(--blue); } .d-in-progress { background: var(--blue); box-shadow: inset 0 0 0 2px var(--surface), 0 0 0 1px var(--blue); } .d-on-hold { background: var(--amber); border-radius: 3px; } .d-resolved { background: var(--green); }
+  .bcol-list { display: grid; gap: 10px; align-content: start; padding: 2px 12px 14px; }
+  .bcol-none { margin: 4px 2px; font-size: 13px; color: var(--text-3); }
+  .icard { position: relative; display: grid; gap: 6px; padding: 10px 12px 10px 14px; border-radius: var(--radius); border: var(--border-card); background: var(--surface); color: inherit; text-decoration: none; transition: transform var(--dur-state) var(--ease-settle), box-shadow var(--dur-state); }
+  .icard::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--line-strong); }
+  .icard.pr-1::before, .icard.pr-2::before { background: var(--red); }
+  .icard.pr-3::before { background: var(--amber); }
+  .icard:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); color: inherit; }
+  .ic-top { display: flex; align-items: center; gap: 6px; }
+  .ic-no { font-size: 11.5px; color: var(--text-3); }
+  .prio { font: 700 10.5px/1 var(--font-mono); padding: 3px 6px; border-radius: 4px; background: var(--surface-3); color: var(--text); }
+  .prio.p-1, .prio.p-2 { background: var(--red); color: #fff; }
+  .prio.p-3 { background: var(--amber-soft); color: var(--amber-ink); }
+  .ic-flag { font: 700 10px/1 var(--font-mono); letter-spacing: .05em; text-transform: uppercase; color: var(--red-ink); }
+  .ic-av { margin-left: auto; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-3); font: 700 9px/1 var(--font-mono); }
+  .ic-t { font-size: 14px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .ic-what { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 8px; align-items: center; }
+  .ic-gl { width: 34px; height: 24px; display: grid; place-items: center; color: var(--text-2); }
+  .ic-gl :global(svg) { width: 34px; height: auto; }
+  .ic-dev { display: block; font-size: 12.5px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ic-what small { display: block; font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ic-state { font-size: 12px; color: var(--text-3); }
+  .bc-on-hold .ic-state { color: var(--amber-ink); font-weight: 600; }
+  .bc-resolved .icard { background: color-mix(in srgb, var(--surface) 80%, transparent); }
+  .snf { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 20px; }
+  .snf li { position: relative; display: grid; gap: 4px; align-content: start; padding: 14px; border-radius: var(--radius-lg); background: var(--surface-2); font-size: 13px; color: var(--text-2); }
+  .snf li b { color: var(--text); font-size: 13.5px; }
+  .snf-sn { background: var(--blue-soft) !important; }
+  .snf-n { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: var(--ink); color: var(--on-ink); font-size: 11px; }
+  .stg { justify-self: start; margin-top: 4px; font: 700 10px/1 var(--font-mono); padding: 4px 6px; border-radius: 4px; border: 1px dashed var(--amber-ink); color: var(--amber-ink); }
+  @media (max-width: 1100px) { .board { grid-template-columns: repeat(2, minmax(0, 1fr)); } .snf { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 760px) { .board, .snf { grid-template-columns: 1fr; } .board { gap: 14px; } }
+</style>

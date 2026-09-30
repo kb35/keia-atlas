@@ -1,0 +1,325 @@
+# House standard: Wi-Fi in offices. Made up for the demo. The access points are UniFi (decision 0028).
+# Vendor guidance is from the UniFi Help Center; spacing and height lean on public enterprise design guides.
+id: wifi
+name: Wi-Fi
+area: wifi
+order: 5
+version: "1.0"
+effective: "2026-09-29"
+owner: Service manager, IT infrastructure
+summary: "Access points on a planned grid across every office, one Cat6A and PoE+ to each, three networks on the VLAN plan, and radio settings that favour steady calls over top speed."
+intro: >-
+  Wi-Fi is designed for how many people use an area, not just for a signal in every corner. Start from the house spacing,
+  check it with a predictive design, install, then prove it with a walk survey. Every access point is a UniFi U7 Pro, or a
+  U7 Pro Max where people gather.
+scope:
+  - Every office floor, meeting room, cafeteria and reception.
+  - The access points, their cabling and power, and the Wi-Fi networks (SSIDs) they carry.
+  - Home offices use the Wi-Fi on their gateway, set by the home offices standard.
+related: [network, cabling, racks, home-offices]
+applies_to:
+  classes: [wireless-access-point]
+  models: [unifi-u7-pro, unifi-u7-pro-max]
+figures:
+  - { n: "150 m²", label: Per access point }
+  - { n: "2.7 to 4.5 m", label: Mounting height }
+  - { n: 1, label: Cat6A per access point }
+  - { n: 3, label: Wi-Fi networks }
+sections:
+  - id: coverage
+    title: How many and where
+    intro: "The spacing is a house starting point, inside the range public enterprise guides give (about 110 to 185 m² of open office per access point). A predictive design and a survey decide the final positions."
+    figure: wifi-grid
+    table:
+      caption: Access points per area (house choice)
+      columns: [Area, Model, How many, Why]
+      rows:
+        - [Open office and desks, U7 Pro, "One per 150 m²", Rated coverage is 140 m²; spacing a little wider suits 5 and 6 GHz cells overlapping]
+        - [Meeting room with 12 or more seats, U7 Pro, One in the room, "Video calls from a full room need their own cell, not a share of the corridor's"]
+        - ["Town hall, cafeteria, training room", U7 Pro Max, "One per 100 m², or one per 50 seats, whichever is more", 4x4 on 5 GHz and a spectral scanning radio for crowds]
+        - [Reception and corridors, U7 Pro, As the grid falls, Coverage for roaming between areas]
+        - [Comms room, None, None, No clients there; covered from the corridor]
+      note: Areas are measured from the floor plan in Keia Atlas. Walls of glass, concrete or lift shafts need more access points, which the predictive design shows.
+    rules:
+      - id: spacing
+        level: must
+        rule: Plan one access point per 150 m² of open office and one in every meeting room with 12 or more seats, then adjust with a predictive design before any cable is pulled.
+        why: Designing for people and calls, not just signal, avoids a floor that shows full bars but stalls at 10 a.m.
+        check: The predictive design shows -65 dBm or better on 5 GHz over every working area, with the access point count at or above the house figure.
+        house: true
+        sources: [meraki-rf-design, unifi-optimizing]
+      - id: signal-target
+        level: must
+        rule: Design for at least -65 dBm on 5 GHz from the nearest access point and -70 dBm from a second one everywhere people work.
+        why: The second access point is what a device roams to; -65 dBm is the level UniFi recommends for steady connections.
+        check: The post-install walk survey heat maps, saved in the handover pack.
+        house: true
+        sources: [unifi-optimizing]
+      - id: survey
+        level: must
+        rule: Walk the floor with a survey tool after install and before handover, and fix any area below the signal target.
+        why: Furniture, glass and people change the design; only a survey shows the real result.
+        check: Survey report in the handover pack with no area below target.
+        house: true
+      - id: dense-model
+        level: should
+        rule: Use the U7 Pro Max where more than 50 people gather, and the U7 Pro everywhere else.
+        why: The Max has twice the 5 GHz streams and a dedicated spectral scanner; elsewhere the Pro does the job for less money and power.
+        check: The models in Keia Atlas match the table for each area.
+        house: true
+        sources: [unifi-u7-pro, unifi-u7-pro-max]
+  - id: mounting
+    title: Mounting
+    rules:
+      - id: ceiling-down
+        level: must
+        rule: Mount access points on the ceiling, facing down, with the Pro mount, between 2.7 and 4.5 m above the floor.
+        why: These access points have built-in antennas designed to cover the floor below; on a high ceiling or a wall the signal goes where people are not.
+        check: Photo of each access point and its height on the as-built floor plan.
+        house: true
+        sources: [unifi-mounts, meraki-high-density, mist-placement]
+      - id: open-ceiling
+        level: should
+        rule: Where the ceiling is open or higher than 4.5 m, hang the access point on a rod or drop it to the level of the light fittings.
+        why: Keeps it within its designed height above the desks.
+        check: Measured height is 4.5 m or less.
+        house: true
+        sources: [mist-placement]
+      - id: clear-of-metal
+        level: must
+        rule: Keep at least 1 m from metal ducts, cable trays, lights and beams, and never mount above a ceiling tile.
+        why: Metal and tiles block and bounce the signal, and a hidden access point cannot be seen or reached.
+        check: Walk the ceiling with the as-built plan.
+        house: true
+      - id: not-on-grid
+        level: should
+        rule: Fix the mount to the ceiling tile with the maker's tile kit or to a junction box, never hung from the ceiling grid alone.
+        why: A falling access point is a safety risk, and a loose one moves out of its designed position.
+        check: Inspection before the ceiling is signed off.
+        house: true
+        sources: [unifi-mounts]
+  - id: cabling
+    title: Cable and power
+    rules:
+      - id: one-cat6a
+        level: must
+        rule: Run one Cat6A cable from the comms room to each access point position, ending on a jack in the ceiling, with a patch cord of up to 3 m to the access point.
+        why: Cat6A carries 2.5 Gb/s today and 10 Gb/s later, and a jack means the access point can be swapped without re-terminating the cable. TIA's access point guidance recommends Cat6A to each position on a grid.
+        check: The certification report lists a passing Cat6A link for every access point position.
+        house: true
+        sources: [tia-tsb-162]
+      - id: two-runs-note
+        level: should
+        rule: Pull a second Cat6A only where the design expects a second access point or a higher-power model within the building's life, and record it as a spare.
+        why: One cable is the house choice for cost; some designers pull two to every position for future access points, and this is where we do.
+        check: Spare runs are labelled and terminated at both ends.
+        house: true
+        sources: [tia-tsb-162]
+      - id: poe-plus
+        level: must
+        rule: Power each access point with PoE+ (IEEE 802.3at) from a 2.5 GbE switch port and count 25.5 W per access point in the switch's PoE budget.
+        why: The U7 Pro draws up to 21 W and the Pro Max up to 25 W; a plain PoE (802.3af) port cannot run them.
+        check: The controller shows each access point uplinked at 2.5 Gb/s on a PoE+ port.
+        sources: [unifi-poe]
+      - id: trunk-port
+        level: must
+        rule: Set the switch port to the management VLAN for the access point itself and tag every VLAN its Wi-Fi networks use.
+        why: Each network lands on its own VLAN at the switch; nothing is bridged on the access point.
+        check: The port profile in the controller matches the VLAN plan.
+        house: true
+        sources: [unifi-creating-ssids]
+  - id: networks
+    title: Wi-Fi networks (SSIDs)
+    intro: Three networks, the same names and VLANs in every office. Fewer networks means less airtime spent on beacons.
+    table:
+      caption: The Wi-Fi networks (house choice)
+      columns: [Name, Security, VLAN, Bands, For]
+      rows:
+        - [Aigna, "WPA3-Enterprise (802.1X)", "20 Corporate", "6, 5 and 2.4 GHz", Staff]
+        - [Aigna-Devices, "WPA2/WPA3 personal with a key per device (PPSK)", "30 Room systems, 31 Displays, 50 Building", "5 and 2.4 GHz", "Room and building devices that need Wi-Fi"]
+        - [Aigna-Guest, "WPA2/WPA3 personal, key changed monthly, clients isolated", "90 Guest", "5 and 2.4 GHz", Visitors]
+      note: 6 GHz requires WPA3, which older devices lack, so the device and guest networks stay on 5 and 2.4 GHz.
+    rules:
+      - id: three-ssids
+        level: must
+        rule: Broadcast only the three house networks, with the names, security and VLANs in the table.
+        why: Every extra network costs airtime on every channel; UniFi also advises against many networks.
+        check: The controller lists exactly three networks per site.
+        house: true
+        sources: [unifi-multiple-ssids]
+      - id: wpa3-6ghz
+        level: must
+        rule: Use WPA3 on any network that includes 6 GHz, and keep devices that cannot do WPA3 on the device network.
+        why: 6 GHz only allows WPA3 with protected management frames.
+        check: The staff network shows WPA3 and 6 GHz enabled.
+        sources: [unifi-6ghz]
+      - id: guest-isolation
+        level: must
+        rule: Isolate guest clients from each other and let the guest VLAN reach only the internet.
+        why: A visitor's laptop must not see another visitor's, or anything of Aigna's.
+        check: From a guest device, another guest device and the office printers are unreachable.
+        house: true
+  - id: radio
+    title: Radio settings
+    rules:
+      - id: channel-width
+        level: must
+        rule: Use 20 MHz on 2.4 GHz (channels 1, 6 and 11 only), 40 MHz on 5 GHz (20 MHz in town halls and cafeterias) and 160 MHz on 6 GHz.
+        why: Narrower channels give more channels to spread neighbouring access points across, which matters more in an office than the top speed of one link.
+        check: The controller's radio settings for every access point.
+        house: true
+        sources: [unifi-optimizing, meraki-high-density]
+      - id: band-steering
+        level: must
+        rule: Leave band steering and BSS transition on, and fast roaming (802.11r) on for the staff network.
+        why: Moves capable devices to 5 and 6 GHz, where there is more room, and helps calls survive a walk between access points.
+        check: The network's settings in the controller.
+        sources: [unifi-ssid-settings, unifi-optimizing]
+      - id: min-rssi-off
+        level: should
+        rule: Leave minimum RSSI off unless a survey shows devices clinging to a far access point, then set it per access point from the survey.
+        why: One value everywhere disconnects devices that were fine; UniFi advises tuning it only with care.
+        check: Minimum RSSI is off, or its value is in the survey report.
+        house: true
+        sources: [unifi-min-rssi]
+      - id: channel-plan
+        level: must
+        rule: Run Channel AI after install, review its plan, then keep it on with the office's change window as its schedule.
+        why: It spreads channels across neighbours using what each access point hears, without changing width or power.
+        check: The controller shows Channel AI on and the last plan applied.
+        house: true
+        sources: [unifi-channel-ai]
+      - id: mlo-lab
+        level: should
+        rule: Leave Multi-Link Operation (MLO) off until the Lab has passed it with the room devices.
+        why: Turning MLO on also turns on WPA3 for that network, which some devices cannot join.
+        check: MLO is off on every network, or the Lab test is linked in Keia Atlas.
+        house: true
+        sources: [unifi-mlo, unifi-ssid-settings]
+      - id: ap-firmware
+        level: must
+        rule: Turn off automatic updates and roll out the access point release the Lab has passed, in the office's change window.
+        why: An update restarts every access point on the floor at once.
+        check: Every access point runs the fleet standard firmware.
+        house: true
+      - id: ap-name
+        level: must
+        rule: Name each access point site-room-ap and number (for example dub-305-ap01), with the room or area it covers.
+        why: The same name finds it on the floor plan, in the controller and in Keia Atlas.
+        check: The controller's device names match Keia Atlas.
+        house: true
+references:
+  - id: unifi-u7-pro
+    name: Access Point U7 Pro, Tech Specs
+    publisher: Ubiquiti
+    kind: vendor
+    summary: The U7 Pro's radios, 21 W PoE+ draw, 2.5 GbE port and rated coverage of 140 square metres.
+    source: unifi-u7-pro-tech-specs
+    checked: "2026-09-29"
+  - id: unifi-u7-pro-max
+    name: Access Point U7 Pro Max, Tech Specs
+    publisher: Ubiquiti
+    kind: vendor
+    summary: The U7 Pro Max's radios (4x4 on 5 GHz), spectral scanning engine, 25 W PoE+ draw and rated coverage of 160 square metres.
+    source: unifi-u7-pro-max-tech-specs
+    checked: "2026-09-29"
+  - id: unifi-poe
+    name: PoE Availability and Modes, UniFi Help Center
+    publisher: Ubiquiti
+    kind: vendor
+    summary: PoE+ means IEEE 802.3at, 25.5 W at the device, and each U7 model's draw fits within it.
+    source: unifi-help-poe-modes
+    checked: "2026-09-29"
+  - id: unifi-optimizing
+    name: Optimizing WiFi Connectivity and Reducing Latency, UniFi Help Center
+    publisher: Ubiquiti
+    kind: vendor
+    summary: Channel widths and power by kind of space, and the signal level clients need for steady connections (-65 dBm recommended).
+    source: unifi-help-optimizing-wifi
+    checked: "2026-09-29"
+  - id: unifi-min-rssi
+    name: Understanding and Implementing Minimum RSSI, UniFi Help Center
+    publisher: Ubiquiti
+    kind: vendor
+    summary: What minimum RSSI does and why it should be set from a survey, not as one value everywhere.
+    source: unifi-help-min-rssi
+    checked: "2026-09-29"
+  - id: unifi-ssid-settings
+    name: UniFi WiFi SSID and AP Settings Overview, UniFi Help Center
+    publisher: Ubiquiti
+    kind: vendor
+    summary: Each Wi-Fi setting explained, including band steering and BSS transition left on, and MLO turning on WPA3.
+    source: unifi-help-ssid-ap-settings
+    checked: "2026-09-29"
+  - id: unifi-channel-ai
+    name: UniFi Channel AI and Automated WiFi Optimization, UniFi Help Center
+    publisher: Ubiquiti
+    kind: vendor
+    summary: How Channel AI plans channels from what each access point hears, without changing width or power.
+    source: unifi-help-channel-ai
+    checked: "2026-09-29"
+  - id: unifi-mlo
+    name: Multi-Link Operation (MLO) in UniFi Network, UniFi Help Center
+    publisher: Ubiquiti
+    kind: vendor
+    summary: MLO per network for Wi-Fi 7 devices, and the software versions it needs.
+    source: unifi-help-mlo
+    checked: "2026-09-29"
+  - id: unifi-6ghz
+    name: Getting Started with 6 GHz, UniFi Help Center
+    publisher: Ubiquiti
+    kind: vendor
+    summary: 6 GHz needs WPA3, reaches less far than 5 GHz, and older devices need a network without it.
+    source: unifi-help-6ghz
+    checked: "2026-09-29"
+  - id: unifi-mounts
+    name: WiFi Access Point (AP) Ceiling Mounts, UniFi Help Center
+    publisher: Ubiquiti
+    kind: vendor
+    summary: The Pro mounting system for the U7 Pro and U7 Pro Max on ceilings, tiles, walls and junction boxes.
+    source: unifi-help-ceiling-mounts
+    checked: "2026-09-29"
+  - id: unifi-multiple-ssids
+    name: Broadcasting Multiple WiFi SSIDs, UniFi Help Center
+    publisher: Ubiquiti
+    kind: vendor
+    summary: How many networks an access point can broadcast, and why fewer is better.
+    source: unifi-help-multiple-ssids
+    checked: "2026-09-29"
+  - id: unifi-creating-ssids
+    name: Creating UniFi WiFi SSIDs, UniFi Help Center
+    publisher: Ubiquiti
+    kind: vendor
+    summary: Each network maps to a VLAN, and the access point's switch port carries every VLAN it serves.
+    source: unifi-help-creating-ssids
+    checked: "2026-09-29"
+  - id: meraki-rf-design
+    name: Meraki Wireless for Enterprise Best Practices, RF Design
+    publisher: Cisco Meraki
+    kind: guide
+    summary: For open offices with ordinary ceilings, about one access point per 110 to 185 square metres for 5 and 6 GHz, 12 to 15 m apart.
+    source: meraki-wireless-rf-design
+    checked: "2026-09-29"
+  - id: meraki-high-density
+    name: High Density Wi-Fi Deployments
+    publisher: Cisco Meraki
+    kind: guide
+    summary: In dense spaces use 20 MHz on 5 GHz and band steering, and choose antennas by mounting height.
+    source: meraki-high-density
+    checked: "2026-09-29"
+  - id: mist-placement
+    name: Access Point and Antenna Placement, Mist AI WLAN design framework
+    publisher: Juniper Networks
+    kind: guide
+    summary: Access points with built-in antennas go on the ceiling facing down, not flat on walls, and are lowered in open ceilings.
+    source: mist-ap-placement
+    checked: "2026-09-29"
+  - id: tia-tsb-162
+    name: TIA TSB-162-B, Telecommunications Cabling Guidelines for Wireless Access Points
+    publisher: Telecommunications Industry Association
+    kind: guide
+    summary: A pre-cabled square grid of access point positions (cells up to about 18 m across) with Category 6A cable to each position.
+    url: https://www.tiafotc.org/tia-standards-update/tsb-162-b/
+    source: tia-tsb-162-a-ieee-slides
+    checked: "2026-09-29"
+demo: true

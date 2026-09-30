@@ -1,0 +1,128 @@
+# House standard: digital signage. Made up for the demo. The display itself follows the displays standard.
+id: signage
+name: Signage
+area: signage
+order: 8
+version: "1.0"
+effective: "2026-09-29"
+owner: Service manager, AV
+summary: "Signage is a 24/7 display and a managed player behind it, at standing eye height, on the network, on a schedule, showing content from one managed platform."
+intro: >-
+  A signage point is two devices: a commercial display, set up by the displays standard, and a signage player, managed in
+  BSN.cloud. This standard covers what is different about signage: where it goes, how the player is fitted, and how
+  content and schedules are run.
+scope:
+  - Screens in reception, pantries, cafeterias, lift lobbies and corridors that show company content.
+  - "Not in scope: meeting room displays (the displays standard) and room booking panels (the scheduler panels standard)."
+related: [displays, network, power]
+applies_to:
+  classes: [signage-player, display]
+  models: [brightsign-xt1145, samsung-qm65c, lg-55uh5q-e]
+  configurations: [brightsign-xt1145-bsn-cloud, samsung-qmc-display, lg-uh5q-display]
+  space_types: [reception-concierge, pantry, pantry-expanded, cafeteria]
+figures:
+  - { n: "1,500 mm", label: Centre of the screen }
+  - { n: "24/7", label: Rated display }
+  - { n: 1, label: Content platform }
+  - { n: "HDMI 1", label: Fixed input }
+sections:
+  - id: placement
+    title: Where it goes
+    rules:
+      - id: eye-height
+        level: must
+        rule: Mount landscape signage with the centre of the screen about 1,500 mm above the floor, where people stand or queue, facing the way they walk.
+        why: That is standing eye height, so people read it without looking up; it is placed where they pause, not where they hurry past.
+        check: Measure from the finished floor to the centre of the screen.
+        house: true
+      - id: protrusion
+        level: must
+        rule: In corridors and lobbies, keep the display and mount within 100 mm of the wall (see the displays standard).
+        why: A screen sticking out at head height is not found with a cane.
+        check: Measure the depth from the wall.
+        sources: [ada-307]
+      - id: daylight
+        level: should
+        rule: Do not place a 500 nit display facing a window or in direct sun; where it must go there, raise an exception for a high brightness model.
+        why: The house displays wash out in daylight, and a signage screen nobody can read is wasted.
+        check: Look at the screen at midday before handover.
+        house: true
+      - id: portrait
+        level: should
+        rule: Mount a display in portrait only if its maker's manual allows portrait use, and turn it so the ports are where the manual says.
+        why: Some displays overheat or void their warranty in portrait, or in the wrong direction.
+        check: The page of the manual that allows portrait is in the handover pack.
+        house: true
+  - id: player
+    title: The player
+    rules:
+      - id: behind
+        level: must
+        rule: Fix the signage player behind the display on the mount or in the recessed box, powered by PoE+ from its data outlet, with a short HDMI lead to HDMI 1.
+        why: Nothing hangs below the screen, and the player can be restarted from the switch.
+        check: Photo behind the display before it is hung; the switch shows the player drawing PoE.
+        house: true
+        sources: [brightsign-hardware]
+      - id: player-network
+        level: must
+        rule: Put the player and the display on the Displays and signage VLAN (31), each with its own reservation and hostname (site-room-sig and dsp numbers).
+        why: Both can be managed and monitored, and their names match on the floor plan.
+        check: Both answer on their reserved addresses.
+        house: true
+      - id: bsn
+        level: must
+        rule: Register the player in BSN.cloud before it leaves the bench, set up by its configuration.
+        why: Content, schedules and health come from one place, and a replaced player picks up its content without a visit.
+        check: The player is online in BSN.cloud in the site's group.
+        house: true
+        sources: [bsn-cloud]
+  - id: running
+    title: Content and schedules
+    rules:
+      - id: display-schedule
+        level: must
+        rule: Turn the display on and off with its own timers (office hours), and let the player's schedule follow the same hours.
+        why: The display is off overnight and at weekends, which is most of the week.
+        check: The display's timers match the office's hours.
+        house: true
+      - id: fixed-input
+        level: must
+        rule: Fix the display's input to HDMI 1 and turn CEC and automatic input switching off.
+        why: A signage screen must never switch to a blank input.
+        check: Unplug and replug the player; the display stays on HDMI 1.
+        house: true
+      - id: fallback
+        level: should
+        rule: Keep a default playlist on the player that shows when scheduled content is missing.
+        why: A black screen in reception looks broken.
+        check: Remove the scheduled content in a test; the default playlist plays.
+        house: true
+      - id: content-rules
+        level: must
+        rule: Show only approved company content, never personal data, meeting names or anything people could not see from the street.
+        why: Reception screens are seen by visitors and passers-by.
+        check: Content owners sign off each playlist in BSN.cloud.
+        house: true
+references:
+  - id: ada-307
+    name: 2010 ADA Standards for Accessible Design, section 307 (Protruding Objects)
+    publisher: United States Access Board and Department of Justice
+    kind: regulation
+    summary: Wall-mounted objects whose leading edge is between 685 and 2,030 mm above the floor may stick out at most 100 mm into a circulation path.
+    url: https://www.access-board.gov/ada/#ada-307
+    checked: "2026-09-29"
+  - id: brightsign-hardware
+    name: BrightSign XT245, XT1145 and XT2145 hardware set up
+    publisher: BrightSign
+    kind: vendor
+    summary: The XT1145 player's ports, PoE+ power and mounting.
+    source: brightsign-xt245-xt1145-xt2145-hardware-set-up
+    checked: "2026-09-29"
+  - id: bsn-cloud
+    name: control.bsn.cloud, BrightSign documentation
+    publisher: BrightSign
+    kind: vendor
+    summary: How players are registered in BSN.cloud and given their setup and content.
+    source: brightsign-controlbsncloud
+    checked: "2026-09-29"
+demo: true

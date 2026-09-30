@@ -1,0 +1,515 @@
+---
+// The "Try it" step inside each Learn lesson: a small, live mock of the real screen, built from the
+// demo's own data. Only the markup lives here; Learn's page script makes each one work and says when
+// it is done. Nothing here changes any real data.
+import Icon from './Icon.astro';
+import DeviceGlyph from './DeviceGlyph.astro';
+import { spaces, sites, models, classes, configurations, projects, modelName, className, KIND, href } from '../lib/data.mjs';
+const { id } = Astro.props;
+
+const curlew = spaces['nyc-20-05'];
+const vbar = curlew.positions.find((p) => p.cls === 'video-bar');
+const vbModel = models[vbar.model];
+const siteName = (s) => sites[s.site].name;
+// Other installed units of the same model, for the drill down.
+const others = Object.values(spaces).filter((s) => s.id !== curlew.id && s.positions.some((p) => p.model === vbar.model)).slice(0, 3)
+  .map((s) => ({ s, p: s.positions.find((p) => p.model === vbar.model) }));
+const vbModels = Object.entries(models).filter(([, m]) => m.class === 'video-bar').map(([mid, m]) => ({ id: mid, name: `${m.manufacturer} ${m.model}`, rooms: Object.values(spaces).filter((s) => s.positions.some((p) => p.model === mid)).length }));
+const PROFILES = ['video-bar', 'display', 'touch-controller', 'scheduler-panel'];
+const roomCount = (cls) => Object.values(spaces).filter((s) => s.positions.some((p) => p.cls === cls)).length;
+const cfgName = Object.values(configurations).find((c) => c.models.includes(vbar.model))?.name ?? 'Its configuration';
+
+// Search: a small index of the demo's own rooms, models, settings, projects and retired devices.
+const REGION = { amer: 'Americas', emea: 'EMEA', apac: 'APAC' };
+const token = (m) => (m.model.split(' ').pop().match(/\d/) ? m.model.split(' ').pop().toLowerCase() : null);
+const SEARCH = id === 'search' ? {
+  models: Object.fromEntries(Object.entries(models).map(([mid, m]) => [mid, { n: `${m.manufacturer} ${m.model}`, t: token(m) }])),
+  sites: Object.fromEntries(Object.entries(sites).map(([sid, s]) => [sid, { n: s.name, city: (s.city ?? '').toLowerCase(), r: s.region ?? '' }])),
+  items: [
+    ...Object.values(spaces).filter((s) => !['desks', 'kits'].includes(KIND(s))).map((s) => ({ k: 'room', n: `${s.number ?? ''} ${s.name}`.trim(), s: `${s.type.profile.name} · ${siteName(s)}`, site: s.site, r: sites[s.site].region ?? '', m: [...new Set(s.positions.map((p) => p.model).filter(Boolean))], to: `/rooms/${s.id}/` })),
+    ...Object.entries(models).map(([mid, m]) => ({ k: 'model', n: `${m.manufacturer} ${m.model}`, s: className(m.class), m: [mid], cls: m.class, to: `/models/${mid}/` })),
+    ...Object.values(configurations).map((c) => ({ k: 'setting', n: c.name, s: c.groups.flatMap((g) => g.settings.map((x) => x.name)).slice(0, 40).join(', '), m: c.models, to: '/configurations/' })),
+    ...Object.values(projects).map((p) => ({ k: 'project', n: `${p.id} ${p.name}`, s: sites[p.site]?.name ?? '', site: p.site, r: sites[p.site]?.region ?? '', to: `/projects/${p.id.toLowerCase()}/` })),
+    ...Object.values(spaces).flatMap((s) => s.retiredKit.map((p) => ({ k: 'retired', n: `${modelName(p.model)}`, s: `${className(p.cls)}, retired from ${s.number ?? ''} ${s.name} · ${siteName(s)}`, site: s.site, r: sites[s.site].region ?? '', cls: p.cls, m: [p.model], to: `/rooms/${s.id}/` }))),
+  ],
+} : null;
+
+// Making a change: how many Studio X units would pick the new value up.
+const studioX = ['poly-studio-x32', 'poly-studio-x52', 'poly-studio-x72'];
+const studioUnits = Object.values(spaces).reduce((n, s) => n + s.positions.filter((p) => studioX.includes(p.model) && p.current).length, 0);
+
+const prj = projects['prj-12'];
+const P12 = ['T-1204', 'T-1205', 'T-1206', 'T-1207'].map((t) => prj.tasks.find((x) => x.id === t));
+const WHO = { liam: 'Liam Doyle', aoife: 'Aoife Byrne', ruth: 'Ruth Kelly', marco: 'Marco Bianchi', tomas: 'Tomás Varga' };
+const due = (d) => new Date(d).toLocaleDateString('en-IE', { day: 'numeric', month: 'short' });
+
+const HOME = [
+  { role: 'delivery', label: 'Delivery engineer', name: 'Aoife', panels: [
+    { k: 'tasks', h: 'Your tasks', rows: ['Commission Curlew and run the verification · 6 Oct', 'Check Heron against the X52 configuration · 2 Oct', 'Write the Wren commissioning notes · 9 Oct'] },
+    { k: 'projects', h: 'Your projects', rows: ['PRJ-12 New York office video bar refresh · Deploy', 'PRJ-14 Juneau office fit-out · Deploy'] },
+  ] },
+  { role: 'sm-av', label: 'Service manager, AV', name: 'Sofia', panels: [
+    { k: 'inbox', h: 'Your inbox', rows: ['Urgent: Heron video bar arrived on 4.7.0', 'New firmware found: Poly Studio X52', 'Suggested change: TC10 pairing step'] },
+    { k: 'lab', h: 'In the Lab', rows: ['LAB-07 VideoOS 4.7.0 · Testing', 'LAB-11 VideoOS 5 · Failed'] },
+  ] },
+  { role: 'pm', label: 'Project manager', name: 'Ruth', panels: [
+    { k: 'projects', h: 'Projects', rows: ['PRJ-12 New York office video bar refresh · 1 blocked', 'PRJ-16 Dublin office IDF switch refresh · Design', 'PRJ-15 Dublin office town hall · Design'] },
+    { k: 'tasks', h: 'Your tasks', rows: ['Hand over with a snag list · 27 Nov', 'Rebook Whooper Swan after 14 Oct'] },
+  ] },
+  { role: 'tech', label: 'On-site technician', name: 'Liam', panels: [
+    { k: 'incidents', h: 'Open incidents', rows: ['P2 No video in 3.04 Curlew, Dublin office', 'P3 Signage off in reception'] },
+    { k: 'tasks', h: 'Your tasks', rows: ['Install the new video bar in Curlew · 2 Oct', 'Swap the X72 in Skylark · 23 Oct'] },
+  ] },
+];
+const STAGE_TEXT = [
+  ['Knowledge', 'Holds the standard: room profiles, device profiles, configurations and rooms.', 'Everything else, by hand, as today.'],
+  ['Live', 'Shows health and incidents from the asset register, device management and monitoring.', 'Fix what is red; decide what is urgent.'],
+  ['Process', 'Runs projects, playbooks, the year plan and the Lab.', 'Own the tasks; sign each gate.'],
+  ['Act', 'Makes an approved change in the other systems, then reads it back to check.', 'Approve every change before it is made.'],
+  ['Assist', 'Answers questions from the knowledge and the live evidence.', 'Check the answer; make the call.'],
+  ['Agents', 'Watches in the background and proposes tasks, with the evidence.', 'Accept, change or dismiss every proposal.'],
+];
+// How a room works: a fault, found the way the team really does it. Start from the report, look
+// remotely, follow the signal from source to screen, fix and test on site, then record it. The wiring
+// is Curlew's own (large, dual display): the table cable goes to the HDBaseT transmitter in the table
+// box, over a direct run to the receiver behind the display, into the video bar, and the video bar's
+// second output feeds display 2. The extenders are not on the network (data/device-classes/
+// av-extender.yaml), so only their lights tell you about them.
+const TROUBLE = [
+  {
+    k: 'Check for an incident',
+    ctx: `The service desk passes on a call from Dana in ${curlew.number} ${curlew.name}: "I plug my laptop into the table cable and nothing shows on the second screen. Meeting at 11:00."`,
+    q: 'What do you do first?',
+    a: [
+      { t: 'Go to the room with a spare cable', say: 'Not yet. You do not know the cause, and someone may already be on the way. Look for an open incident first.' },
+      { t: `Check whether an incident is already open for ${curlew.name}`, ok: true },
+      { t: 'Open a new incident', say: 'Look first. If one is already open you make a duplicate, and two people chase the same fault.' },
+    ],
+    got: 'One is: INC0041196, opened 20 minutes ago by someone in the 10:00 meeting. You add Dana\'s call to it instead of opening a second one. One incident, one owner, and both callers hear back.',
+  },
+  {
+    k: 'Check remotely',
+    light: 'remote',
+    ctx: `The incident is yours. ${curlew.name} is two floors up.`,
+    q: 'Before you go, where do you look?',
+    a: [
+      { t: 'Nowhere: go and look', say: 'The walk may not be needed, and without looking you do not know what to take. Most of what you need is visible from your desk.' },
+      { t: 'Restart the video bar remotely', say: 'A restart ends any meeting in the room and can hide the evidence. Look before you change anything.' },
+      { t: `${curlew.name}'s health in Keia Atlas`, ok: true },
+    ],
+    got: 'Keia Atlas puts monitoring and device management for the room in one place:',
+    read: [
+      { lv: 'ok', from: 'Monitoring', t: 'Display 2 is online, on input HDMI 1: the input in the room\'s configuration.' },
+      { lv: 'warn', from: 'Device management', t: 'The video bar is online and ready for calls, but has no picture on its content input.' },
+      { lv: 'unk', from: 'Not monitored', t: 'The transmitter and receiver are not on the network, so they cannot report. Their lights will tell you, on site.' },
+    ],
+  },
+  {
+    k: 'Follow the signal',
+    light: 'path',
+    hops: true,
+    ctx: 'The screen end is fine, so the picture is lost somewhere between the table and the video bar. You go up with a known-good spare cable and check each point from the source to the screen.',
+    q: 'Where is the signal lost first?',
+    a: [
+      { t: 'Laptop and table cable', sub: 'The laptop says it is sending to a second screen', dev: 'laptop', say: 'The laptop is sending, so the picture gets this far. Keep going towards the screen.' },
+      { t: 'Transmitter, in the table box', sub: 'No lights at all', dev: 'tx', say: 'Close. It is dark because it has no power, and it takes its power from the receiver over the cable to the wall. Check what it depends on first.' },
+      { t: 'Cable from the table box to the wall', sub: 'Runs under the floor to the display wall', dev: 'wire', ok: true },
+      { t: 'Receiver, behind the display', sub: 'Power light on, link light off', dev: 'rx', say: 'It has power and would show a link if anything reached it. It is waiting, not broken. Look one step closer to the source.' },
+      { t: 'Video bar, content input', sub: 'Online, no picture coming in', dev: 'vbar', say: 'It is online and ready. It can only pass on what reaches it, and nothing does.' },
+      { t: 'Display 2, input HDMI 1', sub: 'Online, on the right input', dev: 'dsp2', say: 'It is on and on the right input. A screen only shows what reaches it.' },
+    ],
+    got: 'Right. The receiver has power but no link, and the transmitter, which gets its power over that same cable, is dark. The cable between them is the first point where nothing gets through.',
+  },
+  {
+    k: 'Fix and test',
+    light: 'fixed',
+    ctx: 'At the table box, the cable from the transmitter to the floor box is half out of its socket. It looks like it was knocked.',
+    q: 'What do you do?',
+    a: [
+      { t: 'Replace the transmitter and receiver', say: 'Two new boxes for a loose cable. Start with the quickest fix that matches the evidence.' },
+      { t: 'Reseat it, check the link light, then test', ok: true },
+      { t: 'Leave it: it is still partly in', say: 'Partly in is what broke the link. It will fail again at the next knock.' },
+    ],
+    got: 'The transmitter lights up and the link light comes on. Now test it the way the room will use it: share the laptop from the table cable, check both screens, then start a test call from the touch controller. Had the link stayed off, the next move was the known-good spare cable, then the transmitter.',
+  },
+  {
+    k: 'Record it',
+    light: 'logged',
+    ctx: 'The room works. The incident is still open.',
+    q: 'What goes in the incident before you resolve it?',
+    a: [
+      { t: '"Fixed"', say: 'Then the next person learns nothing, and nobody can see it if table box cables keep coming loose.' },
+      { t: 'Nothing: the room works now', say: 'Then the incident stays open and neither caller hears back.' },
+      { t: 'The cause, the fix and the test', ok: true },
+    ],
+    got: '"Table box HDBaseT cable half out, so the transmitter had no power. Reseated; laptop and a test call checked on both screens." Both callers hear back. If the fault teaches something new, add a captured fix too: here, a clip to hold the cable in the table box. The room profile owner decides whether every large room gets one.',
+  },
+];
+const tick = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+---
+{id === 'profiles' && (
+  <div class="tr tr-prof" data-tr="profiles">
+    <ol class="tp-legend" aria-label="Where you are">
+      <span class="tp-glide" aria-hidden="true"></span>
+      <li data-lv="0"><small>1</small>Device profiles</li>
+      <li data-lv="1"><small>2</small>A device profile</li>
+      <li data-lv="2"><small>3</small>A model</li>
+      <li data-lv="3"><small>4</small>An installed unit</li>
+    </ol>
+    <div class="tp-main">
+      <nav class="tp-crumbs" aria-label="Path">
+        <button type="button" data-crumb="0">Device profiles</button>
+        <button type="button" data-crumb="1" hidden>Video bar</button>
+        <button type="button" data-crumb="2" hidden>{vbModel.model}</button>
+        <button type="button" data-crumb="3" hidden>{vbar.hostname}</button>
+      </nav>
+      <div class="tp-box" data-box>
+        <div class="tp-pan" data-pan="0">
+          <div class="tp-tiles">
+            {PROFILES.map((c) => (
+              <button type="button" class="tp-tile" data-go-lv={c === 'video-bar' ? '1' : undefined} data-hint={c === 'video-bar' ? undefined : 'Curlew\'s video bar is under Video bar.'}>
+                <DeviceGlyph cls={c} size={40} /><b>{className(c)}</b><small>In {roomCount(c)} rooms</small>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div class="tp-pan" data-pan="1" hidden>
+          <p class="tp-kind">Device profile</p>
+          <p class="tp-lead"><b>Video bar.</b> {classes['video-bar'].profile.object_role}.</p>
+          <p class="tp-sub">Models that fit this profile:</p>
+          <div class="tp-tiles">
+            {vbModels.map((m) => (
+              <button type="button" class="tp-tile" data-go-lv={m.id === vbar.model ? '2' : undefined} data-hint={m.id === vbar.model ? undefined : `Curlew is a large room. Large rooms use the ${vbModel.model}.`}>
+                <b>{m.name}</b><small>In {m.rooms} rooms</small>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div class="tp-pan" data-pan="2" hidden>
+          <p class="tp-kind">Model</p>
+          <p class="tp-lead"><b>{modelName(vbar.model)}.</b> One product. Set up with <span class="tp-chip">{cfgName}</span>, its configuration.</p>
+          <p class="tp-sub">Units of this model:</p>
+          <div class="tp-units">
+            <button type="button" class="tp-unit" data-go-lv="3"><span class="mono">{vbar.hostname}</span><span>{curlew.number} {curlew.name} · {siteName(curlew)}</span></button>
+            {others.map(({ s, p }) => (
+              <button type="button" class="tp-unit" data-hint="That one is in another room. Look for Curlew."><span class="mono">{p.hostname}</span><span>{s.number} {s.name} · {siteName(s)}</span></button>
+            ))}
+          </div>
+        </div>
+        <div class="tp-pan" data-pan="3" hidden>
+          <p class="tp-kind">Unit</p>
+          <dl class="tp-dl">
+            <div><dt>Hostname</dt><dd class="mono">{vbar.hostname}</dd></div>
+            <div><dt>Room</dt><dd>{curlew.number} {curlew.name}, {siteName(curlew)}</dd></div>
+            <div><dt>Model</dt><dd>{modelName(vbar.model)}</dd></div>
+            <div><dt>Serial</dt><dd class="mono">{vbar.current.serial}</dd></div>
+            <div><dt>Status</dt><dd><span class="pill deploy">Being installed</span></dd></div>
+          </dl>
+          <p class="tp-room"><b>Rooms work the same way.</b> Room profile <span class="tp-chip">{curlew.type.profile.name}</span> then room <span class="tp-chip">{curlew.number} {curlew.name}</span>.</p>
+        </div>
+      </div>
+      <p class="tr-hint" data-hint-out aria-live="polite"></p>
+    </div>
+  </div>
+)}
+
+{id === 'configurations' && (
+  <div class="tr tr-cfg" data-tr="configurations">
+    <div class="tc-head">
+      <span class="tc-title"><Icon name="sliders" size={16} /><b>Studio X in Google Meet mode</b><small>Poly Studio X52</small></span>
+      <span class="tc-prog" aria-hidden="true"><i data-tc-bar></i></span>
+      <span class="tc-n" data-tc-n>0 of 5 correct</span>
+    </div>
+    <ol class="tc-rows">
+      {[
+        { name: 'Enable Automatic Updates', path: 'General Settings › Device Management', kind: 'set', need: 'Off', opts: ['On', 'Off'], now: 'On', why: 'First, before anything else: version 5 drops Google Meet and cannot be rolled back.', icon: 'lock' },
+        { name: 'Provider', path: 'General Settings › Provider', kind: 'set', need: 'Google Meet', opts: ['Poly Video Mode', 'Google Meet'], now: 'Poly Video Mode', why: 'Aigna meets on Google Meet. The device restarts after this.', icon: 'link' },
+        { name: 'Time Zone', path: 'General Settings › Date and Time', kind: 'set', need: 'New York', opts: ['UTC', 'New York'], now: 'UTC', why: 'Meeting times on the touch controller must match the room calendar.', icon: 'calendar' },
+        { name: 'Download Update From', path: 'General Settings › Device Management', kind: 'verify', need: 'Poly Online Support Center', now: 'Poly Online Support Center', why: 'The default is right. Updates still only happen when Aigna chooses.', icon: 'box' },
+        { name: 'Enable LLDP', path: 'Network › LAN Network › LAN Options', kind: 'set', need: 'On', opts: ['Off', 'On'], now: 'Off', why: 'The switch learns what is plugged into each port.', icon: 'net' },
+      ].map((r, i) => (
+        <li class="tc-row" data-row data-need={r.need} data-kind={r.kind} data-state={i === 0 ? 'now' : 'locked'} style={`--i:${i}`}>
+          <span class="tc-n1 mono">{i + 1}</span>
+          <span class="tc-ic"><Icon name={r.icon} size={16} /></span>
+          <span class="tc-name"><b>{r.name}</b><small>{r.path}</small><small class="tc-why">{r.why}</small></span>
+          <span class={`tc-act ${r.kind}`}>{r.kind === 'set' ? 'Set' : 'Verify'}</span>
+          <span class="tc-need"><small>Needs</small><b>{r.need}</b></span>
+          <span class="tc-ctl">
+            {r.kind === 'set'
+              ? <span class="tc-seg" role="radiogroup" aria-label={`${r.name}: current value`}>{r.opts.map((o) => <button type="button" role="radio" aria-checked={String(o === r.now)} data-val={o} disabled={i > 0}>{o}</button>)}</span>
+              : <button type="button" class="btn small ghost" data-verify disabled={i > 0}>Looks right</button>}
+          </span>
+          <span class="tc-mark" aria-hidden="true" set:html={tick}></span>
+        </li>
+      ))}
+    </ol>
+    <p class="tr-hint" data-hint-out aria-live="polite"></p>
+  </div>
+)}
+
+{id === 'room' && (
+  <div class="tr tr-room" data-tr="room" data-at="1">
+    <div class="rm-chain">
+      <span><small>Room profile</small><b>{curlew.type.profile.name}</b></span><Icon name="arrow" size={14} />
+      <span><small>Build option</small><b>{curlew.option.name}</b></span><Icon name="arrow" size={14} />
+      <span><small>Room</small><b>{curlew.number} {curlew.name}</b></span>
+    </div>
+    <ol class="rt-steps" aria-label="Steps">
+      {TROUBLE.map((s, i) => <li data-rt-s={i + 1}><span class="rt-n mono">{i + 1}</span><span class="rt-t">{s.k}</span></li>)}
+    </ol>
+    <div class="rm-body">
+      <svg class="rm-svg" viewBox="0 0 520 290" role="img" aria-label={`${curlew.name}: the display wall, the table, and the path the laptop picture takes to the second display`}>
+        <rect x="6" y="6" width="508" height="190" rx="8" class="rm-wall" />
+        <path d="M60 282 L110 212 L410 212 L460 282 Z" class="rm-table" />
+        <path class="rm-seg" data-seg="a" d="M300 242 L240 240" />
+        <g class="rm-dev rm-wire" data-dev="wire">
+          <path class="rm-hit" d="M208 240 L111 240 L111 154 L150 154" />
+          <path class="rm-seg" data-seg="b" d="M208 240 L111 240 L111 154 L150 154" />
+        </g>
+        <path class="rm-seg" data-seg="c" d="M180 154 L200 154" />
+        <path class="rm-seg" data-seg="d" d="M320 153 L380 153 L380 134" />
+        <rect x="104" y="180" width="14" height="14" rx="2" class="rm-plate" />
+        <g class="rm-dev" data-dev="dsp1">
+          <rect x="40" y="26" width="190" height="108" rx="4" class="rm-frame" /><rect x="46" y="32" width="178" height="96" class="rm-screen on" />
+          <circle cx="224" cy="26" r="7" class="rm-hl" data-hl="dsp1" />
+        </g>
+        <g class="rm-dev" data-dev="dsp2">
+          <rect x="290" y="26" width="190" height="108" rx="4" class="rm-frame" /><rect x="296" y="32" width="178" height="96" class="rm-screen off" data-scr />
+          <text x="385" y="85" class="rm-nosig" data-scr-t>Nothing shared</text>
+          <circle cx="474" cy="26" r="7" class="rm-hl" data-hl="dsp2" />
+        </g>
+        <g class="rm-dev" data-dev="rx">
+          <rect x="150" y="146" width="30" height="16" rx="3" class="rm-box" />
+          <text x="165" y="178" class="rm-lab">Receiver</text>
+          <circle cx="180" cy="145" r="5" class="rm-hl" data-hl="rx" />
+        </g>
+        <g class="rm-dev" data-dev="vbar">
+          <rect x="200" y="144" width="120" height="18" rx="9" class="rm-bar" /><circle cx="260" cy="153" r="5" class="rm-lens" />
+          <circle cx="320" cy="144" r="6" class="rm-hl" data-hl="vbar" />
+        </g>
+        <g class="rm-dev" data-dev="tx">
+          <rect x="198" y="226" width="70" height="28" rx="4" class="rm-tbox" />
+          <rect x="208" y="233" width="30" height="14" rx="3" class="rm-box" />
+          <text x="233" y="268" class="rm-lab">Table box</text>
+          <circle cx="238" cy="232" r="5" class="rm-hl" data-hl="tx" />
+        </g>
+        <g class="rm-dev" data-dev="laptop">
+          <rect x="300" y="236" width="44" height="14" rx="2" class="rm-box" /><path d="M304 236 L308 220 L340 220 L340 236 Z" class="rm-frame" />
+        </g>
+        <g class="rm-dev" data-dev="tc">
+          <rect x="392" y="240" width="36" height="20" rx="4" class="rm-box" />
+          <circle cx="428" cy="238" r="5" class="rm-hl" data-hl="tc" />
+        </g>
+        <g class="rm-dev" data-dev="mic">
+          <ellipse cx="150" cy="258" rx="18" ry="7" class="rm-box" />
+          <circle cx="168" cy="250" r="5" class="rm-hl" data-hl="mic" />
+        </g>
+      </svg>
+      <div class="rt-host" data-rt-host>
+        {TROUBLE.map((s, i) => (
+          <div class="rt-step" data-rt-step={i + 1} hidden={i > 0}>
+            <p class="rt-k">Step {i + 1} of {TROUBLE.length} · {s.k}</p>
+            <p class="rt-ctx">{s.ctx}</p>
+            <p class="rt-q">{s.q}</p>
+            <div class={`rt-opts${s.hops ? ' hops' : ''}`} data-rt-opts>
+              {s.a.map((o) => (
+                <button type="button" data-ok={o.ok ? '1' : undefined} data-say={o.say} data-dev={o.dev} data-light={o.ok ? s.light : undefined}>
+                  <b>{o.t}</b>{o.sub && <small>{o.sub}</small>}
+                </button>
+              ))}
+            </div>
+            <p class="rt-say" data-rt-say aria-live="polite"></p>
+            <div class="rt-got" data-rt-got hidden>
+              <p>{s.got}</p>
+              {s.read && (
+                <ul class="rt-read">
+                  {s.read.map((r) => <li class={r.lv}><span class="rt-from">{r.from}</span>{r.t}</li>)}
+                </ul>
+              )}
+              {i < TROUBLE.length - 1
+                ? <button type="button" class="btn small primary" data-rt-next>Next: {TROUBLE[i + 1].k.toLowerCase()}</button>
+                : <p class="rt-done"><b>Found, fixed and recorded.</b> The same five steps work for any fault: start from the report, look remotely, follow the signal, fix and test, write it down.</p>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+)}
+
+{id === 'search' && (
+  <div class="tr tr-search" data-tr="search" data-search-data={JSON.stringify(SEARCH)}>
+    <label class="ts-box"><Icon name="search" size={18} /><span class="sr-only">Search Keia Atlas</span><input type="search" autocomplete="off" placeholder="Search rooms, devices, settings, projects..." data-ts-q /></label>
+    <div class="ts-try"><span class="faint">Try:</span>
+      {['emea rooms with x52', 'curlew', 'automatic updates', 'retired displays oak house'].map((q) => <button type="button" class="ts-chip" data-ts-ex={q}>{q}</button>)}
+    </div>
+    <p class="ts-understood" data-ts-und hidden></p>
+    <div class="ts-kinds" role="radiogroup" aria-label="Show">
+      {[['all', 'Everything'], ['room', 'Rooms'], ['model', 'Models'], ['setting', 'Settings'], ['project', 'Projects'], ['retired', 'Retired']].map(([k, l]) => <button type="button" role="radio" aria-checked={String(k === 'all')} data-ts-k={k}>{l}<span data-ts-c={k}></span></button>)}
+    </div>
+    <ol class="ts-res" data-ts-res></ol>
+    <p class="ts-more faint" data-ts-more></p>
+  </div>
+)}
+
+{id === 'change' && (
+  <div class="tr tr-chg" data-tr="change">
+    <div class="tg-row">
+      <span class="tg-ic"><Icon name="calendar" size={16} /></span>
+      <span class="tg-name"><b>Maintenance Hours</b><small>Studio X in Google Meet mode · owned by Sofia Reyes, service manager, AV</small></span>
+      <span class="tg-val" data-tg-val>01:00 to 04:00</span>
+      <button type="button" class="btn small" data-tg-open>Suggest a change</button>
+    </div>
+    <div class="tg-form" data-tg-form hidden>
+      <p class="tg-l">New value</p>
+      <div class="tc-seg" role="radiogroup" aria-label="New value">{['02:00 to 05:00', '00:00 to 03:00'].map((v, i) => <button type="button" role="radio" aria-checked={String(i === 0)} data-tg-v={v}>{v}</button>)}</div>
+      <p class="tg-l">Why</p>
+      <div class="tg-why" role="radiogroup" aria-label="Why">{['Cleaners use the rooms at 01:00 and trip the restart', 'Matches the network maintenance window'].map((v, i) => <button type="button" role="radio" aria-checked={String(i === 0)} data-tg-w={v}>{v}</button>)}</div>
+      <button type="button" class="btn small primary" data-tg-send>Send for review</button>
+    </div>
+    <ol class="tg-steps" data-tg-steps hidden>
+      <li data-st="1" class="on"><span class="tg-dot" set:html={tick}></span><b>Proposed by you</b><small data-tg-chg>CHG-040 · Maintenance Hours to 02:00 to 05:00</small></li>
+      <li data-st="2"><span class="tg-dot" set:html={tick}></span><b>Review by the owner</b><small>Sofia Reyes sees it on her home page, with your reason.</small><button type="button" class="btn small primary" data-tg-approve>Approve as Sofia</button></li>
+      <li data-st="3"><span class="tg-dot" set:html={tick}></span><b>Shows everywhere</b><small>Every page that uses the setting, at once.</small></li>
+    </ol>
+    <div class="tg-every" data-tg-every hidden>
+      <span style="--i:0"><Icon name="sliders" size={16} /><small>The configuration</small><b data-tg-out>02:00 to 05:00</b></span>
+      <span style="--i:1"><Icon name="devices" size={16} /><small>{studioUnits} Studio X units</small><b data-tg-out>02:00 to 05:00</b></span>
+      <span style="--i:2"><Icon name="kit" size={16} /><small>Vendor install pack</small><b data-tg-out>02:00 to 05:00</b></span>
+      <span style="--i:3"><Icon name="decisions" size={16} /><small>History</small><b>You, approved by Sofia</b></span>
+    </div>
+  </div>
+)}
+
+{id === 'report' && (
+  <div class="tr tr-rep" data-tr="report">
+    <div class="tq-drawer">
+      <p class="tq-top"><Icon name="plus" size={16} /><b>Report</b><span class="faint">about 20.05 Curlew, New York office</span></p>
+      <div class="tq-kinds" role="radiogroup" aria-label="What kind">
+        {[['change', 'Suggest a change', 'A setting, step or fact is wrong'], ['firmware', 'New firmware found', 'A version the standard does not list'], ['urgent', 'Urgent issue', 'Something is blocking a room']].map(([k, b, s]) => (
+          <button type="button" role="radio" aria-checked="false" data-tq-k={k}><b>{b}</b><small>{s}</small></button>
+        ))}
+      </div>
+      <div class="tq-fields" data-tq-fields hidden>
+        <label class="tq-l" for="tq-what">What happened?</label>
+        <textarea id="tq-what" rows="2" data-tq-what placeholder="One or two sentences"></textarea>
+        <button type="button" class="ts-chip" data-tq-fill>Provider is not under General Settings on this firmware; the install is stuck</button>
+        <p class="tq-l">Does it block a meeting or an install?</p>
+        <div class="tc-seg" role="radiogroup" aria-label="Does it block">{['Yes', 'No, but it needs fixing'].map((v, i) => <button type="button" role="radio" aria-checked={String(i === 0)}>{v}</button>)}</div>
+        <button type="button" class="btn small primary" data-tq-send>Send</button>
+      </div>
+      <p class="tr-hint" data-hint-out aria-live="polite"></p>
+    </div>
+    <div class="tq-inbox">
+      <p class="tq-ih"><span class="avatar sm">SR</span><b>Sofia's home page</b><small>Your inbox</small></p>
+      <ol data-tq-list>
+        <li class="tq-it fw"><i></i><span><b>New firmware found: Poly Studio X52</b><small>Sam Okafor · 1 day ago</small></span></li>
+        <li class="tq-it ch"><i></i><span><b>Suggested change: TC10 pairing step</b><small>Liam Doyle · 3 days ago</small></span></li>
+      </ol>
+    </div>
+  </div>
+)}
+
+{id === 'projects' && (
+  <div class="tr tr-prj" data-tr="projects">
+    <div class="tk-head">
+      <span><span class="mono faint">{prj.id}</span> <b>{prj.name}</b></span>
+      <ol class="tk-phases" aria-label="Phases">{['Plan', 'Design', 'Procure', 'Deploy', 'Hand over'].map((p, i) => <li class={i < 3 ? 'done' : i === 3 ? 'now' : ''}>{p}</li>)}</ol>
+    </div>
+    <ol class="tk-list" data-tk-list>
+      {P12.map((t) => (
+        <li class={`tk st-${t.status}`} data-tk={t.id}>
+          <div class="tk-row">
+            <button type="button" class="tk-box" aria-label={`Mark ${t.id} done`} data-tk-done={t.id === 'T-1204' ? '' : undefined} disabled={t.id !== 'T-1204'} set:html={tick}></button>
+            <span class="tk-t"><b>{t.title}</b><small><span class="mono">{t.id}</span> · {WHO[t.owner]} · {due(t.due)}{t.blocked_by ? ` · Blocked: ${t.blocked_by}` : ''}</small></span>
+            <span class={`pill st-${t.status}`} data-tk-pill>{{ todo: 'To do', doing: 'Doing', blocked: 'Blocked', done: 'Done' }[t.status]}</span>
+          </div>
+          {t.id === 'T-1204' && (
+            <div class="tk-cap" data-tk-cap hidden>
+              <p>Anything the guide did not cover? One sentence helps the next install.</p>
+              <div class="tg-why">
+                <button type="button" data-tk-fix="Nothing new: the guide was right">Nothing new: the guide was right</button>
+                <button type="button" data-tk-fix="The X72 wall mount needed the longer bolts from the spares kit">The wall mount needed the longer bolts from the spares kit</button>
+              </div>
+            </div>
+          )}
+        </li>
+      ))}
+    </ol>
+    <div class="tk-add" data-tk-add>
+      <button type="button" class="btn small ghost" data-tk-open><Icon name="plus" size={14} />Add a task</button>
+      <div class="tk-form" data-tk-form hidden>
+        <label class="tq-l" for="tk-title">Task</label>
+        <input id="tk-title" type="text" data-tk-title placeholder="What needs doing?" />
+        <button type="button" class="ts-chip" data-tk-sugg>Label both ends of the new HDMI cables</button>
+        <p class="tq-l">Where does it belong?</p>
+        <div class="tc-seg" role="radiogroup" aria-label="Where it belongs">{['Just this project', 'Also suggest it for the playbook'].map((v, i) => <button type="button" role="radio" aria-checked={String(i === 0)} data-tk-scope={i ? 'playbook' : 'project'}>{v}</button>)}</div>
+        <button type="button" class="btn small primary" data-tk-addit>Add task</button>
+      </div>
+    </div>
+    <p class="tr-hint" data-hint-out aria-live="polite"></p>
+  </div>
+)}
+
+{id === 'home' && (
+  <div class="tr tr-home" data-tr="home">
+    <div class="th-roles" role="radiogroup" aria-label="View as">
+      <span class="th-glide" aria-hidden="true"></span>
+      {HOME.map((h, i) => <button type="button" role="radio" aria-checked={String(i === 0)} data-th-role={h.role}>{h.label}</button>)}
+    </div>
+    <div class="th-screens" data-th-host>
+      {HOME.map((h, i) => (
+        <div class="th-screen" data-th-screen={h.role} hidden={i > 0}>
+          <p class="th-hello" data-vk="hello">Good morning, {h.name}. Here's what needs you.</p>
+          <div class="th-panels">
+            {h.panels.map((p) => (
+              <div class={`th-panel th-${p.k}`} data-vk={p.k}>
+                <b>{p.h}</b>
+                <ul>{p.rows.map((r) => <li>{r}</li>)}</ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+    <p class="th-note faint">The real switch is under your name, bottom left (in Settings on a phone). <button type="button" class="linkish" data-th-show>Show me</button></p>
+  </div>
+)}
+
+{id === 'help' && (
+  <div class="tr tr-help" data-tr="help">
+    <ol class="hp-steps">
+      <li data-hs="1"><b>1. Switch it on.</b><button type="button" class="btn small primary" data-hp-on>Switch help on</button><span class="faint">or press ? on your keyboard</span></li>
+      <li data-hs="2"><span><b>2. Point at three different things</b> with a dotted outline: Report, Search, the Help switch, a place in the sidebar. On a touch screen, tap once to read, again to use.</span></li>
+    </ol>
+    <p class="hp-meter" aria-live="polite"><span><b data-hp-n>0</b> of 3 explained</span><span class="hp-dots" aria-hidden="true"><i></i><i></i><i></i></span></p>
+    <p class="tr-hint" data-hint-out aria-live="polite"></p>
+  </div>
+)}
+
+{id === 'stages' && (
+  <div class="tr tr-stg" data-tr="stages">
+    <label class="sg-l" for="sg-range">Stage switched on: <b data-sg-n>1</b></label>
+    <input id="sg-range" type="range" min="1" max="6" step="1" value="1" data-sg-range />
+    <ol class="sg-ladder" aria-hidden="true">{STAGE_TEXT.map((s, i) => <li class={i === 0 ? 'on' : ''} data-sg={i + 1}><span class="mono">{i + 1}</span>{s[0]}</li>)}</ol>
+    <div class="sg-cols" data-sg-host>
+      {STAGE_TEXT.map((s, i) => (
+        <div class="sg-pane" data-sg-pane={i + 1} hidden={i > 0}>
+          <div><small>Keia Atlas does by itself</small><p>{s[1]}</p></div>
+          <div><small>People decide</small><p>{s[2]}</p></div>
+        </div>
+      ))}
+    </div>
+    <div class="sg-agent">
+      <p class="sg-ah"><Icon name="agent" size={18} /><b>Refresh planner</b><span class="faint">an agent</span></p>
+      <p><small>Noticed</small>Four more X52s at the New York office pass their years in service next quarter.</p>
+      <p><small>Proposes</small>Add them to PRJ-12 as a second batch.</p>
+      <div class="sg-btns" data-sg-btns>
+        <button type="button" class="btn small primary" data-sg-d="Accepted: a task is added to PRJ-12 for the project manager.">Accept</button>
+        <button type="button" class="btn small" data-sg-d="Changed: you moved it to next year's plan instead.">Change</button>
+        <button type="button" class="btn small ghost" data-sg-d="Dismissed: nothing happens, and the agent remembers why.">Dismiss</button>
+      </div>
+      <p class="sg-out" data-sg-out hidden></p>
+    </div>
+  </div>
+)}

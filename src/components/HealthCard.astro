@@ -1,0 +1,73 @@
+---
+// One platform's view of a healthy device, as a compact checklist: each field it must hold, the value
+// for one example device, and a check that runs when the section comes into view (spinner, then tick).
+// Every row is the same height and every icon the same size, so the cards read as one grid.
+// The anatomy of each field (what the parts of a hostname mean, and so on) lives in Learn.
+import Icon from './Icon.astro';
+import { roomWords, modelName, STAGE_LABEL } from '../lib/data.mjs';
+const { k, name, p, ex } = Astro.props;
+const cap = (s) => s[0].toUpperCase() + s.slice(1);
+const LABEL = {
+  space: 'Room', model: 'Model', serial: 'Serial', lifecycle_state: 'Lifecycle', expected_firmware: 'Target firmware',
+  asset_tag: 'Asset tag', status: 'Status', hostname: 'Hostname', mac_address: 'MAC', ip_address: 'IP address',
+  device_name: 'Device name', firmware_version: 'Firmware', monitor_name: 'Monitor name', resource_name: 'Calendar', capacity: 'Capacity',
+};
+const ICON = {
+  space: 'room', model: 'box', serial: 'barcode', asset_tag: 'tag', lifecycle_state: 'refresh', expected_firmware: 'chip', firmware_version: 'chip',
+  status: 'check', hostname: 'globe', mac_address: 'net', ip_address: 'net', device_name: 'devices', monitor_name: 'pulse', resource_name: 'calendar', capacity: 'team',
+};
+const short = ex.host.split('.')[0];
+const VALUE = {
+  space: ex.space, model: ex.model ? modelName(ex.model) : 'Per project', serial: ex.serial, asset_tag: ex.asset,
+  lifecycle_state: STAGE_LABEL[ex.stage ?? 'manage'], expected_firmware: ex.fwStd ?? ex.fw, firmware_version: ex.fwStd ?? ex.fw,
+  status: 'Active', hostname: short, mac_address: ex.mac.toUpperCase(), ip_address: ex.ip, device_name: short,
+  monitor_name: short, resource_name: `${ex.site}-${ex.space}`.replace(/\s+/g, '-'), capacity: `${ex.seats} seats`,
+};
+const NOTE = { firmware_version: 'Matches the standard', device_name: 'Matches the hostname', status: 'Active in the register' };
+---
+<article class={`hcard hc-${k}`}>
+  <header>
+    <h3>{name}</h3>
+    <span class="hc-state" data-hc-state><span class="hc-spin" aria-hidden="true"></span><span class="hc-done"><Icon name="check" size={12} />Healthy</span></span>
+  </header>
+  <ul class="hc-rows">
+    {p.required_fields.map((f) => (
+      <li class="hr" title={NOTE[f] ?? ''}>
+        <span class="hr-i"><Icon name={ICON[f] ?? 'about'} size={14} /></span>
+        <span class="hr-k">{LABEL[f] ?? f.replace(/_/g, ' ')}</span>
+        <span class="hr-v mono">{VALUE[f] ?? '·'}</span>
+        <span class="hr-c" data-check aria-label="Checking"><span class="hc-spin" aria-hidden="true"></span><Icon name="check" size={12} /></span>
+      </li>
+    ))}
+  </ul>
+  <p class="hc-when">Healthy when {roomWords(p.healthy_indicators.join('; '))}.</p>
+</article>
+
+<style is:global>
+  .health-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
+  .hcard { display: grid; grid-template-rows: auto 1fr auto; gap: 8px; padding: 12px 14px; background: var(--surface); border: var(--border-card); border-radius: var(--radius-lg); }
+  :root[data-look="classic"] .hcard { border: 2px solid var(--ink); }
+  .hcard header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .hcard h3 { margin: 0; font: 700 14px/1.2 var(--font-display); }
+  .hc-rows { list-style: none; margin: 0; padding: 0; display: grid; align-content: start; }
+  .hr { display: grid; grid-template-columns: 16px 112px minmax(0, 1fr) 16px; gap: 8px; align-items: center; height: 28px; border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); font-size: 12.5px; }
+  .hr:first-child { border-top: 0; }
+  .hr-i { display: grid; place-items: center; color: var(--text-3); }
+  .hr-k { color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hr-v { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hc-when { margin: 0; font-size: 11.5px; line-height: 1.4; color: var(--text-3); }
+
+  /* The check: waiting (faint ring), checking (spinner), confirmed (tick). */
+  .hr-c, .hc-state { display: grid; place-items: center; color: var(--green); }
+  .hr-c > *, .hc-state > * { grid-area: 1 / 1; }
+  .hr-c svg, .hc-done { opacity: 0; transform: scale(.4); transition: opacity .2s var(--ease-settle), transform .35s var(--ease-settle); }
+  .hc-spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line-strong); border-top-color: var(--blue); opacity: .35; }
+  [data-check].checking .hc-spin, [data-hc-state].checking .hc-spin { opacity: 1; animation: hc-spin .7s linear infinite; }
+  [data-check].ok .hc-spin, [data-hc-state].ok .hc-spin { opacity: 0; }
+  [data-check].ok svg { opacity: 1; transform: none; }
+  .hc-state { font: 700 10.5px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; }
+  .hc-done { display: inline-flex; align-items: center; gap: 4px; padding: 4px 7px; border-radius: 999px; background: var(--green-soft); color: var(--green-ink); }
+  [data-hc-state].ok .hc-done { opacity: 1; transform: none; }
+  @keyframes hc-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .hc-spin { animation: none !important; } }
+</style>

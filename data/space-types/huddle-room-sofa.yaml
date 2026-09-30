@@ -1,0 +1,223 @@
+# Space type: Huddle room, sofa
+# Based on public industry guidance (data/sources/room-guidance.yaml, decision 0006); house assumptions say so.
+# Keia part (profile to verification_model): which classes of device belong here.
+# Keia Atlas part: build options, the models each option names, and the outlets.
+
+schema: composite-profile
+
+profile:
+  name: Huddle room, sofa
+  space_type: huddle-room-sofa
+  version: "2.0"
+  last_updated: "2026-09-30"
+  owner: Keia Atlas maintainers
+  capacity: "4-5 people"
+  purpose: >-
+    First-come, booth-style small video room with a fixed table and sofa.
+
+sources:
+  - file: data/sources/room-guidance.yaml
+    provides: 'Public guidance for this space type: size, capacity, display size, kit class and outlets'
+  - file: data/device-classes/display.yaml
+    provides: Healthy state for the display class
+  - file: data/device-classes/video-bar.yaml
+    provides: Healthy state for the video bar class
+  - file: data/device-classes/touch-controller.yaml
+    provides: Healthy state for the touch controller class
+  - file: data/device-classes/av-extender.yaml
+    provides: Healthy state for the AV extender class
+  - file: data/device-classes/adapter.yaml
+    provides: Healthy state for the adapter class
+
+equipment_categories:
+  - category: display
+    description: Screens for the far end and shared content
+    object_profile: data/device-classes/display.yaml
+    quantity: "1"
+  - category: video_conferencing
+    description: Video bar that runs meetings, or acts as the camera and speaker for a laptop
+    object_profile: data/device-classes/video-bar.yaml
+    quantity: "1"
+  - category: meeting_control
+    description: Touchscreen on the table that controls meetings
+    object_profile: data/device-classes/touch-controller.yaml
+    quantity: "1"
+  - category: signal_extension
+    description: HDBaseT transmitters and receivers carrying video, USB, network and power
+    object_profile: data/device-classes/av-extender.yaml
+    quantity: "2"
+  - category: adapters
+    description: Scalers, converters, PoE injectors and single-cable USB-C adapters
+    object_profile: data/device-classes/adapter.yaml
+    quantity: "1"
+
+verification_model:
+  platforms_to_check:
+    - platform: keia_atlas
+      check: every required device in the chosen option is recorded in the space and wired
+        as the option says
+    - platform: inventory
+      check: every device has an active record in this space
+    - platform: dhcp_dns
+      check: every networked device has an address reservation and DNS records
+    - platform: device_management
+      check: meeting devices are online, paired and on standard firmware
+
+keia_atlas:
+  standard: industry
+  guideline: zoom-huddle-space
+  category: connect
+  bookable: false
+  capacity:
+    min: 4
+    max: 5
+  area:
+    sq_ft: 120
+    m2: 11.14
+  geometry:
+    # The room shell for a floor-level 3D model; basis says where each value comes from.
+    width_m: 3.05
+    depth_m: 3.66
+    ceiling_m: 2.6
+    display_wall: back
+    door: { wall: back, from_m: 2.1, to_m: 2.97 }
+    data_entry: { via: ceiling, wall: back, at: above the door }
+    containment: [display-track, wall-riser, ceiling-basket, table-tray, table-leg, floor-box, floor-duct, floor-void, in-wall]
+    basis:
+      size: chosen
+      ceiling: house-default
+      door: house-default
+      data_entry: house-default
+      containment: house-default
+    notes:
+      - 10 x 12 ft, the same shell as the huddle room (house assumption).
+  options:
+    - id: room-system
+      name: Room system
+      summary: Poly Studio X32 with the laptop connection carried from the table over HDBaseT.
+      equipment:
+        - key: display
+          class: display
+          quantity: 1
+          requirement: required
+          location: display-wall
+          sizes_in: [50, 55]
+        - key: video-bar
+          class: video-bar
+          model: poly-studio-x32
+          quantity: 1
+          requirement: required
+          location: display-wall
+        - key: touch-controller
+          class: touch-controller
+          model: poly-tc10
+          quantity: 1
+          requirement: required
+          location: table-top
+        - key: poe-injector
+          class: adapter
+          model: poly-poe-injector
+          role: Powers the video bar
+          quantity: 1
+          requirement: required
+          location: behind-display
+        - key: hdbaset-tx
+          class: av-extender
+          model: kramer-ext3-c-xr-t
+          role: 'HDBaseT transmitter: the laptop connection at the table'
+          quantity: 1
+          requirement: required
+          location: below-table
+        - key: hdbaset-rx
+          class: av-extender
+          model: kramer-ext3-poe-xr-r
+          role: HDBaseT receiver at the display
+          quantity: 1
+          requirement: required
+          location: behind-display
+      infrastructure:
+        - service: power
+          provided_by: it
+          quantity: 4
+          location: behind-display
+          serves: [display, PoE injector, HDBaseT receiver, spare]
+        - service: power
+          provided_by: it
+          quantity: 2
+          location: below-table
+          serves: [HDBaseT transmitter, spare]
+        - service: power
+          provided_by: facilities
+          quantity: 2
+          location: wall-below-table
+          notes: For people in the room. A recommendation; facilities decide.
+        - service: data
+          provided_by: it
+          quantity: 4
+          location: behind-display
+          serves: [display, video bar, spare, spare]
+        - service: data
+          provided_by: it
+          quantity: 2
+          location: below-table
+          serves: [touch controller, spare]
+        - service: direct-run
+          provided_by: it
+          quantity: 2
+          location: below-table
+          serves: [HDBaseT link to the display wall, spare]
+      wiring:
+        - from: video-bar.hdmi-out-1
+          to: display.hdmi-in-1
+          cable: hdmi
+        - from: poe-injector.lan-2
+          to: video-bar.lan-1
+          cable: cat6a
+          notes: PoE++ to the video bar
+        - from: poe-injector.lan-1
+          to: outlet:data/behind-display#2
+          cable: cat6a
+        - from: display.lan-1
+          to: outlet:data/behind-display#1
+          cable: cat6
+        - from: touch-controller.lan-1
+          to: outlet:data/below-table#1
+          cable: cat6
+        - from: hdbaset-tx.hdbaset-1
+          to: hdbaset-rx.hdbaset-1
+          cable: cat6a
+          notes: Direct cable run 1
+        - from: hdbaset-tx.usb-c-1
+          to: laptop
+          cable: usb-c
+        - from: hdbaset-rx.hdmi-out-1
+          to: video-bar.hdmi-in-1
+          cable: hdmi
+        - from: hdbaset-rx.usb-b-1
+          to: video-bar.usb-c-1
+          cable: usb
+          notes: Device mode
+        - from: display.power-in
+          to: outlet:power/behind-display#1
+          cable: power
+        - from: poe-injector.power-in
+          to: outlet:power/behind-display#2
+          cable: power
+        - from: hdbaset-rx.power-in
+          to: outlet:power/behind-display#3
+          cable: power
+        - from: hdbaset-tx.power-in
+          to: outlet:power/below-table#1
+          cable: power
+  notes:
+    - 'Size and capacity: a huddle room with an L-shaped sofa and a powered table for 4 or 5 (house
+      layout); Zoom''s huddle space takes up to 7.'
+    - 'Display size: AVIXA DISCAS basic decision making, text at 3 percent of the image height
+      (house assumption), so the image is at least a sixth of the distance to the farthest seat.
+      That seat is about 3.2 m from the display here, so the display is at least 43 in. 50 or 55
+      in.'
+    - 'Kit class: the Poly Studio X32, which Poly makes for small rooms with pickup to 15 ft (4.6
+      m).'
+    - 'Outlets: a data outlet for every networked device plus a spare, at least two wherever data is
+      provided (TIA-568 asks for two per work area), and one at the door for a booking panel (house
+      assumption). Power for the room''s kit is never on a light switch (house assumption).'

@@ -1,0 +1,215 @@
+---
+import Shell from '../../layouts/Shell.astro';
+import Icon from '../../components/Icon.astro';
+import PageBand from '../../components/PageBand.astro';
+import SidePanel from '../../components/SidePanel.astro';
+import Section from '../../components/Section.astro';
+import { recHere } from '../../lib/vt.mjs';
+import DeviceGlyph from '../../components/DeviceGlyph.astro';
+import PortPanel from '../../components/PortPanel.astro';
+import DeviceArt from '../../components/DeviceArt.astro';
+import { allFacts, portCounts } from '../../lib/modelinfo.mjs';
+import { sites, models, classes, spaceTypes, sources, usedIn, typesUsing, className, modelName, portColour, CONNECTOR_LABEL, OS_LABEL, plural, href } from '../../lib/data.mjs';
+
+export function getStaticPaths() {
+  return Object.keys(models).map((id) => ({ params: { id } }));
+}
+const { id } = Astro.params;
+const m = models[id];
+const FACE_ORDER = ['front', 'rear', 'bottom'];
+const FACE_LABEL = { front: 'Front', rear: 'Rear', bottom: 'Underside', undefined: 'Position not stated' };
+const ports = [...(m.ports ?? [])];
+const faces = FACE_ORDER.filter((f) => ports.some((p) => p.face === f));
+const unplaced = ports.filter((p) => !p.face);
+let n = 1;
+const panels = faces.map((f) => {
+  const ps = ports.filter((p) => p.face === f).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const out = { face: f, ports: ps, start: n };
+  n += ps.length;
+  return out;
+});
+if (unplaced.length) panels.push({ face: undefined, ports: unplaced, start: n });
+
+const DIR = { in: 'In', out: 'Out', bidirectional: 'Both ways' };
+const SIG = { video: 'video', audio: 'audio', usb: 'USB', network: 'network', power: 'power', poe: 'PoE', hdbaset: 'HDBaseT', 'speaker-level': 'speaker level', microphone: 'microphone', control: 'control', thunderbolt: 'Thunderbolt', displayport: 'DisplayPort' };
+const used = usedIn[id];
+const f = allFacts[id];
+const pc = portCounts(m);
+const yearKeys = Object.keys(f.perYear).map(Number).sort((a, b) => a - b);
+const yMax = Math.max(1, ...yearKeys.map((y) => f.perYear[y].live + f.perYear[y].gone));
+const types = [...(typesUsing[id] ?? [])];
+const sibs = Object.keys(models).filter((k) => models[k].class === m.class);
+const i = sibs.indexOf(id);
+const prev = sibs[(i - 1 + sibs.length) % sibs.length];
+const next = sibs[(i + 1) % sibs.length];
+const NUMBERS = [
+  { n: f.installed || 0, label: 'Units', to: '#rooms-using' },
+  { n: f.rooms.length, label: 'Rooms using it', to: f.rooms.length ? '#rooms-using' : undefined, fact: !f.rooms.length },
+  { n: f.years ? f.years.label : 'None', label: 'Years in service', fact: true },
+  { n: f.overdue, label: 'Past planned life', to: '#rooms-using', tone: f.overdue ? 'warn' : undefined },
+];
+const dims = m.dimensions_mm;
+const legend = [...new Set(ports.map((p) => portColour(p)))];
+const LEGEND_NAME = { 'var(--c-hdmi)': 'Video', 'var(--c-hdbt)': 'HDBaseT', 'var(--c-poe)': 'PoE', 'var(--c-usb)': 'USB', 'var(--c-lan)': 'Network', 'var(--c-power)': 'Power', 'var(--c-audio)': 'Audio', 'var(--grey)': 'Other' };
+---
+<Shell vendorOk about={{ kind: 'model', label: modelName(id), model: modelName(id) }} title={modelName(id)} section="models" crumbs={[{ label: 'Models', to: '/models/' }, { label: className(m.class), to: `/models/#${m.class}` }, { label: m.model }]}>
+  <PageBand overline={m.manufacturer} title={m.model} lede={m.summary} numbers={NUMBERS}>
+    <a slot="overline" class="tag" href={href(`/profiles/${m.class}/${id}/`)}>{className(m.class)} profile</a>
+  </PageBand>
+
+  <div class="content">
+    <div class="g12 top">
+      <section class="card mdp-hero s-7 stick" aria-label="What it is for" {...recHere(id)}>
+        <div class="mdp-art"><DeviceArt model={id} cls={m.class} label={modelName(id)} /></div>
+        <div class="mdp-for">
+          <p class="overline" style="margin:0">What it is for</p>
+          <p class="mdp-line">{f.purpose}</p>
+          {f.why.length > 1 && <ul class="note-list">{f.why.slice(1, 3).map((w) => <li>{w.point}</li>)}</ul>}
+          {f.older && <p class="faint" style="margin:0;font-size:13px">Simulated: a made-up model standing in for an older product.</p>}
+        </div>
+        {yearKeys.length > 0 && (
+          <div class="mdp-years" aria-label="Units by install year">
+            <p class="overline" style="margin:0">Installed by year</p>
+            <div class="mdp-bars">
+              {yearKeys.map((y) => {
+                const e = f.perYear[y], t = e.live + e.gone;
+                return <span class="mdp-bar" title={`${y}: ${t} installed, ${e.gone} taken out`}><i style={`height:${(t / yMax) * 100}%`}><b style={`height:${(e.gone / t) * 100}%`}></b></i><em>{String(y).slice(2)}</em></span>;
+              })}
+            </div>
+          </div>
+        )}
+      </section>
+      <SidePanel class="s-5" title="At a glance" meta="From the vendor's documents">
+        <dl class="kv">
+          <div><dt>Class</dt><dd>{className(m.class)}</dd></div>
+          <div><dt>Firmware</dt><dd><span class={`fw fw-${f.fw.tone}`}>{f.fw.label}</span><small class="faint"> {f.fw.sub}</small></dd></div>
+          {f.retired > 0 && <div><dt>Taken out</dt><dd class="num" data-dd-fact>{f.retired}</dd></div>}
+          {f.sites.length > 0 && <div><dt>Offices</dt><dd>{f.sites.join(', ')}</dd></div>}
+          {m.part_numbers?.length > 0 && <div><dt>Part number</dt><dd class="mono">{m.part_numbers.map((p) => p.number).join(', ')}</dd></div>}
+          {dims && <div><dt>Size (W x H x D)</dt><dd class="num">{[dims.width, dims.height, dims.depth].map((v) => (v == null ? '?' : Math.round(v))).join(' x ')} mm</dd></div>}
+          {m.weight_kg && <div><dt>Weight</dt><dd class="num">{m.weight_kg} kg</dd></div>}
+          {m.power?.inputs?.map((p) => <div><dt>Power</dt><dd>{p.type === 'poe' ? 'PoE' : p.type === 'ac' ? 'Mains' : 'DC'}{p.watts ? `, ${p.watts} W` : ''}</dd></div>)}
+          {m.mounting?.length > 0 && <div><dt>Mounting</dt><dd>{m.mounting.map((x) => (x === 'vesa' ? 'VESA' : x.replace('-', ' '))).join(', ').replace(/^./, (c) => c.toUpperCase())}</dd></div>}
+          <div><dt>Works with</dt><dd>{m.client_os?.length ? m.client_os.map((o) => OS_LABEL[o]).join(', ') : <span class="faint" style="font-weight:400">Not stated</span>}</dd></div>
+        </dl>
+      </SidePanel>
+    </div>
+
+    {ports.length > 0 && (
+      <Section title="Ports" id="ports" aside={plural(ports.length, 'port')}>
+        <div class="card pad">
+          <div class="mdl-ports" style="margin-bottom:12px">
+            {pc.map((p) => <span class="mp" style={`--c:${portColour(p.sample)}`}><i></i>{CONNECTOR_LABEL[p.connector] ?? p.connector}<b>{p.n}</b>{(p.ins > 0 || p.outs > 0) && <em>{p.ins ? `${p.ins} in` : ''}{p.ins && p.outs ? ', ' : ''}{p.outs ? `${p.outs} out` : ''}</em>}</span>)}
+          </div>
+          <div class="drawing">
+            {panels.map((pn) => (
+              <div class="face">
+                <p class="overline" style="margin:0">{FACE_LABEL[pn.face]}</p>
+                <PortPanel ports={pn.ports} face={pn.face ?? 'none'} dims={dims} start={pn.start} />
+              </div>
+            ))}
+            <div class="legend">{legend.map((c) => <span style={`--c:${c}`}>{LEGEND_NAME[c]}</span>)}</div>
+          </div>
+          <details class="mdp-all">
+            <summary>Every port, in detail</summary>
+            <div class="tablewrap" style="margin-top:12px">
+              <table>
+                <thead><tr><th scope="col">#</th><th scope="col">Port</th><th scope="col">Connector</th><th scope="col">Carries</th><th scope="col">Direction</th><th scope="col">Where</th></tr></thead>
+                <tbody>
+                  {panels.flatMap((pn) => pn.ports.map((p, k) => (
+                    <tr>
+                      <td class="num faint">{pn.start + k}</td>
+                      <td><span class="mono">{p.id}</span>{p.notes && <small>{p.notes}</small>}</td>
+                      <td style="white-space:nowrap"><span style={`display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;background:${portColour(p)}`}></span>{CONNECTOR_LABEL[p.connector] ?? p.connector}</td>
+                      <td>{(p.signals ?? []).map((s) => SIG[s] ?? s).join(', ')}</td>
+                      <td>{DIR[p.direction] ?? 'Not stated'}</td>
+                      <td>{FACE_LABEL[p.face]}</td>
+                    </tr>
+                  )))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </div>
+      </Section>
+    )}
+
+    {f.rooms.length > 0 && (
+      <Section title="Rooms using it" id="rooms-using" aside={plural(f.rooms.length, 'room')}>
+        <p class="mdp-rooms">
+          {f.rooms.slice(0, 16).map((s) => <a class="tag" href={href(`/rooms/${s.id}/`)}>{sites[s.site]?.code} {s.number ? `${s.number} ` : ''}{s.name}</a>)}
+          {f.rooms.length > 16 && <a class="tag" href={href('/rooms/')}>+{f.rooms.length - 16} more</a>}
+        </p>
+      </Section>
+    )}
+
+    {types.length > 0 && (
+      <Section title="Room profiles that use it" id="where" aside={used ? `${plural(used.units, 'unit')} in ${plural(used.spaces.size, 'room')} at ${plural(used.sites.size, 'site')}` : undefined}>
+        <div class="list" data-items>
+          {types.map((t) => (
+            <a class="row plain" href={href(`/room-profiles/${t}/`)}>
+              <span><span class="name">{spaceTypes[t].profile.name}</span><span class="sub">{spaceTypes[t].keia_atlas.options.filter((o) => o.equipment.some((e) => e.model === id)).map((o) => o.name).join(', ')}</span></span>
+              <span class="end"><Icon name="arrow" /></span>
+            </a>
+          ))}
+        </div>
+      </Section>
+    )}
+
+    {(m.notes?.length > 0 || m.gaps?.length > 0) && (
+      <div class="g12">
+        {m.notes?.length > 0 && (
+          <div class="card side-card s-6" id="notes"><h3>Notes</h3><ul class="note-list">{m.notes.map((t) => <li>{t}</li>)}</ul></div>
+        )}
+        {m.gaps?.length > 0 && (
+          <div class="card side-card s-6" id="gaps"><h3>What the vendor doesn't say</h3><ul class="note-list">{m.gaps.map((g) => <li>{g}</li>)}</ul></div>
+        )}
+      </div>
+    )}
+
+    <Section title="Sources" id="sources">
+      <div class="card side-card">
+        <ul class="note-list" style="padding-left:16px">
+          {m.sources.map((s) => {
+            const src = sources[s.source];
+            return <li>{src?.url ? <a href={src.url}>{src.title}</a> : (src?.title ?? s.source)}<br /><span class="faint" style="font-size:12.5px">{s.provides}</span></li>;
+          })}
+        </ul>
+        <p class="faint" style="margin:0;font-size:12.5px">Each model was read twice, independently, and the two readings reconciled against the vendor's text.</p>
+      </div>
+    </Section>
+
+    {sibs.length > 1 && (
+      <nav class="mdp-pn" aria-label="Other models in this class">
+        <a class="btn small" href={href(`/models/${prev}/`)} rel="prev"><Icon name="back" size={16} />{models[prev].model}</a>
+        <a class="btn small" href={href(`/models/${next}/`)} rel="next">{models[next].model}<Icon name="arrow" size={16} /></a>
+      </nav>
+    )}
+  </div>
+</Shell>
+<style is:global>
+  .mdp-hero { display: grid; gap: 16px; padding: 18px 22px; align-content: start; }
+  .mdp-art { background: var(--surface-2); border-radius: var(--radius-lg); padding: 20px; display: grid; place-items: center; min-height: 220px; }
+  .mdp-art .model-art { max-height: 280px; width: auto; max-width: 100%; }
+  .mdp-art .model-art.generic svg { width: 150px; height: auto; }
+  .mdp-line { margin: 4px 0 0; font-size: 17px; line-height: 1.4; max-width: 60ch; }
+  .mdp-for { display: grid; gap: 6px; }
+  .mdp-years { display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .mdp-bars { display: flex; align-items: flex-end; gap: 3px; height: 64px; }
+  .mdp-bar { display: grid; grid-template-rows: 1fr auto; justify-items: center; height: 100%; width: 14px; }
+  .mdp-bar i { align-self: end; display: flex; flex-direction: column-reverse; width: 10px; background: var(--accent); border-radius: 2px 2px 0 0; overflow: hidden; }
+  .mdp-bar b { display: block; background: var(--grey, #9aa0a6); width: 100%; }
+  .mdp-bar em { font: 500 9px/1 var(--font-mono); color: var(--text-3); font-style: normal; margin-top: 3px; }
+  .mdp-pn { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .mdp-all { margin-top: 14px; } .mdp-all summary { cursor: pointer; font-weight: 700; font-size: 14px; }
+  .mdp-rooms { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+  .mdl-ports { display: flex; flex-wrap: wrap; gap: 4px; }
+  .mp { display: inline-flex; align-items: center; gap: 5px; font: 600 12px/1 var(--font-sans); padding: 5px 8px; border-radius: 999px; background: color-mix(in srgb, var(--c, var(--grey)) 14%, var(--surface)); color: var(--text-2); }
+  .mp i { width: 8px; height: 8px; border-radius: 2px; background: var(--c, var(--grey)); }
+  .mp b { font: 700 12px/1 var(--font-mono); color: var(--text); }
+  .mp em { font-style: normal; font-weight: 400; color: var(--text-3); font-size: 11px; }
+  .fw { display: inline-block; font: 700 11px/1 var(--font-sans); padding: 3px 7px; border-radius: 999px; white-space: nowrap; }
+  .fw-ok { background: var(--green-soft, #dff3e4); color: var(--green-ink, #17612e); }
+  .fw-warn { background: var(--yellow-soft); color: var(--yellow-ink); }
+  .fw-off { background: var(--surface-2); color: var(--text-3); }
+</style>

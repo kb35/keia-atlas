@@ -1,0 +1,47 @@
+# Demo project. People, dates, hours and agent activity are made up; rooms and devices are the real sample data.
+id: PRJ-16
+name: Dublin office IDF switch refresh
+kind: infra-refresh
+playbook: infra-refresh
+site: dub
+phase: procure
+owner: ruth
+budget:
+  approved: 74000
+  currency: EUR
+  lines:
+    - { item: "Access switches (2) and optics", amount: 38000, status: committed, supplier: "Network distributor" }
+    - { item: "Out-of-band console server", amount: 9500, status: committed, supplier: "ZPE Systems reseller" }
+    - { item: "Cutover weekend (overtime)", amount: 6200, status: estimate }
+start: "2026-08-24"
+target: "2026-12-11"
+demo: true
+summary: Replace the access switches in the third and fourth floor IDFs at the Dublin office. Every AV device on those floors moves to a new port, so each room is re-verified after the cutover.
+roles:
+  - { person: tomas, as: programme, hours: 6, logged: 2, does: "Fits the cutover weekend into the year plan" }
+  - { person: ruth, as: pm, hours: 40, logged: 12, does: "Runs the cutover plan, the change request and facilities access" }
+  - { person: marco, as: lead, hours: 64, logged: 20, does: "Audits ports, builds the new switch configuration, runs the cutover" }
+  - { person: aoife, as: engineer, hours: 16, logged: 2, does: "Lists every AV device's port and signs off the re-verification" }
+  - { person: liam, as: technician, hours: 24, logged: 0, does: "Labels ports before the cutover and checks each room after" }
+  - { person: declan, as: service-owner, hours: 6, logged: 3, does: "Approves the switch model and the change window" }
+history:
+  - { phase: plan, planned: "2026-09-04", ended: "2026-09-04", signed_off_by: tomas, summary: "Two IDFs in scope; cutover on a weekend so no rooms are lost in the working week.", artefacts: [Scope, Change window request] }
+  - { phase: design, planned: "2026-09-18", ended: "2026-09-21", signed_off_by: declan, summary: "Port map drawn for both floors; every AV device keeps its VLAN.", artefacts: [Port map, New switch configuration, Rack elevation for each IDF] }
+  - { phase: procure, planned: "2026-10-16", summary: "Switches ordered; optics on back order." }
+log:
+  - { id: X-1, kind: dependency, title: "Optics on back order until mid October", status: open, owner: ruth, raised: "2026-09-29", due: "2026-10-16", note: "The switches are here; the uplink optics are not. Install cannot start without them.", task: T-1603 }
+  - { id: D-1, kind: decision, title: "One IDF per evening, third floor first", status: closed, owner: declan, raised: "2026-09-08", decided: "2026-09-10", note: "Keeps every floor on the network during the day." }
+spaces:
+  - { space: dub-3-04, state: not-started, note: Video bar and touch controller move to new ports }
+  - { space: dub-3-09, state: not-started, note: Video bar and scheduler panel move to new ports }
+  - { space: dub-4-05, state: not-started }
+tasks:
+  - { id: T-1601, title: Audit every port in both IDFs, owner: marco, team: it-network, hours: 12, due: "2026-09-11", phase: plan, kind: survey, status: done, captured_fix: "Export the switch's port descriptions before the audit; half the AV ports were already labelled with the room name." }
+  - { id: T-1602, title: Order switches and optics, owner: ruth, team: procurement, hours: 2, due: "2026-09-25", phase: procure, kind: order, status: done, nothing_new: not-device-related }
+  - { id: T-1603, title: Receive the optics, owner: ruth, team: vendor, hours: 1, due: "2026-10-16", phase: procure, kind: records, status: blocked, blocked_by: Optics on back order until mid October }
+  - { id: T-1604, title: List every AV device's port and VLAN, owner: aoife, hours: 4, due: "2026-10-09", phase: design, kind: design, status: doing }
+  - { id: T-1605, title: Label ports before the cutover, owner: liam, hours: 6, due: "2026-11-13", phase: integrate, kind: network, status: todo }
+  - { id: T-1606, title: Cutover weekend, owner: marco, team: it-network, hours: 16, due: "2026-11-21", phase: integrate, kind: network, status: todo }
+  - { id: T-1607, title: Re-verify every AV room after the cutover, owner: aoife, hours: 6, due: "2026-11-24", phase: integrate, kind: commission, status: todo }
+agents:
+  - { name: Port watcher, status: working, says: "Comparing today's switch port descriptions with the port map for both IDFs." }

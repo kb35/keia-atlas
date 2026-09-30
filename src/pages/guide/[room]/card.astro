@@ -1,0 +1,44 @@
+---
+// The table card for a room: its QR code, name and what the guide does, ready to print on A5 or A4
+// and fold into a tent. Staff reach it from the room's page ("Print the table card").
+import Guide from '../../../layouts/Guide.astro';
+import RoomQR from '../../../components/RoomQR.astro';
+import { href } from '../../../lib/data.mjs';
+import { guidePaths, guideRoom } from '../_room.mjs';
+
+export const getStaticPaths = guidePaths;
+const R = guideRoom(Astro.params.room);
+---
+<Guide title={`Table card, ${R.title}`} office={R.office} home={R.home}>
+  <div class="tc-tools">
+    <a href={href(`/rooms/${R.forClient.id}/#room-guide`)}>← Back to the room page</a>
+    <button type="button" class="btn primary" onclick="window.print()">Print</button>
+  </div>
+  <article class="tc" aria-label={`Table card for ${R.title}`}>
+    <p class="tc-over">{R.office}</p>
+    <h1>{R.title}</h1>
+    <RoomQR room={R.forClient.id} label={R.title} size={260} class="tc-qr" />
+    <p class="tc-scan">Scan with your phone camera</p>
+    <ul>
+      <li>Start a meeting</li>
+      <li>Share your screen</li>
+      <li>Report a problem in two taps</li>
+    </ul>
+  </article>
+</Guide>
+
+<style>
+  .tc-tools { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .tc-tools a { font-weight: 600; font-size: 15px; }
+  .tc { justify-self: center; width: min(100%, 420px); display: grid; justify-items: center; gap: 10px; padding: 28px 24px 26px; border-radius: 18px; background: #fff; color: #1C1A17; border: 1px solid #D2CBBF; text-align: center; }
+  .tc-over { margin: 0; font: 600 12px/1.2 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: #57514A; }
+  .tc h1 { font-size: 30px; line-height: 1.1; color: #1C1A17; }
+  .tc :global(.tc-qr) { width: min(100%, 260px); margin: 6px 0 0; }
+  .tc-scan { margin: 0; font-weight: 700; font-size: 16px; }
+  .tc ul { margin: 4px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 15px; color: #57514A; }
+  @media print {
+    :global(.g-top), :global(.g-foot), .tc-tools { display: none !important; }
+    :global(body) { background: #fff !important; }
+    .tc { border: 0; width: 100%; padding-top: 12mm; }
+  }
+</style>

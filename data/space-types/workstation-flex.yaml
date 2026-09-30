@@ -1,0 +1,212 @@
+# Space type: Hot desk
+# Based on public industry guidance (data/sources/room-guidance.yaml, decision 0006); house assumptions say so.
+# Keia part (profile to verification_model): which classes of device belong here.
+# Keia Atlas part: build options, the models each option names, and the outlets.
+
+schema: composite-profile
+
+profile:
+  name: Hot desk
+  space_type: workstation-flex
+  version: "2.0"
+  last_updated: "2026-09-30"
+  owner: Keia Atlas maintainers
+  capacity: "1 person"
+  purpose: >-
+    A bookable desk anyone can use for the day, in a neighbourhood with other kinds of space
+    nearby.
+
+sources:
+  - file: data/sources/room-guidance.yaml
+    provides: 'Public guidance for this space type: size, capacity, display size, kit class and outlets'
+  - file: data/device-classes/monitor.yaml
+    provides: Healthy state for the monitor class
+  - file: data/device-classes/adapter.yaml
+    provides: Healthy state for the adapter class
+
+equipment_categories:
+  - category: desk_display
+    description: Desk monitor with dock and camera
+    object_profile: data/device-classes/monitor.yaml
+    quantity: "1-2"
+  - category: adapters
+    description: Scalers, converters, PoE injectors and single-cable USB-C adapters
+    object_profile: data/device-classes/adapter.yaml
+    quantity: "1"
+
+verification_model:
+  platforms_to_check:
+    - platform: keia_atlas
+      check: every required device in the chosen option is recorded in the space and wired
+        as the option says
+    - platform: inventory
+      check: every device has an active record in this space
+    - platform: dhcp_dns
+      check: every networked device has an address reservation and DNS records
+    - platform: device_management
+      check: meeting devices are online, paired and on standard firmware
+    - platform: room_booking
+      check: the room resource exists with the right capacity and is linked to its devices
+
+keia_atlas:
+  standard: industry
+  guideline: tia-568-cabling
+  category: focus
+  capacity:
+    min: 1
+    max: 1
+  area:
+    sq_ft: 36
+    m2: 3.34
+  geometry:
+    # The room shell for a floor-level 3D model; basis says where each value comes from.
+    width_m: 4.09
+    depth_m: 5.56
+    ceiling_m: 2.6
+    display_wall: none
+    data_entry: { via: floor, at: the desk run feed }
+    containment: [desk-tray]
+    basis:
+      size: chosen
+      ceiling: house-default
+      door: none
+      data_entry: house-default
+      containment: house-default
+    notes:
+      - One run of four desks and the next run, not a room; 36 sq ft a desk (house assumption).
+  options:
+    - id: single-27
+      name: Single 27 inch
+      summary: A 27 inch monitor with a built-in Thunderbolt 4 dock.
+      equipment:
+        - key: monitor
+          class: monitor
+          model: dell-u2724de
+          quantity: 1
+          requirement: required
+          location: table-top
+      infrastructure: &id001
+        - service: power
+          provided_by: it
+          quantity: 4
+          location: table-top
+          serves: [monitor or dock, spare, spare, spare]
+        - service: data
+          provided_by: it
+          quantity: 2
+          location: table-top
+          serves: [monitor or dock, spare]
+          notes: Only one is patched to a switch port.
+      wiring:
+        - from: monitor.usb-c-2
+          to: laptop
+          cable: thunderbolt
+          notes: 'One cable: picture, network and charging'
+        - from: monitor.lan-1
+          to: outlet:data/table-top#1
+          cable: cat6
+        - from: monitor.power-in
+          to: outlet:power/table-top#1
+          cable: power
+    - id: ultrawide-34
+      name: Ultrawide 34 inch
+      clients:
+        - macos
+        - windows
+      summary: 'A 34 inch monitor with a built-in dock: video, network and 90 W charging.'
+      equipment:
+        - key: monitor
+          class: monitor
+          model: dell-u3425we
+          quantity: 1
+          requirement: required
+          location: table-top
+      infrastructure: *id001
+      wiring:
+        - from: monitor.usb-c-2
+          to: laptop
+          cable: thunderbolt
+          notes: 'One cable: picture, network and charging'
+        - from: monitor.lan-1
+          to: outlet:data/table-top#1
+          cable: cat6
+        - from: monitor.power-in
+          to: outlet:power/table-top#1
+          cable: power
+    - id: dual-27
+      name: Dual 27 inch
+      summary: A 27 inch hub monitor plus a second 27 inch monitor daisy-chained from it.
+      equipment:
+        - key: monitor-hub
+          class: monitor
+          model: dell-u2724de
+          role: Hub monitor
+          quantity: 1
+          requirement: required
+          location: table-top
+        - key: monitor-second
+          class: monitor
+          model: dell-u2724d
+          role: Second monitor, fed over DisplayPort from the hub monitor
+          quantity: 1
+          requirement: required
+          location: table-top
+      infrastructure: *id001
+      wiring:
+        - from: monitor-hub.usb-c-2
+          to: laptop
+          cable: thunderbolt
+          notes: Thunderbolt 4, 40 Gb/s, for two monitors
+        - from: monitor-hub.displayport-out-1
+          to: monitor-second.displayport-in-1
+          cable: displayport
+          notes: Daisy chain
+        - from: monitor-hub.lan-1
+          to: outlet:data/table-top#1
+          cable: cat6
+        - from: monitor-hub.power-in
+          to: outlet:power/table-top#1
+          cable: power
+        - from: monitor-second.power-in
+          to: outlet:power/table-top#2
+          cable: power
+    - id: mac
+      name: Mac
+      standard: house
+      clients:
+        - macos
+      summary: Apple Studio Display for Mac laptops, with a USB-C Ethernet adapter because
+        the display has no network port.
+      equipment:
+        - key: monitor
+          class: monitor
+          model: apple-studio-display-2026
+          quantity: 1
+          requirement: required
+          location: table-top
+          notes: One Thunderbolt 5 cable to the Mac gives picture, 96 W charging and the camera
+        - key: network-adapter
+          class: adapter
+          model: startech-us1gc30b
+          role: Wired network through one of the display's USB-C ports
+          quantity: 1
+          requirement: required
+          location: table-top
+      infrastructure: *id001
+      wiring:
+        - from: monitor.usb-c-1
+          to: laptop
+          cable: thunderbolt
+          notes: 'Thunderbolt 5: picture, camera and 96 W charging'
+        - from: network-adapter.usb-c-1
+          to: monitor.usb-c-3
+          cable: usb-c
+        - from: network-adapter.lan-1
+          to: outlet:data/table-top#1
+          cable: cat6
+  notes:
+    - The laptop cable must be Thunderbolt 4, 40 Gb/s, with DisplayPort Alt Mode, to drive
+      two monitors.
+    - 'The single and dual 27 inch options list no laptop systems: Dell states no operating
+      system compatibility for the U2724DE or U2724D.'
+    - 'Outlets: two data outlets at each desk (TIA-568), one patched (house assumption).'

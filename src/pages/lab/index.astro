@@ -1,0 +1,202 @@
+---
+// The Lab (stage 3, simulated): new devices, firmware and features tried before they can enter the house standard.
+// Anatomy (docs/standards/page-anatomy.md, archetype C): band, filter bar with a Board | Tests switch, then either
+// the flow board (where each test is) or the tests as cards whose detail sits in tabs. The page scrolls.
+import Shell from '../../layouts/Shell.astro';
+import Icon from '../../components/Icon.astro';
+import PageBand from '../../components/PageBand.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import DetailTabs from '../../components/DetailTabs.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import DeviceArt from '../../components/DeviceArt.astro';
+import { labTests, models, modelName, LAB_STATUS, href, fmtDate } from '../../lib/data.mjs';
+import { person, PEOPLE } from '../../lib/demo.mjs';
+
+const all = Object.values(labTests).sort((a, b) => b.start.localeCompare(a.start));
+const FLOW = ['queued', 'testing', 'passed', 'adopted', 'failed'];
+const FLOW_NOTE = { queued: 'Waiting for bench time', testing: 'On the bench now', passed: 'Waiting for the service manager', adopted: 'Entered the standard', failed: 'Not this time' };
+const KIND = { device: 'New device', firmware: 'Firmware', feature: 'Feature', integration: 'Integration' };
+const isPerson = (x) => PEOPLE.some((p) => p.id === x);
+const counts = (l) => ({ pass: l.checks.filter((c) => c.result === 'pass').length, fail: l.checks.filter((c) => c.result === 'fail').length, n: l.checks.length });
+const niamh = person('niamh');
+const by = (st) => all.filter((l) => l.status === st).length;
+const NUMBERS = [
+  { n: by('testing'), label: 'On the bench', to: '?status=testing' },
+  { n: by('passed'), label: 'Waiting for a decision', to: '?status=passed' },
+  { n: by('adopted'), label: 'In the standard', to: '?status=adopted', tone: 'good' },
+  { n: by('failed'), label: 'Failed', to: '?status=failed', tone: by('failed') ? 'bad' : undefined },
+];
+const FACETS = [
+  { key: 'kind', label: 'Kind', options: Object.entries(KIND).filter(([value]) => all.some((l) => l.kind === value)).map(([value, label]) => ({ value, label })) },
+  { key: 'status', label: 'Status', options: FLOW.map((value) => ({ value, label: LAB_STATUS[value] })) },
+];
+const SORT = { options: [{ value: 'new', label: 'Newest first' }, { value: 'status', label: 'By status' }, { value: 'title', label: 'By title' }] };
+const VIEWS = [{ value: 'board', label: 'Board', show: '[data-board]' }, { value: 'tests', label: 'Tests', show: '[data-tests]' }];
+const findOf = (l) => [l.id, l.title, KIND[l.kind], LAB_STATUS[l.status], l.project, ...(l.models ?? []).map((m) => modelName(m))].filter(Boolean).join(' ');
+const tabsOf = (l) => {
+  const c = counts(l), id = l.id.toLowerCase();
+  return [
+    { id: `${id}-checks`, label: 'Checks', count: `${c.pass}/${c.n}` },
+    ...(l.models?.length ? [{ id: `${id}-models`, label: 'Models', count: l.models.length }] : []),
+    { id: `${id}-outcome`, label: 'Outcome' },
+  ];
+};
+---
+<Shell title="The Lab" section="lab" minStage={3} crumbs={[{ label: 'The Lab' }]}>
+  <PageBand overline="Planning" title="The Lab" lede="New models, firmware and features are tried here before they enter the standard." sim numbers={NUMBERS}>
+    <span slot="overline">Run by {niamh.name}, {niamh.role}</span>
+  </PageBand>
+
+  <div class="content lab">
+    <FilterBar facets={FACETS} placeholder="Find a test, number or model" label="Find a Lab test" noun={['test', 'tests']} scope=".content.lab" views={VIEWS} viewKey="rs5-lab-view" sort={SORT} />
+
+    <section class="lab-flow" data-board aria-label="Where each test is">
+      {FLOW.map((st, i) => (
+        <div class={`lf lf-${st}`}>
+          <p class="lf-h"><span>{LAB_STATUS[st]}</span><b class="mono">{by(st)}</b></p>
+          <p class="lf-note">{FLOW_NOTE[st]}</p>
+          {all.filter((l) => l.status === st).map((l) => (
+            <a class="lf-chip" href={`#${l.id.toLowerCase()}`} data-open={l.id.toLowerCase()} data-fi data-find={findOf(l)} data-f-kind={l.kind} data-f-status={l.status}>{l.id}<span>{l.title}</span><small>{KIND[l.kind]}</small></a>
+          ))}
+          {i < 3 && <span class="lf-arrow" aria-hidden="true"><Icon name="arrow" size={16} /></span>}
+        </div>
+      ))}
+    </section>
+
+    <div class="g12 lab-tests" data-tests hidden>
+      {all.map((l) => {
+        const c = counts(l), id = l.id.toLowerCase(), tabs = tabsOf(l);
+        return (
+          <article class={`card side-card s-6 lab-card st-${l.status}`} id={id} data-fi data-find={findOf(l)} data-f-kind={l.kind} data-f-status={l.status} data-new={l.start} data-title={l.title} data-st={FLOW.indexOf(l.status)}>
+            <header class="lc-head">
+              <span class="kind">{l.id}</span><span class="tag">{KIND[l.kind]}</span><span class={`lab-state s-${l.status}`}>{LAB_STATUS[l.status]}</span>
+              {l.project && <a class="tag" href={href(`/projects/${l.project.toLowerCase()}/`)}>For {l.project}</a>}
+              <span class="faint lc-dates">{fmtDate(l.start)}{l.end ? ` to ${fmtDate(l.end)}` : ', ongoing'}</span>
+            </header>
+            <h2>{l.title}</h2>
+            <p class="lc-why">{l.why}</p>
+            <p class="lc-by">
+              <span>Raised by {isPerson(l.raised_by) ? person(l.raised_by).name : <span class="agent-chip"><Icon name="agent" size={14} />{l.raised_by}</span>}</span>
+              {l.with?.length > 0 && <span>With {l.with.map((w) => person(w).name).join(', ')}</span>}
+            </p>
+            <DetailTabs tabs={tabs} label={`More about ${l.id}`}>
+              <div slot={tabs[0].id}>
+                <p class="lc-prog"><span class="ring" style={`--p:${(c.pass / c.n) * 100};--f:${(c.fail / c.n) * 100}`}></span><span><b>{c.pass} of {c.n}</b> checks passed{c.fail ? `, ${c.fail} failed` : ''}</span></p>
+                <ul class="lc-checks">
+                  {l.checks.map((k) => (
+                    <li class={`ck ck-${k.result}`}>
+                      <span class="ck-i" aria-label={k.result}>{k.result === 'pass' ? <Icon name="check" size={14} /> : k.result === 'fail' ? '×' : ''}</span>
+                      <span>{k.name}{k.note && <small>{k.note}</small>}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              {l.models?.length > 0 && (
+                <div slot={tabs[1].id} class="lc-models">
+                  {l.models.map((m) => (
+                    <a class="lc-model" href={href(`/models/${m}/`)}>
+                      <span class="lc-art"><DeviceArt model={m} cls={models[m]?.class} small /></span>
+                      <small>{modelName(m)}</small>
+                    </a>
+                  ))}
+                </div>
+              )}
+              <div slot={tabs[tabs.length - 1].id}>
+                {l.outcome ? <p class="lc-outcome">{l.outcome}{l.decided_by && ` Decided by ${person(l.decided_by).name}.`}</p> : <p class="muted lc-outcome">No decision yet. {FLOW_NOTE[l.status]}.</p>}
+              </div>
+            </DetailTabs>
+          </article>
+        );
+      })}
+    </div>
+    <EmptyState text="No Lab tests match these filters." />
+  </div>
+
+  <script is:inline data-astro-rerun slot="end">
+    (function () {
+      var bar = document.querySelector('[data-fb]'), tests = document.querySelector('[data-tests]'); if (!bar || !tests) return;
+      // A board chip, or a link from another page (/lab/#lab-04), opens that test in the Tests view.
+      var open = function (id, animate) {
+        var card = id && document.getElementById(id); if (!card || !tests.contains(card)) return;
+        var go = function () {
+          var btn = bar.querySelector('[data-fb-view="tests"]');
+          if (btn && btn.getAttribute('aria-pressed') !== 'true') btn.click();
+          try { history.replaceState(history.state, '', location.pathname + location.search + '#' + id); } catch (_) {}
+          var M = window.rsMotion ? window.rsMotion() : { reduced: true };
+          requestAnimationFrame(function () { card.scrollIntoView({ behavior: M.reduced ? 'auto' : 'smooth', block: 'start' }); });
+        };
+        go();
+      };
+      document.querySelectorAll('[data-open]').forEach(function (a) { a.addEventListener('click', function (e) { e.preventDefault(); open(a.dataset.open); }); });
+      var h = (location.hash || '').slice(1);
+      if (h) { var start = function () { open(h); }; if (bar.rsFilter) start(); else document.addEventListener('DOMContentLoaded', start, { once: true }); }
+      // Sort re-orders the chips and the cards inside the bar's run, so they slide into place.
+      var nat = function (x, y) { return String(x).localeCompare(String(y), 'en', { numeric: true }); };
+      var order = function () {
+        var v = bar.rsFilter ? bar.rsFilter.sort() : 'new', cards = Array.prototype.slice.call(tests.children).filter(function (c) { return c.matches('[data-fi]'); });
+        cards.sort(function (a, b) {
+          if (v === 'status') return (+a.dataset.st - +b.dataset.st) || nat(b.dataset.new, a.dataset.new);
+          if (v === 'title') return nat(a.dataset.title, b.dataset.title);
+          return nat(b.dataset.new, a.dataset.new);
+        }).forEach(function (c) { tests.appendChild(c); });
+        // The empty state sits after the cards.
+      };
+      bar.addEventListener('fb:sort', function () { bar.rsFilter.run(true, order); });
+      var s0 = new URLSearchParams(location.search).get('sort');
+      if (s0 && s0 !== 'new') order();
+    })();
+  </script>
+</Shell>
+<style is:global>
+  .content.lab { padding-top: 18px; gap: 20px; }
+  .lab-flow[hidden], .lab-tests[hidden] { display: none; }
+  .lab-flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 20px; }
+  .lf { position: relative; display: grid; gap: 8px; align-content: start; padding: 14px; border-radius: var(--radius-lg); background: var(--surface-2); min-height: 160px; }
+  .lf-h { margin: 0; display: flex; justify-content: space-between; font: 700 11px/1.2 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+  .lf-note { margin: 0; font-size: 12px; color: var(--text-3); }
+  .lf-chip { display: grid; gap: 2px; padding: 8px 10px; border-radius: var(--radius); background: var(--surface); border: var(--border-card); font: 700 10.5px/1.2 var(--font-mono); color: var(--text-3); text-decoration: none; transition: box-shadow var(--dur-state) var(--ease-settle), transform var(--dur-state) var(--ease-settle); }
+  .lf-chip:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); color: var(--text-3); }
+  :root[data-look="classic"] .lf-chip { border: 1.5px solid var(--ink); box-shadow: 2px 2px 0 var(--ink); }
+  .lf-chip span { font: 600 12.5px/1.3 var(--font-sans); color: var(--text); }
+  .lf-chip small { font: 500 11.5px/1.2 var(--font-sans); color: var(--text-3); }
+  .lf-arrow { position: absolute; right: -18px; top: 14px; color: var(--text-3); }
+  .lf-testing { background: var(--violet-soft); }
+  .lf-passed { background: var(--green-soft); }
+  .lf-adopted { background: color-mix(in srgb, var(--green) 26%, var(--surface)); }
+  .lf-failed { background: var(--red-soft); }
+  @media (max-width: 1000px) { .lab-flow { grid-template-columns: 1fr 1fr; } .lf-arrow { display: none; } }
+  @media (max-width: 760px) { .lab-flow { grid-template-columns: 1fr; gap: 14px; } }
+
+  .lab-card { gap: 10px; align-content: start; }
+  .content.lab .lab-card { scroll-margin-top: calc(var(--mast-h, 60px) + 90px); }
+  :root[data-look="classic"] .lab-card { border: 2px solid var(--ink); }
+  .lab-card:target { box-shadow: 0 0 0 3px var(--yellow), var(--shadow-md); }
+  .lc-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .lc-dates { margin-left: auto; font-size: 12.5px; }
+  .lab-state { font: 700 11px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; padding: 5px 8px; border-radius: 999px; }
+  .s-queued { background: var(--surface-2); color: var(--text-2); }
+  .s-testing { background: var(--violet-soft); color: var(--violet-ink); }
+  .s-passed, .s-adopted { background: var(--green-soft); color: var(--green-ink); }
+  .s-failed { background: var(--red-soft); color: var(--red-ink); }
+  .lab-card h2 { margin: 0; font-size: 20px; }
+  .lc-why { margin: 0; color: var(--text-2); }
+  .lc-by { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 13px; color: var(--text-2); }
+  .lab-card .dt-list { margin-bottom: 12px; }
+  .lc-models { display: flex; flex-wrap: wrap; gap: 10px; }
+  .lc-model { display: grid; gap: 4px; justify-items: center; width: 120px; padding: 8px; border-radius: var(--radius); background: var(--stage-bg, var(--surface-2)); color: inherit; text-decoration: none; text-align: center; }
+  .lc-model small { font-size: 11.5px; color: var(--text-2); line-height: 1.2; }
+  .lc-art { width: 96px; height: 60px; display: grid; place-items: center; }
+  .lc-art svg { max-width: 100%; max-height: 100%; }
+  .lc-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .lc-prog { margin: 0 0 10px; display: flex; align-items: center; gap: 10px; font-size: 13.5px; }
+  .ring { width: 30px; height: 30px; border-radius: 50%; background: conic-gradient(var(--green) calc(var(--p) * 1%), var(--red) 0 calc((var(--p) + var(--f)) * 1%), var(--surface-3) 0); mask: radial-gradient(circle, transparent 8px, #000 9px); -webkit-mask: radial-gradient(circle, transparent 8px, #000 9px); }
+  .ck { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; font-size: 13.5px; align-items: start; }
+  .ck small { display: block; font-size: 12px; color: var(--text-3); }
+  .ck-i { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font: 700 14px/1 var(--font-sans); border: 2px solid var(--line-strong); }
+  .ck-pass .ck-i { background: var(--green); border-color: var(--green); color: #fff; }
+  .ck-fail .ck-i { background: var(--red); border-color: var(--red); color: #fff; }
+  .ck-pending .ck-i { border-style: dashed; }
+  .lc-outcome { margin: 0; font-size: 14px; }
+  .agent-chip { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--violet-ink); background: var(--violet-soft); padding: 2px 8px; border-radius: 999px; }
+  :root[data-agents="off"] .agent-chip { background: none; color: inherit; }
+</style>

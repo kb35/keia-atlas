@@ -1,0 +1,77 @@
+---
+/* KeyNumbers: the three or four figures on the right of a page band (docs/rules/layout.md, L9).
+   items: [{ n, label, to?, tone?, id? }], at most 4. `to` makes the figure a link: a path ('/incidents/'),
+   a filter on this page ('?status=installing') or a tab or section ('#incidents'). `tone` ('bad', 'warn',
+   'good') colours the figure; the label still says what it means, so colour is never alone (T3).
+   The count of a filtered list is not a key number: it belongs to the filter bar ("N of M rooms").
+   Drill-down (rule P10, docs/rules/platform.md): a figure that counts things links to the page that owns the list,
+   with the matching filters in the address ('/incidents/?status=new,in-progress'), and that page shows the same
+   number in its "N of M". A link to another page carries data-vt-rec="dd-<path>", so the figure flies into the
+   destination's title when that page sets PageBand rec="dd-<path>" ('dd-incidents' for /incidents/).
+   The one exception is explicit: `fact: true` for a figure that is a fact about this page's own thing and counts
+   no list (a phase, a date, an estimate, a size, a percentage). It links nowhere and says so to the audit
+   (data-kn-plain). A figure with neither `to` nor `fact` warns when the site is built.
+   Live figures: give an item an `id`, then a page script calls window.rsKeyNumber(id, value, { label?, tone?,
+   title? }) to change it (a number is written with thousands separators; tone 'bad', 'warn', 'good' or ''
+   to clear). The id may also be the item's place, 0 for the first. Nothing moves; the figure just changes. */
+import { href } from '../lib/data.mjs';
+interface Item { n: string | number; label: string; to?: string; fact?: boolean; tone?: 'bad' | 'warn' | 'good'; id?: string }
+interface Props { items: Item[] }
+const { items = [] } = Astro.props;
+if (items.length > 4) console.warn(`KeyNumbers: ${items.length} items given, showing the first 4 (rule L9).`);
+const shown = items.slice(0, 4);
+for (const it of shown) if (!it.to && !it.fact) console.warn(`KeyNumbers: "${it.label}" links nowhere. Give it \`to\` (the page that owns the list, rule P10) or \`fact: true\`.`);
+const link = (to) => (to.startsWith('/') ? href(to) : to);
+const ddId = (to) => 'dd' + new URL(to, 'http://x').pathname.replace(/[^a-z0-9]+/gi, '-').replace(/-$/, '');
+const fmt = (n) => (typeof n === 'number' ? n.toLocaleString('en-IE') : n);
+---
+{shown.length > 0 && (
+  <ul class="kn" aria-label="Key numbers">
+    {shown.map((it) => (
+      <li class:list={['kn-i', it.tone && `t-${it.tone}`]} data-kn={it.id} data-kn-plain={!it.to && it.fact ? 'fact' : undefined} data-help={`number:${it.label}`} data-help-name={it.label}>
+        {it.to ? (
+          <a href={link(it.to)}><b class="num" data-vt-rec={it.to.startsWith('/') ? ddId(it.to) : undefined}>{fmt(it.n)}</b><span>{it.label}</span></a>
+        ) : (
+          <span class="kn-s"><b class="num">{fmt(it.n)}</b><span>{it.label}</span></span>
+        )}
+      </li>
+    ))}
+  </ul>
+)}
+
+<script is:inline data-astro-rerun>
+  window.rsKeyNumber = function (id, value, opt) {
+    var li = typeof id === 'number'
+      ? document.querySelectorAll('.band .kn .kn-i')[id]
+      : document.querySelector('.kn-i[data-kn="' + String(id).replace(/"/g, '') + '"]');
+    if (!li) return false;
+    opt = opt || {};
+    var b = li.querySelector('b'), l = li.querySelector('a > span, .kn-s > span');
+    if (value !== undefined && value !== null && b) b.textContent = typeof value === 'number' ? value.toLocaleString('en-IE') : value;
+    if (opt.label !== undefined && l) l.textContent = opt.label;
+    if (opt.title !== undefined) li.title = opt.title;
+    if (opt.tone !== undefined) ['bad', 'warn', 'good'].forEach(function (t) { li.classList.toggle('t-' + t, t === opt.tone); });
+    return true;
+  };
+</script>
+
+<style is:global>
+  .kn { display: flex; gap: 4px; margin: 0; padding: 0; list-style: none; }
+  .kn-i > a, .kn-i > .kn-s { display: grid; gap: 3px; min-width: 64px; padding: 5px 10px; border-radius: var(--radius); color: inherit; text-decoration: none; }
+  .kn-i > a { transition: background var(--dur-hover) var(--ease-settle); }
+  .kn-i > a:hover { background: var(--surface-2); color: inherit; }
+  .kn-i > a:hover span { text-decoration: underline; text-underline-offset: 2px; }
+  .kn-i b { font: 800 22px/1 var(--font-sans); letter-spacing: -.02em; color: var(--text); }
+  .kn-i span { font-size: 12px; line-height: 1.2; color: var(--text-3); white-space: nowrap; }
+  .kn-i.t-bad b { color: var(--red-ink); }
+  .kn-i.t-warn b { color: var(--amber-ink); }
+  .kn-i.t-good b { color: var(--green-ink); }
+  .kn { flex-wrap: wrap; }
+  /* Phones (main under 600 px): a 2 by 2 grid, labels may take two lines, nothing is cut. */
+  @container main (max-width: 599px) {
+    .kn { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; margin-inline: -10px; }
+    .kn-i > a, .kn-i > .kn-s { min-width: 0; padding: 6px 10px; }
+    .kn-i b { font-size: 20px; }
+    .kn-i span { white-space: normal; }
+  }
+</style>

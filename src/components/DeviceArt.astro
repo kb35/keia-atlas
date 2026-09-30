@@ -1,0 +1,47 @@
+---
+// A device drawn front-on. Parts carry data-k keys and geometry in style, so the model switcher
+// can morph one drawing into the next with CSS transitions (the prototype's model morph).
+// Models without a traced drawing fall back to the class line drawing.
+//
+// Layers: every part decelerates into place on the same curve and timing, so a part that starts
+// and ends inside the body stays inside it all the way. As a safety net, everything on the face
+// of the device sits in an inner layer clipped to the body's outline, and the clip rectangle
+// morphs with the body.
+import { artParts, artType } from '../lib/art.mjs';
+import DeviceGlyph from './DeviceGlyph.astro';
+const { model, cls, label = '', small = false } = Astro.props;
+const parts = model ? artParts(model) : null;
+const style = (g) => Object.entries(g).map(([k, v]) => `${k}:${(+v).toFixed(1)}px`).join(';');
+const OUTER = new Set(['shadow', 'body', 'mount', 'stand', 'foot1', 'foot2']);
+const body = parts?.find((p) => p.k === 'body');
+// The E70 camera stands above its base on purpose, and the mic is a path, so those stay unclipped.
+const clip = !!(parts && body?.t === 'rect' && ['bar', 'touch', 'ext', 'poe', 'desk'].includes(artType(model)));
+const cid = `art-clip-${small ? model : 'main'}`;
+const before = clip ? parts.filter((p) => p.k === 'shadow' || p.k === 'body') : [];
+const inner = clip ? parts.filter((p) => !OUTER.has(p.k)) : [];
+const after = clip ? parts.filter((p) => OUTER.has(p.k) && p.k !== 'shadow' && p.k !== 'body') : [];
+---
+{parts ? (
+  <svg class:list={['model-art', { small }]} viewBox="0 0 320 180" role="img" aria-label={label}>
+    {clip ? (
+      <>
+        <defs data-k="defs"><clipPath id={cid} data-k="clip"><rect data-k="clip-body" class="art-clip" style={style(body.g)} /></clipPath></defs>
+        {before.map((p) => <rect data-k={p.k} class={p.cls} style={style(p.g)} />)}
+        <g class="art-inner" clip-path={`url(#${cid})`} data-k="inner">
+          {inner.map((p) => p.t === 'path'
+            ? <path data-k={p.k} class={p.cls} d={p.d} />
+            : p.t === 'rect'
+              ? <rect data-k={p.k} class={p.cls} style={style(p.g)} />
+              : <circle data-k={p.k} class={p.cls} style={style(p.g)} />)}
+        </g>
+        {after.map((p) => <rect data-k={p.k} class={p.cls} style={style(p.g)} />)}
+      </>
+    ) : parts.map((p) => p.t === 'path'
+      ? <path data-k={p.k} class={p.cls} d={p.d} />
+      : p.t === 'rect'
+        ? <rect data-k={p.k} class={p.cls} style={style(p.g)} />
+        : <circle data-k={p.k} class={p.cls} style={style(p.g)} />)}
+  </svg>
+) : (
+  <div class:list={['model-art', 'generic', { small }]} role="img" aria-label={label}><DeviceGlyph cls={cls} size={small ? 44 : 150} /></div>
+)}

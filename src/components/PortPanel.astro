@@ -1,0 +1,43 @@
+---
+// Draws one face of a device with its ports in order, coloured by what they carry.
+// Each port shape gets a view-transition name by position, so moving between models morphs the panel.
+import { portColour, CONNECTOR_LABEL } from '../lib/data.mjs';
+const { ports, face, dims, start = 1, morph = true } = Astro.props;
+
+const SHAPE = {
+  hdmi: [30, 11, 3], displayport: [28, 11, 2], vga: [34, 13, 4], 'usb-a': [24, 10, 1], 'usb-b': [15, 14, 3], 'usb-c': [20, 7, 3.5],
+  'micro-usb': [14, 6, 2], rj45: [22, 19, 1.5], rj11: [16, 14, 1.5], sfp: [26, 12, 1], 'sfp-plus': [26, 12, 1],
+  '3.5mm': ['c', 7], '6.35mm': ['c', 9], xlr: ['c', 12], 'dc-barrel': ['c', 7], 'terminal-block': [34, 11, 1], db9: [34, 13, 5],
+  'iec-c14': [30, 22, 4], 'iec-c8': [24, 12, 6], 'iec-c6': [24, 18, 5], proprietary: [22, 12, 3], 'not-stated': [20, 12, 3],
+};
+// Panel proportions come from the model's dimensions when stated: rear and front use width x height,
+// the underside uses width x depth. Clamped so very flat or very tall units still read well.
+const W = 720;
+const K = 1.7; // drawn size relative to the connector table above
+const across = dims?.width ?? 400;
+const tall = face === 'bottom' ? dims?.depth : dims?.height;
+const H = Math.round(Math.min(200, Math.max(96, tall && across ? (W * tall) / across : 110)));
+const pad = 28;
+const slot = (W - pad * 2) / Math.max(ports.length, 1);
+const cy = H / 2 - 6;
+const drawn = ports.map((p, i) => {
+  const raw = SHAPE[p.connector] ?? SHAPE['not-stated'];
+  const s = raw[0] === 'c' ? ['c', raw[1] * K] : [raw[0] * K, raw[1] * K, raw[2] * K];
+  const cx = pad + slot * i + slot / 2;
+  const scale = Math.min(1, (slot - 6) / (s[0] === 'c' ? s[1] * 2 : s[0]));
+  return { p, n: start + i, cx, s, scale, colour: portColour(p) };
+});
+---
+<svg viewBox={`0 0 ${W} ${H + 26}`} role="img" aria-label={`${face} panel with ${ports.length} ports`}>
+  <rect class="outline" x="2" y="2" width={W - 4} height={H - 4} rx="14" style={morph ? `view-transition-name: art-${face}` : undefined} />
+  {drawn.map(({ p, n, cx, s, scale, colour }) => (
+    <g class="port" style={morph ? `view-transition-name: port-${face}-${n - start}` : undefined}>
+      <title>{`${n}. ${p.id}: ${CONNECTOR_LABEL[p.connector] ?? p.connector}${p.direction ? `, ${p.direction}` : ''}`}</title>
+      {s[0] === 'c'
+        ? <circle cx={cx} cy={cy} r={s[1] * scale} fill={colour} fill-opacity=".22" stroke={colour} stroke-width="2" />
+        : <rect x={cx - (s[0] * scale) / 2} y={cy - (s[1] * scale) / 2} width={s[0] * scale} height={s[1] * scale} rx={s[2]} fill={colour} fill-opacity=".22" style={`stroke:${colour};stroke-width:2`} />}
+      <text x={cx} y={H + 18} text-anchor="middle">{n}</text>
+      <line x1={cx} x2={cx} y1={cy + 22} y2={H - 6} stroke="var(--line-strong)" stroke-width="1" />
+    </g>
+  ))}
+</svg>

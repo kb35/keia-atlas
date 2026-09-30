@@ -1,0 +1,66 @@
+# House values: the fixed values a unit's build sheet is worked out from (time servers, DNS, the calendar and
+# vault naming, the VLAN per kind of device, the management platforms), recorded once for the whole company.
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/house-values
+title: House values
+type: object
+additionalProperties: false
+required: [id, company, domain, time_servers, dns, calendar, vault, vlans, platforms]
+$defs:
+  pattern: { description: "A text with {placeholders} filled in per unit (see the data file's comments).", type: string, minLength: 1 }
+properties:
+  id: { type: string }
+  company: { type: string }
+  domain: { type: string }
+  time_servers: { type: array, minItems: 1, items: { type: string } }
+  dns:
+    description: DNS resolvers per region.
+    type: object
+    additionalProperties: false
+    required: [amer, emea, apac]
+    properties:
+      amer: { type: array, minItems: 1, items: { type: string } }
+      emea: { type: array, minItems: 1, items: { type: string } }
+      apac: { type: array, minItems: 1, items: { type: string } }
+  sip_domain: { type: string }
+  calendar:
+    type: object
+    additionalProperties: false
+    required: [name, address]
+    properties:
+      name: { $ref: "#/$defs/pattern" }
+      address: { $ref: "#/$defs/pattern" }
+  support: { $ref: "#/$defs/pattern" }
+  vault:
+    description: Names of password vault entries. Secrets themselves are never recorded.
+    type: object
+    additionalProperties: false
+    required: [site, room, monitoring]
+    properties:
+      site: { $ref: "#/$defs/pattern" }
+      room: { $ref: "#/$defs/pattern" }
+      monitoring: { $ref: "#/$defs/pattern" }
+  vlans:
+    description: The VLAN each device class goes on; the VLAN must be in the network standard's VLAN plan.
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [vlan, classes]
+      properties:
+        vlan: { type: string, pattern: "^[0-9]{1,4}$" }
+        classes: { type: array, minItems: 1, items: { type: string } }
+  platforms:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, name, org, group_label, group, configurations]
+      properties:
+        id: { type: string, pattern: "^[a-z0-9-]+$" }
+        name: { type: string }
+        org: { description: "The organisation or account Aigna's devices are in.", type: string }
+        group_label: { description: "What the platform calls the place an office's devices sit (Site policy, Room group).", type: string }
+        group: { $ref: "#/$defs/pattern" }
+        configurations: { type: array, items: { type: string } }
+  demo: { type: boolean }

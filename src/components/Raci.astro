@@ -1,0 +1,195 @@
+---
+// An interactive RACI chart. Hover or focus a cell to see what the letter means for that piece of
+// work and who holds the role today; hover a row or column to light it up; pick a role to see only
+// its letters. Responsible does the work, Accountable signs it off (one per row), Consulted is asked
+// first, Informed is told after.
+// Props: rows: [{ label, sub?, cells: { roleId: 'R' | { letter, detail } } }], and optionally group
+//        rows between them: { group: 'Deploy', sub?: 'provision, install, configure, commission' }.
+//        cols: role ids. id: names this chart (data-raci) for links. caption: for screen readers.
+// The table takes its natural height and the page scrolls (rule L8); its column names stick under the
+// top bar (and under a sticky filter bar: the page sets --raci-top). When the table does not fit its column
+// (L10) each piece of work becomes a card listing the roles that have a letter in it; it never scrolls sideways.
+import { ROLES, PEOPLE } from '../lib/demo.mjs';
+const { rows, cols, id = 'raci', caption = '' } = Astro.props;
+const WORD = { R: 'Responsible', A: 'Accountable', C: 'Consulted', I: 'Informed' };
+const MEANS = { R: 'does the work', A: 'signs it off and answers for it', C: 'is asked before it is done', I: 'is told once it is done' };
+const holders = (r) => PEOPLE.filter((p) => p.roleId === r).map((p) => p.name);
+const who = (r) => { const h = holders(r); return h.length ? (h.length > 3 ? `${h.slice(0, 3).join(', ')} and ${h.length - 3} more` : h.join(', ')) : 'No one yet'; };
+let n = 0;
+---
+<div class="raci-wrap" data-raci={id}>
+  <ul class="raci-legend" aria-label="What the letters mean" data-help="raci.legend">
+    {Object.entries(WORD).map(([k, v]) => <li><span class={`rc rc-${k}`} aria-hidden="true">{k}</span><span><b>{v}</b>{{ R: 'Does the work.', A: 'Signs it off and answers for it. One per row.', C: 'Is asked before it is done.', I: 'Is told once it is done.' }[k]}</span></li>)}
+  </ul>
+  <div class="raci-pick" role="group" aria-label="Show one role" data-help="raci.pick">
+    <button type="button" class="on" aria-pressed="true" data-raci-role="">All roles</button>
+    {cols.map((c) => <button type="button" aria-pressed="false" data-raci-role={c}>{ROLES[c]?.name ?? c}</button>)}
+  </div>
+  <div class="raci-scroll">
+    <table class="raci2">
+      {caption && <caption class="sr-only">{caption}</caption>}
+      <thead><tr><th scope="col" class="rw-h">Work</th>{cols.map((c, ci) => <th scope="col" data-col={ci} data-help="raci.role" data-help-name={ROLES[c]?.name ?? c}><span class="rot">{ROLES[c]?.name ?? c}</span></th>)}</tr></thead>
+      <tbody>
+        {rows.map((r) => {
+          if (r.group) return (
+            <tr class="raci-grp" data-grp>
+              <th scope="colgroup" colspan={cols.length + 1}><b>{r.group}</b>{r.sub && <small>{r.sub}</small>}</th>
+            </tr>
+          );
+          const ri = n++;
+          return (
+            <tr data-row={ri} class={ri % 2 ? 'z' : undefined}>
+              <th scope="row" data-row={ri} data-help="raci.work">{r.label}{r.sub && <small>{r.sub}</small>}</th>
+              {cols.map((c, ci) => {
+                const cell = r.cells[c];
+                const L = typeof cell === 'string' ? cell : cell?.letter;
+                const detail = typeof cell === 'object' ? cell?.detail : null;
+                return (
+                  <td data-col={ci} data-role={c} data-role-name={ROLES[c]?.name ?? c}>
+                    {L && (
+                      <span class={`rc rc-${L}`} tabindex="0" aria-label={`${ROLES[c]?.name}: ${WORD[L]} for ${r.label}`}>
+                        {L}
+                        <span class="rc-tip" role="tooltip">
+                          <b>{ROLES[c]?.name} · {WORD[L]}</b>
+                          <span>For “{r.label}”, the {(ROLES[c]?.name ?? c).toLowerCase()} {MEANS[L]}.</span>
+                          {detail && <span class="rc-detail">{detail}</span>}
+                          <span class="rc-who">Today: {who(c)}</span>
+                        </span>
+                      </span>
+                    )}
+                  </td>
+                );
+              })}
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+</div>
+<script is:inline data-astro-rerun>
+  (function () {
+    document.querySelectorAll('[data-raci]').forEach(function (w) {
+      if (w.__raci) return; w.__raci = true;
+      var table = w.querySelector('table'), box = w.querySelector('.raci-scroll');
+      var clear = function () { table.querySelectorAll('.hl-col,.hl-row').forEach(function (x) { x.classList.remove('hl-col'); x.classList.remove('hl-row'); }); };
+      var light = function (t) {
+        var td = t.closest ? t.closest('td,th') : null; if (!td || !table.contains(td)) return;
+        var col = td.getAttribute('data-col'), tr = td.closest('tr'), row = tr && tr.parentElement.tagName === 'TBODY' ? tr.getAttribute('data-row') : null;
+        clear();
+        if (col != null) table.querySelectorAll('[data-col="' + col + '"]').forEach(function (x) { x.classList.add('hl-col'); });
+        if (row != null) tr.querySelectorAll('th,td').forEach(function (x) { x.classList.add('hl-row'); });
+      };
+      table.addEventListener('mouseover', function (e) { light(e.target); });
+      table.addEventListener('focusin', function (e) { light(e.target); });
+      table.addEventListener('mouseleave', clear);
+      // Pick a role: only the rows it has a letter in, and a group heading only when a row under it stays.
+      var show = function (r) {
+        w.querySelectorAll('[data-raci-role]').forEach(function (x) { var on = x.getAttribute('data-raci-role') === r; x.classList.toggle('on', on); x.setAttribute('aria-pressed', String(on)); });
+        w.classList.toggle('filtered', !!r);
+        table.querySelectorAll('td[data-role]').forEach(function (td) { td.classList.toggle('dim', !!r && td.getAttribute('data-role') !== r); });
+        var grp = null, any = false;
+        table.querySelectorAll('tbody tr').forEach(function (tr) {
+          if (tr.hasAttribute('data-grp')) { if (grp) grp.hidden = !any; grp = tr; any = false; return; }
+          tr.hidden = !!r && !tr.querySelector('td[data-role="' + r + '"] .rc');
+          if (!tr.hidden) any = true;
+        });
+        if (grp) grp.hidden = !any;
+      };
+      w.querySelectorAll('[data-raci-role]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var r = b.getAttribute('data-raci-role');
+          if (window.rsHold) window.rsHold(box, function () { show(r); }); else show(r);
+        });
+      });
+      // Another part of the page can ask for one role: el.rsRaci.show('pm').
+      w.rsRaci = { show: show };
+      // Too wide for its column: one card per piece of work instead of a table (L10).
+      var fit = function () {
+        w.classList.remove('raci-cards');
+        if (table.offsetWidth > w.clientWidth + 1) w.classList.add('raci-cards');
+      };
+      fit();
+      if (window.ResizeObserver) { var lw = 0; new ResizeObserver(function () { var x = Math.round(w.getBoundingClientRect().width); if (x !== lw) { lw = x; requestAnimationFrame(fit); } }).observe(w); }
+    });
+  })();
+</script>
+<style is:global>
+  .raci-wrap { display: grid; gap: 12px; }
+  .raci-pick { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px; }
+  .raci-pick button { font: 600 12.5px/1 var(--font-sans); padding: 7px 11px; border-radius: 999px; border: 1.5px solid var(--line-strong); background: var(--surface); color: var(--text-2); cursor: pointer; transition: background var(--dur-state) var(--ease-settle), color var(--dur-state) var(--ease-settle), border-color var(--dur-state) var(--ease-settle); }
+  .raci-pick button:hover { border-color: var(--text-3); color: var(--text); }
+  .raci-pick button.on { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
+  .raci-legend { list-style: none; margin: 0; padding: 16px 16px 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px 16px; }
+  .raci-legend li { display: flex; align-items: flex-start; gap: 9px; font-size: 13px; line-height: 1.35; color: var(--text-2); }
+  .raci-legend li b { display: block; color: var(--text); font-weight: 700; }
+  .raci-legend .rc { flex: none; cursor: default; }
+  .raci-scroll { position: relative; padding-bottom: 6px; min-width: 0; }
+  .raci2 { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+  :root[data-look] .raci2 th, :root[data-look] .raci2 td { padding: 8px 6px; border-bottom: 1px solid var(--line); text-align: center; font-family: var(--font-sans); text-transform: none; letter-spacing: 0; }
+  .raci2 thead th { vertical-align: bottom; height: 150px; }
+  :root[data-look] .raci2 .rw-h { text-align: left; vertical-align: bottom; font: 700 10.5px/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); padding-left: 16px; }
+  :root[data-look] .raci2 tbody th { text-align: left; font-weight: 600; color: var(--text); padding-left: 16px; min-width: 200px; }
+  .raci2 tbody th small { display: block; font-weight: 400; font-size: 11.5px; color: var(--text-3); }
+  .raci2 .rot { display: inline-block; writing-mode: vertical-rl; transform: rotate(180deg); font: 600 11.5px/1.2 var(--font-sans); color: var(--text-2); white-space: nowrap; }
+  /* Group headings (a project phase, or a kind of work) across the whole table. */
+  :root[data-look] .raci2 .raci-grp th { text-align: left; padding: 16px 16px 6px; background: var(--surface); border-bottom: 2px solid var(--line-strong); }
+  .raci-grp b { font: 700 11px/1.2 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text); }
+  .raci-grp small { margin-left: 10px; font-size: 12px; color: var(--text-3); font-weight: 400; }
+  .raci-grp[hidden] { display: none; }
+  /* Zebra on rows and on columns. Where a striped row meets a striped column the cell is a little darker, so both directions read. */
+  .raci2 tbody tr.z > * { background-color: color-mix(in srgb, var(--text) 4%, var(--surface)); }
+  .raci2 tbody tr:not(.z):not(.raci-grp) > * { background-color: var(--surface); }
+  .raci2 tbody td:nth-child(even) { box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--text) 4.5%, transparent); }
+  .raci2 tbody td { border-left: 1px solid color-mix(in srgb, var(--line) 55%, transparent); }
+  /* Sticky headers: the role names stay under the top bar while the page scrolls past the table. */
+  .raci2 thead th { position: sticky; top: var(--raci-top, var(--mast-h, 60px)); z-index: 3; background: var(--surface-2); border-bottom: 2px solid var(--line-strong); }
+  .raci2 thead th:nth-child(even):not(.rw-h) { background: color-mix(in srgb, var(--text) 5%, var(--surface-2)); }
+  .raci2 tbody th[scope=row] { border-right: 2px solid var(--line-strong); }
+  .raci2 thead .rw-h { z-index: 4; border-right: 2px solid var(--line-strong); }
+  /* Crosshair: the row and column under the pointer (or focus) light up, the cell at the crossing most. */
+  .raci2 .hl-row, .raci2 tbody tr:not(.raci-grp):hover > * { background-image: linear-gradient(color-mix(in srgb, var(--yellow) 30%, transparent), color-mix(in srgb, var(--yellow) 30%, transparent)); }
+  .raci2 .hl-col { background-image: linear-gradient(color-mix(in srgb, var(--blue) 20%, transparent), color-mix(in srgb, var(--blue) 20%, transparent)); }
+  .raci2 .hl-row.hl-col { background-image: linear-gradient(color-mix(in srgb, var(--blue) 30%, transparent), color-mix(in srgb, var(--blue) 30%, transparent)); box-shadow: inset 0 0 0 2px var(--blue); }
+  .raci2 thead th.hl-col { background-color: color-mix(in srgb, var(--blue) 22%, var(--surface-2)); }
+  .raci2 tbody th.hl-row { box-shadow: inset 3px 0 0 var(--yellow); }
+  .raci2 td.dim .rc { opacity: .15; }
+  .rc { position: relative; display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; font: 700 12px/1 var(--font-mono); cursor: default; outline: none; }
+  .rc-R { background: var(--blue-soft); color: var(--blue-ink); }
+  .rc-A { background: var(--ink); color: var(--on-ink); }
+  .rc-C { background: var(--surface-2); color: var(--text-2); border: 1.5px solid var(--line-strong); }
+  .rc-I { color: var(--text-3); border: 1.5px dashed var(--line); }
+  .rc:focus-visible { box-shadow: 0 0 0 3px var(--focus); }
+  .rc-tip { position: absolute; z-index: 20; bottom: calc(100% + 8px); left: 50%; width: 250px; transform: translate(-50%, 4px); display: grid; gap: 4px; padding: 10px 12px; border-radius: 10px; background: var(--ink); color: var(--on-ink); font: 400 12.5px/1.4 var(--font-sans); text-align: left; opacity: 0; visibility: hidden; pointer-events: none; box-shadow: var(--shadow-lg);
+    transition: opacity var(--dur-exit) var(--ease-settle), transform var(--dur-exit) var(--ease-settle), visibility 0s var(--dur-exit); }
+  /* A hidden note takes no room, so it can never widen the page; it still fades in. */
+  .rc-tip { display: none; max-width: min(250px, 80vw); transition-behavior: allow-discrete; }
+  .rc:hover .rc-tip, .rc:focus .rc-tip { display: grid; }
+  @starting-style { .rc:hover .rc-tip, .rc:focus .rc-tip { opacity: 0; } }
+  .rc-tip b { font-weight: 700; }
+  .rc-detail { color: color-mix(in srgb, var(--on-ink) 80%, transparent); }
+  .rc-who { font-size: 11.5px; color: color-mix(in srgb, var(--on-ink) 70%, transparent); }
+  .rc:hover .rc-tip, .rc:focus .rc-tip { opacity: 1; visibility: visible; transform: translate(-50%, 0); transition: opacity var(--dur-pop) var(--ease-settle), transform var(--dur-pop) var(--ease-settle), visibility 0s; }
+  /* The last columns' notes open to the left, so they stay on the page. */
+  .raci2 td:nth-last-child(-n+3) .rc-tip { left: auto; right: -8px; transform: translate(0, 4px); }
+  .raci2 td:nth-last-child(-n+3) .rc:hover .rc-tip, .raci2 td:nth-last-child(-n+3) .rc:focus .rc-tip { transform: none; }
+  .raci-key { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0; padding: 4px 14px 14px; font-size: 12.5px; color: var(--text-2); }
+  .raci-key > span { display: inline-flex; align-items: center; gap: 6px; }
+  @media (prefers-reduced-motion: reduce) { .rc-tip, .raci-pick button { transition: none !important; } }
+  /* Cards (the table is wider than its column, set by the script): each piece of work lists its roles and letters. */
+  .raci-cards .raci2, .raci-cards .raci2 tbody { display: block; }
+  .raci-cards .raci2 thead { display: none; }
+  .raci-cards .raci2 tbody tr[data-row] { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px 12px; border-bottom: 1px solid var(--line); }
+  .raci-cards .raci2 tbody tr[data-row][hidden] { display: none; }
+  .raci-cards .raci2 tbody tr > * { background: none !important; box-shadow: none !important; }
+  :root[data-look] .raci-cards .raci2 tbody th[scope=row] { flex: 1 1 100%; min-width: 0; padding: 0 0 2px; border: 0; }
+  .raci-cards .raci2 .raci-grp { display: block; }
+  .raci-cards .raci2 .raci-grp th { display: block; }
+  :root[data-look] .raci-cards .raci2 tbody td { display: inline-flex; align-items: center; gap: 7px; padding: 2px 10px 2px 2px; border: 1px solid var(--line); border-radius: 999px; font-size: 12.5px; color: var(--text-2); }
+  .raci-cards .raci2 tbody td::after { content: attr(data-role-name); order: 2; }
+  .raci-cards .raci2 tbody td:not(:has(.rc)) { display: none !important; }
+  .raci-cards .raci2 td.dim { opacity: .35; }
+  .raci-cards .rc { width: 24px; height: 24px; }
+  .raci-cards .rc-tip { left: 0; transform: translate(0, 4px); }
+  .raci-cards .rc:hover .rc-tip, .raci-cards .rc:focus .rc-tip { transform: none; }
+</style>

@@ -1,0 +1,154 @@
+/* Keia Atlas motion rule book (decision 0017; written out in full in docs/rules/motion.md and at /about/rules/).
+   Every animation in the console is one of these moves, on one curve, so the whole thing reads as one system.
+   Scripts read the same tokens with window.rsMotion() (Shell.astro), so nothing types a duration in.
+
+   1. Persist  An element present before and after moves and resizes into its new place.
+               (A port both models share slides; a page title morphs into the next page's title;
+               the sidebar marker slides to the new section.)
+   2. Enter    A new element grows from nothing at its own centre, a beat after the persistent
+               ones start, so additions read as "one more appears".
+   3. Exit     A leaving element shrinks to nothing at its own centre, quickly, then is removed.
+   4. State    A change of state (colour, health, selection) eases in place; nothing jumps.
+
+   Rules that hold everywhere:
+   - Nothing overshoots. Things decelerate into place (--ease-settle).
+   - Inner layers never leave their outer layer: they share its curve and timing, and are clipped
+     to it (device faces to the body, ports to the chassis).
+   - Motion never blocks a click, and reduced motion turns all of it off.
+   - At most 8 named page-transition elements per page; a clicked item is named only for its own
+     transition. Background: https://developer.chrome.com/docs/web-platform/view-transitions */
+:root {
+  --ease-settle: cubic-bezier(.22, 1, .36, 1);
+  --dur-morph: 520ms;   /* persist: in-page morphs (drawings, ports, switcher) */
+  --dur-enter: 440ms;   /* enter: grow from nothing */
+  --dur-exit: 240ms;    /* exit: shrink to nothing */
+  --dur-page: 420ms;    /* page to page */
+  --dur-state: 300ms;   /* colour and state changes */
+  --dur-hover: 140ms;   /* hover and press feedback */
+  --dur-pop: 200ms;     /* menus, peek cards and popovers appearing */
+  --dur-flash: 800ms;   /* a status light's one flash when it gets its result */
+  --dur-blink: 1.1s;    /* a link light's blink (rack views): on, off, on */
+  --dur-pulse: 2.4s;    /* the slow pulse of something that needs attention (a fault, radiate red) */
+  --dur-flow: 800ms;    /* one lap of signal flowing along a wire (an even loop) */
+  --dur-fill: 900ms;    /* a bar or ring filling to its value */
+  --delay-enter: 120ms; /* enter: the beat after persistent things start moving */
+  --stagger: 24ms;
+  --dur-linger: 4000ms; /* how long a live change stays marked ("Ruth, just now") before it fades */
+  --dur-theme: 360ms;   /* a look or light and dark: one cross-fade of the whole page */
+  --pop-scale: .94;     /* menus, peek cards and Settings grow from this size at their control */
+}
+
+/* ---------- Controls (M12): one family of moves for everything that changes what you see ----------
+   Popovers grow from their control (.rs-pop, or rsPop() in the Shell); a selection marker slides
+   (.rs-mark, rsMarker()); a view or scope swap cross-fades in place while its box eases to the new
+   height (rsSwapBegin/rsSwap); things a setting adds or removes grow and shrink at their centre while
+   the rest slides (rsChange); a look or light and dark cross-fades the whole page (rsTheme). */
+@keyframes rs-pop-in { from { opacity: 0; transform: scale(var(--pop-scale)); } }
+@keyframes rs-pop-out { to { opacity: 0; transform: scale(var(--pop-scale)); } }
+@keyframes rs-fade-in { from { opacity: 0; } }
+@keyframes rs-fade-out { to { opacity: 0; } }
+/* A sliding marker behind the chosen option of a segmented control ("Me | My team | Everyone",
+   "Day | Week | Month | Year", Settings). rsMarker() sets --mx and --mw; the chosen button goes clear. */
+.rs-mark { position: absolute; top: 3px; bottom: 3px; left: 0; width: var(--mw, 0px); transform: translateX(var(--mx, 0px)); border-radius: var(--pill-radius, 999px); background: var(--ink); pointer-events: none; z-index: 0; transition: transform var(--dur-morph) var(--ease-settle), width var(--dur-morph) var(--ease-settle), background-color var(--dur-state) var(--ease-settle); }
+.rs-mark:not(.on) { opacity: 0; }
+.rs-marked { position: relative; isolation: isolate; }
+.rs-marked > :not(.rs-mark) { position: relative; z-index: 1; }
+
+/* ---------- Look and light or dark (rsTheme in the Shell) ----------
+   While the look changes, nothing else moves: every named element joins the one page picture, and no
+   colour eases on its own, so the old page and the new one simply cross-fade (--dur-theme). */
+:root.rs-theming *, :root.rs-theming *::before, :root.rs-theming *::after { transition: none !important; }
+:root.rs-theming * { view-transition-name: none !important; }
+:root.rs-theming::view-transition-group(root) { animation-duration: var(--dur-theme); }
+:root.rs-theming::view-transition-old(root), :root.rs-theming::view-transition-new(root) { animation-duration: var(--dur-theme); animation-timing-function: var(--ease-settle); }
+/* View as on a page that has to redraw itself (Home): the frame stays, the sidebar re-orders itself with
+   its own slide (rsChange), and the page body cross-fades in place instead of leaving and arriving. */
+:root[data-nav-dir="same"]::view-transition-old(side), :root[data-nav-dir="same"]::view-transition-old(mast) { animation: none; opacity: 0; }
+:root[data-nav-dir="same"]::view-transition-new(side), :root[data-nav-dir="same"]::view-transition-new(mast) { animation: none; }
+:root[data-nav-dir="same"]::view-transition-old(page) { animation: var(--dur-page) var(--ease-settle) both rs-fade-out; }
+:root[data-nav-dir="same"]::view-transition-new(page) { animation: var(--dur-page) var(--ease-settle) both rs-fade-in; }
+:root[data-nav-dir="same"] .nav-on { view-transition-name: none; }
+
+/* ---------- Enter and exit (used by the keyed morph for ports and any keyed element) ---------- */
+@keyframes rs-grow { from { transform: scale(0); opacity: 0; } }
+@keyframes rs-shrink { to { transform: scale(0); opacity: 0; } }
+.m-enter { transform-box: fill-box; transform-origin: center; animation: rs-grow var(--dur-enter) var(--ease-settle) both; animation-delay: calc(var(--delay-enter) + var(--i, 0) * var(--stagger)); }
+.m-exit { transform-box: fill-box; transform-origin: center; animation: rs-shrink var(--dur-exit) var(--ease-settle) both; pointer-events: none; }
+
+/* ---------- Page to page (Astro's client router runs these as view transitions) ---------- */
+@keyframes rs-page-out { to { opacity: 0; transform: translateY(-16px); } }
+@keyframes rs-page-in { from { opacity: 0; transform: translateY(28px); } }
+@keyframes rs-page-out-down { to { opacity: 0; transform: translateY(16px); } }
+@keyframes rs-page-in-down { from { opacity: 0; transform: translateY(-28px); } }
+::view-transition-group(*) { animation-duration: var(--dur-page); animation-timing-function: var(--ease-settle); }
+/* The page body leaves upward and the next one rises in; the frame (masthead, sidebar) stays put. */
+main { view-transition-name: page; }
+::view-transition-old(page) { animation: var(--dur-exit) var(--ease-settle) both rs-page-out; }
+::view-transition-new(page) { animation: var(--dur-page) var(--ease-settle) 60ms both rs-page-in; }
+/* Going up the sidebar (or Back), the pages move the other way. */
+:root[data-nav-dir="up"]::view-transition-old(page) { animation-name: rs-page-out-down; }
+:root[data-nav-dir="up"]::view-transition-new(page) { animation-name: rs-page-in-down; }
+/* Shared elements cross-fade inside their moving box instead of stretching text. */
+::view-transition-old(hero), ::view-transition-new(hero),
+::view-transition-old(art-hero), ::view-transition-new(art-hero) { height: 100%; object-fit: contain; }
+/* Persist in place between pages (M5): the top bar, sidebar and its marker, the place tabs and their marker,
+   and now the page band (PageBand names itself `band`) and the filter bar (`fb`), so from one list to the
+   next only the results change. Their words cross-fade inside the box as it eases to its new size. */
+::view-transition-old(band), ::view-transition-new(band),
+::view-transition-old(fb), ::view-transition-new(fb) { height: 100%; object-fit: none; object-position: left top; }
+::view-transition-new(band), ::view-transition-new(fb) { animation-delay: calc(var(--dur-exit) / 4); }
+/* Record shared elements (src/lib/vt.mjs): the clicked record's picture becomes the next page's picture. */
+::view-transition-old(*.rec), ::view-transition-new(*.rec) { height: 100%; object-fit: contain; }
+
+/* Layer order while pages change: the sliding section marker passes between the sidebar's ground
+   (part of the page) and its labels, so the label stays readable on top of the marker. */
+::view-transition-group(page) { z-index: 0; }
+::view-transition-group(band), ::view-transition-group(fb) { z-index: 1; }
+::view-transition-group(*.rec) { z-index: 1; } /* its own rule: older browsers drop a list with a class selector in it */
+::view-transition-group(nav-on) { z-index: 1; }
+::view-transition-group(side) { z-index: 2; }
+::view-transition-group(mast) { z-index: 3; }
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+  .m-enter, .m-exit { animation: none !important; }
+  .rs-mark { transition: none; }
+}
+
+/* ---------- Live changes (M10) ----------
+   When someone else changes an item, it stays where it is: the changed field or card eases to a highlight
+   and back (state move), and a small "Ruth, just now" mark shows and fades. window.rsMarkChanged(el, who)
+   in the Shell adds both and takes them away after --dur-linger. Reduced motion: the same, without easing. */
+.is-changed, .was-changed { transition: background-color var(--dur-state) var(--ease-settle), box-shadow var(--dur-state) var(--ease-settle), color var(--dur-state) var(--ease-settle); }
+.is-changed { background-color: var(--yellow-soft, var(--accent-soft)); box-shadow: 0 0 0 2px var(--yellow-soft, var(--accent-soft)); }
+.rs-changed-mark { display: inline-block; margin-left: 8px; padding: 2px 7px; border-radius: var(--pill-radius); font: 600 11px/1.3 var(--font-sans); color: var(--text-2); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); vertical-align: middle; white-space: nowrap; animation: rs-grow var(--dur-pop) var(--ease-settle) both; transition: opacity var(--dur-exit) var(--ease-settle); }
+:not(.is-changed) > .rs-changed-mark { opacity: 0; }
+
+/* ---------- Health lights: grey until checked, a spinner while checking, then one flash ----------
+   Green for healthy, red for not. The light keeps its colour afterwards; a failed one keeps a slow pulse. */
+.hc-rows .hr-c, .dv-checks .dv-c { width: 18px; height: 18px; border-radius: 50%; background: var(--surface-3); box-shadow: inset 0 0 0 1.5px var(--line-strong); color: #fff; transition: background var(--dur-state) var(--ease-settle); }
+.hc-rows .hr-c svg, .dv-checks .dv-c svg { width: 11px; height: 11px; stroke-width: 3; }
+.hc-rows .hr-c.checking, .dv-checks .dv-c.checking { background: transparent; box-shadow: none; }
+.hc-rows .hr-c.ok, .dv-checks .dv-c.ok { background: var(--green); box-shadow: none; animation: rs-flash-ok var(--dur-flash) var(--ease-settle); }
+.dv-checks .dv-c.bad, .hc-rows .hr-c.bad { background: var(--red); box-shadow: none; animation: rs-flash-bad var(--dur-flash) var(--ease-settle), rs-bad-pulse var(--dur-pulse) var(--dur-flash) ease-in-out infinite; }
+.dv-checks .dv-c .x, .hc-rows .hr-c .x { opacity: 0; }
+.dv-checks .dv-c.bad .x, .hc-rows .hr-c.bad .x { opacity: 1; }
+.dv-checks .dv-c.bad svg:not(.x) { opacity: 0 !important; }
+@keyframes rs-flash-ok { 0% { transform: scale(.5); box-shadow: 0 0 0 0 color-mix(in srgb, var(--green) 70%, transparent); } 45% { transform: scale(1.35); } 100% { transform: scale(1); box-shadow: 0 0 0 12px transparent; } }
+@keyframes rs-flash-bad { 0% { transform: scale(.5); box-shadow: 0 0 0 0 color-mix(in srgb, var(--red) 70%, transparent); } 45% { transform: scale(1.35); } 100% { transform: scale(1); box-shadow: 0 0 0 12px transparent; } }
+@keyframes rs-bad-pulse { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--red) 22%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .hc-rows .hr-c, .dv-checks .dv-c { animation: none !important; } }
+
+/* Status lights anywhere (.hl[data-state]): grey on arrival, then each flashes to its colour in turn. */
+.hl { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--surface-3); box-shadow: inset 0 0 0 1.5px var(--line-strong); vertical-align: middle; transition: background var(--dur-state) var(--ease-settle), box-shadow var(--dur-state); }
+.hl.lit[data-state="ok"] { background: var(--green); box-shadow: none; animation: rs-flash-ok var(--dur-flash) var(--ease-settle); }
+.hl.lit[data-state="bad"] { background: var(--red); box-shadow: none; animation: rs-flash-bad var(--dur-flash) var(--ease-settle), rs-bad-pulse var(--dur-pulse) var(--dur-flash) ease-in-out infinite; }
+.hl.lit[data-state="warn"] { background: var(--amber, #E0A100); box-shadow: none; animation: rs-flash-ok var(--dur-flash) var(--ease-settle); }
+.hl.lit[data-state="off"] { background: var(--surface-3); }
+@media (prefers-reduced-motion: reduce) { .hl { animation: none !important; } }
+
+/* Radiate red (rule book D6): a card or row whose device has an open incident glows and slowly pulses.
+   Reduced motion gets a still red ring. Rooms and Devices still carry their own copies (Known gaps). */
+.rs-radiate { --glow: var(--red); border-color: var(--glow); box-shadow: 0 0 0 1px var(--glow), 0 0 14px 1px color-mix(in srgb, var(--glow) 40%, transparent); animation: rs-radiate var(--dur-pulse) ease-in-out infinite; }
+@keyframes rs-radiate { 0%, 100% { box-shadow: 0 0 0 1px var(--glow), 0 0 6px 0 color-mix(in srgb, var(--glow) 25%, transparent); } 50% { box-shadow: 0 0 0 1px var(--glow), 0 0 22px 4px color-mix(in srgb, var(--glow) 50%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .rs-radiate { animation: none !important; box-shadow: 0 0 0 3px var(--glow); } }

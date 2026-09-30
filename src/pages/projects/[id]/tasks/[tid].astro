@@ -1,0 +1,380 @@
+---
+// One task: what it is, the steps to do it, the devices it touches and their configuration (Set or
+// Verify), what done looks like, and how it closes (what fixed it, or "Nothing new" and why).
+// Vendor tasks carry a form for serial numbers and MAC addresses. Demo: ticks and records stay in this browser.
+import Shell from '../../../../layouts/Shell.astro';
+import PageBand from '../../../../components/PageBand.astro';
+import SidePanel from '../../../../components/SidePanel.astro';
+import Section from '../../../../components/Section.astro';
+import Icon from '../../../../components/Icon.astro';
+import DeviceGlyph from '../../../../components/DeviceGlyph.astro';
+import LiveBar from '../../../../components/LiveBar.astro';
+import PeoplePicker from '../../../../components/PeoplePicker.astro';
+import { pickable } from '../../../../lib/project-status.mjs';
+import { projects, sites, playbooks, PHASE_LABEL, STEP_LABEL, TASK_STATUS, TEAM_LABEL, NOTHING_NEW, phasesOf, fmtDate, DEMO_TODAY, plural, href } from '../../../../lib/data.mjs';
+import { taskDetail } from '../../../../lib/tasks.mjs';
+import { person, PEOPLE, ROLES } from '../../../../lib/demo.mjs';
+
+export function getStaticPaths() {
+  return Object.values(projects).flatMap((p) => (p.tasks ?? []).map((t) => ({ params: { id: p.id.toLowerCase(), tid: t.id.toLowerCase() } })));
+}
+const p = Object.values(projects).find((x) => x.id.toLowerCase() === Astro.params.id);
+const t = p.tasks.find((x) => x.id.toLowerCase() === Astro.params.tid);
+const D = taskDetail(p, t);
+const who = person(t.owner);
+const isVendor = !!who.vendor;
+const days = t.due ? Math.round((new Date(t.due) - new Date(DEMO_TODAY)) / 864e5) : null;
+const dueWord = days == null ? 'No date' : t.status === 'done' ? `Was due ${fmtDate(t.due, { day: 'numeric', month: 'short' })}` : days < 0 ? `${-days} days late` : days === 0 ? 'Due today' : `Due in ${days} days`;
+const idx = p.tasks.indexOf(t);
+const prev = p.tasks[idx - 1], next = p.tasks[idx + 1];
+const tHref = (x) => href(`/projects/${p.id.toLowerCase()}/tasks/${x.id.toLowerCase()}/`);
+const home = `/projects/${p.id.toLowerCase()}/`;
+const PILL = { todo: 'plain', doing: 'deploy', blocked: 'bad', done: 'manage' };
+const where = D.rooms.length === 1 ? `${D.rooms[0].number ? `${D.rooms[0].number} ` : ''}${D.rooms[0].name}, ${sites[p.site].name}` : `${sites[p.site].name}${D.rooms.length ? `, ${D.rooms.length} rooms` : ''}`;
+// Deploy work is done on the project's Deploy board: this task's room, opened at its step.
+const intStep = t.phase === 'integrate' ? ({ provision: 'provision', install: 'install', configure: 'configure', commission: 'commission', records: 'provision' })[t.kind] : null;
+const intLink = intStep && phasesOf(p).includes('integrate') ? `${href(`${home}integrate/`)}${t.space ? `?room=${t.space}` : ''}#open=${intStep}` : null;
+const late = t.status !== 'done' && days != null && days < 0;
+const NUMBERS = [
+  { n: t.due ? fmtDate(t.due, { day: 'numeric', month: 'short' }) : '–', label: dueWord, fact: true, tone: late ? 'bad' : undefined },
+  { n: `${t.hours ?? '–'} h`, label: 'Estimate', fact: true },
+  { n: `${t.status === 'done' ? D.steps.length : 0}/${D.steps.length}`, label: 'Steps done', id: 'steps', fact: true },
+];
+// A note that a step is missing something goes to the playbook owner as a suggested change.
+const pbk = playbooks[p.playbook];
+const owners = (['infra-refresh', 'network-refresh'].includes(pbk?.kind) ? ['programme', 'sm-infra'] : ['programme', 'sm-av']).map((r) => PEOPLE.find((x) => x.roleId === r)).filter(Boolean);
+const snCfg = { project: p.id, task: t.id, title: t.title, pb: pbk?.id ?? '', pbName: pbk?.name ?? '', path: pbk ? `data/playbooks/${pbk.id}.yaml` : `data/projects/${p.id.toLowerCase()}.yaml`, kind: pbk ? 'playbook' : 'project', approver: owners.map((x) => `${x.name}, ${x.role}`).join(' with '), names: owners.map((x) => x.name).join(' and '), steps: D.steps, changes: href('/changes/') };
+---
+<Shell title={`${t.id} ${t.title}`} section="projects" minStage={3} vendorOk={isVendor} about={{ kind: 'task', label: `${t.id} ${t.title}` }} crumbs={[{ label: 'Projects', to: '/projects/' }, { label: p.name, to: `/projects/${p.id.toLowerCase()}/` }, { label: t.id }]}>
+  <PageBand overline={`Task ${t.id}`} title={t.title} numbers={NUMBERS} sim rec={t.id}>
+    <Fragment slot="overline">
+      <span>{D.kindLabel} · {PHASE_LABEL[t.phase] ?? ''} phase</span>
+      <a href={href(home)}>{p.id} {p.name}</a>
+      <span class={`pill ${PILL[t.status]}`} data-tk-pill>{TASK_STATUS[t.status]}</span>
+    </Fragment>
+    <Fragment slot="lede">{where}{t.team ? ` · with ${TEAM_LABEL[t.team] ?? t.team}` : ''}</Fragment>
+    {t.status === 'done'
+      ? <a slot="action" class="btn primary wr-btn" href={href(`${home}tasks/${t.id.toLowerCase()}/report/`)}><Icon name="book" size={16} />Work report</a>
+      : intLink && <a slot="action" class="btn primary" href={intLink}>Open in Deploy</a>}
+  </PageBand>
+
+  <div class="content task">
+    <div class="g12 top">
+      <section class="card tk-steps s-7" aria-labelledby="h-steps">
+          {t.status === 'blocked' && <div class="tk-block"><Icon name="alert" size={20} /><span><b>Blocked.</b> {t.blocked_by}</span><button type="button" class="btn small" data-open-report="urgent">Raise it as urgent</button></div>}
+          {intLink && t.status !== 'done' && <a class="tk-int" href={intLink}><span><b>On the Deploy board</b><small>{D.devices.length ? `${plural(D.devices.length, 'device')}, ` : ''}each with its {STEP_LABEL[intStep]} checklist to tick, live with the rest of the team.</small></span><span class="btn small">Open in Deploy<Icon name="arrow" size={14} /></span></a>}
+          <header class="tk-h"><h2 id="h-steps">What to do</h2><span class="faint" data-step-count></span></header>
+          <ol class="steps" data-steps={`${p.id}-${t.id}`}>
+            {D.steps.map((s, i) => (
+              <li>
+                <label><input type="checkbox" data-step={i} checked={t.status === 'done'} /><span class="tick" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg></span><span class="st-text">{s}</span></label>
+              </li>
+            ))}
+          </ol>
+          {D.fromStep && <p class="faint tk-from">From the {D.playbook.name} playbook, {PHASE_LABEL[t.phase]} phase: "{D.fromStep.title}"{D.fromStep.output ? `, which produces: ${D.fromStep.output}` : ''}.</p>}
+          {D.phase?.gate && <p class="faint tk-from">The phase is done when: {D.phase.gate.checks.join('; ')}.</p>}
+          <div class="sn" data-sn data-cfg={JSON.stringify(snCfg)}>
+            <button type="button" class="sn-open" data-sn-open aria-expanded="false" aria-controls="sn-form"><Icon name="edit" size={14} />This step is missing something</button>
+            <div class="sn-wrap" data-sn-wrap>
+              <form class="sn-form" id="sn-form" data-sn-form novalidate inert>
+                <label class="ef"><span class="ef-l">What is missing or wrong?</span><textarea name="note" rows="3" maxlength="400" placeholder="For example: check the cable length before you order"></textarea></label>
+                <label class="ef"><span class="ef-l">Which step?</span><select name="step"><option value="">The task as a whole</option>{D.steps.map((st, i) => <option value={String(i)}>{i + 1}. {st.length > 70 ? `${st.slice(0, 68)}...` : st}</option>)}</select></label>
+                <p class="faint sn-to">It goes to {snCfg.names} as a suggested change to {pbk ? `the ${pbk.name} playbook` : 'this project'}. You can withdraw it.</p>
+                <p class="sn-err" data-sn-err role="alert" hidden>Write a few words about what is missing.</p>
+                <div class="sn-acts"><button type="submit" class="btn small primary">Send note</button><button type="button" class="btn small ghost" data-sn-cancel>Cancel</button></div>
+              </form>
+            </div>
+            <div class="sn-list" data-sn-list></div>
+          </div>
+        </section>
+      <SidePanel class="s-5" title="The task" meta={dueWord}>
+        <div class="owner" data-tk-live={t.id} data-status={t.status} data-owner={t.owner} data-title={t.title} data-people={JSON.stringify(pickable(p))}>
+          <button type="button" class="av tk-av owner-av" data-tk-owner aria-haspopup="dialog" aria-expanded="false" data-help="project.assign" aria-label={`Assigned to ${who.name}. Change`}>{who.initials}</button>
+          <span><b data-tk-name>{who.name}</b><small data-tk-role>{who.vendorName ? `${who.vendorName} · ` : ''}{ROLES[who.roleId]?.name}</small><small class="tk-changed" data-tk-changed hidden></small></span>
+          <button type="button" class="t-hist owner-hist" data-tk-history data-help="live.history">History</button>
+        </div>
+        <dl class="kv">
+          <div><dt>Status</dt><dd data-tk-status>{TASK_STATUS[t.status]}</dd></div>
+          <div><dt>Due</dt><dd>{t.due ? fmtDate(t.due) : '–'}</dd></div>
+          <div><dt>Estimate</dt><dd>{t.hours ?? '–'} hours</dd></div>
+          <div><dt>Phase</dt><dd>{PHASE_LABEL[t.phase]}</dd></div>
+          <div><dt>Kind of work</dt><dd>{D.kindLabel}</dd></div>
+          {t.team && <div><dt>With</dt><dd>{TEAM_LABEL[t.team] ?? t.team}</dd></div>}
+        </dl>
+        {D.rooms.length > 0 && (
+          <div class="tk-sub">
+            <h3 class="overline">{D.rooms.length === 1 ? 'The room' : 'The rooms'}</h3>
+            <ul class="rooms-mini">{D.rooms.map((r) => <li><a href={href(`/rooms/${r.id}/`)}>{r.number ? `${r.number} ` : ''}{r.name}</a><small>{r.type.profile.name}</small></li>)}</ul>
+          </div>
+        )}
+        <nav class="tk-sub tk-nav" aria-label="Other tasks on this project">
+          <h3 class="overline">On this project</h3>
+          {prev && <a href={tHref(prev)}><Icon name="back" size={14} /><span><small class="mono">{prev.id}</small> {prev.title}</span></a>}
+          {next && <a href={tHref(next)}><span><small class="mono">{next.id}</small> {next.title}</span><Icon name="arrow" size={14} /></a>}
+          <a class="all" href={href(`${home}#tasks`)}>All {p.tasks.length} tasks</a>
+        </nav>
+        <LiveBar page={`task:${t.id}`} />
+      </SidePanel>
+      <PeoplePicker />
+    </div>
+
+    <Section title="How it closed" id="closed">
+      <div class="card tk-close">
+          {t.captured_fix ? (
+            <div class="fix"><span class="fix-ic"><Icon name="check" size={18} /></span><div><b>What fixed it</b><p>"{t.captured_fix}"</p><small class="faint">{who.name} · now in the guide for the next install</small></div></div>
+          ) : t.nothing_new ? (
+            <div class="fix none"><span class="fix-ic"><Icon name="check" size={18} /></span><div><b>{NOTHING_NEW[t.nothing_new]}</b><small class="faint">Closing needs a fix or a reason. The reasons show how good the guides are.</small></div></div>
+          ) : (
+            <>
+              <p class="muted">Closing a task needs one of these. It takes under 30 seconds.</p>
+              <div class="close-btns">
+                <button type="button" class="btn" data-open-report="change" data-report-what={`What fixed it on ${t.id}`}><Icon name="edit" size={16} />What fixed it?</button>
+                <button type="button" class="btn ghost" data-nothing-new>Nothing new</button>
+                <button type="button" class="btn ghost" data-open-report="firmware">New firmware found</button>
+                <button type="button" class="btn ghost" data-open-report="urgent">Raise an urgent issue</button>
+              </div>
+              <div class="nn" hidden data-nn>
+                {Object.entries(NOTHING_NEW).map(([k, v]) => <label><input type="radio" name="nn" value={k} />{v}</label>)}
+              </div>
+            </>
+          )}
+      </div>
+    </Section>
+
+    {D.records && (
+      <Section title="Serial numbers and MAC addresses" id="records" aside="Checked by the delivery engineer before they count">
+        <div class="card tk-rec">
+            <div class="tablewrap"><table class="rec-t">
+              <thead><tr><th>Position</th><th>Model</th><th>Serial</th><th>MAC address</th><th></th></tr></thead>
+              <tbody>
+                {D.devices.map((d, i) => (
+                  <tr data-rec-row={i}>
+                    <td><b>{d.name.replace(/^./, (c) => c.toUpperCase())}</b><small class="mono">{d.host ?? d.p.position}</small></td>
+                    <td>{d.model ?? '–'}</td>
+                    <td><input class="mono" name="serial" placeholder="Serial" value={t.status === 'done' ? d.unit?.serial : ''} /></td>
+                    <td><input class="mono" name="mac" placeholder="00:00:00:00:00:00" /></td>
+                    <td><i class="rec-ok" aria-label="Looks right"></i></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table></div>
+            <p class="faint">Demo: saved in this browser. A MAC is six pairs of letters A to F and digits, with colons or dashes.</p>
+        </div>
+      </Section>
+    )}
+
+    {D.showDevices && D.devices.length > 0 && (
+      <Section title="The devices" id="devices" aside={`${D.devices.length} in ${D.rooms.length === 1 ? 'this room' : 'these rooms'}`} showAll={12}>
+          <div class="dev-cards" data-items>
+            {D.devices.map((d) => (
+              <article class="card dcard">
+                <span class="dc-g"><DeviceGlyph cls={d.cls} size={42} /></span>
+                <div class="dc-main">
+                  <b>{d.link ? <a href={d.link}>{d.name.replace(/^./, (c) => c.toUpperCase())}</a> : d.name}</b>
+                  <small>{d.model ?? 'Model set per project'}{d.host ? ` · ${d.host}` : ''} · {d.where}</small>
+                  <p class="dc-meta">
+                    {d.fw && <span class="tag mono">Firmware {d.fw}</span>}
+                    {d.cfg && <a class="tag" href={d.cfgLink}><b class="set">{d.change} Set</b> · <b class="ver">{d.verify} Verify</b></a>}
+                  </p>
+                  {D.kind === 'commission' && d.checks.length > 0 && <details><summary>Healthy when</summary><ul>{d.checks.map((c) => <li>{c}</li>)}</ul></details>}
+                </div>
+              </article>
+            ))}
+          </div>
+      </Section>
+    )}
+  </div>
+
+  <script is:inline data-astro-rerun slot="end">
+    (function () {
+      /* A quick note that a step is missing something: a suggested change on the Changes page (rs4-changes). */
+      var fb = document.querySelector('[data-sn]'); if (!fb) return;
+      var cfg = JSON.parse(fb.dataset.cfg), S = window.rsStore, wrap = fb.querySelector('[data-sn-wrap]'), form = fb.querySelector('[data-sn-form]'), listEl = fb.querySelector('[data-sn-list]');
+      var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+      var ST = { review: 'Waiting for review', approved: 'Approved', merged: 'Merged', changes: 'Changes asked for', withdrawn: 'Withdrawn' };
+      var notes = function () { return S.get('rs4-changes', []).filter(function (c) { return c.project === cfg.project && c.task === cfg.task && c.fromNote; }); };
+      var render = function (flash) {
+        var n = notes();
+        listEl.innerHTML = n.map(function (c) {
+          return '<div class="sn-n st-' + c.status + '" data-sn-id="' + esc(c.id) + '"><span><b>' + esc(c.noteText) + '</b><small>' + esc(c.id) + ' · ' + esc(ST[c.status] || c.status) + ' · <a href="' + cfg.changes + '#' + esc(c.id.toLowerCase()) + '">See it on Changes</a></small></span>' +
+            (c.status === 'withdrawn' ? '<button type="button" class="btn small ghost" data-sn-act="back">Put back</button>' : c.status === 'review' ? '<button type="button" class="btn small ghost" data-sn-act="withdraw">Withdraw</button>' : '') + '</div>';
+        }).join('');
+        if (flash) { var el = listEl.querySelector('[data-sn-id="' + flash + '"]'); if (el && !matchMedia('(prefers-reduced-motion: reduce)').matches) { var M = window.rsMotion(); el.animate([{ opacity: 0, transform: 'scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: M.enter, easing: M.ease }); } }
+      };
+      var open = function (o) { wrap.classList.toggle('open', o); form.inert = !o; fb.querySelector('[data-sn-open]').setAttribute('aria-expanded', String(o)); if (o) setTimeout(function () { form.querySelector('textarea').focus({ preventScroll: true }); }, 120); };
+      window.__rsSn = { fb: fb, cfg: cfg, form: form, open: open, render: render, S: S, notes: notes };
+      render();
+      if (!window.__rsSnHook) {
+        window.__rsSnHook = true;
+        document.addEventListener('click', function (e) {
+          var F = window.__rsSn; if (!F || !document.body.contains(F.fb)) return;
+          if (e.target.closest('[data-sn-open]')) { F.open(!F.fb.querySelector('[data-sn-wrap]').classList.contains('open')); return; }
+          if (e.target.closest('[data-sn-cancel]')) { F.open(false); return; }
+          var b = e.target.closest('[data-sn-act]'); if (!b) return;
+          window.rsSetChange(b.closest('[data-sn-id]').dataset.snId, b.dataset.snAct === 'withdraw' ? 'withdrawn' : 'review'); F.render();
+        });
+        document.addEventListener('submit', function (e) {
+          var F = window.__rsSn; if (!F || e.target !== F.form) return;
+          e.preventDefault();
+          var note = F.form.querySelector('[name=note]').value.trim(), err = F.form.querySelector('[data-sn-err]');
+          if (!note) { err.hidden = false; F.form.querySelector('[name=note]').focus(); return; }
+          err.hidden = true;
+          var si = F.form.querySelector('[name=step]').value, step = si === '' ? null : F.cfg.steps[+si], c = F.cfg;
+          var ch = window.rsPropose({ kind: c.kind, title: 'Missing from "' + c.title + '": ' + (note.length > 80 ? note.slice(0, 78) + '...' : note), path: c.path, change: 'a note for the ' + (c.pbName ? c.pbName + ' playbook' : 'project') + ' owner, not yet a change to the file',
+            approver: c.approver, project: c.project, task: c.task, fromNote: true, noteText: note,
+            text: '# Note on ' + c.task + ' (' + c.project + ')' + (step ? ', step ' + (+si + 1) + ': "' + step + '"' : '') + '\n' + note.split('\n').map(function (l) { return '# ' + l; }).join('\n') + '\n',
+            note: 'A quick note from the task page. The owner decides whether it becomes a step or a change to a step.' });
+          F.form.reset(); F.open(false); F.render(ch.id);
+        });
+      }
+    })();
+    (function () {
+      /* The owner and status follow the live layer, the same events the project board records
+         (item task:<id>). The avatar opens the people picker; History and Undo are in the drawer. */
+      var box = document.querySelector('[data-tk-live]'); if (!box) return;
+      var STATUS = { todo: 'To do', doing: 'Doing', blocked: 'Blocked', done: 'Done' }, PILL = { todo: 'plain', doing: 'deploy', blocked: 'bad', done: 'manage' };
+      var people = JSON.parse(box.dataset.people || '[]'), item = 'task:' + box.dataset.tkLive;
+      var person = function (id) { return people.filter(function (x) { return x.id === id; })[0] || (window.RS_PEOPLE || []).filter(function (x) { return x.id === id; })[0] || { id: id, name: id, initials: String(id).slice(0, 2).toUpperCase(), role: '' }; };
+      var base = function () { return { status: box.dataset.status, owner: box.dataset.owner }; };
+      var describe = function (e) { var w = e.field === 'status' ? 'Moved to ' + STATUS[e.after] : e.field === 'owner' ? 'Assigned to ' + person(e.after).name : e.field + ' changed'; return e.undoes ? e.note + ': ' + w.charAt(0).toLowerCase() + w.slice(1) : w; };
+      var stop = null;
+      var paint = function (L, fresh, remote) {
+        var st = L.live.stateOf(item, base()), who = person(st.owner), last = L.live.historyOf(item)[0];
+        box.querySelector('[data-tk-owner]').textContent = who.initials;
+        box.querySelector('[data-tk-owner]').setAttribute('aria-label', 'Assigned to ' + who.name + '. Change');
+        box.querySelector('[data-tk-name]').textContent = who.name;
+        if (st.owner !== box.dataset.owner) box.querySelector('[data-tk-role]').textContent = who.role || ''; else if (box.__role != null) box.querySelector('[data-tk-role]').textContent = box.__role;
+        var ch = box.querySelector('[data-tk-changed]'); ch.hidden = !last; if (last) ch.textContent = describe(last) + ': ' + person(last.who).name + ', ' + new Date(last.at).toLocaleTimeString('en-IE', { hour: '2-digit', minute: '2-digit' });
+        var sd = document.querySelector('[data-tk-status]'); if (sd) sd.textContent = STATUS[st.status];
+        var pill = document.querySelector('[data-tk-pill]'); if (pill) { pill.className = 'pill ' + PILL[st.status]; pill.textContent = STATUS[st.status]; }
+        if (fresh && remote && window.rsMarkChanged) window.rsMarkChanged(box, person(last.who).name);
+      };
+      var go = function () {
+        var L = window.rsLive; if (!L || !document.body.contains(box)) return;
+        box.__role = box.querySelector('[data-tk-role]').textContent;
+        L.register('task:', { base: function () { return base(); }, describe: describe });
+        paint(L, false);
+        if (stop) stop();
+        stop = L.live.subscribe(item, function (e, info) { paint(L, true, info && info.remote); });
+        box.addEventListener('click', function (ev) {
+          if (ev.target.closest('[data-tk-history]')) { L.history(item, box.dataset.tkLive + ' ' + box.dataset.title); return; }
+          var b = ev.target.closest('[data-tk-owner]'); if (!b || !window.rsPeoplePicker) return;
+          var now = L.live.stateOf(item, base());
+          window.rsPeoplePicker.open(b, { people: people, current: now.owner, title: 'Assign to', onPick: function (id) { if (id !== now.owner) L.live.record({ item: item, field: 'owner', before: now.owner, after: id, who: L.who() }); } });
+        });
+        document.addEventListener('astro:before-swap', function () { if (stop) stop(); stop = null; }, { once: true });
+      };
+      if (window.rsLive) go(); else document.addEventListener('rs:live-ready', go, { once: true });
+    })();
+    (function () {
+      var list = document.querySelector('[data-steps]'); if (!list) return;
+      var key = 'rs4-steps-' + list.dataset.steps, saved = {};
+      try { saved = JSON.parse(localStorage.getItem(key) || '{}'); } catch (_) {}
+      var boxes = list.querySelectorAll('[data-step]');
+      var count = function () { var n = Array.prototype.filter.call(boxes, function (b) { return b.checked; }).length; document.querySelector('[data-step-count]').textContent = n + ' of ' + boxes.length + ' done';
+        // The band's "Steps done" figure follows the ticks.
+        window.rsKeyNumber('steps', n + '/' + boxes.length); };
+      boxes.forEach(function (b) {
+        if (saved[b.dataset.step] != null) b.checked = saved[b.dataset.step];
+        b.addEventListener('change', function () { saved[b.dataset.step] = b.checked; try { localStorage.setItem(key, JSON.stringify(saved)); } catch (_) {} count(); });
+      });
+      count();
+      var nn = document.querySelector('[data-nothing-new]');
+      if (nn) nn.addEventListener('click', function () { document.querySelector('[data-nn]').hidden = false; });
+      // Records: a MAC must look like one.
+      document.querySelectorAll('[data-rec-row]').forEach(function (row) {
+        var mac = row.querySelector('[name=mac]'), ser = row.querySelector('[name=serial]'), ok = row.querySelector('.rec-ok');
+        var check = function () {
+          var m = mac.value.trim(), good = /^([0-9a-f]{2}[:-]){5}[0-9a-f]{2}$/i.test(m);
+          mac.classList.toggle('bad', !!m && !good);
+          ok.classList.toggle('on', good && !!ser.value.trim());
+        };
+        [mac, ser].forEach(function (i) { i.addEventListener('input', check); });
+      });
+    })();
+  </script>
+</Shell>
+<style is:global>
+  :root[data-who-kind="vendor"] .wr-btn { display: none !important; }
+  .sn { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line-strong); display: grid; gap: 8px; }
+  .sn-open { justify-self: start; appearance: none; border: 0; background: none; padding: 4px 0; display: inline-flex; gap: 6px; align-items: center; font: 600 13.5px var(--font-sans); color: var(--accent-ink); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+  .sn-open:hover { color: var(--accent-hover); }
+  .sn-wrap { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--dur-morph) var(--ease-settle); }
+  .sn-wrap.open { grid-template-rows: 1fr; }
+  .sn-form { min-height: 0; overflow: hidden; display: grid; gap: 10px; visibility: hidden; opacity: 0; transition: opacity var(--dur-state), visibility 0s linear var(--dur-morph); }
+  .sn-wrap.open .sn-form { visibility: visible; opacity: 1; transition: opacity var(--dur-state) 80ms, visibility 0s; padding: 4px 2px 2px; }
+  .sn-form .ef { display: grid; gap: 4px; }
+  .sn-form .ef-l { font: 700 11px/1.2 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); }
+  .sn-form textarea, .sn-form select { width: 100%; box-sizing: border-box; font: 500 14px/1.4 var(--font-sans); padding: 8px 10px; border-radius: 8px; border: 1.5px solid var(--line-strong); background: var(--surface); color: var(--text); resize: vertical; }
+  .sn-form textarea:focus, .sn-form select:focus { outline: 3px solid var(--focus); outline-offset: 1px; }
+  .sn-to { margin: 0; font-size: 12.5px; } .sn-err { margin: 0; font-size: 13px; color: var(--red-ink); } .sn-err[hidden] { display: none; }
+  .sn-acts { display: flex; gap: 8px; }
+  .sn-list { display: grid; gap: 6px; }
+  .sn-n { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius); background: var(--violet-soft); color: var(--text); font-size: 13.5px; }
+  .sn-n.st-withdrawn { background: var(--surface-2); opacity: .75; }
+  .sn-n small { display: block; font-size: 12px; color: var(--text-2); font-weight: 400; }
+  @media (prefers-reduced-motion: reduce) { .sn-wrap, .sn-form { transition: none; } }
+</style>
+<style>
+  .tk-sub { display: grid; gap: 4px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .tk-sub .overline { margin: 0; }
+  .tk-int { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-bottom: 14px; padding: 12px 14px; border-radius: var(--radius); background: var(--accent-soft); color: inherit; text-decoration: none; }
+  .tk-int:hover { color: inherit; }
+  .tk-int b { display: block; font-size: 15px; } .tk-int small { display: block; font-size: 12.5px; color: var(--text-2); }
+  .tk-int .btn { pointer-events: none; }
+  .tk-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .tk-h h2 { font-size: 19px; margin: 0; } .tk-h .faint { font-size: 12.5px; }
+  .tk-steps, .tk-rec, .tk-close { padding: 16px 18px; }
+  .steps { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+  .steps li { border-top: 1px solid var(--line); }
+  .steps li:first-child { border-top: 0; }
+  .steps label { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 12px; align-items: start; padding: 10px 2px; cursor: pointer; }
+  .steps input { position: absolute; opacity: 0; pointer-events: none; }
+  .tick { width: 20px; height: 20px; border-radius: 6px; border: 2px solid var(--line-strong); display: grid; place-items: center; transition: background var(--dur-state), border-color var(--dur-state); }
+  .tick svg { width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 24; stroke-dashoffset: 24; transition: stroke-dashoffset 360ms var(--ease-settle) 80ms; }
+  .steps input:checked + .tick { background: var(--green); border-color: var(--green); }
+  .steps input:checked + .tick svg { stroke-dashoffset: 0; }
+  .steps input:focus-visible + .tick { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .st-text { font-size: 14.5px; line-height: 1.45; transition: color var(--dur-state), opacity var(--dur-state); }
+  .steps input:checked ~ .st-text { color: var(--text-3); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--text-3) 50%, transparent); }
+  .tk-from { margin: 10px 0 0; font-size: 13px; }
+  .tk-block { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 14px; padding: 10px 12px; border-radius: var(--radius); background: var(--red-soft); color: var(--red-ink); font-size: 14px; }
+  .tk-block .btn { margin-left: auto; }
+  .rec-t { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .rec-t th { text-align: left; font: 700 10.5px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); padding: 6px 8px 6px 0; }
+  .rec-t td { padding: 6px 8px 6px 0; border-top: 1px solid var(--line); vertical-align: middle; }
+  .rec-t td small { display: block; font-size: 11.5px; color: var(--text-3); }
+  .rec-t input { width: 100%; box-sizing: border-box; padding: 7px 9px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface-2); color: var(--text); font-size: 13px; }
+  .rec-t input.bad { border-color: var(--red); background: var(--red-soft); }
+  .rec-ok { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--surface-3); transition: background var(--dur-state); }
+  .rec-ok.on { background: var(--green); animation: rs-flash-ok var(--dur-flash) var(--ease-settle); }
+  .dev-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+  .dcard { display: grid; grid-template-columns: 50px minmax(0, 1fr); gap: 12px; padding: 12px 14px; }
+  .dc-g { color: var(--art-line, var(--text-2)); display: grid; place-items: center; }
+  .dc-main b { display: block; font-size: 14.5px; } .dc-main small { display: block; font-size: 12.5px; color: var(--text-2); }
+  .dc-meta { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 0; }
+  .dc-meta .set { color: var(--accent-ink); } .dc-meta .ver { color: var(--green-ink); }
+  .dcard details { font-size: 12.5px; margin-top: 6px; } .dcard ul { margin: 4px 0 0; padding-left: 18px; color: var(--text-2); }
+  .fix { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; align-items: start; padding: 12px; border-radius: var(--radius); background: var(--green-soft); }
+  .fix.none { background: var(--surface-2); }
+  .fix-ic { width: 30px; height: 30px; border-radius: 50%; background: var(--green); color: #fff; display: grid; place-items: center; }
+  .fix p { margin: 4px 0; font-size: 15px; }
+  .close-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+  .nn { display: grid; gap: 6px; margin-top: 10px; animation: rise var(--dur-enter, 440ms) var(--ease-settle); }
+  .nn label { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+  .owner { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; position: relative; }
+  .owner > span { min-width: 0; flex: 1; }
+  .owner b { display: block; } .owner small { display: block; color: var(--text-2); font-size: 12.5px; }
+  .owner .tk-changed { font-size: 11px; color: var(--text-3); } .owner .tk-changed[hidden] { display: none; }
+  .owner-av { width: 34px; height: 34px; font-size: 12px; border: 0; }
+  .owner-hist { appearance: none; border: 0; background: none; padding: 2px 4px; font: 600 12px/1.2 var(--font-sans); color: var(--text-2); text-decoration: underline; cursor: pointer; border-radius: 4px; }
+  .owner .rs-changed-mark { position: absolute; right: 0; top: -14px; }
+  .av { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-3); font: 700 12px var(--font-mono); flex: none; }
+  .tk-av { appearance: none; padding: 0; cursor: pointer; color: var(--text); transition: transform var(--dur-hover) var(--ease-settle), box-shadow var(--dur-hover); }
+  .tk-av:hover, .tk-av[aria-expanded=true] { transform: scale(1.08); box-shadow: 0 0 0 2px var(--accent); }
+  .tk-av:focus-visible { outline: 2px solid var(--focus, var(--ink)); outline-offset: 2px; }
+  .rooms-mini { list-style: none; margin: 6px 0 0; padding: 0; } .rooms-mini li { padding: 6px 0; border-top: 1px solid var(--line); } .rooms-mini li:first-child { border-top: 0; }
+  .rooms-mini small { display: block; font-size: 12px; color: var(--text-2); }
+  .tk-nav { display: grid; gap: 6px; } .tk-nav a { display: flex; gap: 8px; align-items: center; font-size: 13.5px; color: inherit; text-decoration: none; padding: 6px; border-radius: var(--radius); }
+  .tk-nav a:hover { background: var(--surface-2); } .tk-nav small { color: var(--text-3); } .tk-nav .all { color: var(--accent-ink); font-weight: 700; }
+</style>

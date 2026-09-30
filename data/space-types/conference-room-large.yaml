@@ -1,0 +1,933 @@
+# Space type: Large meeting room
+# Based on public industry guidance (data/sources/room-guidance.yaml, decision 0006); house assumptions say so.
+# Keia part (profile to verification_model): which classes of device belong here.
+# Keia Atlas part: build options, the models each option names, and the outlets.
+
+schema: composite-profile
+
+profile:
+  name: Large meeting room
+  space_type: conference-room-large
+  version: "2.0"
+  last_updated: "2026-09-30"
+  owner: Keia Atlas maintainers
+  capacity: "12-16 people"
+  purpose: >-
+    Video conference room for large meetings and customer presentations, with an enhanced
+    build that uses separate cameras, microphones and ceiling speakers.
+
+sources:
+  - file: data/sources/room-guidance.yaml
+    provides: 'Public guidance for this space type: size, capacity, display size, kit class and outlets'
+  - file: data/device-classes/display.yaml
+    provides: Healthy state for the display class
+  - file: data/device-classes/video-bar.yaml
+    provides: Healthy state for the video bar class
+  - file: data/device-classes/codec.yaml
+    provides: Healthy state for the video codec class
+  - file: data/device-classes/touch-controller.yaml
+    provides: Healthy state for the touch controller class
+  - file: data/device-classes/camera.yaml
+    provides: Healthy state for the camera class
+  - file: data/device-classes/microphone.yaml
+    provides: Healthy state for the microphone class
+  - file: data/device-classes/amplifier.yaml
+    provides: Healthy state for the amplifier class
+  - file: data/device-classes/loudspeaker.yaml
+    provides: Healthy state for the loudspeaker class
+  - file: data/device-classes/av-extender.yaml
+    provides: Healthy state for the AV extender class
+  - file: data/device-classes/network-switch.yaml
+    provides: Healthy state for the in-room network switch class
+  - file: data/device-classes/scheduler-panel.yaml
+    provides: Healthy state for the scheduler panel class
+  - file: data/device-classes/adapter.yaml
+    provides: Healthy state for the adapter class
+
+equipment_categories:
+  - category: display
+    description: Screens for the far end and shared content
+    object_profile: data/device-classes/display.yaml
+    quantity: "1-2"
+  - category: video_conferencing
+    description: Video bar that runs meetings, or acts as the camera and speaker for a laptop
+    object_profile: data/device-classes/video-bar.yaml
+    quantity: "1"
+  - category: video_conferencing_codec
+    description: Meeting computer driving separate cameras, microphones and speakers
+    object_profile: data/device-classes/codec.yaml
+    quantity: "1"
+  - category: meeting_control
+    description: Touchscreen on the table that controls meetings
+    object_profile: data/device-classes/touch-controller.yaml
+    quantity: "1"
+  - category: camera
+    description: 'Separate cameras: PTZ, wide-angle or whiteboard'
+    object_profile: data/device-classes/camera.yaml
+    quantity: "1-1 or set by the integrator"
+  - category: microphones
+    description: Extra microphones beyond the video bar or codec
+    object_profile: data/device-classes/microphone.yaml
+    quantity: "1-1 or set by the integrator"
+  - category: audio_amplification
+    description: Amplifier and audio processing for ceiling speakers
+    object_profile: data/device-classes/amplifier.yaml
+    quantity: "set by the integrator"
+  - category: loudspeakers
+    description: Ceiling speakers
+    object_profile: data/device-classes/loudspeaker.yaml
+    quantity: "set by the integrator"
+  - category: signal_extension
+    description: HDBaseT transmitters and receivers carrying video, USB, network and power
+    object_profile: data/device-classes/av-extender.yaml
+    quantity: "2-6"
+  - category: network
+    description: In-room network switch for the AV devices
+    object_profile: data/device-classes/network-switch.yaml
+    quantity: "1"
+  - category: scheduling_panel
+    description: Booking panel at the door
+    object_profile: data/device-classes/scheduler-panel.yaml
+    quantity: "1"
+    notes: Optional in every build of this space type
+  - category: adapters
+    description: Scalers, converters, PoE injectors and single-cable USB-C adapters
+    object_profile: data/device-classes/adapter.yaml
+    quantity: "2"
+    notes: Optional in every build of this space type
+
+verification_model:
+  platforms_to_check:
+    - platform: keia_atlas
+      check: every required device in the chosen option is recorded in the space and wired
+        as the option says
+    - platform: inventory
+      check: every device has an active record in this space
+    - platform: dhcp_dns
+      check: every networked device has an address reservation and DNS records
+    - platform: device_management
+      check: meeting devices are online, paired and on standard firmware
+    - platform: room_booking
+      check: the room resource exists with the right capacity and is linked to its devices
+
+keia_atlas:
+  standard: industry
+  guideline: microsoft-teams-rooms-plan
+  category: connect
+  capacity:
+    min: 12
+    max: 16
+  area:
+    sq_ft:
+      min: 360
+      max: 480
+    m2:
+      min: 33.4
+      max: 44.6
+  geometry:
+    # The room shell for a floor-level 3D model; basis says where each value comes from.
+    width_m: 4.6
+    depth_m: 9.7
+    ceiling_m: 2.6
+    display_wall: back
+    door: { wall: left, from_m: 8.5, to_m: 9.4 }
+    data_entry: { via: ceiling, wall: left, at: above the door }
+    containment: [display-track, wall-riser, ceiling-drop, ceiling-basket, table-tray, table-leg, floor-cover, floor-box, floor-duct, floor-void, in-wall]
+    basis:
+      size: published
+      ceiling: house-default
+      door: house-default
+      data_entry: house-default
+      containment: house-default
+    notes:
+      - 15 x 32 ft (44.6 m²), Microsoft's large room; smaller large rooms down to 360 sq ft are a house allowance.
+  options:
+    - id: large-single
+      name: Large, single display
+      summary: One display with a Poly Studio X72 video bar and an extra table microphone.
+      equipment:
+        - key: display
+          class: display
+          quantity: 1
+          requirement: required
+          location: display-wall
+          sizes_in: [98]
+        - key: video-bar
+          class: video-bar
+          model: poly-studio-x72
+          quantity: 1
+          requirement: required
+          location: display-wall
+          notes: Wall mounted above or below the display
+        - key: touch-controller
+          class: touch-controller
+          model: poly-tc10
+          quantity: 1
+          requirement: required
+          location: table-top
+        - &id001
+          key: hdbaset-tx
+          class: av-extender
+          model: kramer-ext3-c-xr-t
+          role: 'HDBaseT transmitter: the laptop connection at the table'
+          quantity: 1
+          requirement: required
+          location: below-table
+        - &id002
+          key: hdbaset-rx
+          class: av-extender
+          model: kramer-ext3-poe-xr-r
+          role: HDBaseT receiver at the display
+          quantity: 1
+          requirement: required
+          location: behind-display
+        - key: microphone
+          class: microphone
+          model: poly-expansion-microphone
+          quantity: 1
+          requirement: required
+          location: table-top
+          notes: With an extension cable kit
+        - &id003
+          key: whiteboard-camera
+          class: camera
+          model: logitech-scribe
+          role: Whiteboard camera
+          quantity: 1
+          requirement: optional
+          location: wall
+          notes: 'On the marker board wall, centred over the board, its arm reaching out and looking
+            back at it; the base about 124 mm (5 in) above the top of the board (Logitech). Never
+            on the display wall.'
+        - &id004
+          key: scaler
+          class: adapter
+          model: kramer-vp-440h2
+          role: Scaler for the whiteboard camera picture
+          quantity: 1
+          requirement: optional
+          location: behind-display
+        - &id005
+          key: usb-hdmi-converter
+          class: adapter
+          model: inogeni-u-cam
+          role: USB to HDMI converter for the whiteboard camera
+          quantity: 1
+          requirement: optional
+          location: behind-display
+        - &id006
+          key: scheduler-panel
+          class: scheduler-panel
+          model: logitech-tap-scheduler
+          quantity: 1
+          requirement: optional
+          location: room-entrance
+      infrastructure:
+        - service: power
+          provided_by: it
+          quantity:
+            min: 4
+            max: 8
+          location: behind-display
+          serves: [display, HDBaseT receiver, video bar, spare]
+          notes: 'Four more if the optional whiteboard kit is fitted: scaler, camera power
+            box, USB to HDMI converter and a spare.'
+        - service: power
+          provided_by: it
+          quantity: 2
+          location: below-table
+          serves: [HDBaseT transmitter, spare]
+        - &id007
+          service: power
+          provided_by: facilities
+          quantity: 2
+          location: floor-box
+          notes: For people at the table. A recommendation; facilities decide. Placed under
+            a table leg.
+        - service: data
+          provided_by: it
+          quantity: 4
+          location: behind-display
+          serves: [display, video bar, spare, spare]
+        - service: data
+          provided_by: it
+          quantity: 2
+          location: below-table
+          serves: [touch controller, spare]
+        - service: direct-run
+          provided_by: it
+          quantity: 3
+          location: below-table
+          serves: [HDBaseT link to the display wall, extra microphone (optional), spare]
+          notes: Cable runs straight from the table floor box to the display wall.
+        - service: direct-run
+          provided_by: it
+          quantity: 2
+          location: below-table
+          serves: [spare, spare]
+        - service: data
+          provided_by: it
+          quantity: 1
+          location: room-entrance
+          serves: [scheduler panel (optional)]
+      wiring:
+        - from: video-bar.hdmi-out-1
+          to: display.hdmi-in-1
+          cable: hdmi
+        - from: display.lan-1
+          to: outlet:data/behind-display#1
+          cable: cat6
+        - from: video-bar.lan-1
+          to: outlet:data/behind-display#2
+          cable: cat6
+        - from: touch-controller.lan-1
+          to: outlet:data/below-table#1
+          cable: cat6
+        - from: hdbaset-tx.hdbaset-1
+          to: hdbaset-rx.hdbaset-1
+          cable: cat6a
+          notes: In direct cable run 1, floor box to display wall. The receiver powers the
+            transmitter over this cable.
+        - from: hdbaset-tx.usb-c-1
+          to: laptop
+          cable: usb-c
+          notes: The table cable people plug their laptop into
+        - from: hdbaset-rx.hdmi-out-1
+          to: video-bar.hdmi-in-1
+          cable: hdmi
+          unless: scaler
+        - from: hdbaset-rx.hdmi-out-1
+          to: scaler.hdmi-in-1
+          cable: hdmi
+          when: scaler
+        - from: scaler.hdmi-out-1
+          to: video-bar.hdmi-in-1
+          cable: hdmi
+          when: scaler
+        - from: usb-hdmi-converter.hdmi-out-1
+          to: scaler.hdmi-in-2
+          cable: hdmi
+          when: scaler
+        - from: whiteboard-camera.lan-1
+          to: usb-hdmi-converter.usb-a-1
+          cable: proprietary
+          notes: 'Up the marker board wall in trunking, along the ceiling to the display wall and
+            down to the camera power box and dongle behind the display'
+        - from: hdbaset-rx.usb-b-1
+          to: video-bar.usb-c-1
+          cable: usb
+          notes: Laptop USB through to the video bar, for device mode
+        - from: microphone.mic-1
+          to: video-bar.mic-1
+          cable: poly-mic
+          notes: Over direct cable run 2, with the extension kit
+        - from: scheduler-panel.lan-1
+          to: outlet:data/room-entrance#1
+          cable: cat6
+        - from: display.power-in
+          to: outlet:power/behind-display#1
+          cable: power
+        - from: hdbaset-rx.power-in
+          to: outlet:power/behind-display#2
+          cable: power
+        - from: hdbaset-tx.power-in
+          to: outlet:power/below-table#1
+          cable: power
+          notes: 'Optional: the transmitter can also run on power from the receiver'
+        - from: video-bar.power-in
+          to: outlet:power/behind-display#3
+          cable: power
+        - from: scaler.power-in
+          to: outlet:power/behind-display#4
+          cable: power
+          when: scaler
+        - from: usb-hdmi-converter.power-in
+          to: outlet:power/behind-display#5
+          cable: power
+          when: scaler
+    - id: large-dual
+      name: Large, dual display
+      summary: Two displays with a Poly Studio X72 video bar and an extra table microphone.
+      equipment:
+        - key: display
+          class: display
+          quantity: 2
+          requirement: required
+          location: display-wall
+          sizes_in: [98]
+        - key: video-bar
+          class: video-bar
+          model: poly-studio-x72
+          quantity: 1
+          requirement: required
+          location: display-wall
+          notes: Wall mounted above or below the display
+        - key: touch-controller
+          class: touch-controller
+          model: poly-tc10
+          quantity: 1
+          requirement: required
+          location: table-top
+        - *id001
+        - *id002
+        - key: microphone
+          class: microphone
+          model: poly-expansion-microphone
+          quantity: 1
+          requirement: required
+          location: table-top
+          notes: With an extension cable kit
+        - *id003
+        - *id004
+        - *id005
+        - *id006
+      infrastructure:
+        - service: power
+          provided_by: it
+          quantity: 8
+          location: behind-display
+          serves: [display 1, HDBaseT receiver, spare, spare, display 2, video bar, spare,
+            spare]
+          notes: The optional whiteboard kit (scaler, camera power box, USB to HDMI converter)
+            uses three of the spares.
+        - service: power
+          provided_by: it
+          quantity: 2
+          location: below-table
+          serves: [HDBaseT transmitter, spare]
+        - *id007
+        - service: data
+          provided_by: it
+          quantity: 4
+          location: behind-display
+          serves: [display 1, video bar, display 2, spare]
+        - service: data
+          provided_by: it
+          quantity: 2
+          location: below-table
+          serves: [touch controller, spare]
+        - service: direct-run
+          provided_by: it
+          quantity: 3
+          location: below-table
+          serves: [HDBaseT link to the display wall, extra microphone (optional), spare]
+          notes: Cable runs straight from the table floor box to the display wall.
+        - service: direct-run
+          provided_by: it
+          quantity: 2
+          location: below-table
+          serves: [spare, spare]
+        - service: data
+          provided_by: it
+          quantity: 1
+          location: room-entrance
+          serves: [scheduler panel (optional)]
+      wiring:
+        - from: video-bar.hdmi-out-1
+          to: display#1.hdmi-in-1
+          cable: hdmi
+        - from: video-bar.hdmi-out-2
+          to: display#2.hdmi-in-1
+          cable: hdmi
+        - from: display#1.lan-1
+          to: outlet:data/behind-display#1
+          cable: cat6
+        - from: video-bar.lan-1
+          to: outlet:data/behind-display#2
+          cable: cat6
+        - from: touch-controller.lan-1
+          to: outlet:data/below-table#1
+          cable: cat6
+        - from: hdbaset-tx.hdbaset-1
+          to: hdbaset-rx.hdbaset-1
+          cable: cat6a
+          notes: In direct cable run 1, floor box to display wall. The receiver powers the
+            transmitter over this cable.
+        - from: hdbaset-tx.usb-c-1
+          to: laptop
+          cable: usb-c
+          notes: The table cable people plug their laptop into
+        - from: hdbaset-rx.hdmi-out-1
+          to: video-bar.hdmi-in-1
+          cable: hdmi
+          unless: scaler
+        - from: hdbaset-rx.hdmi-out-1
+          to: scaler.hdmi-in-1
+          cable: hdmi
+          when: scaler
+        - from: scaler.hdmi-out-1
+          to: video-bar.hdmi-in-1
+          cable: hdmi
+          when: scaler
+        - from: usb-hdmi-converter.hdmi-out-1
+          to: scaler.hdmi-in-2
+          cable: hdmi
+          when: scaler
+        - from: whiteboard-camera.lan-1
+          to: usb-hdmi-converter.usb-a-1
+          cable: proprietary
+          notes: 'Up the marker board wall in trunking, along the ceiling to the display wall and
+            down to the camera power box and dongle behind the display'
+        - from: hdbaset-rx.usb-b-1
+          to: video-bar.usb-c-1
+          cable: usb
+          notes: Laptop USB through to the video bar, for device mode
+        - from: microphone.mic-1
+          to: video-bar.mic-1
+          cable: poly-mic
+          notes: Over direct cable run 2, with the extension kit
+        - from: scheduler-panel.lan-1
+          to: outlet:data/room-entrance#1
+          cable: cat6
+        - from: display#1.power-in
+          to: outlet:power/behind-display#1
+          cable: power
+        - from: hdbaset-rx.power-in
+          to: outlet:power/behind-display#2
+          cable: power
+        - from: hdbaset-tx.power-in
+          to: outlet:power/below-table#1
+          cable: power
+          notes: 'Optional: the transmitter can also run on power from the receiver'
+        - from: display#2.lan-1
+          to: outlet:data/behind-display#3
+          cable: cat6
+        - from: display#2.power-in
+          to: outlet:power/behind-display#5
+          cable: power
+        - from: video-bar.power-in
+          to: outlet:power/behind-display#6
+          cable: power
+        - from: scaler.power-in
+          to: outlet:power/behind-display#3
+          cable: power
+          when: scaler
+        - from: usb-hdmi-converter.power-in
+          to: outlet:power/behind-display#4
+          cable: power
+          when: scaler
+    - id: enhanced-single
+      name: Enhanced, single display
+      summary: Poly G62 codec with PTZ camera, table and ceiling microphones and ceiling speakers.
+      equipment:
+        - key: display
+          class: display
+          quantity: 1
+          requirement: required
+          location: display-wall
+          sizes_in: [98]
+        - key: display-led
+          class: display
+          quantity: 1
+          requirement: optional
+          location: display-wall
+          sizes_in: [110, 136, 146]
+          notes: All-in-one direct-view LED wall instead of a flat panel
+        - key: codec
+          class: codec
+          model: poly-g62
+          quantity: 1
+          requirement: required
+          location: display-wall
+        - key: ptz-camera
+          class: camera
+          model: poly-e60
+          role: PTZ camera facing the audience
+          quantity: tbd
+          requirement: required
+          location: display-wall
+        - key: wide-camera
+          class: camera
+          model: poly-e70
+          role: Wide-angle camera, for training rooms
+          quantity: tbd
+          requirement: optional
+          location: display-wall
+        - key: touch-controller
+          class: touch-controller
+          model: poly-tc10
+          quantity: 1
+          requirement: required
+          location: table-top
+        - key: table-microphone
+          class: microphone
+          model: poly-tabletop-microphone
+          quantity: tbd
+          requirement: required
+          location: table-top
+          notes: Count and placement set by the integrator
+        - key: ceiling-microphone
+          class: microphone
+          model: poly-ip-ceiling-microphone
+          quantity: tbd
+          requirement: optional
+          location: ceiling
+        - key: amplifier
+          class: amplifier
+          model: kramer-pa-240z
+          quantity: tbd
+          requirement: required
+          location: data-closet
+          notes: Amplifier with audio processing
+        - key: loudspeaker
+          class: loudspeaker
+          model: kramer-galil-6
+          quantity: tbd
+          requirement: required
+          location: ceiling
+        - key: network-switch
+          class: network-switch
+          model: netgear-m4250-gsm4210pd
+          quantity: 1
+          requirement: required
+          location: data-closet
+        - key: display-tx
+          class: av-extender
+          model: kramer-tp-583txr
+          role: HDBaseT transmitter for each display
+          quantity: 1
+          requirement: required
+          location: data-closet
+        - key: display-rx
+          class: av-extender
+          model: kramer-tp-583rxr
+          role: HDBaseT receiver at each display
+          quantity: 1
+          requirement: required
+          location: behind-display
+        - *id001
+        - *id002
+        - *id006
+      infrastructure:
+        - service: power
+          provided_by: it
+          quantity: 4
+          location: behind-display
+          serves: [display, HDBaseT receiver, spare, spare]
+        - service: power
+          provided_by: it
+          quantity: 2
+          location: below-table
+          serves: [HDBaseT transmitters, spare]
+        - *id007
+        - service: data
+          provided_by: it
+          quantity: 4
+          location: behind-display
+          serves: [display, HDBaseT to the display receiver, audience camera, spare]
+        - service: data
+          provided_by: it
+          quantity: 5
+          location: below-table
+          serves: [touch controller, HDBaseT for the table transmitter, table microphone 1,
+            table microphone 2, spare]
+        - service: data
+          provided_by: it
+          quantity: 2
+          location: tbd
+          serves: [presenter camera (optional), spare]
+        - service: data
+          provided_by: it
+          quantity: tbd
+          location: ceiling
+          serves: [ceiling microphones (optional)]
+        - service: data
+          provided_by: it
+          quantity: 1
+          location: room-entrance
+          serves: [scheduler panel (optional)]
+      wiring:
+        - from: codec.hdmi-out-1
+          to: display-tx#1.hdmi-in-1
+          cable: hdmi
+        - from: display-tx#1.hdbaset-1
+          to: display-rx#1.hdbaset-1
+          cable: cat6a
+          notes: Structured cable from the data closet to the display
+        - from: display-rx#1.hdmi-out-1
+          to: display#1.hdmi-in-1
+          cable: hdmi
+        - from: display#1.lan-1
+          to: outlet:data/behind-display#1
+          cable: cat6
+        - from: ptz-camera.lan-1
+          to: outlet:data/behind-display#3
+          cable: cat6
+          notes: Audience camera
+        - from: codec.lan-1
+          to: network-switch.lan-1
+          cable: cat6
+          notes: The switch powers the codec (PoE+)
+        - from: codec.lan-2
+          to: network-switch.lan-2
+          cable: cat6
+          notes: Link-local network for Poly IP peripherals
+        - from: ceiling-microphone.lan-1
+          to: network-switch.lan-3
+          cable: cat6
+          when: ceiling-microphone
+        - from: network-switch.lan-9
+          to: outlet:data/behind-display#4
+          cable: cat6
+          notes: Uplink
+        - from: table-microphone.lan-1
+          to: outlet:data/below-table#3
+          cable: cat6
+        - from: touch-controller.lan-1
+          to: outlet:data/below-table#1
+          cable: cat6
+        - from: hdbaset-tx.hdbaset-1
+          to: hdbaset-rx.hdbaset-1
+          cable: cat6a
+          notes: Table connection over HDBaseT
+        - from: hdbaset-tx.usb-c-1
+          to: laptop
+          cable: usb-c
+        - from: hdbaset-rx.hdmi-out-1
+          to: codec.hdmi-in-1
+          cable: hdmi
+        - from: codec.audio-out-1
+          to: amplifier.audio-in-1
+          cable: audio
+        - from: amplifier.speaker-out-1
+          to: loudspeaker.speaker-in-1
+          cable: speaker
+          notes: Speakers are chained from the amplifier; the integrator sets how many
+        - from: scheduler-panel.lan-1
+          to: outlet:data/room-entrance#1
+          cable: cat6
+        - from: display#1.power-in
+          to: outlet:power/behind-display#1
+          cable: power
+        - from: display-rx#1.power-in
+          to: outlet:power/behind-display#2
+          cable: power
+        - from: hdbaset-tx.power-in
+          to: outlet:power/below-table#1
+          cable: power
+    - id: enhanced-dual
+      name: Enhanced, dual display
+      summary: As the enhanced single build, with two displays.
+      equipment:
+        - key: display
+          class: display
+          quantity: 2
+          requirement: required
+          location: display-wall
+          sizes_in: [98]
+        - key: codec
+          class: codec
+          model: poly-g62
+          quantity: 1
+          requirement: required
+          location: display-wall
+        - key: ptz-camera
+          class: camera
+          model: poly-e60
+          role: PTZ camera facing the audience
+          quantity: tbd
+          requirement: required
+          location: display-wall
+        - key: wide-camera
+          class: camera
+          model: poly-e70
+          role: Wide-angle camera, for training rooms
+          quantity: tbd
+          requirement: optional
+          location: display-wall
+        - key: touch-controller
+          class: touch-controller
+          model: poly-tc10
+          quantity: 1
+          requirement: required
+          location: table-top
+        - key: table-microphone
+          class: microphone
+          model: poly-tabletop-microphone
+          quantity: tbd
+          requirement: required
+          location: table-top
+          notes: Count and placement set by the integrator
+        - key: ceiling-microphone
+          class: microphone
+          model: poly-ip-ceiling-microphone
+          quantity: tbd
+          requirement: optional
+          location: ceiling
+        - key: amplifier
+          class: amplifier
+          model: kramer-pa-240z
+          quantity: tbd
+          requirement: required
+          location: data-closet
+          notes: Amplifier with audio processing
+        - key: loudspeaker
+          class: loudspeaker
+          model: kramer-galil-6
+          quantity: tbd
+          requirement: required
+          location: ceiling
+        - key: network-switch
+          class: network-switch
+          model: netgear-m4250-gsm4210pd
+          quantity: 1
+          requirement: required
+          location: data-closet
+        - key: display-tx
+          class: av-extender
+          model: kramer-tp-583txr
+          role: HDBaseT transmitter for each display
+          quantity: 2
+          requirement: required
+          location: data-closet
+        - key: display-rx
+          class: av-extender
+          model: kramer-tp-583rxr
+          role: HDBaseT receiver at each display
+          quantity: 2
+          requirement: required
+          location: behind-display
+        - *id001
+        - *id002
+        - *id006
+      infrastructure:
+        - service: power
+          provided_by: it
+          quantity: 8
+          location: behind-display
+          serves: [display, HDBaseT receiver, spare, spare, display, HDBaseT receiver, spare,
+            spare]
+        - service: power
+          provided_by: it
+          quantity: 2
+          location: below-table
+          serves: [HDBaseT transmitters, spare]
+        - *id007
+        - service: data
+          provided_by: it
+          quantity: 8
+          location: behind-display
+          serves: [display, HDBaseT to the display receiver, audience camera, spare, display,
+            HDBaseT to the display receiver, spare, spare]
+        - service: data
+          provided_by: it
+          quantity: 5
+          location: below-table
+          serves: [touch controller, HDBaseT for the table transmitter, table microphone 1,
+            table microphone 2, spare]
+        - service: data
+          provided_by: it
+          quantity: 2
+          location: tbd
+          serves: [presenter camera (optional), spare]
+        - service: data
+          provided_by: it
+          quantity: tbd
+          location: ceiling
+          serves: [ceiling microphones (optional)]
+        - service: data
+          provided_by: it
+          quantity: 1
+          location: room-entrance
+          serves: [scheduler panel (optional)]
+      wiring:
+        - from: codec.hdmi-out-1
+          to: display-tx#1.hdmi-in-1
+          cable: hdmi
+        - from: display-tx#1.hdbaset-1
+          to: display-rx#1.hdbaset-1
+          cable: cat6a
+          notes: Structured cable from the data closet to the display
+        - from: display-rx#1.hdmi-out-1
+          to: display#1.hdmi-in-1
+          cable: hdmi
+        - from: codec.hdmi-out-2
+          to: display-tx#2.hdmi-in-1
+          cable: hdmi
+        - from: display-tx#2.hdbaset-1
+          to: display-rx#2.hdbaset-1
+          cable: cat6a
+          notes: Structured cable from the data closet to the display
+        - from: display-rx#2.hdmi-out-1
+          to: display#2.hdmi-in-1
+          cable: hdmi
+        - from: display#1.lan-1
+          to: outlet:data/behind-display#1
+          cable: cat6
+        - from: ptz-camera.lan-1
+          to: outlet:data/behind-display#3
+          cable: cat6
+          notes: Audience camera
+        - from: codec.lan-1
+          to: network-switch.lan-1
+          cable: cat6
+          notes: The switch powers the codec (PoE+)
+        - from: codec.lan-2
+          to: network-switch.lan-2
+          cable: cat6
+          notes: Link-local network for Poly IP peripherals
+        - from: ceiling-microphone.lan-1
+          to: network-switch.lan-3
+          cable: cat6
+          when: ceiling-microphone
+        - from: network-switch.lan-9
+          to: outlet:data/behind-display#4
+          cable: cat6
+          notes: Uplink
+        - from: table-microphone.lan-1
+          to: outlet:data/below-table#3
+          cable: cat6
+        - from: touch-controller.lan-1
+          to: outlet:data/below-table#1
+          cable: cat6
+        - from: hdbaset-tx.hdbaset-1
+          to: hdbaset-rx.hdbaset-1
+          cable: cat6a
+          notes: Table connection over HDBaseT
+        - from: hdbaset-tx.usb-c-1
+          to: laptop
+          cable: usb-c
+        - from: hdbaset-rx.hdmi-out-1
+          to: codec.hdmi-in-1
+          cable: hdmi
+        - from: codec.audio-out-1
+          to: amplifier.audio-in-1
+          cable: audio
+        - from: amplifier.speaker-out-1
+          to: loudspeaker.speaker-in-1
+          cable: speaker
+          notes: Speakers are chained from the amplifier; the integrator sets how many
+        - from: scheduler-panel.lan-1
+          to: outlet:data/room-entrance#1
+          cable: cat6
+        - from: display#1.power-in
+          to: outlet:power/behind-display#1
+          cable: power
+        - from: display-rx#1.power-in
+          to: outlet:power/behind-display#2
+          cable: power
+        - from: hdbaset-tx.power-in
+          to: outlet:power/below-table#1
+          cable: power
+        - from: display#2.lan-1
+          to: outlet:data/behind-display#5
+          cable: cat6
+        - from: display#2.power-in
+          to: outlet:power/behind-display#5
+          cable: power
+        - from: display-rx#2.power-in
+          to: outlet:power/behind-display#6
+          cable: power
+  notes:
+    - In the enhanced builds the amplifier sits in the data closet and the integrator sets
+      speaker, microphone and camera counts.
+    - The enhanced builds leave out the whiteboard camera kit.
+    - Two 98 in displays fill the 4.6 m display wall; a wider pair, or an LED wall, needs a design review first.
+    - 'Size and capacity: Microsoft''s large room, 15 x 32 ft for 12 to 16 people.'
+    - 'Display size: AVIXA DISCAS basic decision making, text at 3 percent of the image height
+      (house assumption), so the image is at least a sixth of the distance to the farthest seat.
+      That seat is about 7.2 m from the display here, so the display is at least 97 in. So every
+      build uses 98 in displays, or an LED wall in the enhanced single build.'
+    - 'Kit class: the Poly Studio X72, which Poly makes for large rooms with pickup to 25 ft (7.6
+      m), plus an expansion microphone; the enhanced builds split the microphones and speakers out,
+      as Microsoft advises for larger rooms.'

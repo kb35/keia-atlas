@@ -1,0 +1,169 @@
+# Device model: Kramer EXT3-C-XR-T
+# Facts from the vendor's public documentation (two independent readings, reconciled).
+# Anything the sources don't state is left out and listed under gaps.
+
+manufacturer: Kramer
+
+model: EXT3-C-XR-T
+
+class: av-extender
+
+summary: A 4K60 4:4:4 HDBaseT 3.0 extended-reach transmitter that takes a USB-C (DisplayPort Alt Mode)
+  source and extends HDMI video, USB 2.0, Ethernet, RS-232 and IR to a matching receiver over a single
+  HDBaseT cable, powered either by its own adapter or by PoE from the receiver.
+
+dimensions_mm:
+  width: 190
+  height: 27
+  depth: 113
+  notes: Manual's Technical Specifications table gives (W,D,H) 19cm x 11.3cm x 2.7cm; the kramerav.com
+    product page separately lists 19.00cm x 11.60cm x 2.70cm for the same axes (11.6 vs 11.3cm depth)
+    - used the manual figure as primary.
+
+weight_kg: 0.56
+
+power:
+  inputs:
+    - type: dc
+      port: power-in
+      volts: 20V DC
+      watts: 88
+      supplied: true
+      notes: Included external power adapter; source 20V DC 6A, unit consumption 20V DC 4.35A, 88W max.
+        Also powers 60W USB-C PD charging of the connected source.
+    - type: hdbaset
+      port: hdbaset-1
+      watts: 19.7
+      supplied: false
+      notes: 'Alternative to the adapter: can be powered over the HDBaseT cable from a paired EXT3-POE-XR-R
+        receiver (bidirectional PoE / PD).'
+  consumption_w:
+    max: 88
+
+mounting:
+  - ceiling
+  - rack
+
+sources:
+  - source: kramer-ext3-c-xr-t-4k60-4-4
+    provides: Specifications
+  - source: kramer-ext3-c-xr-t-ext3-poe-xr
+    provides: Port labels, faces and panel layout
+
+ports:
+  - id: usb-c-1
+    label: USB-C IN
+    connector: usb-c
+    signals:
+      - video
+      - usb
+      - ethernet
+      - power
+    direction: bidirectional
+    usb_power_w: 60
+    face: front
+    order: 1
+    notes: DisplayPort Alt Mode AV input; USB host connection to local/remote USB devices; LAN pass-through;
+      charges the connected source up to 60W (PD 2.0 per manual text; product spec page separately states
+      PD 3.0 compliant -.) only when the transmitter is powered via its adapter.
+  - id: hdbaset-1
+    label: HDBT OUT PoE◄
+    connector: rj45
+    signals:
+      - video
+      - usb
+      - ethernet
+      - rs232
+      - ir
+      - hdbaset
+      - poe
+    direction: out
+    poe:
+      role: powered
+      standard: hdbaset-poh
+      watts: 19.7
+    face: rear
+    order: 1
+    notes: Connects to the HDBT IN connector on EXT3-POE-XR-R; carries extended HDMI, USB, Ethernet, RS-232
+      and IR; can receive PoE (PD) from the receiver.
+  - id: hdmi-out-1
+    label: HDMI LOOP
+    connector: hdmi
+    signals:
+      - video
+      - audio
+    direction: out
+    face: rear
+    order: 2
+    notes: Local loop-through of the USB-C source's video signal to a local HDMI acceptor.
+  - id: usb-a-1
+    label: USB DEVICE 1
+    connector: usb-a
+    signals:
+      - usb
+    direction: bidirectional
+    face: rear
+    order: 3
+    notes: For local USB peripherals (e.g. PTZ camera). USB signal and charging power are inactive on
+      this port when no USB host PC is connected. Shares a 2A total USB device-charging current budget
+      with usb-a-2.
+  - id: usb-a-2
+    label: USB DEVICE 2
+    connector: usb-a
+    signals:
+      - usb
+    direction: bidirectional
+    face: rear
+    order: 4
+    notes: For local USB peripherals (e.g. camera, soundbar, microphone). Charging power on this port
+      stays active even when the USB host PC is disconnected. Shares a 2A total USB device-charging current
+      budget with usb-a-1.
+  - id: ir-1
+    label: IR
+    connector: 3.5mm
+    signals:
+      - ir
+    direction: bidirectional
+    face: rear
+    order: 5
+    notes: Bidirectional IR link extension.
+  - id: rs232-1
+    label: RS-232
+    connector: terminal-block
+    signals:
+      - rs232
+    direction: bidirectional
+    face: rear
+    order: 6
+    notes: 3-pin (G, Rx, Tx) bidirectional RS-232 link extension.
+  - id: lan-1
+    label: 1G LAN
+    connector: rj45
+    signals:
+      - ethernet
+    direction: bidirectional
+    face: rear
+    order: 7
+    notes: Gigabit LAN connection for the USB-C source's Ethernet extension to the receiver.
+  - id: power-in
+    label: 20V DC
+    connector: dc-barrel
+    signals:
+      - power
+    direction: in
+    face: rear
+    order: 8
+    notes: Locking 2-pin DC power connector (not a plain round barrel jack); +20V DC 6A, for powering
+      the unit and USB-C charging.
+
+gaps:
+  - No hardware revision is published, so the "Rev 0304" in the house kit list cannot be checked.
+  - USB-A charging is given only as 2 A shared between both ports.
+
+notes:
+  - Powered by its 20 V adapter, or by PoE sent from the EXT3-POE-XR-R over the HDBaseT cable (up to 19.7
+    W).
+  - Size and weight from the manual (190 x 27 x 113 mm, 0.56 kg); the product page says 116 mm deep and
+    0.6 kg.
+  - USB-C charging up to 60 W; the manual says Power Delivery 2.0, the product page PD 3.0.
+  - The manual came from a reseller-hosted copy; Kramer's download is behind a bot check.

@@ -1,0 +1,68 @@
+---
+// The answer, in one strip: three lights (schedule, cost, scope) each with a word and a one-line
+// reason, the next gate with who signs it, and what is stuck. Lights are the shared .hl lights (M8).
+import Icon from './Icon.astro';
+import { lights, nextGate, stuck } from '../lib/project-status.mjs';
+import { fmtDate, href, plural } from '../lib/data.mjs';
+import { person } from '../lib/demo.mjs';
+const { project: p } = Astro.props;
+const L = lights(p), G = nextGate(p), S = stuck(p);
+const short = (d) => fmtDate(d, { day: 'numeric', month: 'short' });
+const KIND = { task: 'Blocked task', risk: 'Risk', issue: 'Issue', dependency: 'Waiting on' };
+---
+<section class="card pst" aria-label="Where the project stands">
+  <div class="pst-lights" data-pst-lights>
+    {[['schedule', 'Schedule', L.schedule], ['cost', 'Cost', L.cost], ['scope', 'Scope', L.scope]].map(([k, name, l]) => (
+      <div class="pst-l" data-help={`project.light:${k}`} data-help-name={name} data-light={k}>
+        <span class="pst-lh"><i class="hl" data-state={l.state}></i>{name}</span>
+        <b data-word>{l.word}</b>
+        <small data-why>{l.why}</small>
+      </div>
+    ))}
+  </div>
+  <div class="pst-gate" data-help="project.gate">
+    <span class="pst-lh"><i class:list={['pst-dia', { late: G?.late, signed: G?.signed }]} aria-hidden="true"></i>{p.phase === 'closed' ? 'Last gate' : 'Next gate'}</span>
+    {G ? (
+      <>
+        <b>{G.phase}{p.phase === 'closed' ? '' : ' gate'}<span class:list={['pst-when', { late: G.late }]}>{G.signed ? `signed off ${short(G.date)}` : G.late ? `${plural(G.slip, 'day')} over, was due ${short(G.date)}` : `due ${short(G.date)}`}</span></b>
+        <small>{G.signed ? `By ${G.signer}.` : `${G.signer} signs it off.`}{G.checks.length ? ` ${G.checks.slice(0, 2).join('. ')}.` : ''}</small>
+      </>
+    ) : <small>No gate.</small>}
+  </div>
+  <div class="pst-stuck" data-help="project.stuck">
+    <span class="pst-lh"><Icon name="alert" size={14} />{S.length ? `Stuck: ${S.length}` : 'Nothing stuck'}</span>
+    {S.length ? (
+      <ul class="pst-list">
+        {S.slice(0, 3).map((s) => <li><a href={s.to} title={s.why}><span class={`pst-k k-${s.kind}`}>{KIND[s.kind] ?? s.kind}</span><span class="pst-t">{s.label}</span></a></li>)}
+        {S.length > 3 && <li><a class="faint" href="#log">and {S.length - 3} more in the log</a></li>}
+      </ul>
+    ) : <small>No blocked tasks, open issues or dependencies waiting.</small>}
+  </div>
+</section>
+
+<style is:global>
+  .pst { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 1.25fr) minmax(0, 1.4fr); gap: 0; padding: 0; overflow: hidden; }
+  .pst > * { padding: 14px 18px; min-width: 0; }
+  .pst > * + * { border-left: var(--border-rule); }
+  .pst-lights { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .pst-l { display: grid; gap: 3px; align-content: start; min-width: 0; }
+  .pst-lh { display: flex; align-items: center; gap: 7px; font: 700 10.5px/1.2 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); }
+  .pst-l b, .pst-gate b { display: block; font-size: 15px; line-height: 1.25; }
+  .pst-l small, .pst-gate small, .pst-stuck small { display: block; font-size: 12.5px; line-height: 1.4; color: var(--text-2); }
+  .pst-gate, .pst-stuck { display: grid; gap: 3px; align-content: start; }
+  .pst-when { display: block; font: 500 11.5px/1.3 var(--font-mono); color: var(--text-3); }
+  .pst-when.late { color: var(--red-ink); font-weight: 700; }
+  .pst-dia { display: inline-block; width: 10px; height: 10px; transform: rotate(45deg); border: 2px solid var(--line-strong); border-radius: 1px; background: var(--surface); }
+  .pst-dia.signed { background: var(--ph-done); border-color: var(--ph-done); } .pst-dia.late { border-color: var(--red); background: var(--red-soft); }
+  .pst-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .pst-list li { font-size: 13px; }
+  .pst-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pst-list a { color: inherit; text-decoration: none; font-weight: 600; display: flex; gap: 6px; align-items: baseline; min-width: 0; }
+  .pst-list a:hover { text-decoration: underline; }
+  .pst-list small { font-size: 11.5px; }
+  .pst-k { flex: none; font: 700 9.5px/1.2 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; padding: 2px 6px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); }
+  .pst-k.k-task { background: var(--red-soft); color: var(--red-ink); } .pst-k.k-issue { background: var(--amber-soft); color: var(--amber-ink); } .pst-k.k-dependency { background: var(--blue-soft); color: var(--blue-ink); } .pst-k.k-risk { background: var(--violet-soft); color: var(--violet-ink); }
+  :root[data-look="classic"] .pst { border: 2px solid var(--ink); }
+  @container content (max-width: 1099px) { .pst { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .pst-lights { grid-column: 1 / -1; } .pst > * + * { border-left: 0; border-top: var(--border-rule); } .pst-stuck { border-left: var(--border-rule) !important; } }
+  @container content (max-width: 599px) { .pst { grid-template-columns: minmax(0, 1fr); } .pst-lights { grid-template-columns: minmax(0, 1fr); gap: 12px; } .pst-stuck { border-left: 0 !important; } }
+</style>

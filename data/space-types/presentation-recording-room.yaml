@@ -1,0 +1,134 @@
+# Space type: Recording studio
+# Based on public industry guidance (data/sources/room-guidance.yaml, decision 0006); house assumptions say so.
+# Keia part (profile to verification_model): which classes of device belong here.
+# Keia Atlas part: build options, the models each option names, and the outlets.
+
+schema: composite-profile
+
+profile:
+  name: Recording studio
+  space_type: presentation-recording-room
+  version: "2.0"
+  last_updated: "2026-09-30"
+  owner: Keia Atlas maintainers
+  capacity: "1 person"
+  purpose: >-
+    Bookable single-person room for recording and upgraded hybrid presenting. Not for all-day
+    or recurring use.
+
+sources:
+  - file: data/sources/room-guidance.yaml
+    provides: 'Public guidance for this space type: size, capacity, display size, kit class and outlets'
+  - file: data/device-classes/scheduler-panel.yaml
+    provides: Healthy state for the scheduler panel class
+  - file: data/device-classes/desk-video-device.yaml
+    provides: Healthy state for the desk video device class
+
+equipment_categories:
+  - category: scheduling_panel
+    description: Booking panel at the door
+    object_profile: data/device-classes/scheduler-panel.yaml
+    quantity: "1"
+  - category: personal_video
+    description: Personal video device with its own screen
+    object_profile: data/device-classes/desk-video-device.yaml
+    quantity: "1"
+
+verification_model:
+  platforms_to_check:
+    - platform: keia_atlas
+      check: every required device in the chosen option is recorded in the space and wired
+        as the option says
+    - platform: inventory
+      check: every device has an active record in this space
+    - platform: dhcp_dns
+      check: every networked device has an address reservation and DNS records
+    - platform: device_management
+      check: meeting devices are online, paired and on standard firmware
+    - platform: room_booking
+      check: the room resource exists with the right capacity and is linked to its devices
+
+keia_atlas:
+  standard: industry
+  guideline: zoom-hardware-guide
+  category: connect
+  bookable: true
+  capacity:
+    min: 1
+    max: 1
+  area:
+    sq_ft:
+      min: 70
+      max: 90
+    m2: 8
+  geometry:
+    # The room shell for a floor-level 3D model; basis says where each value comes from.
+    width_m: 3.05
+    depth_m: 2.62
+    ceiling_m: 2.6
+    display_wall: none
+    door: { wall: left, from_m: 1.64, to_m: 2.52 }
+    data_entry: { via: ceiling, wall: left, at: above the door }
+    containment: [ceiling-basket, skirting, desk-tray, desk-leg, floor-cover]
+    basis:
+      size: chosen
+      ceiling: house-default
+      door: house-default
+      data_entry: house-default
+      containment: house-default
+    notes:
+      - 10 x 8.6 ft (house assumption).
+  options:
+    - id: standard
+      name: Standard
+      summary: A Cisco Desk Pro on a height-adjustable desk, with a scheduler panel at the
+        door.
+      equipment:
+        - key: desk-video-device
+          class: desk-video-device
+          model: cisco-desk-pro
+          quantity: 1
+          requirement: required
+          location: table-top
+          notes: Also works as a USB-C monitor and camera for a laptop
+        - key: scheduler-panel
+          class: scheduler-panel
+          model: logitech-tap-scheduler
+          quantity: 1
+          requirement: required
+          location: room-entrance
+          notes: Standard here, not optional
+      infrastructure:
+        - service: data
+          provided_by: it
+          quantity: 2
+          location: wall-below-table
+          serves: [desk video device, spare]
+        - service: power
+          provided_by: it
+          quantity: 2
+          location: wall-below-table
+          serves: [desk video device, spare]
+        - service: data
+          provided_by: it
+          quantity: 1
+          location: room-entrance
+          serves: [scheduler panel]
+      wiring:
+        - from: desk-video-device.usb-c-1
+          to: laptop
+          cable: usb-c
+          notes: Laptop as a second screen and camera user
+        - from: desk-video-device.lan-1
+          to: outlet:data/wall-below-table#1
+          cable: cat6
+        - from: desk-video-device.power-in
+          to: outlet:power/wall-below-table#1
+          cable: power
+        - from: scheduler-panel.lan-1
+          to: outlet:data/room-entrance#1
+          cable: cat6
+  notes:
+    - Zoom lists a broadcast studio among its kinds of space; this is its smallest form, one person
+      recording or presenting at a desk video device (house assumption).
+    - 'Outlets: two data outlets at the desk (TIA-568), one spare (house assumption).'

@@ -1,0 +1,44 @@
+# Vendor: a company Aigna works with, and the contract that says what they do.
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/vendor
+title: Vendor
+type: object
+additionalProperties: false
+required: [id, name, kind, summary, regions, contract, demo]
+properties:
+  id: { type: string }
+  name: { type: string }
+  kind: { enum: [integration, service, manufacturer] }
+  summary: { type: string }
+  regions: { type: array, items: { enum: [amer, emea, apac] } }
+  sites: { type: array, items: { type: string } }
+  people: { description: Portal users from the demo people., type: array, items: { type: string } }
+  owner: { description: The Aigna person who manages the relationship., type: string }
+  contract:
+    type: object
+    additionalProperties: false
+    required: [ref, start, end, scope]
+    properties:
+      ref: { type: string }
+      start: { type: string, format: date }
+      end: { type: string, format: date }
+      scope: { type: array, items: { type: string } }
+      excludes: { type: array, items: { type: string } }
+      sla:
+        type: array
+        items: { type: object, additionalProperties: false, required: [what, target], properties: { what: { type: string }, target: { type: string } } }
+      covers_models: { type: array, items: { type: string } }
+  record:
+    description: How the last twelve months went (demo figures).
+    type: object
+    additionalProperties: false
+    properties:
+      jobs: { type: integer }
+      on_time: { type: integer, minimum: 0, maximum: 100 }
+      snags_open: { type: integer }
+      note: { type: string }
+  gets:
+    description: What Aigna gives this vendor through the portal, and when.
+    type: array
+    items: { type: object, additionalProperties: false, required: [when, what], properties: { when: { enum: [plan, design, integrate, handover, service] }, what: { type: string } } }
+  demo: { const: true }

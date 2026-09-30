@@ -1,0 +1,180 @@
+---
+/* LiveSide: the column beside a live overview (Rooms and Devices overviews, src/lib/livesim.mjs).
+   Two cards: what needs attention now, and a feed of what just happened. The page's script fills both.
+   Layout (the page puts this first in .lv-layout, then its main blocks in .lv-main):
+     content 940 px wide and more   main area 8 of 12 columns, this column 4, sticky under the top bar and
+                                    filter bar (by its foot when taller than the window), beside the grid
+     680 to 939 px                  the two cards side by side above the main area
+     narrower                       one column: attention, feed, then the main area
+   Props:  attention  the first card's title        feedTitle  the feed's title
+           none       what the attention card says when nothing needs attention
+           note       the line under the feed: where the figures come from
+           attentionTo, attentionPlace  where "See all N in <place> →" under the first 6 goes (rule P10: an
+                      overview never expands in place; the page's own filtered view, '?status=problem')
+   The feed keeps a fixed number of rows of one height, so it never changes size (motion.md, M6). */
+import Section from './Section.astro';
+interface Props { attention: string; feedTitle: string; none: string; note: string; attentionTo?: string; attentionPlace?: string }
+const { attention, feedTitle, none, note, attentionTo, attentionPlace } = Astro.props;
+---
+<div class="lv-side" data-lv-side>
+  <Section title={attention} class="card lv-card lv-att" showAll={6} id="attention" to={attentionTo} place={attentionPlace}>
+    <span slot="aside" class="lv-meta" data-att-n></span>
+    <ol class="lv-att-list" data-items data-att aria-live="polite"></ol>
+    <p class="lv-none" data-att-none hidden>{none}</p>
+  </Section>
+  <Section title={feedTitle} class="card lv-card lv-feed" id="feed">
+    <span slot="aside" class="lv-meta"><span class="lv-dot" aria-hidden="true"></span><span data-feed-clock>Updating</span></span>
+    <ol class="lv-feed-list" data-feed></ol>
+    <p class="lv-none" data-feed-none hidden>Nothing has happened here in the last hour.</p>
+    <p class="lv-note">{note}</p>
+  </Section>
+</div>
+
+<style is:global>
+  /* The page: side column and main area on the one grid. The layout follows the width of the page's content
+     (not the window), so it is right with or without the sidebar: one column; then the two side cards
+     side by side above the main area (8 columns); then main area 8 of 12 and the side column 4 (12 columns).
+     The page's .content carries .lv-page. Its hidden filter lists may reach past the right edge until they
+     open (and turn towards the page), so the content clips sideways: the page itself never scrolls sideways. */
+  .lv-page { container: lvpage / inline-size; }
+  .lv-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-items: start; }
+  .lv-side { display: grid; gap: 14px; min-width: 0; }
+  .lv-main { display: grid; gap: 14px; min-width: 0; container: lvmain / inline-size; }
+  @container lvpage (min-width: 680px) {
+    .lv-layout, .lv-main { gap: 20px; }
+    .lv-side { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: stretch; }
+  }
+  @container lvpage (min-width: 940px) {
+    .lv-layout { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+    .lv-side { grid-column: 9 / span 4; grid-row: 1; grid-template-columns: minmax(0, 1fr); align-items: start; position: sticky; top: var(--lv-top, calc(var(--mast-h, 60px) + var(--fb-h, 0px) + 16px)); }
+    .lv-main { grid-column: 1 / span 8; grid-row: 1; }
+  }
+
+  /* The cards. */
+  .lv-card { padding: 16px 18px 16px; min-width: 0; }
+  .lv-card .section-head { margin-bottom: 8px; }
+  .lv-card .section-head h2 { font-size: 18px; }
+  .lv-meta { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .lv-none { margin: 4px 0 0; padding: 14px 12px; border: 1px dashed var(--line-strong); border-radius: var(--radius); font-size: 13.5px; color: var(--text-2); text-align: center; }
+  .lv-none[hidden] { display: none; }
+  .lv-note { margin: 10px 0 0; font-size: 12px; line-height: 1.45; color: var(--text-3); }
+
+  /* The live pulse: in the band's overline and beside the feed. It breathes; with reduced motion it is still. */
+  .lv-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex: none; animation: pulse var(--dur-pulse) ease-in-out infinite; --accent: var(--green); }
+  .lv-live { display: inline-flex; align-items: center; gap: 6px; font: 700 11px/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: var(--green-ink); }
+  .lv-paused .lv-dot { animation: none; background: var(--grey); }
+
+  /* Needs attention: one row per thing, a room or a unit, worst first. */
+  .lv-att-list, .lv-feed-list { list-style: none; margin: 0; padding: 0; display: grid; }
+  .lv-ar { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 4px 10px; align-items: start; padding: 9px 4px; border-top: var(--border-rule); }
+  .lv-ar:first-child { border-top: 0; }
+  .lv-ar[hidden] { display: none; }
+  .lv-ar > i { width: 10px; height: 10px; margin-top: 4px; border-radius: 50%; background: var(--red); }
+  .lv-ar > i[data-r="1"], .lv-ar > i[data-r="2"], .lv-ar > i[data-r="3"] { background: var(--amber); }
+  .lv-ar-b { min-width: 0; display: grid; gap: 1px; }
+  .lv-ar-b > a { color: inherit; text-decoration: none; font-weight: 700; font-size: 14px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lv-ar-b > a:hover { text-decoration: underline; text-underline-offset: 2px; }
+  .lv-ar-b small { font-size: 12.5px; line-height: 1.35; color: var(--text-2); }
+  .lv-ar-b small b { font-weight: 650; color: var(--text); }
+  .lv-ar-e { display: grid; justify-items: end; gap: 4px; font-size: 12px; color: var(--text-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .lv-ar-e a { font: 700 11.5px/1 var(--font-mono); padding: 4px 6px; border-radius: 5px; background: var(--red-soft); color: var(--red-ink); text-decoration: none; }
+  .lv-ar-e a:hover { text-decoration: underline; }
+
+  /* The feed: rows of one height (two lines), newest first. */
+  .lv-ev { height: 50px; display: grid; grid-template-columns: 42px 4px minmax(0, 1fr); gap: 0 10px; align-items: center; border-top: var(--border-rule); }
+  .lv-ev:first-child { border-top: 0; }
+  .lv-ev[hidden] { display: none; }
+  .lv-et { font: 600 12px/1 var(--font-mono); color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .lv-ek { align-self: stretch; margin: 9px 0; border-radius: 2px; background: var(--grey); }
+  .lv-ev[data-k=use] .lv-ek, .lv-ev[data-k=call-on] .lv-ek { background: var(--blue); }
+  .lv-ev[data-k=free] .lv-ek, .lv-ev[data-k=clear] .lv-ek, .lv-ev[data-k=online] .lv-ek, .lv-ev[data-k=cleared] .lv-ek { background: var(--green); }
+  .lv-ev[data-k=problem] .lv-ek, .lv-ev[data-k=offline] .lv-ek { background: var(--red); }
+  .lv-ev[data-k=alert] .lv-ek { background: var(--amber); }
+  .lv-ev[data-k=call-off] .lv-ek { background: color-mix(in srgb, var(--blue) 45%, var(--surface-3)); }
+  .lv-eb { min-width: 0; display: grid; gap: 2px; color: inherit; text-decoration: none; border-radius: 6px; }
+  a.lv-eb:hover span { text-decoration: underline; text-underline-offset: 2px; }
+  .lv-eb span, .lv-eb small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lv-eb span { font-size: 13.5px; line-height: 1.3; }
+  .lv-eb span b { font-weight: 700; }
+  .lv-eb small { font-size: 12px; color: var(--text-3); }
+
+  /* Something that just changed: a ring that eases in and fades (M10). */
+  .lv-hit { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text) !important; }
+
+  /* A key: the swatch and its word, below what it explains (L7). */
+  .lv-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin: 0; padding: 12px 18px; border-top: var(--border-rule); font-size: 12.5px; color: var(--text-2); }
+  .lv-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .lv-legend .lv-legend-t { margin-left: auto; color: var(--text-3); }
+  @media (max-width: 759px) { .lv-legend .lv-legend-t { margin-left: 0; } }
+  /* The main area's cards of site rows (Rooms: offices and home offices; Devices: every unit). */
+  .lv-sites { min-width: 0; container-type: inline-size; }
+  .lv-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; padding: 16px 18px 6px; }
+  .lv-h h2 { font-size: var(--h2-size); margin: 0; }
+  .lv-h .faint { font-size: 13px; }
+  .lv-rows { display: grid; }
+
+  /* A site row: its name, clock and counts on the left, its rooms or units on the right. */
+  .lv-site { display: grid; grid-template-columns: minmax(190px, 230px) minmax(0, 1fr); gap: 10px 18px; align-items: start; padding: 14px 18px; border-top: var(--border-rule); }
+  .lv-rows > .lv-site:first-child { border-top: 0; }
+  .lv-sh { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 10px; align-items: center; min-width: 0; }
+  .lv-sh .code { grid-row: 1 / span 2; align-self: start; min-width: 42px; text-align: center; }
+  .lv-sn { min-width: 0; }
+  .lv-sn b { display: block; font-size: 14.5px; line-height: 1.25; }
+  .lv-sn a.lv-sl { color: inherit; text-decoration: none; }
+  .lv-sn a.lv-sl:hover b { text-decoration: underline; text-underline-offset: 2px; }
+  /* Counts in a site's header open that site's rooms or units in that state (rule P10). */
+  .lv-counts a, .lv-hcounts a { color: inherit; text-decoration: none; }
+  .lv-counts a:hover, .lv-hcounts a:hover { text-decoration: underline; text-underline-offset: 2px; }
+  .lv-sn small { display: block; font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .lv-open { grid-column: 2; font-size: 12.5px; font-weight: 650; color: var(--green-ink); }
+  .lv-open[data-open="0"] { color: var(--text-3); }
+  a.lv-open { color: var(--accent-ink); font-weight: 600; }
+  .lv-counts { grid-column: 1 / -1; font-size: 12.5px; line-height: 1.4; color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .lv-counts b { color: var(--red-ink); font-weight: 700; }
+  .lv-site.is-closed .lv-sn b { color: var(--text-2); }
+
+  @container (max-width: 560px) {
+    .lv-site { grid-template-columns: minmax(0, 1fr); padding: 12px 14px; }
+    .lv-h { padding: 14px 14px 4px; }
+    .lv-tiles .lv-t { width: 22px; height: 22px; }
+  }
+
+  /* The tiles: one per room, coloured by state, with a mark that does not rely on colour alone. */
+  .lv-tiles { display: flex; flex-wrap: wrap; gap: 4px; align-content: flex-start; min-width: 0; }
+  .lv-t, .lv-sw { position: relative; flex: none; width: 24px; height: 24px; border-radius: 6px; background: var(--surface-3); box-shadow: inset 0 0 0 1px var(--line);
+    transition: background-color var(--dur-state) var(--ease-settle), box-shadow var(--dur-state) var(--ease-settle); }
+  .lv-sw { display: inline-block; width: 14px; height: 14px; border-radius: 4px; }
+  .lv-t:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .lv-t:hover, .lv-t.peek-on { box-shadow: 0 0 0 2px var(--text); }
+  .lv-t[data-st=use], .lv-sw[data-st=use] { background: var(--blue); box-shadow: none; }
+  .lv-t[data-st=free], .lv-sw[data-st=free] { background: var(--green-soft); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--green) 60%, transparent); }
+  .lv-t[data-st=problem], .lv-sw[data-st=problem] { background: var(--red); box-shadow: none; }
+  .lv-t[data-st=closed], .lv-sw[data-st=closed] { background: repeating-linear-gradient(135deg, var(--surface-2) 0 3px, var(--surface-3) 3px 6px); box-shadow: inset 0 0 0 1px var(--line); }
+  .lv-t[data-st=problem]::after, .lv-sw[data-st=problem]::after { content: '!'; position: absolute; inset: 0; display: grid; place-items: center; font: 800 13px/1 var(--font-sans); color: #fff; }
+  .lv-sw[data-st=problem]::after { font-size: 10px; }
+  .lv-t[data-call]::before, .lv-sw[data-call]::before { content: ''; position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: #fff; }
+  .lv-sw[data-call]::before { width: 6px; height: 6px; margin: -3px 0 0 -3px; }
+  .lv-t[data-st=problem][data-call]::before, .lv-t[data-st=closed][data-call]::before { display: none; }
+
+  /* Units as dots: round, so they never read as rooms. */
+  .lv-dots { gap: 3px; }
+  .lv-t.lv-u { width: 16px; height: 16px; border-radius: 50%; }
+  .lv-t[data-st=online], .lv-sw[data-st=online] { background: var(--green-soft); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--green) 60%, transparent); }
+  .lv-t[data-st=alert], .lv-sw[data-st=alert] { background: var(--amber); box-shadow: none; }
+  .lv-t[data-st=offline], .lv-sw[data-st=offline] { background: var(--red); box-shadow: none; }
+  .lv-t[data-st=alert]::after, .lv-sw[data-st=alert]::after, .lv-t[data-st=offline]::after, .lv-sw[data-st=offline]::after { position: absolute; inset: 0; display: grid; place-items: center; font: 800 11px/1 var(--font-sans); color: #fff; }
+  .lv-t[data-st=alert]::after, .lv-sw[data-st=alert]::after { content: '!'; color: #1b1406; }
+  .lv-t[data-st=offline]::after, .lv-sw[data-st=offline]::after { content: '\00d7'; font-size: 13px; }
+  .lv-sw.lv-sw[data-st]::after { font-size: 10px; }
+
+  /* The peek card for a room or a unit (Peek lives on <body>). */
+  .lv-pk { display: grid; gap: 4px; }
+  .lv-pk-st { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
+  .lv-pk-st::before { content: ''; width: 10px; height: 10px; border-radius: 3px; background: var(--grey); }
+  .lv-pk-st[data-st=use]::before { background: var(--blue); } .lv-pk-st[data-st=free]::before { background: var(--green); }
+  .lv-pk-st[data-st=problem]::before { background: var(--red); } .lv-pk-st[data-st=problem] { color: var(--red-ink); }
+  .lv-pk-st[data-st=online]::before { background: var(--green); } .lv-pk-st[data-st=offline]::before { background: var(--red); }
+  .lv-pk-st[data-st=offline] { color: var(--red-ink); } .lv-pk-st[data-st=alert]::before { background: var(--amber); } .lv-pk-st[data-st=alert] { color: var(--amber-ink); }
+
+  @media (prefers-reduced-motion: reduce) { .lv-dot { animation: none; } }
+</style>

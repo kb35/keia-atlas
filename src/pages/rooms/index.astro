@@ -1,0 +1,231 @@
+---
+// Rooms: every room at every site, found with a few filters (decision 0022: Sites became a filter).
+// Filters open when you hover them and apply as you pick, so finding a room never needs a form.
+import Shell from '../../layouts/Shell.astro';
+import Icon from '../../components/Icon.astro';
+import RoomPlanSprite from '../../components/RoomPlanSprite.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import PageBand from '../../components/PageBand.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import { spaces, sites, spaceTypes, incidents, SITE_ORDER, KIND, KIND_LABEL, REGION_LABEL, INC_STATE, countryName, href } from '../../lib/data.mjs';
+import { NOW_YEAR, lifeOf } from '../../lib/refresh.mjs';
+import { PEOPLE } from '../../lib/demo.mjs';
+
+const STATUS = { service: 'In service', installing: 'Being installed', replacing: 'Being replaced', planned: 'Planned' };
+const statusOf = (s) => (s.positions.some((p) => p.legacy) ? 'replacing' : s.stages.deploy ? 'installing' : (s.stages.plan || s.stages.procure) && !s.stages.manage ? 'planned' : 'service');
+const LIGHT = { service: 'ok', installing: 'warn', replacing: 'warn', planned: 'off' };
+const floorName = (s) => sites[s.site].floors?.find((f) => f.id === s.floor)?.name?.replace(/:.*$/, '') ?? null;
+const rooms = SITE_ORDER.flatMap((sid) => Object.values(spaces).filter((s) => s.site === sid).sort((a, b) => String(a.number ?? a.id).localeCompare(String(b.number ?? b.id), 'en', { numeric: true })));
+const units = (s) => s.positions.reduce((n, p) => n + p.units.length, 0);
+// A room "radiates red" when it has an open incident. Older kit past its replacement year is a quieter amber signal.
+const openInc = {};
+for (const inc of Object.values(incidents)) if (inc.state !== 'resolved') (openInc[inc.room] ??= []).push(inc);
+const oldKit = (s) => s.olderKit.filter((p) => p.current?.installed && +p.current.installed.slice(0, 4) + lifeOf(p.cls) < NOW_YEAR).length;
+const R = rooms.map((s, i) => ({
+  name: s.name, number: s.number ?? '', typeName: s.type.profile.name, siteName: sites[s.site].name, floor: floorName(s) ?? '', devices: units(s) + s.olderKit.length,
+  issues: (openInc[s.id] ?? []).length, older: oldKit(s),
+  id: s.id, i, site: s.site, region: sites[s.site].region ?? 'remote', type: s.space_type, kind: KIND(s), status: statusOf(s),
+  q: `${s.number ?? ''} ${s.name} ${s.type.profile.name} ${sites[s.site].name} ${sites[s.site].city ?? ''} ${s.id}`.toLowerCase(),
+}));
+const FACETS = [
+  { key: 'region', label: 'Region', options: ['amer', 'emea', 'apac'].map((r) => ({ value: r, label: REGION_LABEL[r].replace('Europe, Middle East and Africa', 'EMEA') })) },
+  { key: 'site', label: 'Office', options: SITE_ORDER.map((sid) => ({ value: sid, label: sites[sid].name, sub: sites[sid].kind === 'remote' ? 'Home offices' : sites[sid].city })) },
+  { key: 'kind', label: 'Kind', options: Object.entries(KIND_LABEL).map(([value, label]) => ({ value, label })) },
+  { key: 'status', label: 'Status', options: Object.entries(STATUS).map(([value, label]) => ({ value, label })) },
+  { key: 'type', label: 'Room profile', options: Object.entries(spaceTypes).sort((a, b) => a[1].profile.name.localeCompare(b[1].profile.name)).map(([value, t]) => ({ value, label: t.profile.name })) },
+];
+const SORT = { options: [
+  { value: 'site', label: 'By office' }, { value: 'name', label: 'By name' }, { value: 'type', label: 'By room profile' },
+  { value: 'status', label: 'Being installed first' }, { value: 'issues', label: 'Incidents first' },
+] };
+const VIEWS = [{ value: 'cards', label: 'Cards', show: '[data-grid]' }, { value: 'list', label: 'List', show: '[data-list]' }];
+const withIssues = rooms.filter((s) => (openInc[s.id] ?? []).length > 0).length;
+const NUMBERS = [
+  { n: SITE_ORDER.filter((id) => sites[id].kind === 'office').length, label: 'Offices', fact: true },
+  { n: rooms.filter((s) => statusOf(s) === 'installing').length, label: 'Being installed', to: '?status=installing' },
+  { n: withIssues, label: 'With incidents', to: '?issues=1', tone: withIssues ? 'bad' : undefined },
+];
+const SITES = Object.fromEntries(SITE_ORDER.map((sid) => {
+  const s = sites[sid], tech = PEOPLE.find((p) => p.site === sid);
+  return [sid, { name: s.name, where: s.kind === 'remote' ? `Home offices, ${({ amer: 'Americas', emea: 'EMEA', apac: 'APAC' })[s.region] ?? 'worldwide'}` : `${s.city}, ${countryName(s.country)}`, power: s.mains ? `${s.mains.volts} V, ${s.mains.hz} Hz, plug ${s.mains.plugs?.join(', ')}` : null, tz: s.time_zone ?? null, tech: tech ? `${tech.name}, on-site technician` : null, floors: s.floors?.length ?? 0 }];
+}));
+---
+<Shell title="Rooms" section="rooms" crumbs={[{ label: 'Rooms' }]}>
+  <PageBand overline="Directory" title="Rooms" rec="dd-rooms" lede="Every room at every site. Hover a filter to open it; the list changes as you pick." numbers={NUMBERS} />
+
+  <div class="content rooms">
+    <RoomPlanSprite />
+    <FilterBar facets={FACETS} toggles={[{ key: 'issues', label: 'Open incidents', title: 'Only rooms with an open incident' }]} placeholder="Find a room, number or office" label="Find a room" noun={['room', 'rooms']} scope=".content.rooms" views={VIEWS} viewKey="rs4-rooms-view" sort={SORT} />
+
+    <section class="site-card card" hidden data-site-card aria-live="polite"></section>
+
+    <div class="room-grid" data-grid>
+      {rooms.map((s, i) => {
+        const st = statusOf(s), n = units(s);
+        return (
+          <a class:list={['rcard', { alert: (openInc[s.id] ?? []).length > 0 }]} href={href(`/rooms/${s.id}/`)} data-id={s.id} data-i={i} data-vk={s.id} data-kind={KIND(s)} data-fi data-find={R[i].q} data-f-region={R[i].region} data-f-site={s.site} data-f-kind={KIND(s)} data-f-type={s.space_type} data-f-status={st} data-t-issues={(openInc[s.id] ?? []).length ? '1' : undefined}>
+            <span class="rc-plan" data-vt-rec={s.id}><svg class="rplan" viewBox="0 0 120 80" aria-hidden="true"><use href={`#rp-${s.space_type}`} /></svg></span>
+            <span class="rc-body">
+              <span class="rc-top"><span class="mono rc-no">{s.number ?? sites[s.site].code}</span><i class="hl" data-state={n ? LIGHT[st] : 'off'} title={n ? STATUS[st] : 'No tracked devices'}></i></span>
+              <b>{s.name}</b>
+              <small>{s.type.profile.name}</small>
+              <small class="faint">{sites[s.site].name}{floorName(s) ? ` · ${floorName(s)}` : ''} · {n} {n === 1 ? 'device' : 'devices'}</small>
+              <span class="rc-flags">
+                {(openInc[s.id] ?? []).map((inc) => <span class="rc-st st-issue" title={inc.short_description}>{inc.number} {INC_STATE[inc.state].toLowerCase()}</span>)}
+                {st !== 'service' && <span class={`rc-st st-${st}`}>{STATUS[st]}</span>}
+                {oldKit(s) > 0 && <span class="rc-st st-older" title="Older kit past its replacement year">{oldKit(s)} older {oldKit(s) === 1 ? 'device' : 'devices'}</span>}
+                {KIND(s) === 'meeting' && <span class="rc-st st-live" data-live hidden title="A meeting is on now (demo)">In a meeting</span>}
+              </span>
+            </span>
+          </a>
+        );
+      })}
+    </div>
+    <div class="rlist-wrap card" data-list hidden>
+      <table class="rlist">
+        <thead><tr>
+          {[['number', 'No.'], ['name', 'Room'], ['typeName', 'Room profile'], ['siteName', 'Office'], ['floor', 'Floor'], ['devices', 'Devices'], ['status', 'Status'], ['issues', 'Signals']].map(([k, l]) => <th scope="col" aria-sort="none"><button type="button" data-sortcol={k}>{l}<i aria-hidden="true"></i></button></th>)}
+        </tr></thead>
+        <tbody>
+          {rooms.map((s, i) => {
+            const st = statusOf(s), inc = openInc[s.id] ?? [];
+            return (
+              <tr class:list={{ alert: inc.length > 0 }} data-id={s.id} data-row data-fi data-find={R[i].q} data-f-region={R[i].region} data-f-site={s.site} data-f-kind={KIND(s)} data-f-type={s.space_type} data-f-status={st} data-t-issues={inc.length ? '1' : undefined}>
+                <td class="mono">{s.number ?? sites[s.site].code}</td>
+                <td><a href={href(`/rooms/${s.id}/`)}><b>{s.name}</b></a></td>
+                <td>{s.type.profile.name}</td>
+                <td>{sites[s.site].name}</td>
+                <td>{floorName(s) ?? ''}</td>
+                <td class="num">{units(s) + s.olderKit.length}</td>
+                <td><i class="hl" data-state={LIGHT[st]}></i> {STATUS[st]}</td>
+                <td>
+                  {inc.map((x) => <span class="rc-st st-issue" title={x.short_description}>{x.number}</span>)}
+                  {oldKit(s) > 0 && <span class="rc-st st-older">{oldKit(s)} older</span>}
+                  {KIND(s) === 'meeting' && <span class="rc-st st-live" data-live hidden>In a meeting</span>}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+    <EmptyState text="No rooms match these filters." />
+  </div>
+
+  <script is:inline data-astro-rerun define:vars={{ R, SITES }} slot="end">
+    (function () {
+      var grid = document.querySelector('[data-grid]'), bar = document.querySelector('[data-fb]'); if (!grid || !bar) return;
+      var cards = new Map(Array.prototype.map.call(grid.children, function (el) { return [el.dataset.id, el]; }));
+      var listWrap = document.querySelector('[data-list]'), tbody = listWrap.querySelector('tbody');
+      var rows = new Map(Array.prototype.map.call(tbody.children, function (el) { return [el.dataset.id, el]; }));
+      // On a first load the bar starts after this script, so read a shared ?sort= from the address too.
+      var dir = 1, sort = bar.rsFilter ? bar.rsFilter.sort() : (new URLSearchParams(location.search).get('sort') || 'site');
+      var ORDER = { installing: 0, replacing: 1, planned: 2, service: 3 };
+      var nat = function (x, y) { return String(x).localeCompare(String(y), 'en', { numeric: true }); };
+      // Put the cards and the rows in the chosen order. The filter bar hides and counts them.
+      function reorder() {
+        R.slice().sort(function (a, b) {
+          var c = 0;
+          if (sort === 'name') c = nat(a.name, b.name);
+          else if (sort === 'type' || sort === 'typeName') c = nat(a.typeName, b.typeName);
+          else if (sort === 'status') c = ORDER[a.status] - ORDER[b.status];
+          else if (sort === 'issues') c = (b.issues - a.issues) || (b.older - a.older);
+          else if (sort === 'number') c = nat(a.number, b.number);
+          else if (sort === 'siteName') c = nat(a.siteName, b.siteName);
+          else if (sort === 'floor') c = nat(a.floor, b.floor);
+          else if (sort === 'devices') c = a.devices - b.devices;
+          return (c || a.i - b.i) * dir;
+        }).forEach(function (r) { grid.appendChild(cards.get(r.id)); tbody.appendChild(rows.get(r.id)); });
+        document.querySelectorAll('[data-sortcol]').forEach(function (b) { b.parentElement.setAttribute('aria-sort', b.dataset.sortcol === sort ? (dir > 0 ? 'ascending' : 'descending') : 'none'); });
+      }
+      // One site chosen: a card about the site above the rooms.
+      bar.addEventListener('fb:change', function () {
+        var pick = bar.rsFilter.get('site'), only = pick.length === 1 ? SITES[pick[0]] : null, sc = document.querySelector('[data-site-card]');
+        sc.hidden = !only;
+        if (only) sc.innerHTML = '<div><p class="overline">Office</p><h2>' + only.name + '</h2><p class="muted">' + only.where + '</p></div><dl class="kv">' +
+          (only.power ? '<div><dt>Mains</dt><dd>' + only.power + '</dd></div>' : '') + (only.tz ? '<div><dt>Time zone</dt><dd>' + only.tz + '</dd></div>' : '') +
+          (only.tech ? '<div><dt>On site</dt><dd>' + only.tech + '</dd></div>' : '') + (only.floors ? '<div><dt>Floors</dt><dd>' + only.floors + '</dd></div>' : '') + '</dl>';
+      });
+      // Sort: the bar's Sort pill, or a column heading in the list (a second click turns it round).
+      bar.addEventListener('fb:sort', function (e) { sort = e.detail.value; dir = 1; bar.rsFilter.run(true, reorder); });
+      var LABEL = { number: 'By number', typeName: 'By room profile', siteName: 'By office', floor: 'By floor', devices: 'By devices', status: 'Being installed first', issues: 'Incidents first', name: 'By name' };
+      document.querySelectorAll('[data-sortcol]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var k = b.dataset.sortcol; if (sort === k) dir = -dir; else { sort = k; dir = 1; }
+          bar.rsFilter.setSort(k === 'typeName' ? 'type' : k === 'siteName' ? 'site' : k, LABEL[k]);
+          bar.rsFilter.run(false, reorder);
+        });
+      });
+      if (sort !== 'site') { if (bar.rsFilter) bar.rsFilter.run(false, reorder); else reorder(); }   // opened with ?sort=...
+      // A quiet live signal: meeting rooms show "In a meeting" for a stretch of each hour (demo, not a real calendar).
+      var live = function () {
+        var d = new Date(), slot = d.getHours() * 2 + (d.getMinutes() >= 30 ? 1 : 0), work = d.getHours() >= 9 && d.getHours() < 18 && d.getDay() % 6 !== 0;
+        document.querySelectorAll('[data-live]').forEach(function (el) {
+          var id = (el.closest('[data-id]') || {}).dataset && el.closest('[data-id]').dataset.id || '', h = 0;
+          for (var i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i) + slot * 7) >>> 0;
+          el.hidden = !(work && h % 3 === 0);
+        });
+      };
+      if (bar.rsFilter) bar.rsFilter.run(false);   // the bar may have started before this script: recount with the site card hooked up
+      live(); if (!window.__rsLiveTimer) window.__rsLiveTimer = setInterval(function () { if (document.querySelector('[data-live]')) live(); }, 60000);
+    })();
+  </script>
+</Shell>
+<style>
+  .rooms { gap: 16px; padding-top: 18px; }
+  .site-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 20px; padding: 16px 20px; align-items: center; animation: rise var(--dur-enter, 440ms) var(--ease-settle); }
+  .site-card h2 { margin: 2px 0; font-size: 22px; } .site-card p { margin: 0; }
+  .site-card .kv { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); display: grid; gap: 8px 20px; }
+  .site-card .kv > div { display: grid; border: 0; padding: 0; } .site-card .kv dd { text-align: left; }
+  .room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+  .rcard { display: grid; grid-template-rows: auto 1fr; border-radius: var(--radius-lg); border: var(--border-card); background: var(--surface); color: inherit; text-decoration: none; overflow: hidden; transition: transform var(--dur-state) var(--ease-settle), box-shadow var(--dur-state); }
+  .rcard[hidden] { display: none; }
+  .rcard:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); color: inherit; }
+  .rc-plan { display: grid; place-items: center; height: 92px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+  .rc-plan svg { height: 80px; width: auto; transition: transform var(--dur-morph, 520ms) var(--ease-settle); }
+  .rcard:hover .rc-plan svg { transform: scale(1.08); }
+  .rc-body { display: grid; gap: 2px; padding: 10px 12px 12px; align-content: start; }
+  .rc-top { display: flex; justify-content: space-between; align-items: center; }
+  .rc-no { font-size: 12px; color: var(--text-3); }
+  .rc-body b { font-size: 15px; }
+  .rc-body small { font-size: 12.5px; color: var(--text-2); }
+  .rc-st { justify-self: start; margin-top: 6px; font: 700 11px/1 var(--font-sans); padding: 4px 8px; border-radius: var(--pill-radius); background: var(--amber-soft, #FFF1CC); color: var(--amber-ink, #7A5600); }
+  .rc-st.st-planned { background: var(--surface-3); color: var(--text-2); }
+  .rc-flags { display: flex; flex-wrap: wrap; gap: 4px; }
+  .rc-flags .rc-st { margin-top: 6px; }
+  .rc-st.st-issue { background: var(--red-soft, #fbe3e0); color: var(--red-ink, #9a2318); }
+  .rc-st.st-older { background: var(--amber-soft, #FFF1CC); color: var(--amber-ink, #7A5600); }
+  .rc-st.st-live { background: var(--green-soft, #dff3e4); color: var(--green-ink, #17612e); }
+  .rc-st.st-live::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green, #2e9e58); margin-right: 5px; vertical-align: 1px; }
+  .rc-st[hidden] { display: none; }
+  .room-grid[hidden], .rlist-wrap[hidden] { display: none; }
+  .rlist-wrap { overflow: auto; padding: 0; }
+  .rlist { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .rlist th { position: sticky; top: 0; background: var(--surface-2); text-align: left; padding: 0; border-bottom: 1px solid var(--line-strong); }
+  .rlist th button { appearance: none; border: 0; background: none; width: 100%; text-align: left; padding: 10px 12px; font: 700 11px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  .rlist th button:hover { color: var(--text); }
+  .rlist th[aria-sort="ascending"] button i::after { content: '\25B2'; font-size: 8px; }
+  .rlist th[aria-sort="descending"] button i::after { content: '\25BC'; font-size: 8px; }
+  .rlist th[aria-sort] button { color: var(--text-2); }
+  .rlist td { padding: 9px 12px; border-bottom: 1px solid var(--line); }
+  .rlist tbody tr:nth-child(even) { background: color-mix(in srgb, var(--text) 3%, transparent); }
+  .rlist tbody tr:hover { background: color-mix(in srgb, var(--text) 7%, transparent); }
+  .rlist tr[hidden] { display: none; }
+  .rlist td a { color: inherit; text-decoration: none; } .rlist td a:hover { text-decoration: underline; }
+  .rlist td .rc-st { margin: 0 4px 0 0; }
+  /* Radiate red: an open incident gives the room a soft pulsing red glow. Reduced motion gets a still red ring. */
+  .rcard.alert, .rlist tr.alert { --glow: var(--red, #d92d20); }
+  .rcard.alert { border-color: var(--glow); box-shadow: 0 0 0 1px var(--glow), 0 0 14px 1px color-mix(in srgb, var(--glow) 40%, transparent); animation: radiate var(--dur-pulse) ease-in-out infinite; }
+  .rlist tr.alert td { background: color-mix(in srgb, var(--glow) 9%, transparent); animation: radiate-row var(--dur-pulse) ease-in-out infinite; }
+  .rlist tr.alert td:first-child { box-shadow: inset 4px 0 0 var(--glow); }
+  @keyframes radiate { 0%, 100% { box-shadow: 0 0 0 1px var(--glow), 0 0 6px 0 color-mix(in srgb, var(--glow) 25%, transparent); } 50% { box-shadow: 0 0 0 1px var(--glow), 0 0 22px 4px color-mix(in srgb, var(--glow) 50%, transparent); } }
+  @keyframes radiate-row { 0%, 100% { background-color: color-mix(in srgb, var(--glow) 6%, transparent); } 50% { background-color: color-mix(in srgb, var(--glow) 16%, transparent); } }
+  @media (prefers-reduced-motion: reduce) {
+    .rcard.alert, .rlist tr.alert td { animation: none; }
+    .rcard.alert { box-shadow: 0 0 0 3px var(--glow); }
+  }
+  @media (max-width: 760px) {
+    .site-card { grid-template-columns: 1fr; }
+    .room-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+</style>

@@ -1,0 +1,348 @@
+---
+// One service, whole: AV, the network or IT infrastructure. Overview archetype
+// (page-anatomy.md, D) built like the Devices overview, because the questions are the same: what is wrong now, where, and
+// how do I get to it. The figures are simulated live (src/lib/livesim.mjs); the numbers that do not move in a day (firmware
+// behind, comms rooms to standard) come from the data.
+//   band      the owner, the light, and four figures (live where they are live), each opening the list it counts
+//   bar       Region, Office, Kind, Status, and a switch for firmware out of date: it filters everything on the page
+//   side      Needs attention, and Alerts and changes (the same LiveSide as the Devices overview)
+//   main      Health by office (bars; each opens that office), then every unit as a dot, by office
+//   below     comms rooms against the standard (infrastructure), firmware against the standard per model, incidents,
+//             changes and upcoming work, stock and records, and who runs the service
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import LiveSide from '../../components/LiveSide.astro';
+import Section from '../../components/Section.astro';
+import { REGION_LABEL, href } from '../../lib/data.mjs';
+import { serviceModel, KIND_LABEL_OF } from '../../lib/services-view.mjs';
+import { PEOPLE } from '../../lib/demo.mjs';
+
+const { id } = Astro.props;
+const m = serviceModel(id);
+const svc = m.svc;
+const owner = PEOPLE.find((p) => p.id === svc.owner);
+const word = id === 'av' ? ['unit', 'units'] : ['item', 'items'];
+const STATUS = { online: 'Online', alert: 'Alert', offline: 'Offline' };
+const FACETS = [
+  { key: 'region', label: 'Region', options: ['amer', 'emea', 'apac'].map((r) => ({ value: r, label: REGION_LABEL[r].replace('Europe, Middle East and Africa', 'EMEA') })) },
+  { key: 'site', label: 'Office', options: m.sites.map((s) => ({ value: s.id, label: s.name, sub: s.remote ? 'Home offices' : s.city })) },
+  { key: 'kind', label: 'Kind', options: m.kinds.map((x) => ({ value: x.k, label: x.label })) },
+  { key: 'status', label: 'Status', options: Object.entries(STATUS).map(([value, label]) => ({ value, label })) },
+];
+const TOGGLES = m.behind ? [{ key: 'fw', label: 'Firmware out of date', title: 'Only units running firmware behind the standard' }] : [];
+const SORT = { options: [{ value: 'attention', label: 'Problems first' }, { value: 'site', label: 'By office' }, { value: 'count', label: `Most ${word[1]} first` }] };
+const NUMBERS = {
+  av: [
+    { id: 'sv-1', n: '–', label: 'Rooms working now', to: '/rooms/overview/?status=use,free' },
+    { id: 'sv-2', n: '–', label: 'Units alerting', to: '?status=alert,offline#units' },
+    { id: 'sv-3', n: m.behind, label: 'Firmware behind the standard', to: '?fw=1#units' },
+    { id: 'sv-4', n: m.incidents.length, label: 'Open incidents', to: '#incidents' },
+  ],
+  network: [
+    { id: 'sv-1', n: '–', label: 'Offices online', to: '#health' },
+    { id: 'sv-2', n: '–', label: 'Home gateways online', to: '?kind=home-gateway&status=online,alert#units' },
+    { id: 'sv-3', n: '–', label: 'Switches alerting', to: '?kind=switch&status=alert,offline#units' },
+    { id: 'sv-4', n: '–', label: 'Circuits up', to: '?kind=circuit&status=online,alert#units' },
+  ],
+  infrastructure: [
+    { id: 'sv-1', n: m.statics.toStandard, label: 'Comms rooms to standard', to: '#commsrooms' },
+    { id: 'sv-2', n: '–', label: 'UPS and power strip alerts', to: '?kind=ups,pdu&status=alert,offline#units' },
+    { id: 'sv-3', n: m.statics.short, label: 'Rack space short', to: '#commsrooms' },
+    { id: 'sv-4', n: '–', label: 'Links with a fault', to: '?kind=link&status=alert,offline#units' },
+  ],
+}[id];
+const unitLink = (u) => href(u.to ?? `/device/?tag=${u.id}`);
+const find = (u, s) => `${u.n} ${u.rn} ${s.name} ${s.city ?? ''} ${u.id} ${u.m ?? ''} ${KIND_LABEL_OF(u.k)}`;
+const client = { ...m.sim, base: href('/'), statics: m.statics, incCount: m.incidents.length, kinds: Object.fromEntries(m.kinds.map((x) => [x.k, x.label])) };
+const json = JSON.stringify(client).replace(/</g, '\\u003c');
+const PRI = { 1: 'Critical', 2: 'High', 3: 'Moderate', 4: 'Low' };
+const ROLE_TO = (p) => href(`/team/?p=${p.id}`);
+const nOwners = m.owners.length;
+const blurb = {
+  av: 'Rooms, units and firmware are simulated from each unit\'s kind and age and the open incidents, the same in every window. At stage 2 the real feeds plug in: monitoring, device management and room booking.',
+  network: 'Simulated from each item\'s kind and the open incidents, the same in every window. Access points are units in the open areas and corridors of each floor. At stage 2 UniFi and the switch management feed this page.',
+  infrastructure: 'Simulated from each item\'s kind and the open incidents, the same in every window. The comms room checks read the recorded racks. At stage 2 the UPS, power strip and console server feeds plug in.',
+}[id];
+---
+<Shell title={svc.title} section={`services-${id}`} crumbs={[{ label: 'Services', to: '/services/' }, { label: svc.name }]} about={{ kind: 'page', label: svc.title }}>
+  <PageBand overline="Service" title={svc.title} rec={`svc-${id}`} lede={svc.lede} sim="live" numbers={NUMBERS}>
+    <span slot="overline" class="lv-live" data-lv-live title="A new moment every five seconds, the same in every window"><span class="lv-dot" aria-hidden="true"></span>Live</span>
+    <a slot="overline" class="pill plain sv-owner" href={href(`/team/?p=${svc.owner}`)} data-help="services.owner">Owner: {owner.name}</a>
+    <span slot="overline" class="sv-light" data-sv-light data-l="none" data-help="services.light" title="Red when several are offline or one in ten has a fault, amber for any fault, green when all is well"></span>
+  </PageBand>
+
+  <div class="content svc lv-page" data-sv={id}>
+    <FilterBar facets={FACETS} toggles={TOGGLES} placeholder={id === 'av' ? 'Find a unit, hostname or room' : 'Find an item, office or room'} label={`Find ${id === 'av' ? 'a unit' : 'an item'}`} noun={word} scope=".content.svc" sort={SORT} />
+
+    <div class="lv-layout">
+      <LiveSide attention="Needs attention" feedTitle="Alerts and changes" none={`Every ${word[0]} in this service is online, with no alerts.`} attentionTo="?status=offline,alert#units" attentionPlace={`the ${word[0]} map`} note={blurb} />
+
+      <div class="lv-main">
+        <section class="card sv-hcard" id="health" aria-labelledby="hs-h" data-steady data-dd="filters this page's own list" data-help="services.health">
+          <header class="lv-h"><h2 id="hs-h">Health by office</h2><span class="faint">Select one to filter by it</span></header>
+          <div class="sv-hrows" data-health>
+            {m.sites.map((s) => (
+              <div class="sv-hr" data-k={s.id} data-on="false">
+                <a class="sv-hn" href={`?site=${s.id}#units`} title={`Show only ${s.name}`}><b>{s.name}</b><small data-hn></small></a>
+                <span class="sv-hv"><span class="sv-hbar" aria-hidden="true"><i data-st="online"></i><i data-st="alert"></i><i data-st="offline"></i></span><span class="sv-hx" data-hx></span></span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section class="card lv-sites" id="units" aria-labelledby="units-h" data-steady data-help="services.units">
+          <header class="lv-h"><h2 id="units-h">{id === 'av' ? 'Every unit in the service' : 'Everything in the service'}</h2><span class="faint">Each dot is {id === 'av' ? 'a unit' : 'an item'}. Hover to look, select to open it.</span></header>
+          <div class="lv-rows" data-rows="units">
+            {m.sites.map((s) => (
+              <article class="lv-site" data-fb-group data-steady data-site={s.i} aria-label={s.name}>
+                <header class="lv-sh">
+                  <span class="code">{s.code}</span>
+                  <span class="lv-sn"><a class="lv-sl" href={href(`/rooms/?site=${s.id}`)} title={`Every room at ${s.name}`}><b>{s.name}</b></a><small>{s.city ?? 'Home offices'}</small></span>
+                  <span class="lv-counts" data-counts></span>
+                </header>
+                <div class="lv-tiles lv-dots">
+                  {s.units.map((u) => (
+                    <a class="lv-t lv-u" href={unitLink(u)} data-i={m.units.indexOf(u)} data-fi data-find={find(u, s)} data-f-region={s.region} data-f-site={s.id} data-f-kind={u.k} data-f-status="" data-t-fw={u.fw ? '1' : undefined} data-st="" data-peek aria-label={u.n}>
+                      <template data-peek-body><b class="peek-h">{u.n}</b><small>{KIND_LABEL_OF(u.k)}{u.host ? ` · ${u.host}` : ''}</small><small>{s.name} · {u.rn}</small><span class="lv-pk" data-pk></span></template>
+                    </a>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+          <p class="lv-legend" aria-label="Key">
+            <span><i class="lv-sw" data-st="online"></i>Online</span>
+            <span><i class="lv-sw" data-st="alert"></i>Alert, or an open incident</span>
+            <span><i class="lv-sw" data-st="offline"></i>Offline</span>
+            {id === 'av' && <span class="lv-legend-t">Speakers, cables and printers are not part of this service's map.</span>}
+          </p>
+        </section>
+        <EmptyState text={`No ${word[1]} match these filters.`} />
+      </div>
+    </div>
+
+    {id === 'infrastructure' && (
+      <Section title="Comms rooms against the standard" id="commsrooms" aside={`${m.statics.toStandard} of ${m.statics.rooms} on the standard`} help="services.commsrooms">
+        <div class="tablewrap"><table class="to-cards sv-tbl">
+          <thead><tr><th>Comms room</th><th>Office</th><th>Free space</th><th>Still to do</th></tr></thead>
+          <tbody data-items>
+            {m.commsRooms.map((r) => (
+              <tr>
+                <td data-label=""><a href={href(r.to)}><b>{r.name}</b></a> <span class="faint">· {r.rack}</span></td>
+                <td data-label="Office"><a href={href(`/rooms/?site=${r.site}`)}>{r.siteName}</a></td>
+                <td data-label="Free space" class:list={{ 't-warn': r.short }}>{r.free}U of {r.height}U{r.short ? ' (short)' : ''}</td>
+                <td data-label="Still to do">{r.toStandard ? <span class="pill manage">On the standard</span> : r.failed.map((f) => f.label).join(', ')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table></div>
+        <p class="sv-note">The standard: a UPS, two power feeds (A and B), an out-of-band console, a fibre patch panel, and switches on the house standard. A rack is short of space with under {m.statics.shortU}U free, counting reserved growth space as free. Older rooms are due in the network refresh.</p>
+      </Section>
+    )}
+
+    {id !== 'infrastructure' ? (
+      <Section title="Firmware against the standard" id="firmware" aside={m.firmware.length ? 'Per model, following the filters above' : undefined} help="services.firmware">
+        <div class="tablewrap"><table class="to-cards sv-tbl">
+          <thead><tr><th>Model</th><th>Kind</th><th>Units</th><th>Behind the standard</th><th>The standard</th><th>Advisories</th><th>Known issues</th></tr></thead>
+          <tbody data-items>
+            {m.firmware.map((f) => (
+              <tr data-m={f.m}>
+                <td data-label=""><a href={href(f.profile)}><b>{f.name}</b></a></td>
+                <td data-label="Kind">{f.kind}</td>
+                <td data-label="Units"><span data-fu>{f.units}</span></td>
+                <td data-label="Behind"><span data-fwb>{f.behind}</span>{f.found.length > 0 && <small class="faint"> ({f.found.join(', ')})</small>}</td>
+                <td data-label="Standard">{f.standard ? <>{f.line} {f.standard}</> : <span class="faint">Version not tracked yet</span>}</td>
+                <td data-label="Advisories">{f.advisories.length ? f.advisories.map((a, i) => <>{i > 0 && ', '}<a href={href(f.profile)} title={a.title}>{a.id}</a></>) : <span class="faint">None</span>}</td>
+                <td data-label="Known issues">{f.issues ? <a href={href(`/known-issues/?model=${f.m}`)}>{f.issues} {f.issues === 1 ? 'issue' : 'issues'}</a> : <span class="faint">None</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table></div>
+        <p class="sv-none" data-fw-none hidden>No model matches these filters.</p>
+        <p class="sv-note">Only the Poly line has release data, so other models name no versions. Which units run behind is simulated; at stage 2 device management reports it.</p>
+      </Section>
+    ) : (
+      <Section title="Equipment against the standard" id="firmware" aside="Rack equipment in the comms rooms" help="services.firmware">
+        <div class="tablewrap"><table class="to-cards sv-tbl">
+          <thead><tr><th>Equipment</th><th>Kind</th><th>Fitted</th><th>In racks</th><th>On the house standard</th></tr></thead>
+          <tbody data-items>
+            {m.gear.map((g) => (
+              <tr>
+                <td data-label=""><b>{g.name}</b></td>
+                <td data-label="Kind">{g.kindLabel}</td>
+                <td data-label="Fitted">{g.count}</td>
+                <td data-label="In racks">{g.racks}</td>
+                <td data-label="Standard">{g.standard ? <span class="pill manage">Yes</span> : <span class="faint">Older, due in the network refresh</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table></div>
+        <p class="sv-note">Firmware for rack equipment is not tracked yet. At stage 2 the switch and console server feeds report it here.</p>
+      </Section>
+    )}
+
+    <Section title="Incidents" id="incidents" aside={m.incidents.length ? `${m.incidents.length} open` : undefined} help="services.incidents">
+      {m.incidents.length ? (
+        <div class="tablewrap"><table class="to-cards sv-tbl">
+          <thead><tr><th>Incident</th><th>Priority</th><th>Status</th><th>Room</th><th>Opened</th></tr></thead>
+          <tbody data-items>
+            {m.incidents.map((i) => (
+              <tr>
+                <td data-label=""><a href={i.to}><b class="code">{i.no}</b> {i.title}</a></td>
+                <td data-label="Priority">P{i.pri} {PRI[i.pri]}</td>
+                <td data-label="Status">{i.state}</td>
+                <td data-label="Room">{i.room}, <a href={href(`/rooms/?site=${i.site}`)}>{i.siteName}</a></td>
+                <td data-label="Opened">{i.opened?.replace('T', ' ')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table></div>
+      ) : <EmptyState text="No open incidents on this service." />}
+      <p class="sv-note">Open incidents raise an alert on their unit until they are resolved. <a href={href('/incidents/')}>Open the Incidents board</a> for every service.</p>
+    </Section>
+
+    <Section title="Changes and upcoming work" id="changes" help="services.changes">
+      <div class="g12">
+        <div class="card side-card s-7">
+          <h3>Projects that touch this service</h3>
+          {m.projects.length ? (
+            <ul class="sv-list">
+              {m.projects.map((p) => (
+                <li>
+                  <a href={href(p.to)}><b>{p.id}</b> {p.name}</a>
+                  <small>{p.kind} · {p.phase} · {p.siteName} · run by {p.owner} · target {p.targetText}{p.open ? ` · ${p.open} open ${p.open === 1 ? 'task' : 'tasks'}` : ''}</small>
+                </li>
+              ))}
+            </ul>
+          ) : <p class="faint">No open projects.</p>}
+        </div>
+        <div class="card side-card s-5">
+          <h3>Tasks due in the next two weeks</h3>
+          {m.due.length ? (
+            <ul class="sv-list">
+              {m.due.slice(0, 6).map((t) => (
+                <li>
+                  <a href={t.to}>{t.title}</a>
+                  <small>{t.project} · due {t.endText}{t.who ? ` · ${t.who}` : ''}</small>
+                </li>
+              ))}
+            </ul>
+          ) : <p class="faint">Nothing due in the next two weeks.</p>}
+          {m.due.length > 6 && <p class="faint sv-more">And {m.due.length - 6} more, in <a href={href('/work/list/')}>the Work list</a>.</p>}
+        </div>
+      </div>
+    </Section>
+
+    <Section title="Stock and records" id="stock" aside={m.spares.length ? `${m.spares.length} below minimum` : undefined} help="services.stock">
+      {m.spares.length ? (
+        <div class="tablewrap"><table class="to-cards sv-tbl">
+          <thead><tr><th>Spare</th><th>Office</th><th>On the shelf</th><th>Where</th></tr></thead>
+          <tbody data-items>
+            {m.spares.map((s) => (
+              <tr>
+                <td data-label=""><a href={href(s.to)}><b>{s.what}</b></a></td>
+                <td data-label="Office"><a href={href(`/rooms/?site=${s.site}`)}>{s.siteName}</a></td>
+                <td data-label="On the shelf" class="t-warn">{s.quantity} of {s.minimum} minimum</td>
+                <td data-label="Where">{s.where}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table></div>
+      ) : <EmptyState text="Every spare for this service is at or above its minimum." />}
+    </Section>
+
+    <Section title="Who runs this service" id="owners" aside="From the roles on the Team page" help="services.owners">
+      <div class="g12">
+        {m.owners.map((o) => (
+          <article class:list={['card', 'side-card', `s-${nOwners === 2 || nOwners === 4 ? 6 : 4}`, 'sv-own']} data-help="services.owner-card" data-help-name={o.name}>
+            <h3>{o.owner ? 'Service owner' : 'Hands on'}</h3>
+            <p class="sv-role"><b>{o.name}</b></p>
+            <p class="sv-people">
+              {o.people.map((p, i) => <>{i > 0 && ', '}<a href={ROLE_TO(p)}>{p.name}</a></>)}{o.more > 0 && <> and {o.more} more, in every region</>}
+            </p>
+            <dl class="sv-dl">
+              <div><dt>Owns</dt><dd>{o.owns.join('. ')}</dd></div>
+              <div><dt>Decides</dt><dd>{o.decides.join('. ')}</dd></div>
+              <div><dt>Hands on to</dt><dd>{o.hands}</dd></div>
+            </dl>
+          </article>
+        ))}
+      </div>
+      <p class="sv-note">Live figures come from: {svc.systems.join(', ')}. Today they are simulated.</p>
+    </Section>
+
+    <script type="application/json" data-lv-model set:html={json}></script>
+  </div>
+
+  <script>
+    import { initService } from '../../lib/services-client.mjs';
+    let stop = () => {};
+    function init() {
+      const root = document.querySelector('.content.svc[data-sv]');
+      if (root) stop = initService(root);
+    }
+    init();
+    document.addEventListener('astro:before-swap', () => stop(), { once: true });
+    document.addEventListener('astro:page-load', init);
+  </script>
+</Shell>
+
+<style>
+  /* LiveSide names this container "lvpage"; the shared grid (.g12) and tables look for "content", so it keeps both names. */
+  .content.svc.lv-page { container: lvpage content / inline-size; }
+  .sv-light { display: inline-flex; align-items: center; gap: 6px; font: 700 12.5px/1 var(--font-sans); color: var(--text-2); }
+  .sv-light:empty { display: none; }
+  .sv-light :global(.sv-lt), :global(.sv-lt) { width: 10px; height: 10px; border-radius: 50%; background: var(--grey); flex: none; transition: background-color var(--dur-state) var(--ease-settle); }
+  .sv-light :global(.sv-lt[data-l=good]) { background: var(--green); }
+  .sv-light :global(.sv-lt[data-l=warn]) { background: var(--amber); }
+  .sv-light :global(.sv-lt[data-l=bad]) { background: var(--red); }
+  .sv-owner { text-decoration: none; }
+  .sv-owner:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+  /* Health by office: one row per office, its bar and its problems. */
+  .sv-hcard { min-width: 0; padding-bottom: 10px; }
+  .sv-hrows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0 10px; column-gap: 12px; }
+  .sv-hr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: center; padding: 6px 8px; border-radius: var(--radius); transition: background var(--dur-hover) var(--ease-settle), opacity var(--dur-state) var(--ease-settle); }
+  .sv-hr:hover { background: var(--surface-2); }
+  .sv-hr[data-on=true] { background: var(--accent-soft); color: var(--accent-ink); }
+  .sv-hr.none { opacity: .45; }
+  .sv-hn, .sv-hv { min-width: 0; display: grid; gap: 3px; }
+  .sv-hn { color: inherit; text-decoration: none; }
+  .sv-hn b { font-size: 13.5px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sv-hn:hover b { text-decoration: underline; text-underline-offset: 2px; }
+  .sv-hn small { font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sv-hbar { display: flex; gap: 2px; height: 8px; border-radius: 4px; overflow: hidden; background: var(--surface-2); }
+  .sv-hbar i { flex: 0 1 0; min-width: 0; transition: flex-grow var(--dur-fill) var(--ease-settle); }
+  .sv-hbar i[data-st=online] { background: color-mix(in srgb, var(--green) 55%, var(--surface)); }
+  .sv-hbar i[data-st=alert] { background: var(--amber); }
+  .sv-hbar i[data-st=offline] { background: var(--red); }
+  .sv-hbar i.has { min-width: 5px; }
+  .sv-hx { font-size: 12px; line-height: 1.3; color: var(--text-3); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sv-hx :global(a) { color: inherit; text-decoration: none; }
+  .sv-hx :global(a:hover) { text-decoration: underline; text-underline-offset: 2px; }
+  .sv-hx :global(.t-bad) { color: var(--red-ink); } .sv-hx :global(.t-warn) { color: var(--amber-ink); }
+  .lv-sites :global(.lv-counts .t-warn) { color: var(--amber-ink); }
+  @container lvmain (max-width: 699px) { .sv-hrows { grid-template-columns: minmax(0, 1fr); } }
+
+  /* The sections below. */
+  .sv-tbl :global(td.t-warn), .sv-tbl :global(.t-warn) { color: var(--amber-ink); font-weight: 600; }
+  .sv-note { margin: 10px 2px 0; font-size: 12.5px; line-height: 1.5; color: var(--text-3); max-width: 78ch; }
+  .sv-none { margin: 8px 2px 0; font-size: 13.5px; color: var(--text-2); }
+  .sv-list { list-style: none; margin: 0; padding: 0; display: grid; }
+  .sv-list li { display: grid; gap: 2px; padding: 9px 0; border-top: var(--border-rule); min-width: 0; }
+  .sv-list li:first-child { border-top: 0; padding-top: 0; }
+  .sv-list a { color: inherit; font-size: 14px; line-height: 1.35; text-decoration: none; }
+  .sv-list a:hover { text-decoration: underline; text-underline-offset: 2px; }
+  .sv-list small { font-size: 12.5px; line-height: 1.4; color: var(--text-3); }
+  .sv-more { margin: 0; font-size: 12.5px; }
+  .sv-own .sv-role { margin: 0; font-size: 15px; }
+  .sv-own .sv-people { margin: 0; font-size: 14px; }
+  .sv-own .sv-people a { color: var(--accent-ink); }
+  .sv-dl { margin: 0; display: grid; gap: 10px; }
+  .sv-dl div { display: grid; gap: 2px; padding-top: 10px; border-top: var(--border-rule); }
+  .sv-dl dt { font: 700 var(--overline-size)/1.2 var(--font-sans); letter-spacing: var(--overline-track); text-transform: var(--overline-case); color: var(--text-3); }
+  .sv-dl dd { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--text-2); }
+  .sv-own { align-content: start; }
+</style>

@@ -1,0 +1,1046 @@
+---
+// The one page template: masthead, left navigation (a bottom tab bar on phones), page band, content.
+import Icon from '../components/Icon.astro';
+import { href } from '../lib/data.mjs';
+import Settings from '../components/Settings.astro';
+import Report from '../components/Report.astro';
+import Peek from '../components/Peek.astro';
+import HelpMode from '../components/HelpMode.astro';
+import SearchOverlay from '../components/SearchOverlay.astro';
+import { ClientRouter } from 'astro:transitions';
+import '../styles/looks/enterprise.css';
+import '../styles/looks/classic.css';
+import '../styles/looks/studio.css';
+import '../styles/looks/drawing.css';
+import '../styles/looks/contrast.css';
+import '../styles/base.css';
+import '../styles/motion.css';
+
+import { PEOPLE, STAGES_DEMO, TEAMS } from '../lib/demo.mjs';
+
+// minStage: the adoption stage a page belongs to (stages 1 to 6, see src/lib/demo.mjs). Below it, the page shows
+// what arrives at that stage instead of its content. Gated here, at page level, never in components.
+const { title, crumbs = [], section = '', minStage = 1, vendorOk = false, about } = Astro.props;
+const VENDOR_IDS = PEOPLE.filter((p) => p.vendor).map((p) => p.id);
+// Six places (decision 0022). Each is one sidebar entry; the pages inside it show as tabs at the
+// top of the page, so the sidebar stays short and the same everywhere.
+const NAV = [
+  { id: 'home', label: 'Home', to: '/', icon: 'home', mobile: true, vendorOk: true, tabs: [] },
+  { id: 'vendor', label: 'Your installation', short: 'Install', to: '/vendor/', icon: 'kit', vendorOnly: true, vendorOk: true, mobile: true, tabs: [] },
+  { id: 'vschedule', label: 'Your schedule', short: 'Schedule', to: '/work/schedule/', icon: 'schedule', vendorOnly: true, vendorOk: true, tabs: [] },
+  { id: 'work', label: 'Work', to: '/work/', icon: 'project', mobile: true, tabs: [
+    { id: 'overview', label: 'Overview', to: '/work/' },
+    { id: 'schedule', label: 'Schedule', to: '/work/schedule/' },
+    { id: 'projects', label: 'Projects', to: '/projects/', stage: 3 },
+    { id: 'incidents', label: 'Incidents', to: '/incidents/', stage: 2 },
+    { id: 'known-issues', label: 'Known issues', to: '/known-issues/', stage: 2 },
+    { id: 'playbooks', label: 'Playbooks', to: '/playbooks/', stage: 3 },
+    { id: 'planning', label: 'Planning', to: '/work/planning/', stage: 3, lead: true },
+    { id: 'refresh', label: 'Work plan', to: '/refresh/' },
+    { id: 'lab', label: 'Lab', to: '/lab/', stage: 3 },
+  ], also: ['changes'] },
+  // Locations: offices, regions and home offices, with the rooms inside them. Rooms keep their
+  // address (/rooms/) but live here. Region, office and home-office pages light the place, not a tab.
+  { id: 'locations', label: 'Locations', to: '/locations/', icon: 'sites', mobile: true, tabs: [
+    { id: 'locations-overview', label: 'Overview', to: '/locations/' },
+    { id: 'offices', label: 'Offices', to: '/locations/offices/' },
+    { id: 'rooms', label: 'Rooms', to: '/rooms/' },
+    { id: 'types', label: 'Room profiles', to: '/room-profiles/' },
+    { id: 'usage', label: 'Usage', to: '/usage/', stage: 2, lead: true },
+  ], also: ['sites', 'office', 'region', 'home-offices'] },
+  // Services: the health, fleet, standard and owners of each service.
+  { id: 'services', label: 'Services', to: '/services/', icon: 'pulse', tabs: [
+    { id: 'services-overview', label: 'Overview', to: '/services/' },
+    { id: 'services-av', label: 'AV', to: '/services/av/' },
+    { id: 'services-network', label: 'Network', to: '/services/network/' },
+    { id: 'services-infrastructure', label: 'Infrastructure', to: '/services/infrastructure/' },
+  ], also: ['service'] },
+  { id: 'devices', label: 'Devices', to: '/devices/overview/', vendorTo: '/profiles/', icon: 'devices', mobile: true, vendorOk: true, tabs: [
+    { id: 'devices-overview', label: 'Overview', to: '/devices/overview/' },
+    { id: 'profiles', label: 'Device profiles', to: '/profiles/', vendorOk: true },
+    { id: 'devices', label: 'Units', to: '/devices/' },
+    { id: 'models', label: 'Models', to: '/models/', vendorOk: true },
+    { id: 'configurations', label: 'Configurations', to: '/configurations/', vendorOk: true },
+    { id: 'standards', label: 'Standards', to: '/standards/', vendorOk: true },
+    { id: 'equipment-usage', label: 'Usage', to: '/usage/equipment/', stage: 2, lead: true },
+    { id: 'spares', label: 'IT stores', to: '/spares/' },
+    { id: 'cables', label: 'Cables', to: '/cables/' },
+  ] },
+  { id: 'team', label: 'Team', to: '/team/', icon: 'team', tabs: [
+    { id: 'team', label: 'People', to: '/team/', stage: 3 },
+    { id: 'vendors', label: 'Vendors', to: '/vendors/', stage: 3 },
+  ] },
+  { id: 'learn', label: 'Learn', to: '/learn/', icon: 'book', vendorOk: true, tabs: [] },
+];
+const parent = NAV.find((n) => n.id === section || n.tabs.some((t) => t.id === section) || (n.also ?? []).includes(section));
+const tabs = parent && parent.tabs.length > 1 ? parent.tabs : [];
+// Each role sees its own places first (under "Yours"), then everything else. Nothing is hidden.
+const ROLE_NAV = {
+  delivery: ['work', 'locations', 'devices'], 'sm-av': ['services', 'devices', 'work'], 'sm-infra': ['services', 'locations', 'devices', 'work'],
+  pm: ['work', 'locations', 'team'], 'delivery-manager': ['team', 'work'], programme: ['work', 'team'],
+  head: ['work', 'services', 'team'], tech: ['locations', 'devices', 'work'], desk: ['work', 'locations'], innovation: ['work', 'devices'],
+  network: ['locations', 'services', 'work', 'devices'],
+  'eng-manager': ['team', 'work'], 'pm-manager': ['work', 'team'], 'tech-manager': ['team', 'locations', 'work'],
+  everyone: ['work', 'locations', 'services', 'devices', 'team'],
+};
+// Usage and Scenarios (lead: true) are for everyone, but come first, marked, for the roles that decide
+// where money and space go: both service managers, the head of the service and the programme manager.
+const LEAD_ROLES = ['sm-av', 'sm-infra', 'head', 'programme'];
+const leadCss = LEAD_ROLES.map((r) => `:root[data-role="${r}"] .sec-tabs [data-lead]{order:-1}:root[data-role="${r}"] .sec-tabs [data-lead]::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-right:7px;vertical-align:2px}`).join('');
+// "Everyone (overview)" is not a role, so it is matched by who (data-who); it comes last, so its order wins.
+const roleSel = (r) => (r === 'everyone' ? ':root[data-who="everyone"]' : `:root[data-role="${r}"]`);
+const roleCss = Object.entries(ROLE_NAV).map(([r, ids]) =>
+  ids.map((id, i) => `${roleSel(r)} .nav [data-nav="${id}"]{order:${i + 1}}`).join('') +
+  `${roleSel(r)} .nav .nav-div{display:block}`).join('');
+const WHO_ROLE = Object.fromEntries(PEOPLE.map((p) => [p.id, p.roleId]));
+// "Everyone (overview)" in View as is a demo viewer, not a person: Home shows every role's panels at once
+// (matched by data-who="everyone"); anywhere else it reads as the default role.
+const EVERYONE = { id: 'everyone', name: 'Everyone', role: 'Everyone (overview)', where: 'Every role at once', initials: 'All', scope: 'Every role at once' };
+// Just enough about each person for pages that act as the viewer (task forms, proposed changes).
+// In Everyone (overview) nobody in particular is signed in, so any change made there is recorded as this clearly labelled demo admin.
+const DEMO_ADMIN = { id: 'demo-admin', name: 'Demo admin (Everyone view)', roleId: 'delivery', role: 'Demo admin', initials: 'DA', vendor: false };
+const PEOPLE_LITE = [...PEOPLE.map((p) => ({ id: p.id, name: p.name, roleId: p.roleId, role: p.role, initials: p.initials, vendor: !!p.vendor })), DEMO_ADMIN];
+const who0 = PEOPLE[0];
+// The object this page is about, for the Report drawer ("Suggest a change about ...").
+const aboutThis = about ?? { kind: 'page', label: title ?? 'this page' };
+// Styles that hide anything above the chosen stage (data-stage on <html>, set from Settings).
+const below = (min) => Array.from({ length: min - 1 }, (_, i) => i + 1);
+const gateCss = [2, 3, 4, 5, 6].flatMap((min) => below(min).flatMap((st) => [
+  `:root[data-stage="${st}"] [data-min-stage="${min}"]`, `:root[data-stage="${st}"] [data-min-stage-group="${min}"]`,
+  `:root[data-stage="${st}"] main[data-page-stage="${min}"] .page-body`])).join(',');
+const gateShow = [2, 3, 4, 5, 6].flatMap((min) => below(min).map((st) => `:root[data-stage="${st}"] main[data-page-stage="${min}"] .stage-gate`)).join(',');
+const stageInfo = STAGES_DEMO.find((x) => x.n === minStage);
+const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
+---
+<!doctype html>
+<html lang="en-IE" data-look="studio">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>{pageTitle}</title>
+  <meta name="description" content="Keia Atlas: workplace technology, mapped. A workplace technology console for a made-up company, built on public device data and the Keia framework." />
+  <script is:inline data-astro-rerun define:vars={{ VENDOR_IDS, WHO_ROLE, PEOPLE_LITE }}>window.RS_VENDORS = VENDOR_IDS; window.RS_WHO_ROLE = WHO_ROLE; window.RS_PEOPLE = PEOPLE_LITE;</script>
+  <script is:inline data-astro-rerun>
+    /* Small shared helpers for pages that keep demo records in this browser: read and write a JSON list
+       (falling back to memory when storage is blocked), and who the viewer is right now. */
+    window.rsStore = window.rsStore || {
+      mem: {},
+      get: function (k, d) { try { var v = localStorage.getItem(k); if (v != null) return JSON.parse(v); } catch (_) {} return k in this.mem ? this.mem[k] : d; },
+      put: function (k, v) { this.mem[k] = v; if (k === 'rs4-changes') window.__rsLocalChanges = v; try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} },
+    };
+    /* Who this window is signed in as (View as). Each window keeps its own person in sessionStorage
+       (rs5-who), so two windows can be two people for the live demo. A window that has not chosen yet takes
+       the last pick made in any window (localStorage rs4-who) once, and keeps it. */
+    window.rsWhoId = function () {
+      var id = null; try { id = sessionStorage.getItem('rs5-who'); } catch (_) {}
+      if (!id) {
+        try { id = localStorage.getItem('rs4-who'); } catch (_) {}
+        id = id || 'aoife';
+        try { sessionStorage.setItem('rs5-who', id); } catch (_) {}
+      }
+      // "You" is the person this window opened as; View as anyone else shows the ribbon, and "Back to you" returns here.
+      try { if (!sessionStorage.getItem('rs5-me')) sessionStorage.setItem('rs5-me', id); } catch (_) {}
+      return id;
+    };
+    window.rsMeId = function () { var me = null; try { me = sessionStorage.getItem('rs5-me'); } catch (_) {} return me || window.rsWhoId(); };
+    window.rsSetWho = function (id) {
+      try { sessionStorage.setItem('rs5-who', id); } catch (_) {}
+      try { localStorage.setItem('rs4-who', id); } catch (_) {}   // the next window to open starts as this person
+    };
+    /* Who a change is recorded as. In Everyone (overview) nobody in particular is signed in, so changes made
+       there belong to a labelled demo admin instead of "everyone". */
+    window.rsActorId = function () { var id = window.rsWhoId(); return id === 'everyone' ? 'demo-admin' : id; };
+    window.rsWho = function () {
+      var id = window.rsActorId();
+      var all = window.RS_PEOPLE || []; return all.filter(function (p) { return p.id === id; })[0] || all[0] || { id: id, name: id, role: '' };
+    };
+    /* Add a proposed change to the Changes page (rs4-changes, newest first) and return it. */
+    window.rsPropose = function (c) {
+      var list = window.rsStore.get('rs4-changes', []);
+      var n = list.reduce(function (m, x) { var k = parseInt(String(x.id).replace(/\D/g, ''), 10) || 0; return Math.max(m, k); }, 40);
+      var who = window.rsWho();
+      var item = Object.assign({ id: 'CHG-' + (n + 1), date: new Date().toISOString().slice(0, 10), status: 'review', by: who.name, byRole: who.role }, c);
+      list.unshift(item); window.rsStore.put('rs4-changes', list); return item;
+    };
+    window.rsSetChange = function (id, status) {
+      var list = window.rsStore.get('rs4-changes', []); list.forEach(function (x) { if (x.id === id) x.status = status; }); window.rsStore.put('rs4-changes', list);
+    };
+  </script>
+  <script is:inline data-astro-rerun>
+    /* Apply the saved look and light or dark mode before first paint, so the page never flashes.
+       Also loads the extra web fonts a look needs, only when that look is chosen. */
+    (function () {
+      var FONTS = {
+        drawing: 'family=Barlow+Condensed:wght@500;600;700&family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600'
+      };
+      var LOOK = { classic: { look: 'classic' }, studio: { look: 'studio' }, enterprise: { look: 'enterprise' }, contrast: { look: 'enterprise', contrast: 'high' }, drawing: { look: 'draw' } };
+      // Studio is the default; Playful (stored as 'classic') is last in Settings. The mode follows the system (Auto)
+      // until the viewer picks one. The retired Control room look falls back to the default.
+      // v2: looks chosen before Studio became the default are cleared once, so everyone starts on Studio.
+      window.rsApplyTheme = function () {
+        var r = document.documentElement, s = 'studio', t = 'system';
+        try { if (localStorage.getItem('rs4-look-v') !== '2') { localStorage.removeItem('rs4-skin'); localStorage.setItem('rs4-look-v', '2'); } s = localStorage.getItem('rs4-skin') || s; t = localStorage.getItem('rs4-theme') || t; } catch (_) {}
+        if (!LOOK[s]) s = 'studio';
+        var m = LOOK[s];
+        r.setAttribute('data-look', m.look);
+        if (m.contrast) r.setAttribute('data-contrast', m.contrast); else r.removeAttribute('data-contrast');
+        // Only clear a light or dark mode this script set itself, so a host page's own setting stays.
+        if (t === 'light' || t === 'dark') { r.setAttribute('data-theme', t); r.setAttribute('data-rs-theme', ''); }
+        else if (r.hasAttribute('data-rs-theme')) { r.removeAttribute('data-theme'); r.removeAttribute('data-rs-theme'); }
+        r.setAttribute('data-skin', s);
+        r.setAttribute('data-mode', t === 'light' || t === 'dark' ? t : 'system');
+        // Demo controls from Settings: which stage is switched on, and whether agents are shown.
+        var st = '6', ag = 'on';
+        try { st = localStorage.getItem('rs4-stage') || st; ag = localStorage.getItem('rs4-agents') || ag; } catch (_) {}
+        r.setAttribute('data-stage', st); r.setAttribute('data-agents', ag);
+        // Help mode (the ? switch): kept per window (session storage), and put back after every page swap.
+        var hp = 'off'; try { hp = sessionStorage.getItem('rs5-help') === 'on' ? 'on' : 'off'; } catch (_) {}
+        r.setAttribute('data-help', hp);
+        // Signed in as a vendor: Keia Atlas narrows to their installation and the device reference.
+        var who = window.rsWhoId ? window.rsWhoId() : 'aoife';
+        r.setAttribute('data-who', who);
+        r.setAttribute('data-role', (window.RS_WHO_ROLE || {})[who] || 'delivery');
+        r.setAttribute('data-who-kind', (window.RS_VENDORS || []).indexOf(who) >= 0 ? 'vendor' : 'staff');
+        fontLink(s);
+      };
+      /* The web fonts a look needs (a stylesheet from Google for the Drawing set; the others are bundled).
+         rsLookFonts(skin) resolves once that look's faces are downloaded, so a look change never shows a
+         late font swap; rsPreloadLooks() warms every look when Settings opens. */
+      var FACES = {
+        studio: ['400 1em "Inter Variable"', '700 1em "Inter Variable"', '400 1em "JetBrains Mono Variable"'],
+        classic: ['400 1em "Instrument Sans Variable"', '700 1em "Instrument Sans Variable"', '700 1em "Bricolage Grotesque Variable"', '400 1em "JetBrains Mono Variable"'],
+        enterprise: ['400 1em "Inter Variable"', '700 1em "Inter Variable"', '400 1em "JetBrains Mono Variable"'],
+        drawing: ['400 1em "Barlow"', '500 1em "Barlow"', '600 1em "Barlow"', '700 1em "Barlow"', '600 1em "Barlow Condensed"', '700 1em "Barlow Condensed"', '400 1em "IBM Plex Mono"', '500 1em "IBM Plex Mono"']
+      };
+      FACES.contrast = FACES.enterprise;
+      function fontLink(s) {
+        if (!FONTS[s]) return Promise.resolve();
+        var id = 'font-' + s, l = document.getElementById(id);
+        if (!l) {
+          l = document.createElement('link');
+          l.id = id; l.rel = 'stylesheet'; l.setAttribute('data-rs-font', '');
+          l.href = 'https://fonts.googleapis.com/css2?' + FONTS[s] + '&display=swap';
+          l.__rsLoaded = new Promise(function (ok) { l.onload = ok; l.onerror = ok; });
+          document.head.appendChild(l);
+        }
+        return l.__rsLoaded || Promise.resolve();
+      }
+      window.rsLookFonts = function (s) {
+        if (!FACES[s] || !document.fonts || !document.fonts.load) return Promise.resolve();
+        return fontLink(s).then(function () {
+          return Promise.all(FACES[s].map(function (f) { return document.fonts.load(f, 'Aa').catch(function () {}); }));
+        });
+      };
+      window.rsPreloadLooks = function () { Object.keys(FACES).forEach(function (s) { window.rsLookFonts(s); }); };
+      window.rsApplyTheme();
+      // The client router swaps in the next page's <html> attributes; put the chosen look back.
+      if (!window.__rsThemeHook) {
+        window.__rsThemeHook = true;
+        document.addEventListener('astro:after-swap', function () { window.rsApplyTheme(); });
+        // Keep the look's font stylesheets across page changes (the router drops head tags the next page
+        // lacks), so text never falls back to another font for a moment on the way to the next page.
+        document.addEventListener('astro:before-swap', function (e) {
+          document.querySelectorAll('link[data-rs-font]').forEach(function (l) {
+            if (!e.newDocument.head.querySelector('link[href="' + l.getAttribute('href') + '"]')) e.newDocument.head.appendChild(l.cloneNode());
+          });
+        });
+        // A static preview (plain files) uses relative links. The router swaps the next page in before it
+        // updates the address, so relative paths would resolve against the old page. Make them full
+        // addresses first (and the current page's stylesheets too, so shared ones are kept, not reloaded).
+        var REL = /^(?![a-z][a-z0-9+.-]*:|#|\/)/i;
+        var absolutise = function (root, base) {
+          var n = 0;
+          root.querySelectorAll('[href],[src]').forEach(function (el) {
+            ['href', 'src'].forEach(function (a) { var v = el.getAttribute(a); if (v && REL.test(v)) { el.setAttribute(a, new URL(v, base).href); n++; } });
+          });
+          return n;
+        };
+        // Stylesheet tags come after this script, so check once the page has been read.
+        document.addEventListener('DOMContentLoaded', function () { window.__rsRelative = absolutise(document.head, location.href) > 0; });
+        // Relative-link build: load the next page ourselves and fix its paths before the router
+        // looks at it (its own loader preloads stylesheets against the old address).
+        document.addEventListener('astro:before-preparation', function (e) {
+          if (!window.__rsRelative) return;
+          e.loader = async function () {
+            var res = await fetch(e.to.href, { signal: e.signal });
+            e.newDocument = new DOMParser().parseFromString(await res.text(), 'text/html');
+            absolutise(e.newDocument, e.to);
+          };
+        });
+        // Remember where each navigation is going (with its #tab), for pages that open on a tab.
+        document.addEventListener('astro:before-preparation', function (e) { window.__rsNavTo = e.to; });
+        // Direction: moving down the sidebar, the next page rises from below; moving up, it comes from above.
+        document.addEventListener('astro:before-preparation', function (e) {
+          var navs = Array.from(document.querySelectorAll('.nav [data-nav]'));
+          var cur = navs.findIndex(function (a) { return a.getAttribute('aria-current'); });
+          var tgt = navs.findIndex(function (a) { return new URL(a.href, location.href).pathname === e.to.pathname; });
+          window.__rsNavDir = cur < 0 || tgt < 0 || tgt === cur ? 'forward' : tgt > cur ? 'down' : 'up';
+          // Up the path (a crumb, a room back to Rooms) moves like Back.
+          var here = location.pathname, there = e.to.pathname;
+          if (there !== here && here.indexOf(there) === 0 && (cur === tgt || cur < 0 || tgt < 0)) window.__rsNavDir = 'up';
+          if (e.direction === 'back') window.__rsNavDir = 'up';
+          document.documentElement.setAttribute('data-nav-dir', window.__rsNavDir);
+        });
+        document.addEventListener('astro:after-swap', function () { if (window.__rsNavDir) document.documentElement.setAttribute('data-nav-dir', window.__rsNavDir); });
+        document.addEventListener('astro:page-load', function () { setTimeout(function () { document.documentElement.removeAttribute('data-nav-dir'); }, 700); });
+        // Rule book, persist: name only the clicked item's drawing, so it flies into the next page's stage.
+        document.addEventListener('astro:before-preparation', function (e) {
+          var a = e.sourceElement && e.sourceElement.closest ? e.sourceElement.closest('a') : null;
+          var art = a && a.querySelector('.model-art');
+          // (a picture that flies whole as a record, data-vt-rec, carries its drawing with it)
+          if (art && !art.closest('.product-stage') && !art.closest('[data-vt-rec]') && !(a && a.matches('[data-vt-rec]'))) art.style.viewTransitionName = 'art-hero';
+        });
+        /* Rule book M5, record shared elements (src/lib/vt.mjs). A clicked record's picture (data-vt-rec)
+           flies into the element that stands for it on the next page (data-vt-here, named statically), and
+           back again on Back or up the path. Paired once the next page is loaded, before the old page is
+           captured; a static name with no partner is dropped so it moves with its page. The band is dropped
+           too when it has scrolled away, so it does not fall in from above. */
+        document.addEventListener('astro:before-preparation', function (e) {
+          var load = e.loader, src = e.sourceElement && e.sourceElement.closest ? e.sourceElement : null;
+          e.loader = async function () {
+            await load();
+            var nd = e.newDocument; if (!nd || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+            var safe = function (id) { return 'rec-' + String(id).replace(/[^a-zA-Z0-9_-]/g, '-'); };
+            var esc = function (s) { return window.CSS && CSS.escape ? CSS.escape(s) : s; };
+            var named = function (el, id) { el.style.viewTransitionName = safe(id); el.style.viewTransitionClass = 'rec'; };
+            var a = src && src.closest('a');
+            var clicked = a && (a.matches('[data-vt-rec]') ? a : a.querySelector('[data-vt-rec]') || a.closest('[data-vt-rec]'));
+            var pair = null;
+            // Opening: the clicked picture, and the element on the next page that stands for the same record.
+            if (clicked && nd.querySelector('[data-vt-here="' + esc(clicked.dataset.vtRec) + '"]')) pair = clicked.dataset.vtRec;
+            // Going back: this page's record, and its picture in the list we return to.
+            document.querySelectorAll('[data-vt-here]').forEach(function (el) {
+              var id = el.dataset.vtHere, there = !pair && nd.querySelector('[data-vt-rec="' + esc(id) + '"]');
+              if (there) { pair = id; named(there, id); }
+              else if (id !== pair) el.style.viewTransitionName = 'none';
+            });
+            if (clicked && pair === clicked.dataset.vtRec) named(clicked, pair);
+            nd.querySelectorAll('[data-vt-here]').forEach(function (el) { if (el.dataset.vtHere !== pair) el.style.viewTransitionName = 'none'; });
+            // A record picture that flies whole carries its drawing with it, so the drawing must not also fly on
+            // its own as "art-hero" (the clicked one above, or one a page names in its own styles).
+            [document, nd].forEach(function (root) {
+              root.querySelectorAll('[data-vt-rec], [data-vt-here]').forEach(function (el) {
+                var n = el.style.viewTransitionName; if (!n || n === 'none') return;
+                el.querySelectorAll('.model-art').forEach(function (art) { art.style.viewTransitionName = 'none'; });
+              });
+            });
+            var band = document.querySelector('.band.pb'), mast = document.querySelector('.mast');
+            if (band && band.getBoundingClientRect().bottom < (mast ? mast.getBoundingClientRect().bottom : 0)) band.style.viewTransitionName = 'none';
+          };
+        });
+      }
+    })();
+  </script>
+  <ClientRouter />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="icon" href={href('/favicon.svg')} type="image/svg+xml" />
+  <slot name="head" />
+</head>
+<body>
+  <a class="sr-only" href="#main">Skip to content</a>
+  <header class="mast">
+    <a class="brand" href={href('/')} aria-label="Keia Atlas home" data-help="shell.brand">
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect class="tile" x="1.5" y="1.5" width="28" height="28" rx="7" stroke-width="2" /><path class="tick" d="M8.5 16l4.5 4.5 10-10" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      <span><b>Keia Atlas</b><small>Workplace technology, mapped.</small></span>
+    </a>
+    <nav class="crumbs" aria-label="Breadcrumb" data-help="shell.path">
+      {crumbs.map((c, i) => (
+        <>
+          {i > 0 && <span class="sep" aria-hidden="true">/</span>}
+          {c.to ? <a href={href(c.to)}>{c.label}</a> : <span aria-current="page">{c.label}</span>}
+        </>
+      ))}
+    </nav>
+    <span class="spacer"></span>
+    <button class="search-btn" type="button" data-help="shell.search" data-open-search aria-label="Search everything (/ or Ctrl K)" title="Search everything"><Icon name="search" size={16} /><span>Search</span><kbd data-search-kbd>Ctrl K</kbd></button>
+    <button class="help-btn" type="button" data-help-toggle data-help="shell.help" data-help-src={href('/help/index.json')} aria-pressed="false" aria-label="Help: explain what things are (?)" title="Help: explain what things are (press ? to switch on or off)"><span class="hb-q" aria-hidden="true">?</span></button>
+    <button class="report-btn" type="button" data-help="shell.report" data-open-report title="Suggest a change, log new firmware or raise an urgent issue about this page"><Icon name="plus" size={16} /><span>Report</span></button>
+    <button class="icon-btn mobile-gear" type="button" data-help="shell.mode" data-toggle-mode aria-label="Colour mode: Auto" title="Colour mode: Auto"><span class="m-system"><Icon name="auto" /></span><span class="m-light"><Icon name="sun" /></span><span class="m-dark"><Icon name="moon" /></span></button>
+    <button class="icon-btn mobile-gear" type="button" data-help="shell.settings" data-open-settings aria-label="Settings"><Icon name="gear" /></button>
+  </header>
+  <div class="shell">
+    <aside class="side" aria-label="Primary">
+      <nav class="nav" aria-label="Sections">
+        {NAV.map((n) => {
+          const on = parent?.id === n.id;
+          const stage = n.tabs.length && n.tabs.every((t) => t.stage) ? Math.min(...n.tabs.map((t) => t.stage)) : undefined;
+          return (
+            <a href={href(n.to)} data-help={`place:${n.id}`} data-vendor-to={n.vendorTo ? href(n.vendorTo) : undefined} aria-current={on ? 'page' : undefined} class={n.mobile ? 'on-mobile' : undefined} data-min-stage={stage} data-nav={n.id} data-vendor-ok={n.vendorOk ? '' : undefined} data-vendor-only={n.vendorOnly ? '' : undefined}>
+              {on && <span class="nav-on" aria-hidden="true"></span>}<Icon name={n.icon} /><span class="long">{n.label}</span><span class="short">{n.short ?? n.label}</span>
+            </a>
+          );
+        })}
+        <p class="nav-div" aria-hidden="true">Everything else</p>
+        <button class="nav-more" type="button" aria-expanded="false" data-nav-more data-help="shell.more"><Icon name="menu" /><span class="short">More</span></button>
+      </nav>
+      <div class="foot">
+        <div class="account">
+          <button class="acct-btn" type="button" data-help="shell.account" aria-haspopup="menu" aria-expanded="false" data-acct-menu>
+            <span class="avatar" aria-hidden="true" data-who-initials>AB</span>
+            <span class="acct-who"><b data-who-role>AV and IT delivery engineer</b><small data-who-where>EMEA</small></span>
+          </button>
+          <span class="tools">
+            <button class="icon-btn" type="button" data-help="shell.mode" data-toggle-mode aria-label="Colour mode: Auto. Select to change" title="Colour mode: Auto">
+              <span class="m-system"><Icon name="auto" /></span><span class="m-light"><Icon name="sun" /></span><span class="m-dark"><Icon name="moon" /></span>
+            </button>
+            <button class="icon-btn" type="button" data-help="shell.settings" data-open-settings aria-label="Settings" title="Settings"><Icon name="gear" /></button>
+          </span>
+          <div class="acct-menu" data-help="shell.viewas" role="menu" aria-label="View as someone else" hidden>
+            <div class="am-top">
+              <p class="am-h">View as <span class="faint">· demo</span></p>
+              <label class="am-q" data-help="shell.viewas-find"><Icon name="search" size={14} /><input type="search" placeholder="Role, place or team" data-who-q aria-label="Find a person" /></label>
+            </div>
+            <div class="am-people" data-who-list>
+              <div class="am-grp" data-grp>
+                <p class="am-g">Overview</p>
+                <button type="button" role="menuitemradio" aria-checked="false" data-help="shell.viewas-everyone" data-pick-who="everyone" data-text="everyone overview all roles master demo">
+                  <span class="avatar sm" aria-hidden="true">All</span>
+                  <span class="am-p"><b>{EVERYONE.role}</b><small>Every role's first screen, all at once</small></span>
+                </button>
+              </div>
+              {['delivery', 'onsite', 'av-it', 'it-infra', 'service-desk', 'leadership', 'vendor'].map((tm) => {
+                const ps = PEOPLE.filter((p) => p.team === tm);
+                return ps.length > 0 && (
+                  <div class="am-grp" data-grp>
+                    <p class="am-g">{TEAMS[tm]}</p>
+                    {ps.map((p) => (
+                      <button type="button" role="menuitemradio" aria-checked="false" data-help="shell.viewas-person" data-pick-who={p.id} data-text={`${p.role} ${p.where} ${TEAMS[tm]} ${p.scope ?? ''} ${p.name}`.toLowerCase()}>
+                        <span class="avatar sm" aria-hidden="true" title={p.name}>{p.initials}</span>
+                        <span class="am-p"><b>{p.role}</b><small>{p.where}</small></span>
+                      </button>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+            <div class="am-links">
+              <button type="button" role="menuitem" data-open-settings><Icon name="gear" size={16} />Settings</button>
+              <a role="menuitem" href={href('/about/')}><Icon name="about" size={16} />About</a>
+              <a role="menuitem" href={href('/about/#decisions')}><Icon name="decisions" size={16} />Decisions</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+    <main id="main" data-page-help={`page.${section || 'generic'}`} data-page-stage={minStage > 1 ? minStage : undefined} data-vendor-ok={vendorOk ? '' : undefined}>
+      <!-- View as: a thin ribbon under the top bar while this window is someone else, on every page (C14). -->
+      <div class="viewas" data-viewas data-help="shell.ribbon" hidden role="status">
+        <span class="va-eye" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg></span>
+        <span class="va-t">Viewing as <b data-va-name></b><span class="va-role">, <span data-va-role></span>, <span data-va-where></span></span></span>
+        <button type="button" class="va-back" data-back-to-you data-help="shell.back-to-you">Back to you</button>
+      </div>
+      <section class="vendor-gate">
+        <p class="kind">Vendor access</p>
+        <h1>This part is for Aigna staff</h1>
+        <p class="lede">Vendors see their own installation and the device reference they need to build it: profiles, configurations and models. Everything else stays with Aigna.</p>
+        <a class="btn primary" href={href('/vendor/')}>Go to your installation</a>
+      </section>
+      {minStage > 1 && (
+        <section class="stage-gate">
+          <p class="kind">Stage {minStage}: {stageInfo?.name}</p>
+          <h1>This arrives at stage {minStage}</h1>
+          <p class="lede">{stageInfo?.adds}. It's switched off because the demo is set to an earlier stage.</p>
+          <button class="btn primary" type="button" data-help="shell.stage-gate" data-set-stage={minStage}>Switch on stage {minStage}</button>
+        </section>
+      )}
+      {tabs.length > 0 && (
+        <nav class="sec-tabs" aria-label={parent.label} data-help="shell.tabs" data-sec-tabs>
+          <div class="sec-list" data-sec-list>
+            {tabs.map((t) => (
+              <a href={href(t.to)} data-help={`tab:${t.id}`} aria-current={t.id === section ? 'page' : undefined} data-min-stage={t.stage} data-vendor-ok={t.vendorOk ? '' : undefined} data-lead={t.lead ? '' : undefined}>
+                {t.label}{t.id === section && <span class="sec-on" aria-hidden="true"></span>}
+              </a>
+            ))}
+          </div>
+          {/* Tabs that do not fit the width go into More (filled by the script below), never a sideways scroll. */}
+          <div class="sec-more" data-sec-more hidden>
+            <button type="button" class="sec-more-btn" aria-haspopup="true" aria-expanded="false">More<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg></button>
+            <div class="sec-more-pop" role="menu" data-sec-pop></div>
+          </div>
+        </nav>
+        <script is:inline data-astro-rerun>
+          (function () {
+            var nav = document.querySelector('[data-sec-tabs]'); if (!nav || nav.__sec) return; nav.__sec = true;
+            var list = nav.querySelector('[data-sec-list]'), more = nav.querySelector('[data-sec-more]'), pop = nav.querySelector('[data-sec-pop]'), btn = more.querySelector('button');
+            var shown = function (a) { return getComputedStyle(a).display !== 'none'; };
+            var fit = function () {
+              var links = Array.prototype.slice.call(list.children);
+              links.forEach(function (a) { a.classList.remove('sec-x'); });
+              pop.innerHTML = ''; more.hidden = true;
+              if (list.scrollWidth <= list.clientWidth + 1) return;
+              more.hidden = false;
+              // Hide from the right end (as shown, after any role ordering), never the current tab, until the rest fit.
+              var vis = links.filter(shown).sort(function (a, b) { return a.offsetLeft - b.offsetLeft; });
+              for (var i = vis.length - 1; i >= 0 && list.scrollWidth > list.clientWidth + 1; i--) {
+                if (!vis[i].hasAttribute('aria-current')) vis[i].classList.add('sec-x');
+              }
+              vis.filter(function (a) { return a.classList.contains('sec-x'); }).forEach(function (a) {
+                var c = a.cloneNode(true); c.classList.remove('sec-x'); c.setAttribute('role', 'menuitem'); pop.appendChild(c);
+              });
+            };
+            var open = function (v) { more.classList.toggle('open', v); btn.setAttribute('aria-expanded', String(v)); };
+            btn.addEventListener('click', function (e) { e.stopPropagation(); open(!more.classList.contains('open')); });
+            more.addEventListener('keydown', function (e) { if (e.key === 'Escape') { open(false); btn.focus(); } });
+            document.addEventListener('click', function (e) { if (!more.contains(e.target)) open(false); });
+            fit();
+            if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+            if (window.ResizeObserver) new ResizeObserver(function () { requestAnimationFrame(fit); }).observe(nav);
+          })();
+        </script>
+      )}
+      <div class="page-body"><slot /></div>
+    </main>
+  </div>
+  <Settings />
+  <Report about={aboutThis} />
+  <Peek />
+  <HelpMode />
+  <SearchOverlay />
+  <slot name="end" />
+  <script is:inline data-astro-rerun>
+    /* Tables marked "to-cards" become cards on narrow screens (base.css): each cell carries its column's name. */
+    (function () {
+      var label = function (t) {
+        var heads = Array.prototype.map.call(t.querySelectorAll('thead th'), function (th) { return th.textContent.trim(); });
+        t.querySelectorAll('tbody tr').forEach(function (tr) {
+          Array.prototype.forEach.call(tr.children, function (td, i) { if (!td.hasAttribute('data-label') && heads[i]) td.setAttribute('data-label', heads[i]); });
+        });
+      };
+      document.querySelectorAll('table.to-cards').forEach(function (t) {
+        label(t);
+        if (window.MutationObserver && !t.__tc) { t.__tc = true; new MutationObserver(function () { label(t); }).observe(t, { childList: true, subtree: true }); }
+      });
+    })();
+  </script>
+  <script is:inline data-astro-rerun define:vars={{ PEOPLE, EVERYONE }}>
+    (function () {
+      /* Per page: show who you're signed in as and which stage is on (both chosen in Settings). */
+      var get = function (k, d) { try { return localStorage.getItem(k) || d; } catch (_) { return d; } };
+      window.rsSyncDemo = function () {
+        var id = window.rsWhoId();
+        var who = id === 'everyone' ? EVERYONE : PEOPLE.find(function (p) { return p.id === id; }) || PEOPLE[0];
+        document.querySelectorAll('[data-who-name]').forEach(function (el) { el.textContent = who.name; });
+        document.querySelectorAll('[data-who-role]').forEach(function (el) { el.textContent = who.role; });
+        document.querySelectorAll('[data-who-where]').forEach(function (el) { el.textContent = who.where; });
+        document.querySelectorAll('[data-who-initials]').forEach(function (el) { el.textContent = who.initials; });
+        document.querySelectorAll('[data-stage-n]').forEach(function (el) { el.textContent = get('rs4-stage', '6'); });
+        // The View as ribbon: shown while this window is anyone but the person it opened as.
+        var rib = document.querySelector('[data-viewas]');
+        if (rib) {
+          var meId = window.rsMeId ? window.rsMeId() : id, viewing = id !== meId;
+          rib.hidden = !viewing;
+          if (viewing) {
+            rib.querySelector('[data-va-name]').textContent = who.name;
+            rib.querySelector('[data-va-role]').textContent = id === 'everyone' ? 'every role at once' : who.role.charAt(0).toLowerCase() + who.role.slice(1);
+            rib.querySelector('[data-va-where]').textContent = who.where;
+            var me = PEOPLE.find(function (p) { return p.id === meId; }) || EVERYONE;
+            rib.querySelector('[data-back-to-you]').title = 'Back to ' + me.name + ', ' + me.role;
+          }
+        }
+        // Vendors have no list of units, so their Devices entry opens the profiles.
+        var vend = !!who.vendor;
+        document.querySelectorAll('[data-vendor-to]').forEach(function (a) {
+          if (!a.dataset.staffTo) a.dataset.staffTo = a.getAttribute('href');
+          a.setAttribute('href', vend ? a.dataset.vendorTo : a.dataset.staffTo);
+        });
+      };
+      window.rsSyncDemo();
+      /* Status lights: grey first, then light up one after another once they're on screen. */
+      var lights = document.querySelectorAll('.hl[data-state]:not(.lit)');
+      if (lights.length) {
+        var n = 0;
+        var light = function (el) { setTimeout(function () { el.classList.add('lit'); }, 350 + (n++ % 40) * 70); };
+        if ('IntersectionObserver' in window) {
+          var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { io.unobserve(e.target); light(e.target); } }); }, { threshold: 0.5 });
+          lights.forEach(function (el) { io.observe(el); });
+        } else lights.forEach(light);
+      }
+      /* Phone: More opens the rest of the places as a sheet above the tab bar. */
+      var more = document.querySelector('[data-nav-more]');
+      if (more) more.addEventListener('click', function () {
+        var open = !document.documentElement.classList.contains('nav-sheet');
+        document.documentElement.classList.toggle('nav-sheet', open);
+        more.setAttribute('aria-expanded', String(open));
+      });
+      document.querySelectorAll('.nav a').forEach(function (a) { a.addEventListener('click', function () { document.documentElement.classList.remove('nav-sheet'); }); });
+      /* "Switch on stage n" on a gated page. */
+      document.querySelectorAll('[data-set-stage]').forEach(function (b) {
+        b.addEventListener('click', function () { window.rsSetStage(b.dataset.setStage); });
+      });
+      /* Account menu: about the project, decision records and settings live here. */
+      var btn = document.querySelector('[data-acct-menu]'), menu = document.querySelector('.acct-menu');
+      if (btn && menu) {
+        // It grows from the account button and shrinks back to it (M11, M12).
+        var close = function () {
+          if (menu.hidden || menu.__closing) return;
+          menu.__closing = true; btn.setAttribute('aria-expanded', 'false');
+          window.rsPopOut(menu, btn, function () { menu.hidden = true; menu.__closing = false; });
+        };
+        var markWho = function () {
+          var cur = window.rsWhoId();
+          menu.querySelectorAll('[data-pick-who]').forEach(function (b) { b.setAttribute('aria-checked', String(b.dataset.pickWho === cur)); });
+        };
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          if (!menu.hidden && !menu.__closing) { close(); return; }
+          menu.__closing = false; menu.getAnimations().forEach(function (an) { an.cancel(); });
+          menu.hidden = false; btn.setAttribute('aria-expanded', 'true');
+          markWho(); var on = menu.querySelector('[aria-checked=true]'); if (on) on.scrollIntoView({ block: 'nearest' });
+          window.rsPopIn(menu, btn);
+          var q = menu.querySelector('[data-who-q]'); if (q && matchMedia('(hover: hover)').matches) q.focus({ preventScroll: true });
+        });
+        menu.addEventListener('click', function (e) {
+          var pick = e.target.closest('[data-pick-who]');
+          if (pick) {
+            // The menu closes first, then the page changes to the new person in one move (rsPickWho).
+            var id = pick.dataset.pickWho, m = window.rsMotion ? window.rsMotion() : { reduced: true, exit: 0 };
+            close(); markWho();
+            if (m.reduced) window.rsPickWho(id); else setTimeout(function () { window.rsPickWho(id); }, m.exit);
+            return;
+          }
+          if (e.target.closest('[role=menuitem]')) close();
+        });
+        var wq = menu.querySelector('[data-who-q]');
+        if (wq) wq.addEventListener('input', function () {
+          var q = wq.value.trim().toLowerCase();
+          menu.querySelectorAll('[data-grp]').forEach(function (g) {
+            var any = false;
+            g.querySelectorAll('[data-pick-who]').forEach(function (b) { var ok = !q || b.dataset.text.indexOf(q) >= 0; b.hidden = !ok; any = any || ok; });
+            g.hidden = !any;
+          });
+        });
+        if (!window.__rsMenuHook) {   // once per visit, not once per page
+          window.__rsMenuHook = true;
+          document.addEventListener('click', function (e) {
+            var m = document.querySelector('.acct-menu'), b = document.querySelector('[data-acct-menu]');
+            if (m && !m.hidden && !m.__closing && !e.target.closest('.acct-menu')) {
+              m.__closing = true; if (b) b.setAttribute('aria-expanded', 'false');
+              window.rsPopOut(m, b, function () { m.hidden = true; m.__closing = false; });
+            }
+          });
+        }
+        menu.addEventListener('keydown', function (e) { if (e.key === 'Escape') { close(); btn.focus(); } });
+      }
+      /* "Back to you" on the View as ribbon: back to the person this window opened as. */
+      var back = document.querySelector('[data-back-to-you]');
+      if (back) back.addEventListener('click', function () { window.rsPickWho(window.rsMeId()); });
+    })();
+  </script>
+  <script is:inline data-astro-rerun>
+    /* Rule book, persist (motion.css): swap one panel for another so anything the two share (keyed by
+       data-vk) moves from where it was to where it is now, new things grow in, and the box changes
+       height smoothly. Used by build-option tabs, filters and other in-page switches. */
+    /* Rule book, still: switching tabs never moves the page. The box a tab lives in only ever grows
+       while you are on the page, so a shorter tab cannot pull the page up under your pointer. */
+    /* Rule book M1 and M7: scripts take durations and the curve from the motion tokens in motion.css, and
+       check reduced motion, through this one helper. Values are milliseconds. */
+    window.rsMotion = window.rsMotion || function () {
+      var cs = getComputedStyle(document.documentElement);
+      var ms = function (name, d) {
+        var v = cs.getPropertyValue(name).trim(), n = parseFloat(v);
+        return isNaN(n) ? d : /ms$/.test(v) ? n : /s$/.test(v) ? n * 1000 : n;
+      };
+      return {
+        reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
+        ease: cs.getPropertyValue('--ease-settle').trim() || 'cubic-bezier(.22,1,.36,1)',
+        morph: ms('--dur-morph', 520), enter: ms('--dur-enter', 440), exit: ms('--dur-exit', 240), page: ms('--dur-page', 420),
+        state: ms('--dur-state', 300), hover: ms('--dur-hover', 140), pop: ms('--dur-pop', 200), flash: ms('--dur-flash', 800),
+        delay: ms('--delay-enter', 120), stagger: ms('--stagger', 24),
+      };
+    };
+    /* The box keeps its height through the swap (so the scroll cannot jump), then eases down to its new
+       height over --dur-morph and lets go: a shorter tab or filter result never leaves blank space behind. */
+    window.rsHold = function (box, swap) {
+      if (!box) { swap(); return; }
+      var h0 = box.getBoundingClientRect().height, y0 = window.scrollY, M = window.rsMotion();
+      if (box.__rsHold) box.__rsHold();
+      // While held, spare room collects at the bottom (a grid would otherwise stretch its rows into it).
+      var ac = box.style.alignContent;
+      box.style.alignContent = 'start';
+      box.style.minHeight = h0 + 'px';
+      swap();
+      if (Math.abs(window.scrollY - y0) > 1) window.scrollTo(window.scrollX, y0);
+      box.style.minHeight = '';
+      var end = function () { if (box.__rsHold !== end) return; box.__rsHold = null; if (an) an.cancel(); box.style.alignContent = ac; };
+      box.__rsHold = end;
+      if (M.reduced || !box.animate) { end(); return; }
+      // From the old height down to nothing: the box follows its content once that is taller, so it settles
+      // on its new height with the same curve as everything else.
+      var an = box.animate([{ minHeight: h0 + 'px' }, { minHeight: '0px' }], { duration: M.morph, easing: M.ease });
+      an.onfinish = end;
+    };
+    window.rsMorphPanels = window.rsMorphPanels || function (oldP, newP, swap) {
+      var M = window.rsMotion(), reduced = M.reduced;
+      var box = function (el) { return el instanceof SVGGraphicsElement && el.ownerSVGElement ? el.getBBox() : el.getBoundingClientRect(); };
+      var before = new Map();
+      if (oldP && !reduced) oldP.querySelectorAll('[data-vk]').forEach(function (el) { try { before.set(el.dataset.vk, box(el)); } catch (_) {} });
+      var host = newP.parentElement, h0 = host.getBoundingClientRect().height;
+      swap();
+      if (reduced) return;
+      var h1 = host.getBoundingClientRect().height;
+      if (Math.abs(h1 - h0) > 2) host.animate([{ height: h0 + 'px', overflow: 'hidden' }, { height: h1 + 'px', overflow: 'hidden' }], { duration: M.morph, easing: M.ease });
+      var i = 0;
+      newP.querySelectorAll('[data-vk]').forEach(function (el) {
+        var a = before.get(el.dataset.vk), b; try { b = box(el); } catch (_) { return; }
+        var svg = el instanceof SVGGraphicsElement && el.ownerSVGElement;
+        if (a && b.width && b.height) {
+          var sx = a.width / b.width, sy = a.height / b.height;
+          if (svg) {
+            el.style.transformBox = 'view-box'; el.style.transformOrigin = '0 0';
+            var tx = a.x - sx * b.x, ty = a.y - sy * b.y;
+            if (Math.abs(tx) + Math.abs(ty) + Math.abs(sx - 1) + Math.abs(sy - 1) < 0.5) return;
+            el.animate([{ transform: 'translate(' + tx + 'px,' + ty + 'px) scale(' + sx + ',' + sy + ')' }, { transform: 'none' }], { duration: M.morph, easing: M.ease });
+          } else {
+            var dx = a.left - b.left, dy = a.top - b.top;
+            if (Math.abs(dx) + Math.abs(dy) < 1) return;
+            el.animate([{ transform: 'translate(' + dx + 'px,' + dy + 'px)' }, { transform: 'none' }], { duration: M.morph, easing: M.ease });
+          }
+        } else if (before.size) {
+          el.style.transformBox = 'fill-box'; el.style.transformOrigin = 'center';
+          el.animate([{ transform: 'scale(0)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: M.enter, delay: M.delay + (i++ % 12) * M.stagger, easing: M.ease, fill: 'backwards' });
+        }
+      });
+    };
+    /* Rule book M10, live changes: someone else changed this item. It stays where it is; its colour eases
+       (.is-changed, motion.css) and a small "Ruth, just now" mark shows, then both fade. Never re-render the
+       list or move the scroll. who: a name; el: the changed field or card. */
+    window.rsMarkChanged = window.rsMarkChanged || function (el, who) {
+      if (!el) return;
+      var M = window.rsMotion(), linger = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dur-linger')) || 4000;
+      var old = el.querySelector(':scope > .rs-changed-mark'); if (old) old.remove();
+      clearTimeout(el.__rsChanged);
+      el.classList.add('was-changed', 'is-changed');   // was-changed keeps the easing on the way back
+      if (who) { var m = document.createElement('span'); m.className = 'rs-changed-mark'; m.textContent = who + ', just now'; el.appendChild(m); }
+      el.__rsChanged = setTimeout(function () {
+        el.classList.remove('is-changed');
+        var mk = el.querySelector(':scope > .rs-changed-mark');
+        if (mk) setTimeout(function () { mk.remove(); }, M.reduced ? 0 : M.exit);
+      }, linger);
+    };
+  </script>
+  <script is:inline data-astro-rerun>
+    /* Rule book M12, controls: one family of moves for everything that changes what you see (motion.md).
+       rsAnchor     keeps what you were looking at still on screen through a change
+       rsTheme      a look or light and dark: one cross-fade of the whole page, fonts ready first
+       rsChange     a setting that adds, removes or re-orders things (stage, agents, View as): what leaves
+                    shrinks to its centre, what arrives grows from its centre, the rest slides
+       rsSwapBegin  a view or scope swap: the old view fades out where it was, the new one fades in, the box
+                    eases to its new height, and the bar you clicked stays under your pointer
+       rsMarker     the sliding marker behind the chosen option of a segmented control
+       rsPopIn/Out  a menu, card or Settings grows from the control that opened it and shrinks back
+       Reduced motion: every one of them changes at once, and still keeps your place. */
+    (function () {
+      var W = window, D = document, R = D.documentElement;
+      var noop = function () {};
+      var rendered = function (el) { return !!el && el.isConnected && el.getClientRects().length > 0; };
+      var M = function () { return W.rsMotion ? W.rsMotion() : { reduced: true }; };
+      // The line under the top bar (and under the filter bar while it sticks): content above it is out of sight.
+      var topLimit = function () {
+        var m = D.querySelector('.mast'), t = m ? m.getBoundingClientRect().bottom : 0;
+        var fb = D.querySelector('main .fb[data-fb]');
+        if (fb && getComputedStyle(fb).position === 'sticky') { var fr = fb.getBoundingClientRect(); if (fr.top <= t + 2) t = Math.max(t, fr.bottom); }
+        return t;
+      };
+      W.rsTopLimit = topLimit;
+      W.rsAnchor = function () {
+        var main = D.querySelector('main');
+        if (!main || W.scrollY < 2) return { restore: noop };
+        var y = topLimit() + 12, el = main, chain = [];
+        for (var depth = 0; depth < 14 && el; depth++) {
+          var next = null, kids = el.children, i, r;
+          for (i = 0; i < kids.length && !next; i++) { r = kids[i].getBoundingClientRect(); if (r.height && r.top <= y && r.bottom > y && !/sticky|fixed/.test(getComputedStyle(kids[i]).position)) next = kids[i]; }
+          for (i = 0; i < kids.length && !next; i++) { r = kids[i].getBoundingClientRect(); if (r.height && r.top > y) next = kids[i]; }
+          if (!next) break;
+          chain.push({ el: next, top: next.getBoundingClientRect().top });
+          el = next;
+        }
+        return { restore: function () {
+          for (var i = chain.length - 1; i >= 0; i--) {
+            if (!rendered(chain[i].el)) continue;
+            var d = chain[i].el.getBoundingClientRect().top - chain[i].top;
+            if (Math.abs(d) > 0.5) W.scrollBy(0, d);
+            return;
+          }
+        } };
+      };
+
+      /* Look and light or dark. update() sets the new look; skin names it, so its fonts load first. */
+      var theming = 0;
+      W.rsTheme = function (update, skin) {
+        var go = function () {
+          var a = W.rsAnchor(), m = M();
+          theming++; R.classList.add('rs-theming');
+          var done = function () { if (--theming <= 0) { theming = 0; R.classList.remove('rs-theming'); } };
+          var run = function () { update(); a.restore(); };
+          if (!D.startViewTransition || m.reduced) { run(); requestAnimationFrame(function () { requestAnimationFrame(done); }); return; }
+          D.startViewTransition(run).finished.then(done, done);
+        };
+        var wait = skin && W.rsLookFonts ? W.rsLookFonts(skin) : null;
+        if (!wait) { go(); return; }
+        var fired = false, once = function () { if (!fired) { fired = true; go(); } };
+        wait.then(once, once); setTimeout(once, 800);
+      };
+
+      /* A setting that changes <html> attributes (stage, agents, who). setAttrs sets them; after() does the
+         rest (words, page scripts). Moves: exits pinned where they were and shrunk, enters grown, the rest
+         slid (FLIP) by the difference from any moving parent. A change that swaps the whole page body (a
+         page from a later stage, the vendor gate) cross-fades the page instead, like a look. */
+      var live = [];
+      var settle = function () { var l = live; live = []; l.forEach(function (f) { f(); }); };
+      var attrs = function () { var o = {}; Array.prototype.forEach.call(R.attributes, function (a) { o[a.name] = a.value; }); return o; };
+      var setAll = function (o) {
+        Array.prototype.slice.call(R.attributes).forEach(function (a) { if (!(a.name in o)) R.removeAttribute(a.name); });
+        Object.keys(o).forEach(function (k) { if (R.getAttribute(k) !== o[k]) R.setAttribute(k, o[k]); });
+      };
+      var gateOf = function () {
+        return ['.page-body', '.stage-gate', '.vendor-gate'].map(function (s) { return rendered(D.querySelector('main ' + s)) ? 1 : 0; }).join('');
+      };
+      W.rsChange = function (setAttrs, after, opts) {
+        opts = opts || {};
+        settle();
+        var m = M(), a = W.rsAnchor();
+        var old = attrs(), g0 = gateOf();
+        setAttrs();
+        var neu = attrs(), g1 = gateOf();
+        if (m.reduced) { if (after) after(); a.restore(); return; }
+        if (g1 !== g0) { setAll(old); W.rsTheme(function () { setAll(neu); if (after) after(); }); return; }
+        setAll(old);
+        var roots = (opts.roots || ['.side', 'main']).map(function (s) { return D.querySelector(s); }).filter(Boolean), els = [];
+        roots.forEach(function (r) { els.push(r); Array.prototype.forEach.call(r.querySelectorAll('*'), function (el) { if (!(el instanceof SVGElement && el.ownerSVGElement)) els.push(el); }); });
+        var before = new Map();
+        els.forEach(function (el) { before.set(el, el.getClientRects().length ? el.getBoundingClientRect() : null); });
+        setAll(neu);
+        if (after) after();
+        a.restore();
+        var vh = innerHeight, near = function (r) { return r && r.bottom > -60 && r.top < vh + 60; };
+        var inRoot = function (el) { return roots.indexOf(el) >= 0; };
+        var entered = new Set(), exited = new Set(), deltas = new Map(), enters = [], exits = [], moves = [];
+        els.forEach(function (el) {
+          var b = before.get(el), r = el.isConnected && el.getClientRects().length ? el.getBoundingClientRect() : null, p = el.parentElement;
+          if (!b && r) { entered.add(el); if (!entered.has(p) && near(r)) enters.push([el, r]); return; }
+          if (b && !r) { exited.add(el); if (el.isConnected && !exited.has(p) && near(b)) exits.push([el, b]); return; }
+          if (!b || !r || entered.has(p) || (!near(b) && !near(r))) return;
+          var dx = b.left - r.left, dy = b.top - r.top, base = null;
+          for (var q = p; q && !base; q = q.parentElement) { base = deltas.get(q) || null; if (inRoot(q)) break; }
+          var rx = dx - (base ? base.dx : 0), ry = dy - (base ? base.dy : 0);
+          if (Math.abs(rx) < 1 && Math.abs(ry) < 1) return;
+          var cs = getComputedStyle(el);
+          if (cs.display === 'inline' || cs.transform !== 'none' || /sticky|fixed/.test(cs.position)) return;
+          deltas.set(el, { dx: dx, dy: dy });
+          if (moves.length < 400) moves.push([el, rx, ry]);
+        });
+        // What leaves: read how it was shown (the old attributes, for a moment), then pin it where it was.
+        var shows = [];
+        if (exits.length) { setAll(old); shows = exits.map(function (x) { return getComputedStyle(x[0]).display; }); setAll(neu); }
+        live.push(W.rsExitEls(exits.map(function (x, i) { return [x[0], x[1], shows[i]]; })));
+        var anims = moves.map(function (x) {
+          return x[0].animate([{ transform: 'translate(' + x[1] + 'px,' + x[2] + 'px)' }, { transform: 'none' }], { duration: m.morph, easing: m.ease });
+        });
+        live.push(function () { anims.forEach(function (an) { an.cancel(); }); });
+        live.push(W.rsEnterEls(enters));
+      };
+
+      /* Enter and exit (M2) for any list of elements. Grow and shrink at the centre of the part you can see;
+         big things (a whole panel) only fade. rsExitEls takes [el, its box before, how it was displayed],
+         already hidden: it shows it once more, pinned where it was and out of the flow (so the rest can slide
+         into its room), shrinks it, then lets it go. Both return a function that ends them at once. */
+      var originOf = function (r) {
+        var vh = innerHeight, t = Math.max(r.top, 0), btm = Math.min(r.bottom, vh);
+        return Math.round(r.width / 2) + 'px ' + Math.round(Math.max(0, (t + btm) / 2 - r.top)) + 'px';
+      };
+      var bigBox = function (r) { return r.height > innerHeight * 0.6 || r.width > 900; };
+      W.rsEnterEls = function (list) {
+        var m = M(); if (m.reduced || !list || !list.length) return noop;
+        var anims = list.map(function (x, i) {
+          var o = originOf(x[1]), k = bigBox(x[1]) ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, transform: 'scale(0)', transformOrigin: o }, { opacity: 1, transform: 'none', transformOrigin: o }];
+          return x[0].animate(k, { duration: m.enter, delay: m.delay + Math.min(i, 12) * m.stagger, easing: m.ease, fill: 'backwards' });
+        });
+        return function () { anims.forEach(function (an) { an.cancel(); }); };
+      };
+      W.rsExitEls = function (list) {
+        var m = M(); if (m.reduced || !list || !list.length) return noop;
+        var pins = list.filter(function (x) { return x[0].isConnected && x[2] && x[2] !== 'none'; }).map(function (x) {
+          var el = x[0], saved = el.getAttribute('style');
+          el.style.setProperty('display', x[2], 'important'); el.style.setProperty('position', 'absolute', 'important');
+          el.style.margin = '0'; el.style.boxSizing = 'border-box'; el.style.width = x[1].width + 'px'; el.style.height = x[1].height + 'px';
+          el.style.left = '0px'; el.style.top = '0px'; el.style.right = 'auto'; el.style.bottom = 'auto'; el.style.pointerEvents = 'none'; el.style.zIndex = '5';
+          return { el: el, b: x[1], saved: saved };
+        });
+        pins.forEach(function (p) { p.r = p.el.getBoundingClientRect(); });
+        pins.forEach(function (p) { p.el.style.left = (p.b.left - p.r.left) + 'px'; p.el.style.top = (p.b.top - p.r.top) + 'px'; });
+        var undos = pins.map(function (p) {
+          var o = originOf(p.b), k = bigBox(p.b) ? [{ opacity: 1 }, { opacity: 0 }] : [{ opacity: 1, transform: 'none', transformOrigin: o }, { opacity: 0, transform: 'scale(0)', transformOrigin: o }];
+          var an = p.el.animate(k, { duration: m.exit, easing: m.ease, fill: 'forwards' }), gone = false;
+          var undo = function () { if (gone) return; gone = true; an.cancel(); if (p.saved == null) p.el.removeAttribute('style'); else p.el.setAttribute('style', p.saved); };
+          an.onfinish = undo;
+          return undo;
+        });
+        return function () { undos.forEach(function (u) { u(); }); };
+      };
+
+      /* A view or scope swap. Call begin with what shows now, change the page, then end(with what shows
+         next). opts.same: the same box is redrawn in place (a ghost copy of the old drawing fades out over it).
+         opts.dir: 1 or -1, the new view comes in from that side (next or previous day, week, tab). */
+      var swapDone = null;
+      W.rsSwapBegin = function (oldEl, opts) {
+        opts = opts || {};
+        if (swapDone) swapDone();
+        var m = M();
+        if (!oldEl || !rendered(oldEl)) return { end: noop };
+        var b = oldEl.getBoundingClientRect(), lim = topLimit(), shown = getComputedStyle(oldEl).display, ghost = null;
+        // Hold the page's height from here to end(), so the new view can be measured without the browser
+        // pulling the scroll up first (that would move the bar you clicked out from under the pointer).
+        var box = oldEl.parentElement, held = { mh: box.style.minHeight, ac: box.style.alignContent };
+        box.style.minHeight = box.getBoundingClientRect().height + 'px'; box.style.alignContent = 'start';
+        var unhold = function () { if (!held) return; box.style.minHeight = held.mh; box.style.alignContent = held.ac; held = null; };
+        if (opts.same && !m.reduced) {
+          ghost = oldEl.cloneNode(true);
+          [ghost].concat(Array.prototype.slice.call(ghost.querySelectorAll('[id],[name],[data-fi],[data-fb-group],[data-help]'))).forEach(function (e) { ['id', 'name', 'data-fi', 'data-fb-group', 'data-help'].forEach(function (n) { e.removeAttribute(n); }); });
+          ghost.setAttribute('aria-hidden', 'true'); ghost.inert = true; ghost.removeAttribute('hidden');
+        }
+        return { end: function (newEl) {
+          newEl = newEl || oldEl;
+          // The box's top had gone up under the bar: start the new view at its top, just under the bar.
+          var toTop = function () { if (b.top < lim - 1) { var d = newEl.getBoundingClientRect().top - lim; if (Math.abs(d) > 0.5) W.scrollBy(0, d); } };
+          if (!rendered(newEl)) { unhold(); return; }
+          if (m.reduced) { unhold(); toTop(); return; }
+          var h1 = newEl.getBoundingClientRect().height, out = ghost || (oldEl !== newEl ? oldEl : null), saved = out && out.getAttribute('style');
+          var anims = [];
+          // The new box starts at the old height and eases to its own, so the page never shrinks at once.
+          if (Math.abs(h1 - b.height) > 2) anims.push(newEl.animate([{ height: b.height + 'px', overflow: 'clip' }, { height: h1 + 'px', overflow: 'clip' }], { duration: m.morph, easing: m.ease }));
+          unhold(); toTop();
+          if (ghost) newEl.parentNode.insertBefore(ghost, newEl);
+          if (out) {
+            out.style.setProperty('display', shown, 'important'); out.style.setProperty('position', 'absolute', 'important');
+            out.style.margin = '0'; out.style.boxSizing = 'border-box'; out.style.width = b.width + 'px'; out.style.height = b.height + 'px';
+            out.style.left = '0px'; out.style.top = '0px'; out.style.overflow = 'clip'; out.style.pointerEvents = 'none'; out.style.zIndex = '2';
+            var r = out.getBoundingClientRect();
+            out.style.left = (b.left - r.left) + 'px'; out.style.top = (b.top - r.top) + 'px';
+            anims.push(out.animate([{ opacity: 1 }, { opacity: 0 }], { duration: m.exit, easing: m.ease, fill: 'forwards' }));
+          }
+          var from = opts.dir ? { opacity: 0, transform: 'translateX(' + (opts.dir * 24) + 'px)' } : { opacity: 0 };
+          anims.push(newEl.animate([from, { opacity: 1, transform: 'none' }], { duration: m.enter, delay: m.exit / 2, easing: m.ease, fill: 'backwards' }));
+          var finished = false, done = function () {
+            if (finished) return; finished = true; swapDone = null;
+            anims.forEach(function (an) { an.cancel(); });
+            if (ghost) ghost.remove(); else if (out) { if (saved == null) out.removeAttribute('style'); else out.setAttribute('style', saved); }
+          };
+          swapDone = done;
+          // Ends when every part has ended, even if something else cancelled one of them.
+          Promise.all(anims.map(function (an) { return an.finished.catch(noop); })).then(done);
+          setTimeout(done, m.morph + m.enter + 100);
+        } };
+      };
+      W.rsSwap = function (el, update, opts) {
+        var s = W.rsSwapBegin(el, Object.assign({ same: true }, opts || {}));
+        update(); s.end(el);
+      };
+
+      /* The sliding marker of a segmented control: pick() returns the chosen button. */
+      W.rsMarker = function (group, pick) {
+        if (!group) return;
+        var mark = group.querySelector(':scope > .rs-mark');
+        if (!mark) { mark = D.createElement('span'); mark.className = 'rs-mark'; mark.setAttribute('aria-hidden', 'true'); group.insertBefore(mark, group.firstChild); group.classList.add('rs-marked'); }
+        var on = pick();
+        if (!rendered(on)) { mark.classList.remove('on'); return; }
+        var first = !mark.classList.contains('on');
+        if (first) mark.style.transition = 'none';
+        mark.style.setProperty('--mx', on.offsetLeft + 'px'); mark.style.setProperty('--mw', on.offsetWidth + 'px');
+        if (first) { mark.classList.add('on'); void mark.offsetWidth; mark.style.transition = ''; }
+      };
+      W.rsMarkerWatch = function (group, sel) {
+        if (!group || group.__rsMark) return; group.__rsMark = true;
+        var upd = function () { W.rsMarker(group, function () { return group.querySelector(sel); }); };
+        upd();
+        if (W.MutationObserver) new MutationObserver(upd).observe(group, { attributes: true, subtree: true, attributeFilter: ['aria-pressed', 'aria-checked', 'aria-selected', 'hidden'] });
+        if (W.ResizeObserver) new ResizeObserver(upd).observe(group);
+        if (D.fonts && D.fonts.ready) D.fonts.ready.then(upd);
+      };
+
+      /* Popovers: grow from the control that opened them, shrink back to it. */
+      var popScale = function () { return parseFloat(getComputedStyle(R).getPropertyValue('--pop-scale')) || 0.94; };
+      var originAt = function (el, from) {
+        if (!from || !rendered(from)) return 'center';
+        var a = el.getBoundingClientRect(), b = from.getBoundingClientRect();
+        return Math.round(b.left + b.width / 2 - a.left) + 'px ' + Math.round(b.top + b.height / 2 - a.top) + 'px';
+      };
+      W.rsPopIn = function (el, from) {
+        var m = M(); if (m.reduced || !el.animate) return;
+        var o = originAt(el, from);
+        el.animate([{ opacity: 0, transform: 'scale(' + popScale() + ')', transformOrigin: o }, { opacity: 1, transform: 'none', transformOrigin: o }], { duration: m.pop, easing: m.ease });
+      };
+      W.rsPopOut = function (el, from, done) {
+        var m = M(); if (m.reduced || !el.animate) { done(); return; }
+        var o = originAt(el, from);
+        el.animate([{ opacity: 1, transform: 'none', transformOrigin: o }, { opacity: 0, transform: 'scale(' + popScale() + ')', transformOrigin: o }], { duration: m.exit, easing: m.ease, fill: 'forwards' }).onfinish = function (e) { done(); if (e && e.target) e.target.cancel(); };
+      };
+
+      /* The demo settings, each as one smooth moment. */
+      var applyDemo = function () { W.rsApplyTheme(); };
+      var synced = function (what) { return function () { if (W.rsSyncDemo) W.rsSyncDemo(); D.dispatchEvent(new CustomEvent('rs:demo-change', { detail: { what: what } })); }; };
+      // Every page that draws itself for the viewer (Home) listens for rs:demo-change and redraws in place,
+      // inside this one change: the sidebar slides into its new order, what leaves shrinks, what arrives grows.
+      W.rsSetStage = function (n) {
+        try { localStorage.setItem('rs4-stage', String(n)); } catch (_) {}
+        W.rsChange(applyDemo, synced('stage'));
+      };
+      W.rsSetAgents = function (v) {
+        try { localStorage.setItem('rs4-agents', v); } catch (_) {}
+        W.rsChange(applyDemo, synced('agents'));
+      };
+      W.rsPickWho = function (id) {
+        if (id === (W.rsWhoId && W.rsWhoId())) return;
+        W.rsSetWho(id);
+        W.rsChange(applyDemo, synced('who'));
+      };
+    })();
+  </script>
+  <script is:inline data-astro-rerun>
+    (function () {
+      var r = document.documentElement;
+      // One button flips what you see: light goes dark, dark goes light. When the flip lands on what the
+      // system would show anyway, it goes back to Auto, so Auto is never lost.
+      var NAME = { system: 'Auto', light: 'Light', dark: 'Dark' };
+      function mode() { try { return localStorage.getItem('rs4-theme') || 'system'; } catch (_) { return 'system'; } }
+      function sysDark() { return matchMedia('(prefers-color-scheme: dark)').matches; }
+      function showsDark() { var t = r.getAttribute('data-theme'); return t ? t === 'dark' : sysDark(); }
+      function nextMode() { var want = showsDark() ? 'light' : 'dark'; return (want === 'dark') === sysDark() ? 'system' : want; }
+      function label() {
+        var m = mode(), want = showsDark() ? 'Light' : 'Dark';
+        r.setAttribute('data-mode', m);
+        document.querySelectorAll('[data-toggle-mode]').forEach(function (b) {
+          b.setAttribute('aria-label', 'Colour mode: ' + NAME[m] + '. Select for ' + want);
+          b.title = 'Switch to ' + want.toLowerCase() + (m === 'system' ? ' (now Auto)' : '');
+        });
+      }
+      window.rsSyncMode = label;
+      label();
+      document.querySelectorAll('[data-toggle-mode]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var next = nextMode();
+          try { localStorage.setItem('rs4-theme', next); } catch (_) {}
+          window.rsTheme(function () { window.rsApplyTheme(); label(); });
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
+<style is:global set:html={`${gateCss} { display: none !important; } ${gateShow} { display: grid !important; } ${roleCss}${leadCss}`}></style>
+<style is:global>
+  .m-light, .m-dark { display: none; }
+  :root[data-mode="light"] .m-system, :root[data-mode="dark"] .m-system { display: none; }
+  :root[data-mode="light"] .m-light, :root[data-mode="dark"] .m-dark { display: contents; }
+  .nav .short { display: none; }
+  @media (max-width: 767px) { .nav .long { display: none; } .nav .short { display: inline; } }
+  /* The View as ribbon: thin, calm, under the top bar, and still while pages change (it names itself). */
+  .viewas { position: sticky; top: calc(var(--mast-h) + env(safe-area-inset-top, 0px)); z-index: 19; display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 4px var(--pad-x); font-size: 13px; color: var(--accent-ink); background: color-mix(in srgb, var(--accent-soft) 70%, var(--surface)); border-bottom: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); view-transition-name: ribbon; }
+  .viewas[hidden] { display: none; }
+  .va-eye { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--on-accent); flex: none; }
+  .va-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .va-back { margin-left: auto; flex: none; font: 600 12.5px/1 var(--font-sans); padding: 6px 10px; border-radius: var(--pill-radius); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); background: var(--surface); color: var(--accent-ink); cursor: pointer; transition: background var(--dur-hover), border-color var(--dur-hover); }
+  .va-back:hover { background: var(--accent-soft); border-color: var(--accent); }
+  @media (max-width: 600px) { .va-role { display: none; } }
+  ::view-transition-group(ribbon) { z-index: 3; }
+</style>

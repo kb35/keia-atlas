@@ -1,0 +1,125 @@
+---
+// The model catalogue: one card per model with its drawing, what it is for, and the facts that matter
+// (how many are installed, where, how long they have been in service, firmware). Ports are a compact strip.
+import Shell from '../../layouts/Shell.astro';
+import DeviceArt from '../../components/DeviceArt.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import PageBand from '../../components/PageBand.astro';
+import Section from '../../components/Section.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import { models, classes, className, portColour, CONNECTOR_LABEL, plural, href, configurations } from '../../lib/data.mjs';
+import { allFacts, portCounts } from '../../lib/modelinfo.mjs';
+
+const byClass = {};
+for (const [id, m] of Object.entries(models)) (byClass[m.class] ??= []).push({ id, ...m });
+const order = Object.keys(byClass).sort((a, b) => className(a).localeCompare(className(b)));
+for (const c of order) byClass[c].sort((a, b) => allFacts[b.id].installed - allFacts[a.id].installed);
+const kindOf = (f) => (f.older ? 'older' : f.installed ? 'standard' : 'unused');
+const n = (v) => v.toLocaleString('en-IE');
+const counts = { all: Object.keys(models).length, standard: 0, older: 0, unused: 0 };
+for (const id of Object.keys(models)) counts[kindOf(allFacts[id])]++;
+const makers = [...new Set(Object.values(models).map((m) => m.manufacturer))].sort((a, b) => a.localeCompare(b));
+const slug = (v) => String(v).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const SORT = { options: [{ value: 'units', label: 'Most units first' }, { value: 'name', label: 'By name' }, { value: 'maker', label: 'By maker' }] };
+const fwEnded = Object.keys(models).filter((id) => allFacts[id].fw.tone === 'warn').length;
+const NUMBERS = [
+  { n: counts.all, label: 'Models', fact: true },
+  { n: counts.standard, label: 'In use now', to: '?use=standard' },
+  { n: counts.older, label: 'Older kit', to: '?use=older', tone: counts.older ? 'warn' : undefined },
+  { n: fwEnded, label: 'Support ended', to: '?fw=warn', tone: fwEnded ? 'warn' : undefined },
+];
+// Models a configuration is written for: Configurations' "Models covered" opens ?cfg=1 (rule P10).
+const CFG_MODELS = new Set(Object.values(configurations).flatMap((c) => c.models ?? []));
+const TOGGLES = [{ key: 'cfg', label: 'Has a configuration', title: 'Only models a configuration is written for' }];
+const FACETS = [
+  { key: 'cls', label: 'Kind', options: order.map((value) => ({ value, label: className(value) })) },
+  { key: 'maker', label: 'Maker', options: makers.map((m) => ({ value: slug(m), label: m })) },
+  { key: 'use', label: 'Status', options: [{ value: 'standard', label: 'In use now' }, { value: 'older', label: 'Older kit' }, { value: 'unused', label: 'Not installed' }] },
+  { key: 'fw', label: 'Firmware', options: [{ value: 'ok', label: 'Supported' }, { value: 'warn', label: 'Support ended' }, { value: 'off', label: 'Not tracked' }] },
+];
+---
+<Shell vendorOk title="Device models" section="models" crumbs={[{ label: 'Models' }]}>
+  <PageBand overline="Catalogue" title="Device models" rec="dd-models" lede="What each model is for, where it is installed and where its firmware stands." numbers={NUMBERS}>
+    <a slot="action" class="btn primary" href={href('/edit/?kind=model')}>New model</a>
+  </PageBand>
+  <div class="content models">
+    <FilterBar facets={FACETS} toggles={TOGGLES} placeholder="Find a model, maker or class" label="Find a model" noun={['model', 'models']} scope=".content.models" sort={SORT} />
+    {order.map((c) => (
+      <div data-fb-group>
+      <Section title={className(c)} id={c} aside={classes[c]?.profile.object_role}>
+        <div class="mdl-grid" data-mgrid>
+          {byClass[c].map((m) => {
+            const f = allFacts[m.id];
+            const pc = portCounts(m);
+            return (
+              <a class:list={['mdl', { warn: f.overdue > 0 }]} href={href(`/models/${m.id}/`)} data-fi data-units={f.installed} data-name={m.model} data-maker={m.manufacturer} data-find={`${m.manufacturer} ${m.model} ${className(c)} ${f.types.join(' ')}`} data-f-cls={c} data-f-maker={slug(m.manufacturer)} data-f-use={kindOf(f)} data-f-fw={f.fw.tone} data-t-cfg={CFG_MODELS.has(m.id) ? '1' : undefined}>
+                <span class="mdl-art" data-vt-rec={m.id}><DeviceArt model={m.id} cls={c} small label="" /></span>
+                <span class="mdl-body">
+                  <span class="mdl-name"><small>{m.manufacturer}</small><b>{m.model}</b></span>
+                  <span class="mdl-for">{f.purpose}</span>
+                  <span class="mdl-ports" aria-label={`${plural(m.ports?.length ?? 0, 'port')}`}>
+                    {pc.slice(0, 6).map((p) => <span class="mp" style={`--c:${portColour(p.sample)}`} title={`${CONNECTOR_LABEL[p.connector] ?? p.connector}: ${p.n}`}><i></i>{CONNECTOR_LABEL[p.connector] ?? p.connector}<b>{p.n}</b></span>)}
+                    {pc.length > 6 && <span class="mp more">+{pc.length - 6}</span>}
+                  </span>
+                  <dl class="mdl-facts">
+                    <div><dt>Units</dt><dd class="num">{f.installed ? n(f.installed) : 'None'}</dd></div>
+                    <div><dt>Rooms</dt><dd class="num">{f.rooms.length ? n(f.rooms.length) : 'None'}</dd></div>
+                    <div><dt>Years in service</dt><dd class="num">{f.years ? f.years.label : (f.retired ? `${f.retired} taken out` : 'None')}</dd></div>
+                    <div><dt>Firmware</dt><dd><span class={`fw fw-${f.fw.tone}`} title={f.fw.sub}>{f.fw.label}</span></dd></div>
+                  </dl>
+                </span>
+              </a>
+            );
+          })}
+        </div>
+      </Section>
+      </div>
+    ))}
+    <EmptyState text="No models match these filters." />
+  </div>
+  <script is:inline data-astro-rerun slot="end">
+    (function () {
+      var bar = document.querySelector('[data-fb]'); if (!bar || bar.__msort) return; bar.__msort = true;
+      var by = {
+        units: function (a, b) { return +b.dataset.units - +a.dataset.units || a.dataset.name.localeCompare(b.dataset.name); },
+        name: function (a, b) { return a.dataset.name.localeCompare(b.dataset.name, 'en', { numeric: true }); },
+        maker: function (a, b) { return a.dataset.maker.localeCompare(b.dataset.maker) || a.dataset.name.localeCompare(b.dataset.name, 'en', { numeric: true }); }
+      };
+      var reorder = function (v) {
+        document.querySelectorAll('[data-mgrid]').forEach(function (g) {
+          Array.prototype.slice.call(g.children).sort(by[v] || by.units).forEach(function (el) { g.appendChild(el); });
+        });
+      };
+      bar.addEventListener('fb:sort', function (e) { bar.rsFilter.run(true, function () { reorder(e.detail.value); }); });
+      var v0 = new URLSearchParams(location.search).get('sort'); if (v0 && by[v0] && v0 !== 'units') reorder(v0);
+    })();
+  </script>
+</Shell>
+<style is:global>
+  .mdl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; }
+  .mdl { display: grid; grid-template-rows: auto 1fr; background: var(--surface); border: var(--border-card); border-radius: var(--radius-lg); overflow: hidden; color: inherit; text-decoration: none; transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast); }
+  .mdl:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  .mdl-art { display: grid; place-items: center; padding: 10px 24px 4px; background: var(--surface-2); border-bottom: 1px solid var(--line); height: 120px; overflow: hidden; }
+  .mdl-art .model-art { max-height: 104px; width: auto; max-width: 100%; }
+  .mdl-art .model-art.generic { aspect-ratio: auto; color: var(--art-line); }
+  .mdl-art .model-art.generic svg { width: 96px; height: auto; }
+  .mdl-body { display: grid; gap: 9px; padding: 12px 14px 14px; align-content: start; }
+  .mdl-name { display: grid; gap: 1px; }
+  .mdl-name small { font: 700 10.5px/1.2 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+  .mdl-name b { font-size: 15.5px; line-height: 1.25; }
+  .mdl-for { font-size: 13px; line-height: 1.4; color: var(--text-2); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .mdl-ports { display: flex; flex-wrap: wrap; gap: 4px; }
+  .mp { display: inline-flex; align-items: center; gap: 5px; font: 600 11px/1 var(--font-sans); padding: 4px 7px; border-radius: 999px; background: color-mix(in srgb, var(--c, var(--grey)) 14%, var(--surface)); color: var(--text-2); }
+  .mp i { width: 7px; height: 7px; border-radius: 2px; background: var(--c, var(--grey)); }
+  .mp b { font: 700 11px/1 var(--font-mono); color: var(--text); }
+  .mp.more { --c: var(--grey); }
+  .mdl-facts { display: grid; grid-template-columns: repeat(4, auto); justify-content: space-between; gap: 6px 10px; margin: 2px 0 0; padding-top: 10px; border-top: 1px solid var(--line); }
+  .mdl-facts div { display: grid; gap: 3px; min-width: 0; }
+  .mdl-facts dt { font-size: 10.5px; color: var(--text-3); order: 2; }
+  .mdl-facts dd { margin: 0; font: 700 12.5px/1.2 var(--font-sans); }
+  .fw { display: inline-block; font: 700 11px/1 var(--font-sans); padding: 3px 7px; border-radius: 999px; white-space: nowrap; }
+  .fw-ok { background: var(--green-soft, #dff3e4); color: var(--green-ink, #17612e); }
+  .fw-warn { background: var(--yellow-soft); color: var(--yellow-ink); }
+  .fw-off { background: var(--surface-2); color: var(--text-3); }
+  .mdl.warn { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--amber) 55%, transparent); }
+</style>

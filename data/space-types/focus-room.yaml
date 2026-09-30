@@ -1,0 +1,108 @@
+# Space type: Focus room
+# Based on public industry guidance (data/sources/room-guidance.yaml, decision 0006); house assumptions say so.
+# Keia part (profile to verification_model): which classes of device belong here.
+# Keia Atlas part: build options, the models each option names, and the outlets.
+
+schema: composite-profile
+
+profile:
+  name: Focus room
+  space_type: focus-room
+  version: "2.0"
+  last_updated: "2026-09-30"
+  owner: Keia Atlas maintainers
+  capacity: "1 person"
+  purpose: >-
+    Closed single-person room for calls and deep work where acoustic privacy matters.
+
+sources:
+  - file: data/sources/room-guidance.yaml
+    provides: 'Public guidance for this space type: size, capacity, display size, kit class and outlets'
+  - file: data/device-classes/monitor.yaml
+    provides: Healthy state for the monitor class
+
+equipment_categories:
+  - category: desk_display
+    description: Desk monitor with dock and camera
+    object_profile: data/device-classes/monitor.yaml
+    quantity: "1"
+
+verification_model:
+  platforms_to_check:
+    - platform: keia_atlas
+      check: every required device in the chosen option is recorded in the space and wired
+        as the option says
+    - platform: inventory
+      check: every device has an active record in this space
+    - platform: dhcp_dns
+      check: every networked device has an address reservation and DNS records
+    - platform: device_management
+      check: meeting devices are online, paired and on standard firmware
+
+keia_atlas:
+  standard: industry
+  guideline: zoom-hardware-guide
+  category: focus
+  capacity:
+    min: 1
+    max: 1
+  area:
+    sq_ft: 60
+    m2: 5.57
+  geometry:
+    # The room shell for a floor-level 3D model; basis says where each value comes from.
+    width_m: 2.44
+    depth_m: 2.29
+    ceiling_m: 2.6
+    display_wall: none
+    door: { wall: left, from_m: 1.34, to_m: 2.19 }
+    data_entry: { via: ceiling, wall: left, at: above the door }
+    containment: [desk-tray]
+    basis:
+      size: chosen
+      ceiling: house-default
+      door: house-default
+      data_entry: house-default
+      containment: house-default
+    notes:
+      - 8 x 7.5 ft (house assumption).
+  options:
+    - id: desk
+      name: Desk and chair
+      summary: A desk with a monitor that has a built-in camera and dock.
+      equipment:
+        - key: monitor
+          class: monitor
+          model: dell-p2726deb
+          quantity: 1
+          requirement: required
+          location: table-top
+          notes: 27 inch, built-in camera and dock, charges the laptop
+      infrastructure:
+        - service: data
+          provided_by: it
+          quantity: 2
+          location: table-top
+          serves: [monitor, spare]
+          notes: Only one of the two is patched to a switch port.
+        - service: power
+          provided_by: it
+          quantity: 2
+          location: table-top
+          serves: [monitor, spare]
+      wiring:
+        - from: monitor.usb-c-1
+          to: laptop
+          cable: usb-c
+          notes: 'One cable: picture, network and charging'
+        - from: monitor.lan-1
+          to: outlet:data/table-top#1
+          cable: cat6
+        - from: monitor.power-in
+          to: outlet:power/table-top#1
+          cable: power
+  notes:
+    - 'Zoom groups the phone booth and the focus room together: one person on a call or at work
+      alone. The monitor''s camera and dock do that here, so there is no desk phone (house
+      assumption).'
+    - 'Outlets: two data outlets at the desk (TIA-568), one patched (house assumption).'

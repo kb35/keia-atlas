@@ -1,0 +1,131 @@
+---
+// One log for risks, issues, decisions and dependencies (open first), and the change requests for
+// scope. Approving or declining a change request is an event in the live layer (who, when, undo).
+import Icon from './Icon.astro';
+import { logEntries, changeRequests } from '../lib/project-status.mjs';
+import { fmtDate, href } from '../lib/data.mjs';
+const { project: p, which = 'log' } = Astro.props;
+const short = (d) => fmtDate(d, { day: 'numeric', month: 'short' });
+const L = logEntries(p).sort((a, b) => (a.status === b.status ? (a.due ?? a.raised).localeCompare(b.due ?? b.raised) : a.status === 'open' ? -1 : 1));
+const C = changeRequests(p);
+---
+{which === 'log' ? (
+  L.length ? (
+    <div class="list plog" data-items>
+      {L.map((l) => (
+        <div class:list={['row plain plog-r', `k-${l.kind}`, `st-${l.status}`]} id={`log-${l.id.toLowerCase()}`} data-help="project.logentry">
+          <span class="plog-main">
+            <span class="plog-top"><span class={`pst-k k-${l.kind}`}>{l.kindLabel}</span><span class="name">{l.title}</span></span>
+            {l.note && <span class="sub">{l.note}</span>}
+            {l.links.length > 0 && <span class="plog-links">{l.links.map((x) => <a class="tag" href={x.to}><Icon name={x.kind === 'incident' ? 'alert' : x.kind === 'room' ? 'room' : 'project'} size={12} />{x.label}</a>)}</span>}
+          </span>
+          <span class="end plog-end">
+            <span class="plog-who"><span class="av" title={l.ownerName}>{l.ownerInitials}</span><span><b>{l.ownerName}</b><small class="mono">{l.status === 'closed' ? `${l.statusLabel.toLowerCase()} ${short(l.decided ?? l.raised)}` : l.due ? `by ${short(l.due)}` : `raised ${short(l.raised)}`}</small></span></span>
+            <span class:list={['pill', l.status === 'open' ? (l.kind === 'issue' ? 'warn' : l.kind === 'dependency' ? 'info' : 'plan') : 'plain']}>{l.statusLabel}</span>
+          </span>
+        </div>
+      ))}
+    </div>
+  ) : <p class="card pad muted plog-none">No risks, issues, decisions or dependencies on record for this project.</p>
+) : (
+  C.length ? (
+    <div class="g12 pcr-grid" data-pcr data-project={p.id}>
+      {C.map((c) => (
+        <article class:list={['card side-card s-6 pcr', `st-${c.status}`]} data-live-cr={c.id} data-status={c.status} data-title={c.title} data-approver={c.approverName} data-help="project.change">
+          <span class="pcr-top"><span class="code">{c.id}</span><span class="pill plain" data-cr-status>{c.statusLabel}</span></span>
+          <b class="pcr-t">{c.title}</b>
+          {c.why && <small class="pcr-why">{c.why}</small>}
+          <span class="pcr-meta">{c.effect && <span class="tag mono">{c.effect}</span>}<span class="faint">Proposed by {c.byName}, {short(c.raised)}</span></span>
+          <span class="pcr-dec">
+            <span class="plog-who"><span class="av">{c.approverInitials}</span><span><b>{c.approverName}</b><small data-cr-note>{c.status === 'proposed' ? 'decides' : `${c.statusLabel.toLowerCase()} ${short(c.decided)}`}</small></span></span>
+            <span class="pcr-acts" data-cr-acts hidden={c.status !== 'proposed'}>
+              <button type="button" class="btn small primary" data-cr-set="approved" data-help="project.approve">Approve</button>
+              <button type="button" class="btn small ghost" data-cr-set="declined" data-help="project.decline">Decline</button>
+            </span>
+            <button type="button" class="t-hist" data-cr-history data-help="live.history" hidden={c.status !== 'proposed'}>History</button>
+          </span>
+        </article>
+      ))}
+    </div>
+  ) : <p class="card pad muted plog-none">No change requests. The scope is as chartered.</p>
+)}
+{which === 'changes' && (
+  <script is:inline data-astro-rerun>
+    (function () {
+      /* Approving or declining a change request is an event in the live layer: item cr:<project>:<id>,
+         field status. The card, the scope light in the status strip and the History drawer all follow. */
+      var grid = document.querySelector('[data-pcr]'); if (!grid) return;
+      var WORD = { proposed: 'Waiting for approval', approved: 'Approved', declined: 'Declined' };
+      var person = function (id) { return (window.RS_PEOPLE || []).filter(function (p) { return p.id === id; })[0] || { name: id }; };
+      var items = Array.prototype.slice.call(grid.querySelectorAll('[data-live-cr]'));
+      var itemOf = function (el) { return 'cr:' + grid.dataset.project + ':' + el.dataset.liveCr; };
+      var base = function (el) { return { status: el.dataset.status }; };
+      var elOf = function (item) { return items.filter(function (el) { return itemOf(el) === item; })[0]; };
+      var describe = function (e) { var w = e.after === 'approved' ? 'Approved' : e.after === 'declined' ? 'Declined' : 'Back to waiting for approval'; return e.undoes ? e.note + ': ' + w.charAt(0).toLowerCase() + w.slice(1) : w; };
+      var stop = null;
+      var scopeLight = function (L) {
+        var light = document.querySelector('[data-light="scope"]'); if (!light) return;
+        var waiting = items.filter(function (el) { return L.live.stateOf(itemOf(el), base(el)).status === 'proposed'; });
+        var approved = items.filter(function (el) { return L.live.stateOf(itemOf(el), base(el)).status === 'approved'; });
+        var hl = light.querySelector('.hl'), word = light.querySelector('[data-word]'), why = light.querySelector('[data-why]');
+        if (waiting.length) { hl.dataset.state = 'warn'; word.textContent = waiting.length + (waiting.length === 1 ? ' change request' : ' change requests') + ' waiting'; why.textContent = waiting[0].dataset.title + (waiting.length > 1 ? ' and ' + (waiting.length - 1) + ' more' : '') + ': ' + waiting[0].dataset.approver + ' decides.'; }
+        else if (approved.length) { hl.dataset.state = 'ok'; word.textContent = 'Changed ' + (approved.length === 1 ? 'once' : approved.length + ' times') + ', approved'; why.textContent = approved[approved.length - 1].dataset.title + ' was approved by ' + approved[approved.length - 1].dataset.approver + '.'; }
+        else { hl.dataset.state = 'ok'; word.textContent = 'As chartered'; why.textContent = 'No change requests open or approved.'; }
+        hl.classList.add('lit');
+      };
+      var paint = function (L, el, fresh, remote) {
+        var st = L.live.stateOf(itemOf(el), base(el)).status, last = L.live.historyOf(itemOf(el))[0];
+        el.className = el.className.replace(/\bst-(proposed|approved|declined)\b/, 'st-' + st);
+        el.querySelector('[data-cr-status]').textContent = WORD[st];
+        el.querySelector('[data-cr-acts]').hidden = st !== 'proposed';
+        el.querySelector('[data-cr-history]').hidden = !last;
+        var note = el.querySelector('[data-cr-note]');
+        if (last) note.textContent = (st === 'proposed' ? 'decides' : WORD[st].toLowerCase() + ' by ' + person(last.who).name + ', ' + new Date(last.at).toLocaleTimeString('en-IE', { hour: '2-digit', minute: '2-digit' }));
+        else if (!note.dataset.orig) note.dataset.orig = note.textContent; else note.textContent = note.dataset.orig;
+        if (fresh && window.rsMarkChanged) window.rsMarkChanged(el, last ? person(last.who).name : '');
+      };
+      var go = function () {
+        var L = window.rsLive; if (!L || !document.body.contains(grid)) return;
+        L.register('cr:', { base: function (item) { var el = elOf(item); return el ? base(el) : {}; }, describe: describe });
+        items.forEach(function (el) { paint(L, el, false); }); scopeLight(L);
+        if (stop) stop();
+        stop = L.live.subscribe('cr:', function (e, info) { var el = elOf(e.item); if (el) { paint(L, el, true, info && info.remote); scopeLight(L); } });
+        grid.addEventListener('click', function (ev) {
+          var b = ev.target.closest('[data-cr-set]'), h = ev.target.closest('[data-cr-history]'), el = ev.target.closest('[data-live-cr]'); if (!el) return;
+          if (b) { var now = L.live.stateOf(itemOf(el), base(el)).status; L.live.record({ item: itemOf(el), field: 'status', before: now, after: b.dataset.crSet, who: L.who() }); }
+          else if (h) L.history(itemOf(el), el.dataset.liveCr + ' ' + el.dataset.title);
+        });
+        document.addEventListener('astro:before-swap', function () { if (stop) stop(); stop = null; }, { once: true });
+      };
+      if (window.rsLive) go(); else document.addEventListener('rs:live-ready', go, { once: true });
+    })();
+  </script>
+)}
+
+<style is:global>
+  .plog-r { grid-template-columns: minmax(0, 1fr) auto; align-items: start; padding: 12px 18px; }
+  .plog-main { display: grid; gap: 4px; min-width: 0; }
+  .plog-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .plog-top .name { display: inline; }
+  .plog-r .sub { margin: 0; }
+  .plog-links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+  .plog-links .tag { font-size: 12px; padding: 3px 9px; gap: 5px; }
+  .plog-links .tag:hover { color: var(--text); }
+  .plog-end { align-items: center; }
+  .plog-who { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; }
+  .plog-who b { display: block; font-weight: 600; white-space: nowrap; } .plog-who small { display: block; font-size: 11px; color: var(--text-3); white-space: nowrap; }
+  .plog-who .av { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 700 10px/1 var(--font-mono); background: var(--surface-3); color: var(--text); flex: none; }
+  .st-closed .plog-top .name { color: var(--text-2); }
+  .plog-none { margin: 0; font-size: 14px; }
+  .pcr { gap: 8px; }
+  .pcr-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .pcr-t { font-size: 15.5px; line-height: 1.25; }
+  .pcr-why { font-size: 13px; color: var(--text-2); line-height: 1.4; }
+  .pcr-meta { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 12.5px; }
+  .pcr-dec { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding-top: 8px; border-top: var(--border-rule); }
+  .pcr-acts { display: inline-flex; gap: 6px; } .pcr-acts[hidden], .pcr [data-cr-history][hidden] { display: none; }
+  .pcr.st-approved [data-cr-status] { background: var(--green-soft); color: var(--green-ink); }
+  .pcr.st-declined [data-cr-status] { background: var(--surface-2); color: var(--text-3); } .pcr.st-declined .pcr-t { color: var(--text-2); }
+  .pcr.st-proposed [data-cr-status] { background: var(--amber-soft); color: var(--amber-ink); }
+  @container content (max-width: 699px) { .plog-r { grid-template-columns: minmax(0, 1fr); } .plog-end { justify-content: space-between; } }
+</style>

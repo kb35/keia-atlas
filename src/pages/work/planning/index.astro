@@ -1,0 +1,695 @@
+---
+// Planning (stage 3, simulated): the budget, the scenarios and the team's capacity as one place, by financial
+// year. One year selector in the filter bar (this financial year, next, and five ahead; the address keeps it);
+// every view follows it. Budget shows what is committed (projects in flight), planned (the work plan, priced) and
+// estimated (scenarios adopted), by kind, region and office, and every figure opens the projects and work plan
+// items behind it (rule P10). Scenarios are changes to the plan, compared with it side by side, adopted through
+// the live layer (who, when, undo) and then fed into every figure. Capacity sets the hours the work needs
+// against the hours the team has, by role, region and year, on a documented ratio model (data/planning).
+// Anatomy (docs/standards/page-anatomy.md, archetype C): band with the year's answer, filter bar with the view
+// switch, then the view at its natural height; the page scrolls, nothing scrolls inside. The maths is in
+// src/lib/planningcore.mjs (pure) and src/lib/planning.mjs (the baseline from the data); the page's script uses
+// the same functions, so an adopted or typed scenario changes every figure the same way the build did.
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import FilterBar from '../../../components/FilterBar.astro';
+import Section from '../../../components/Section.astro';
+import EmptyState from '../../../components/EmptyState.astro';
+import LiveBar from '../../../components/LiveBar.astro';
+import { href, sites, SITE_ORDER, REGION_LABEL, PROJECT_KIND } from '../../../lib/data.mjs';
+import { person } from '../../../lib/demo.mjs';
+import { YEARS, NOW_FY, baseline, ctx, totals, scenarios, lines, pipeline, officeName, officeFacts, ratios, headcount, budget, hoursPerPerson, inProjectCount, team, siteRegion, CLASS } from '../../../lib/planning.mjs';
+import { ROLES, ROLE_LABEL, ROLE_ONE, REGIONS, REGION_NAME, fyLabel, fySpan, groupOf, bauHours } from '../../../lib/planningcore.mjs';
+import { flat, ledeFor, compareHtml, money, kmoney, fmtH } from '../../../lib/planningview.mjs';
+import { NOW_YEAR } from '../../../lib/refresh.mjs';
+import '../../../styles/viz.css';
+
+const NOW = YEARS.find((y) => y.current);
+const ALL_YEARS = YEARS.map((y) => y.id).join('|');
+const ALL_REGIONS = REGIONS.join('|');
+const F = Object.fromEntries(YEARS.map((y) => [y.id, flat(totals[y.id])]));
+const t0 = totals[NOW.id];
+const STATUS_LABEL = { committed: 'Committed', planned: 'Planned', estimated: 'Estimated' };
+const KIND_ROWS = [...new Set([...lines.map((l) => l.kind), 'fit-out'])].sort((a, b) => (PROJECT_KIND[a] ?? a).localeCompare(PROJECT_KIND[b] ?? b));
+const kindsHere = [...new Set(lines.map((l) => l.kind))];
+const sitesHere = SITE_ORDER.filter((s) => lines.some((l) => l.site === s));
+const OFFICES = SITE_ORDER.filter((s) => sites[s].kind !== 'remote');
+const REMOTE = SITE_ORDER.filter((s) => sites[s].kind === 'remote');
+const siteRank = Object.fromEntries(SITE_ORDER.map((s, i) => [s, i]));
+const regionShort = (g) => REGION_LABEL[g].replace('Europe, Middle East and Africa', 'EMEA');
+const FACETS = [
+  { key: 'region', label: 'Region', options: REGIONS.map((value) => ({ value, label: regionShort(value) })) },
+  { key: 'site', label: 'Office', options: sitesHere.map((value) => ({ value, label: officeName(value), sub: sites[value].kind === 'remote' ? 'Home offices' : sites[value].name })) },
+  { key: 'kind', label: 'Kind', options: KIND_ROWS.filter((k) => kindsHere.includes(k) || k === 'fit-out').map((value) => ({ value, label: PROJECT_KIND[value] ?? value })) },
+  { key: 'status', label: 'Status', options: ['committed', 'planned', 'estimated'].map((value) => ({ value, label: STATUS_LABEL[value], sub: value === 'committed' ? 'Projects in flight' : value === 'planned' ? 'The work plan, priced' : 'Scenarios adopted' })) },
+  { key: 'year', label: 'Year', single: true, value: NOW.id, options: YEARS.map((y) => ({ value: y.id, label: y.label, sub: y.current ? `This year, ${y.span}` : y.next ? `Next year, ${y.span}` : y.span })) },
+];
+const VIEWS = [
+  { value: 'budget', label: 'Budget', show: '[data-view-budget]', noun: ['line', 'lines'] },
+  { value: 'scenarios', label: 'Scenarios', show: '[data-view-scenarios]', noun: ['scenario', 'scenarios'] },
+  { value: 'capacity', label: 'Hours', show: '[data-view-capacity]', noun: ['role', 'roles'] },
+];
+const SORT = { options: [{ value: 'amount', label: 'Most money first' }, { value: 'site', label: 'By office' }, { value: 'name', label: 'By name' }] };
+const NUMBERS = [
+  { n: kmoney(t0.spend.committed), label: 'Committed', id: 'committed', to: '?status=committed#budget' },
+  { n: kmoney(t0.spend.planned), label: 'Planned', id: 'planned', to: '?status=planned#budget' },
+  { n: t0.units, label: 'Devices to replace', id: 'units', to: `/refresh/?year=${NOW_YEAR},${NOW_FY}&project=none` },
+  { n: `${t0.hours.tech.pct}%`, label: 'Technician hours used', id: 'tech', to: '#capacity', tone: t0.hours.tech.pct > 105 ? 'bad' : t0.hours.tech.pct > 85 ? 'warn' : undefined },
+];
+// The lines behind every figure: every (year, office, kind) has a row, so an adopted scenario can move money into a
+// year and office that had none; empty rows stay hidden.
+const lineAt = new Map(lines.map((l) => [l.id, l]));
+const planKey = (yid, site, group) => `${yid}:${site}:${group}`;
+const GROUPS = [['av', 'refresh'], ['network', 'infra-refresh']];
+const planLines = YEARS.flatMap((y) => SITE_ORDER.flatMap((site) => GROUPS.map(([group, kind]) => {
+  const l = lineAt.get(planKey(y.id, site, group));
+  return l ?? { id: planKey(y.id, site, group), year: y.id, n: y.n, status: 'planned', kind, kindLabel: PROJECT_KIND[kind], site, region: siteRegion[site], name: `${officeName(site)}: ${group === 'network' ? 'comms room' : 'AV'} replacements`, sub: '', eur: 0, units: 0, rooms: 0, empty: true, to: `/refresh/?year=${y.n === NOW_FY ? `${NOW_YEAR},${y.n}` : y.n}&site=${site}&project=none`, where: 'the Work plan' };
+})));
+const committedLines = lines.filter((l) => l.status === 'committed');
+// Estimated lines: what each scenario on record adds, hidden until it is adopted (a typed scenario adds its own).
+const estimatedLines = scenarios.flatMap((s) => s.plan.flatMap((y) => y.estimated.projects.map((p) => ({ sc: s.id, id: `${s.id}:${p.id}`, year: y.id, n: y.n, status: 'estimated', kind: p.kind, kindLabel: PROJECT_KIND[p.kind] ?? p.kind, site: null, region: p.region, name: p.name, sub: `${s.name} · ${p.units} units in ${p.rooms} rooms, ${p.staff} staff`, eur: p.eur, units: p.units, rooms: p.rooms, to: '#scenarios', where: 'Scenarios' }))));
+const roomWord = (n) => `${n} ${n === 1 ? 'room' : 'rooms'}`;
+const unitWord = (n) => `${n} ${n === 1 ? 'unit' : 'units'}`;
+const dueLink = (y, extra = '') => href(`/refresh/?year=${y.n === NOW_FY ? `${NOW_YEAR},${y.n}` : y.n}&project=none${extra}`);
+// The ratio model as it stands today, office by office.
+const techAt = (sid) => team[sites[sid].region]?.tech ?? 0;
+const officesByRegion = REGIONS.map((g) => ({ g, sites: OFFICES.filter((s) => sites[s].region === g), techs: team[g].tech, staff: OFFICES.filter((s) => sites[s].region === g).reduce((n, s) => n + officeFacts[s].staff, 0), rooms: OFFICES.filter((s) => sites[s].region === g).reduce((n, s) => n + officeFacts[s].rooms, 0), units: OFFICES.filter((s) => sites[s].region === g).reduce((n, s) => n + officeFacts[s].units, 0) }));
+const target = (role, per) => ratios.targets.find((t) => t.role === role && t.per === per)?.n ?? null;
+const sizeAdds = Object.entries(ratios.office_sizes).map(([k, sz]) => {
+  const bau = bauHours({ rooms: sz.rooms, units: sz.units, staff: sz.staff, kits: 0 }, ratios);
+  const fit = Object.fromEntries(ROLES.map((r) => [r, (ratios.fit_out.hours_per_unit[r] ?? 0) * sz.units]));
+  return { k, ...sz, bau, fit, cost: sz.units * ratios.fit_out.cost_per_unit, likeName: officeName(sz.like) };
+});
+const DATA = { years: YEARS, nowFy: NOW_FY, nowYear: NOW_YEAR, baseline, ctx, scenarios: scenarios.map((s) => ({ id: s.id, name: s.name, say: s.say, owner: s.owner, changes: s.changes })), classes: Object.entries(CLASS).map(([id, c]) => ({ id, name: c.name })).sort((a, b) => a.name.localeCompare(b.name)), officeName: Object.fromEntries(SITE_ORDER.map((s) => [s, officeName(s)])), kindLabel: PROJECT_KIND, regionName: REGION_NAME, sizes: Object.fromEntries(Object.entries(ratios.office_sizes).map(([k, v]) => [k, v.name])) };
+const scenarioFor = scenarios[0];
+---
+<Shell title="Planning" section="planning" minStage={3} crumbs={[{ label: 'Work', to: '/work/' }, { label: 'Planning' }]} about={{ kind: 'page', label: 'Planning', to: '/work/planning/' }}>
+  <PageBand overline="Planning" title="Planning" sim numbers={NUMBERS}>
+    <Fragment slot="overline"><span class="pill plain pl-year-pill" data-pl-yearpill>{NOW.label} · {NOW.span}</span></Fragment>
+    <Fragment slot="lede"><span data-pl-lede>{ledeFor(t0, NOW.n, NOW_FY)}</span></Fragment>
+  </PageBand>
+
+  <div class="content pl" data-pl>
+    <FilterBar facets={FACETS} placeholder="Find a project, office or scenario" label="Find a line, scenario or role" noun={['line', 'lines']} scope=".content.pl" views={VIEWS} viewKey="rs4-view:planning" viewsHelp="planning.views" sort={SORT} />
+
+    {/* ---------------- Budget ---------------- */}
+    <div data-view-budget class="pl-view">
+      <div data-year-host="budget">
+        {YEARS.map((y) => { const v = F[y.id], t = totals[y.id], inProj = inProjectCount(y.n); return (
+          <div class="pl-year" data-year-panel={y.id} hidden={!y.current}>
+            <div class="g12">
+              <section class="card side-card s-8 pl-money" aria-labelledby={`h-money-${y.id}`} data-help="planning.year-money">
+                <div class="section-head"><h3 id={`h-money-${y.id}`}>{y.label} in money</h3><span class="aside faint">{y.span}{y.envelope ? '' : ''}</span></div>
+                <div class="pl-mbar" aria-hidden="true">
+                  <i class="b-cm" data-v="bar.committed" style={`width:${v['bar.committed']}%`}></i><i class="b-pl" data-v="bar.planned" style={`width:${v['bar.planned']}%`}></i><i class="b-es" data-v="bar.estimated" style={`width:${v['bar.estimated']}%`}></i>
+                  <b class="pl-cap" data-v="bar.cap" style={`left:${v['bar.cap']}%`} hidden={t.envelope == null}></b>
+                </div>
+                <dl class="pl-key">
+                  <div><dt><i class="dot b-cm"></i>Committed</dt><dd><a href={`?year=${y.id}&status=committed#budget`} data-v="spend.committed">{v['spend.committed']}</a><small>{t.projects} {t.projects === 1 ? 'project' : 'projects'} in flight</small></dd></div>
+                  <div><dt><i class="dot b-pl"></i>Planned</dt><dd><a href={`?year=${y.id}&status=planned#budget`} data-v="spend.planned">{v['spend.planned']}</a><small><a href={dueLink(y)} data-vt-rec="dd-refresh"><span data-v="units">{v.units}</span> devices</a> in <span data-v="rooms">{v.rooms}</span> rooms{inProj ? <a href={dueLink(y, '').replace('&project=none', '&project=in')}> · {inProj} more are in a project</a> : ''}</small></dd></div>
+                  <div><dt><i class="dot b-es"></i>Estimated</dt><dd><a href={`?year=${y.id}&status=estimated#budget`} data-v="spend.estimated">{v['spend.estimated']}</a><small><a href="#scenarios" data-pl-goto="scenarios">From scenarios adopted</a></small></dd></div>
+                  <div><dt><i class="dot b-cap"></i>Envelope</dt><dd>{t.envelope == null ? <span class="faint">Not set yet</span> : <span>{money(t.envelope)}</span>}<small>{y.envelope?.note ?? (t.envelope == null ? 'Set when the year is budgeted' : '')}{y.envelope?.status === 'proposed' ? ' (proposed)' : ''}</small></dd></div>
+                  <div><dt>Position</dt><dd><span class:list={['pl-head', v['headroom.tone']]} data-v="headroom" data-tone-of="headroom.tone">{v.headroom}</span><small>Total <span data-v="spend.total">{v['spend.total']}</span></small></dd></div>
+                </dl>
+              </section>
+              <section class="card side-card s-4 pl-kinds" aria-labelledby={`h-kind-${y.id}`} data-help="planning.by-kind">
+                <div class="section-head"><h3 id={`h-kind-${y.id}`}>By kind</h3></div>
+                <ul class="pl-kl">
+                  {KIND_ROWS.map((k) => { const b = t.byKind[k]; const n = b ? b.committed + b.planned + b.estimated : 0; return (
+                    <li data-kind-row={k} hidden={!n}>
+                      <a href={`?year=${y.id}&kind=${k}#budget`}><span>{PROJECT_KIND[k] ?? k}</span><b class="num" data-v={`kind:${k}:total`}>{v[`kind:${k}:total`] ?? '€0k'}</b></a>
+                      <span class="pl-kbar" aria-hidden="true"><i class="b-cm" data-v={`kind:${k}:committed`} style={`width:${v[`kind:${k}:committed`] ?? 0}%`}></i><i class="b-pl" data-v={`kind:${k}:planned`} style={`width:${v[`kind:${k}:planned`] ?? 0}%`}></i><i class="b-es" data-v={`kind:${k}:estimated`} style={`width:${v[`kind:${k}:estimated`] ?? 0}%`}></i></span>
+                    </li>
+                  ); })}
+                </ul>
+                <p class="faint pl-note">Kit at house prices, hours at {money(budget.hour_rate)} each. Run costs (support contracts, licences) are not modelled.</p>
+              </section>
+            </div>
+
+            <Section title="By region and office" id={`office-${y.id}`} aside={`${y.label}: every figure opens what is behind it`} help="planning.by-office">
+              <div class="tablewrap">
+                <table class="pl-table to-cards">
+                  <thead><tr><th scope="col">Office</th><th scope="col" class="r">Committed</th><th scope="col" class="r">Planned</th><th scope="col" class="r">Estimated</th><th scope="col" class="r">Total</th><th scope="col" class="r">Devices</th><th scope="col" class="r">Rooms</th></tr></thead>
+                  {REGIONS.map((g) => (
+                    <tbody>
+                      <tr class="pl-region"><th scope="row"><a href={`?year=${y.id}&region=${g}#budget`}>{regionShort(g)}</a></th>
+                        <td class="num r" data-v={`region:${g}:committed`}>{v[`region:${g}:committed`]}</td><td class="num r" data-v={`region:${g}:planned`}>{v[`region:${g}:planned`]}</td><td class="num r" data-v={`region:${g}:estimated`}>{v[`region:${g}:estimated`]}</td><td class="num r" data-v={`region:${g}:total`}><b>{v[`region:${g}:total`]}</b></td><td class="num r" data-v={`region:${g}:units`}>{v[`region:${g}:units`]}</td><td class="num r" data-v={`region:${g}:rooms`}>{v[`region:${g}:rooms`]}</td></tr>
+                      {SITE_ORDER.filter((s) => sites[s].region === g).map((s) => (
+                        <tr data-office-row={s}>
+                          <td><a href={`?year=${y.id}&site=${s}#budget`}>{officeName(s)}</a><small>{sites[s].kind === 'remote' ? `${officeFacts[s].kits} home offices` : `${officeFacts[s].staff} staff · ${roomWord(officeFacts[s].rooms)} · ${unitWord(officeFacts[s].units)}`}</small></td>
+                          <td class="num r"><a href={href(`/projects/?site=${s}`)} data-v={`office:${s}:committed`}>{v[`office:${s}:committed`]}</a></td>
+                          <td class="num r"><a href={dueLink(y, `&site=${s}`)} data-v={`office:${s}:planned`}>{v[`office:${s}:planned`]}</a></td>
+                          <td class="num r" data-v={`office:${s}:estimated`}>{v[`office:${s}:estimated`]}</td>
+                          <td class="num r" data-v={`office:${s}:total`}>{v[`office:${s}:total`] ?? ''}</td>
+                          <td class="num r"><a href={dueLink(y, `&site=${s}`)} data-v={`office:${s}:units`}>{v[`office:${s}:units`]}</a></td>
+                          <td class="num r" data-v={`office:${s}:rooms`}>{v[`office:${s}:rooms`]}</td>
+                        </tr>
+                      ))}
+                      <tr data-office-row={`new:${g}`} class="pl-new" hidden><td><span data-v={`new:${g}:name`}>New office</span><small>From a scenario</small></td><td></td><td></td><td class="num r" data-v={`new:${g}:estimated`}></td><td class="num r" data-v={`new:${g}:total`}></td><td class="num r" data-v={`new:${g}:units`}></td><td class="num r" data-v={`new:${g}:rooms`}></td></tr>
+                    </tbody>
+                  ))}
+                </table>
+              </div>
+            </Section>
+          </div>
+        ); })}
+      </div>
+
+      <Section title="The lines behind the figures" id="lines" aside="Projects, the work plan by office, and what scenarios add" help="planning.lines">
+        <div class="list pl-lines" data-items data-lines>
+          {committedLines.map((l, i) => (
+            <a class="row plain pl-line" href={href(l.to)} data-fi data-i={i} data-eur={l.eur} data-s={siteRank[l.site]} data-name={l.name} data-line={l.id} data-help="planning.line"
+              data-find={`${l.name} ${l.sub} ${officeName(l.site)} ${l.kindLabel} ${STATUS_LABEL[l.status]} ${fyLabel(l.n)}`} data-f-region={l.region} data-f-site={l.site} data-f-kind={l.kind} data-f-status={l.status} data-f-year={l.year}>
+              <span><span class="name">{l.name}</span><span class="sub">{l.sub}</span></span>
+              <span class="end"><span class="pill plain pl-st st-committed">Committed</span><span class="pl-amt num"><b>{money(l.eur)}</b><small>{fyLabel(l.n)} · {l.kindLabel}</small></span><span class="pl-open faint">Open →</span></span>
+            </a>
+          ))}
+          {planLines.map((l, i) => (
+            <a class="row plain pl-line" href={href(l.to)} data-fi={l.empty ? undefined : ''} hidden={l.empty} data-i={committedLines.length + i} data-eur={l.eur} data-s={siteRank[l.site]} data-name={l.name} data-line={l.id} data-help="planning.line"
+              data-find={`${l.name} ${l.sub} ${officeName(l.site)} ${l.kindLabel} Planned ${fyLabel(l.n)}`} data-f-region={l.region} data-f-site={l.site} data-f-kind={l.kind} data-f-status="planned" data-f-year={l.year}>
+              <span><span class="name">{l.name}</span><span class="sub" data-lv="sub">{l.sub}</span></span>
+              <span class="end"><span class="pill plain pl-st st-planned">Planned</span><span class="pl-amt num"><b data-lv="eur">{money(l.eur)}</b><small><span data-lv="units">{l.units}</span> units · {fyLabel(l.n)}</small></span><span class="pl-open faint">Work plan →</span></span>
+            </a>
+          ))}
+          {estimatedLines.map((l, i) => (
+            <a class="row plain pl-line" href="#scenarios" hidden data-sc-line={l.sc} data-i={committedLines.length + planLines.length + i} data-eur={l.eur} data-s={99} data-name={l.name} data-line={l.id} data-help="planning.line" data-pl-goto="scenarios"
+              data-find={`${l.name} ${l.sub} ${l.kindLabel} Estimated ${fyLabel(l.n)}`} data-f-region={l.region} data-f-site="" data-f-kind={l.kind} data-f-status="estimated" data-f-year={l.year}>
+              <span><span class="name">{l.name}</span><span class="sub">{l.sub}</span></span>
+              <span class="end"><span class="pill plain pl-st st-estimated">Estimated</span><span class="pl-amt num"><b>{money(l.eur)}</b><small>{fyLabel(l.n)} · {l.kindLabel}</small></span><span class="pl-open faint">Scenario →</span></span>
+            </a>
+          ))}
+          <div data-new-lines></div>
+        </div>
+        <EmptyState text="No lines match these filters." />
+        {pipeline.length > 0 && <p class="faint pl-note pl-pipe">Also in the year plan, priced when raised: {pipeline.map((w, i) => <span>{i ? ' · ' : ''}<a href={href('/work/schedule/year/')}>{w.title}</a> ({w.status}, {fyLabel(w.year)})</span>)}</p>}
+      </Section>
+    </div>
+
+    {/* ---------------- Scenarios ---------------- */}
+    <div data-view-scenarios class="pl-view" hidden>
+      <div class="pl-sc-grid" data-sc-grid>
+        <form class="card side-card pl-try" data-try aria-labelledby="h-try" data-help="planning.try">
+          <div class="section-head"><h3 id="h-try">Try a scenario</h3></div>
+          <label class="pl-f"><span>What</span><select name="op" data-try-op>
+            <option value="cut">Cut planned spend in a year</option><option value="new-office">Open a new office</option><option value="early">Refresh a device class early</option><option value="delay">Delay a refresh</option>
+          </select></label>
+          <label class="pl-f" data-for="cut new-office early"><span>Year</span><select name="year">{YEARS.filter((y) => !y.current).map((y) => <option value={y.id}>{y.label}, {y.span}</option>)}</select></label>
+          <label class="pl-f" data-for="cut"><span>How much</span><select name="percent"><option value="10">10%</option><option value="15" selected>15%</option><option value="25">25%</option><option value="30">30%</option></select></label>
+          <label class="pl-f" data-for="new-office" hidden><span>Size</span><select name="size">{sizeAdds.map((s) => <option value={s.k} selected={s.k === 'M'}>{s.name}: {roomWord(s.rooms)}, {s.staff} staff (like {s.likeName})</option>)}</select></label>
+          <label class="pl-f" data-for="new-office" hidden><span>Region</span><select name="region">{REGIONS.map((g) => <option value={g}>{regionShort(g)}</option>)}</select></label>
+          <label class="pl-f" data-for="new-office" hidden><span>City</span><input name="city" type="text" placeholder="Sydney" maxlength="30" /></label>
+          <label class="pl-f" data-for="early" hidden><span>Device class</span><select name="class">{DATA.classes.map((c) => <option value={c.id} selected={c.id === 'video-bar'}>{c.name}</option>)}</select></label>
+          <label class="pl-f" data-for="delay" hidden><span>Which work</span><select name="group"><option value="network">Switches and gateways (the network refresh)</option><option value="av">AV devices</option></select></label>
+          <label class="pl-f" data-for="delay" hidden><span>By</span><select name="years"><option value="1">A year</option><option value="2">Two years</option></select></label>
+          <button type="submit" class="btn small primary">Add scenario</button>
+          <p class="faint pl-note">A scenario changes nothing until someone adopts it. It is kept in this browser's live layer, with who added it.</p>
+        </form>
+        {scenarios.map((s, i) => (
+          <article class="card side-card pl-sc" data-fi data-sc={s.id} data-i={i} data-name={s.name} data-eur={Math.abs(s.rows.reduce((a, r) => a + Math.max(0, r.d.spend), 0))} data-s={0} data-help="planning.scenario" data-live-sc={s.id}
+            data-find={`${s.name} ${s.say} ${person(s.owner).name} ${s.changes.map((c) => c.op).join(' ')}`} data-f-region={s.changes.map((c) => c.region).filter(Boolean).join('|') || ALL_REGIONS} data-f-site="" data-f-kind={s.changes.some((c) => c.op === 'new-office') ? 'fit-out' : s.changes.some((c) => c.group === 'network') ? 'infra-refresh' : 'refresh'} data-f-status="estimated" data-f-year={ALL_YEARS}>
+            <header class="pl-sch"><h3>{s.name}</h3><span class="pl-adopted" data-sc-state hidden></span></header>
+            <p class="pl-say">{s.say}</p>
+            <ul class="pl-notes">{s.notes.map((n) => <li>{n}</li>)}</ul>
+            <p class="pl-effect"><b>Effect:</b> {s.effect}</p>
+            <dl class="pl-sc-year" data-sc-year>
+              <div><dt>Spend, <span data-sc-ylabel>{NOW.label}</span></dt><dd class="num" data-sc-v="spend">{s.rows.find((r) => r.id === NOW.id)?.d.spend ? (s.rows.find((r) => r.id === NOW.id).d.spend > 0 ? '+' : '−') + kmoney(Math.abs(s.rows.find((r) => r.id === NOW.id).d.spend)) : 'same'}</dd></div>
+              <div><dt>Devices</dt><dd class="num" data-sc-v="units">{(() => { const d = s.rows.find((r) => r.id === NOW.id)?.d.units ?? 0; return d > 0 ? `+${d}` : d < 0 ? `−${-d}` : 'same'; })()}</dd></div>
+              <div><dt>Technician hours</dt><dd class="num" data-sc-v="tech">{(() => { const d = Math.round(s.rows.find((r) => r.id === NOW.id)?.hours.tech.d ?? 0); return d > 0 ? `+${d} h` : d < 0 ? `−${-d} h` : 'same'; })()}</dd></div>
+            </dl>
+            <footer class="pl-scf">
+              <span class="faint">Raised by {person(s.owner).name}</span>
+              <span class="pl-scb">
+                <button type="button" class="btn small ghost" data-sc-compare={s.id} aria-pressed={i === 0 ? 'true' : 'false'} data-help="planning.compare-btn">Compare</button>
+                <button type="button" class="btn small primary" data-sc-adopt={s.id} data-help="planning.adopt">Adopt</button>
+                <button type="button" class="btn small ghost" data-sc-undo hidden>Undo</button>
+                <button type="button" class="btn small ghost" data-sc-history={s.id} data-help="live.history">History</button>
+              </span>
+            </footer>
+          </article>
+        ))}
+      </div>
+      <EmptyState text="No scenarios match these filters." />
+      <Section title="Compared with the plan" id="compare" help="planning.compare">
+        <div class="card side-card pl-compare" data-compare-host>
+          <p class="pl-cmp-h"><b data-compare-name>{scenarioFor.name}</b> <span class="faint">against the plan as it stands, year by year. Hours are the team's own; vendors' hours are not counted.</span></p>
+          <div data-compare set:html={compareHtml(scenarioFor.rows, scenarioFor.name)} />
+        </div>
+      </Section>
+    </div>
+
+    {/* ---------------- Capacity ---------------- */}
+    <div data-view-capacity class="pl-view" hidden>
+      <div data-year-host="capacity">
+        {YEARS.map((y) => { const v = F[y.id], t = totals[y.id]; return (
+          <div class="pl-year" data-year-panel={y.id} hidden={!y.current}>
+            <div class="g12">
+              {ROLES.map((r) => (
+                <section class="card side-card s-3 pl-role" data-fi data-role={r} data-name={ROLE_LABEL[r]} data-eur={0} data-s={ROLES.indexOf(r)} data-help="planning.role" aria-labelledby={`h-${r}-${y.id}`}
+                  data-find={`${ROLE_LABEL[r]} capacity hours`} data-f-region={ALL_REGIONS} data-f-site="" data-f-kind="" data-f-status="" data-f-year={ALL_YEARS}>
+                  <div class="section-head"><h3 id={`h-${r}-${y.id}`}>{ROLE_LABEL[r]}</h3></div>
+                  <p class="pl-rn"><b class:list={['num', 'pl-pct', `t-${v[`hours:${r}:tone`]}`]} data-v={`hours:${r}:pct`} data-tone-of={`hours:${r}:tone`}>{v[`hours:${r}:pct`] || 'None'}</b><span class="faint" data-v={`hours:${r}:word`}>{v[`hours:${r}:word`]}</span></p>
+                  <div class="pl-hbar" aria-hidden="true"><i class="h-bau" data-v={`hours:${r}:bar.bau`} style={`width:${v[`hours:${r}:bar.bau`]}%`}></i><i class="h-plan" data-v={`hours:${r}:bar.plan`} style={`width:${v[`hours:${r}:bar.plan`]}%`}></i><i class="h-scen" data-v={`hours:${r}:bar.scen`} style={`width:${v[`hours:${r}:bar.scen`]}%`}></i><b class="pl-cap" data-v={`hours:${r}:bar.have`} style={`left:${v[`hours:${r}:bar.have`]}%`}></b></div>
+                  <dl class="pl-hk">
+                    <div><dt><i class="dot h-bau"></i>Upkeep</dt><dd data-v={`hours:${r}:bau`}>{v[`hours:${r}:bau`]}</dd></div>
+                    <div><dt><i class="dot h-plan"></i>Plan and projects</dt><dd data-v={`hours:${r}:plan`}>{v[`hours:${r}:plan`]}</dd></div>
+                    <div><dt><i class="dot h-scen"></i>Scenarios</dt><dd data-v={`hours:${r}:scen`}>{v[`hours:${r}:scen`]}</dd></div>
+                    <div><dt><i class="dot b-cap"></i>Available</dt><dd><span data-v={`hours:${r}:have`}>{v[`hours:${r}:have`]}</span> <small>(<span data-v={`hours:${r}:people`}>{v[`hours:${r}:people`]}</span> people)</small></dd></div>
+                  </dl>
+                  <p class:list={['pl-gap', v[`hours:${r}:gap.tone`]]} data-v={`hours:${r}:gap`} data-tone-of={`hours:${r}:gap.tone`}>{v[`hours:${r}:gap`]}</p>
+                </section>
+              ))}
+            </div>
+            <Section title="By region and role" id={`region-${y.id}`} aside={`${y.label}: people, hours available and hours needed`} help="planning.by-region">
+              <div class="tablewrap">
+                <table class="pl-table to-cards">
+                  <thead><tr><th scope="col">Region and role</th><th scope="col" class="r">People</th><th scope="col" class="r">Available</th><th scope="col" class="r">Needed</th><th scope="col">Gap</th></tr></thead>
+                  {REGIONS.map((g) => (
+                    <tbody>
+                      <tr class="pl-region"><th scope="row" colspan="5"><a href={`?year=${y.id}&region=${g}#capacity`}>{regionShort(g)}</a> <small class="faint"><span data-v={`estate:${g}:offices`}>{v[`estate:${g}:offices`]}</span> offices · <span data-v={`estate:${g}:rooms`}>{v[`estate:${g}:rooms`]}</span> rooms · <span data-v={`estate:${g}:units`}>{v[`estate:${g}:units`]}</span> units · <span data-v={`estate:${g}:staff`}>{v[`estate:${g}:staff`]}</span> staff and home offices</small></th></tr>
+                      {ROLES.map((r) => (
+                        <tr><td>{ROLE_LABEL[r]}</td><td class="num r" data-v={`hours:${r}:${g}:people`}>{v[`hours:${r}:${g}:people`]}</td><td class="num r" data-v={`hours:${r}:${g}:have`}>{v[`hours:${r}:${g}:have`]}</td><td class="num r" data-v={`hours:${r}:${g}:need`}>{v[`hours:${r}:${g}:need`]}</td><td><span class:list={['pl-gap', 'inline', v[`hours:${r}:${g}:gap.tone`]]} data-v={`hours:${r}:${g}:gap`} data-tone-of={`hours:${r}:${g}:gap.tone`}>{v[`hours:${r}:${g}:gap`]}</span></td></tr>
+                      ))}
+                    </tbody>
+                  ))}
+                </table>
+              </div>
+            </Section>
+          </div>
+        ); })}
+      </div>
+
+      <Section title="The ratio model" id="ratios" aside="House assumptions, so the arithmetic can be followed" help="planning.ratios">
+        <div class="g12">
+          <div class="card side-card s-7">
+            <h3>Technicians against staff and rooms, today</h3>
+            <div class="tablewrap">
+              <table class="pl-table to-cards">
+                <thead><tr><th scope="col">Region</th><th scope="col" class="r">Technicians</th><th scope="col" class="r">Staff</th><th scope="col" class="r">Rooms</th><th scope="col" class="r">Staff each</th><th scope="col" class="r">Rooms each</th></tr></thead>
+                <tbody>
+                  {officesByRegion.map((o) => { const sp = o.techs ? Math.round(o.staff / o.techs) : null, rp = o.techs ? Math.round(o.rooms / o.techs) : null; const ts = target('tech', 'staff'), tr = target('tech', 'room'); return (
+                    <tr><td>{regionShort(o.g)}<small>{o.sites.map((s) => officeName(s)).join(', ')}</small></td><td class="num r">{o.techs}</td><td class="num r">{o.staff}</td><td class="num r">{o.rooms}</td>
+                      <td class="num r"><span class:list={['pl-gap', 'inline', sp != null && sp <= ts ? 'good' : 'warn']}>{sp ?? 'None'}</span><small>target {ts}</small></td>
+                      <td class="num r"><span class:list={['pl-gap', 'inline', rp != null && rp <= tr ? 'good' : 'warn']}>{rp ?? 'None'}</span><small>target {tr}</small></td></tr>
+                  ); })}
+                </tbody>
+              </table>
+            </div>
+            <dl class="kv">
+              <div><dt>Plannable hours a person a year</dt><dd class="num">{hoursPerPerson.toLocaleString('en-IE')} h<small class="faint"> ({ratios.hours.working_days} working days less {ratios.hours.leave_days} off, at {ratios.hours.per_day} h a day)</small></dd></div>
+              {ROLES.map((r) => <div><dt>Upkeep, {ROLE_ONE[r]}</dt><dd class="num">{ratios.support[r].per_room} h a room · {ratios.support[r].per_unit} h a unit · {ratios.support[r].per_staff} h a person · {ratios.support[r].per_kit} h a home office, a year</dd></div>)}
+              {ratios.targets.map((t) => <div><dt>Target, {ROLE_ONE[t.role]}s</dt><dd>{t.note}</dd></div>)}
+            </dl>
+          </div>
+          <div class="card side-card s-5" data-help="planning.new-office">
+            <h3>What a new office adds</h3>
+            <div class="pl-sizes">
+              {sizeAdds.map((s) => (
+                <div class="pl-size">
+                  <b>{s.name}</b><small class="faint">like {s.likeName}: {roomWord(s.rooms)}, {s.desks} desks, {s.staff} staff, {unitWord(s.units)}</small>
+                  <dl class="kv">
+                    <div><dt>Fit-out</dt><dd class="num">{kmoney(s.cost)}</dd></div>
+                    <div><dt>Fit-out hours</dt><dd class="num">{fmtH(s.fit.tech)} technician · {fmtH(s.fit.delivery)} engineer · {fmtH(s.fit.pm)} PM</dd></div>
+                    <div><dt>Every year after</dt><dd class="num">{fmtH(s.bau.tech)} technician · {fmtH(s.bau.delivery)} engineer</dd></div>
+                  </dl>
+                </div>
+              ))}
+            </div>
+            <p class="faint pl-note">A medium office needs about {fmtH(sizeAdds[1].bau.tech)} more on-site technician hours a year, {Math.round((sizeAdds[1].bau.tech / hoursPerPerson) * 100)}% of one technician, plus {fmtH(sizeAdds[1].fit.tech)} in the fit-out year. Its units start falling due {ratios.fit_out.refresh_after} years after it opens.</p>
+          </div>
+          <div class="card side-card s-6" data-help="planning.headcount">
+            <h3>Headcount changes in the plan</h3>
+            <ul class="pl-hc">
+              {headcount.changes.map((c) => <li><b>{fyLabel(c.year)}</b> {c.add > 0 ? `+${c.add}` : c.add} {ROLE_ONE[c.role]}{Math.abs(c.add) === 1 ? '' : 's'}, {regionShort(c.region)} <span class:list={['pill', 'plain', 'pl-st', c.status === 'approved' ? 'st-committed' : 'st-estimated']}>{c.status === 'approved' ? 'Approved' : 'Proposed'}</span><small class="faint">{c.why}</small></li>)}
+            </ul>
+            <p class="faint pl-note">The team today: {REGIONS.map((g) => `${regionShort(g)} ${team[g].tech} technicians, ${team[g].delivery} engineer${team[g].delivery === 1 ? '' : 's'}`).join(' · ')}. The network engineer covers the Americas and EMEA, so he counts as half in each.</p>
+          </div>
+          <div class="card side-card s-6" data-help="planning.benchmarks">
+            <h3>Published benchmarks</h3>
+            <ul class="pl-bm">{ratios.benchmarks.map((b) => <li><b>{b.body}</b><span>{b.what}</span><small class="faint">{b.note}</small></li>)}</ul>
+            <p class="faint pl-note">None of these feeds the arithmetic: they cover endpoints or the service desk, which Keia Atlas does not, or are paywalled. Every figure above is a house assumption for the demo.</p>
+          </div>
+        </div>
+      </Section>
+    </div>
+
+    <LiveBar page="planning" />
+  </div>
+
+  <script type="application/json" data-pl-data set:html={JSON.stringify(DATA)} />
+  <script>
+    import { ROLES, REGIONS, fyLabel, yearTotals, applyScenario, compare, effectWords, changeFromForm } from '../../../lib/planningcore.mjs';
+    import { flat, ledeFor, compareHtml, money, kmoney } from '../../../lib/planningview.mjs';
+
+    type Sc = { id: string; name: string; say: string; owner: string; changes: any[]; typed?: boolean };
+    const W = window as any;
+    function boot() {
+      const root = document.querySelector('[data-pl]') as HTMLElement | null; if (!root || (root as any).__pl) return;
+      (root as any).__pl = true;
+      const bar = root.querySelector('[data-fb]') as any; if (!bar) return;
+      const D = JSON.parse((document.querySelector('[data-pl-data]') as HTMLElement).textContent || '{}');
+      const M = () => (W.rsMotion ? W.rsMotion() : { reduced: true, morph: 0, enter: 0, ease: 'linear' });
+      const q = (s: string, el: ParentNode = root) => el.querySelector(s) as HTMLElement | null;
+      const qa = (s: string, el: ParentNode = root) => Array.from(el.querySelectorAll(s)) as HTMLElement[];
+      const yearIds: string[] = D.years.map((y: any) => y.id);
+      const yearAt = (id: string) => D.years.find((y: any) => y.id === id);
+      let scenarios: Sc[] = D.scenarios.slice();
+      const scById = () => Object.fromEntries(scenarios.map((s) => [s.id, s]));
+      let adopted: string[] = [];             // scenario ids, in the order they were adopted
+      let live: any = null;
+
+      /* ---- The year: one facet of the bar; the panels of both views follow it, and the band says the year's answer. */
+      const year = () => (bar.rsFilter ? bar.rsFilter.get('year')[0] : null) || D.years.find((y: any) => y.current).id;
+      let planYears = D.baseline, planCtx = D.ctx, baseTotals: any = {}, curTotals: any = {};
+      function recompute() {
+        let years = D.baseline, ctx = D.ctx;
+        const by = scById();
+        for (const id of adopted) { const s = by[id]; if (!s) continue; const r = applyScenario(years, s, ctx); years = r.years; ctx = r.ctx; }
+        planYears = years; planCtx = ctx;
+        for (const y of D.baseline) baseTotals[y.id] = yearTotals(y, D.ctx);
+        for (const y of planYears) curTotals[y.id] = yearTotals(y, planCtx);
+      }
+      const setTone = (el: HTMLElement, tone: string) => { el.classList.remove('good', 'warn', 'bad', 't-good', 't-warn', 't-bad'); if (tone) el.classList.add(tone); };
+      function paintPanel(panel: HTMLElement, v: Record<string, any>, t: any) {
+        for (const el of qa('[data-v]', panel)) {
+          const k = el.dataset.v!, val = v[k];
+          if (k.startsWith('bar.') || /:bar\./.test(k) || /^kind:.*:(committed|planned|estimated)$/.test(k)) { if (el.tagName === 'B') el.style.left = `${val ?? 100}%`; else el.style.width = `${val ?? 0}%`; continue; }
+          if (val === undefined) { if (k.startsWith('office:') || k.startsWith('region:') || k.startsWith('new:')) el.textContent = ''; continue; }
+          if (el.textContent !== String(val)) el.textContent = String(val);
+          if (el.dataset.toneOf) setTone(el, v[el.dataset.toneOf] ? (el.classList.contains('pl-pct') ? `t-${v[el.dataset.toneOf]}` : v[el.dataset.toneOf]) : '');
+        }
+        for (const row of qa('[data-kind-row]', panel)) row.hidden = !(v[`kind:${row.dataset.kindRow}:n`] > 0);
+        // A new office from a scenario: its own row under its region.
+        for (const g of REGIONS) {
+          const row = q(`[data-office-row="new:${g}"]`, panel); if (!row) continue;
+          const adds = (t.estimatedProjects || []).filter((p: any) => p.region === g);
+          row.hidden = !adds.length;
+          if (adds.length) { const est = adds.reduce((a: number, p: any) => a + p.eur, 0); const set = (k: string, s: string) => { const e = q(`[data-v="new:${g}:${k}"]`, row); if (e) e.textContent = s; }; set('name', adds.map((p: any) => p.name).join(', ')); set('estimated', kmoney(est)); set('total', kmoney(est)); set('units', String(adds.reduce((a: number, p: any) => a + (p.units || 0), 0))); set('rooms', String(adds.reduce((a: number, p: any) => a + (p.rooms || 0), 0))); }
+        }
+      }
+      function paintYear(animate: boolean) {
+        const yid = year(), y = yearAt(yid), t = curTotals[yid], b = baseTotals[yid];
+        t.estimatedProjects = planYears.find((x: any) => x.id === yid)?.estimated.projects ?? [];
+        const v = flat(t, b);
+        for (const host of qa('[data-year-host]')) {
+          const panels = qa('[data-year-panel]', host), next = panels.find((p) => p.dataset.yearPanel === yid), cur = panels.find((p) => !p.hidden);
+          if (next) paintPanel(next, v, t);
+          if (next && cur !== next) {
+            const swap = () => { if (cur) cur.hidden = true; next.hidden = false; };
+            if (animate && cur && !M().reduced && W.rsMorphPanels) W.rsMorphPanels(cur, next, () => (W.rsHold ? W.rsHold(host, swap) : swap()));
+            else if (W.rsHold && animate) W.rsHold(host, swap); else swap();
+          }
+        }
+        // The band.
+        const lede = q('[data-pl-lede]', document); if (lede) lede.textContent = ledeFor(t, y.n, D.nowFy);
+        const pill = q('[data-pl-yearpill]', document); if (pill) pill.textContent = `${fyLabel(y.n)} · ${y.span}`;
+        if (W.rsKeyNumber) {
+          W.rsKeyNumber('committed', kmoney(t.spend.committed)); W.rsKeyNumber('planned', kmoney(t.spend.planned + t.spend.estimated), { label: t.spend.estimated ? 'Planned and estimated' : 'Planned' });
+          W.rsKeyNumber('units', t.units); W.rsKeyNumber('tech', `${t.hours.tech.pct ?? 0}%`, { tone: t.hours.tech.pct > 105 ? 'bad' : t.hours.tech.pct > 85 ? 'warn' : '' });
+        }
+        // The figures' links follow the year.
+        const set = (id: string, href: string) => { const a = document.querySelector(`.kn-i[data-kn="${id}"] a`); if (a) a.setAttribute('href', href); };
+        set('committed', `?year=${yid}&status=committed#budget`); set('planned', `?year=${yid}&status=planned#budget`);
+        set('units', (document.querySelector('.kn-i[data-kn="units"] a')?.getAttribute('href') || '').replace(/year=[^&]*/, `year=${y.n === D.nowFy ? `${D.nowYear},${y.n}` : y.n}`));
+        // Each scenario card says its effect in this year.
+        for (const card of qa('[data-sc]')) {
+          const s = scById()[card.dataset.sc!]; if (!s) continue;
+          const rows = compare(D.baseline, applyScenario(D.baseline, s, D.ctx), D.ctx), r = rows.find((x) => x.id === yid);
+          const lab = q('[data-sc-ylabel]', card); if (lab) lab.textContent = fyLabel(y.n);
+          const sv = (k: string, txt: string) => { const e = q(`[data-sc-v="${k}"]`, card); if (e) e.textContent = txt; };
+          if (r) { sv('spend', r.d.spend > 0 ? `+${kmoney(r.d.spend)}` : r.d.spend < 0 ? `−${kmoney(-r.d.spend)}` : 'same'); sv('units', r.d.units > 0 ? `+${r.d.units}` : r.d.units < 0 ? `−${-r.d.units}` : 'same'); const h = Math.round(r.hours.tech.d); sv('tech', h > 0 ? `+${h} h` : h < 0 ? `−${-h} h` : 'same'); }
+        }
+      }
+      // Planned lines follow the plan (a scenario moves units between years and offices); estimated lines show when adopted.
+      function paintLines() {
+        for (const y of planYears) for (const site of Object.keys(planCtx.siteRegion)) for (const group of ['av', 'network']) {
+          const row = q(`[data-line="${y.id}:${site}:${group}"]`); if (!row) continue;
+          const o = y.planned.byOffice[site]; let units = 0, eur = 0;
+          if (o) for (const [cls, n] of Object.entries(o.classes) as [string, number][]) { if (!n) continue; const g = ['network-switch', 'network-gateway', 'wireless-access-point', 'security-device'].includes(cls) ? 'network' : 'av'; if (g !== group) continue; units += n; const c = planCtx.CLASS[cls] || { eur: 500, hours: {} }; eur += (c.eur + ROLES.reduce((a: number, r: string) => a + (c.hours[r] || 0) * planCtx.rate, 0)) * n; }
+          row.hidden = !units; if (units) row.setAttribute('data-fi', ''); else row.removeAttribute('data-fi');
+          row.dataset.eur = String(Math.round(eur));
+          const e = q('[data-lv="eur"]', row); if (e) e.textContent = money(eur);
+          const u = q('[data-lv="units"]', row); if (u) u.textContent = String(units);
+        }
+        for (const row of qa('[data-sc-line]')) { const on = adopted.includes(row.dataset.scLine!); row.hidden = !on; if (on) row.setAttribute('data-fi', ''); else row.removeAttribute('data-fi'); }
+        if (bar.rsFilter) bar.rsFilter.refresh();
+        document.dispatchEvent(new CustomEvent('rs:sa-refresh'));
+      }
+      function paintAll(animate: boolean) { recompute(); paintYear(animate); paintLines(); }
+
+      /* ---- Views: Budget | Scenarios | Capacity, kept in the address's hash so a drill-down can name one. */
+      const VIEWS = ['budget', 'scenarios', 'capacity'];
+      const fromHash = () => { const h = location.hash.replace('#', ''); return VIEWS.includes(h) ? h : ''; };
+      const h0 = fromHash(); if (h0 && bar.rsFilter) bar.rsFilter.setView(h0);
+      bar.addEventListener('fb:view', (e: any) => { try { history.replaceState(history.state, '', location.pathname + location.search + '#' + e.detail.value); } catch (_) {} });
+      addEventListener('hashchange', () => { const h = fromHash(); if (h && bar.rsFilter && bar.rsFilter.view() !== h) bar.rsFilter.setView(h); });
+      root.addEventListener('click', (e) => { const a = (e.target as HTMLElement).closest('[data-pl-goto]') as HTMLElement | null; if (a && bar.rsFilter) { e.preventDefault(); bar.rsFilter.setView(a.dataset.plGoto); history.replaceState(history.state, '', location.pathname + location.search + '#' + a.dataset.plGoto); } });
+      bar.addEventListener('fb:change', () => paintYear(true));
+
+      /* ---- Sort: lines and scenarios re-order inside the bar's run, so they slide into place. */
+      const num = (el: HTMLElement, k: string) => +(el.dataset[k] || 0);
+      const order = () => {
+        const v = bar.rsFilter ? bar.rsFilter.sort() : 'amount';
+        for (const list of [q('[data-lines]'), q('[data-sc-grid]')]) {
+          if (!list) continue;
+          const rows = qa(':scope > [data-i]', list).sort((a, b) => {
+            let c = 0;
+            if (v === 'site') c = num(a, 's') - num(b, 's'); else if (v === 'name') c = String(a.dataset.name).localeCompare(String(b.dataset.name), 'en', { numeric: true }); else c = num(b, 'eur') - num(a, 'eur');
+            return c || num(a, 'i') - num(b, 'i');
+          });
+          rows.forEach((r) => list.appendChild(r));
+        }
+      };
+      bar.addEventListener('fb:sort', () => bar.rsFilter.run(true, order));
+      const s0 = new URLSearchParams(location.search).get('sort'); if (s0 && s0 !== 'amount') order();
+
+      /* ---- Compare: the chosen scenario against the plan, side by side. */
+      function showCompare(id: string, animate: boolean) {
+        const s = scById()[id]; if (!s) return;
+        const rows = compare(D.baseline, applyScenario(D.baseline, s, D.ctx), D.ctx);
+        const host = q('[data-compare-host]'), box = q('[data-compare]'); if (!host || !box) return;
+        for (const b of qa('[data-sc-compare]')) b.setAttribute('aria-pressed', String(b.dataset.scCompare === id));
+        const draw = () => { const n = q('[data-compare-name]'); if (n) n.textContent = s.name; box.innerHTML = compareHtml(rows, s.name); };
+        if (animate && W.rsPanelSwap) W.rsPanelSwap(host, draw); else if (animate && W.rsHold) W.rsHold(host, draw); else draw();
+      }
+      root.addEventListener('click', (e) => {
+        const t = e.target as HTMLElement;
+        const c = t.closest('[data-sc-compare]') as HTMLElement | null; if (c) { showCompare(c.dataset.scCompare!, true); const sec = q('#compare'); if (sec && sec.getBoundingClientRect().top > innerHeight - 80) sec.scrollIntoView({ behavior: M().reduced ? 'auto' : 'smooth', block: 'start' }); return; }
+        const a = t.closest('[data-sc-adopt]') as HTMLElement | null; if (a) { adopt(a.dataset.scAdopt!, !a.classList.contains('is-on')); return; }
+        const u = t.closest('[data-sc-undo]') as HTMLElement | null; if (u && u.dataset.ev && live) { live.live.undo(u.dataset.ev, { who: live.who(), base: {} }); return; }
+        const h = t.closest('[data-sc-history]') as HTMLElement | null; if (h && live) { const s = scById()[h.dataset.scHistory!]; live.history('scenario:' + h.dataset.scHistory, s ? s.name : 'Scenario'); }
+      });
+
+      /* ---- Adopt: a live-layer event (who, when, Undo in History); adopted scenarios feed every figure. */
+      const state = (id: string) => (live ? live.live.stateOf('scenario:' + id, { adopted: false, adoptedAt: null }) : { adopted: false });
+      function adopt(id: string, on: boolean) {
+        if (!live) return;
+        const now = state(id); if (!!now.adopted === on) return;
+        live.live.record({ item: 'scenario:' + id, field: 'adopted', before: !!now.adopted, after: on, who: live.who(), note: on ? 'Adopted into the plan' : 'Taken out of the plan' });
+      }
+      function paintCard(id: string, mark: boolean, who?: string | null, ev?: any) {
+        const card = q(`[data-sc="${id}"]`); if (!card) return;
+        const st = state(id), on = !!st.adopted;
+        card.classList.toggle('is-adopted', on);
+        const btn = q('[data-sc-adopt]', card); if (btn) { btn.textContent = on ? 'Take out of the plan' : 'Adopt'; btn.classList.toggle('is-on', on); btn.classList.toggle('primary', !on); btn.classList.toggle('ghost', on); }
+        const lab = q('[data-sc-state]', card);
+        if (lab) { lab.hidden = !on; if (on) { const last = (live.live.historyOf('scenario:' + id) as any[]).find((e) => e.field === 'adopted' && !e.undoneBy); lab.textContent = last ? `Adopted by ${live.name(last.who)}, ${new Date(last.at).toLocaleString('en-IE', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}` : 'Adopted'; } }
+        const undo = q('[data-sc-undo]', card) as HTMLElement | null;
+        if (undo) { if (ev && !ev.undoes) { undo.hidden = false; undo.dataset.ev = ev.id; clearTimeout((undo as any).__t); (undo as any).__t = setTimeout(() => { undo.hidden = true; }, M().linger || 4000); } else undo.hidden = true; }
+        if (mark && W.rsMarkChanged) W.rsMarkChanged(card, who ? live.name(who) : null);
+      }
+      function readAdopted() {
+        if (!live) return;
+        const evs = (live.live.events() as any[]).filter((e) => e.item.startsWith('scenario:'));
+        // Typed scenarios: their definition is an event too, so they come back on every open of the page.
+        for (const e of evs) if (e.field === 'defined' && e.after && !scById()[e.item.slice(9)]) { scenarios.push({ ...(e.after as Sc), id: e.item.slice(9), typed: true }); addCard(scenarios[scenarios.length - 1], e.who); }
+        const order: string[] = [];
+        for (const s of scenarios) { const st = state(s.id); if (st.adopted) { const last = evs.filter((e) => e.item === 'scenario:' + s.id && e.field === 'adopted' && !e.undoneBy).pop(); order.push(`${last ? last.at : ''}|${s.id}`); } }
+        adopted = order.sort().map((x) => x.split('|')[1]);
+      }
+      const esc = (s: unknown) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
+      function addCard(s: Sc, who: string | null) {
+        const grid = q('[data-sc-grid]'); if (!grid || q(`[data-sc="${s.id}"]`)) return;
+        const res = applyScenario(D.baseline, s, D.ctx), rows = compare(D.baseline, res, D.ctx);
+        const years = rows.filter((r) => r.d.spend || r.d.units).map((r) => r.id).join('|') || yearIds.join('|');
+        const region = s.changes.map((c) => c.region).filter(Boolean).join('|') || REGIONS.join('|');
+        const kind = s.changes.some((c) => c.op === 'new-office') ? 'fit-out' : s.changes.some((c) => c.group === 'network') ? 'infra-refresh' : 'refresh';
+        const el = document.createElement('article');
+        el.className = 'card side-card pl-sc is-typed'; el.setAttribute('data-fi', ''); el.dataset.sc = s.id; el.dataset.i = String(100 + grid.children.length); el.dataset.name = s.name; el.dataset.eur = String(rows.reduce((a, r) => a + Math.max(0, r.d.spend), 0)); el.dataset.s = '0'; el.setAttribute('data-help', 'planning.scenario');
+        el.dataset.find = `${s.name} ${s.say} ${s.changes.map((c) => c.op).join(' ')}`; el.dataset.fRegion = region; el.dataset.fSite = ''; el.dataset.fKind = kind; el.dataset.fStatus = 'estimated'; el.dataset.fYear = yearIds.join('|'); void years;
+        el.innerHTML = `<header class="pl-sch"><h3>${esc(s.name)}</h3><span class="pl-adopted" data-sc-state hidden></span></header><p class="pl-say">${esc(s.say)}</p><ul class="pl-notes">${res.notes.map((n: string) => `<li>${esc(n)}</li>`).join('')}</ul><p class="pl-effect"><b>Effect:</b> ${esc(effectWords(rows))}</p>` +
+          `<dl class="pl-sc-year" data-sc-year><div><dt>Spend, <span data-sc-ylabel></span></dt><dd class="num" data-sc-v="spend"></dd></div><div><dt>Devices</dt><dd class="num" data-sc-v="units"></dd></div><div><dt>Technician hours</dt><dd class="num" data-sc-v="tech"></dd></div></dl>` +
+          `<footer class="pl-scf"><span class="faint">Typed by ${esc(who ? live.name(who) : 'you')}</span><span class="pl-scb"><button type="button" class="btn small ghost" data-sc-compare="${esc(s.id)}" aria-pressed="false" data-help="planning.compare-btn">Compare</button><button type="button" class="btn small primary" data-sc-adopt="${esc(s.id)}" data-help="planning.adopt">Adopt</button><button type="button" class="btn small ghost" data-sc-undo hidden>Undo</button><button type="button" class="btn small ghost" data-sc-history="${esc(s.id)}" data-help="live.history">History</button></span></footer>`;
+        const form = q('[data-try]'); if (form && form.nextSibling) grid.insertBefore(el, form.nextSibling); else grid.appendChild(el);
+        // Its estimated lines, for the Budget view.
+        const host = q('[data-new-lines]');
+        if (host) for (const y of res.years) for (const p of y.estimated.projects) {
+          const a = document.createElement('a'); a.className = 'row plain pl-line'; a.href = '#scenarios'; a.hidden = true; a.dataset.scLine = s.id; a.dataset.i = '900'; a.dataset.eur = String(p.eur); a.dataset.s = '99'; a.dataset.name = p.name; a.setAttribute('data-help', 'planning.line'); a.dataset.plGoto = 'scenarios';
+          a.dataset.find = `${p.name} ${s.name} Estimated ${fyLabel(y.n)}`; a.dataset.fRegion = p.region; a.dataset.fSite = ''; a.dataset.fKind = p.kind; a.dataset.fStatus = 'estimated'; a.dataset.fYear = y.id;
+          a.innerHTML = `<span><span class="name">${esc(p.name)}</span><span class="sub">${esc(s.name)} · ${p.units} units in ${p.rooms} rooms, ${p.staff} staff</span></span><span class="end"><span class="pill plain pl-st st-estimated">Estimated</span><span class="pl-amt num"><b>${esc(money(p.eur))}</b><small>${esc(fyLabel(y.n))} · ${esc(D.kindLabel[p.kind] || p.kind)}</small></span><span class="pl-open faint">Scenario →</span></span>`;
+          host.appendChild(a);
+        }
+        const m = M(); if (!m.reduced && who === (live && live.who())) el.animate([{ opacity: 0, transform: 'scale(.94)' }, { opacity: 1, transform: 'none' }], { duration: m.enter, easing: m.ease });
+      }
+
+      /* ---- Try a scenario: the form makes one from its fields; the live layer keeps it. */
+      const form = q('[data-try]') as HTMLFormElement | null;
+      if (form) {
+        const opSel = q('[data-try-op]', form) as HTMLSelectElement;
+        const showFields = () => { for (const f of qa('[data-for]', form)) f.hidden = !f.dataset.for!.split(' ').includes(opSel.value); };
+        opSel.addEventListener('change', () => { if (W.rsHold) W.rsHold(form, showFields); else showFields(); });
+        showFields();
+        form.addEventListener('submit', (e) => {
+          e.preventDefault(); if (!live) return;
+          const f: Record<string, string> = {}; new FormData(form).forEach((v, k) => { f[k] = String(v); });
+          const c = changeFromForm(f); if (!c) return;
+          const yl = f.year ? fyLabel(+f.year.replace('fy', '')) : '';
+          const name = c.op === 'cut' ? `Cut ${c.percent}% from ${yl}` : c.op === 'new-office' ? `Open a ${(D.sizes[c.size] || 'medium').toLowerCase()} ${c.city} office in ${yl}` : c.op === 'early' ? `Refresh every ${(D.classes.find((x: any) => x.id === c.class) || { name: c.class }).name.toLowerCase()} in ${yl}` : `Delay the ${c.group === 'network' ? 'network' : 'AV'} refresh ${c.years === 1 ? 'a year' : `${c.years} years`}`;
+          const id = `typed-${Date.now().toString(36)}`;
+          const sc: Sc = { id, name, say: 'Typed on the Planning page.', owner: live.who(), changes: [c] };
+          live.live.record({ item: 'scenario:' + id, field: 'defined', before: null, after: sc, who: live.who(), note: 'Scenario added' });
+          form.reset(); showFields();
+        });
+      }
+
+      /* ---- The live layer. */
+      let stop: (() => void) | null = null;
+      const go = () => {
+        live = W.rsLive; if (!live) return;
+        live.register('scenario:', { base: () => ({ adopted: false }), describe: (e: any) => (e.field === 'defined' ? 'Scenario added' : e.after ? 'Adopted into the plan' : 'Taken out of the plan') });
+        readAdopted();
+        for (const s of scenarios) paintCard(s.id, false);
+        paintAll(false);
+        if (stop) stop();
+        stop = live.live.subscribe('scenario:', (e: any, info: any) => {
+          const id = e.item.slice(9);
+          if (e.field === 'defined') { if (!scById()[id] && e.after) { scenarios.push({ ...(e.after as Sc), id, typed: true }); addCard(scenarios[scenarios.length - 1], e.who); if (bar.rsFilter) bar.rsFilter.refresh(); paintYear(false); } return; }
+          readAdopted(); paintCard(id, !!(info && info.remote), e.who, info && info.remote ? null : e); paintAll(true);
+        });
+        document.addEventListener('astro:before-swap', () => { if (stop) stop(); stop = null; }, { once: true });
+      };
+      if (W.rsLive) go(); else document.addEventListener('rs:live-ready', go, { once: true });
+      if (!W.rsLive) { recompute(); paintYear(false); }
+      showCompare(scenarios[0]?.id, false);
+    }
+    boot();
+    document.addEventListener('astro:page-load', boot);
+  </script>
+</Shell>
+<style is:global>
+  .content.pl { gap: 20px; padding-top: 18px; }
+  .pl-view[hidden], .pl-year[hidden] { display: none; }
+  .pl-view, .pl-year { display: grid; gap: 20px; }
+  .pl-year-pill { font-weight: 600; }
+  .pl-note { margin: 0; font-size: 12.5px; line-height: 1.45; }
+  .pl-table th.r, .pl-table td.r { text-align: right; }
+  .pl-table td small { font-size: 11.5px; }
+  .pl-table a { color: inherit; text-decoration: none; } .pl-table a:hover { text-decoration: underline; text-underline-offset: 2px; }
+  .pl-table tbody + tbody tr:first-child th, .pl-table tbody + tbody tr:first-child td { border-top: 2px solid var(--line); }
+  .pl-region th, .pl-region td { background: var(--surface-2); font-weight: 700; }
+  .pl-region th small { font-weight: 500; margin-left: 8px; }
+  .pl-new td { color: var(--text-2); }
+  /* Money: one bar, committed then planned then estimated, with the envelope as a tick. */
+  .pl-mbar, .pl-hbar { position: relative; display: flex; height: 14px; border-radius: 7px; background: var(--surface-3); overflow: visible; }
+  .pl-mbar i, .pl-hbar i { display: block; height: 100%; transition: width var(--dur-morph) var(--ease-settle); }
+  .pl-mbar i:first-child, .pl-hbar i:first-child { border-radius: 7px 0 0 7px; }
+  .pl-mbar i + i, .pl-hbar i + i { box-shadow: -2px 0 0 var(--surface); }
+  .b-cm { background: var(--seq-6); } .b-pl { background: var(--seq-4); } .b-es { background: repeating-linear-gradient(135deg, var(--seq-2) 0 4px, var(--seq-1) 4px 8px); } .b-cap { background: var(--text); }
+  .h-bau { background: var(--seq-3); } .h-plan { background: var(--seq-5); } .h-scen { background: repeating-linear-gradient(135deg, var(--seq-2) 0 4px, var(--seq-1) 4px 8px); }
+  .pl-cap { position: absolute; top: -5px; bottom: -5px; width: 2px; margin-left: -1px; background: var(--text); border-radius: 1px; transition: left var(--dur-morph) var(--ease-settle); }
+  .pl-cap[hidden] { display: none; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .pl-key { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px 16px; margin: 0; }
+  .pl-key div { display: grid; gap: 3px; min-width: 0; }
+  .pl-key dt { font-size: 12px; color: var(--text-2); white-space: nowrap; }
+  .pl-key dd { margin: 0; font-weight: 800; font-size: 15px; }
+  .pl-key dd a { color: inherit; text-decoration: none; } .pl-key dd a:hover { text-decoration: underline; text-underline-offset: 2px; }
+  .pl-key dd small { display: block; font-weight: 500; font-size: 11.5px; color: var(--text-3); line-height: 1.35; }
+  .pl-head.good { color: var(--green-ink); } .pl-head.bad { color: var(--red-ink); }
+  .pl-kl { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .pl-kl li { display: grid; gap: 4px; } .pl-kl li[hidden] { display: none; }
+  .pl-kl a { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: inherit; text-decoration: none; } .pl-kl a:hover span { text-decoration: underline; text-underline-offset: 2px; }
+  .pl-kl b { font-weight: 700; }
+  .pl-kbar { display: flex; height: 6px; border-radius: 3px; background: var(--surface-3); overflow: hidden; } .pl-kbar i { display: block; height: 100%; transition: width var(--dur-morph) var(--ease-settle); } .pl-kbar i + i { box-shadow: -1px 0 0 var(--surface); }
+  /* The lines. */
+  .pl-lines .row.plain { grid-template-columns: minmax(0, 1fr) auto; }
+  .pl-line[hidden] { display: none; }
+  .pl-line .end { gap: 14px; }
+  .pl-amt { text-align: right; min-width: 150px; } .pl-amt b { display: block; font-size: 14px; }
+  .pl-line .pl-st { min-width: 86px; justify-content: center; } .pl-amt small { display: block; font-size: 11.5px; color: var(--text-3); white-space: nowrap; }
+  .pl-open { font-size: 12.5px; }
+  .pl-st { font-size: 11px; padding: 4px 8px; }
+  .st-committed { background: var(--seq-1); color: var(--seq-7); } .st-planned { background: var(--blue-soft); color: var(--blue-ink); } .st-estimated { background: var(--surface-2); color: var(--text-2); box-shadow: inset 0 0 0 1px var(--line-strong); }
+  .pl-pipe { padding: 12px 4px 0; }
+  /* Scenarios. */
+  .pl-sc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gutter, 20px); align-items: stretch; }
+  .pl-sc, .pl-try { gap: 10px; align-content: start; }
+  .pl-sc.fb-out { display: none; }
+  .pl-sch { display: flex; justify-content: space-between; align-items: start; gap: 10px; }
+  .pl-sch h3 { font: 700 15.5px/1.3 var(--font-sans); letter-spacing: 0; text-transform: none; color: var(--text); margin: 0; }
+  .pl-adopted { font: 600 11.5px/1.3 var(--font-sans); color: var(--green-ink); background: var(--green-soft); padding: 4px 8px; border-radius: 999px; white-space: nowrap; }
+  .pl-adopted[hidden] { display: none; }
+  .pl-sc.is-adopted { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--green-ink) 55%, transparent), var(--shadow-sm); }
+  .pl-say { margin: 0; font-size: 13.5px; color: var(--text-2); line-height: 1.45; }
+  .pl-notes { margin: 0; padding-left: 18px; font-size: 13px; color: var(--text-2); line-height: 1.45; }
+  .pl-effect { margin: 0; font-size: 13px; line-height: 1.45; }
+  .pl-sc-year { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 10px 12px; border-radius: var(--radius); background: var(--surface-2); }
+  .pl-sc-year div { display: grid; gap: 2px; min-width: 0; } .pl-sc-year dt { font-size: 11.5px; color: var(--text-3); } .pl-sc-year dd { margin: 0; font-weight: 800; font-size: 15px; }
+  .pl-scf { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-top: auto; font-size: 12.5px; }
+  .pl-scb { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+  .pl-scb .btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-ink, var(--accent)); }
+  .pl-scb [hidden] { display: none; }
+  .pl-f { display: grid; gap: 4px; font-size: 12.5px; color: var(--text-2); }
+  .pl-f[hidden] { display: none; }
+  .pl-f select, .pl-f input { font: 500 13px var(--font-sans); padding: 7px 9px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); min-width: 0; width: 100%; }
+  .pl-try .btn { justify-self: start; }
+  .pl-compare > * { min-width: 0; }
+  .pl-cmp-h { margin: 0; font-size: 13.5px; line-height: 1.45; }
+  .plc-chart { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; align-items: end; height: 150px; padding: 18px 0 0; border-bottom: 1px solid var(--line-strong); }
+  .plc-col { display: grid; grid-template-rows: minmax(0, 1fr) auto; height: 100%; min-width: 0; justify-items: center; }
+  .plc-bars { position: relative; display: flex; align-items: flex-end; justify-content: center; gap: 3px; width: 100%; height: 100%; }
+  .plc-b { display: block; width: 30%; max-width: 22px; border-radius: 4px 4px 0 0; min-height: 2px; transition: height var(--dur-morph) var(--ease-settle); }
+  .plc-base { background: var(--cat-1); } .plc-sc { background: var(--cat-2); }
+  .plc-lbl { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font: 700 11px/1 var(--font-mono); white-space: nowrap; color: var(--text-2); }
+  .plc-y { font: 700 11px/1.3 var(--font-mono); color: var(--text-2); padding-top: 4px; }
+  .plc-key { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12.5px; color: var(--text-2); }
+  .plc-key li { display: inline-flex; align-items: center; gap: 6px; } .plc-key i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .plc-table { font-size: 12.5px; } .plc-table td, .plc-table th { padding: 8px 10px; }
+  .plc-table th[scope="row"] { color: var(--text); white-space: nowrap; }
+  .plc-d.up { color: var(--amber-ink); } .plc-d.down { color: var(--green-ink); } .plc-d.same { color: var(--text-3); }
+  .plc-table tfoot td, .plc-table tfoot th { border-top: 2px solid var(--line); font-weight: 700; }
+  /* Capacity. */
+  .pl-role { gap: 10px; }
+  .pl-rn { margin: 0; display: flex; align-items: baseline; gap: 10px; }
+  .pl-pct { font: 800 30px/1 var(--font-sans); letter-spacing: -.02em; }
+  .pl-pct.t-warn { color: var(--amber-ink); } .pl-pct.t-bad { color: var(--red-ink); }
+  .pl-hk { display: grid; gap: 5px; margin: 0; font-size: 12.5px; } .pl-hk div { display: flex; justify-content: space-between; gap: 8px; } .pl-hk dt { color: var(--text-2); } .pl-hk dd { margin: 0; font-weight: 600; text-align: right; }
+  .pl-gap { margin: 0; font-weight: 700; font-size: 13px; } .pl-gap.good { color: var(--green-ink); } .pl-gap.bad { color: var(--red-ink); } .pl-gap.warn { color: var(--amber-ink); }
+  .pl-gap.inline { display: inline; }
+  .pl-sizes { display: grid; gap: 12px; }
+  .pl-size { display: grid; gap: 6px; padding-bottom: 10px; border-bottom: var(--border-rule); } .pl-size:last-child { border-bottom: 0; padding-bottom: 0; }
+  .pl-size b { font-size: 14px; } .pl-size small { font-size: 12px; }
+  .pl-size .kv { gap: 6px; } .pl-size .kv > div { padding-bottom: 6px; } .pl-size .kv dd { font-weight: 600; font-size: 12.5px; }
+  .pl-hc, .pl-bm { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; font-size: 13.5px; }
+  .pl-hc li, .pl-bm li { display: grid; gap: 3px; } .pl-hc small, .pl-bm small { font-size: 12.5px; line-height: 1.4; }
+  .pl-hc .pl-st { justify-self: start; }
+  .pl-bm span { color: var(--text-2); font-size: 13px; }
+  /* Every width (L10): the money key wraps, the scenario grid goes two then one wide, the tables become cards under 700 px. */
+  @container content (max-width: 1099px) { .pl-sc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pl-key { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @container content (max-width: 699px) {
+    .pl-sc-grid { grid-template-columns: minmax(0, 1fr); }
+    .pl-key { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pl-lines .row.plain { grid-template-columns: minmax(0, 1fr); }
+    .pl-line .end { justify-content: flex-start; } .pl-amt { text-align: left; }
+    .plc-chart { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; height: 120px; }
+    .plc-lbl { display: none; }
+    table.pl-table.to-cards th[scope="row"] { display: block; flex: 1 1 100%; white-space: normal; padding: 0; }
+    .pl-lines .row.plain > * { grid-column: 1; }
+    table.pl-table.to-cards td.r { text-align: left; }
+    table.plc-table.to-cards td[data-label]::before { content: attr(data-label) ": "; }
+  }
+  @container content (max-width: 559px) {
+    .pl-sc-year { grid-template-columns: minmax(0, 1fr); }
+    /* Three view words on a phone: a little less room in each pill, so the switch fits beside Filters. */
+    .content.pl .fb-views .fb-view { padding: 0 9px; }
+  }
+</style>

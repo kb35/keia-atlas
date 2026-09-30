@@ -1,0 +1,145 @@
+# Space type: Huddle room, small
+# Based on public industry guidance (data/sources/room-guidance.yaml, decision 0006); house assumptions say so.
+# Keia part (profile to verification_model): which classes of device belong here.
+# Keia Atlas part: build options, the models each option names, and the outlets.
+
+schema: composite-profile
+
+profile:
+  name: Huddle room, small
+  space_type: huddle-room-small
+  version: "2.0"
+  last_updated: "2026-09-30"
+  owner: Keia Atlas maintainers
+  capacity: "1-2 people"
+  purpose: >-
+    Small first-come room for one-to-one conversations, glass-walled so people can see it
+    is in use. Not for working alone.
+
+sources:
+  - file: data/sources/room-guidance.yaml
+    provides: 'Public guidance for this space type: size, capacity, display size, kit class and outlets'
+  - file: data/device-classes/display.yaml
+    provides: Healthy state for the display class
+  - file: data/device-classes/video-bar.yaml
+    provides: Healthy state for the video bar class
+
+equipment_categories:
+  - category: display
+    description: Screens for the far end and shared content
+    object_profile: data/device-classes/display.yaml
+    quantity: "1"
+  - category: video_conferencing
+    description: Video bar that runs meetings, or acts as the camera and speaker for a laptop
+    object_profile: data/device-classes/video-bar.yaml
+    quantity: "1"
+
+verification_model:
+  platforms_to_check:
+    - platform: keia_atlas
+      check: every required device in the chosen option is recorded in the space and wired
+        as the option says
+    - platform: inventory
+      check: every device has an active record in this space
+    - platform: dhcp_dns
+      check: every networked device has an address reservation and DNS records
+    - platform: device_management
+      check: meeting devices are online, paired and on standard firmware
+
+keia_atlas:
+  standard: industry
+  guideline: microsoft-teams-rooms-plan
+  category: connect
+  bookable: false
+  capacity:
+    min: 1
+    max: 2
+  area:
+    sq_ft:
+      min: 70
+      max: 95
+    m2:
+      min: 6.5
+      max: 8.8
+  geometry:
+    # The room shell for a floor-level 3D model; basis says where each value comes from.
+    width_m: 2.67
+    depth_m: 3
+    ceiling_m: 2.6
+    display_wall: back
+    door: { wall: left, from_m: 1.95, to_m: 2.8 }
+    data_entry: { via: ceiling, wall: left, at: above the door }
+    containment: [display-track, ceiling-basket, wall-pass-through, table-tray]
+    basis:
+      size: chosen
+      ceiling: house-default
+      door: house-default
+      data_entry: house-default
+      containment: house-default
+    notes:
+      - About 9 x 10 ft (8 m²), close to Microsoft's 10 x 9 ft; rooms from 6.5 to 8.8 m² are a house allowance.
+  options:
+    - id: byom
+      name: Bring your own meeting
+      summary: People run the meeting on their own laptop and use the room camera, microphones
+        and speakers over USB.
+      equipment:
+        - key: display
+          class: display
+          quantity: 1
+          requirement: required
+          location: display-wall
+          sizes_in: [32, 43]
+        - key: video-bar
+          class: video-bar
+          model: logitech-meetup-2
+          quantity: 1
+          requirement: required
+          location: display-wall
+          notes: Above or below the display, used over USB from a laptop
+      infrastructure:
+        - service: power
+          provided_by: it
+          quantity: 4
+          location: behind-display
+          serves: [video bar, display, spare, spare]
+        - service: power
+          provided_by: facilities
+          quantity: 4
+          location: wall-below-table
+          notes: For people in the room. A recommendation; facilities decide.
+        - service: data
+          provided_by: it
+          quantity: 3
+          location: behind-display
+          serves: [video bar, display, spare]
+      wiring:
+        - from: video-bar.hdmi-out-1
+          to: display.hdmi-in-1
+          cable: hdmi
+        - from: video-bar.usb-c-1
+          to: laptop
+          cable: usb-c
+        - from: video-bar.lan-1
+          to: outlet:data/behind-display#1
+          cable: cat6
+        - from: display.lan-1
+          to: outlet:data/behind-display#2
+          cable: cat6
+        - from: video-bar.power-in
+          to: outlet:power/behind-display#1
+          cable: power
+        - from: display.power-in
+          to: outlet:power/behind-display#2
+          cable: power
+  notes:
+    - 'Size and capacity: Microsoft sizes a 10 x 9 ft video room (its focus room) for 2 to 4 people;
+      this one seats 2 at a peninsula (house assumption).'
+    - 'Display size: AVIXA DISCAS basic decision making, text at 3 percent of the image height
+      (house assumption), so the image is at least a sixth of the distance to the farthest seat.
+      That seat is about 1.1 m from the display here, so the display is at least 19 in. 32 or 43 in,
+      for a laptop''s shared screen.'
+    - 'Kit class: Logitech MeetUp 2, made for small meeting rooms, used from the laptop.'
+    - 'Outlets: a data outlet for every networked device plus a spare, at least two wherever data is
+      provided (TIA-568 asks for two per work area), and one at the door for a booking panel (house
+      assumption). Power for the room''s kit is never on a light switch (house assumption).'

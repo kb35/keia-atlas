@@ -1,0 +1,176 @@
+---
+// One unit's build sheet: every setting the unit gets, worked out to its own value from the data (src/lib/buildsheet.mjs), grouped
+// where you set it and in setup order, with copy, print and export. Record archetype with a list: the filter
+// bar first (the band's figures open it filtered), the sheet beside a side panel with the values typed most,
+// where each step stands and what is not recorded.
+import Shell from '../../../../../layouts/Shell.astro';
+import PageBand from '../../../../../components/PageBand.astro';
+import FilterBar from '../../../../../components/FilterBar.astro';
+import SidePanel from '../../../../../components/SidePanel.astro';
+import EmptyState from '../../../../../components/EmptyState.astro';
+import LiveBar from '../../../../../components/LiveBar.astro';
+import IntegrateLive from '../../../../../components/IntegrateLive.astro';
+import BuildSheet from '../../../../../components/BuildSheet.astro';
+import { projects, sites, PHASE_LABEL, STEP_LABEL, phasesOf, href } from '../../../../../lib/data.mjs';
+import { integratePlan, buildModel, batchHref, sheetFor } from '../../../../../lib/integrate.mjs';
+import { cellHtml } from '../../../../../lib/integrate-view.mjs';
+
+export function getStaticPaths() {
+  return Object.values(projects).filter((p) => phasesOf(p).includes('integrate')).flatMap((p) => {
+    const plan = integratePlan(p);
+    const seen = new Set();
+    return plan.units.map((u) => {
+      if (seen.has(`${u.batch}/${u.slug}`)) throw new Error(`Two units share the build sheet address ${u.batch}/${u.slug}`);
+      seen.add(`${u.batch}/${u.slug}`);
+      return { params: { id: p.id.toLowerCase(), batch: u.batch, unit: u.slug }, props: { pid: p.id, plan, uid: u.id } };
+    });
+  });
+}
+const { pid, plan, uid } = Astro.props;
+const p = Object.values(projects).find((x) => x.id === pid);
+const M = buildModel(plan);
+const u = M.U.get(uid);
+const b = M.B.get(u.batch);
+const sheet = sheetFor(plan, uid);
+const site = sites[u.site];
+const PHASE = PHASE_LABEL.integrate;
+const home = `/projects/${p.id.toLowerCase()}/`;
+const inBatch = b.units.map((id) => M.U.get(id));
+const at = inBatch.findIndex((x) => x.id === uid);
+const prev = inBatch[at - 1] ?? null, next = inBatch[at + 1] ?? null;
+const C = sheet.counts;
+const title = u.host ?? `${u.roomName} ${u.short.toLowerCase()}`;
+const head = {
+  Unit: u.name, Hostname: u.host ?? 'Not recorded', Model: u.modelName ?? u.clsName, Room: u.roomName, Office: site.name,
+  Project: `${p.id} ${p.name}`, Batch: b.title, Configuration: b.cfg ? `${b.cfg.name} ${b.cfg.version}` : 'None: nothing to set',
+};
+const STATUS = [{ value: 'seen', label: 'Checked' }, { value: 'issue', label: 'Needs you' }, { value: 'todo', label: 'Not checked yet' }, { value: 'missing', label: 'Not recorded' }];
+const FACETS = [
+  { key: 'status', label: 'Status', options: STATUS },
+  { key: 'where', label: 'Where', options: sheet.groups.map((g) => ({ value: g.id, label: `${g.n}. ${g.title}` })) },
+  { key: 'act', label: 'Set or check', options: [{ value: 'change', label: 'Set' }, { value: 'verify', label: 'Check' }] },
+  { key: 'scope', label: 'Scope', options: [{ value: 'unit', label: 'This unit only' }, { value: 'same', label: 'The same on every unit' }] },
+];
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many ?? `${one}s`}`;
+const COPY = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/></svg><svg class="bs-done" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+---
+<Shell title={`${title}: build sheet`} section="projects" minStage={3} vendorOk about={{ kind: 'unit', label: `${u.name}, build sheet (${p.id})`, to: `${home}integrate/${b.id}/${u.slug}/` }}
+  crumbs={[{ label: 'Projects', to: '/projects/' }, { label: p.name, to: home }, { label: PHASE, to: `${home}integrate/` }, { label: b.title, to: `${home}integrate/${b.id}/` }, { label: `${u.roomName} ${u.short.toLowerCase()}` }]}>
+  <PageBand overline="Build sheet" title={title} sim="live" rec={`bs-${u.slug}`}
+    lede={`${u.modelName ?? u.clsName} in ${u.roomName}, ${site.name}. Every setting worked out for this unit, in setup order.`}
+    numbers={[
+      { n: C.set, label: 'To set', to: '?act=change' },
+      { n: C.verify, label: 'To check', to: '?act=verify' },
+      { n: C.per, label: 'Only this unit', to: '?scope=unit' },
+      { n: C.missing, label: 'Not recorded', to: '?status=missing', tone: C.missing ? 'warn' : undefined },
+    ]}>
+    <Fragment slot="overline"><span>Batch {b.n} of {plan.batches.length}</span><span>Project {p.id}</span></Fragment>
+    <button slot="action" type="button" class="btn primary" data-bs-act="print" data-help="integrate.sheet-print">Print the sheet</button>
+  </PageBand>
+
+  <div class="content integrate bsp" data-int data-page="sheet" data-focus={uid}>
+    <FilterBar facets={FACETS} placeholder="Find a setting, value or menu" label="Find a setting" noun={['setting', 'settings']} scope=".content.bsp" />
+    <LiveBar page={`integrate:${p.id}`} />
+
+    <div class="g12 top bsp-top">
+      <div class="s-8 bsp-sheet" id="sheet">
+        {sheet.groups.length ? <BuildSheet sheet={sheet} M={M} uid={uid} head={head} /> : <EmptyState filter={false} text="Nothing to set on this unit: provision and install it, then the room test." action="Back to the batch" to={`${home}integrate/${b.id}/`} />}
+        <EmptyState text="No setting matches these filters." />
+      </div>
+
+      <SidePanel class="s-4" title="This unit" meta={u.modelName ?? u.clsName} help="integrate.sheet-unit">
+        <dl class="bsp-facts">
+          {sheet.facts.map((f) => (
+            <div>
+              <dt>{f.t}</dt>
+              <dd>{f.val ? <><code>{f.val}</code><button type="button" class="bs-copy bsp-copy" data-bs-copy-fact={f.val} aria-label={`Copy ${f.t}`} data-help="integrate.sheet-copy" set:html={COPY} /></> : <span class="bsp-nr">Not recorded</span>}</dd>
+            </div>
+          ))}
+        </dl>
+        <div class="bsp-steps" data-help="integrate.sheet-steps">
+          {u.steps.map((st) => <div class="bsp-step"><span class="bsp-sl">{STEP_LABEL[st]}</span><span set:html={cellHtml(M, uid, st)} /></div>)}
+        </div>
+        {sheet.missing.length > 0 && (
+          <div class="bsp-miss" data-help="integrate.sheet-missing">
+            <h3>Not recorded</h3>
+            <ul>{sheet.missing.map((r) => <li><a href={`?status=missing#${r.k}`} data-bs-goto={r.k}>{r.t}</a><small>{r.why}</small></li>)}</ul>
+          </div>
+        )}
+        <div class="bsp-acts">
+          <button type="button" class="btn small" data-bs-act="copy-sheet" data-help="integrate.sheet-copy-sheet"><span class="bs-ic" set:html={COPY} /><span data-l>Copy the whole sheet</span></button>
+          <button type="button" class="btn small ghost" data-bs-act="csv" data-name={`${u.host ?? u.slug}-build-sheet`} data-help="integrate.sheet-csv"><span data-l>Export CSV</span></button>
+        </div>
+        <nav class="bsp-nav" aria-label="Other units in this batch">
+          {prev ? <a href={prev.sheet} data-help="integrate.sheet-other">Previous: {prev.host ?? prev.roomName}</a> : <span />}
+          {next ? <a href={next.sheet} data-help="integrate.sheet-other">Next: {next.host ?? next.roomName}</a> : <a href={batchHref(plan, b.id)}>Back to the batch</a>}
+        </nav>
+      </SidePanel>
+    </div>
+
+    <IntegrateLive plan={plan} />
+  </div>
+</Shell>
+
+<script>
+  // The side panel's own copy buttons, and a "Not recorded" link that scrolls its row into view and marks it.
+  function start() {
+    const root = document.querySelector('.content.bsp');
+    if (!root || (root as any).__bsp) return;
+    (root as any).__bsp = true;
+    const W = window as any;
+    root.addEventListener('click', async (ev) => {
+      const t = ev.target as Element;
+      const b = t.closest('[data-bs-copy-fact]') as HTMLElement | null;
+      if (b) {
+        try { await navigator.clipboard.writeText(b.dataset.bsCopyFact || ''); } catch (_) { return; }
+        b.classList.add('copied'); setTimeout(() => b.classList.remove('copied'), 1600);
+        return;
+      }
+      const go = t.closest('[data-bs-goto]') as HTMLElement | null;
+      if (go) {
+        const row = root.querySelector(`[data-k="${CSS.escape(go.dataset.bsGoto || '')}"]`) as HTMLElement | null;
+        if (!row || row.hidden) return;
+        ev.preventDefault();
+        row.scrollIntoView({ block: 'center', behavior: W.rsMotion?.().reduced ? 'auto' : 'smooth' });
+        row.classList.add('copied'); setTimeout(() => row.classList.remove('copied'), 1600);
+      }
+    });
+  }
+  document.addEventListener('astro:page-load', start);
+  if (document.readyState !== 'loading') start(); else document.addEventListener('DOMContentLoaded', start, { once: true });
+</script>
+
+<style>
+  .content.integrate :global(.livebar) { margin-bottom: 14px; }
+  .bsp-sheet { min-width: 0; display: grid; gap: var(--gutter); align-content: start; }
+  .bsp-facts { margin: 0; display: grid; }
+  .bsp-facts > div { display: grid; grid-template-columns: minmax(0, 104px) minmax(0, 1fr); gap: 2px 10px; align-items: center; padding: 7px 0; border-top: 1px solid var(--line); }
+  .bsp-facts > div:first-child { border-top: 0; padding-top: 0; }
+  .bsp-facts dt { font-size: 12px; color: var(--text-3); }
+  .bsp-facts dd { margin: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px; min-width: 0; }
+  .bsp-facts code { font: 600 12.5px/1.35 var(--font-mono); color: var(--text); background: none; padding: 0; overflow-wrap: anywhere; }
+  .bsp-nr, .bsp-miss h3 { font-size: 12px; font-weight: 650; color: var(--amber-ink); }
+  .bsp-copy { appearance: none; width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: var(--radius); background: none; color: var(--text-3); cursor: pointer; transition: background-color var(--dur-hover) var(--ease-settle), color var(--dur-hover) var(--ease-settle); }
+  .bsp-copy:hover { background: var(--surface-2); color: var(--text); }
+  .bsp-copy :global(svg) { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; grid-area: 1 / 1; transition: opacity var(--dur-pop) var(--ease-settle), transform var(--dur-pop) var(--ease-settle); }
+  .bsp-copy :global(.bs-done) { opacity: 0; transform: scale(var(--pop-scale, .94)); stroke: var(--green); stroke-width: 2.4; }
+  .bsp-copy:global(.copied) :global(.bs-done) { opacity: 1; transform: none; }
+  .bsp-copy:global(.copied) :global(svg:not(.bs-done)) { opacity: 0; }
+  .bsp-steps { display: grid; gap: 2px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .bsp-step { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 6px; }
+  .bsp-sl { font-size: 12px; color: var(--text-3); }
+  .bsp-miss { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .bsp-miss h3 { margin: 0 0 6px; }
+  .bsp-miss ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .bsp-miss li { display: grid; gap: 1px; font-size: 13px; }
+  .bsp-miss small { font-size: 11.5px; color: var(--text-2); line-height: 1.35; }
+  .bsp-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .bsp-acts .btn { gap: 6px; }
+  .bsp-acts :global(.bs-ic) { display: inline-grid; place-items: center; }
+  .bsp-acts :global(.bs-ic svg) { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; grid-area: 1 / 1; transition: opacity var(--dur-pop) var(--ease-settle), transform var(--dur-pop) var(--ease-settle); }
+  .bsp-acts :global(.bs-ic .bs-done) { opacity: 0; transform: scale(var(--pop-scale, .94)); stroke: var(--green); stroke-width: 2.4; }
+  .bsp-acts :global(.copied .bs-ic .bs-done) { opacity: 1; transform: none; }
+  .bsp-acts :global(.copied .bs-ic svg:not(.bs-done)) { opacity: 0; }
+  .bsp-nav { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; margin-top: 12px; font-size: 12.5px; }
+  .bsp-nav a { overflow-wrap: anywhere; }
+</style>

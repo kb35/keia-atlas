@@ -1,0 +1,55 @@
+# Configuration: EXT3 extender pair. Setting names, menu paths and defaults are the vendor's (cited per setting);
+# the values and reasons are Aigna's (demo). Researched from vendor documents, Sept 2026.
+id: kramer-ext3-pair
+name: EXT3 extender pair
+models: [kramer-ext3-c-xr-t, kramer-ext3-poe-xr-r]
+mode: Point to point
+version: '1.0'
+owner: sofia
+updated: '2026-09-28'
+summary: A USB-C HDBaseT pair that extends a table laptop's video, USB and Ethernet to the room's display/rack end. Everything is set with rear-panel DIP-switches;
+  Aigna keeps Kramer's defaults except the receiver's USB-host switch, which must be flipped so only one end claims the USB host role.
+managed_by: Front-panel DIP switches
+steps: [Mount EXT3-C-XR-T at the table (or credenza) and EXT3-POE-XR-R at the display/rack end., 'Set the DIP-switches on both units, below, before connecting
+    cables or power.', Connect EXT3-C-XR-T's HDBT OUT to EXT3-POE-XR-R's HDBT IN with a single certified HDBaseT cable., Connect the room laptop to the
+    USB-C IN on EXT3-C-XR-T; connect the display to HDMI OUT on EXT3-POE-XR-R., 'Power both units from their own adapters, or let EXT3-POE-XR-R feed EXT3-C-XR-T
+    over the HDBaseT cable (up to 19.7W) if only one adapter is run to the table.', 'Power-cycle both units once, since DIP-switches 2B, 3B and 4B only
+    take effect after a restart.', 'Confirm the LINK LED lights on both units and that the room''s USB peripherals (camera, soundbar) enumerate on the laptop.']
+groups:
+- name: DIP-switches - EXT3-C-XR-T (transmitter)
+  where: Rear panel SETUP DIP-switches
+  settings:
+  - {name: ETH by USB (DIP 1A), path: Rear panel > SETUP DIP-switches > 1A, value: Off (ETH enabled), action: verify, layer: profile, why: 'Passes the laptop''s
+      Ethernet link through to the receiver end, which Aigna''s AV VLAN design assumes is available.', source: kramer-ext3-c-xr-t-ext3-poe-xr}
+  - {name: HDBT Range Mode (DIP 2A), path: Rear panel > SETUP DIP-switches > 2A, value: Off (Standard range mode), action: verify, layer: room-type, why: 'Standard
+      range covers Aigna''s typical cable runs at full quality; only switch to Long range mode if a site''s run needs the extra reach, which costs bandwidth.',
+    source: kramer-ext3-c-xr-t-ext3-poe-xr}
+  - {name: Active USB Host (DIP 2B), path: Rear panel > SETUP DIP-switches > 2B, value: Off (this unit is the active USB host), action: verify, layer: profile,
+    why: 'The laptop plugs in at the transmitter, so it must stay the USB host; the receiver''s matching switch is changed to slave so only one side claims
+      the role.', source: kramer-ext3-c-xr-t-ext3-poe-xr}
+  - {name: IR Modulation (DIP 3B), path: Rear panel > SETUP DIP-switches > 3B, value: Off (IR pass-thru enabled), action: verify, layer: profile, why: 'Aigna
+      rooms don''t drive an IR emitter cable from this port, so plain pass-through is correct.', source: kramer-ext3-c-xr-t-ext3-poe-xr}
+  - {name: RS-232 operation Mode (DIP 4B), path: Rear panel > SETUP DIP-switches > 4B, value: Off (RS-232 firmware programming inactive), action: verify,
+    layer: profile, why: Keeps the RS-232 port carrying normal control traffic instead of sitting in firmware-upload mode., source: kramer-ext3-c-xr-t-ext3-poe-xr}
+- name: DIP-switches - EXT3-POE-XR-R (receiver)
+  where: Rear panel SETUP DIP-switches
+  settings:
+  - {name: HDBT Range Mode (DIP 1A), path: Rear panel > SETUP DIP-switches > 1A, value: Off (Standard range mode), action: verify, layer: room-type, why: 'Must
+      match the transmitter''s range mode; long range only turns on together with the transmitter''s, for a longer run.', source: kramer-ext3-c-xr-t-ext3-poe-xr}
+  - {name: Active USB Host (DIP 2B), path: Rear panel > SETUP DIP-switches > 2B, value: On (this unit's USB is a slave), action: change, layer: profile,
+    why: 'Both units default to host, but only one may host the USB link at a time; since Aigna''s laptop connects at the transmitter, the receiver is
+      switched to slave.', source: kramer-ext3-c-xr-t-ext3-poe-xr}
+  - {name: IR Modulation (DIP 3B), path: Rear panel > SETUP DIP-switches > 3B, value: Off (IR pass-thru enabled), action: verify, layer: profile, why: Matches
+      the transmitter side so an extended IR signal passes through unmodified., source: kramer-ext3-c-xr-t-ext3-poe-xr}
+  - {name: RS-232 operation Mode (DIP 4B), path: Rear panel > SETUP DIP-switches > 4B, value: Off (RS-232 firmware programming inactive), action: verify,
+    layer: profile, why: Normal operation; only slid to the programming position during a firmware upgrade., source: kramer-ext3-c-xr-t-ext3-poe-xr}
+- name: Power
+  where: Rear panel
+  settings:
+  - {name: Power source, value: 'EXT3-C-XR-T''s own 20V adapter, run to the table end', action: change, layer: room-type, why: 'The transmitter''s adapter
+      also runs the 60W USB-C PD laptop charging; PoE sent from the receiver caps out at 19.7W, which won''t charge a laptop, so Aigna runs the transmitter''s
+      own adapter whenever charging is wanted.', source: kramer-ext3-c-xr-t-4k60-4-4}
+gaps: ['Neither unit''s manual states a current firmware or hardware revision, so firmware above is left blank rather than guessed; settings were checked
+    against the manual''s own P/N 2900-301567 Rev 2.', 'No web interface, Protocol 3000, or Kramer Network support is documented for either unit; everything
+    is set with DIP-switches and cabling.', 'USB-A device charging is only specified as a 2A budget shared across the rear ports on each unit, with no per-port
+    figure to size room USB hubs against.']

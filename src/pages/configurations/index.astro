@@ -1,0 +1,177 @@
+---
+// Configurations: the library of standard set-ups, one per model or family of models (List archetype,
+// docs/standards/page-anatomy.md). Each card opens the configuration's own page. Configuring a real
+// device happens in a project's Deploy page; this is the standard it follows.
+// Old links (/configurations/#<id>) still work: the page sends them on to /configurations/<id>/.
+// The previous workspace (a rail and a panel that filled the window) is in git history.
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import DeviceArt from '../../components/DeviceArt.astro';
+import ConfigScript from '../../components/ConfigScript.astro';
+import { configurations, models, href } from '../../lib/data.mjs';
+import { useOf, factsOf, STATUS_LABEL, FW_KIND } from './_use.mjs';
+
+const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const cfgs = Object.values(configurations)
+  .map((c) => ({ c, f: factsOf(c), u: useOf(c) }))
+  .sort((a, b) => a.f.kind.localeCompare(b.f.kind) || a.c.name.localeCompare(b.c.name));
+const R = cfgs.map(({ c, f, u }, i) => ({ id: c.id, i, name: c.name, kind: f.kind, configuring: u.configuring, now: u.now.length, drifted: u.drifted }));
+const cfgModels = [...new Set(cfgs.flatMap(({ c }) => c.models))];
+const tally = (vals) => [...vals.reduce((m, v) => m.set(v, (m.get(v) ?? 0) + 1), new Map())].sort((a, b) => a[0].localeCompare(b[0])).map(([v]) => v);
+const FACETS = [
+  { key: 'cls', label: 'Kind', options: [...new Map(cfgs.map(({ f }) => [f.cls, f.kind]))].sort((a, b) => a[1].localeCompare(b[1])).map(([value, label]) => ({ value, label })) },
+  { key: 'status', label: 'Status', options: Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label })) },
+  { key: 'model', label: 'Model', options: cfgModels.sort((a, b) => `${models[a].manufacturer} ${models[a].model}`.localeCompare(`${models[b].manufacturer} ${models[b].model}`)).map((m) => ({ value: m, label: models[m].model, sub: models[m].manufacturer })) },
+  { key: 'fw', label: 'Firmware', options: Object.entries(FW_KIND).map(([value, label]) => ({ value, label })) },
+  { key: 'mode', label: 'Mode', options: tally(cfgs.map(({ f }) => f.mode)).map((m) => ({ value: slug(m), label: m })) },
+];
+const SORT = { options: [
+  { value: 'kind', label: 'By kind' }, { value: 'name', label: 'By name' },
+  { value: 'configuring', label: 'Being configured first' }, { value: 'drift', label: 'Drift first' },
+] };
+const VIEWS = [{ value: 'cards', label: 'Cards', show: '[data-grid]' }, { value: 'list', label: 'List', show: '[data-list]' }];
+const nNow = cfgs.filter(({ u }) => u.now.length).length, nDrift = cfgs.filter(({ u }) => u.drifted).length;
+const NUMBERS = [
+  { n: cfgModels.length, label: 'Models covered', to: '/models/?cfg=1' },
+  { n: nNow, label: 'Being configured', to: '?status=configuring' },
+  { n: nDrift, label: 'With drift', to: '?status=drift', tone: nDrift ? 'warn' : undefined },
+];
+const attrs = ({ c, f, u }) => ({
+  'data-fi': '', 'data-id': c.id,
+  'data-find': `${c.name} ${f.kind} ${c.mode} ${f.maker} ${c.models.map((m) => models[m].model).join(' ')} ${c.groups.flatMap((g) => g.settings.map((s) => s.name)).join(' ')}`,
+  'data-f-cls': f.cls, 'data-f-status': u.status.join('|'), 'data-f-model': c.models.join('|'), 'data-f-fw': f.fwKind, 'data-f-mode': slug(f.mode),
+});
+const firstNow = (u) => u.now[0];
+---
+<Shell vendorOk title="Configurations" section="configurations" crumbs={[{ label: 'Devices', to: '/profiles/' }, { label: 'Configurations' }]}>
+  <PageBand overline="Catalogue" title="Configurations" lede="The standard set-up for each model. Configuring happens in a project's Deploy page." numbers={NUMBERS} sim>
+    <button slot="action" type="button" class="btn primary" data-open-report="change">Propose a change</button>
+  </PageBand>
+
+  <div class="content cfl">
+    <FilterBar facets={FACETS} placeholder="Find a configuration, model or setting" label="Find a configuration" noun={['configuration', 'configurations']} scope=".content.cfl" views={VIEWS} viewKey="rs5-cfg-view" sort={SORT} />
+
+    <div class="cfl-grid" data-grid>
+      {cfgs.map((x) => {
+        const { c, f, u } = x, p = firstNow(u);
+        return (
+          <a class="card cfc" href={href(`/configurations/${c.id}/`)} {...attrs(x)}>
+            <span class="cfc-art stage" data-vt-rec={c.id}><DeviceArt model={c.models[0]} cls={f.cls} small label="" /></span>
+            <span class="cfc-body">
+              <span class="cfc-kind">{f.kind}<span>·</span>{f.mode}</span>
+              <b class="cfc-name">{c.name}</b>
+              <small class="cfc-models">{`${f.maker} ${f.modelList}`}</small>
+              <span class="cfc-bar" aria-hidden="true"><i class="s" style={`flex:${f.nSet || 0.001}`}></i><i class="v" style={`flex:${f.nVer || 0.001}`}></i></span>
+              <small class="cfc-n"><b class="num">{f.steps}</b> steps · <b class="num">{f.nSet}</b> set · <b class="num">{f.nVer}</b> verify</small>
+              <span class="cfc-flags">
+                {p && <span class="cf-st st-cfg" title={`${p.id} ${p.name}: ${p.done} of ${p.total} configured`}>Being configured in {p.id}{u.now.length > 1 ? ` and ${u.now.length - 1} more` : ''}</span>}
+                {u.drifted > 0 && <span class="cf-st st-drift">{u.drifted} {u.drifted === 1 ? 'unit' : 'units'} drifted</span>}
+                {!u.units.length && <span class="cf-st st-none">No units yet</span>}
+                {u.units.length > 0 && !u.drifted && !p && <span class="cf-st st-ok">{u.live} in service, in sync</span>}
+              </span>
+            </span>
+          </a>
+        );
+      })}
+    </div>
+
+    <div class="cfl-list card" data-list hidden>
+      <table class="cfl-t">
+        <thead><tr><th scope="col">Configuration</th><th scope="col">Kind</th><th scope="col">Models</th><th scope="col">Firmware</th><th scope="col">Mode</th><th scope="col" class="num">Steps</th><th scope="col" class="num">Set or verify</th><th scope="col">In use</th></tr></thead>
+        <tbody>
+          {cfgs.map((x) => {
+            const { c, f, u } = x, p = firstNow(u);
+            return (
+              <tr {...attrs(x)}>
+                <td><a href={href(`/configurations/${c.id}/`)}><b>{c.name}</b></a></td>
+                <td>{f.kind}</td>
+                <td>{`${f.maker} ${f.modelList}`}</td>
+                <td class="mono small">{f.fwShort ?? <span class="faint">Not versioned</span>}</td>
+                <td>{f.mode}</td>
+                <td class="num">{f.steps}</td>
+                <td class="num">{f.applied}</td>
+                <td>
+                  {p && <span class="cf-st st-cfg">In {p.id}{u.now.length > 1 ? ` +${u.now.length - 1}` : ''}</span>}
+                  {u.drifted > 0 && <span class="cf-st st-drift">{u.drifted} drifted</span>}
+                  {!u.units.length ? <span class="faint">No units yet</span> : <span class="faint"> {u.live} in service</span>}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+    <EmptyState text="No configurations match these filters." />
+  </div>
+  <ConfigScript />
+
+  <script is:inline data-astro-rerun define:vars={{ R }} slot="end">
+    (function () {
+      // Old links named a configuration after a # on this page: send them on to its own page.
+      var to = window.__rsNavTo, want = ((to && to.hash) || location.hash || '').slice(1);
+      if (want && R.some(function (r) { return r.id === want; })) { location.replace(location.pathname.replace(/\/?$/, '/') + want + '/'); return; }
+      var grid = document.querySelector('[data-grid]'), bar = document.querySelector('.cfl [data-fb]'); if (!grid || !bar) return;
+      var cards = new Map(Array.prototype.map.call(grid.children, function (el) { return [el.dataset.id, el]; }));
+      var tbody = document.querySelector('.cfl-t tbody');
+      var rows = new Map(Array.prototype.map.call(tbody.children, function (el) { return [el.dataset.id, el]; }));
+      var sort = bar.rsFilter ? bar.rsFilter.sort() : (new URLSearchParams(location.search).get('sort') || 'kind');
+      function reorder() {
+        R.slice().sort(function (a, b) {
+          var c = 0;
+          if (sort === 'name') c = a.name.localeCompare(b.name);
+          else if (sort === 'configuring') c = (b.now - a.now) || (b.configuring - a.configuring);
+          else if (sort === 'drift') c = b.drifted - a.drifted;
+          return c || a.i - b.i;
+        }).forEach(function (r) { grid.appendChild(cards.get(r.id)); tbody.appendChild(rows.get(r.id)); });
+      }
+      bar.addEventListener('fb:sort', function (e) { sort = e.detail.value; bar.rsFilter.run(true, reorder); });
+      if (sort !== 'kind') { if (bar.rsFilter) bar.rsFilter.run(false, reorder); else reorder(); }
+    })();
+  </script>
+</Shell>
+
+<style>
+  .cfl { padding-top: 18px; gap: 16px; }
+  .cfl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+  .cfc { display: grid; grid-template-rows: auto 1fr; overflow: hidden; color: inherit; text-decoration: none; transition: transform var(--dur-state) var(--ease-settle), box-shadow var(--dur-state) var(--ease-settle); }
+  .cfc[hidden] { display: none; }
+  .cfc:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); color: inherit; }
+  .cfc-art { display: grid; place-items: center; height: 112px; padding: 8px 22px; border-radius: 0; border-bottom: 1px solid var(--line); }
+  .cfc-art :global(.model-art) { max-height: 96px; width: auto; max-width: 100%; }
+  .cfc-art :global(.model-art.generic) { width: 100%; height: 96px; color: var(--text-2); }
+  .cfc-art :global(.model-art.generic svg) { width: 84px; height: auto; }
+  .cfc-body { display: grid; gap: 3px; padding: 11px 14px 14px; align-content: start; min-width: 0; }
+  .cfc-kind { display: flex; gap: 6px; font: 700 10.5px/1.2 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+  .cfc-kind span { opacity: .5; }
+  .cfc-name { font: 700 16px/1.25 var(--font-display); margin-top: 2px; }
+  .cfc-models { font-size: 12.5px; color: var(--text-2); }
+  .cfc-bar { display: flex; height: 5px; gap: 2px; border-radius: 3px; overflow: hidden; max-width: 160px; margin-top: 6px; }
+  .cfc-bar .s { background: var(--accent); } .cfc-bar .v { background: var(--green); }
+  .cfc-n { font-size: 12px; color: var(--text-3); } .cfc-n b { color: var(--text-2); }
+  .cfc-flags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .cf-st { font: 700 11px/1 var(--font-sans); padding: 4px 8px; border-radius: var(--pill-radius); white-space: nowrap; }
+  .cf-st.st-cfg { background: var(--blue-soft); color: var(--blue-ink); }
+  .cf-st.st-drift { background: var(--amber-soft); color: var(--amber-ink); }
+  .cf-st.st-ok { background: var(--green-soft); color: var(--green-ink); }
+  .cf-st.st-none { background: var(--surface-3); color: var(--text-2); }
+  .cfl-grid[hidden], .cfl-list[hidden] { display: none; }
+  .cfl-list { overflow-x: auto; padding: 0; }
+  .cfl-t { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .cfl-t th { background: var(--surface-2); text-align: left; padding: 10px 12px; font: 700 11px/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); border-bottom: 1px solid var(--line-strong); white-space: nowrap; }
+  .cfl-t td { padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .cfl-t td.num, .cfl-t th.num { text-align: right; }
+  .cfl-t td .cf-st { margin-right: 4px; }
+  .cfl-t tbody tr:nth-child(even) { background: color-mix(in srgb, var(--text) 3%, transparent); }
+  .cfl-t tbody tr:hover { background: color-mix(in srgb, var(--text) 7%, transparent); }
+  .cfl-t tr[hidden] { display: none; }
+  .cfl-t td a { color: inherit; text-decoration: none; } .cfl-t td a:hover { text-decoration: underline; }
+  .cfl-t .small { font-size: 12px; }
+  @media (max-width: 760px) {
+    .cfl-grid { grid-template-columns: minmax(0, 1fr); }
+    .cfc { grid-template-columns: 112px minmax(0, 1fr); grid-template-rows: auto; }
+    .cfc-art { height: auto; padding: 8px; border-bottom: 0; border-right: 1px solid var(--line); }
+    .cfc-art :global(.model-art.generic) { height: 64px; } .cfc-art :global(.model-art.generic svg) { width: 60px; }
+  }
+</style>

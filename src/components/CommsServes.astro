@@ -1,0 +1,31 @@
+---
+// The rooms a comms room serves, by floor. An MDF lists its own floor, then each floor comms room it
+// feeds with that floor's rooms. Each room is a link.
+import { href } from '../lib/data.mjs';
+const { facts: f } = Astro.props;
+const groups = [
+  ...f.serves.direct.map((fl) => ({ title: fl.name, note: f.isMdf ? 'Patched in this room' : null, rooms: fl.rooms })),
+  ...f.serves.via.flatMap((v) => v.floors.map((fl) => ({ title: fl.name, note: 'Through', via: v.room, rooms: fl.rooms }))),
+  ...f.serves.unplaced.map((fl) => ({ title: fl.name, note: 'No floor comms room recorded', rooms: fl.rooms })),
+];
+---
+<div class="cs-groups">
+  {groups.map((g) => (
+    <div class="cs-g">
+      <h3>{g.title} <span class="faint">{g.rooms.length} {g.rooms.length === 1 ? 'room' : 'rooms'}{g.note ? ' · ' : ''}{g.note}{g.via && <> <a href={href(`/rooms/${g.via.id}/`)}>{g.via.number} {g.via.name}</a></>}</span></h3>
+      <ul>
+        {g.rooms.map((r) => <li><a href={href(`/rooms/${r.id}/`)}><span class="mono">{r.number}</span> {r.name}</a></li>)}
+      </ul>
+    </div>
+  ))}
+</div>
+
+<style is:global>
+  .cs-groups { display: grid; gap: 16px; }
+  .cs-g h3 { margin: 0 0 8px; font-size: 15px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+  .cs-g h3 .faint { font: 400 13px var(--font-sans); }
+  .cs-g ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .cs-g li a { display: inline-flex; gap: 6px; align-items: baseline; padding: 5px 10px; border: 1px solid var(--line); border-radius: var(--pill-radius, 999px); background: var(--surface); color: inherit; text-decoration: none; font-size: 13px; transition: border-color var(--dur-hover) var(--ease-settle), background var(--dur-hover) var(--ease-settle); }
+  .cs-g li a:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .cs-g li .mono { font-size: 11.5px; color: var(--text-3); }
+</style>

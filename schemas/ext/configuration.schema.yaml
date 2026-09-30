@@ -1,0 +1,83 @@
+# Configuration: the settings Aigna sets on a model, grouped the way the device's own admin pages
+# group them. Settings with action change or verify are the ones Aigna chooses; a configuration may
+# also list settings it leaves at the vendor default (action leave), so the full menu map is on record.
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/configuration
+title: Configuration
+type: object
+additionalProperties: false
+required: [id, name, models, mode, version, owner, updated, groups]
+properties:
+  id: { type: string }
+  name: { type: string }
+  models: { type: array, items: { type: string } }
+  mode: { type: string }
+  version: { type: string }
+  owner: { type: string }
+  updated: { type: string, format: date }
+  summary: { type: string }
+  firmware: { description: "The firmware or software version the names and menu paths were checked against.", type: string }
+  managed_by: { description: "Where it is set: the device's web interface, a vendor console, DIP switches, or nothing to set.", type: string }
+  gaps: { description: "What the vendor documents don't say, stated honestly.", type: array, items: { type: string } }
+  firmware_min: { description: "The oldest firmware this configuration works on, and any line it must stay on.", type: string }
+  requires: { description: "What the device needs before it is configured (licence, power, network).", type: array, items: { type: string } }
+  menus: { description: "The top menus of the device's web interface, in the vendor's order.", type: array, items: { type: string } }
+  setup:
+    description: "The first-time setup, in the order it must be done. Critical steps are the ones where order matters; after names the earlier steps a step depends on and why_order says why."
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, title]
+      properties:
+        id: { type: string, pattern: "^[a-z0-9-]+$" }
+        title: { type: string }
+        detail: { type: string }
+        path: { type: string }
+        critical: { type: boolean }
+        unconfirmed: { description: "Not confirmed on a real unit or in the vendor's documents yet.", type: boolean }
+        after: { description: "Ids of earlier steps that must be done first.", type: array, items: { type: string } }
+        why_order: { description: "Why this step must come after the ones in after, in plain words.", type: string }
+        source: { type: string }
+  steps:
+    description: The order to apply it in, for a new install.
+    type: array
+    items: { type: string }
+  groups:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [name, settings]
+      properties:
+        name: { type: string }
+        where: { description: "Where these live: the device web interface or an admin console.", type: string }
+        settings:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [name, value, why, action]
+            properties:
+              name: { type: string }
+              action: { description: "change: the installer sets it (the vendor default is wrong for Aigna). verify: the default is already right; only check it. leave: left at the vendor default and not checked; listed so the whole menu is on record.", enum: [change, verify, leave] }
+              unconfirmed: { description: "Not confirmed on a real unit or in the vendor's documents yet.", type: boolean }
+              default: { description: "The vendor's default, when documented.", type: string }
+              path: { type: string }
+              param: { description: "Provisioning parameter, when the vendor documents one.", type: string }
+              value: { type: string }
+              per_device: { description: The value differs per device (taken from the device's record)., type: boolean }
+              derive:
+                description: >-
+                  The value template: how a unit's own value is worked out for its build sheet (src/lib/buildsheet.mjs), from the
+                  unit, its room, its site and the house values (data/house-values). hostname, fqdn, compute-host (the paired
+                  compute system's hostname), room-name, calendar, time-zone, country, holidays, time-server-1, time-server-2,
+                  time-servers, time-servers-zone, dns-servers, domain, dhcp-reservation, sip-address, contact, pair (the partner
+                  in the same room), management (the platform's organisation and the office's place in it), vault-site,
+                  vault-room, vault-monitoring (the vault entry's name, never the secret), office-hours, as-written (the same
+                  instruction on every unit), on-site (decided or measured on site, so not recorded before).
+                enum: [hostname, fqdn, compute-host, room-name, calendar, time-zone, country, holidays, time-server-1, time-server-2, time-servers, time-servers-zone, dns-servers, domain, dhcp-reservation, sip-address, contact, pair, management, vault-site, vault-room, vault-monitoring, office-hours, as-written, on-site]
+              layer: { enum: [profile, model, country, naming-network, room-type, exception] }
+              why: { type: string }
+              source: { type: string }
+              advisory: { type: string }

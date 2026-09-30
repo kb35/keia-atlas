@@ -1,0 +1,135 @@
+# House standard: power and earthing for comms rooms and AV. Made up for the demo.
+# Electrical work is done by a licensed electrician to the country's wiring rules; this standard adds what IT needs on top.
+id: power
+name: Power and earthing
+area: power
+order: 3
+version: "1.0"
+effective: "2026-03-01"
+owner: Service manager, IT infrastructure
+summary: Comms rooms run on two feeds through a UPS sized with headroom, every rack is bonded to earth, and meeting room kit has its own outlets behind the display.
+intro: >-
+  The country's wiring rules always come first, and fixed electrical work is always done by a licensed electrician. These
+  rules say what IT needs from the electrical design: which circuits, how the UPS is sized, how racks are earthed and where
+  outlets go in rooms.
+scope:
+  - Power to racks in comms rooms, the UPS and the power strips (PDUs) in the rack.
+  - Earthing and bonding of racks, trays and shielded cabling.
+  - Power outlets for meeting room, signage and scheduler panel equipment.
+related: [racks, cabling, meeting-av, displays]
+applies_to:
+  space_types: [mdf, idf]
+figures:
+  - { n: "A + B", label: Feeds to every rack }
+  - { n: "80%", label: Most UPS load }
+  - { n: "15 min", label: UPS runtime }
+  - { n: 1, label: Earth bond per rack }
+sections:
+  - id: circuits
+    title: Circuits and feeds
+    rules:
+      - id: dedicated-circuits
+        level: must
+        rule: Feed each rack from dedicated circuits that serve nothing else, labelled at the distribution board and at the rack.
+        why: A kettle or a cleaner's vacuum on the same circuit trips the network.
+        check: The circuit schedule shows the rack circuits serve only the comms room; labels match on both ends.
+        house: true
+      - id: a-and-b
+        level: must
+        rule: Give every rack two power strips on two separate feeds (A and B), and plug each device with two power supplies into both.
+        why: One failed feed, strip or power supply does not take a device down. The colours (black A, grey B) are in the colour standard.
+        check: Pull feed A during commissioning; everything with two supplies stays up.
+        house: true
+      - id: metered-pdus
+        level: should
+        rule: Use metered, network-connected power strips on the management network.
+        why: Monitoring sees the load per feed and warns before a circuit is overloaded; a strip can be read without a site visit.
+        check: Both strips report their load to monitoring.
+        house: true
+  - id: ups
+    title: UPS
+    rules:
+      - id: ups-size
+        level: must
+        rule: Size the UPS so the rack's total load is no more than 80% of its rating, including every switch's full PoE budget.
+        why: PoE devices draw through the switch; a UPS sized for the switches alone is overloaded when the access points and video bars start.
+        check: The design's load sum and the UPS rating; the UPS's own load reading after commissioning is under 80%.
+        house: true
+      - id: ups-runtime
+        level: must
+        rule: Give at least 15 minutes of runtime at full load, or enough to reach the building generator where there is one.
+        why: Covers most short outages, and gives time to shut down cleanly in a long one.
+        check: The maker's runtime chart for the installed load, and a timed test at commissioning.
+        house: true
+        sources: [iec-62040]
+      - id: ups-network
+        level: must
+        rule: Connect the UPS's network card to the management network and send its alarms (on battery, battery fault, overload) to monitoring.
+        why: A UPS nobody hears is just a battery that will fail quietly.
+        check: Pull the UPS input for 30 seconds during commissioning; monitoring raises an on-battery alert.
+        house: true
+      - id: battery-test
+        level: should
+        rule: Schedule an automatic battery self-test each month and replace batteries at the maker's service life.
+        why: Batteries wear out without warning; the self-test finds a weak one before an outage does.
+        check: The UPS log shows a passed self-test in the last month.
+        house: true
+  - id: earthing
+    title: Earthing and bonding
+    rules:
+      - id: tgb
+        level: must
+        rule: Fit a telecommunications earthing busbar in every comms room, bonded to the building's main earthing terminal.
+        why: Gives racks, trays and shielded cabling one low-resistance path to earth, which protects people and equipment.
+        check: The electrician's test certificate lists the bond and its resistance.
+        sources: [tia-607, en-50310]
+      - id: rack-bond
+        level: must
+        rule: Bond each rack and each run of metal cable tray to the busbar with its own labelled conductor; never chain racks through each other.
+        why: A chained bond is only as good as its weakest joint, and removing one rack breaks the chain.
+        check: One conductor per rack at the busbar, labelled with the rack number.
+        sources: [tia-607]
+  - id: rooms
+    title: Power in rooms
+    rules:
+      - id: behind-display
+        level: must
+        rule: Put a double power outlet and the data outlets in a recessed box behind every wall display, inside the display's footprint.
+        why: No cables hang below the screen, and the plugs stay reachable by lifting the screen off its mount.
+        check: The room's outlet schedule and a photo before the display is hung.
+        house: true
+      - id: switched-by-room
+        level: should
+        rule: Do not put AV equipment on outlets switched by lighting or occupancy controls.
+        why: Devices that lose power every night miss their updates and reboot during the first meeting.
+        check: Turn the room's lights off during commissioning; the video bar stays on.
+        house: true
+      - id: surge
+        level: should
+        rule: Protect table boxes and floor boxes with surge protection where the building has none at the board.
+        why: Laptops and devices at the table are the first to suffer from a surge.
+        check: The electrical design or the table box data sheet.
+        house: true
+references:
+  - id: tia-607
+    name: ANSI/TIA-607-D, Generic Telecommunications Bonding and Grounding (Earthing) for Customer Premises
+    publisher: Telecommunications Industry Association
+    kind: standard
+    summary: Describes the telecommunications earthing busbar in each room, how it links to the building's main earth, and how racks and trays are bonded to it.
+    url: https://tiaonline.org/products-and-services/tia-standards/
+    checked: "2026-09-29"
+  - id: en-50310
+    name: EN 50310, Telecommunications bonding networks for buildings and other structures
+    publisher: CENELEC
+    kind: standard
+    summary: The European counterpart for bonding and earthing information technology equipment in buildings.
+    url: https://www.cenelec.eu/
+    checked: "2026-09-29"
+  - id: iec-62040
+    name: IEC 62040, Uninterruptible power systems (UPS)
+    publisher: International Electrotechnical Commission
+    kind: standard
+    summary: The series covering UPS safety, electromagnetic compatibility and how a UPS's performance (including runtime) is specified and tested.
+    url: https://webstore.iec.ch/
+    checked: "2026-09-29"
+demo: true

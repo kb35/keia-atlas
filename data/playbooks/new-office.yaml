@@ -1,0 +1,73 @@
+# Demo playbook. Aigna's own way of working; not taken from any real company.
+id: new-office
+name: New office build
+kind: fit-out
+version: "2.1"
+intensity: heavy
+weeks: { min: 30, max: 40 }
+summary: Take a new floor from bare shell to live. Every room, desk, comms room and circuit, with a vendor installing to Aigna's design and both service managers signing off.
+when: Use for a new site or a whole new floor. The long-lead items (the internet circuit, the comms room, landlord approvals) decide the dates, so they start in the first week.
+changes:
+  - { date: "2026-09-29", change: "Install and Commission merged into one Deploy phase, with Provision, Install, Configure and Commission steps for each device (decision 0025)." }
+  - { date: "2026-09-04", change: "Photograph each device label before mounting.", from: PRJ-14 }
+  - { date: "2026-06-19", change: "Order the internet circuit at plan, not design: it took 11 weeks.", from: PRJ-14 }
+phases:
+  - phase: plan
+    weeks: "6 to 8"
+    steps:
+      - { title: "Order the internet circuit", role: network, long_lead: true, note: Order now; it sets the earliest go-live date }
+      - { title: "Floor survey with facilities and the landlord", role: delivery, output: Floor survey }
+      - { title: "Room type schedule: every room gets a room type", role: delivery, output: Room type schedule }
+      - { title: "Comms room: space, power and cooling agreed with facilities", role: network, long_lead: true }
+      - { title: "Budget and programme dates", role: programme, output: Budget and programme }
+      - { title: "Choose the AV vendor", role: pm, long_lead: true }
+    gate: { by: [head], checks: [Budget and dates approved, Circuit ordered, Every room has a room type] }
+  - phase: design
+    weeks: "4 to 6"
+    steps:
+      - { title: "Room designs from their room types", role: delivery, output: Room designs }
+      - { title: "Signal routes and cable schedule", role: delivery, output: Cable schedule }
+      - { title: "Rack elevations for the MDF and each IDF", role: network, output: Rack elevations }
+      - { title: "Address plan and VLANs", role: network, output: Address plan }
+      - { title: "Containment, power and wall backing for display walls", role: pm, note: With facilities }
+      - { title: "Vendor scope of works", role: pm, output: Scope of works }
+      - { title: "Lab-check any model that is not yet in the standard", role: innovation }
+      - { title: "Vendor site survey and a review of the design", role: vendor, output: Survey notes and questions }
+    gate: { by: [sm-av, sm-infra], checks: [AV design signed off, Network design signed off, Vendor scope agreed] }
+  - phase: procure
+    weeks: "8 to 12"
+    steps:
+      - { title: "Purchase orders", role: pm, long_lead: true }
+      - { title: "Vendor programme of works", role: pm, output: Vendor programme }
+      - { title: "Prepare calendar room accounts and device management enrolment", role: delivery }
+      - { title: "Switches pre-staged in the Lab", role: network }
+      - { title: "Vendor confirms delivery dates and sends serials and MACs before delivery", role: vendor, note: Through the vendor portal }
+    gate: { by: [pm], checks: [Everything ordered, Vendor programme agreed] }
+  - phase: integrate
+    weeks: 8 to 14
+    steps:
+      - { title: "Record serial and MAC for each position, with a label photo", role: vendor, note: Through the vendor portal, step: provision }
+      - { title: Cabling and containment, role: vendor, step: install }
+      - { title: Comms room built and switches live, role: network, step: install }
+      - { title: Mount and connect devices to the design, role: vendor, step: install }
+      - { title: Review the vendor's records, role: delivery, step: install }
+      - { title: Weekly site walk, role: pm, step: install }
+      - { title: "Configure each device in its setup order, then set and verify its settings", role: delivery, step: configure }
+      - { title: Run the verification for each room, role: delivery, step: commission }
+      - { title: Test calls and room booking, role: tech, step: commission }
+      - { title: Snag list with the vendor, role: delivery, output: Snag list, step: commission }
+      - { title: Vendor fixes snags on their work within five working days, role: vendor, step: commission }
+    gate: { by: [delivery], checks: [Everything installed to the design, Vendor records checked, "Every room passes, or its snags are accepted"] }
+  - phase: handover
+    weeks: "1 to 2"
+    steps:
+      - { title: "Handover pack to the service desk: rooms, devices, known issues", role: pm, output: Handover pack }
+      - { title: "Walk-through for on-site staff", role: delivery }
+      - { title: "Record vendor warranty and support contacts", role: pm }
+      - { title: "As-built drawings and a photo of every wall and rack from the vendor", role: vendor, output: As-built pack }
+    gate: { by: [head], checks: [Service desk ready, Snags closed or owned] }
+  - phase: closed
+    weeks: "-"
+    steps:
+      - { title: "Project review and lessons into this playbook", role: programme }
+    gate: { by: [programme], checks: [Lessons captured] }

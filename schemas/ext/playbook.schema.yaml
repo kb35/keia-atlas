@@ -1,0 +1,52 @@
+# Playbook: the repeatable way Aigna runs one kind of project. Projects follow a playbook; what a
+# project learns is fed back into its playbook (the knowledge loop, applied to delivery).
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/playbook
+title: Playbook
+type: object
+additionalProperties: false
+required: [id, name, kind, summary, when, intensity, weeks, phases]
+properties:
+  id: { type: string, pattern: "^[a-z0-9-]+$" }
+  name: { type: string }
+  kind: { description: The project kind it serves., enum: [refresh, infra-refresh, fit-out, upgrade, custom-design, workplace-refresh, network-refresh, rma, provision, firmware-rollout, home-kit, decommission] }
+  summary: { type: string }
+  when: { description: "When to use it, and when not to.", type: string }
+  intensity: { enum: [light, medium, heavy] }
+  weeks: { description: "Typical length, start to handover.", type: object, required: [min, max], additionalProperties: false, properties: { min: { type: integer }, max: { type: integer } } }
+  version: { type: string }
+  changes:
+    description: What changed in the playbook, and which project taught it.
+    type: array
+    items: { type: object, additionalProperties: false, required: [date, change], properties: { date: { type: string, format: date }, change: { type: string }, from: { type: string } } }
+  phases:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [phase, weeks, steps, gate]
+      properties:
+        phase: { description: "A playbook may skip phases, but keeps them in order.", enum: [plan, design, procure, integrate, handover, closed] }
+        weeks: { type: string, description: "Typical length, like \"2 to 3\"." }
+        steps:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [title, role]
+            properties:
+              title: { type: string }
+              role: { description: A role id (src/lib/demo.mjs ROLES)., type: string }
+              output: { description: What the step produces., type: string }
+              note: { type: string }
+              long_lead: { description: "Start early: this waits on someone outside the team.", type: boolean }
+              step: { description: "Deploy only: the device step this belongs to.", enum: [provision, install, configure, commission] }
+        gate:
+          type: object
+          additionalProperties: false
+          required: [by, checks]
+          properties:
+            by: { type: array, items: { type: string } }
+            checks: { type: array, items: { type: string } }

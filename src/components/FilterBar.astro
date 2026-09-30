@@ -1,0 +1,693 @@
+---
+/* FilterBar: the one filter for every list in Keia Atlas (rule P1, docs/rules/platform.md).
+   A find box, then pill buttons (Region, Office, Kind...) that open a list of choices on hover, on click or
+   tap, and on keyboard focus. Pick as many as you like. Each choice shows how many items it would leave.
+   The list changes as you pick, and the address bar follows (?region=emea,apac&q=x) so a filtered list can
+   be shared. It never fetches anything, never moves the page (window.rsHold) and moves items with the
+   shared motion tokens (window.rsMotion); with reduced motion on, nothing moves.
+
+   How a page uses it:
+     1. Mark each thing to filter with data-fi (a card, a row, a list item). Give it:
+          data-find="words to match"          every word typed must appear (any case)
+          data-f-<key>="value"                one per facet; several values with a bar: "a|b"
+          data-t-<key>="1"                    for a switch (toggles) when the item is on
+        Keep keys in lower case with hyphens. Items inside a [hidden] panel are not counted, so the same
+        items can appear as cards and as rows and only the view on show is counted.
+     2. Optionally mark a container data-fb-group. It hides when none of its items show.
+     3. Render the bar first in .content, above the items:
+          <FilterBar placeholder="Find a room, number or office" noun={['room', 'rooms']} scope=".content"
+            facets={[{ key: 'region', label: 'Region', options: [{ value: 'emea', label: 'EMEA', sub: 'optional' }] }]}
+            views={[{ value: 'cards', label: 'Cards', show: '[data-grid]' }, { value: 'list', label: 'List', show: '[data-list]' }]}
+            sort={{ options: [{ value: 'site', label: 'By office' }, { value: 'name', label: 'By name' }] }} />
+        Order in the bar (rule book, words.md W5 and W6): find box, facets (Region, Office, Kind, Status, then the
+        page's own), switches, Clear; then at the right anything inside the bar tag, the view switch, Sort,
+        and always the count, "N of M rooms".
+        views: word pills ("Cards | List"). Each view's `show` is a selector for the element it shows; the
+          bar hides the others, holds the page still, recounts, remembers the choice in this browser
+          (viewKey, default one per page) and fires "fb:view" with detail { value }. A view may carry its
+          own `noun` ([one, many]) when the count should name something else there ("3 of 12 rooms" as
+          cards, "5 of 61 units" as a list). A page sets the view from code with bar.rsFilter.setView(v).
+        sort: a pill "Sort: By office" that opens like a facet, never a <select>. The bar keeps the choice in
+          the address (?sort=name, left out for the first option) and fires "fb:sort" with detail { value };
+          the page re-orders its items inside bar.rsFilter.run(true, reorder) so they slide into place.
+          bar.rsFilter.set(key, values) sets a facet to exactly those choices (an empty list clears it; an object {role: [...], kind: [...]} sets several and recounts once);
+          bar.rsFilter.sort() reads the choice; bar.rsFilter.setSort(value, label) shows a choice made
+          elsewhere (a table heading) without firing.
+     4. Add the empty state (EmptyState.astro, or any element with data-fb-none), hidden until nothing
+        matches, with a <button data-fb-clear> inside it. Any element with data-fb-shown or data-fb-total
+        gets those numbers.
+     4b. A facet can be `single: true` (one choice at a time: choosing another drops the first) and can
+        start on a choice: `value: 'cut'` (or an array for several). A facet with a starting choice is
+        not "active" while it holds it, "Clear all" puts it back, and the address only names it when it
+        differs (?situation=cut left out; ?status= for none). A single facet that starts on a choice is
+        always on one: choosing the same again does nothing. Its list closes after a pick.
+        The bar sets --fb-h (its height in px, 0 when it is not sticky) on <html>, for sticky headings
+        that sit under it: top: calc(var(--mast-h) + var(--fb-h)). A facet list that would run off the
+        right edge of the window opens towards the left by itself.
+     5. A group of choices can also sit elsewhere on the page: an element with data-fb-facet="<key>" that holds
+        buttons [data-fopt][data-v][data-label] (each may hold a [data-n] for its count).
+   Hooks for the page: the bar (and document) gets "fb:change" with detail {shown, total, active}; a page that
+   re-orders or swaps views calls bar.rsFilter.run(animate, beforeFn) or dispatches "rs:find-refresh" on document.
+   Items whose data-f-* or data-find change after load (live updates): bar.rsFilter.refresh(el) re-reads that
+   item (or every item inside el; no argument re-reads all), or dispatch "rs:find-refresh" with detail { el }. */
+import Icon from './Icon.astro';
+
+interface Option { value: string; label: string; sub?: string; swatch?: string }
+interface Facet { key: string; label: string; options: Option[]; single?: boolean; value?: string | string[] }
+interface Toggle { key: string; label: string; title?: string }
+interface View { value: string; label: string; show?: string; noun?: [string, string] }
+interface Sort { options: { value: string; label: string }[]; value?: string }
+// `count` is kept so older pages still build; the count always shows now (words.md W6).
+interface Props { facets?: Facet[]; toggles?: Toggle[]; placeholder?: string; label?: string; noun?: [string, string]; scope?: string; sticky?: boolean; count?: boolean; animate?: boolean; url?: boolean; views?: View[]; view?: string; viewKey?: string; viewsHelp?: string; sort?: Sort }
+const { facets = [], toggles = [], placeholder = 'Find', label = 'Find', noun = ['item', 'items'], scope = '.content', sticky = true, animate = true, url = true, views = [], view, viewKey, sort, viewsHelp = 'filter.views' } = Astro.props;
+const hasExtra = Astro.slots.has('default');
+const sort0 = sort ? (sort.options.find((o) => o.value === sort.value) ?? sort.options[0]) : null;
+const view0 = views.length ? (views.find((v) => v.value === view) ?? views[0]).value : '';
+const chev = '<path d="M6 9l6 6 6-6" />';
+// One id per bar, so the Filters button can name the group it opens.
+const uid = `fb${Math.random().toString(36).slice(2, 8)}`;
+---
+<div class:list={['fb', 'glass-bar', { 'fb-sticky': sticky }]} data-fb data-scope={scope} data-noun={noun[0]} data-nouns={noun[1]} data-animate={animate ? 'on' : 'off'} data-url={url ? 'on' : 'off'} data-view-key={views.length ? (viewKey ?? '') : undefined} data-view0={view0 || undefined} data-sort0={sort0?.value}>
+  <label class="fb-search" data-help="filter.find"><Icon name="search" size={16} /><span class="sr-only">{label}</span><input type="search" placeholder={placeholder} autocomplete="off" spellcheck="false" data-fb-q /></label>
+  {(facets.length > 0 || toggles.length > 0) && (
+    <button type="button" class="fb-filters" data-fb-sheet-open aria-expanded="false" aria-controls={`${uid}-facets`}><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4" /></svg>Filters<b class="fb-nact" data-fb-nact></b></button>
+  )}
+  <div class="fb-facets" id={`${uid}-facets`} data-fb-facets role="group" aria-label="Filters">
+    <div class="fb-sheet-h"><b>Filters</b><button type="button" class="fb-clear fb-clear-sheet" data-fb-clear>Clear all</button><button type="button" class="btn small primary fb-done" data-fb-sheet-close>Show <span data-fb-shown></span></button></div>
+    {facets.map((f) => (
+      <div class="fb-chip" data-help={`filter.facet:${f.key}`} data-help-name={f.label} data-fb-facet={f.key} data-single={f.single ? '1' : undefined} data-default={f.value === undefined ? undefined : [].concat(f.value).join(',')}>
+        <button type="button" class="fb-chip-btn" aria-haspopup="true" aria-expanded="false"><span>{f.label}</span><b class="fb-val" data-val></b><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg></button>
+        <div class={`fb-pop ${f.options.length > 8 ? 'wide' : ''}`} role="group" aria-label={f.label}>
+          {f.options.map((o) => <button type="button" class="fb-opt" data-fopt data-v={o.value} data-label={o.label} aria-pressed="false"><span>{o.swatch && <i class="fb-sw" style={`--sw:${o.swatch}`}></i>}{o.label}{o.sub && <small>{o.sub}</small>}</span><i class="fb-n" data-n></i></button>)}
+        </div>
+      </div>
+    ))}
+    {toggles.map((t) => <button type="button" class="fb-toggle" data-help="filter.toggle" data-help-name={t.label} data-fb-toggle={t.key} aria-pressed="false" title={t.title}><span class="fb-tick" aria-hidden="true"></span>{t.label}</button>)}
+    <button type="button" class="fb-clear fb-clear-bar" data-help="filter.clear" data-fb-clear hidden>Clear all</button>
+  </div>
+  <div class="fb-end">
+    {hasExtra && <div class="fb-extra"><slot /></div>}
+    {views.length > 1 && (
+      <div class="fb-views" role="group" aria-label="View" data-help={viewsHelp}>
+        {views.map((v) => <button type="button" class="fb-view" data-fb-view={v.value} data-show={v.show} data-noun={v.noun?.[0]} data-nouns={v.noun?.[1]} aria-pressed={v.value === view0 ? 'true' : 'false'}>{v.label}</button>)}
+      </div>
+    )}
+    <div class="fb-sc">
+    {sort0 && (
+      <div class="fb-chip fb-sort" data-help="filter.sort" data-fb-sort>
+        <button type="button" class="fb-chip-btn" aria-haspopup="true" aria-expanded="false"><span>Sort</span><b class="fb-val" data-sort-val>{sort0.label}</b><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true" set:html={chev}></svg></button>
+        <div class="fb-pop end" role="radiogroup" aria-label="Sort">
+          {sort!.options.map((o) => <button type="button" class="fb-opt" role="radio" data-sort-opt data-v={o.value} data-label={o.label} aria-checked={o.value === sort0.value ? 'true' : 'false'}><span>{o.label}</span></button>)}
+        </div>
+      </div>
+    )}
+    <span class="fb-count" data-help="filter.count" data-fb-count aria-live="polite"></span>
+    </div>
+  </div>
+</div>
+
+<script is:inline data-astro-rerun>
+  (function () {
+    var norm = function (s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); };
+    var fmt = function (n) { return n.toLocaleString('en-IE'); };
+    // The items come after the bar in the page, so on a first load wait until the page is read.
+    // Glass only while pinned: a 1px marker sits just above each sticky bar; once it has scrolled past the
+    // line the bar pins to, the bar is stuck and gets its frosted background (.is-stuck in base.css).
+    var watchStuck = function (bar) {
+      if (!bar.classList.contains('fb-sticky') || bar.rsStuck) return;
+      var mark = document.createElement('div'); mark.setAttribute('aria-hidden', 'true'); mark.style.cssText = 'height:1px;margin-bottom:-1px;pointer-events:none';
+      bar.parentNode.insertBefore(mark, bar);
+      var check = function () {
+        if (!bar.isConnected) { window.removeEventListener('scroll', check); window.removeEventListener('resize', check); return; }
+        var top = parseFloat(getComputedStyle(bar).top);
+        bar.classList.toggle('is-stuck', getComputedStyle(bar).position === 'sticky' && mark.getBoundingClientRect().top < (isNaN(top) ? 60 : top));
+      };
+      bar.rsStuck = check;
+      window.addEventListener('scroll', check, { passive: true }); window.addEventListener('resize', check, { passive: true }); check();
+    };
+    var start = function () { document.querySelectorAll('[data-fb]').forEach(function (b) { bind(b); watchStuck(b); }); };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true }); else start();
+
+    function bind(bar) {
+      if (bar.__fb) return;
+      var scope = document.querySelector(bar.dataset.scope) || document.querySelector('.content') || document.body;
+      var qi = bar.querySelector('[data-fb-q]'), countEl = bar.querySelector('[data-fb-count]'), clearBtns = bar.querySelectorAll('[data-fb-clear]'), nactEl = bar.querySelector('[data-fb-nact]');
+      var one = bar.dataset.noun, many = bar.dataset.nouns, one0 = one, many0 = many, useUrl = bar.dataset.url !== 'off', canMove = bar.dataset.animate !== 'off';
+      var facets = Array.prototype.slice.call(document.querySelectorAll('[data-fb-facet]'));
+      var toggles = Array.prototype.slice.call(bar.querySelectorAll('[data-fb-toggle]'));
+      var sel = {}, on = {}, q = '', cache = new WeakMap();
+      // A facet may start on a choice (data-default) and may allow one choice only (data-single).
+      var dflt = {};
+      facets.forEach(function (f) { var k = f.dataset.fbFacet; sel[k] = new Set(); dflt[k] = (f.dataset.default || '').split(',').filter(Boolean); });
+      toggles.forEach(function (t) { on[t.dataset.fbToggle] = false; });
+      var qs = new URLSearchParams(location.search);
+      // The address wins; a facet the address does not name starts on its default ("?k=" alone means none).
+      Object.keys(sel).forEach(function (k) { (qs.has(k) ? qs.get(k) : dflt[k].join(',')).split(',').filter(Boolean).forEach(function (v) { sel[k].add(v); }); });
+      Object.keys(on).forEach(function (k) { on[k] = qs.get(k) === '1'; });
+      q = norm(qs.get('q') || '').trim(); qi.value = qs.get('q') || '';
+      // Sort and view (words.md W6): a sort pill that opens like a facet, and word pills for the view.
+      var sortChip = bar.querySelector('[data-fb-sort]'), sort0 = bar.dataset.sort0 || '', sortV = sort0;
+      var sortOpts = sortChip ? Array.prototype.slice.call(sortChip.querySelectorAll('[data-sort-opt]')) : [];
+      if (sortOpts.some(function (o) { return o.dataset.v === qs.get('sort'); })) sortV = qs.get('sort');
+      var viewBtns = Array.prototype.slice.call(bar.querySelectorAll('[data-fb-view]'));
+      var viewKey = 'rs4-view:' + (bar.dataset.viewKey || location.pathname), viewV = bar.dataset.view0 || '';
+      if (viewBtns.length) { try { var sv = localStorage.getItem(bar.dataset.viewKey || viewKey); if (viewBtns.some(function (b) { return b.dataset.fbView === sv; })) viewV = sv; } catch (_) {} }
+
+      // What one item says about itself: its text, its value for each facet, its switches. Read once.
+      var info = function (el) {
+        var c = cache.get(el); if (c) return c;
+        c = { v: {}, t: {}, q: norm(el.getAttribute('data-find') || el.textContent) };
+        for (var i = 0; i < el.attributes.length; i++) {
+          var a = el.attributes[i];
+          if (a.name.indexOf('data-f-') === 0) c.v[a.name.slice(7)] = a.value.split('|').filter(Boolean);
+          else if (a.name.indexOf('data-t-') === 0) c.t[a.name.slice(7)] = a.value === '1';
+        }
+        cache.set(el, c); return c;
+      };
+      // What stops an item showing: the words, one facet, or one switch. Nothing listed means it shows.
+      var misses = function (c, words) {
+        var out = [], w, k, j, ok;
+        for (w = 0; w < words.length; w++) if (c.q.indexOf(words[w]) < 0) { out.push('#q'); break; }
+        for (k in sel) {
+          if (!sel[k].size) continue;
+          var v = c.v[k] || []; ok = false;
+          for (j = 0; j < v.length; j++) if (sel[k].has(v[j])) { ok = true; break; }
+          if (!ok) out.push(k);
+        }
+        for (k in on) if (on[k] && !c.t[k]) out.push('#t');
+        return out;
+      };
+      var inHidden = function (el) { var p = el.closest('[hidden]'); return !!p && (scope === p || scope.contains(p)); };
+      // A facet holding its starting choice is not a filter the viewer chose.
+      var atDefault = function (k) { var s = sel[k]; return s.size === dflt[k].length && dflt[k].every(function (v) { return s.has(v); }); };
+      var isActive = function () { return !!q || Object.keys(sel).some(function (k) { return !atDefault(k); }) || Object.keys(on).some(function (k) { return on[k]; }); };
+      var visible = function (el) { return !el.classList.contains('fb-out') && !inHidden(el); };
+
+      // Keep the address in step, so a filtered, sorted list can be shared.
+      function syncUrl() {
+        if (!useUrl) return;
+        var p = new URLSearchParams();
+        Object.keys(sel).forEach(function (k) { if (!atDefault(k)) p.set(k, Array.from(sel[k]).join(',')); });
+        Object.keys(on).forEach(function (k) { if (on[k]) p.set(k, '1'); });
+        if (qi.value.trim()) p.set('q', qi.value.trim());
+        if (sortV && sortV !== sort0) p.set('sort', sortV);
+        try { history.replaceState(history.state, '', location.pathname + (p.toString() ? '?' + p : '') + location.hash); } catch (_) {}
+      }
+
+      function run(animate, before) {
+        var M = window.rsMotion ? window.rsMotion() : { reduced: matchMedia('(prefers-reduced-motion: reduce)').matches, ease: 'cubic-bezier(.22,1,.36,1)', morph: 520, enter: 440, stagger: 24 };
+        if (bar.__rsOut) { bar.__rsOut(); bar.__rsOut = null; }   // a quick second pick ends the last exits first
+        var els = Array.prototype.slice.call(scope.querySelectorAll('[data-fi]'));
+        var words = q ? q.split(/\s+/) : [];
+        var counted = els.filter(function (el) { return !inHidden(el); });
+        var move = animate && canMove && !M.reduced && counted.length <= 400;
+        var was = new Map(), shows = new Map(), vh = innerHeight;
+        var near = function (r) { return r.bottom > -60 && r.top < vh + 60; };
+        if (move) counted.forEach(function (el) {
+          if (el.classList.contains('fb-out')) return;
+          var r = el.getBoundingClientRect(); was.set(el, r);
+          if (near(r)) shows.set(el, getComputedStyle(el).display);
+        });
+        // The bar's own pills slide aside when one grows to name its choice (M12).
+        var groups = move ? Array.prototype.slice.call(scope.querySelectorAll('[data-fb-group]:not(.fb-out)')).map(function (g) {
+          var r = g.getBoundingClientRect(); return near(r) && !inHidden(g) ? [g, r, getComputedStyle(g).display] : null;
+        }).filter(Boolean) : [];
+        var parts = move ? Array.prototype.slice.call(bar.querySelectorAll('.fb-facets > .fb-chip, .fb-facets > .fb-toggle, .fb-facets > .fb-clear, .fb-end .fb-views, .fb-end .fb-chip, .fb-extra > *')) : [];
+        var partsWas = parts.map(function (el) { return el.getBoundingClientRect(); });
+        var count0 = countEl ? countEl.textContent : '';
+        var apply = function () {
+          if (before) before();
+          els.forEach(function (el) { el.classList.toggle('fb-out', misses(info(el), words).length > 0); });
+          Array.prototype.forEach.call(scope.querySelectorAll('[data-fb-group]'), function (g) { g.classList.toggle('fb-out', !g.querySelector('[data-fi]:not(.fb-out)')); });
+        };
+        if (window.rsHold && animate) {
+          window.rsHold(scope, apply);
+          if (window.scrollY < 4) scope.style.minHeight = '';
+        } else apply();
+        // Counts: what shows, and how many each choice would leave with everything else as it is.
+        var shown = 0, total = counted.length, counts = {};
+        Object.keys(sel).forEach(function (k) { counts[k] = {}; });
+        counted.forEach(function (el) {
+          var c = info(el), m = misses(c, words);
+          if (!m.length) shown++;
+          if (m.length > 1) return;
+          Object.keys(sel).forEach(function (k) {
+            if (m.length && m[0] !== k) return;
+            var v = c.v[k] || []; for (var j = 0; j < v.length; j++) counts[k][v[j]] = (counts[k][v[j]] || 0) + 1;
+          });
+        });
+        facets.forEach(function (f) {
+          var k = f.dataset.fbFacet, s = sel[k], names = [];
+          Array.prototype.forEach.call(f.querySelectorAll('[data-fopt]'), function (b) {
+            var pressed = s.has(b.dataset.v), n = counts[k][b.dataset.v] || 0, ne = b.querySelector('[data-n]');
+            b.setAttribute('aria-pressed', String(pressed));
+            if (ne) ne.textContent = n;
+            b.classList.toggle('none', n === 0 && !pressed);
+            if (pressed) names.push(b.dataset.label);
+          });
+          f.classList.toggle('on', s.size > 0);
+          var val = f.querySelector('[data-val]');
+          if (val) val.textContent = names.length > 1 ? names.length + ' chosen' : (names[0] || '');
+        });
+        toggles.forEach(function (t) { t.setAttribute('aria-pressed', String(on[t.dataset.fbToggle])); });
+        var active = isActive();
+        scope.classList.toggle('fb-on', active);
+        Array.prototype.forEach.call(clearBtns, function (b) { b.hidden = !active; });
+        // Phones: the Filters button says how many choices are on.
+        if (nactEl) {
+          var nOn = Object.keys(sel).reduce(function (m, k) { return m + (atDefault(k) ? 0 : sel[k].size); }, 0) + Object.keys(on).filter(function (k) { return on[k]; }).length;
+          nactEl.textContent = nOn ? String(nOn) : '';
+        }
+        // Always "N of M", so the count keeps its width and place as filters come and go; a new number eases in.
+        if (countEl) {
+          countEl.textContent = fmt(shown) + ' of ' + fmt(total) + ' ' + (total === 1 ? one : many);
+          if (animate && !M.reduced && count0 && countEl.textContent !== count0 && countEl.animate) countEl.animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: M.state, easing: M.ease });
+          // The page added items since the bar was laid out (a list drawn by its script): make room once.
+          if (bar.rsLayout && countEl.scrollWidth > (parseFloat(countEl.style.minWidth) || 0) + 1) bar.rsLayout();
+        }
+        Array.prototype.forEach.call(document.querySelectorAll('[data-fb-shown]'), function (e) { e.textContent = fmt(shown); });
+        Array.prototype.forEach.call(document.querySelectorAll('[data-fb-total]'), function (e) { e.textContent = fmt(total); });
+        Array.prototype.forEach.call(document.querySelectorAll('[data-fb-none]'), function (e) { e.hidden = shown > 0 || total === 0; });
+        syncUrl();
+        var detail = { shown: shown, total: total, active: active };
+        bar.dispatchEvent(new CustomEvent('fb:change', { bubbles: true, detail: detail }));
+        // Motion (M2, M12): things that stay slide to their new place, things that arrive grow from their
+        // centre, things that leave shrink to theirs where they were (rsEnterEls and rsExitEls in the Shell).
+        if (move) {
+          var ins = [], outs = groups.filter(function (g) { return g[0].classList.contains('fb-out'); });
+          counted.forEach(function (el) {
+            var a = was.get(el);
+            if (el.classList.contains('fb-out')) { if (a && shows.has(el) && !el.closest('[data-fb-group].fb-out')) outs.push([el, a, shows.get(el)]); return; }
+            var b = el.getBoundingClientRect();
+            if (!near(b) && !(a && near(a))) return;
+            if (a) {
+              var dx = a.left - b.left, dy = a.top - b.top;
+              if (Math.abs(dx) + Math.abs(dy) > 0.5) el.animate([{ transform: 'translate(' + dx + 'px,' + dy + 'px)' }, { transform: 'none' }], { duration: M.morph, easing: M.ease });
+            } else ins.push([el, b]);
+          });
+          if (window.rsExitEls) bar.__rsOut = window.rsExitEls(outs);
+          if (window.rsEnterEls) window.rsEnterEls(ins);
+          parts.forEach(function (el, i) {
+            var a = partsWas[i], b = el.getBoundingClientRect(), dx = a.left - b.left, dy = a.top - b.top;
+            if (b.width && a.width && Math.abs(dx) + Math.abs(dy) > 0.5) el.animate([{ transform: 'translate(' + dx + 'px,' + dy + 'px)' }, { transform: 'none' }], { duration: M.morph, easing: M.ease });
+          });
+        }
+        return detail;
+      }
+
+      var clearAll = function () {
+        Object.keys(sel).forEach(function (k) { sel[k].clear(); dflt[k].forEach(function (v) { sel[k].add(v); }); });
+        Object.keys(on).forEach(function (k) { on[k] = false; });
+        q = ''; qi.value = ''; run(true);
+      };
+      var pick = function (k, v, single) {
+        var s = sel[k];
+        if (single) { if (s.has(v)) { if (dflt[k].length) return; s.delete(v); } else { s.clear(); s.add(v); } }
+        else if (s.has(v)) s.delete(v); else s.add(v);
+        run(true);
+      };
+
+      // A pill that opens its list: hover opens it; a click keeps it open until a second click, Escape,
+      // or a click elsewhere; keyboard focus opens it too. Facets and Sort both work this way.
+      // A list that would run past the right edge of the window opens towards the left instead.
+      var fit = function (f) {
+        var pop = f.querySelector('.fb-pop'); if (!pop || pop.classList.contains('end') || bar.classList.contains('fb-sheet')) return;
+        pop.classList.remove('flip');
+        var right = f.getBoundingClientRect().left + pop.offsetWidth, room = document.documentElement.clientWidth - 12;
+        if (right > room && f.getBoundingClientRect().right - pop.offsetWidth > 12) pop.classList.add('flip');
+      };
+      var chip = function (f) {
+        var btn = f.querySelector('.fb-chip-btn'); if (!btn) return;
+        var t, open = function (v) {
+          f.classList.toggle('open', v); btn.setAttribute('aria-expanded', String(v)); if (!v) delete f.dataset.pin;
+          if (v) fit(f);
+        };
+        f.rsClose = function () { open(false); };
+        // Hover opens it; a click keeps it open until a second click, Escape, or a click elsewhere.
+        f.addEventListener('mouseenter', function () { if (document.documentElement.getAttribute('data-help') === 'on' || bar.classList.contains('fb-sheet')) return; clearTimeout(t); t = setTimeout(function () { open(true); }, 110); });
+        f.addEventListener('mouseleave', function () { clearTimeout(t); if (f.dataset.pin) return; t = setTimeout(function () { open(false); }, 160); });
+        btn.addEventListener('click', function () {
+          if (f.classList.contains('open') && f.dataset.pin) open(false);
+          else { open(true); f.dataset.pin = '1'; }
+        });
+        f.addEventListener('keydown', function (e) { if (e.key === 'Escape') { open(false); btn.focus(); } });
+        f.addEventListener('focusin', function (e) { if (document.documentElement.getAttribute('data-help') === 'on') return; if (e.target.matches && e.target.matches(':focus-visible')) { clearTimeout(t); f.classList.add('open'); btn.setAttribute('aria-expanded', 'true'); } });
+        f.addEventListener('focusout', function (e) { if (!f.contains(e.relatedTarget) && !f.dataset.pin) open(false); });
+      };
+      facets.forEach(function (f) {
+        Array.prototype.forEach.call(f.querySelectorAll('[data-fopt]'), function (b) {
+          b.addEventListener('click', function () {
+            pick(f.dataset.fbFacet, b.dataset.v, !!f.dataset.single);
+            if (f.dataset.single && f.rsClose) f.rsClose();
+          });
+        });
+        chip(f);
+      });
+      // Sort: one choice. The page re-orders on "fb:sort"; the pill says what is chosen.
+      var showSort = function (v, label) {
+        sortV = v;
+        sortOpts.forEach(function (o) { o.setAttribute('aria-checked', String(o.dataset.v === v)); });
+        var o = sortOpts.filter(function (x) { return x.dataset.v === v; })[0], val = sortChip && sortChip.querySelector('[data-sort-val]');
+        if (val) val.textContent = label || (o ? o.dataset.label : v);
+      };
+      if (sortChip) {
+        chip(sortChip);
+        showSort(sortV);
+        sortOpts.forEach(function (o) {
+          o.addEventListener('click', function () {
+            showSort(o.dataset.v); if (sortChip.rsClose) sortChip.rsClose();
+            syncUrl();
+            bar.dispatchEvent(new CustomEvent('fb:sort', { bubbles: true, detail: { value: sortV } }));
+          });
+        });
+      }
+      // Views: show one, hide the others, hold the page still, recount, remember the choice.
+      var setView = function (v, hold) {
+        viewV = v;
+        var vb = viewBtns.filter(function (b) { return b.dataset.fbView === v; })[0];
+        one = (vb && vb.dataset.noun) || one0; many = (vb && vb.dataset.nouns) || many0;
+        var swap = function () {
+          viewBtns.forEach(function (b) {
+            b.setAttribute('aria-pressed', String(b.dataset.fbView === v));
+            var el = b.dataset.show && document.querySelector(b.dataset.show); if (el) el.hidden = b.dataset.fbView !== v;
+          });
+        };
+        // Hold the page through the swap; the box then eases to the new view's height (rsHold lets go by itself).
+        if (hold && window.rsHold) window.rsHold(scope, swap); else swap();
+        try { localStorage.setItem(bar.dataset.viewKey || viewKey, v); } catch (_) {}
+      };
+      // Change the view: from a click, or from the page (bar.rsFilter.setView('week')).
+      // M12: the old view fades out where it was while the new one fades in and its box eases to the new
+      // height; the bar stays under the pointer, and if you had scrolled into the view, the new one starts at
+      // its top, just under the bar (window.rsSwapBegin).
+      var target = function (val) { var b = viewBtns.filter(function (x) { return x.dataset.fbView === val; })[0]; return b && b.dataset.show ? document.querySelector(b.dataset.show) : null; };
+      var switchView = function (v) {
+        if (v === viewV || !viewBtns.some(function (b) { return b.dataset.fbView === v; })) return;
+        var oldEl = target(viewV), sw = oldEl && window.rsSwapBegin ? window.rsSwapBegin(oldEl) : null;
+        setView(v, !sw); run(false);
+        bar.dispatchEvent(new CustomEvent('fb:view', { bubbles: true, detail: { value: viewV } }));
+        if (sw) sw.end(target(v));
+      };
+      viewBtns.forEach(function (b) { b.addEventListener('click', function () { switchView(b.dataset.fbView); }); });
+      if (viewBtns.length) setView(viewV, false);
+      toggles.forEach(function (t) { t.addEventListener('click', function () { on[t.dataset.fbToggle] = !on[t.dataset.fbToggle]; run(true); }); });
+      var qt;
+      qi.addEventListener('input', function () { clearTimeout(qt); qt = setTimeout(function () { q = norm(qi.value).trim(); run(true); }, 90); });
+      qi.addEventListener('keydown', function (e) { if (e.key === 'Escape' && qi.value) { e.preventDefault(); e.stopPropagation(); qi.value = ''; q = ''; run(true); } });
+      Array.prototype.forEach.call(document.querySelectorAll('[data-fb-clear]'), function (b) { b.addEventListener('click', clearAll); });
+
+      // Its height, for sticky headings under it (0 when it scrolls away with the page, as on phones).
+      var root = document.documentElement;
+      var height = function () { root.style.setProperty('--fb-h', (getComputedStyle(bar).position === 'sticky' ? Math.round(bar.getBoundingClientRect().height) : 0) + 'px'); };
+      height();
+      if (window.ResizeObserver) new ResizeObserver(height).observe(bar); else window.addEventListener('resize', height);
+
+      /* Layout (layout.md L10). Three ways to lay the bar out, chosen by the room it has:
+           line   everything on one line: find, facets, then the view switch, Sort and the count at the right
+           stack  find with the view switch, Sort and the count on the first line (they wrap to their own
+                  line, at the right, when there is no room); the facets as one group on the next line.
+                  The default, so a first paint never runs off the edge.
+           sheet  phones (the bar's column under 600 px, set in CSS), or when stacking would take more than
+                  three lines: find, then a Filters button beside the view switch, Sort and count; the facets
+                  open in a sheet from the bottom of the screen.
+         The choice depends on the bar's width only, never on what it happens to hold right now: it is made
+         with every part at its widest (Clear all shown, Sort shown even where a view switches it off, the
+         count at its longest wording), and again only when the width changes. So picking a filter or
+         switching Day, Week, Month and Year never re-lays the bar (M12). */
+      var facetsBox = bar.querySelector('[data-fb-facets]'), sheetBtn = bar.querySelector('[data-fb-sheet-open]');
+      var laying = false;
+      var longest = function () {
+        var n = fmt(Math.max(scope.querySelectorAll('[data-fi]').length, 1)), words = [many0].concat(viewBtns.map(function (b) { return b.dataset.nouns || ''; }));
+        var w = words.reduce(function (a, b) { return b.length > a.length ? b : a; }, '');
+        return n + ' of ' + n + ' ' + w;
+      };
+      bar.rsLayout = function () {
+        if (laying || bar.classList.contains('fb-sheet-open')) return;
+        laying = true;
+        var said = countEl ? countEl.textContent : '';
+        bar.classList.add('fb-measure');
+        if (countEl) { countEl.style.minWidth = ''; countEl.textContent = longest(); }
+        // Every pill measured as if it named a choice ("2 chosen"); longer names shorten with an ellipsis.
+        var vals = Array.prototype.map.call(bar.querySelectorAll('.fb-facets [data-val]'), function (v) { var t = v.textContent; v.textContent = '2 chosen'; return [v, t]; });
+        bar.classList.remove('fb-sheet', 'fb-line', 'fb-stack2');
+        if (sheetBtn && getComputedStyle(sheetBtn).display !== 'none') bar.classList.add('fb-sheet');
+        else {
+          bar.classList.add('fb-line');
+          var end = bar.querySelector('.fb-end'), r = bar.getBoundingClientRect(), cs = getComputedStyle(bar);
+          var over = (end && end.getBoundingClientRect().right > r.right - (parseFloat(cs.paddingRight) || 0) + 1) || (facetsBox && facetsBox.scrollWidth > facetsBox.clientWidth + 1);
+          if (over) {
+            bar.classList.remove('fb-line');
+            // Two ways to stack; keep the shorter: (a) find beside the view switch, Sort and count, facets under;
+            // (b) find on its own line, facets and the view switch, Sort and count sharing the next.
+            var hA = bar.clientHeight;
+            bar.classList.add('fb-stack2');
+            if (bar.clientHeight >= hA) bar.classList.remove('fb-stack2');
+            var inner = bar.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0);
+            var squeezed = facetsBox && facetsBox.scrollWidth > facetsBox.clientWidth + 1;   // the facets need more than one line
+            if (sheetBtn && (squeezed || inner > 3 * 38 + 2 * 8 + 4)) { bar.classList.remove('fb-stack2'); bar.classList.add('fb-sheet'); }
+          }
+        }
+        // The count keeps the room of its longest wording, so "3 of 12 people" and "40 of 212 items" sit alike.
+        if (countEl) { countEl.style.minWidth = Math.ceil(countEl.getBoundingClientRect().width) + 'px'; countEl.textContent = said; }
+        vals.forEach(function (x) { x[0].textContent = x[1]; });
+        bar.classList.remove('fb-measure');
+        laying = false;
+      };
+      bar.rsLayout();
+      if (window.ResizeObserver) { var lw = Math.round(bar.getBoundingClientRect().width); new ResizeObserver(function () { var w = Math.round(bar.getBoundingClientRect().width); if (w !== lw) { lw = w; requestAnimationFrame(bar.rsLayout); } }).observe(bar); }
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { bar.rsLayout(); });
+      // A new look brings new fonts and sizes: lay the bar out again once, inside the look's cross-fade.
+      if (window.MutationObserver) {
+        var lookWatch = new MutationObserver(function () { if (!bar.isConnected) { lookWatch.disconnect(); return; } bar.rsLayout(); });
+        lookWatch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-look', 'data-contrast'] });
+      }
+      // The view switch and any switch a page puts in the bar (Me | My team | Everyone): a marker slides.
+      if (window.rsMarkerWatch) bar.querySelectorAll('.fb-views').forEach(function (g) { window.rsMarkerWatch(g, '[aria-pressed=true]:not([hidden])'); });
+      // The sheet: the facets move to the end of <body> while it is open, so nothing on the page can cover it.
+      if (sheetBtn && facetsBox) {
+        var scrim = null, home = facetsBox.parentNode, next = facetsBox.nextSibling;
+        var closing = false;
+        var closeSheet = function (focus, now) {
+          if (!bar.classList.contains('fb-sheet-open') || (closing && !now)) return;
+          var finish = function () {
+            closing = false; facetsBox.style.pointerEvents = '';
+            facetsBox.getAnimations().forEach(function (an) { an.cancel(); });
+            bar.classList.remove('fb-sheet-open'); facetsBox.classList.remove('fb-sheet-on');
+            home.insertBefore(facetsBox, next);
+            if (scrim) { scrim.remove(); scrim = null; }
+            document.documentElement.classList.remove('fb-lock');
+            sheetBtn.setAttribute('aria-expanded', 'false');
+            if (focus) sheetBtn.focus({ preventScroll: true });
+            bar.rsLayout();
+          };
+          var M = window.rsMotion ? window.rsMotion() : { reduced: true };
+          if (now || M.reduced || !facetsBox.animate) { finish(); return; }
+          // The sheet sinks back the way it rose, quickly (--dur-exit), and takes no clicks on the way.
+          closing = true;
+          facetsBox.style.pointerEvents = 'none';
+          if (scrim) scrim.animate([{ opacity: 1 }, { opacity: 0 }], { duration: M.exit, easing: M.ease, fill: 'forwards' });
+          facetsBox.animate([{ transform: 'none', opacity: 1 }, { transform: 'translateY(24px)', opacity: 0 }], { duration: M.exit, easing: M.ease, fill: 'forwards' }).onfinish = function () { facetsBox.style.pointerEvents = ''; finish(); };
+        };
+        var openSheet = function () {
+          scrim = document.createElement('div'); scrim.className = 'fb-scrim'; scrim.addEventListener('click', function () { closeSheet(true); });
+          document.body.appendChild(scrim); document.body.appendChild(facetsBox);
+          facetsBox.classList.add('fb-sheet-on'); bar.classList.add('fb-sheet-open');
+          document.documentElement.classList.add('fb-lock');
+          sheetBtn.setAttribute('aria-expanded', 'true');
+          var first = facetsBox.querySelector('.fb-opt, .fb-toggle'); if (first) first.focus({ preventScroll: true });
+        };
+        sheetBtn.addEventListener('click', openSheet);
+        facetsBox.querySelector('[data-fb-sheet-close]').addEventListener('click', function () { closeSheet(true); });
+        facetsBox.addEventListener('keydown', function (e) { if (e.key === 'Escape' && bar.classList.contains('fb-sheet-open')) { e.stopPropagation(); closeSheet(true); } });
+        document.addEventListener('astro:before-swap', function () { closeSheet(false, true); }, { once: true });
+      }
+
+      bar.__fb = true;
+      bar.rsFilter = {
+        run: run, clear: clearAll, get: function (k) { return Array.from(sel[k] || []); },
+        // Set a facet to exactly these choices from code (rsFilter.set('role', ['pm'])); [] clears it. Unknown choices are ignored.
+        set: function (k, values) {
+          var all = k && typeof k === 'object' ? k : (function () { var o = {}; o[k] = values; return o; })(), did = false;
+          Object.keys(all).forEach(function (key) {
+            var s = sel[key]; if (!s) return;
+            var f = facets.filter(function (x) { return x.dataset.fbFacet === key; })[0];
+            var known = f ? Array.prototype.map.call(f.querySelectorAll('[data-fopt]'), function (b) { return b.dataset.v; }) : [];
+            var want = [].concat(all[key] == null ? [] : all[key]).filter(function (v) { return known.indexOf(v) >= 0; });
+            if (f && f.dataset.single) want = want.slice(0, 1);
+            s.clear(); want.forEach(function (v) { s.add(v); }); did = true;
+          });
+          if (did) run(true);
+          return did;
+        },
+        // Read items again after their data attributes changed (a live update): refresh(el) for one item or a
+        // container of items, refresh() for all. Recounts without moving anything.
+        refresh: function (el) {
+          if (!el) cache = new WeakMap();
+          else { cache.delete(el); Array.prototype.forEach.call(el.querySelectorAll ? el.querySelectorAll('[data-fi]') : [], function (x) { cache.delete(x); }); }
+          return run(false);
+        },
+        sort: function () { return sortV; }, setSort: function (v, label) { showSort(v, label); },
+        view: function () { return viewV; }, setView: switchView,
+      };
+      run(false);
+    }
+
+    if (!window.__rsFbHook) {   // once per visit, not once per page
+      window.__rsFbHook = true;
+      document.addEventListener('click', function (e) {
+        document.querySelectorAll('.fb-chip.open').forEach(function (c) {
+          if (c.contains(e.target)) return;
+          c.classList.remove('open'); delete c.dataset.pin;
+          var b = c.querySelector('.fb-chip-btn'); if (b) b.setAttribute('aria-expanded', 'false');
+        });
+      });
+      // A page that switches views, or adds items, asks the bar to recount.
+      document.addEventListener('rs:find-refresh', function (e) { var el = e.detail && e.detail.el; document.querySelectorAll('[data-fb]').forEach(function (b) { if (b.rsFilter) { if (el !== undefined) b.rsFilter.refresh(el); else b.rsFilter.run(false); } }); });
+    }
+  })();
+</script>
+
+<style is:global>
+  /* Layout (see the script): "stack" is the default. Line 1: the find box, then the view switch, Sort and
+     the count at the right (they wrap to their own line, still at the right, when the find box would get
+     narrower than 240 px). Line 2: the facets, switches and Clear, as one group that wraps among itself. */
+  .fb { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 10px var(--pad-x); margin-inline: calc(-1 * var(--pad-x)); }
+  .fb-search { order: 0; }
+  .fb-end { order: 1; }
+  /* The facets stay on one line: a pill naming long choices shortens them with an ellipsis rather than
+     wrapping onto a new line, so choosing never changes the bar's shape (M12). The layout script sends the
+     facets into the Filters sheet when they cannot fit one line at this width. */
+  .fb-facets { order: 2; flex: 1 1 100%; min-width: 0; display: flex; flex-wrap: nowrap; gap: 8px; align-items: center; }
+  .fb-facets > .fb-chip { flex: 0 1 auto; min-width: 0; }
+  .fb-facets > .fb-chip > .fb-chip-btn { max-width: 100%; min-width: 0; }
+  .fb-chip-btn > span, .fb-chip-btn > svg { flex: none; }
+  .fb-facets > .fb-toggle, .fb-facets > .fb-clear { flex: none; }
+  .fb-facets:not(:has(> .fb-chip, > .fb-toggle)) { display: none; }
+  .fb-filters, .fb-sheet-h { display: none; }
+  /* "line": everything fits on one line, in the reading order of the rule book (find, facets, then the rest). */
+  .fb.fb-line { flex-wrap: nowrap; }
+  .fb.fb-line .fb-search { order: 0; flex: 1 1 260px; max-width: 340px; min-width: 200px; }
+  .fb.fb-line .fb-facets { order: 1; flex: 0 1 auto; flex-wrap: nowrap; }
+  .fb.fb-measure.fb-line .fb-facets { flex-shrink: 0; }
+  .fb.fb-line .fb-end { order: 2; }
+  /* The other stack: find on its own line; the facets and then the view switch, Sort and count on the next. */
+  .fb.fb-stack2 .fb-search { flex-basis: 100%; }
+  .fb.fb-stack2 .fb-facets { order: 1; flex: 0 1 auto; }
+  .fb.fb-stack2 .fb-end { order: 2; }
+  /* It stays in place from one list to the next (motion.css, M5). One bar per page. */
+  .fb[data-fb] { view-transition-name: fb; }
+  .fb-sticky { position: sticky; top: calc(var(--mast-h, 60px) + env(safe-area-inset-top, 0px)); z-index: 19; }
+  .fb-search { display: flex; align-items: center; gap: 8px; padding: 0 12px; height: 38px; border-radius: var(--pill-radius); border: 1px solid var(--line); background: var(--surface); color: var(--text-3); min-width: 0; flex: 1 1 240px; transition: border-color var(--dur-state), box-shadow var(--dur-state); }
+  .fb-search input { border: 0; outline: 0; background: none; font: 400 14px var(--font-sans); color: var(--text); width: 100%; min-width: 0; }
+  .fb-search input::-webkit-search-cancel-button { display: none; }
+  .fb-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .fb-chip { position: relative; }
+  .fb-chip-btn { appearance: none; display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 12px 0 14px; border-radius: var(--pill-radius); border: 1px solid var(--line); background: var(--surface); color: var(--text); font: 600 14px/1 var(--font-sans); cursor: pointer; transition: border-color var(--dur-state), background var(--dur-state); }
+  .fb-chip-btn svg { color: var(--text-3); transition: transform var(--dur-state) var(--ease-settle); }
+  .fb-chip.open .fb-chip-btn svg { transform: rotate(180deg); }
+  .fb-chip.on .fb-chip-btn { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
+  .fb-val:empty { display: none; }
+  .fb-val { font-weight: 800; max-width: 160px; min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: -4px; }
+  .fb-val::before { content: ': '; font-weight: 600; }
+  /* A list grows from its pill (--dur-pop, from --pop-scale at the pill's corner) and shrinks back to it
+     quickly (--dur-exit), like every menu (M11, M12). */
+  .fb-pop { position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; min-width: 230px; max-height: 360px; overflow: auto; display: grid; gap: 2px; padding: 6px; border-radius: var(--radius-lg); border: var(--border-card); background: var(--surface); box-shadow: var(--shadow-lg);
+    opacity: 0; visibility: hidden; transform: scale(var(--pop-scale)); transform-origin: top left; transition: opacity var(--dur-exit) var(--ease-settle), transform var(--dur-exit) var(--ease-settle), visibility 0s var(--dur-exit), display var(--dur-exit); }
+  .fb-pop.wide { grid-template-columns: 1fr 1fr; min-width: 440px; }
+  .fb-chip.open .fb-pop { opacity: 1; visibility: visible; transform: none; transition: opacity var(--dur-pop) var(--ease-settle), transform var(--dur-pop) var(--ease-settle), visibility 0s, display 0s; }
+  /* A closed list takes no room at all, so it can never widen the page; it still grows in and shrinks out. */
+  .fb-pop { display: none; max-width: calc(100vw - 24px); transition-behavior: allow-discrete; }
+  .fb-chip.open .fb-pop { display: grid; }
+  @starting-style { .fb-chip.open .fb-pop { opacity: 0; transform: scale(var(--pop-scale)); } }
+  .fb-chip::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 8px; } /* a bridge so the pointer can reach the list */
+  /* Options: picking one changes its colour and grows its tick in a space that is always kept, so no word
+     in the list moves when you pick (M12). */
+  .fb-opt { appearance: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 0; border-radius: var(--radius); background: none; color: var(--text); font: 550 14px/1.2 var(--font-sans); text-align: left; cursor: pointer; transition: background var(--dur-state) var(--ease-settle), color var(--dur-state) var(--ease-settle), opacity var(--dur-state) var(--ease-settle); }
+  .fb-opt small { display: block; font-size: 12px; font-weight: 450; color: var(--text-3); }
+  .fb-opt:hover { background: var(--surface-2); }
+  .fb-opt > span { display: block; padding-left: 20px; position: relative; }
+  .fb-opt > span::before { content: '\2713'; position: absolute; left: 2px; top: 0; font-weight: 700; opacity: 0; transform: scale(0); transition: opacity var(--dur-state) var(--ease-settle), transform var(--dur-state) var(--ease-settle); }
+  .fb-opt[aria-pressed=true], .fb-sort .fb-opt[aria-checked=true] { background: var(--accent-soft); color: var(--accent-ink); }
+  .fb-opt[aria-pressed=true] > span::before, .fb-sort .fb-opt[aria-checked=true] > span::before { opacity: 1; transform: none; }
+  .fb-opt.none { opacity: .4; }
+  .fb-n { font: 600 12px var(--font-mono); font-style: normal; color: var(--text-3); }
+  .fb-sw { display: inline-block; width: 12px; height: 12px; border-radius: 4px; background: var(--sw); margin-right: 8px; vertical-align: -1px; box-shadow: inset 0 0 0 1px rgba(128, 128, 128, .55); }
+  .fb-toggle { appearance: none; display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px 0 10px; border-radius: var(--pill-radius); border: 1px solid var(--line); background: var(--surface); color: var(--text); font: 600 14px/1 var(--font-sans); cursor: pointer; transition: border-color var(--dur-state), background var(--dur-state); }
+  .fb-tick { width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid var(--line-strong); display: grid; place-items: center; transition: background var(--dur-state), border-color var(--dur-state); }
+  .fb-toggle[aria-pressed=true] { border-color: var(--amber); background: var(--amber-soft); color: var(--amber-ink); }
+  .fb-toggle[aria-pressed=true] .fb-tick { background: var(--amber); border-color: var(--amber); }
+  .fb-toggle[aria-pressed=true] .fb-tick::after { content: ''; width: 8px; height: 4px; border-left: 2px solid #fff; border-bottom: 2px solid #fff; transform: translateY(-1px) rotate(-45deg); }
+  .fb-clear { appearance: none; border: 0; background: none; color: var(--accent-ink); font: 700 13.5px var(--font-sans); cursor: pointer; padding: 8px; transition: opacity var(--dur-state) var(--ease-settle), transform var(--dur-state) var(--ease-settle); }
+  .fb-clear[hidden] { display: none; }
+  /* Clear all keeps its place in the bar when there is nothing to clear, so it appears and goes without
+     moving the pills beside it. */
+  .fb .fb-clear-bar[hidden] { display: inline-block !important; visibility: hidden; opacity: 0; transform: scale(.8); transition: opacity var(--dur-exit) var(--ease-settle), transform var(--dur-exit) var(--ease-settle), visibility 0s var(--dur-exit); }
+  /* Measuring the layout (see the script): everything that can show, shows. */
+  .fb.fb-measure .fb-clear-bar[hidden] { visibility: visible; }
+  .fb.fb-measure [data-fb-sort] { display: block !important; }
+  .fb.fb-measure .fb-sort .fb-chip-btn { display: inline-flex !important; }
+  .fb.fb-measure .fb-facets > .fb-chip { flex-shrink: 0; }
+  .fb-end { flex: 0 1 auto; margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: safe flex-end; min-height: 38px; min-width: 0; }
+  .fb.fb-line .fb-end { flex: none; flex-wrap: nowrap; }
+  /* Sort and the count never part. */
+  .fb-sc { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; }
+  .fb-count { font: 600 13px var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text-2); white-space: nowrap; padding-left: 4px; text-align: right; }
+  .fb-extra { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  /* View switch: word pills, "Cards | List". */
+  .fb-views { display: inline-flex; height: 38px; padding: 3px; gap: 2px; border-radius: var(--pill-radius); border: 1px solid var(--line); background: var(--surface); }
+  .fb-view { appearance: none; border: 0; background: none; padding: 0 12px; border-radius: var(--pill-radius); font: 600 13.5px/1 var(--font-sans); color: var(--text-2); cursor: pointer; transition: background var(--dur-state) var(--ease-settle), color var(--dur-state) var(--ease-settle); }
+  .fb-view:hover { color: var(--text); background: var(--surface-2); }
+  .fb-view[aria-pressed=true] { background: var(--ink); color: var(--on-ink); }
+  /* With its marker (rsMarkerWatch), the chosen view is drawn by one pill that slides between the words. */
+  .fb-views.rs-marked .fb-view[aria-pressed=true], .fb-views.rs-marked .fb-view[aria-pressed=true]:hover { background: none; color: var(--on-ink); }
+  .fb-view:disabled, .fb-chip-btn:disabled { opacity: .45; cursor: default; }
+  /* Sort: a pill that opens like a facet; its list opens towards the page, from the right. */
+  .fb-pop.end, .fb-pop.flip { left: auto; right: 0; transform-origin: top right; }
+  .fb-extra select { height: 36px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); color: var(--text); padding: 0 10px; font: 500 13.5px var(--font-sans); }
+  .fb-extra label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); }
+  .fb-out { display: none !important; }
+  /* The empty state and any "Clear the filters" link. */
+  .fb-none { margin: 0; padding: 22px 4px; color: var(--text-2); }
+  .fb-none[hidden] { display: none; }
+  .fb-link { appearance: none; border: 0; background: none; padding: 0; color: var(--accent-ink); font: inherit; font-weight: 650; text-decoration: underline; cursor: pointer; }
+  @media (prefers-reduced-motion: reduce) { .fb-pop, .fb-opt, .fb-opt > span::before, .fb-chip-btn svg, .fb .fb-clear-bar[hidden] { transition: none; } }
+  /* Below 1024 px a bar that needs two lines scrolls away with the page instead of sticking. */
+  @media (max-width: 1023px) { .fb.fb-sticky:not(.fb-line) { position: relative; top: auto; } }
+  /* Phones ("sheet", the bar's column under 600 px): the find box on its own line, then Filters and the
+     view switch, Sort and count; the facets open in a sheet from the bottom of the screen. */
+  .fb-filters { order: 1; align-items: center; gap: 8px; height: 38px; padding: 0 14px 0 12px; border-radius: var(--pill-radius); border: 1px solid var(--line); background: var(--surface); color: var(--text); font: 600 14px/1 var(--font-sans); cursor: pointer; }
+  .fb-filters:hover { border-color: var(--line-strong); }
+  .fb.fb-sheet .fb-search { flex: 1 1 100%; }
+  .fb.fb-sheet .fb-filters { display: inline-flex; align-self: flex-start; }
+  .fb.fb-sheet .fb-end { order: 2; flex: 1 1 0; }
+  .fb.fb-sheet .fb-facets { display: none; }
+  @container content (max-width: 599px) {
+    .fb, .fb.fb-sticky { position: relative; top: auto; margin-inline: calc(-1 * var(--pad-x)); padding: 10px var(--pad-x); gap: 8px; }
+    .fb-search { flex: 1 1 100%; }
+    .fb-search input { font-size: 16px; }
+    .fb-filters { display: inline-flex; }
+    .fb-end { order: 2; flex: 1 1 0; }
+    .fb-facets { display: none; }
+  }
+  /* The number on Filters keeps its room when it is empty, so the button never changes width as you pick. */
+  .fb-nact:empty { visibility: hidden; }
+  .fb-nact { min-width: 20px; height: 20px; padding: 0 6px; display: inline-grid; place-items: center; border-radius: 10px; background: var(--accent); color: var(--on-accent); font: 700 11.5px/1 var(--font-sans); }
+  .fb-filters:has(.fb-nact:not(:empty)) { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
+  /* The sheet itself (moved to <body> while open). */
+  .fb-scrim { position: fixed; inset: 0; z-index: 90; background: color-mix(in srgb, #000 38%, transparent); animation: fb-fade var(--dur-pop) var(--ease-settle); }
+  .fb-facets.fb-sheet-on { position: fixed; left: 0; right: 0; bottom: 0; z-index: 91; display: grid; gap: 14px; align-content: start; max-height: 86vh; overflow: auto; overscroll-behavior: contain; padding: 0 16px calc(20px + env(safe-area-inset-bottom, 0px)); background: var(--surface); border-radius: 16px 16px 0 0; box-shadow: var(--shadow-lg); animation: fb-up var(--dur-enter) var(--ease-settle); }
+  .fb-sheet-on .fb-sheet-h { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 10px; margin: 0 -16px; padding: 14px 16px 10px; background: var(--surface); border-bottom: var(--border-rule); }
+  .fb-sheet-on .fb-sheet-h b { font-size: 17px; margin-right: auto; }
+  .fb-sheet-on .fb-clear-bar { display: none; }
+  .fb-sheet-on .fb-chip { position: static; }
+  .fb-sheet-on .fb-chip::after { display: none; }
+  .fb-sheet-on .fb-chip-btn { height: auto; padding: 0 0 6px; border: 0; background: none; pointer-events: none; font-size: 13px; color: var(--text-2); }
+  .fb-sheet-on .fb-chip-btn svg { display: none; }
+  .fb-sheet-on .fb-chip.on .fb-chip-btn { background: none; color: var(--accent-ink); }
+  .fb-sheet-on .fb-pop, .fb-sheet-on .fb-pop.wide { position: static; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); min-width: 0; max-width: none; max-height: none; overflow: visible; opacity: 1; visibility: visible; transform: none; padding: 0; border: 0; box-shadow: none; background: none; }
+  .fb-sheet-on .fb-opt { border: 1px solid var(--line); min-height: 40px; }
+  .fb-sheet-on .fb-toggle { justify-self: start; }
+  :root.fb-lock, :root.fb-lock body { overflow: hidden; }
+  @keyframes fb-up { from { transform: translateY(24px); opacity: 0; } }
+  @keyframes fb-fade { from { opacity: 0; } }
+</style>

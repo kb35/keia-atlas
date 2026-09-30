@@ -1,0 +1,64 @@
+# Configuration: MeetUp 2 in a Google Meet hardware room. Setting names, menu paths and defaults are the vendor's (cited per setting);
+# the values and reasons are Aigna's (demo). Researched from vendor documents, Sept 2026.
+id: logitech-meetup-2-google-meet
+name: MeetUp 2 in a Google Meet hardware room
+models: [logitech-meetup-2]
+mode: Google Meet hardware peripheral (USB/HDMI bar, paired with a ChromeOS compute system)
+version: '1.0'
+owner: sofia
+updated: '2026-09-28'
+firmware: CollabOS 1.15+ (for RightSight 2 / RightSound 2)
+summary: MeetUp 2 is USB/HDMI hardware, not an all-in-one appliance; it's certified as Google Meet hardware only when paired with a separate ChromeOS compute
+  system, which is what actually runs Google Meet and is enrolled in the Google Admin console. MeetUp 2 itself runs Logitech's CollabOS, so it has its own
+  local web interface (Local Network Access) and is monitored, updated and tuned through Logitech Sync, independently of the compute system.
+managed_by: Logitech Sync (Sync Portal / Sync App), plus the device's own Local Network Access web page
+steps: ['Connect MeetUp 2 to the room''s ChromeOS compute system by USB-C, and HDMI-out to the room display (or via HDMI-in if the compute system drives
+    the display directly).', 'Enrol the ChromeOS compute system as Google Meet hardware in the Google Admin console, using the hostname as its device name.',
+  Connect MeetUp 2's Ethernet port to the AV VLAN for Sync management (it carries no PoE)., 'Install the Sync App on a laptop the first time, or use Sync
+    Portal, to bring the device into Aigna''s Logitech Sync organisation and confirm the room.', 'On first login to Local Network Access (its own IP
+    address), change the admin password from the default.', 'In the Google Admin console, set Default Camera Framing to Manufacturer framing so RightSight
+    2 runs the camera.', Set RightSight 2 to Speaker View or Group View in the Sync App's Camera settings., 'Run the room''s verification, including a Google
+    Meet test call.']
+groups:
+- name: Google Meet hardware (Google Admin console)
+  where: Google Admin console > Devices > Google Meet hardware
+  settings:
+  - {derive: compute-host, name: Enroll a device with a code, value: 'Device name: the hostname (of the paired ChromeOS compute system)', per_device: true, action: change, layer: naming-network,
+    why: 'Each room uses one Meet hardware licence on its compute system, named the same as everywhere else.', source: google-meet-enroll}
+  - {derive: calendar, name: Room calendar, path: Device settings > Calendar, value: The room's calendar resource, per_device: true, action: change, layer: room-type, why: Shows
+      the room's meetings and lets people join in one tap., source: google-meet-calendar}
+  - {derive: time-zone, name: Time zone, path: Settings > Device settings, value: The site's time zone, per_device: true, action: change, layer: country, why: Must match the
+      room and its calendar., source: google-meet-device-settings}
+  - {name: Scheduled reboot, path: Settings > Device settings, value: 'Daily, inside the maintenance hours', action: change, layer: profile, why: A fresh
+      start each night when no one is in the room; the documented default isn't stated., source: google-meet-device-settings}
+  - {name: Default Camera Framing, path: Devices > Google Meet hardware > Settings > Camera settings, value: Manufacturer framing, action: change, layer: model,
+    why: 'Google''s own documentation says RightSight 2 only works when this is set to Manufacturer framing; left at No Preference, the room falls back
+      to manual camera control.', source: logitech-rightsight2-google-meet}
+- name: Camera (Logitech Sync)
+  where: Logitech Sync App / Sync Portal > Device > Camera
+  settings:
+  - {name: RightSight 2, value: 'Enabled, Speaker View', action: change, layer: profile, why: 'Frames the active speaker with a room-view inset, which is
+      what Aigna wants for its small Google Meet rooms; the documented default isn''t stated.', source: logitech-rightsight-rightsound-collabos-guide}
+- name: Security and network (Local Network Access)
+  where: MeetUp 2's own web interface (Local Network Access, by IP address)
+  settings:
+  - {name: Local Network Access, path: System > More settings, value: 'On', action: change, layer: profile, why: 'Gives Aigna a per-device admin page
+      over the network, rather than needing to reset the device or use only Sync Portal.', source: logitech-local-network-access-collabos-guide}
+  - {derive: vault-site, name: Admin password, param: admin, value: 'From the password vault, per site', per_device: true, action: change, layer: profile, why: 'The default
+      password is the last five digits of the device hostname, printed nowhere obvious; every device needs its own vault password.', source: logitech-local-network-access-collabos-guide}
+  - {derive: time-server-1, name: Internet Time (NTP), path: Local Network Access > System settings, value: ntp1.aigna.example, action: change, layer: naming-network, why: Use
+      Aigna's own time server instead of whatever the network offers., source: logitech-local-network-access-collabos-guide}
+  - {derive: dhcp-reservation, name: TCP/IP (IPv4 addressing), path: Local Network Access > Network, value: Auto DHCP, action: verify, layer: naming-network, why: 'Aigna puts
+      AV devices on the AV VLAN with a DHCP reservation, which is also this device''s default.', source: logitech-local-network-access-collabos-guide}
+- name: Firmware
+  where: Logitech Sync Portal
+  settings:
+  - {name: Firmware update, path: Inventory > Room > Update, value: 'Manually scheduled, after the Lab passes it', action: verify, layer: profile, why: 'Sync
+      Portal has no automatic-update toggle to turn off; every update is already a manually chosen time window, which matches how Aigna tests firmware
+      in the Lab first.', source: logitech-sync-schedule-firmware-update}
+gaps: ['The exact menu names inside the Sync App''s Camera and System tabs for RightSight 2, framing speed and NTP aren''t laid out step-by-step in the
+    public docs; the paths above are as specific as the sources state.', 'Whether RightSound 2 (AI Noise Suppression, AI Echo Suppression) is on by default
+    on MeetUp 2 isn''t documented; Aigna''s installers should check it during verification rather than assume.', No PoE standard or power draw is documented
+    for MeetUp 2's own power supply beyond the 19V/2.1A rating (see the device model); the Ethernet port itself carries no PoE., 'It isn''t documented in
+    the sources checked whether the ChromeOS compute system this bar is paired with is supplied by Logitech, Google, or a separate vendor (for example a
+    Chromebox); Aigna''s procurement should confirm this per site.']
