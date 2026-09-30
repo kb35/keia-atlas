@@ -1,6 +1,16 @@
-// Learn's two tracks. "Using Keia Atlas" teaches the application, one bite-size lesson per idea, each with a
-// hands-on try (drawn by components/LessonTry.astro). "How the team works" is for people new to the team.
+// Learn's two tracks. "Using Keia Atlas" teaches the application, one bite-size lesson at a time, each with a
+// hands-on try (drawn by components/LessonTry.astro) and each following one of the Keia Method's five ideas
+// (docs/keia-method.md, Level 1). "How the team works" is for people new to the team.
 // Written for people used to spreadsheets, email and tickets. Files starting with _ are not pages.
+
+// The Keia Method's five ideas, in the method's order. A "Using" lesson names the idea it follows (idea: n).
+export const IDEAS = [
+  { n: 1, name: 'Start from the building' },
+  { n: 2, name: 'Capture, don\'t ask' },
+  { n: 3, name: 'Answer first' },
+  { n: 4, name: 'Own it, hand it on' },
+  { n: 5, name: 'Learn as you go' },
+];
 
 // "Why it matters to you" is written four ways; each role reads the one closest to its work.
 export const GROUP = {
@@ -13,7 +23,7 @@ export const GROUPS = ['field', 'build', 'own', 'lead'];
 
 export const USING = [
   {
-    id: 'help', title: 'Switch on help', icon: 'about', mins: 2,
+    id: 'help', title: 'Switch on help', icon: 'about', mins: 2, idea: 5,
     card: 'Point at anything to see what it is and what to do.',
     one: 'The [[help|Help]] switch, the round ? in the top bar, explains any page as you use it. With it on, everything that can explain itself gets a dotted outline. Point at one, or tap it once on a touch screen, and a small card says what it is, what to do with it, and where to learn more.',
     why: {
@@ -32,7 +42,7 @@ export const USING = [
     go: { help: true, label: 'Switch help on' },
   },
   {
-    id: 'profiles', title: 'What a profile is', icon: 'profile', mins: 3,
+    id: 'profiles', title: 'Device types, models and units', icon: 'profile', mins: 3, idea: 1,
     card: 'Device type, model, installed unit, and space type.',
     one: 'A [[device-profile|device type]] is a kind of device, a [[model]] is one product that fits it, and a [[unit]] is the real box, ordered, installed and one day taken out. A [[room-profile|space type]] is the same idea for spaces.',
     why: {
@@ -51,7 +61,7 @@ export const USING = [
     go: { to: '/profiles/video-bar/', label: 'Open the video bar profile' },
   },
   {
-    id: 'configurations', title: 'Setup guides: set and verify', icon: 'sliders', mins: 3,
+    id: 'configurations', title: 'Setup guides: set and verify', icon: 'sliders', mins: 3, idea: 5,
     card: 'The settings for a model, in order, and how to tick them off.',
     one: 'A [[configuration]] is the list of settings for a model, in order. Each line is [[set|Set]] (change it) or [[verify|Verify]] (the default is right: check it and tick it).',
     why: {
@@ -70,7 +80,7 @@ export const USING = [
     go: { to: '/configurations/poly-x-google-meet/', label: 'Open the X52 setup guide' },
   },
   {
-    id: 'room', title: 'How a space works', icon: 'room', mins: 3,
+    id: 'room', title: 'Start from the space', icon: 'room', mins: 3, idea: 1,
     card: 'Space type, build option, the devices and their health.',
     one: 'Every [[room]] is built from a [[room-profile|space type]] and one [[build-option|build option]], so Keia Atlas knows what should be in it, how it is wired and whether each device is healthy.',
     why: {
@@ -89,7 +99,7 @@ export const USING = [
     go: { to: '/rooms/nyc-20-05/', label: 'Open Curlew' },
   },
   {
-    id: 'search', title: 'Finding anything', icon: 'search', mins: 2,
+    id: 'search', title: 'Finding anything', icon: 'search', mins: 2, idea: 1,
     card: 'Type it the way you would say it.',
     one: 'Type what you want the way you would say it, such as "EMEA spaces with X52", and Keia Atlas works out which spaces, devices, settings or projects you mean.',
     why: {
@@ -108,7 +118,7 @@ export const USING = [
     go: { to: '/rooms/?q=oak', label: 'Search the spaces' },
   },
   {
-    id: 'change', title: 'Making a proposal', icon: 'edit', mins: 3,
+    id: 'change', title: 'Keep a fix as a proposal', icon: 'edit', mins: 3, idea: 2,
     card: 'Propose, approve, and see it everywhere.',
     one: 'Anyone can make a [[change]] to Keia Atlas\'s knowledge. The person who owns it [[approve|approves]] it, and then it shows on every page that uses it.',
     why: {
@@ -127,13 +137,13 @@ export const USING = [
     go: { to: '/changes/', label: 'See every proposal and who approved it' },
   },
   {
-    id: 'report', title: 'Reporting an issue', icon: 'inbox', mins: 2,
+    id: 'report', title: 'Reporting an issue', icon: 'inbox', mins: 2, idea: 2,
     card: 'One button, top of every page, under 30 seconds.',
     one: 'The [[report|Report]] button at the top of every page sends a suggestion, new firmware or an urgent issue to the person who owns it, in under 30 seconds. It is for Keia Atlas\'s knowledge. A broken space is an [[incident]], raised through the service desk.',
     why: {
       field: 'No hunting for the right email address. Report knows which page you are on and who owns it.',
       build: 'Waiting on something on site? An urgent report goes straight to the top of the owner\'s home page.',
-      own: 'Reports arrive already sorted: what it is about, what happened, and whether it blocks someone.',
+      own: 'Reports arrive already sorted: what it is about, what happened, and whether someone is waiting on it.',
       lead: 'Problems show up the day they happen, not at the end-of-project review.',
     },
     like: 'The help button in a shop that calls the right person to the right aisle.',
@@ -146,7 +156,7 @@ export const USING = [
     go: { report: 'urgent', label: 'Open the real Report' },
   },
   {
-    id: 'projects', title: 'Projects and tasks', icon: 'project', mins: 3,
+    id: 'projects', title: 'Projects and tasks with an owner', icon: 'project', mins: 3, idea: 4,
     card: 'Phases, tasks, and adding the task the plan forgot.',
     one: 'A [[project]] follows a [[playbook]] through its [[phase|phases]]. Each phase is a list of [[task|tasks]] with an owner and a date, and you can add your own task when the plan misses something.',
     why: {
@@ -165,12 +175,12 @@ export const USING = [
     go: { to: '/projects/prj-12/', label: 'Open the New York office project' },
   },
   {
-    id: 'home', title: 'Your role\'s home page', icon: 'home', mins: 2,
+    id: 'home', title: 'Your home page: the answer first', icon: 'home', mins: 2, idea: 3,
     card: 'What is ready for you today, and View as.',
     one: 'Your [[home-page|home page]] shows what is ready for you today, and it follows your role: tasks for engineers, an inbox for service managers, projects for project managers.',
     why: {
       field: 'Open Keia Atlas and today\'s jobs are the first thing you see, with anything urgent on top.',
-      build: 'Your tasks, soonest first, with anything waiting on something flagged in red.',
+      build: 'Your tasks, soonest first, with anything that is waiting on something marked "Waiting on".',
       own: 'Your inbox: urgent reports first, then new firmware, then suggested changes.',
       lead: 'Your projects and your team\'s load for the next two weeks, at a glance.',
     },
@@ -184,23 +194,23 @@ export const USING = [
     go: { to: '/', label: 'Go to your home page' },
   },
   {
-    id: 'stages', title: 'Modules and agents', icon: 'agent', mins: 3,
-    card: 'What Keia Atlas does by itself, and what people still decide.',
-    one: 'Keia Atlas is used one module at a time, from shared knowledge up to [[agent|agents]]. Agents only watch and propose. A person always decides.',
+    id: 'modules', title: 'Modules and agents', icon: 'agent', mins: 3, idea: 4,
+    card: 'Modules are On, Connected or Off. Agents work under standing rules with named owners.',
+    one: 'Nothing has to be climbed in order. A team sets each [[module]] to On, Connected (an outside tool shows its data here) or Off, and starts anywhere. An [[agent]] does routine work only under a [[standing-rule|standing rule]] that a named person approved once. Anything that cannot be put back is a proposal a person confirms.',
     why: {
-      field: 'You know which screens are live and which are simulated, and that nothing changes a device behind your back.',
-      build: 'Agents do the watching (release notes, install evidence, years in service) and hand you a task with the evidence attached.',
-      own: 'Agents propose changes to your standard. You approve or dismiss them, exactly like a person\'s suggestion.',
-      lead: 'Start with one module and add the rest as the team trusts it.',
+      field: 'Every automatic action shows what it read and what it did, with the rule and its owner. Where the rule has an Undo, it is there.',
+      build: 'Start with the device catalogue, which works alone. Add modules as they help. A Connected module keeps your existing tool as the record, with its source and time on each figure.',
+      own: 'A rule is yours. You approve it once, with its conditions and its way back, and you are told on every run.',
+      lead: 'A one-person team has no tiers to remove and lets rules do more. A global team has the same records and the same words.',
     },
-    like: 'A good assistant: keeps an eye on things and tells you what they noticed, but never signs anything for you.',
-    task: 'Switch on more modules, then decide what happens to an agent\'s proposal.',
-    check: { q: 'An agent notices four X52s are due for refresh. What happens next?', a: [
-      ['It orders four new ones', 0, 'Agents never act by themselves.'],
-      ['It proposes a task, and a person decides', 1, 'Right. Accept, change or dismiss: always a person.'],
-      ['Nothing: agents only keep logs', 0, 'They do more than log: they propose work, with the evidence.'],
+    like: 'A smart home routine: you approve the rule once, it runs within its limits and tells you each time. Unlocking the front door still takes you.',
+    task: 'Set some modules On, Connected or Off. Then see what runs under a rule and what waits for a person.',
+    check: { q: 'A rule could reboot a display, or update a video bar\'s firmware. What happens?', a: [
+      ['Both run by themselves', 0, 'Firmware cannot be put back, so it is a proposal a person confirms every time.'],
+      ['The reboot can run under the rule; the firmware waits for a person', 1, 'Right. Actions that can be put back run within the rule\'s limits. Firmware, resets and deletes are proposals.'],
+      ['Neither: software never acts', 0, 'It does routine work, but only under a standing rule a named person approved.'],
     ] },
-    go: { settings: true, label: 'Choose what is switched on in Settings' },
+    go: { settings: true, label: 'Choose which modules are on in Settings' },
   },
 ];
 
@@ -234,12 +244,12 @@ export const TEAM = [
   {
     id: 't-support', title: 'How support flows', icon: 'alert', mins: 3,
     card: 'From a broken space to a fixed one, and who does what.',
-    one: 'A fault becomes one [[incident]]: the service desk checks nobody has opened it already, then looks at the space\'s health remotely. The on-site technician follows the signal from source to screen with the space\'s guide, and it moves up only when the fix is not in the guide: to the delivery engineer, then the service vendor. It closes with the cause and the fix.',
+    one: 'A fault becomes one [[incident]]: the service desk checks nobody has opened it already, then looks at the space\'s health remotely. The on-site technician follows the signal from source to screen with the space\'s guide, and it is handed on, as a whole with what was tried, only when the fix is not in the guide: to the delivery engineer, then the service vendor. It closes with the cause and the fix.',
     why: 'Most faults are fixed on the first visit because the guide travels with the incident. Anything new gets captured so it is quicker next time.',
     like: 'A hospital: the nurse on the ward first, the specialist when it needs one, and the notes go everywhere with the patient.',
     check: { q: 'The on-site technician cannot fix a space and the guide does not cover it. Next?', a: [
       ['Close the incident', 0, 'The space is still broken.'],
-      ['Escalate to the delivery engineer', 1, 'Right. Then the vendor if it is a hardware fault under contract.'],
+      ['Hand it to the delivery engineer', 1, 'Right. It goes with everything tried so far. Then the vendor if it is a hardware fault under contract.'],
       ['Order a new space', 0, 'A bit much.'],
     ] },
     go: { to: '/incidents/', label: 'See the open incidents' },
@@ -302,15 +312,15 @@ export const TEAM = [
 export const PATHS = {
   delivery: ['help', 'home', 'profiles', 'configurations', 'room', 'projects', 'change', 'report'],
   network: ['help', 'home', 'room', 'search', 'projects', 'report'],
-  innovation: ['help', 'profiles', 'configurations', 'change', 'stages'],
+  innovation: ['help', 'profiles', 'configurations', 'change', 'modules'],
   vendor: ['help', 'profiles', 'configurations', 'room', 'report'],
   tech: ['help', 'home', 'room', 'search', 'configurations', 'report'],
   desk: ['help', 'home', 'search', 'room', 'report'],
   'service-vendor': ['help', 'search', 'room', 'report'],
-  'sm-av': ['help', 'home', 'profiles', 'configurations', 'change', 'report', 'stages'],
+  'sm-av': ['help', 'home', 'profiles', 'configurations', 'change', 'report', 'modules'],
   'sm-infra': ['help', 'home', 'room', 'profiles', 'change', 'report'],
-  pm: ['help', 'home', 'projects', 'search', 'report', 'stages'],
-  programme: ['help', 'home', 'projects', 'stages', 'search'],
-  'delivery-manager': ['help', 'home', 'projects', 'search', 'stages'],
-  head: ['help', 'home', 'stages', 'projects', 'search'],
+  pm: ['help', 'home', 'projects', 'search', 'report', 'modules'],
+  programme: ['help', 'home', 'projects', 'modules', 'search'],
+  'delivery-manager': ['help', 'home', 'projects', 'search', 'modules'],
+  head: ['help', 'home', 'modules', 'projects', 'search'],
 };
