@@ -9,7 +9,8 @@
 //   [data-guide-host]           a staff page: "board" | "office" | "home" | "room", with data-site or data-room
 // Rows are added in the page's own style: they take the scoped-style mark of the list they join.
 import { browserLive } from './live.mjs';
-import { reportIncident, makeRequest, fromEvents, symptomOf, requestOf, REPORT_PREFIX, REQUEST_PREFIX } from './guide.mjs';
+import { reportIncident, makeRequest, fromEvents, symptomOf, requestOf, reportStatus, sentFields, localStamp, REPORT_PREFIX, REQUEST_PREFIX } from './guide.mjs';
+import { setGlyph } from './health.mjs';
 
 const D = document;
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -34,19 +35,174 @@ function html(el, markup, cid) {
 }
 const mark = (el, remote) => { if (remote && window.rsMarkChanged) window.rsMarkChanged(el, 'Room guide'); };
 
-// ---- The guide: "We know" also lists today's reports from this room ---------------------------------
+// ---- The guide: the answer line says so when a report from this room is open --------------------------
+// The report itself, its status and its steps are GuideReport's (mountReport, below).
 function mountGuide(root) {
-  const room = root.dataset.room, list = root.querySelector('[data-guide-known-live]'), box = root.querySelector('[data-guide-known]');
-  if (!list || !box) return;
+  const room = root.dataset.room, ans = root.querySelector('[data-guide-answer]');
+  if (!ans) return;
+  const glyphEl = ans.querySelector('.hg'), text = ans.querySelector('[data-answer-text]');
+  const was = { state: glyphEl?.dataset.state, text: text?.textContent };
+  const owner = JSON.parse(root.querySelector('[data-guide-report] script[type="application/json"]')?.textContent ?? '{}').room?.owner ?? null;
   const draw = () => {
-    const mine = all().reports.filter((r) => r.subject?.room === room);
-    const today = mine.length ? todayOf(mine[0].opened) : null;
-    const shown = mine.filter((r) => todayOf(r.opened) === today).slice(0, 3);
-    list.innerHTML = shown.map((r) => `<li><b>${esc(symptomOf(r.keia_atlas?.symptom).label)}</b>, reported here at ${esc(hm(r.opened))} <span class="g-ref">${esc(r.number)}</span>. The local team has it.</li>`).join('');
-    box.hidden = !box.querySelector('[data-guide-known-static] li') && !shown.length;
+    const r = openReport(room);
+    if (!r) { setGlyph(glyphEl, was.state, { title: was.text }); if (text.textContent !== was.text) text.textContent = was.text; return; }
+    const st = reportStatus(r, { owner });
+    const words = `We know: ${symptomOf(r.reported.keia_atlas?.symptom).label.toLowerCase()} · ${st.word}`;
+    setGlyph(glyphEl, st.glyph, { title: words });
+    if (text.textContent !== words) text.textContent = words;
   };
   draw();
   onChange(draw);
+}
+
+// The newest report from this room today that is still open for the person (not answered "Yes, it works").
+const itemOf = (n) => REPORT_PREFIX + n;
+function openReport(room) {
+  const mine = all().reports.filter((r) => r.subject?.room === room);
+  if (!mine.length) return null;
+  const today = todayOf(mine[0].opened);
+  for (const inc of mine.filter((x) => todayOf(x.opened) === today)) {
+    const r = live()?.stateOf(itemOf(inc.number)) ?? { reported: inc };
+    if (!r.followup?.ok) return r;
+  }
+  return null;
+}
+
+// ---- GuideReport: two taps, then the status read back ------------------------------------------------
+// Views: start (two buttons) → list (symptoms) → sent (status, steps, follow-up, what was sent). The box eases
+// to its new height (the held-box morph, --dur-morph) and the new view fades in (--dur-state); the With chip
+// slides between owners (km.chip, MOTION-V2 4.17); a status change eases the glyph in place and cross-fades the
+// words once (4.15). Reduced motion: everything changes at once.
+const TAKE_AFTER_MS = 6000;   // simulated: the technician takes a new report a few seconds after it arrives
+function mountReport(root) {
+  const { room } = JSON.parse(root.querySelector('script[type="application/json"]').textContent);
+  const owner = room.owner ?? null;
+  const $ = (s) => root.querySelector(s);
+  const views = [...root.querySelectorAll('[data-gr-view]')];
+  const M = () => window.km?.t ?? { state: 300, stagger: 24, settle: 'cubic-bezier(.22,1,.36,1)' };
+  const morphMs = () => parseFloat(getComputedStyle(D.documentElement).getPropertyValue('--dur-morph')) || 520;
+  const stamp = () => localStamp(Date.now(), room.tz ?? 'UTC');
+  let current = null, last = null, timer = null;
+
+  function show(to, { focus = true } = {}) {
+    if (root.dataset.view === to) return;
+    const h0 = root.offsetHeight;
+    for (const v of views) v.hidden = v.dataset.grView !== to;
+    root.dataset.view = to;
+    const el = views.find((v) => v.dataset.grView === to);
+    if (focus) el.querySelector('[data-gr-focus]')?.focus({ preventScroll: true });
+    // Keep the view's top in sight under the sticky bar.
+    const top = root.getBoundingClientRect().top;
+    if (top < 64) scrollBy({ top: top - 72, behavior: reduced() ? 'auto' : 'smooth' });
+    if (reduced() || !root.animate) return;
+    const h1 = root.offsetHeight;
+    if (Math.abs(h1 - h0) > 1) root.animate([{ height: `${h0}px`, overflow: 'hidden' }, { height: `${h1}px`, overflow: 'hidden' }], { duration: morphMs(), easing: M().settle });
+    el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: M().state, easing: M().settle });
+  }
+
+  const L = live();
+  const now = () => (current ? L?.stateOf(itemOf(current)) ?? null : null);
+  const put = (field, after, note) => L?.record({ item: itemOf(current), field, before: now()?.[field] ?? null, after, who: null, note });
+
+  // Liam's side, simulated: he takes it, then marks it fixed. A technician doing it in another window is the same event.
+  const take = () => { const r = now(); if (!r || r.with || !owner) return; put('with', { who: owner.id, name: owner.name, at: stamp() }, `${owner.first} took it (simulated)`); };
+  const fix = () => { const r = now(); if (!r?.with || (r.fixed && r.followup?.ok !== false)) return; if (r.followup) put('followup', null); put('fixed', { at: stamp(), by: r.with.who }, `${r.with.name.split(' ')[0]} marked it fixed (simulated)`); };
+  const armTake = (r) => {
+    clearTimeout(timer);
+    if (!r || r.with || !owner) return;
+    const made = L?.historyOf(itemOf(current)).at(-1)?.at;
+    const age = made ? Date.now() - Date.parse(made) : 0;
+    timer = setTimeout(take, Math.max(1500, TAKE_AFTER_MS - age));
+  };
+  stops.push(() => clearTimeout(timer));
+
+  function render() {
+    const r = now(); if (!r?.reported) return;
+    const st = reportStatus(r, { owner });
+    const first = last === null;
+    if (!first && last !== st.step && !reduced()) {
+      for (const el of [$('[data-gr-head]'), $('[data-gr-line]')]) el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: M().state, easing: M().settle });
+    }
+    // The sent view's glyphs arrive after the page's M8, so they are lit at once (as glyph() draws them).
+    root.querySelectorAll('[data-gr-view="sent"] .hg:not(.lit)').forEach((el) => el.classList.add('lit'));
+    setGlyph($('[data-gr-glyph] .hg'), st.glyph, { title: st.sentence });
+    $('[data-gr-head]').textContent = st.head;
+    $('[data-gr-line]').textContent = st.line;
+    // The chip: Ready for Liam, then With Liam · since 08:05. It slides only when the owner or the words change.
+    const chip = $('[data-gr-chip]');
+    if (chip && owner) {
+      const who = r.with ? r.with.name.split(' ')[0] : owner.first;
+      const text = r.with ? `With ${who}` : `Ready for ${who}`;
+      if (chip.dataset.key !== text) {
+        if (first || !window.km) chip.querySelector('.km-chip-text').textContent = text;
+        else window.km.chip(chip, { mark: owner.initials, kind: 'person', text });
+        chip.dataset.key = text;
+      }
+      chip.toggleAttribute('data-ready', !r.with);
+      chip.hidden = st.step === 'done' || st.step === 'fixed';
+    }
+    for (const s of st.steps) {
+      const li = $(`[data-step="${s.key}"]`);
+      setGlyph(li.querySelector('.hg'), s.state, { title: `${s.word} ${s.at}`.trim() });
+      li.querySelector('[data-step-word]').textContent = s.word;
+      li.querySelector('[data-step-at]').textContent = s.at;
+      li.toggleAttribute('data-done', s.state === 'fine');
+    }
+    $('[data-gr-ask]').hidden = !st.ask;
+    // Once it is fixed there is nothing left to be told about.
+    $('[data-gr-opt="contact"]').hidden = st.step === 'fixed' || st.step === 'done';
+    // The demo strip: what happens next on Liam's side, and a button to play it now.
+    const demo = $('[data-gr-demo]'), next = $('[data-gr-next]'), dt = $('[data-gr-demo-text]');
+    const name = r.with?.name.split(' ')[0] ?? owner?.first ?? 'The team';
+    demo.hidden = st.step === 'done';
+    next.hidden = st.step === 'fixed';
+    dt.textContent = !r.with ? `${name} takes it in a few seconds.` : st.step === 'fixed' ? 'Answer as the person in the room.' : `${name} is working on it. Play the fix:`;
+    next.textContent = !r.with ? `Take it as ${name}` : `Mark it fixed as ${name}`;
+    if (first || $('[data-gr-ref]').textContent !== r.reported.number) {
+      $('[data-gr-ref]').textContent = r.reported.number;
+      $('[data-gr-fields]').innerHTML = sentFields(r.reported, room).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
+    }
+    const saved = [r.note && 'Note added.', r.contact && "We'll tell you when it's fixed."].filter(Boolean).join(' ');
+    $('[data-gr-saved]').hidden = !saved; $('[data-gr-saved]').textContent = saved;
+    last = st.step;
+    armTake(r);
+  }
+
+  // Tap 1: the buttons become the list, in place.
+  $('[data-gr-open]')?.addEventListener('click', (e) => { e.preventDefault(); show('list'); });
+  $('[data-gr-back]')?.addEventListener('click', () => show(current && now() && !now().followup?.ok ? 'sent' : 'start'));
+  // Tap 2: the report is made and sent; the status replaces the list.
+  root.querySelectorAll('[data-symptom]').forEach((b) => b.addEventListener('click', () => {
+    root.querySelectorAll('.gr-sym.picked').forEach((x) => x.classList.remove('picked'));
+    b.classList.add('picked');
+    const rec = reportIncident({ room, symptom: b.dataset.symptom });
+    current = rec.number; last = null;
+    L?.record({ item: itemOf(rec.number), field: 'reported', before: null, after: JSON.parse(JSON.stringify(rec)), who: null, note: 'Reported from the room guide' });
+    root.querySelectorAll('.gr-opt').forEach((d) => { d.open = false; d.querySelector('input').value = ''; });
+    render();
+    const go = () => { b.classList.remove('picked'); show('sent'); };
+    reduced() ? go() : setTimeout(go, M().state / 2);
+  }));
+  $('[data-gr-next]').addEventListener('click', () => { const r = now(); if (!r?.with) take(); else fix(); });
+  root.querySelectorAll('[data-gr-answer]').forEach((b) => b.addEventListener('click', () => {
+    const ok = b.dataset.grAnswer === 'yes';
+    put('followup', { ok, at: stamp() }, ok ? 'The person in the room says it works' : 'Reopened: not fixed for the person');
+    if (!ok) put('fixed', null);
+  }));
+  root.querySelectorAll('[data-gr-save]').forEach((f) => f.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const v = f.querySelector('input').value.trim(); if (!v || !current) return;
+    put(f.dataset.grSave, v, f.dataset.grSave === 'note' ? 'Note from the person in the room' : 'The person in the room asked to be told');
+    f.closest('details').open = false;
+  }));
+  $('[data-gr-again]').addEventListener('click', () => show('list'));
+
+  onChange((e) => { if (current && e.item === itemOf(current)) render(); });
+  // Coming back to the page: the newest open report from this room reads its status back at once.
+  if (root.dataset.view === 'start') {
+    const r = openReport(room.id);
+    if (r) { current = r.reported.number; render(); show('sent', { focus: false }); }
+  }
 }
 
 // ---- The forms: pick a tile, Send, see the reference ------------------------------------------------
@@ -199,6 +355,7 @@ function roomHost(host) {
 
 const HOSTS = { board: boardHost, office: officeHost, home: homeHost, room: roomHost };
 export function mountAll() {
+  for (const el of D.querySelectorAll('[data-guide-report]:not([data-gm])')) { el.dataset.gm = '1'; mountReport(el); }
   for (const el of D.querySelectorAll('[data-guide-room]:not([data-gm])')) { el.dataset.gm = '1'; mountGuide(el); }
   for (const el of D.querySelectorAll('[data-guide-form]:not([data-gm])')) { el.dataset.gm = '1'; mountForm(el); }
   for (const el of D.querySelectorAll('[data-guide-host]:not([data-gm])')) { el.dataset.gm = '1'; HOSTS[el.dataset.guideHost]?.(el); }
