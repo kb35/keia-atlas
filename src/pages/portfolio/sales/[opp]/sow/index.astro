@@ -1,0 +1,99 @@
+---
+// The statement of work (src/lib/provider-sales.mjs, buildSow): generated from the design and the quote the client
+// has, as a clean document. Every section says where its words came from, so nothing in it was typed again. It
+// prints on its own (Download as PDF uses the browser's print, with print styles that leave only the document).
+// Simulated; every price is fictional.
+import Shell from '../../../../../layouts/Shell.astro';
+import PageBand from '../../../../../components/PageBand.astro';
+import SalesFrame from '../../../../../components/SalesFrame.astro';
+import SalesThread from '../../../../../components/SalesThread.astro';
+import { sales } from '../../../../../lib/provider-sales-data.mjs';
+import { money } from '../../../../../lib/provider-sales.mjs';
+import { dateWords } from '../../../../../lib/vendors.mjs';
+
+export function getStaticPaths() {
+  return sales().opps.filter((o) => o.sow).map((o) => ({ params: { opp: o.slug }, props: { o } }));
+}
+const { o } = Astro.props;
+const S = o.sow;
+const V = o.current;
+const draft = V.status === 'draft';
+const answer = `Written from the design and quote version ${S.v}${draft ? ' (a draft)' : ''} · ${S.sections.length} sections, each with its source`;
+const sec = (id: string) => S.sections.find((s: any) => s.id === id);
+---
+<Shell vendorOk title={`${o.title}: statement of work`} section="sales-sow" crumbs={[{ label: 'Sales', to: '/portfolio/sales/' }, { label: o.title, to: `/portfolio/sales/${o.slug}/` }, { label: 'Statement of work' }]}>
+  <SalesFrame provider={o.provider}>
+    <div class="sl-noprint">
+      <PageBand overline={`Statement of work · ${o.id}`} title={o.title} answer={answer} lede={`${o.clientName}, ${o.siteName}`} sim heartbeat={false}>
+        {o.fictional && <span slot="overline" class="pf-fict">Made-up client</span>}
+        <button slot="action" type="button" class="btn primary" data-sl-print data-help="sales.print">Download as PDF</button>
+      </PageBand>
+    </div>
+
+    <div class="content sl-page">
+      <div class="sl-noprint"><SalesThread o={o} here="sow" /></div>
+
+      <article class="sl-doc card" data-feature="provider-sales" data-help="sales.sow" aria-labelledby="sl-doc-h">
+        <header class="sl-doc-h">
+          <p class="overline">Statement of work · {o.id} · version {S.v}{draft ? ', draft' : ''}</p>
+          <h2 id="sl-doc-h">{o.title}</h2>
+          <dl class="sl-doc-meta">
+            <div><dt>For</dt><dd>{S.client}, {o.siteName}</dd></div>
+            <div><dt>By</dt><dd>{S.provider}</dd></div>
+            <div><dt>Dated</dt><dd>{dateWords(S.date)}</dd></div>
+            <div><dt>Quote</dt><dd>Version {S.v}, {money(sec('price').total)}</dd></div>
+          </dl>
+          <p class="sl-doc-demo">A demo document: every name, price and date in it is made up.</p>
+        </header>
+
+        {S.sections.map((s: any, i: number) => (
+          <section class="sl-doc-s" id={`sow-${s.id}`}>
+            <h3><span class="sl-doc-n">{i + 1}</span>{s.title}</h3>
+            <p class="sl-from" data-help="sales.from"><span>From</span> {s.from}</p>
+            {s.rooms && (
+              <div class="sl-doc-rooms">
+                {s.rooms.map((r: any) => (
+                  <div class="sl-doc-room">
+                    <h4>{r.label}</h4>
+                    <p class="sl-doc-type">{r.type}</p>
+                    <ul>{r.lines.map((l: string) => <li>{l}</li>)}</ul>
+                  </div>
+                ))}
+              </div>
+            )}
+            {s.items && <ul class="sl-doc-list">{s.items.map((t: string) => <li>{t}</li>)}</ul>}
+            {s.steps && (
+              <table class="sl-doc-t">
+                <thead><tr><th>Step</th><th>Working days</th><th>Worked out from</th></tr></thead>
+                <tbody>{s.steps.map((t: any) => <tr><td>{t.what}</td><td>{t.start === t.end ? `Day ${t.start}` : `Days ${t.start} to ${t.end}`}</td><td>{t.from}</td></tr>)}</tbody>
+              </table>
+            )}
+            {s.payments && (
+              <>
+                <table class="sl-doc-t">
+                  <thead><tr><th>Payment</th><th>Share</th><th>Amount</th></tr></thead>
+                  <tbody>{s.payments.map((p: any) => <tr><td>{p.when}</td><td>{p.pct}%</td><td>{money(p.amount)}</td></tr>)}</tbody>
+                  <tfoot><tr><td><b>Total</b></td><td>100%</td><td><b>{money(s.total)}</b></td></tr></tfoot>
+                </table>
+                <ul class="sl-doc-list">
+                  {!draft && <li>The quote is valid to {dateWords(s.validUntil)}.</li>}
+                  <li>{s.warranty}</li>
+                  {s.tax && <li>{s.tax}</li>}
+                </ul>
+              </>
+            )}
+          </section>
+        ))}
+
+        <footer class="sl-doc-f">
+          <div><p>Accepted for {S.client}</p><span></span><small>Name, date</small></div>
+          <div><p>For {S.provider}</p><span></span><small>Name, date</small></div>
+        </footer>
+      </article>
+    </div>
+  </SalesFrame>
+  <script>
+    import { bootSales } from '../../../../../lib/provider-sales-client.mjs';
+    bootSales();
+  </script>
+</Shell>

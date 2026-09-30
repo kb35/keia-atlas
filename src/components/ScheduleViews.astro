@@ -28,6 +28,8 @@ import ScheduleYear from './ScheduleYear.astro';
 import { work } from '../lib/work.mjs';
 // Room checks (the Room checks capability): their rounds are work items that leave the board while it is off.
 import { checkWork } from '../lib/capabilities-view.mjs';
+// Client events (the Events and experience centres capability): one item per event for its technician, with its readiness.
+import { eventWork } from '../lib/events-view.mjs';
 import { schedule, ALLOWANCE } from '../lib/schedule.mjs';
 import { projects, sites, spaces, SITE_ORDER, PHASE_LABEL, STEP_LABEL, PROJECT_KIND, DEMO_TODAY, href, plural } from '../lib/data.mjs';
 import { PEOPLE, TEAMS, ROLES } from '../lib/demo.mjs';
@@ -46,9 +48,9 @@ const people = PEOPLE.map((p) => ({
   base: p.base, office: p.office, office_days: p.office_days, home: p.home, country: sites[p.office]?.country ?? 'IE', vendor: !!p.vendor,
 }));
 // Work-plan items for next year are a year-long window with no day yet; the Year view shows them.
-const items = [...work, ...checkWork].filter((it) => !(it.kind === 'refresh' && it.start > YEAR_END)).map((it) => ({
+const items = [...work, ...checkWork, ...eventWork].filter((it) => !(it.kind === 'refresh' && it.start > YEAR_END)).map((it) => ({
   id: it.id, kind: it.kind, title: it.title, who: it.who, site: it.site, room: it.room, start: it.start, end: it.end, hours: it.hours,
-  status: it.status, href: it.href, project: it.project, where: it.where, taskKind: it.taskKind ?? null, planKind: it.planKind ?? null, feature: it.feature ?? null,
+  status: it.status, href: it.href, project: it.project, where: it.where, taskKind: it.taskKind ?? null, planKind: it.planKind ?? null, feature: it.feature ?? null, line: it.line ?? null,
 }));
 const rooms = {};
 for (const it of items) if (it.room && spaces[it.room]) rooms[it.room] = { name: spaces[it.room].name, number: spaces[it.room].number ?? null };
@@ -111,7 +113,7 @@ const REGION_SHORT = { amer: 'Americas', emea: 'EMEA', apac: 'APAC' };
 const FACETS = [
   { key: 'region', label: 'Region', options: ['amer', 'emea', 'apac'].map((r) => ({ value: r, label: REGION_SHORT[r] })) },
   { key: 'site', label: 'Office', options: SITE_ORDER.map((s) => ({ value: s, label: sites[s].name, sub: sites[s].kind === 'remote' ? 'Home offices' : sites[s].city })) },
-  { key: 'kind', label: 'Kind', options: ['provision', 'install', 'configure', 'commission', 'task', 'visit', 'incident', 'lab', 'refresh', 'time-off', 'holiday', 'phase', 'plan', 'inbox'].map((k) => ({ value: k, label: KIND_WORDS[k] })) },
+  { key: 'kind', label: 'Kind', options: ['provision', 'install', 'configure', 'commission', 'task', 'visit', 'event', 'incident', 'lab', 'refresh', 'time-off', 'holiday', 'phase', 'plan', 'inbox'].map((k) => ({ value: k, label: KIND_WORDS[k] })) },
   { key: 'status', label: 'Status', options: Object.entries(WORK_STATUS).map(([value, label]) => ({ value, label })) },
   { key: 'team', label: 'Team', options: P.teams.map(([value, label]) => ({ value, label })) },
 ];
@@ -121,7 +123,7 @@ const VIEWS = ['day', 'week', 'month', 'year'].map((v) => ({ value: v, label: v[
 const SORT = { options: [{ value: 'team', label: 'By team' }, { value: 'name', label: 'By name' }, { value: 'busy', label: 'Busiest first' }] };
 const KEY = [
   ['provision', 'Provision'], ['install', 'Install'], ['configure', 'Configure'], ['commission', 'Commission'], ['task', 'Other project work'],
-  ['visit', 'Site visit'], ['check', 'Room check'], ['incident', 'Incident'], ['lab', 'Lab test'], ['refresh', 'Work plan'], ['time-off', 'Time off'], ['holiday', 'Public holiday'], ['phase', 'Phase end'], ['plan', 'Planning'],
+  ['visit', 'Site visit'], ['event', 'Client event'], ['check', 'Room check'], ['incident', 'Incident'], ['lab', 'Lab test'], ['refresh', 'Work plan'], ['time-off', 'Time off'], ['holiday', 'Public holiday'], ['phase', 'Phase end'], ['plan', 'Planning'],
 ];
 ---
 <PageBand overline="Planning" title="Schedule" answer={answer} lede="Who is where and doing what: today across the offices, each person's week, the month and the year." sim numbers={NUMBERS}>
@@ -243,7 +245,7 @@ const KEY = [
   <footer class="sch-foot">
     <LiveBar page="schedule" />
     <ul class="sch-key k-board" data-help="schedule.key" aria-label="Key">
-      {KEY.map(([k, label]) => <li data-feature={k === 'check' ? 'maintenance' : undefined}><i class={`kd k-${k}`}></i>{label}</li>)}
+      {KEY.map(([k, label]) => <li data-feature={k === 'check' ? 'maintenance' : k === 'event' ? 'events' : undefined}><i class={`kd k-${k}`}></i>{label}</li>)}
       <li><i class="kd k-cover"></i>Needs cover</li>
       <li><i class="pk-visit"></i>Visiting</li>
     </ul>
@@ -297,7 +299,7 @@ const KEY = [
   const round = (n) => Math.round(n * 10) / 10;
   const REMOTE_OF = { emea: 'rem', amer: 'ram', apac: 'rap' };
   const REGION_WORDS = { emea: 'EMEA', amer: 'Americas', apac: 'APAC' };
-  const DAY_KINDS = new Set(['task', 'visit', 'incident', 'lab', 'refresh', 'check']);
+  const DAY_KINDS = new Set(['task', 'visit', 'incident', 'lab', 'refresh', 'check', 'event']);
   const BOOKS_ROOM = new Set(['install', 'configure', 'commission', 'survey']);
   const pluralS = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
@@ -379,6 +381,7 @@ const KEY = [
         + `<small>${esc(P.kinds[k] ?? k)} · ${esc(statusWord(it))}${it.where ? ` · ${it.where === 'onsite' ? 'on site' : 'remote'}` : ''}</small>`
         + (pr ? `<small>${esc(pr.id)} ${esc(pr.name)} · ${esc(pr.phaseLabel)}</small>` : '')
         + (place ? `<small>${esc(place)}</small>` : '')
+        + (it.line && it.status !== 'done' ? `<small class="${/^Ready/.test(it.line) ? '' : 'pk-warn'}">${esc(it.line)}</small>` : '')
         + `<small>${esc(dates)}${it.hours ? ` · ${round(it.hours)} h` : ''}</small>`
         + `<small>${it.who.length ? esc(it.who.map(nameOf).join(', ')) : 'Nobody on it yet'}</small>`
         + (opt.cover ? `<small class="pk-warn">${esc(nameOf(it.who[0]))} is away that day: needs cover</small>` : '')
@@ -613,7 +616,7 @@ const KEY = [
         const k = chipKind(it);
         if (it.kind === 'visit' && overlaps(it, ds) && (all || ppl(it.who))) add({ item: it, kind: 'visit' });
         else if (it.kind === 'task' && it.end === ds && (all || ppl(it.who))) add({ item: it, kind: k, due: true });
-        else if (it.kind === 'check' && overlaps(it, ds) && (all || ppl(it.who))) add({ item: it, kind: 'check' });
+        else if ((it.kind === 'check' || it.kind === 'event') && overlaps(it, ds) && (all || ppl(it.who))) add({ item: it, kind: it.kind });
         else if (it.kind === 'plan' && overlaps(it, ds) && (it.planKind === 'freeze' || all || ppl(it.who)) && !isWeekend(ds)) add({ item: it, kind: 'plan' });
       }
       for (const pr of P.projects) {
@@ -1056,7 +1059,7 @@ const KEY = [
   /* Chips: one piece of work. The left edge says the kind; the peek says the rest. */
   .k-provision { --kc: var(--violet); } .k-install { --kc: var(--amber); } .k-configure { --kc: var(--blue); } .k-commission { --kc: var(--green); }
   .k-task { --kc: var(--grey); } .k-visit { --kc: var(--accent); } .k-incident { --kc: var(--red); } .k-lab { --kc: var(--violet); }
-  .k-refresh { --kc: var(--amber); } .k-check { --kc: var(--green); } .k-time-off { --kc: var(--grey); } .k-plan { --kc: var(--blue); } .k-inbox { --kc: var(--grey); }
+  .k-refresh { --kc: var(--amber); } .k-check { --kc: var(--green); } .k-event { --kc: var(--blue-ink); } .k-time-off { --kc: var(--grey); } .k-plan { --kc: var(--blue); } .k-inbox { --kc: var(--grey); }
   .k-holiday { --kc: var(--green); } .k-phase { --kc: var(--ink); }
   .chips { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; align-content: flex-start; }
   .chip { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; padding: 3px 7px 3px 6px; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--kc, var(--grey)) 55%, transparent); background: color-mix(in srgb, var(--kc, var(--grey)) 14%, var(--surface)); color: var(--text); font: 600 var(--fs-mark)/1.3 var(--font-sans); text-decoration: none; transition: background var(--dur-hover) var(--ease-settle), box-shadow var(--dur-hover) var(--ease-settle); }
@@ -1064,7 +1067,7 @@ const KEY = [
   a.chip:hover, .chip.peek-on { background: color-mix(in srgb, var(--kc, var(--grey)) 26%, var(--surface)); color: var(--text); }
   .chip.done { opacity: .62; } .chip.done > span { text-decoration: line-through; }
   .chip.cover { box-shadow: inset 0 0 0 1.5px var(--red); background: var(--red-soft); }
-  .chip.k-lab, .chip.k-refresh, .chip.k-check { background: transparent; border: 1px solid var(--kc); border-left-width: 3px; }
+  .chip.k-lab, .chip.k-refresh, .chip.k-check, .chip.k-event { background: transparent; border: 1px solid var(--kc); border-left-width: 3px; }
   .chip.k-time-off { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--grey) 18%, var(--surface)) 0 5px, var(--surface) 5px 10px); }
   .chip.pend { border-style: dashed; border-width: 1px 1px 1px 3px; background: transparent; }
   .chip.more { border-left-color: var(--line-strong); background: var(--surface-2); color: var(--text-2); }

@@ -1,0 +1,253 @@
+---
+// One service from the catalogue beyond the live three (src/lib/catalogue.mjs): Collaboration platforms, Wi-Fi,
+// Security, Print, Digital signage and displays, Room booking and scheduling, Building and sensors, Home office kit.
+// Record archetype, built like the live service pages but still: the states are a simulated snapshot, not a feed.
+//   band      the owner, the answer ("Below target in London: 1 printer of 1 not working"), four figures
+//   main      the service map, lit by the worst state of each group; health by office against the availability target;
+//             what is not working
+//   below     what only this service has (platforms and licences, the Wi-Fi networks, privacy records, calendars),
+//             the targets, the standard, every unit in scope, and who runs it
+// The page belongs to its capability (FeatureGate): while it is off, the page says so and offers to switch it on.
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import Section from '../../components/Section.astro';
+import HealthGlyph from '../../components/HealthGlyph.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import SourceMark from '../../components/SourceMark.astro';
+import FeatureGate from '../../components/FeatureGate.astro';
+import ServiceMap from '../../components/ServiceMap.astro';
+import { href, sites } from '../../lib/data.mjs';
+import { catalogueModel, serviceAnswer, placeName } from '../../lib/catalogue-view.mjs';
+import { ROLES } from '../../lib/demo.mjs';
+
+const { id } = Astro.props;
+const m = catalogueModel(id);
+const svc = m.svc;
+const w = svc.word;
+const remote = m.sites.length > 0 && m.sites.every((s) => s.remote);
+const placeWord = remote ? ['remote group', 'remote groups'] : ['office', 'offices'];
+const avail = m.targets.find((t) => t.from === 'units');
+const notWorking = m.roll.offline;
+const keptN = m.targets.filter((t) => t.kept).length;
+const NUMBERS = [
+  { n: m.roll.working, label: `${w[1][0].toUpperCase()}${w[1].slice(1)} working`, to: '#units' },
+  { n: notWorking, label: 'Not working', to: '#attention', tone: notWorking ? 'bad' : undefined },
+  { n: m.roll.below.length, label: `${placeWord[1][0].toUpperCase()}${placeWord[1].slice(1)} below target`, to: '#health', tone: m.roll.below.length ? 'warn' : undefined },
+  { n: `${keptN} of ${m.targets.length}`, label: 'Targets kept', to: '#targets', tone: keptN < m.targets.length ? 'warn' : undefined },
+];
+const ST = { online: 'fine', alert: 'review', offline: 'fault' };
+const STW = { online: 'Fine', alert: 'To review', offline: 'Fault · offline' };
+const pct = (v) => (v == null ? '–' : `${v >= 99.95 ? 100 : v >= 99 ? v.toFixed(1) : Math.round(v)}%`);
+const owner = m.owner;
+const ownerRole = ROLES[owner.roleId];
+const connected = svc.capability === 'security';
+// The service map: what it needs first, its groups lit by the worst state of their kit, what it gives.
+const CHAIN = {
+  before: svc.map.before,
+  groups: m.groups.map((g) => ({ label: g.label, state: g.counts ? 'fine' : g.state, to: g.kit || g.checks ? href('/services/events/#kit') : '#units',
+    sub: g.counts ? 'Per room, never per person' : g.n ? `${g.n - g.off} of ${g.n} working${g.al ? `, ${g.al} alerting` : ''}` : 'From the connected platform' })),
+  after: svc.map.after,
+};
+const CAP_WORD = { captures: { video: 'Video', audio: 'Sound', 'people-count': 'How many people', presence: 'Whether anyone is there', 'badge-id': 'Badge number' } };
+---
+<Shell title={svc.name} section="service" crumbs={[{ label: 'Services', to: '/services/' }, { label: svc.short ?? svc.name }]} about={{ kind: 'page', label: svc.name }}>
+  <FeatureGate id={svc.capability}>
+    <PageBand overline="Service" title={svc.name} rec={`svc-${id}`} answer={serviceAnswer(m)} lede={svc.lede} sim numbers={NUMBERS} heartbeat={false}>
+      <a slot="overline" class="pill plain sv-owner" href={href(`/team/?p=${owner.id}`)} data-help="services.owner">{svc.ownedBy ? `${svc.ownedBy} · contact ${owner.name}` : `Owner: ${owner.name}`}</a>
+      <span slot="overline" class="sv-st"><HealthGlyph state={m.within ? 'fine' : m.roll.offline ? 'fault' : 'review'} size={12} word={m.within ? 'Fine · within target' : 'To review · below target'} quiet={m.within} /></span>
+      {connected && <span slot="overline" data-feat-src={svc.capability}><SourceMark from="the security platform" synced="connected" /></span>}
+    </PageBand>
+
+    <div class="content svcat" data-svcat={id}>
+      <ServiceMap chain={CHAIN} systems={svc.systems} synced="simulated" />
+
+      <Section title={`Health by ${placeWord[0]}`} id="health" aside={`Target: ${avail.target}% working in every ${placeWord[0]}`} help="services.cat-health">
+        <div class="card svcat-rows">
+          {m.sites.map((s) => (
+            <a class="svcat-r" href={href(remote ? `/locations/` : `/rooms/?site=${s.site}`)} data-within={String(s.within)}>
+              <span class="svcat-rn"><b>{s.name}</b><small>{s.all} {s.all === 1 ? w[0] : w[1]}{s.alert ? ` · ${s.alert} with an alert` : ''}{s.offline ? ` · ${s.offline} offline` : ''}</small></span>
+              <span class="svcat-bar" aria-hidden="true" data-chart-bar="each"><i data-st="online" style={`flex-grow:${s.online}`}></i><i data-st="alert" style={`flex-grow:${s.alert}`}></i><i data-st="offline" style={`flex-grow:${s.offline}`}></i></span>
+              <span class="svcat-rv"><b class="num">{pct(s.share)}</b><HealthGlyph state={s.within ? 'fine' : 'fault'} size={16} word={s.within ? 'Fine' : 'Fault · below target'} quiet={s.within} /></span>
+            </a>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Not working now" id="attention" aside={m.notWorking.length ? `${m.notWorking.length} ${m.notWorking.length === 1 ? w[0] : w[1]}, offline first` : undefined} rows={8} help="services.cat-attention">
+        {m.notWorking.length ? (
+          <ul class="card svcat-list" data-items>
+            {m.notWorking.map((u) => (
+              <li>
+                <HealthGlyph state={ST[u.st]} size={16} word={STW[u.st]} />
+                <span><a href={href(u.to)}><b>{u.role}{u.modelName ? `, ${u.modelName}` : ''}</b></a><small>{u.why} · {u.spaceName}, {sites[u.site]?.name}</small></span>
+              </li>
+            ))}
+          </ul>
+        ) : <EmptyState text={`Every ${w[0]} in this service is working.`} filter={false} to="#units" action={`See every ${w[0]}`} />}
+      </Section>
+
+      {id === 'collaboration' && (
+        <Section title="Platforms" id="platforms" aside="From the licence pools and the certified platforms" help="services.cat-platforms">
+          <div class="tablewrap"><table class="to-cards sv-tbl">
+            <thead><tr><th>Platform in use</th><th>Room systems</th><th>Offices</th><th>Also certified for</th></tr></thead>
+            <tbody>{m.extra.platforms.map((p) => <tr><td data-label=""><b>{p.name}</b></td><td data-label="Room systems" class="num">{p.units}</td><td data-label="Offices" class="num">{p.sites}</td><td data-label="Also certified for">{p.certified.filter((c) => c !== p.name).join(', ') || <span class="faint">None recorded</span>}</td></tr>)}</tbody>
+          </table></div>
+          <div class="tablewrap svcat-gap"><table class="to-cards sv-tbl" data-feature="licences">
+            <thead><tr><th>Licence pool</th><th>Seats in use</th><th>Renews</th></tr></thead>
+            <tbody>{m.extra.licences.map((l) => <tr><td data-label=""><a href={href('/assets/licences/')}><b>{l.name}</b></a></td><td data-label="Seats in use" class:list={['num', { 't-warn': l.short }]}>{l.used} of {l.seats}{l.short ? ` (${l.short} short)` : ''}</td><td data-label="Renews">{l.renews}</td></tr>)}</tbody>
+          </table></div>
+          <p class="sv-note">Which platform each room system joins is read from the licence pool that covers its model; the others it could join come from each model's certified platforms. Zoom Rooms is certified on some models and not licensed here.</p>
+        </Section>
+      )}
+
+      {id === 'wifi' && (
+        <Section title="The networks" id="networks" aside="The same three in every office, from the Wi-Fi standard" help="services.cat-networks">
+          <div class="tablewrap"><table class="to-cards sv-tbl">
+            <thead><tr><th>Network (SSID)</th><th>Security</th><th>VLAN</th><th>Bands</th><th>For</th></tr></thead>
+            <tbody>{m.extra.networks.map((n) => <tr><td data-label=""><b class="code">{n.name}</b></td><td data-label="Security">{n.security}</td><td data-label="VLAN">{n.vlan}</td><td data-label="Bands">{n.bands}</td><td data-label="For">{n.forWho}</td></tr>)}</tbody>
+          </table></div>
+        </Section>
+      )}
+
+      {(id === 'security' || id === 'building') && (
+        <Section title={id === 'security' ? 'Privacy records' : 'Privacy first'} id="privacy" aside={id === 'security' ? 'Every camera and door covered' : 'Room counts come from the meeting-room privacy records'} help="services.cat-privacy">
+          {id === 'building' && <p class="svcat-lead">The sensors here measure the building (temperature, humidity and air), not people. Room counts come from the video bars, counted per room, only for groups of three or more, and never shown per person.</p>}
+          <ul class="svcat-priv">
+            {m.extra.privacy.map((r) => (
+              <li class="card">
+                <b>{r.name}</b>
+                <small>{r.sites.join(', ')} · captures {r.captures.map((c) => CAP_WORD.captures[c] ?? c).join(', ').toLowerCase()}{r.identifies ? ' · identifies people' : ' · identifies nobody'}</small>
+                {r.counted && <small>Counted per room{r.min ? `, groups of ${r.min} or more` : ''}; {r.perPerson ? 'per-person views allowed' : 'never per person'}</small>}
+                <small>Never: {r.never.join('; ').toLowerCase()}</small>
+              </li>
+            ))}
+          </ul>
+          {id === 'security' && <p class="sv-note">Visitor sign-in, footage and door events stay in the security platform, which the IT security team runs; Keia Atlas holds only the devices and their wiring. Its figures show while Security is Connected.</p>}
+        </Section>
+      )}
+
+      {id === 'booking' && (
+        <Section title="Calendars" id="calendars" aside="Simulated from the room booking system" help="services.cat-calendar">
+          <div class="g12">
+            <div class="card side-card s-4"><h3>Bookable spaces</h3><p class="svcat-big num">{m.extra.calendar.bookable}</p></div>
+            <div class="card side-card s-4"><h3>Linked to their calendar</h3><p class="svcat-big num">{m.extra.calendar.linked}</p></div>
+            <div class="card side-card s-4"><h3>With a booking panel</h3><p class="svcat-big num">{m.extra.calendar.panels}</p></div>
+          </div>
+          <p class="sv-note">A bookable space without a panel is booked from the calendar alone: the space type says whether it has one.</p>
+        </Section>
+      )}
+
+      <Section title="Targets" id="targets" aside={`${keptN} of ${m.targets.length} kept this month · simulated`} help="services.cat-targets">
+        <div class="tablewrap"><table class="to-cards sv-tbl">
+          <thead><tr><th>Target</th><th>Promise</th><th>This month</th><th>Kept</th><th>How it is measured</th></tr></thead>
+          <tbody>
+            {m.targets.map((t) => (
+              <tr>
+                <td data-label=""><b>{t.what}</b></td>
+                <td data-label="Promise">{t.promise}</td>
+                <td data-label="This month" class="num">{t.words}</td>
+                <td data-label="Kept"><HealthGlyph state={t.kept ? 'fine' : 'review'} size={16} word={t.kept ? 'Fine · kept' : 'To review · below target'} quiet={t.kept} /></td>
+                <td data-label="Measured">{t.how}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table></div>
+      </Section>
+
+      <Section title="The standard" id="standard" aside={m.standard.house ? 'A house choice' : `${m.standard.rules} rules`} help="services.cat-standard">
+        <div class="card pad svcat-std">
+          <p class="svcat-std-h"><b>{m.standard.name}</b>{m.standard.house && <span class="pill plain">House choice</span>}</p>
+          <p class="svcat-std-s">{m.standard.summary}</p>
+          <ul>{m.standard.sample.map(([rule, why]) => <li><span>{rule}</span><small>{why}</small></li>)}</ul>
+          {m.standard.to ? <a class="aside" href={href(m.standard.to)}>Open the {m.standard.name} standard →</a> : <p class="sv-note">Aigna's own choice for this demo, not a public standard's requirement. It joins the standards library when it is written in full.</p>}
+        </div>
+      </Section>
+
+      <Section title={`Every ${w[0]} in the service`} id="units" aside={m.kinds.map((k) => `${k.n} ${k.label.toLowerCase()}`).join(' · ')} rows={8} help="services.cat-units">
+        <div class="tablewrap"><table class="to-cards sv-tbl">
+          <thead><tr><th>Unit</th><th>Space</th><th>Office</th><th>State</th></tr></thead>
+          <tbody data-items>
+            {m.units.map((u) => (
+              <tr>
+                <td data-label=""><a href={href(u.to)}><b>{u.role}</b></a>{u.modelName && <small class="faint"> · {u.modelName}</small>}{u.host && <small class="faint code"> {u.host}</small>}</td>
+                <td data-label="Space"><a href={href(`/rooms/${u.space}/`)}>{u.spaceName}</a></td>
+                <td data-label="Office">{sites[u.site]?.name}</td>
+                <td data-label="State"><HealthGlyph state={ST[u.st]} size={16} word={u.st === 'online' ? 'Fine' : STW[u.st].split(' · ')[0]} quiet={u.st === 'online'} />{u.st !== 'online' && <small class="faint svcat-why">{u.why}</small>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table></div>
+        <p class="sv-note">In scope: {svc.classes ? svc.classes.map((c) => c.replace(/-/g, ' ')).join(', ') : 'every unit in its spaces'}{svc.where?.kinds ? ` in ${svc.where.kinds.includes('kits') ? 'home offices' : 'shared spaces (receptions, pantries and cafeterias)'}` : ''}. States are simulated: seeded per unit, with open incidents on alert. Real feeds from {svc.systems.slice(0, 2).join(' and ')} replace them with the same shape.</p>
+      </Section>
+
+      <Section title="Who runs this service" id="owners" help="services.owners">
+        <article class="card side-card sv-own s-6">
+          <h3>{svc.ownedBy ? `Run by ${svc.ownedBy.replace(/^The /, 'the ')}` : 'Service owner'}</h3>
+          <p class="sv-role"><b>{ownerRole.name}</b></p>
+          <p class="sv-people"><a href={href(`/team/?p=${owner.id}`)}>{owner.name}</a>{svc.ownedBy && ', the contact on this team'}</p>
+          <dl class="sv-dl">
+            <div><dt>Owns</dt><dd>{svc.name}: its standard, its targets and what goes into it.</dd></div>
+            <div><dt>Hands on to</dt><dd>{ownerRole.hands}</dd></div>
+          </dl>
+        </article>
+      </Section>
+    </div>
+  </FeatureGate>
+</Shell>
+
+<style>
+  .sv-owner { text-decoration: none; }
+  .sv-owner:hover { text-decoration: underline; text-underline-offset: 2px; }
+  .sv-st { display: inline-flex; align-items: center; }
+  .svcat { display: grid; gap: 24px; }
+  .svcat-rows { display: grid; padding: 6px 10px; }
+  .svcat-r { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 6px 16px; align-items: center; padding: 9px 8px; border-top: var(--border-rule); color: inherit; text-decoration: none; border-radius: var(--radius); }
+  .svcat-r:first-child { border-top: 0; }
+  .svcat-r:hover { background: var(--surface-2); }
+  .svcat-r:hover b { text-decoration: underline; text-underline-offset: 2px; }
+  .svcat-rn { display: grid; gap: 2px; min-width: 0; }
+  .svcat-rn b { font-size: var(--fs-body); }
+  .svcat-rn small { font-size: var(--fs-code); color: var(--text-3); }
+  .svcat-bar { display: flex; gap: 2px; height: 8px; border-radius: 4px; overflow: hidden; background: var(--surface-2); }
+  .svcat-bar i { flex: 0 1 0; min-width: 0; }
+  .svcat-bar i[data-st=online] { background: color-mix(in srgb, var(--h-fine) 60%, var(--surface)); }
+  .svcat-bar i[data-st=alert] { background: var(--amber); }
+  .svcat-bar i[data-st=offline] { background: var(--red); }
+  .svcat-rv { display: inline-flex; align-items: center; gap: 12px; justify-content: flex-end; font-variant-numeric: tabular-nums; }
+  .svcat-rv b { font-size: var(--fs-body); min-width: 4ch; text-align: right; }
+  .svcat-list { list-style: none; margin: 0; padding: 4px 16px; display: grid; }
+  .svcat-list li { display: grid; grid-template-columns: 9.5em minmax(0, 1fr); gap: 4px 12px; align-items: start; padding: 10px 0; border-top: var(--border-rule); }
+  .svcat-list li:first-child { border-top: 0; }
+  .svcat-list span { display: grid; gap: 2px; min-width: 0; }
+  .svcat-list a { color: inherit; text-decoration: none; }
+  .svcat-list a:hover { text-decoration: underline; text-underline-offset: 2px; }
+  .svcat-list small { font-size: var(--fs-code); color: var(--text-2); }
+  .svcat-gap { margin-top: 12px; }
+  .svcat-why { display: block; overflow-wrap: anywhere; }
+  .svcat-lead { margin: 0 0 12px; font-size: var(--fs-body); line-height: 1.5; max-width: 72ch; }
+  .svcat-priv { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 12px; }
+  .svcat-priv li { display: grid; gap: 4px; padding: 14px 16px; min-width: 0; }
+  .svcat-priv small { font-size: var(--fs-code); color: var(--text-2); line-height: 1.4; }
+  .svcat-big { margin: 4px 0 0; font: var(--fw-title) 28px/1.1 var(--font-display, var(--font-sans)); }
+  .svcat-std { display: grid; gap: 10px; }
+  .svcat-std-h { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0; font-size: var(--fs-h3); }
+  .svcat-std-s { margin: 0; font-size: var(--fs-body); line-height: 1.5; color: var(--text-2); max-width: 78ch; }
+  .svcat-std ul { list-style: none; margin: 0; padding: 0; display: grid; }
+  .svcat-std li { display: grid; gap: 2px; padding: 9px 0; border-top: var(--border-rule); }
+  .svcat-std li span { font-size: var(--fs-body); line-height: 1.45; }
+  .svcat-std li small { font-size: var(--fs-code); color: var(--text-3); line-height: 1.4; }
+  .sv-tbl :global(td.t-warn) { color: var(--amber-ink); font-weight: 600; }
+  .sv-note { margin: 10px 2px 0; font-size: var(--fs-code); line-height: 1.5; color: var(--text-3); max-width: 78ch; }
+  .sv-own .sv-role { margin: 0; font-size: var(--fs-h3); }
+  .sv-own .sv-people { margin: 0; font-size: var(--fs-body); }
+  .sv-own .sv-people a { color: var(--accent-ink); }
+  .sv-dl { margin: 0; display: grid; gap: 10px; }
+  .sv-dl div { display: grid; gap: 2px; padding-top: 10px; border-top: var(--border-rule); }
+  .sv-dl dt { font: 600 var(--overline-size)/1.2 var(--font-sans); letter-spacing: var(--overline-track); text-transform: var(--overline-case); color: var(--text-3); }
+  .sv-dl dd { margin: 0; font-size: var(--fs-body); line-height: 1.45; color: var(--text-2); }
+  @container content (max-width: 640px) {
+    .svcat-r { grid-template-columns: minmax(0, 1fr) auto; }
+    .svcat-bar { grid-column: 1 / -1; grid-row: 2; }
+    .svcat-list li { grid-template-columns: minmax(0, 1fr); }
+  }
+</style>

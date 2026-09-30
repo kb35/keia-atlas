@@ -3,9 +3,10 @@
 import { onCall, sites } from './data.mjs';
 import { PEOPLE } from './demo.mjs';
 import { rotaAt, lineFor, whenWords, hoursWords, utcOf, REGION_WORD } from './oncall.mjs';
+import { demoShift } from './demo-clock.mjs';
 
 // The demo's now: noon on Monday 28 September in Dublin (src/lib/home.mjs), as a moment every time zone agrees on.
-export const DEMO_NOW_UTC = '2026-09-28T11:00:00Z';
+export const DEMO_NOW_UTC = demoShift('2026-09-28T11:00:00Z');
 const person = (id) => PEOPLE.find((p) => p.id === id) ?? null;
 const first = (id) => person(id)?.name.split(' ')[0] ?? id;
 export const ROTAS = ['emea', 'amer', 'apac'].map((g) => Object.values(onCall).find((r) => r.region === g)).filter(Boolean);

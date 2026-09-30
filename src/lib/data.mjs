@@ -1,11 +1,11 @@
 // Loads everything in data/ once, at build time, and works out what the pages need.
 // The validator (npm run validate) runs before the build, so this trusts the data.
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { parse } from 'yaml';
+import { loadYaml, demoToday } from './demo-clock.mjs';
 
 const DATA = path.join(process.cwd(), 'data');
-export const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+export const base = (import.meta.env?.BASE_URL ?? '/keia-atlas/').replace(/\/$/, '');
 export const href = (p) => `${base}${p}`;
 // The repository is private for now, so links to its decision records point at the site's own copies.
 const REPO_DECISIONS = 'https://github.com/kb35/keia-atlas/blob/main/docs/decisions/';
@@ -18,7 +18,7 @@ function readFolder(folder) {
       if (name.startsWith('.')) continue;
       const full = path.join(dir, name);
       if (statSync(full).isDirectory()) walk(full);
-      else if (name.endsWith('.yaml')) out[name.slice(0, -5)] = parse(readFileSync(full, 'utf8'));
+      else if (name.endsWith('.yaml')) out[name.slice(0, -5)] = loadYaml(full);   // demo dates moved (demo-clock.mjs)
     }
   };
   walk(path.join(DATA, folder));
@@ -214,8 +214,10 @@ export const PROJECT_KIND = { refresh: 'AV refresh', 'infra-refresh': 'Comms roo
 export const LAB_STATUS = { queued: 'Queued', testing: 'Testing', passed: 'Passed', failed: 'Failed', adopted: 'In the standard' };
 export const INC_STATE = { new: 'New', 'in-progress': 'In progress', 'on-hold': 'On hold', resolved: 'Resolved' };
 export const fmtDate = (d, o = { day: 'numeric', month: 'short', year: 'numeric' }) => (d ? new Date(d).toLocaleDateString('en-IE', o) : '');
-// The demo's "today", so dates in the made-up data read sensibly whenever the site is built.
-export const DEMO_TODAY = '2026-09-28';
+// The demo's "today": the anchor the made-up data is written as of, moved forward by whole weeks to the build
+// date when the demo clock is rolling (src/lib/demo-clock.mjs), so dates read as current whenever the site is built.
+export const DEMO_TODAY = demoToday();
+export { demoShift, demoNow, DEMO_CLOCK_NOTE, CLOCK } from './demo-clock.mjs';
 export const findTask = (tid) => {
   for (const p of Object.values(projects)) { const t = p.tasks.find((x) => x.id === tid); if (t) return { project: p, task: t }; }
   return null;

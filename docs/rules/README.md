@@ -16,7 +16,7 @@ How Keia Atlas moves, lays out a page, draws a device or a space, and words thin
 
 **Words.** Plain English, glossary words used exactly, no internal names, no em dashes. Filter bars, buttons, status words, the simulated tag and the overline are worded the same on every page.
 
-**Looks and tokens.** Tokens only. Five looks, light and dark, WCAG AA contrast.
+**Looks and tokens.** Tokens only. Five looks, light and dark, WCAG AA contrast. Icons in a line of text scale with Text size; marks in a drawing keep its scale.
 
 **Data.** YAML checked by schema at build time. Every fact has a source; unknown is allowed, a guess is not.
 

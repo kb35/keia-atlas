@@ -11,10 +11,11 @@
 //   4. Performance against the contract is measured from the records, with no manual reporting.
 //   5. Paperwork before data: a data processing agreement and a security assessment per partner, with their dates.
 //
-// The jobs, cases, grants and figures here are SIMULATED (made up, fixed in time at the demo's now, 28 Sept 12:00).
-// Pure: no data is loaded, so the rules can be tested (tests/vendors.test.mjs). Pages join this to data/vendors.
+// The jobs, cases, grants and figures here are SIMULATED (made up, written at the demo's now, 28 Sept 12:00 on the anchor).
+// The dates move with the rolling demo clock (demoShift). No data is loaded, so the rules can be tested (tests/vendors.test.mjs). Pages join this to data/vendors.
+import { demoShift } from './demo-clock.mjs';
 
-export const NOW = '2026-09-28T12:00';
+export const NOW = demoShift('2026-09-28T12:00');
 
 // ---- Time, as the data writes it: "2026-09-28T12:00", read as written (no zone) -------------------------------------
 const ms = (t) => Date.parse(`${t.length === 10 ? `${t}T00:00` : t}:00Z`);
@@ -136,52 +137,52 @@ export function accessRegister(jobs, now = NOW) {
 export const JOBS = [
   // Keystone Service: break-fix under the maintenance contract (Dev Patel).
   { id: 'INC0041214', vendor: 'keystone', person: 'dev', kind: 'incident', title: 'Video bar fan noise, swap under warranty', space: 'dub-3-09', site: 'dub', position: 'video-bar', priority: 2,
-    why: 'Fan noise, swap under warranty', handedBy: 'liam', handedAt: '2026-09-28T08:05', sla: { what: 'P2 (room degraded)', kind: 'fix', workdays: 1 }, state: 'with',
+    why: 'Fan noise, swap under warranty', handedBy: 'liam', handedAt: demoShift('2026-09-28T08:05'), sla: { what: 'P2 (room degraded)', kind: 'fix', workdays: 1 }, state: 'with',
     native: { from: 'Keystone service desk', ref: 'KS-48812', status: 'Engineer assigned' }, opened: 4,
-    history: [{ at: '2026-09-28T07:52', text: 'Opened from the room: fan noise during calls' }, { at: '2026-09-28T08:05', text: 'Liam handed it to Keystone Service (vendor): fan noise, swap under warranty' }, { at: '2026-09-28T08:40', text: 'Keystone booked Dev Patel for tomorrow morning' }] },
+    history: [{ at: demoShift('2026-09-28T07:52'), text: 'Opened from the room: fan noise during calls' }, { at: demoShift('2026-09-28T08:05'), text: 'Liam handed it to Keystone Service (vendor): fan noise, swap under warranty' }, { at: demoShift('2026-09-28T08:40'), text: 'Keystone booked Dev Patel for tomorrow morning' }] },
   { id: 'INC0041215', vendor: 'keystone', person: 'dev', kind: 'incident', title: 'Room down: codec will not start', space: 'nyc-20-05', site: 'nyc', position: 'codec', priority: 1,
-    why: 'Codec stuck at the start screen after a power cut, meeting at 14:00', handedBy: 'anna', handedAt: '2026-09-28T09:40', sla: { what: 'P1 (room down, meeting today)', kind: 'response', hours: 4 }, state: 'with',
+    why: 'Codec stuck at the start screen after a power cut, meeting at 14:00', handedBy: 'anna', handedAt: demoShift('2026-09-28T09:40'), sla: { what: 'P1 (room down, meeting today)', kind: 'response', hours: 4 }, state: 'with',
     native: { from: 'Keystone service desk', ref: 'KS-48820', status: 'On the way' }, opened: 2,
-    history: [{ at: '2026-09-28T09:31', text: 'Opened by the service desk: nothing starts in the room' }, { at: '2026-09-28T09:40', text: 'Anna handed it to Keystone Service (vendor): codec stuck after a power cut, meeting at 14:00' }] },
+    history: [{ at: demoShift('2026-09-28T09:31'), text: 'Opened by the service desk: nothing starts in the room' }, { at: demoShift('2026-09-28T09:40'), text: 'Anna handed it to Keystone Service (vendor): codec stuck after a power cut, meeting at 14:00' }] },
   { id: 'INC0041199', vendor: 'keystone', person: 'dev', kind: 'incident', title: 'Camera not detected', space: 'cph-4-11', site: 'cph', position: 'video-bar', priority: 2,
-    why: 'Camera missing after the firmware update, needs a swap', handedBy: 'anna', handedAt: '2026-09-25T08:00', sla: { what: 'P2 (room degraded)', kind: 'fix', workdays: 1 }, state: 'waiting',
-    wait: 'client site access', waitOwner: 'anna', waitFrom: '2026-09-28T10:10', native: { from: 'Keystone service desk', ref: 'KS-48790', status: 'Awaiting access' }, opened: 6,
-    history: [{ at: '2026-09-25T07:44', text: 'Opened from the room: the camera is not found' }, { at: '2026-09-25T08:00', text: 'Anna handed it to Keystone Service (vendor): camera missing after the firmware update' }, { at: '2026-09-28T10:10', text: 'Keystone: waiting on site access to the fourth floor' }] },
+    why: 'Camera missing after the firmware update, needs a swap', handedBy: 'anna', handedAt: demoShift('2026-09-25T08:00'), sla: { what: 'P2 (room degraded)', kind: 'fix', workdays: 1 }, state: 'waiting',
+    wait: 'client site access', waitOwner: 'anna', waitFrom: demoShift('2026-09-28T10:10'), native: { from: 'Keystone service desk', ref: 'KS-48790', status: 'Awaiting access' }, opened: 6,
+    history: [{ at: demoShift('2026-09-25T07:44'), text: 'Opened from the room: the camera is not found' }, { at: demoShift('2026-09-25T08:00'), text: 'Anna handed it to Keystone Service (vendor): camera missing after the firmware update' }, { at: demoShift('2026-09-28T10:10'), text: 'Keystone: waiting on site access to the fourth floor' }] },
   { id: 'INC0041171', vendor: 'keystone', person: 'dev', kind: 'incident', title: 'Touch panel cracked', space: 'dub-4-05', site: 'dub', position: 'touch-controller', priority: 3,
-    why: 'Glass cracked, advance replacement', handedBy: 'liam', handedAt: '2026-09-21T11:00', sla: { what: 'Advance replacement shipped', kind: 'fix', workdays: 1 }, state: 'done', closedAt: '2026-09-22T09:30',
+    why: 'Glass cracked, advance replacement', handedBy: 'liam', handedAt: demoShift('2026-09-21T11:00'), sla: { what: 'Advance replacement shipped', kind: 'fix', workdays: 1 }, state: 'done', closedAt: demoShift('2026-09-22T09:30'),
     native: { from: 'Keystone service desk', ref: 'KS-48744', status: 'Closed' }, opened: 5, history: [] },
   // Northlight AV: the Juneau office fit-out (PRJ-14) and a survey (Sam Okafor).
   { id: 'SNAG-14-02', vendor: 'northlight', person: 'sam', kind: 'snag', title: 'Camera framing too tight for the far seats', space: 'jnu-2-02', site: 'jnu', position: 'video-bar', project: 'PRJ-14',
-    why: 'Snag from the space test: reframe the camera', handedBy: 'marcus', handedAt: '2026-09-16T15:00', sla: { what: 'Snag fixed after handover', kind: 'fix', workdays: 10 }, state: 'with',
-    native: { from: 'Northlight projects', ref: 'NL-2291', status: 'Scheduled' }, opened: 3, history: [{ at: '2026-09-16T15:00', text: 'Marcus handed the snag to Northlight AV (vendor): reframe the camera' }] },
+    why: 'Snag from the space test: reframe the camera', handedBy: 'marcus', handedAt: demoShift('2026-09-16T15:00'), sla: { what: 'Snag fixed after handover', kind: 'fix', workdays: 10 }, state: 'with',
+    native: { from: 'Northlight projects', ref: 'NL-2291', status: 'Scheduled' }, opened: 3, history: [{ at: demoShift('2026-09-16T15:00'), text: 'Marcus handed the snag to Northlight AV (vendor): reframe the camera' }] },
   { id: 'TASK-14-2-03', vendor: 'northlight', person: 'sam', kind: 'install', title: 'Record serials and MACs, 2.03', space: 'jnu-2-03', site: 'jnu', project: 'PRJ-14',
-    why: 'Install and record each unit', handedBy: 'marcus', handedAt: '2026-09-21T09:00', sla: { what: 'Install to the project plan', kind: 'fix', workdays: 8 }, state: 'waiting',
-    wait: 'switch ports patched by the network team', waitOwner: 'marco', waitFrom: '2026-09-25T16:00', native: { from: 'Northlight projects', ref: 'NL-2294', status: 'On hold' }, opened: 9, history: [] },
+    why: 'Install and record each unit', handedBy: 'marcus', handedAt: demoShift('2026-09-21T09:00'), sla: { what: 'Install to the project plan', kind: 'fix', workdays: 8 }, state: 'waiting',
+    wait: 'switch ports patched by the network team', waitOwner: 'marco', waitFrom: demoShift('2026-09-25T16:00'), native: { from: 'Northlight projects', ref: 'NL-2294', status: 'On hold' }, opened: 9, history: [] },
   { id: 'SURV-0412', vendor: 'northlight', person: 'sam', kind: 'survey', title: 'Site survey before the 12.09 refit', space: 'chi-12-09', site: 'chi',
-    why: 'Survey for the refit design', handedBy: 'marcus', handedAt: '2026-09-18T10:00', sla: { what: 'Site survey after request', kind: 'fix', workdays: 5 }, state: 'with',
+    why: 'Survey for the refit design', handedBy: 'marcus', handedAt: demoShift('2026-09-18T10:00'), sla: { what: 'Site survey after request', kind: 'fix', workdays: 5 }, state: 'with',
     native: { from: 'Northlight projects', ref: 'NL-2280', status: 'Booked' }, opened: 1, history: [] },
   { id: 'SNAG-14-05', vendor: 'northlight', person: 'sam', kind: 'snag', title: 'Cable cover missing under the table', space: 'jnu-2-05', site: 'jnu', project: 'PRJ-14',
-    why: 'Snag from the space test', handedBy: 'marcus', handedAt: '2026-09-08T10:00', sla: { what: 'Snag fixed after handover', kind: 'fix', workdays: 10 }, state: 'done', closedAt: '2026-09-11T15:20',
+    why: 'Snag from the space test', handedBy: 'marcus', handedAt: demoShift('2026-09-08T10:00'), sla: { what: 'Snag fixed after handover', kind: 'fix', workdays: 10 }, state: 'done', closedAt: demoShift('2026-09-11T15:20'),
     native: { from: 'Northlight projects', ref: 'NL-2262', status: 'Closed' }, opened: 4, history: [] },
   // Brightwave Integration: the Dublin town hall (PRJ-15) (Lena Fischer).
   { id: 'DSGN-15-01', vendor: 'brightwave', person: 'lena', kind: 'design', title: 'Design review: the divisible town hall', space: 'dub-3-04', site: 'dub', project: 'PRJ-15',
-    why: 'Return the design review with the microphone plan', handedBy: 'anna', handedAt: '2026-09-24T14:00', sla: { what: 'Design review returned', kind: 'fix', workdays: 3 }, state: 'with',
+    why: 'Return the design review with the microphone plan', handedBy: 'anna', handedAt: demoShift('2026-09-24T14:00'), sla: { what: 'Design review returned', kind: 'fix', workdays: 3 }, state: 'with',
     native: { from: 'Brightwave jobs', ref: 'BW-7713', status: 'In review' }, opened: 7, history: [] },
   { id: 'SURV-0415', vendor: 'brightwave', person: 'lena', kind: 'survey', title: 'Site survey before the 3.09 refit', space: 'dub-3-09', site: 'dub', project: 'PRJ-15',
-    why: 'Measure the ceiling for the microphones', handedBy: 'anna', handedAt: '2026-09-23T09:00', sla: { what: 'Site survey after request', kind: 'fix', workdays: 5 }, state: 'waiting',
-    wait: 'floor access after 18:00', waitOwner: 'anna', waitFrom: '2026-09-25T11:00', native: { from: 'Brightwave jobs', ref: 'BW-7709', status: 'Awaiting access' }, opened: 2, history: [] },
+    why: 'Measure the ceiling for the microphones', handedBy: 'anna', handedAt: demoShift('2026-09-23T09:00'), sla: { what: 'Site survey after request', kind: 'fix', workdays: 5 }, state: 'waiting',
+    wait: 'floor access after 18:00', waitOwner: 'anna', waitFrom: demoShift('2026-09-25T11:00'), native: { from: 'Brightwave jobs', ref: 'BW-7709', status: 'Awaiting access' }, opened: 2, history: [] },
   { id: 'DSGN-15-00', vendor: 'brightwave', person: 'lena', kind: 'design', title: 'Concept design: the divisible town hall', space: 'dub-3-04', site: 'dub', project: 'PRJ-15',
-    why: 'First design from the space type', handedBy: 'anna', handedAt: '2026-09-10T09:00', sla: { what: 'Design review returned', kind: 'fix', workdays: 3 }, state: 'done', closedAt: '2026-09-14T16:00',
+    why: 'First design from the space type', handedBy: 'anna', handedAt: demoShift('2026-09-10T09:00'), sla: { what: 'Design review returned', kind: 'fix', workdays: 3 }, state: 'done', closedAt: demoShift('2026-09-14T16:00'),
     native: { from: 'Brightwave jobs', ref: 'BW-7680', status: 'Closed' }, opened: 11, history: [] },
 ];
 
 /** Paperwork before data (CONNECT 7.3 rule 7, BLUEPRINT 6.3 row 6): the data processing agreement and the security
     assessment for each partner, with their dates. Made up. */
 export const PAPERS = {
-  keystone: { dpa: { signed: '2025-12-02', ends: '2028-12-31' }, assessment: { done: '2025-12-10', next: '2026-12-10' } },
-  northlight: { dpa: { signed: '2025-03-14', ends: '2027-03-31' }, assessment: { done: '2025-03-20', next: '2026-03-20' } },
-  brightwave: { dpa: { signed: '2024-10-15', ends: '2026-10-31' }, assessment: { done: '2025-10-21', next: '2026-10-21' } },
-  'hp-poly': { dpa: { signed: '2023-03-20', ends: '2027-03-31' }, assessment: { done: '2026-02-11', next: '2027-02-11' } },
+  keystone: { dpa: { signed: demoShift('2025-12-02'), ends: demoShift('2028-12-31') }, assessment: { done: demoShift('2025-12-10'), next: demoShift('2026-12-10') } },
+  northlight: { dpa: { signed: demoShift('2025-03-14'), ends: demoShift('2027-03-31') }, assessment: { done: demoShift('2025-03-20'), next: demoShift('2026-03-20') } },
+  brightwave: { dpa: { signed: demoShift('2024-10-15'), ends: demoShift('2026-10-31') }, assessment: { done: demoShift('2025-10-21'), next: demoShift('2026-10-21') } },
+  'hp-poly': { dpa: { signed: demoShift('2023-03-20'), ends: demoShift('2027-03-31') }, assessment: { done: demoShift('2026-02-11'), next: demoShift('2027-02-11') } },
 };
 /** The paperwork in words, with To review when a date has passed or falls within 60 days. */
 export function papersOf(id, now = NOW) {

@@ -44,6 +44,30 @@ const panels = await Promise.all(tabs.map(async (t) => ({ ...t, html: Astro.slot
 
 <script is:inline data-astro-rerun>
   (function () {
+    /* A drawing that both panels have (an element with the same data-morph, registered in window.rsMorphers, such
+       as the room drawing in src/lib/scene-client.mjs) morphs from one panel's to the other's: capture before the
+       swap, play after it. Returns the play function, or null when there is nothing to morph. */
+    window.rsMorphOwn = window.rsMorphOwn || function (from, to) {
+      var reg = window.rsMorphers || {}, plays = [];
+      Array.prototype.forEach.call(from.querySelectorAll('[data-morph]'), function (a) {
+        var m = reg[a.dataset.morph], b = m && to.querySelector('[data-morph="' + a.dataset.morph + '"]');
+        if (!b) return;
+        var snap = m.capture(a);
+        if (snap) plays.push(function () { m.play(b, snap); });
+      });
+      return plays.length ? function () { plays.forEach(function (p) { p(); }); } : null;
+    };
+    /* The parts of a panel outside its morphing drawings: they make the ordinary tab move, the drawing does not. */
+    window.rsAroundMorph = window.rsAroundMorph || function (panel) {
+      var out = [];
+      (function walk(el) {
+        Array.prototype.forEach.call(el.children, function (c) {
+          if (c.matches('[data-morph]')) return;
+          if (c.querySelector('[data-morph]')) walk(c); else out.push(c);
+        });
+      })(panel);
+      return out;
+    };
     function bind(root) {
       if (root.__dt) return; root.__dt = true;
       var tabs = Array.prototype.slice.call(root.querySelectorAll('[data-dt-tab]'));
@@ -72,10 +96,15 @@ const panels = await Promise.all(tabs.map(async (t) => ({ ...t, html: Astro.slot
         };
         var held = function () { if (window.rsHold) window.rsHold(box, swap); else swap(); };
         if (animate && cur && next && cur !== next && !M.reduced) {
-          if (window.rsMorphPanels) window.rsMorphPanels(cur, next, held); else held();
-          // The next tab comes from the side you moved towards (M5).
+          // A drawing both panels have (data-morph, the room drawing) morphs from one to the other instead.
+          var own = window.rsMorphOwn(cur, next);
+          var swapped = own ? function () { held(); own(); } : held;
+          if (window.rsMorphPanels) window.rsMorphPanels(cur, next, swapped); else swapped();
+          // The next tab comes from the side you moved towards (M5); a drawing that morphs stays where it is.
           var dir = ids.indexOf(id) > ids.indexOf(was) ? 1 : -1;
-          next.animate([{ opacity: 0, transform: 'translateX(' + dir * 24 + 'px)' }, { opacity: 1, transform: 'none' }], { duration: M.enter, easing: M.ease });
+          (own ? window.rsAroundMorph(next) : [next]).forEach(function (el) {
+            el.animate([{ opacity: 0, transform: 'translateX(' + dir * 24 + 'px)' }, { opacity: 1, transform: 'none' }], { duration: M.enter, easing: M.ease });
+          });
         } else held();
         if (focus) { var t = tabs[ids.indexOf(id)]; if (t) t.focus(); }
         if (location.hash !== '#' + id && (animate || location.hash)) { try { history.replaceState(history.state, '', location.pathname + location.search + '#' + id); } catch (_) {} }

@@ -1,0 +1,166 @@
+---
+// One opportunity's quote (src/lib/provider-sales.mjs): each version priced whole, from its own design. Cost, sell
+// and margin by line and in total; the options, priced on their own; what changed from the version before; validity
+// and terms. Versions cross-fade when you switch between them (motion row 58). Costs and margin are Northlight's own
+// and never reach the client. Simulated; every price is fictional.
+import Shell from '../../../../../layouts/Shell.astro';
+import PageBand from '../../../../../components/PageBand.astro';
+import SalesFrame from '../../../../../components/SalesFrame.astro';
+import SalesThread from '../../../../../components/SalesThread.astro';
+import { href } from '../../../../../lib/data.mjs';
+import { sales } from '../../../../../lib/provider-sales-data.mjs';
+import { money, MARKS, STATUS_WORDS, hoursWords, pctWords } from '../../../../../lib/provider-sales.mjs';
+import { dateWords } from '../../../../../lib/vendors.mjs';
+
+export function getStaticPaths() {
+  return sales().opps.filter((o) => o.versions.length).map((o) => ({ params: { opp: o.slug }, props: { o } }));
+}
+const { o } = Astro.props;
+const M = sales();
+const V = o.current;
+const q = V.quote;
+const draft = V.status === 'draft';
+const answer = draft
+  ? `Draft version ${V.v}, ${money(Math.round(q.totals.sell))} at ${pctWords(q.totals.marginPct)} margin · not sent yet`
+  : `Version ${V.v}, ${money(Math.round(q.totals.sell))} at ${pctWords(q.totals.marginPct)} margin · ${V.status === 'accepted' ? `accepted ${dateWords(o.accepted)}` : `valid to ${dateWords(V.validUntil)}`}`;
+const NUMBERS = [
+  { n: money(Math.round(q.totals.sell)), label: `Version ${V.v} total`, fact: true },
+  { n: pctWords(q.totals.marginPct), label: 'Margin', fact: true },
+  { n: o.versions.length, label: o.versions.length === 1 ? 'Version' : 'Versions', to: '#versions' },
+  { n: V.options.length, label: V.options.length === 1 ? 'Option' : 'Options', to: '#options' },
+];
+const vs = [...o.versions].sort((a: any, b: any) => b.v - a.v);
+const diff = o.diffs.at(-1) ?? null;
+const T = M.terms;
+const kindWord = { equipment: 'Equipment', allowance: 'Sundries', labour: 'Labour' } as Record<string, string>;
+---
+<Shell vendorOk title={`${o.title}: quote`} section="sales-quote" crumbs={[{ label: 'Sales', to: '/portfolio/sales/' }, { label: o.title, to: `/portfolio/sales/${o.slug}/` }, { label: 'Quote' }]}>
+  <SalesFrame provider={o.provider}>
+    <PageBand overline={`Quote · ${o.id}`} title={o.title} answer={answer} lede={`${o.clientName}, ${o.siteName}`} sim heartbeat={false} numbers={NUMBERS}>
+      {o.fictional && <span slot="overline" class="pf-fict">Made-up client</span>}
+    </PageBand>
+
+    <div class="content sl-page" data-sl-quote>
+      <SalesThread o={o} here="quote" />
+
+      <section class="sec" id="versions" aria-labelledby="sl-v-h" data-feature="provider-sales">
+        <header class="section-head">
+          <h2 id="sl-v-h" data-help="sales.versions">The quote</h2>
+          {vs.length > 1 && (
+            <div class="sl-seg" role="tablist" aria-label="Versions" data-sl-vtabs>
+              {vs.map((v: any) => <button type="button" role="tab" aria-selected={v.v === V.v ? 'true' : 'false'} data-sl-v={v.v}>Version {v.v}</button>)}
+            </div>
+          )}
+        </header>
+        <div class="sl-vbox" data-sl-vbox>
+          {vs.map((v: any) => (
+            <div class="sl-ver" data-sl-panel={v.v} hidden={v.v !== V.v} role="tabpanel" aria-label={`Version ${v.v}`}>
+              <div class="g12 top">
+                <div class="s-8 sl-ver-main">
+                  <p class="sl-ver-meta"><span class="sl-status" data-status={v.status}>{STATUS_WORDS[v.status]}</span><span>Dated {dateWords(v.date)}{v.status !== 'draft' ? ` · valid to ${dateWords(v.validUntil)}` : ''}</span></p>
+                  {v.note && <p class="sl-ver-note">{v.note}</p>}
+                  <div class="tablewrap">
+                    <table class="to-cards sl-qt" data-help="sales.lines">
+                      <thead><tr><th>Line</th><th class="num-c">Qty</th><th class="num-c">Cost</th><th class="num-c">Sell</th><th class="num-c">Margin</th></tr></thead>
+                      <tbody>
+                        {v.quote.lines.map((l: any, i: number) => (
+                          <>
+                            {(i === 0 || v.quote.lines[i - 1].kind !== l.kind) && l.kind !== 'allowance' && <tr class="sl-qt-g"><td colspan="5">{kindWord[l.kind]}</td></tr>}
+                            <tr>
+                              <td><b>{l.name}</b><small>{l.kind === 'equipment' ? <><span class="sl-mark" data-mark={l.mark}>{MARKS[l.mark].word}</span> {money(l.unitSell)} each</> : l.kind === 'labour' ? `${money(l.unitSell)} an hour` : l.basis}</small></td>
+                              <td data-label="Qty" class="num-c">{l.kind === 'labour' ? hoursWords(l.qty) : l.kind === 'allowance' ? '1 lot' : l.qty}</td>
+                              <td data-label="Cost" class="num-c">{money(l.cost)}</td>
+                              <td data-label="Sell" class="num-c">{money(l.sell)}</td>
+                              <td data-label="Margin" class="num-c">{money(l.margin)}<small>{pctWords(l.marginPct)}</small></td>
+                            </tr>
+                          </>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <aside class="s-4 card pad sl-qsum" data-help="sales.totals">
+                  <h3 class="sl-h3">Version {v.v} in total</h3>
+                  <dl class="sl-sum">
+                    <div><dt>Equipment and sundries</dt><dd>{money(v.quote.equipment.sell)}<small>{pctWords(v.quote.equipment.marginPct)} margin</small></dd></div>
+                    <div><dt>Labour, {hoursWords(v.labour.totals.hours)}</dt><dd>{money(v.quote.labour.sell)}<small>{pctWords(v.quote.labour.marginPct)} margin</small></dd></div>
+                    {v.quote.discount && <div><dt>Discount, {v.quote.discount.pct}% on {v.quote.discount.on}</dt><dd>{money(-v.quote.discount.amount)}<small>{v.quote.discount.why}</small></dd></div>}
+                    <div class="sl-sum-t"><dt>Total to {o.clientName}</dt><dd>{money(v.quote.totals.sell)}</dd></div>
+                    <div><dt>Cost to Northlight</dt><dd>{money(v.quote.totals.cost)}</dd></div>
+                    <div><dt>Margin</dt><dd>{money(v.quote.totals.margin)}<small>{pctWords(v.quote.totals.marginPct)}</small></dd></div>
+                  </dl>
+                  <p class="eg-note">Cost and margin stay in Northlight's Keia. {o.clientName} sees the sell prices and the terms.</p>
+                </aside>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {diff && (
+        <section class="sec" id="changes" aria-labelledby="sl-d-h" data-feature="provider-sales">
+          <header class="section-head"><h2 id="sl-d-h" data-help="sales.diff">What changed from version {diff.from}</h2><span class="aside faint">{diff.answer}</span></header>
+          <div class="g12 top">
+            <div class="s-8 card pad">
+              <ul class="sl-diff">
+                {diff.rooms.map((r: any) => <li data-d="room"><span class="sl-dk">Rebuilt</span><span><b>{r.label}</b> from {r.from} to {r.to}</span></li>)}
+                {diff.added.map((l: any) => <li data-d="add"><span class="sl-dk">Added</span><span><b>{l.name}</b> · {l.kind === 'labour' ? hoursWords(l.qty) : l.qty} · {money(l.sell)}</span></li>)}
+                {diff.removed.map((l: any) => <li data-d="remove"><span class="sl-dk">Taken out</span><span><b>{l.name}</b> · {l.kind === 'labour' ? hoursWords(l.qty) : l.qty} · {money(-l.sell)}</span></li>)}
+                {diff.changed.map((l: any) => <li data-d="change"><span class="sl-dk">Changed</span><span><b>{l.name}</b> · {l.kind === 'labour' ? `${hoursWords(l.qtyA)} to ${hoursWords(l.qtyB)}` : l.kind === 'allowance' ? 'follows the equipment' : `${l.qtyA} to ${l.qtyB}`} · {l.delta >= 0 ? '+' : ''}{money(l.delta)}</span></li>)}
+                {diff.options.added.map((x: any) => <li data-d="add"><span class="sl-dk">New option</span><span><b>{x.title}</b> · {money(x.sell)}, not in the total</span></li>)}
+                {diff.discount && <li data-d="change"><span class="sl-dk">Discount</span><span>{diff.discount.to ? <><b>{diff.discount.to.pct}% on {diff.discount.to.on}</b> · {diff.discount.to.why}</> : 'Taken out'}</span></li>}
+              </ul>
+            </div>
+            <div class="s-4 card pad sl-delta" data-help="sales.delta">
+              <p class="overline">Version {diff.from} to {diff.to}</p>
+              <p class="sl-delta-n">{money(diff.totals.sellA)} <span aria-hidden="true">→</span> <b>{money(diff.totals.sellB)}</b></p>
+              <p>{diff.totals.delta < 0 ? `${money(-diff.totals.delta)} less` : `${money(diff.totals.delta)} more`} · margin {pctWords(diff.totals.marginPctA)} to {pctWords(diff.totals.marginPctB)}</p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {V.options.length > 0 && (
+        <section class="sec" id="options" aria-labelledby="sl-o-h" data-feature="provider-sales">
+          <header class="section-head"><h2 id="sl-o-h" data-help="sales.options">Options</h2><span class="aside faint">Priced on their own; not in the total</span></header>
+          <div class="sl-opts">
+            {V.options.map((x: any) => (
+              <article class="card pad sl-optc">
+                <h3>{x.title}</h3>
+                {x.why && <p class="sl-ver-note">{x.why}</p>}
+                <ul class="sl-optl">{[...new Map(x.lines.map((l: any) => [l.id, { name: l.name, n: x.lines.filter((y: any) => y.id === l.id).reduce((s: number, y: any) => s + y.qty, 0), rooms: [...new Set(x.lines.filter((y: any) => y.id === l.id).map((y: any) => y.room.split(' ')[0]))] }])).values()].map((l: any) => <li>{l.n} × {l.name} <small>{l.rooms.join(', ')}</small></li>)}</ul>
+                <p class="sl-optp"><b>{money(x.sell)}</b><span>{x.units} units, {hoursWords(x.hours)} · {pctWords(x.marginPct)} margin</span></p>
+                <p class="eg-note"><span class="sl-mark" data-mark="standard">Standard</span> Each line is one the space type lists as optional.</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section class="sec" id="terms" aria-labelledby="sl-t-h" data-feature="provider-sales">
+        <header class="section-head"><h2 id="sl-t-h" data-help="sales.terms">Validity and terms</h2><span class="aside faint">Northlight's standard terms</span></header>
+        <div class="g12">
+          <div class="s-6 card pad">
+            <h3 class="sl-h3">Payments</h3>
+            <ul class="sl-pay">{T.payment.map((p: any) => <li><span>{p.when}</span><b>{p.pct}% · {money(Math.round((q.totals.sell * p.pct)) / 100)}</b></li>)}</ul>
+            <p class="eg-note">{T.tax} Valid for {T.validity_days} days from its date.</p>
+          </div>
+          <div class="s-6 card pad">
+            <h3 class="sl-h3">Warranty</h3>
+            <p class="sl-ver-note">{T.warranty}</p>
+            <h3 class="sl-h3">Invoicing</h3>
+            <p class="sl-ver-note">Connects to: Xero or QuickBooks, which raise the invoices from these payments. Designed, not built: Keia Atlas keeps no ledger.</p>
+          </div>
+        </div>
+        <div class="sl-row sl-next">
+          <a class="btn" href={href(`/portfolio/sales/${o.slug}/sow/`)}>Open the statement of work</a>
+          {o.hasQuote && <a class="btn primary" href={href(`/portfolio/sales/${o.slug}/accept/`)}>{o.stage === 'accepted' ? `See what it became: ${o.becomes}` : 'Accept this quote'}</a>}
+        </div>
+      </section>
+    </div>
+  </SalesFrame>
+  <script>
+    import { bootSales } from '../../../../../lib/provider-sales-client.mjs';
+    bootSales();
+  </script>
+</Shell>

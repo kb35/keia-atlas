@@ -1,0 +1,276 @@
+# A provider's sales records (docs/service-providers.md, section 7; src/lib/provider-sales.mjs): the "win the work" side
+# of a provider's own Keia. Four kinds, one file each, told apart by `kind`:
+#   price-list    what the provider pays for each model in the device library, and what it sells it for
+#   labour        roles with their rates, and the task types (install, configure, commission, manage) with their times
+#   terms         the provider's standard terms: validity, payments, assumptions, exclusions, what the client does
+#   opportunity   one piece of work to win: its stage, the design (spaces, space types, options), and the quote
+#                 versions, each a list of the person's changes to the space types' standard
+# Everything is made up for the demo and every price is fictional (demo: true). Costs and margin are the provider's own
+# and never flow to a client (RECORD_KINDS.cost in src/lib/engagements.mjs).
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/provider-sales
+title: A provider's sales record
+type: object
+required: [kind]
+properties:
+  kind: { enum: [price-list, labour, terms, opportunity] }
+oneOf:
+  - $ref: "#/$defs/priceList"
+  - $ref: "#/$defs/labour"
+  - $ref: "#/$defs/terms"
+  - $ref: "#/$defs/opportunity"
+
+$defs:
+  money: { type: number, minimum: 0 }
+  date: { type: string, pattern: "^\\d{4}-\\d{2}-\\d{2}$" }
+  id: { type: string, pattern: "^[a-z0-9][a-z0-9-]*$" }
+
+  priceList:
+    type: object
+    additionalProperties: false
+    required: [kind, provider, currency, updated, items, allowance, demo]
+    properties:
+      kind: { const: price-list }
+      provider: { $ref: "#/$defs/id" }
+      currency: { enum: [USD, EUR, GBP] }
+      updated: { $ref: "#/$defs/date" }
+      demo: { description: "Every price is fictional.", const: true }
+      items:
+        type: array
+        minItems: 1
+        items:
+          type: object
+          additionalProperties: false
+          required: [model, cost, sell]
+          properties:
+            model: { description: "A model in data/device-models/.", $ref: "#/$defs/id" }
+            cost: { description: "What the provider pays, each.", $ref: "#/$defs/money" }
+            sell: { description: "The provider's list price to a client, each.", $ref: "#/$defs/money" }
+      allowance:
+        description: Mounts, cables and sundries, as a share of the equipment's cost, with the provider's markup on it.
+        type: object
+        additionalProperties: false
+        required: [what, pct, markup_pct]
+        properties:
+          what: { type: string }
+          pct: { type: number, minimum: 0, maximum: 50 }
+          markup_pct: { type: number, minimum: 0, maximum: 200 }
+
+  labour:
+    type: object
+    additionalProperties: false
+    required: [kind, provider, currency, roles, tasks, crew, demo]
+    properties:
+      kind: { const: labour }
+      provider: { $ref: "#/$defs/id" }
+      currency: { enum: [USD, EUR, GBP] }
+      demo: { const: true }
+      roles:
+        type: array
+        minItems: 1
+        items:
+          type: object
+          additionalProperties: false
+          required: [id, name, cost, sell]
+          properties:
+            id: { $ref: "#/$defs/id" }
+            name: { type: string }
+            cost: { description: "What an hour costs the provider.", $ref: "#/$defs/money" }
+            sell: { description: "The hourly rate charged.", $ref: "#/$defs/money" }
+      tasks:
+        type: object
+        additionalProperties: false
+        required: [install, configure, commission, manage]
+        properties:
+          install:
+            description: Mount, cable and power each unit. Minutes per unit, by device class.
+            type: object
+            additionalProperties: false
+            required: [role, minutes_by_class, default_minutes]
+            properties:
+              role: { $ref: "#/$defs/id" }
+              minutes_by_class: { type: object, additionalProperties: { type: number, minimum: 0 } }
+              default_minutes: { type: number, minimum: 0 }
+          configure:
+            description: Set each unit up to its setup guide. A base time, plus a time for each setting the guide sets or checks.
+            type: object
+            additionalProperties: false
+            required: [role, base_minutes, per_setting_minutes]
+            properties:
+              role: { $ref: "#/$defs/id" }
+              base_minutes: { type: number, minimum: 0 }
+              per_setting_minutes: { type: number, minimum: 0 }
+          commission:
+            description: Test each room against its space type. A base time per room, plus a time per unit in it.
+            type: object
+            additionalProperties: false
+            required: [role, base_minutes, per_unit_minutes]
+            properties:
+              role: { $ref: "#/$defs/id" }
+              base_minutes: { type: number, minimum: 0 }
+              per_unit_minutes: { type: number, minimum: 0 }
+          manage:
+            description: Project management, as a share of every other hour.
+            type: object
+            additionalProperties: false
+            required: [role, share_pct]
+            properties:
+              role: { $ref: "#/$defs/id" }
+              share_pct: { type: number, minimum: 0, maximum: 50 }
+      crew:
+        type: object
+        additionalProperties: false
+        required: [installers, hours_per_day]
+        properties:
+          installers: { type: integer, minimum: 1 }
+          hours_per_day: { type: number, minimum: 1, maximum: 12 }
+
+  terms:
+    type: object
+    additionalProperties: false
+    required: [kind, provider, validity_days, lead_time_days, payment, warranty, assumptions, exclusions, client_responsibilities, change_control, demo]
+    properties:
+      kind: { const: terms }
+      provider: { $ref: "#/$defs/id" }
+      demo: { const: true }
+      validity_days: { type: integer, minimum: 1 }
+      lead_time_days: { description: "Working days from acceptance to kit on site.", type: integer, minimum: 0 }
+      payment:
+        type: array
+        minItems: 1
+        items:
+          type: object
+          additionalProperties: false
+          required: [when, pct]
+          properties:
+            when: { type: string }
+            pct: { type: number, minimum: 0, maximum: 100 }
+      warranty: { type: string }
+      tax: { type: string }
+      assumptions: { type: array, items: { type: string } }
+      exclusions: { type: array, items: { type: string } }
+      client_responsibilities: { type: array, items: { type: string } }
+      change_control: { type: array, items: { type: string } }
+
+  change:
+    description: >-
+      One change the person made to the space type's standard, in one space: a quantity (0 takes the line out), a
+      model swapped for another in the library, an item that is not in the library yet (typed with its prices), an
+      optional line added, or another build option for the space.
+    type: object
+    additionalProperties: false
+    required: [space, why]
+    properties:
+      space: { type: string }
+      key: { description: "The equipment key in the space type's option.", type: string }
+      qty: { type: integer, minimum: 0 }
+      model: { $ref: "#/$defs/id" }
+      item: { description: "A product that is not in the device library yet.", type: string }
+      class: { $ref: "#/$defs/id" }
+      cost: { $ref: "#/$defs/money" }
+      sell: { $ref: "#/$defs/money" }
+      add: { description: "Include a line the space type marks optional.", const: true }
+      option: { description: "Build this space to another of its space type's options.", $ref: "#/$defs/id" }
+      why: { type: string }
+
+  labourChange:
+    type: object
+    additionalProperties: false
+    required: [task, minutes, why]
+    properties:
+      task: { enum: [install, configure, commission] }
+      class: { $ref: "#/$defs/id" }
+      minutes: { type: number, minimum: 0 }
+      why: { type: string }
+
+  opportunity:
+    type: object
+    additionalProperties: false
+    required: [kind, id, provider, client, engagement, title, site, stage, opened, answer, demo]
+    properties:
+      kind: { const: opportunity }
+      id: { type: string, pattern: "^OPP-\\d{4}$" }
+      provider: { $ref: "#/$defs/id" }
+      client: { $ref: "#/$defs/id" }
+      engagement: { $ref: "#/$defs/id" }
+      title: { type: string }
+      site: { type: string }
+      stage: { enum: [lead, design, quoted, accepted, lost] }
+      opened: { $ref: "#/$defs/date" }
+      answer: { description: "The opportunity in one sentence.", type: string, maxLength: 110 }
+      next: { type: string }
+      estimate: { description: "A lead's rough value, before any design.", $ref: "#/$defs/money" }
+      related: { type: array, items: { type: string } }
+      contact: { description: "The client's person for this work, by id (src/lib/demo.mjs).", type: string }
+      accepted: { $ref: "#/$defs/date" }
+      becomes: { description: "The client's project this became.", type: string, pattern: "^PRJ-\\d+$" }
+      lost:
+        type: object
+        additionalProperties: false
+        required: [on, why]
+        properties:
+          on: { $ref: "#/$defs/date" }
+          why: { type: string }
+      demo: { const: true }
+      design:
+        type: object
+        additionalProperties: false
+        required: [spaces]
+        properties:
+          surveyed: { $ref: "#/$defs/date" }
+          spaces:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              additionalProperties: false
+              required: [space, space_type, option]
+              properties:
+                space: { description: "The client's space id; for a client whose spaces are not in this demo, an id from the survey.", type: string }
+                name: { description: "Only for a space that is not in data/spaces/.", type: string }
+                number: { type: string }
+                space_type: { $ref: "#/$defs/id" }
+                option: { $ref: "#/$defs/id" }
+      versions:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [v, date, status, changes]
+          properties:
+            v: { type: integer, minimum: 1 }
+            extends: { description: "The version whose changes this one starts from.", type: integer, minimum: 1 }
+            date: { $ref: "#/$defs/date" }
+            status: { enum: [draft, sent, superseded, accepted] }
+            note: { type: string }
+            changes: { type: array, items: { $ref: "#/$defs/change" } }
+            labour_changes: { type: array, items: { $ref: "#/$defs/labourChange" } }
+            discount:
+              type: object
+              additionalProperties: false
+              required: [pct, on, why]
+              properties:
+                pct: { type: number, minimum: 0, maximum: 30 }
+                on: { enum: [labour, equipment, all] }
+                why: { type: string }
+            options:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                required: [id, title, adds]
+                properties:
+                  id: { $ref: "#/$defs/id" }
+                  title: { type: string }
+                  why: { type: string }
+                  adds:
+                    type: array
+                    minItems: 1
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required: [space, key]
+                      properties:
+                        space: { type: string }
+                        key: { type: string }
+                        qty: { type: integer, minimum: 1 }

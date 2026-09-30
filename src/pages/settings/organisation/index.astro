@@ -1,0 +1,73 @@
+---
+// Organisation settings: the modules and their capabilities (src/lib/modules.mjs; rule P13). An admin's settings,
+// not a person's: they change the sidebar and the pages for everyone. In this demo they are kept in this browser.
+// Reached from Settings, from each switched-off module's page and from the palette ("Organisation settings").
+// /settings/organisation/#assets opens a module with its capabilities showing.
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import FilterBar from '../../../components/FilterBar.astro';
+import EmptyState from '../../../components/EmptyState.astro';
+import SettingsModules from '../../../components/SettingsModules.astro';
+import { MODULES, CAPABILITIES, MODULE_DEFAULTS, readFeatures } from '../../../lib/modules.mjs';
+const feats = readFeatures(null, null);
+const mOn = MODULES.filter((m) => MODULE_DEFAULTS[m.id] !== 'off').length;
+const cOn = CAPABILITIES.filter((c) => feats[c.id] !== 'off').length;
+const answer = `${mOn} of ${MODULES.length} modules on · ${cOn} of ${CAPABILITIES.length} capabilities on`;
+---
+<Shell title="Organisation settings" section="organisation" crumbs={[{ label: 'Settings', to: '/settings/' }, { label: 'Organisation' }]}>
+  <PageBand overline="Organisation · affects everyone" title="Organisation settings" answer={answer} lede="Which modules and capabilities your organisation uses, and where their records come from." />
+  <div class="content org-page">
+    <div class="org-top">
+      <p class="org-note"><span class="st-demo-tag">Demo</span> A change here changes Keia Atlas for everyone. In this demo it is kept in this browser, so only you see it.</p>
+      <div class="org-acts">
+        <button type="button" class="btn small ghost" data-org-all>Switch everything on</button>
+        <button type="button" class="btn small ghost" data-org-reset>Reset to defaults</button>
+      </div>
+    </div>
+    <FilterBar placeholder="Find a module or capability" label="Find a module or capability" noun={['module', 'modules']} scope=".org-page"
+      facets={[{ key: 'state', label: 'State', options: [{ value: 'on', label: 'On' }, { value: 'connected', label: 'Connected' }, { value: 'off', label: 'Off' }] }]} />
+    <SettingsModules />
+    <EmptyState text="No module or capability matches." action="Clear the filters" />
+  </div>
+</Shell>
+
+<script is:inline data-astro-rerun define:vars={{ CAPS: CAPABILITIES.map((c) => ({ id: c.id, state: c.state })) }}>
+  (function () {
+    var page = document.querySelector('.org-page'); if (!page || page.__org) return; page.__org = true;
+    var W = window, D = document;
+    // The band's answer counts what is on now.
+    W.rsOrgSummary = function () {
+      if (!W.rsModules || !W.rsAnswer) return;
+      var m = W.rsModules(), f = W.rsFeatures(), ids = Object.keys(m), fids = Object.keys(f);
+      var mo = ids.filter(function (k) { return m[k] !== 'off'; }).length, fo = fids.filter(function (k) { return f[k] !== 'off'; }).length;
+      W.rsAnswer(mo + ' of ' + ids.length + ' modules on · ' + fo + ' of ' + fids.length + ' capabilities on');
+    };
+    // Switch everything on (keeping what is Connected), or put back the defaults; both in one move, with Undo (P7).
+    var snap = function () { return { m: JSON.stringify(W.rsModules()), f: JSON.stringify(W.rsFeatureChoice()) }; };
+    var undo = function (s, words) {
+      if (W.rsToast) W.rsToast(words, { action: 'Undo', onAction: function () { W.rsSetOrg(JSON.parse(s.m), JSON.parse(s.f)); } });
+    };
+    page.querySelector('[data-org-all]').addEventListener('click', function () {
+      var s = snap(), m = W.rsModules(), c = Object.assign({}, W.rsFeatureChoice());
+      Object.keys(m).forEach(function (k) { if (m[k] === 'off') m[k] = 'on'; });
+      CAPS.forEach(function (x) { var v = c[x.id] || x.state; c[x.id] = v === 'off' ? 'on' : v; });
+      W.rsSetOrg(m, c);
+      undo(s, 'Every module and capability is on.');
+    });
+    page.querySelector('[data-org-reset]').addEventListener('click', function () {
+      var s = snap();
+      W.rsSetOrg(null, null);
+      undo(s, 'Modules and capabilities are back to their defaults.');
+    });
+    W.rsOrgSummary();
+    // (the band's own script, which gives rsAnswer, runs after this one on the first visit)
+    D.addEventListener('astro:page-load', function () { if (page.isConnected) W.rsOrgSummary(); }, { once: true });
+  })();
+</script>
+
+<style>
+  .org-page { max-width: 920px; }
+  .org-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; }
+  .org-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .org-note { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; font-size: var(--fs-support, 13px); line-height: 1.5; color: var(--text-2); }
+</style>

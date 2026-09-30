@@ -1,0 +1,33 @@
+# Demo and loaner kit at an experience centre (the Events and experience centres service, src/lib/events.mjs): the
+# units booked to events, where they are kept, whether they run on a battery and how charged they are, and when each
+# was last tested. One file per office. Bookings, check-out and check-in are on the events (data/events/). Made up.
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/demo-kit
+title: Demo and loaner kit
+type: object
+additionalProperties: false
+required: [site, kept_in, units, demo]
+properties:
+  site: { type: string }
+  kept_in: { description: The space the kit is kept and charged in (data/spaces/)., type: string }
+  units:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, n, name, class, use, battery, tested]
+      properties:
+        id: { type: string, pattern: "^KIT-\\d{2}$" }
+        n: { description: The number on the unit's label., type: integer, minimum: 1 }
+        name: { type: string }
+        class: { description: The device class (data/device-classes/)., type: string }
+        model: { description: "The model (data/device-models/), when it is one in the library.", type: string }
+        asset_tag: { type: string, pattern: "^AG-\\d{6}$" }
+        use: { enum: [demo, loaner] }
+        battery: { type: boolean }
+        charge_pct: { type: integer, minimum: 0, maximum: 100 }
+        charged_at: { type: string, pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$" }
+        tested: { description: When it was last tested end to end., type: string, pattern: "^\\d{4}-\\d{2}-\\d{2}$" }
+        notes: { type: string }
+  demo: { const: true }

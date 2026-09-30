@@ -86,7 +86,7 @@ test('requires cascades: a module Off takes its capabilities, and a capability w
 test('the lists on <html>, and featureOn when the site is built', () => {
   const attrs = featureAttrs(readFeatures(null, null));
   assert.equal(attrs.off, 'credentials');
-  assert.deepEqual(attrs.conn.split(' ').sort(), ['alerts', 'config-backups', 'meeting-quality']);
+  assert.deepEqual(attrs.conn.split(' ').sort(), ['alerts', 'config-backups', 'meeting-quality', 'security'], 'Security is Connected: the security team runs it');
   assert.equal(featureOn('licences'), true);
   assert.equal(featureOn('credentials'), false);
   assert.equal(featureOn('alerts'), true, 'Connected counts as on');

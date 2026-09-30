@@ -210,7 +210,7 @@ export const USING = [
       ['The reboot can run under the rule; the firmware waits for a person', 1, 'Right. Actions that can be put back run within the rule\'s limits. Firmware, resets and deletes are proposals.'],
       ['Neither: software never acts', 0, 'It does routine work, but only under a standing rule a named person approved.'],
     ] },
-    go: { settings: true, label: 'Choose which modules are on in Settings' },
+    go: { to: '/settings/organisation/', label: 'Choose which modules are on' },
   },
 ];
 

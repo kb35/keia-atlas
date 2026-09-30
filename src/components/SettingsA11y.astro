@@ -1,62 +1,57 @@
 ---
-/* Settings › Accessibility (docs/accessibility.md; src/lib/a11y.mjs). Saved in this browser as rs7-a11y, for the
-   person at the keyboard (not per View as), and applied before first paint by the boot script in each layout.
-   Every choice applies at once and can be undone the same way. Motion changes nothing on screen by itself, so it is
-   set directly; the rest change sizes or add words, so they go through rsChange, which keeps what you were looking
-   at still (M12). High contrast is the High contrast look (rs4-skin), switched with rsTheme like the Look cards. */
+/* Settings › Accessibility (/settings/#accessibility; docs/accessibility.md; src/lib/a11y.mjs). Saved in this browser
+   as rs7-a11y, for the person at the keyboard (not per View as), and applied before first paint by the boot script
+   in each layout. Every choice applies at once and can be undone the same way. A clean list: each switch on the
+   right with one line under its name (iOS style).
+   Motion changes nothing on screen by itself, so it is set directly; the rest change sizes or add words, so they go
+   through rsChange, which keeps what you were looking at still (M12). High contrast is the High contrast look
+   (rs4-skin), switched with rsTheme like the looks. */
 import { href } from '../lib/data.mjs';
-const SWITCHES = [
-  { id: 'contrast', name: 'High contrast', note: 'The High contrast look: darker text, stronger lines' },
-  { id: 'outlines', name: 'Stronger outlines and focus rings', note: 'Lines and the keyboard focus ring drawn thicker and darker' },
-  { id: 'links', name: 'Underline links', note: 'Every text link is underlined' },
-  { id: 'words', name: 'Status shown with words', note: 'The word beside every status mark: Fine, Fault, To review' },
-  { id: 'still', name: 'Keep things still', note: 'Moving pictures start paused, and nothing slides or draws in by itself' },
-];
+import { A11Y_SWITCHES, MOTION_NOTE, TEXT_STEPS } from '../lib/settings.mjs';
+const MOTION = [{ id: 'system', name: 'Follow my device' }, { id: 'reduced', name: 'Reduced' }, { id: 'off', name: 'Off' }];
 ---
-<section class="set-a11y" aria-labelledby="set-a11y-h" data-help="settings.a11y">
-  <h3 id="set-a11y-h" class="overline">Accessibility</h3>
-  <fieldset>
-    <legend class="set-a11y-l">Motion</legend>
-    <div class="seg-s" data-seg>
-      <label><input type="radio" name="a11y-motion" value="system" /><span>Follow my device</span></label>
-      <label><input type="radio" name="a11y-motion" value="reduced" /><span>Reduced</span></label>
-      <label><input type="radio" name="a11y-motion" value="off" /><span>Off</span></label>
+<ul class="card st-list" data-st-a11y data-help="settings.a11y">
+  <li class="st-item st-stack" data-fi data-find="motion animation reduced off follow device movement">
+    <div class="st-item-t"><b id="st-motion-l">Motion</b><small data-a11y-motion-note>{MOTION_NOTE.system}</small></div>
+    <div class="st-seg" role="radiogroup" aria-labelledby="st-motion-l" data-seg>
+      {MOTION.map((m) => (<label><input type="radio" name="a11y-motion" value={m.id} /><span>{m.name}</span></label>))}
     </div>
-    <small class="faint set-note" data-a11y-motion-note>Follows your device's reduced motion setting.</small>
-  </fieldset>
-  <fieldset>
-    <legend class="set-a11y-l">Text size</legend>
-    <div class="seg-s" data-seg>
-      <label><input type="radio" name="a11y-text" value="default" /><span>Default</span></label>
-      <label><input type="radio" name="a11y-text" value="larger" /><span>Larger</span></label>
-      <label><input type="radio" name="a11y-text" value="largest" /><span>Largest</span></label>
+  </li>
+  <li class="st-item st-stack" data-fi data-find="text size larger largest font bigger zoom">
+    <div class="st-item-t"><b id="st-text-l">Text size</b><small>Pages reflow to fit, even on a phone</small></div>
+    <div class="st-seg" role="radiogroup" aria-labelledby="st-text-l" data-seg>
+      {TEXT_STEPS.map((m) => (<label><input type="radio" name="a11y-text" value={m.id} /><span>{m.name}</span></label>))}
     </div>
-  </fieldset>
-  <div class="set-a11y-sw">
-    {SWITCHES.map((s) => (
-      <label class="set-switch"><input type="checkbox" name={`a11y-${s.id}`} data-a11y={s.id} /><span class="sw" aria-hidden="true"></span><span>{s.name} <small class="faint">{s.note}</small></span></label>
-    ))}
-  </div>
-  <p class="faint set-a11y-more">What works, and what does not yet: <a href={href('/about/accessibility/')}>accessibility</a>.</p>
-</section>
+  </li>
+  {A11Y_SWITCHES.map((s) => (
+    <li class="st-item" data-fi data-find={`${s.name} ${s.note}`.toLowerCase()}>
+      <label class="st-item-t" for={`a11y-${s.id}`}><b>{s.name}</b></label>
+      <label class="st-switch"><input type="checkbox" role="switch" id={`a11y-${s.id}`} name={`a11y-${s.id}`} data-a11y={s.id} aria-describedby={`a11y-${s.id}-d`} /><span class="sw" aria-hidden="true"></span></label>
+      <small class="st-sub" id={`a11y-${s.id}-d`}>{s.note}</small>
+    </li>
+  ))}
+  <li class="st-item st-link" data-fi data-find="accessibility statement what works gaps report">
+    <a href={href('/about/accessibility/')}><span class="st-item-t"><b>What works, and what does not yet</b><small>Known gaps, and how to report one</small></span><span aria-hidden="true">›</span></a>
+  </li>
+</ul>
 
-<script is:inline data-astro-rerun>
+<script is:inline data-astro-rerun define:vars={{ NOTE: MOTION_NOTE }}>
   (function () {
-    var dlg = document.querySelector('dialog#settings'); if (!dlg) return;
-    var W = window, R = document.documentElement;
-    var NOTE = { system: "Follows your device's reduced motion setting.", reduced: 'Short fades only. Nothing slides or zooms.', off: 'Nothing moves. Every change is instant.' };
+    var box = document.querySelector('[data-st-a11y]'); if (!box || box.__st) return; box.__st = true;
+    var W = window;
     var get = function (k, d) { try { return localStorage.getItem(k) || d; } catch (_) { return d; } };
     var put = function (k, v) { try { localStorage.setItem(k, v); } catch (_) {} };
     function sync() {
       var p = W.rsA11y ? W.rsA11y() : {};
-      dlg.querySelectorAll('input[name=a11y-motion]').forEach(function (i) { i.checked = i.value === (p.motion || 'system'); });
-      dlg.querySelectorAll('input[name=a11y-text]').forEach(function (i) { i.checked = i.value === (p.text || 'default'); });
-      dlg.querySelectorAll('input[data-a11y]').forEach(function (i) { i.checked = i.dataset.a11y === 'contrast' ? get('rs4-skin', 'studio') === 'contrast' : !!p[i.dataset.a11y]; });
-      var n = dlg.querySelector('[data-a11y-motion-note]'); if (n) n.textContent = NOTE[p.motion || 'system'];
+      box.querySelectorAll('input[name=a11y-motion]').forEach(function (i) { i.checked = i.value === (p.motion || 'system'); });
+      box.querySelectorAll('input[name=a11y-text]').forEach(function (i) { i.checked = i.value === (p.text || 'default'); });
+      box.querySelectorAll('input[data-a11y]').forEach(function (i) { i.checked = i.dataset.a11y === 'contrast' ? get('rs4-skin', 'studio') === 'contrast' : !!p[i.dataset.a11y]; });
+      var n = box.querySelector('[data-a11y-motion-note]'); if (n) n.textContent = NOTE[p.motion || 'system'];
+      box.querySelectorAll('[data-seg]').forEach(function (g) {
+        if (W.rsMarker) W.rsMarker(g, function () { var i = g.querySelector('input:checked'); return i && i.closest('label'); });
+      });
     }
-    if (dlg.__rsA11y) { sync(); return; }
-    dlg.__rsA11y = true;
-    dlg.addEventListener('change', function (e) {
+    box.addEventListener('change', function (e) {
       var i = e.target, set;
       if (i.name === 'a11y-motion') { W.rsSetA11y({ motion: i.value }); sync(); return; }
       if (i.name === 'a11y-text') set = { text: i.value };
@@ -67,25 +62,17 @@ const SWITCHES = [
         else to = get('rs7-skin-before', 'studio') === 'contrast' ? 'studio' : get('rs7-skin-before', 'studio');
         put('rs4-skin', to);
         W.rsTheme(function () { W.rsApplyTheme(); }, to);
+        document.dispatchEvent(new CustomEvent('rs:settings-change', { detail: { what: 'skin' } }));
         sync(); return;
       } else if (i.dataset && i.dataset.a11y) { set = {}; set[i.dataset.a11y] = i.checked; }
       if (!set) return;
       var apply = function () { W.rsSetA11y(set); };
       if (W.rsChange) W.rsChange(apply); else apply();
       sync();
-      if (dlg.__rsPlace) dlg.__rsPlace();
     });
-    new MutationObserver(function () { if (dlg.open) sync(); }).observe(dlg, { attributes: true, attributeFilter: ['open'] });
-    sync();
+    ['rs:settings-change', 'rs:a11y', 'rs:demo-change'].forEach(function (ev) { document.addEventListener(ev, function () { if (box.isConnected) sync(); }); });
+    // (on a first visit the Shell's helpers, rsModules, rsMarker and the rest, are defined after this script)
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { sync(); }, { once: true }); else sync();
   })();
 </script>
 
-<style is:global>
-  .settings .set-a11y { display: grid; gap: 12px; padding-top: 4px; }
-  .settings .set-a11y h3 { margin: 0; }
-  .settings .set-a11y .set-a11y-l { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
-  .settings .set-a11y fieldset { gap: 0; }
-  .settings .set-a11y-sw { display: grid; gap: 10px; }
-  .settings .set-a11y-more { font-size: 12.5px; }
-  @media (max-width: 420px) { .settings .set-a11y .seg-s span { padding: 6px 10px; } }
-</style>

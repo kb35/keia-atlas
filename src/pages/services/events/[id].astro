@@ -1,0 +1,233 @@
+---
+// /services/events/<id>/: one event in an experience centre (src/lib/events.mjs). Record archetype, answer first:
+//   band      the event's readiness ("At risk: demo kit unit 3 not charged") or, once it has run, its report in a line
+//   main      the readiness checks, each ticking into place as it is seen; beside them the facts (when, who, where,
+//             the backup plan)
+//   below     the run of show (on the day, the item running now is lit, from the clock or ?at=HH:MM), the rooms on the
+//             briefing centre's floor, the demo kit booked with check-out and check-in, and the report after
+// Every client, host and agenda is made up.
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import Section from '../../../components/Section.astro';
+import HealthGlyph from '../../../components/HealthGlyph.astro';
+import FeatureGate from '../../../components/FeatureGate.astro';
+import SmallMultiples from '../../../components/SmallMultiples.astro';
+import { href, sites, spaces, DEMO_TODAY } from '../../../lib/data.mjs';
+import { events, spaceTitle, liveIncident } from '../../../lib/events-view.mjs';
+import { STATE_GLYPH } from '../../../lib/events.mjs';
+import { WORD as WORDS } from '../../../lib/health.mjs';
+import { incidentPath } from '../../../lib/data.mjs';
+
+export function getStaticPaths() {
+  return events.map((e) => ({ params: { id: e.id.toLowerCase() } }));
+}
+const e = events.find((x) => x.id.toLowerCase() === Astro.params.id);
+const r = e.report;
+const ANSWER = r
+  ? `Ran: ${r.ran} of ${r.planned} items${r.faults.length ? `, ${r.lost} min lost to ${r.faults.length} ${r.faults.length === 1 ? 'fault' : 'faults'}` : ', no faults'}`
+  : e.line;
+const NUMBERS = [
+  { n: e.left, label: r ? 'Checks left at the start' : 'Checks left', to: '#checks', tone: e.left ? 'warn' : undefined },
+  { n: e.rooms.length, label: 'Rooms', to: '#rooms' },
+  { n: e.client.guests ?? '–', label: 'Guests', fact: true },
+  { n: e.kit.length, label: 'Demo kit', to: '#kit' },
+];
+const GROUP = { rooms: 'Rooms tested', kit: 'Demo kit', show: 'The show' };
+const groups = ['rooms', 'kit', 'show'].map((g) => ({ g, label: GROUP[g], list: e.checks.filter((c) => c.group === g) })).filter((x) => x.list.length);
+const when = (t) => (t ? (t.slice(0, 10) === e.date ? t.slice(11, 16) : `${new Date(`${t.slice(0, 10)}T00:00:00Z`).toLocaleDateString('en-IE', { day: 'numeric', month: 'short', timeZone: 'UTC' })}${t.length > 10 ? `, ${t.slice(11, 16)}` : ''}`) : '');
+const floorOf = spaces[e.rooms[0]]?.floor ?? null;
+const health = Object.fromEntries(e.checks.filter((c) => c.group === 'rooms' && !c.done).map((c) => [c.id.slice(5), { h: 'review', why: c.missing }]));
+const SHOW = JSON.stringify({ date: e.date, today: DEMO_TODAY, tz: sites[e.site]?.time_zone ?? 'Europe/Dublin', agenda: e.agenda.map((a) => [a.at, a.until]) });
+---
+<Shell title={e.title} section="services-events" crumbs={[{ label: 'Services', to: '/services/' }, { label: 'Events', to: '/services/events/' }, { label: e.id }]} about={{ kind: 'event', label: e.title, to: e.to }}>
+  <FeatureGate id="events">
+    <PageBand overline={`Event ${e.id} · ${e.kindWord}`} title={e.title} rec={`evt-${e.id}`} answer={ANSWER} lede={`${e.client.name} (a made-up client) at the ${sites[e.site].name}, ${e.day}, ${e.start} to ${e.end}.`} sim numbers={NUMBERS} heartbeat={false}>
+      <span slot="overline"><HealthGlyph state={r ? (r.faults.length ? 'review' : 'fine') : STATE_GLYPH[e.readiness]} size={12} word={r ? `${r.faults.length ? 'To review' : 'Fine'} · ran` : `${WORDS[STATE_GLYPH[e.readiness]]} · ${e.readinessWord.toLowerCase()}`} quiet={!r && e.readiness === 'ready'} /></span>
+    </PageBand>
+
+    <div class="content evp">
+      <div class="g12 evp-top">
+        <section class="card evp-checks s-7" id="checks" aria-labelledby="ck-h" data-help="events.checks">
+          <header class="evp-h"><h2 id="ck-h">{r ? 'Readiness at the start' : 'Readiness checks'}</h2><span class="faint"><b class="num" data-tick>{e.checks.length - e.left}</b> of {e.checks.length} done</span></header>
+          {groups.map((x) => (
+            <div class="evp-g">
+              <h3>{x.label}</h3>
+              <ul>
+                {x.list.map((c) => (
+                  <li data-done={String(c.done)}>
+                    <HealthGlyph state={c.done ? 'fine' : 'review'} size={16} label={`${c.done ? 'Done' : 'To do'}: ${c.label}`} />
+                    <span><b>{c.done ? c.label : `${c.missing.charAt(0).toUpperCase()}${c.missing.slice(1)}`}</b>{c.at && c.done && <small>{c.group === 'kit' && c.at.length > 10 && e.kit.find((k) => k.out === c.at) ? `Checked out ${when(c.at)}` : when(c.at)}</small>}{c.text && <small>{c.text}</small>}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          <p class="sv-note">The checks are generated from the event: a test of every room on the day or the afternoon before, each demo kit unit charged to 80% and tested within 14 days, the content, the recording when it is recorded, and a backup plan.</p>
+        </section>
+
+        <aside class="card side-card s-5 evp-facts" aria-labelledby="facts-h" data-help="events.facts">
+          <h3 id="facts-h">The event</h3>
+          <dl class="kv">
+            <div><dt>When</dt><dd>{e.day}, {e.start} to {e.end}</dd></div>
+            <div><dt>Client</dt><dd>{e.client.name} <span class="faint">(made up)</span>{e.client.guests && `, ${e.client.guests} guests`}</dd></div>
+            <div><dt>Host</dt><dd>{e.host.name}, {e.host.role} <span class="faint">(made up)</span></dd></div>
+            <div><dt>Technician</dt><dd><a href={href(`/team/?p=${e.tech.id}`)}>{e.tech.name}</a>, on site for the whole event</dd></div>
+            <div><dt>Recording</dt><dd>{e.recording ? 'Recorded and streamed' : 'Not recorded'}</dd></div>
+            <div><dt>Backup plan</dt><dd>{e.checks.find((c) => c.id === 'backup')?.text ?? <span class="faint">Not written yet</span>}</dd></div>
+          </dl>
+          <p class="sv-note">An incident in one of these rooms while the event runs is raised to P1: a live client briefing cannot wait in a queue.</p>
+        </aside>
+      </div>
+
+      <Section title="Run of show" id="show" aside={e.date === DEMO_TODAY ? 'Today: the item running now is lit' : e.past ? 'As it was planned' : e.day} help="events.show">
+        <ol class="card evp-show" data-show={SHOW}>
+          {e.agenda.map((a, i) => (
+            <li data-i={i}>
+              <span class="evp-t num">{a.at} to {a.until}</span>
+              <span class="evp-w"><b>{a.title}</b><small>{spaceTitle(a.room)}{a.who ? ` · ${a.who}` : ''}</small></span>
+              <span class="evp-now" data-now-word hidden>Now</span>
+            </li>
+          ))}
+        </ol>
+      </Section>
+
+      <Section title="Rooms" id="rooms" aside={`${e.rooms.length} rooms on the ${spaces[e.rooms[0]] ? `${sites[e.site].name.replace(/ office$/, '')} briefing centre` : 'floor'}`} help="events.rooms">
+        <div class="g12">
+          {floorOf && <div class="s-7"><SmallMultiples cards={[{ key: `${e.site}-${floorOf}`, site: e.site, floor: floorOf, title: 'Briefing centre', to: `/locations/${e.site}/?floor=${floorOf}` }]} health={health} min={300} label="The briefing centre's floor" /></div>}
+          <div class="card side-card s-5">
+            <h3>Tested for this event</h3>
+            <ul class="evp-rooms">
+              {e.roomsNamed.map((rm) => {
+                const c = e.checks.find((x) => x.id === `room:${rm.id}`);
+                return <li><HealthGlyph state={c?.done ? 'fine' : 'review'} size={16} quiet={c?.done} label={c?.done ? 'Tested' : 'Not tested'} /><span><a href={href(rm.to)}>{rm.name}</a><small>{c?.done ? `Tested ${when(c.at)}` : 'Not tested yet'} · {e.agenda.filter((a) => a.room === rm.id).length} {e.agenda.filter((a) => a.room === rm.id).length === 1 ? 'item' : 'items'}</small></span></li>;
+              })}
+            </ul>
+          </div>
+        </div>
+      </Section>
+
+      <Section title="Demo kit" id="kit" aside={e.kit.length ? 'Booked to this event, checked out and back in' : undefined} help="events.kit">
+        {e.kit.length ? (
+          <div class="tablewrap"><table class="to-cards sv-tbl">
+            <thead><tr><th>Unit</th><th>Charge</th><th>Last tested</th><th>Checked out</th><th>Checked in</th></tr></thead>
+            <tbody>
+              {e.kit.map((k) => (
+                <tr>
+                  <td data-label=""><b>Unit {k.n}: {k.name}</b>{k.modelName && <small class="faint"> · {k.modelName}</small>}</td>
+                  <td data-label="Charge" class:list={['num', { 't-warn': k.battery && k.charge_pct < 80 && !k.out }]}>{k.battery ? `${k.charge_pct}%` : <span class="faint">No battery</span>}</td>
+                  <td data-label="Last tested">{when(k.tested)}</td>
+                  <td data-label="Checked out">{k.out ? when(k.out) : <span class="faint">Not yet</span>}</td>
+                  <td data-label="Checked in">{k.back ? when(k.back) : <span class="faint">{k.out ? 'Still out' : 'Not yet'}</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>
+        ) : <p class="faint">No demo kit booked.</p>}
+      </Section>
+
+      {r && (
+        <Section title="The report" id="report" aside="Taken from the record, never asked for" help="events.report">
+          <div class="g12">
+            <div class="card side-card s-4"><h3>What ran</h3><p class="evp-big"><b class="num">{r.ran}</b> of {r.planned} items</p><small class="faint">{e.checks.length - e.left} of {e.checks.length} checks done at the start</small></div>
+            <div class="card side-card s-4"><h3>Time lost</h3><p class="evp-big"><b class="num">{r.lost}</b> min</p><small class="faint">{r.faults.length ? `${r.faults.length} ${r.faults.length === 1 ? 'fault' : 'faults'}` : 'No faults'}</small></div>
+            <div class="card side-card s-4"><h3>Lessons</h3><p class="evp-big"><b class="num">{r.lessons.length}</b></p><small class="faint">Captured from the faults and the checks</small></div>
+          </div>
+          {r.faults.length > 0 && (
+            <ul class="card evp-faults">
+              {r.faults.map((f) => (
+                <li><HealthGlyph state="review" size={16} word={`To review · ${f.minutes} min`} /><span><b>{f.at}, {spaceTitle(f.room)}</b><small>{f.what}{f.incident && <> · <a href={href(incidentPath(f.incident))}>{f.incident}{liveIncident(f.incident) ? `, raised to P1: ${liveIncident(f.incident).reason}` : ''}</a></>}</small></span></li>
+              ))}
+            </ul>
+          )}
+          {r.lessons.length > 0 ? <ul class="evp-lessons">{r.lessons.map((l) => <li>{l}</li>)}</ul> : <p class="sv-note">It ran as planned: nothing to learn this time.</p>}
+        </Section>
+      )}
+    </div>
+  </FeatureGate>
+</Shell>
+
+<script>
+  // The run of show on the day: the item running now takes the accent wash, and the items before it are done. The
+  // time is the office's clock on the demo's today, or ?at=HH:MM to see the day at a moment. Checked once a minute;
+  // the change eases in place (--dur-state, motion row 65) and nothing scrolls.
+  function init() {
+    const box = document.querySelector<HTMLElement>('[data-show]');
+    if (!box || (box as any).__show) return;
+    (box as any).__show = true;
+    const S = JSON.parse(box.dataset.show || '{}');
+    const items = [...box.querySelectorAll<HTMLElement>('li[data-i]')];
+    const clock = () => {
+      const at = new URLSearchParams(location.search).get('at');
+      if (at && /^\d{2}:\d{2}$/.test(at)) return at;
+      try { return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: S.tz }).format(new Date()); } catch { return new Date().toTimeString().slice(0, 5); }
+    };
+    const paint = () => {
+      const day = new URLSearchParams(location.search).get('at') ? S.date : S.today;
+      const t = clock();
+      items.forEach((li, i) => {
+        const [a, u] = S.agenda[i];
+        const onDay = day === S.date;
+        const now = onDay && a <= t && t < u;
+        const done = S.date < S.today || (onDay && u <= t);
+        li.dataset.now = String(now); li.dataset.done = String(done);
+        const w = li.querySelector<HTMLElement>('[data-now-word]'); if (w) w.hidden = !now;
+      });
+    };
+    paint();
+    const iv = setInterval(paint, 60e3);
+    document.addEventListener('astro:before-swap', () => clearInterval(iv), { once: true });
+  }
+  init();
+  document.addEventListener('astro:page-load', init);
+</script>
+
+<style>
+  .evp { display: grid; gap: 24px; }
+  .evp-top { align-items: start; }
+  .evp-checks { padding: 18px 22px; display: grid; gap: 14px; min-width: 0; }
+  .evp-h { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+  .evp-h h2 { margin: 0; font-size: var(--fs-h3); }
+  .evp-h .faint { font-size: var(--fs-code); font-variant-numeric: tabular-nums; }
+  .evp-g h3 { margin: 0 0 4px; font: 600 var(--overline-size)/1.2 var(--font-sans); letter-spacing: var(--overline-track); text-transform: var(--overline-case); color: var(--text-3); }
+  .evp-g ul { list-style: none; margin: 0; padding: 0; display: grid; }
+  .evp-g li { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 10px; align-items: start; padding: 7px 0; border-top: var(--border-rule); }
+  .evp-g li:first-child { border-top: 0; }
+  .evp-g li > span { display: grid; gap: 1px; min-width: 0; }
+  .evp-g li b { font-size: var(--fs-body); font-weight: var(--fw-name); }
+  .evp-g li[data-done=false] b { color: var(--h-review-ink); }
+  .evp-g li small { font-size: var(--fs-code); color: var(--text-3); }
+  .evp-facts .kv { margin: 0; }
+  .evp-show { list-style: none; margin: 0; padding: 6px 12px; display: grid; }
+  .evp-show li { display: grid; grid-template-columns: 8.5em minmax(0, 1fr) auto; gap: 4px 14px; align-items: baseline; padding: 10px 10px; border-top: var(--border-rule); border-radius: var(--radius); transition: background-color var(--dur-state) var(--ease-settle), color var(--dur-state) var(--ease-settle); }
+  .evp-show li:first-child { border-top: 0; }
+  .evp-show li[data-now=true] { background: var(--accent-soft); color: var(--accent-ink); border-top-color: transparent; }
+  .evp-show li[data-now=true] + li { border-top-color: transparent; }
+  .evp-show li[data-done=true] .evp-w b { color: var(--text-2); font-weight: 500; }
+  .evp-t { font-size: var(--fs-code); color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .evp-w { display: grid; gap: 1px; min-width: 0; }
+  .evp-w b { font-size: var(--fs-body); font-weight: var(--fw-name); }
+  .evp-w small { font-size: var(--fs-code); color: var(--text-3); }
+  .evp-now { font: 600 var(--fs-mark)/1 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; }
+  .evp-now[hidden] { display: none; }
+  .evp-rooms { list-style: none; margin: 0; padding: 0; display: grid; }
+  .evp-rooms li { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 10px; padding: 8px 0; border-top: var(--border-rule); }
+  .evp-rooms li:first-child { border-top: 0; padding-top: 0; }
+  .evp-rooms span { display: grid; gap: 1px; min-width: 0; }
+  .evp-rooms a { color: inherit; font-weight: var(--fw-name); text-decoration: none; }
+  .evp-rooms a:hover { text-decoration: underline; text-underline-offset: 2px; }
+  .evp-rooms small { font-size: var(--fs-code); color: var(--text-3); }
+  .evp-big { margin: 2px 0 0; font-size: var(--fs-body); color: var(--text-2); }
+  .evp-big b { font: var(--fw-title) 28px/1.1 var(--font-display, var(--font-sans)); color: var(--text); margin-right: 4px; }
+  .evp-faults { list-style: none; margin: 12px 0 0; padding: 4px 16px; display: grid; }
+  .evp-faults li { display: grid; grid-template-columns: 7em minmax(0, 1fr); gap: 4px 12px; padding: 10px 0; border-top: var(--border-rule); }
+  .evp-faults li:first-child { border-top: 0; }
+  .evp-faults span { display: grid; gap: 2px; min-width: 0; }
+  .evp-faults small { font-size: var(--fs-code); color: var(--text-2); }
+  .evp-lessons { margin: 12px 0 0; padding-left: 20px; display: grid; gap: 6px; font-size: var(--fs-body); line-height: 1.45; max-width: 78ch; }
+  .sv-tbl :global(td.t-warn) { color: var(--amber-ink); font-weight: 600; }
+  .sv-note { margin: 10px 2px 0; font-size: var(--fs-code); line-height: 1.5; color: var(--text-3); max-width: 78ch; }
+  @container content (max-width: 640px) {
+    .evp-show li { grid-template-columns: minmax(0, 1fr) auto; }
+    .evp-t { grid-column: 1 / -1; }
+  }
+</style>

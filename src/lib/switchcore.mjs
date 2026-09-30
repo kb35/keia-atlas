@@ -19,9 +19,9 @@
 //
 // Pure except readSwitchPorts() and readHouse(), which read the files. Used by the validator, the generator
 // (tools/migrations/2026-09-30-switch-ports.mjs), the pages (src/lib/switchports.mjs) and tests/switchports.test.mjs.
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { parse } from 'yaml';
+import { loadYaml } from './demo-clock.mjs';
 import { signalGraph, wiringToOutlet } from './floors.mjs';
 import { parseEnd, devKey } from './room3d.mjs';
 
@@ -55,12 +55,12 @@ export const routedVlans = (plan) => plan.filter((v) => v.routed && v.vlan !== 1
 export function readSwitchPorts(root = process.cwd()) {
   const dir = path.join(root, 'data', 'switch-ports');
   if (!existsSync(dir)) return {};
-  return Object.fromEntries(readdirSync(dir).filter((n) => n.endsWith('.yaml')).sort().map((n) => [n.slice(0, -5), parse(readFileSync(path.join(dir, n), 'utf8'))]));
+  return Object.fromEntries(readdirSync(dir).filter((n) => n.endsWith('.yaml')).sort().map((n) => [n.slice(0, -5), loadYaml(path.join(dir, n))]));
 }
 export function readHouse(root = process.cwd()) {
   const dir = path.join(root, 'data', 'house-values');
   const f = existsSync(dir) ? readdirSync(dir).find((n) => n.endsWith('.yaml')) : null;
-  return f ? parse(readFileSync(path.join(dir, f), 'utf8')) : null;
+  return f ? loadYaml(path.join(dir, f)) : null;
 }
 
 // ---- Port ranges ------------------------------------------------------------------------------------------------

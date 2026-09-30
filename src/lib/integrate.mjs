@@ -25,9 +25,8 @@
 // when, what passed for that unit and step (ev) and the group it was accepted in (in), written as one event
 // with a summary in its note. Everything here is simulated: the systems' answers are made up from the
 // project's tasks, so the page is labelled Simulated live.
-import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { parse } from 'yaml';
+import { loadYaml } from './demo-clock.mjs';
 import { spaces, sites, classes, configFor, standardFirmware, firmwareFor, advisoriesFor, ADV_LEVEL, REGION_LABEL, className, modelName, href, LOC_LABEL, INTEGRATE_STEPS, STEP_LABEL, PHASE_LABEL, PHASES, SITE_ORDER, deviceName, countryName, DEMO_TODAY } from './data.mjs';
 import { SYSTEMS } from './cfgstate.mjs';
 import { PEOPLE, person } from './demo.mjs';
@@ -39,7 +38,7 @@ const hash = (str) => [...String(str)].reduce((n, c) => (n * 31 + c.charCodeAt(0
 
 // The house values every build sheet is worked out from (data/house-values), and the network standard's VLAN
 // names. Read here because data.mjs does not load them; the validator has already checked both.
-const readData = (rel) => parse(readFileSync(path.join(process.cwd(), 'data', rel), 'utf8'));
+const readData = (rel) => loadYaml(path.join(process.cwd(), 'data', rel));
 export const HOUSE = readData('house-values/aigna.yaml');
 const NETWORK = readData('standards/network.yaml');
 const VLAN_NAME = Object.fromEntries((NETWORK.sections.find((s) => s.id === 'vlans')?.table?.rows ?? []).map((r) => [String(r[0]), r[1]]));

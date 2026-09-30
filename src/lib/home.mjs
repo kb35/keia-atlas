@@ -13,6 +13,7 @@ import { integratePlan, buildModel, batchHref } from './integrate.mjs';
 import { lights, nextGate } from './project-status.mjs';
 import { issues as kiIssues } from './knownissues-view.mjs';
 import { KIND } from './data.mjs';
+import { demoShift } from './demo-clock.mjs';
 
 const TODAY = DEMO_TODAY;
 const TASK_KINDS = 'provision,install,configure,commission,task';
@@ -249,9 +250,9 @@ export { BY_ID as itemById };
 // Everything Home needs to say who has what, which spaces are not all right, what was done automatically, what
 // changed overnight and, after time away, what happened. Worked out once here; src/lib/homecore.mjs turns it into
 // each role's answer sentence, four figures and lists in the browser, with the live layer's changes on top.
-const DEMO_NOW = '2026-09-28T12:00';
-const OVERNIGHT = '2026-09-27T18:00';
-const AWAY_FROM = '2026-09-14';        // Welcome back: two weeks away, 14 to 28 September
+const DEMO_NOW = demoShift('2026-09-28T12:00');
+const OVERNIGHT = demoShift('2026-09-27T18:00');
+const AWAY_FROM = demoShift('2026-09-14');        // Welcome back: two weeks away, 14 to 28 September
 const HOLD_WORDS = { 'awaiting-caller': 'the caller', 'awaiting-vendor': 'the vendor', 'awaiting-change': 'a change', 'awaiting-parts': 'parts' };
 const STATE_WORD = { 'in-progress': 'Taken', 'on-hold': 'On hold', resolved: 'Resolved' };
 const LOG_WORD = { risk: 'Risk', issue: 'Issue', dependency: 'Dependency', decision: 'Decision' };
@@ -276,7 +277,7 @@ export const MATCH_RULE = { name: 'Match tickets to spaces', owner: 'priya' };
 // Anna stopped part way through commissioning Heron in Juneau.
 export const PARKED_SEED = {
   'task:T-1605': { by: 'liam', at: `${DEMO_TODAY}T10:14`, park: { where: 'Labelled ports 1 to 8 on the IDF 3 panel', next: 'Label 9 to 12, then check each against the build sheet', question: 'Is port 11 the booking panel? Its label is missing' } },
-  'task:T-1404': { by: 'anna', at: '2026-09-25T16:40', park: { where: 'Framing fixed; half of the verification run', next: 'Run the far-end checks from another office', question: 'Does the Juneau desk want the old unit kept as a spare?' } },
+  'task:T-1404': { by: 'anna', at: demoShift('2026-09-25T16:40'), park: { where: 'Framing fixed; half of the verification run', next: 'Run the far-end checks from another office', question: 'Does the Juneau desk want the old unit kept as a spare?' } },
 };
 function baseOwn(it) {
   const to = it.who[0] ?? null;
@@ -434,7 +435,7 @@ const scopeSites = (p) => (p.roleId === 'tech' ? [p.office] : p.region ? SITE_OR
 function welcomeFor(p) {
   if (p.vendor || p.roleId === 'head') return null;
   const inScope = new Set(scopeSites(p)), cover = coverOf(p);
-  const mineOpen = ITEMS.filter((it) => it.who.includes(p.id) && ['incident', 'task', 'lab'].includes(it.kind) && it.status !== 'done' && (it.kind !== 'task' || it.status !== 'todo' || (it.end && it.end <= '2026-10-05')));
+  const mineOpen = ITEMS.filter((it) => it.who.includes(p.id) && ['incident', 'task', 'lab'].includes(it.kind) && it.status !== 'done' && (it.kind !== 'task' || it.status !== 'todo' || (it.end && it.end <= demoShift('2026-10-05'))));
   const open = mineOpen.map((it) => ({ item: it.id, title: it.title, sub: [it.room ? roomName(it.room) : null, it.project].filter(Boolean).join(' · '), to: it.href, park: PARKED_SEED[it.id]?.park ?? null, note: cover && it.kind === 'incident' && it.status !== 'todo' ? `${pFirst(cover)} covered it while you were away` : null }));
   const handled = Object.values(incidents).filter((inc) => inc.state === 'resolved').map((inc) => ({ inc, res: [...inc.history].reverse().find((h) => h.state === 'resolved') }))
     .filter(({ inc, res }) => res && res.at.slice(0, 10) >= AWAY_FROM && (inScope.has(spaces[inc.subject.room]?.site) || inc.keia_atlas?.assigned === p.id))
