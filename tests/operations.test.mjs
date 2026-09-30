@@ -10,6 +10,8 @@ import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
 import { warrantyWords, supportWords, monthsUntil, endingSoon, money } from '../src/lib/cover.mjs';
 import { FEATURES_ADDED } from '../src/lib/features-added.mjs';
+import { rotaAt, lineFor, outOfHours, localAt, utcOf, whenWords } from '../src/lib/oncall.mjs';
+import { PEOPLE } from '../src/lib/demo.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const walk = (d) => readdirSync(d).flatMap((n) => { const p = path.join(d, n); return statSync(p).isDirectory() ? walk(p) : n.endsWith('.yaml') ? [p] : []; });
@@ -78,5 +80,49 @@ test('each capability added is listed once, with a label, a line and a module', 
   assert.equal(new Set(ids).size, ids.length);
   for (const f of FEATURES_ADDED) {
     assert.ok(f.label && f.description && ['assets', 'locations', 'team', 'support', 'projects'].includes(f.module), f.id);
+  }
+});
+
+// ---- On call -----------------------------------------------------------------------------------------------------
+
+const NOW_UTC = '2026-09-28T11:00:00Z';   // noon on Monday 28 September in Dublin
+const rotas = () => load('on-call');
+
+test('the rota answers who is on call now, in each region\'s own time', () => {
+  const R = Object.fromEntries(rotas().map((r) => [r.region, rotaAt(r, NOW_UTC)]));
+  assert.equal(R.emea.local, '2026-09-28T12:00');
+  assert.equal(R.emea.now.person, 'liam', 'EMEA handed over at 08:00 this morning');
+  assert.equal(R.amer.local, '2026-09-28T07:00');
+  assert.equal(R.amer.now.person, 'grace', 'New York has not reached 08:00 yet, so last week\'s person is still on');
+  assert.equal(R.apac.ooh, true, '19:00 in Singapore is out of hours');
+  assert.equal(R.emea.ooh, false);
+});
+
+test('a person\'s Home line: on call, backup, or next', () => {
+  const all = rotas();
+  assert.equal(lineFor('liam', all, NOW_UTC).text, "You're on call until Monday 08:00");
+  assert.equal(lineFor('tom', all, NOW_UTC).text, "You're backup on call until Monday 08:00");
+  assert.equal(lineFor('anna', all, NOW_UTC).text, "You're on call from Monday 5 Oct, 08:00");
+  assert.equal(lineFor('claire', all, NOW_UTC), null, 'someone not on the rota gets no line');
+});
+
+test('times: out of hours, the wall clock and back, and the words for when', () => {
+  const r = { out_of_hours: { weekdays_from: '19:00', weekdays_to: '07:00', weekends: true } };
+  assert.equal(outOfHours(r, '2026-09-28T06:59'), true);
+  assert.equal(outOfHours(r, '2026-09-28T12:00'), false);
+  assert.equal(outOfHours(r, '2026-10-03T12:00'), true, 'Saturday');
+  assert.equal(localAt('Europe/Dublin', utcOf('2026-09-28T07:53', 'Europe/Dublin')), '2026-09-28T07:53');
+  assert.equal(whenWords('2026-09-28T08:00', '2026-09-28T07:00'), '08:00 today');
+  assert.equal(whenWords('2026-09-29T08:00', '2026-09-28T07:00'), 'tomorrow 08:00');
+});
+
+test('every rota: someone on call today, people on the team, and a backup who is someone else', () => {
+  const ids = new Set(PEOPLE.filter((p) => !p.vendor).map((p) => p.id));
+  const all = rotas();
+  assert.deepEqual(all.map((r) => r.region).sort(), ['amer', 'apac', 'emea']);
+  for (const r of all) {
+    assert.ok(rotaAt(r, NOW_UTC).now, `${r.region} has someone on call now`);
+    assert.ok(r.demo, `${r.region} is marked demo`);
+    for (const w of r.weeks) assert.ok(ids.has(w.person) && ids.has(w.backup) && w.person !== w.backup, `${r.region} ${w.from}`);
   }
 });

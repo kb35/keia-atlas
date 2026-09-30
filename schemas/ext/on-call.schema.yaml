@@ -1,0 +1,51 @@
+# On call: who answers out of hours in one region, week by week (data/on-call/<region>.yaml). The rota is Keia
+# Atlas's; paging stays with the paging tool (PagerDuty, Opsgenie or the service desk's own on-call), by connector.
+# People are named by their id (src/lib/demo.mjs), never by contact details: phone numbers stay in the paging tool.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/on-call
+title: On-call rota
+type: object
+additionalProperties: false
+required: [region, name, time_zone, covers, out_of_hours, handover, escalate_to, weeks]
+$defs:
+  person: { type: string, pattern: "^[a-z]+$" }
+  time: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$" }
+properties:
+  region: { enum: [amer, emea, apac] }
+  name: { description: "How the team says it (EMEA out of hours).", type: string, minLength: 1 }
+  time_zone: { description: "IANA time zone the rota's times are in (the regional lead's).", type: string, pattern: "^[A-Za-z_]+/[A-Za-z_]+$" }
+  covers: { description: "The sites the rota covers: every office and the home offices in the region.", type: array, minItems: 1, uniqueItems: true, items: { type: string, pattern: "^[a-z]{3}$" } }
+  out_of_hours:
+    description: When the person on call is the first to answer. Inside office hours the office's own technician is.
+    type: object
+    additionalProperties: false
+    required: [weekdays_from, weekdays_to, weekends]
+    properties:
+      weekdays_from: { $ref: "#/$defs/time" }
+      weekdays_to: { $ref: "#/$defs/time" }
+      weekends: { description: "True when Saturday and Sunday are covered all day.", type: boolean }
+  handover:
+    description: When one week's person hands to the next.
+    type: object
+    additionalProperties: false
+    required: [day, at]
+    properties:
+      day: { enum: [mon, tue, wed, thu, fri, sat, sun] }
+      at: { $ref: "#/$defs/time" }
+  escalate_to: { description: "Who the person on call calls when they need a decision (a manager's id).", $ref: "#/$defs/person" }
+  paging: { description: "How people are paged, in words. The tool itself connects; no numbers here.", type: string }
+  weeks:
+    description: One entry per week, in order, each starting on the handover day.
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [from, person, backup]
+      properties:
+        from: { description: "The handover day that starts the week.", type: string, format: date }
+        person: { $ref: "#/$defs/person" }
+        backup: { $ref: "#/$defs/person" }
+        note: { type: string }
+  demo: { const: true }

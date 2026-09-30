@@ -16,6 +16,8 @@ import TeamChip from '../../components/TeamChip.astro';
 import TeamPerson from '../../components/TeamPerson.astro';
 import TeamFlow from '../../components/TeamFlow.astro';
 import OpenWork from './_OpenWork.astro';
+import Arrive from '../../components/Arrive.astro';
+import { onCallNow } from '../../lib/oncall-view.mjs';
 import { projects, sites, SITE_ORDER, spaces, vendors, classes, configurations, racks, incidents, commsRooms, PHASE_LABEL, DEMO_TODAY } from '../../lib/data.mjs';
 import { PEOPLE, ROLES, PROJECT_ROLE, REGION_SHORT } from '../../lib/demo.mjs';
 import { workByPerson, whereIs, overlaps, addDays, WORK_KIND, WORK_STATUS } from '../../lib/work.mjs';
@@ -232,6 +234,9 @@ const FLOW_TEAMS = [
 ].map((t) => ({ ...t, people: who(t.id) }));
 
 const siteCode = (p) => (p.site ? sites[p.site]?.code : '');
+// On call (the overlooked items, #6): who answers out of hours in each region now, until when, and the weeks after.
+const OC = onCallNow();
+const ocAnswer = OC.filter((x) => x.person).map((x) => `${x.person.name} for ${x.regionWord}`).join(', ');
 const mgrSub = (p) => `Manager${p.city ? ` · ${p.city}` : ''}`;
 ---
 <Shell title="Team" section="team" minStage={3} crumbs={[{ label: 'Team' }]}>
@@ -324,6 +329,33 @@ const mgrSub = (p) => `Manager${p.city ? ` · ${p.city}` : ''}`;
         </div>
       </SidePanel>
     </div>
+
+    <Section title="On call" id="on-call" help="team.oncall" data-feature="oncall" data-arrive aside="Out of hours, week by week · paging stays with the paging tool">
+      <p class="ocl-answer">On call now: {ocAnswer}.</p>
+      <div class="g12 ocl-rotas">
+        {OC.map((x) => (
+          <article class="card side-card s-4 ocl-rota" aria-labelledby={`ocl-${x.region}`}>
+            <header class="ocl-rh"><h3 id={`ocl-${x.region}`}>{x.name}</h3>{x.ooh && <span class="pill plain ocl-now">Out of hours now</span>}</header>
+            {x.person ? (
+              <a class="ocl-who" href={`?p=${x.person.id}#person`} title={`${x.person.name}, ${x.person.role}`}>
+                <span class="pc-av" aria-hidden="true">{x.person.initials}</span>
+                <span><b>{x.person.name}</b><small>until <span class="rs-tick">{x.until}</span></small></span>
+              </a>
+            ) : <p class="faint">Nobody on the rota this week.</p>}
+            <dl class="kv ocl-kv">
+              {x.backup && <div><dt>Backup</dt><dd>{x.backup.name}</dd></div>}
+              <div><dt>Escalate to</dt><dd>{x.escalate?.name}</dd></div>
+              <div><dt>Covers</dt><dd>{x.hours}, {x.tz.split('/')[1].replace(/_/g, ' ')} time</dd></div>
+            </dl>
+            {x.next.length > 0 && (
+              <ol class="ocl-next" aria-label="The weeks after">
+                {x.next.map((w) => <li><span class="faint">From {w.from}</span><b>{w.person?.name}</b></li>)}
+              </ol>
+            )}
+          </article>
+        ))}
+      </div>
+    </Section>
 
     <OpenWork />
 
@@ -516,7 +548,24 @@ const mgrSub = (p) => `Manager${p.city ? ` · ${p.city}` : ''}`;
     })();
   </script>
 </Shell>
+<Arrive />
+
 <style is:global>
+  /* On call: the answer, then one card per region. */
+  .ocl-answer { margin: 0 0 12px; font: var(--fw-title) var(--fs-h3)/1.35 var(--font-display); color: var(--text); }
+  .ocl-rota { gap: 10px; }
+  .ocl-rh { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; }
+  .ocl-rh h3 { margin: 0; font-size: var(--fs-body); }
+  .ocl-now { font-size: var(--fs-mark); }
+  .ocl-who { display: flex; align-items: center; gap: 10px; padding: 6px 8px; margin: 0 -8px; border-radius: 8px; color: inherit; text-decoration: none; transition: background var(--dur-hover) var(--ease-settle); }
+  .ocl-who:hover { background: var(--surface-2); }
+  .ocl-who .pc-av { width: 38px; height: 38px; font-size: var(--fs-code); }
+  .ocl-who b { display: block; font: var(--fw-title) var(--fs-h3)/1.2 var(--font-display); }
+  .ocl-who small { display: block; font-size: var(--fs-support); color: var(--text-2); }
+  .ocl-kv div { grid-template-columns: 96px minmax(0, 1fr); }
+  .ocl-next { list-style: none; margin: 0; padding: 8px 0 0; border-top: 1px solid var(--line); display: grid; gap: 4px; font-size: var(--fs-code); }
+  .ocl-next li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  .ocl-next b { font-weight: var(--fw-name); }
   .tm-reg { display: none; }
   .tm-top { align-items: start; }
   .tm-main { display: grid; gap: 20px; min-width: 0; }

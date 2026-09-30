@@ -46,6 +46,8 @@ import { SERVICE_ORDER } from '../lib/services.mjs';
 import { leadership } from '../lib/costs.mjs';
 import { partnerBand } from '../lib/vendors.mjs';
 import { sparkSvg } from '../lib/spark.mjs';
+import Arrive from '../components/Arrive.astro';
+import { homeLines } from '../lib/oncall-view.mjs';
 
 const H = homeData();
 // Leadership (V7): "are we OK, and what does it cost?" The AV service's experience across every office (the same figures
@@ -115,6 +117,10 @@ const labWaiting = Object.values(labTests).filter((l) => ['passed', 'testing', '
 const pms = PEOPLE.filter((p) => p.roleId === 'pm');
 // A project manager sees the projects they run; everyone else sees them all.
 const pmCss = pms.map((pm) => `:root[data-who="${pm.id}"] [data-pm]:not([data-pm="${pm.id}"]){display:none}`).join('');
+// On call (the overlooked items, #6): the line for whoever is viewing, when they are on the rota this week or next.
+// Every line is drawn once; the viewer's own shows (View as switches it with the rest of Home).
+const OCL = homeLines();
+const oclCss = Object.keys(OCL).map((id) => `:root[data-who="${id}"] .ocl-home{display:block}:root[data-who="${id}"] [data-oncall-for="${id}"]{display:grid}`).join('');
 ---
 <Shell title="Home" section="home" vendorOk crumbs={[{ label: 'Home' }]}>
   <PageBand overline="Home" title="Anna, ready for you" answer={H.cockpit ? ' ' : ''} heartbeat>
@@ -135,6 +141,17 @@ const pmCss = pms.map((pm) => `:root[data-who="${pm.id}"] [data-pm]:not([data-pm
     </section>
 
     <div class="layer" data-layer="summary" id="summary">
+      <!-- On call: "You're on call until Monday 08:00", only for the people on the rota. -->
+      <section class="ck card ocl-home" data-feature="oncall" data-arrive aria-label="On call" data-help="home.oncall">
+        {Object.entries(OCL).map(([id, l]) => (
+          <div class:list={['ocl-line', `k-${l.kind}`]} data-oncall-for={id}>
+            <span class="ocl-ic" aria-hidden="true"><Icon name="schedule" size={16} /></span>
+            <p class="ocl-t"><b>{l.lead}</b> <span class="rs-tick">{l.when}</span></p>
+            <p class="ocl-s">{l.sub}</p>
+            <a class="ocl-a" href={href('/team/#on-call')}>The rota <span aria-hidden="true">→</span></a>
+          </div>
+        ))}
+      </section>
       <!-- Hand over for cover: on the colleague's Home while the person is away (UX-V2 §4.3, step 4). -->
       <section data-sec="cover" id="cover" hidden aria-label="Covering">
         <HandoverCard variant="cover" id="cv" overline="Hand over for cover" title="Covering" meta="" />
@@ -464,4 +481,5 @@ const pmCss = pms.map((pm) => `:root[data-who="${pm.id}"] [data-pm]:not([data-pm
     document.addEventListener('astro:page-load', start);
   </script>
 </Shell>
-<style is:global set:html={pmCss}></style>
+<style is:global set:html={pmCss + oclCss}></style>
+<Arrive />
