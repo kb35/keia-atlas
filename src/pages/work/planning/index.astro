@@ -23,6 +23,10 @@ import { ROLES, ROLE_LABEL, ROLE_ONE, REGIONS, REGION_NAME, fyLabel, fySpan, gro
 import { flat, ledeFor, compareHtml, money, kmoney, fmtH } from '../../../lib/planningview.mjs';
 import { NOW_YEAR } from '../../../lib/refresh.mjs';
 import '../../../styles/viz.css';
+import TrendStrip from '../../../components/TrendStrip.astro';
+import Arrive from '../../../components/Arrive.astro';
+import { fleetEnding } from '../../../lib/cover-view.mjs';
+import { monthYear } from '../../../lib/cover.mjs';
 
 const NOW = YEARS.find((y) => y.current);
 const ALL_YEARS = YEARS.map((y) => y.id).join('|');
@@ -83,6 +87,10 @@ const sizeAdds = Object.entries(ratios.office_sizes).map(([k, sz]) => {
 });
 const DATA = { years: YEARS, nowFy: NOW_FY, nowYear: NOW_YEAR, baseline, ctx, scenarios: scenarios.map((s) => ({ id: s.id, name: s.name, say: s.say, owner: s.owner, changes: s.changes })), classes: Object.entries(CLASS).map(([id, c]) => ({ id, name: c.name })).sort((a, b) => a.name.localeCompare(b.name)), officeName: Object.fromEntries(SITE_ORDER.map((s) => [s, officeName(s)])), kindLabel: PROJECT_KIND, regionName: REGION_NAME, sizes: Object.fromEntries(Object.entries(ratios.office_sizes).map(([k, v]) => [k, v.name])) };
 const scenarioFor = scenarios[0];
+// Warranties ending in the next 12 months (the overlooked items, #3): the answer, a strip by month, and one row per
+// office and model, soonest first, saying whether a support contract picks the units up afterwards.
+const WAR = fleetEnding(12);
+const warSpan = (r) => (r.first.slice(0, 7) === r.last.slice(0, 7) ? monthYear(r.first) : `${monthYear(r.first)} to ${monthYear(r.last)}`);
 ---
 <Shell title="Planning" section="planning" minStage={3} crumbs={[{ label: 'Work', to: '/work/' }, { label: 'Planning' }]} about={{ kind: 'page', label: 'Planning', to: '/work/planning/' }}>
   <PageBand overline="Planning" title="Planning" answer={answer} sim numbers={NUMBERS}>
@@ -183,6 +191,31 @@ const scenarioFor = scenarios[0];
         </div>
         <EmptyState text="No lines match these filters." />
         {pipeline.length > 0 && <p class="faint pl-note pl-pipe">Also in the year plan, priced when raised: {pipeline.map((w, i) => <span>{i ? ' · ' : ''}<a href={href('/work/schedule/year/')}>{w.title}</a> ({w.status}, {fyLabel(w.year)})</span>)}</p>}
+      </Section>
+
+      <Section title="Warranties ending in the next 12 months" id="warranties" help="planning.warranties" data-feature="warranty" data-arrive
+        aside={`${WAR.rows.length} ${WAR.rows.length === 1 ? 'group' : 'groups'} by office and model · demo dates`} showAll={8}>
+        <div class="card side-card pl-war">
+          <p class="pl-war-a">{WAR.count ? <><b class="rs-tick">{WAR.count.toLocaleString('en-IE')}</b> {WAR.answer.replace(/^[\d,]+ /, '')}</> : WAR.answer}</p>
+          <TrendStrip bars={WAR.bars.map((b) => ({ label: b.label, n: b.n }))} label="Warranties ending each month, the next 12 months" tone="warn" height={36} step={22} ends mark={0} />
+          <div class="tablewrap">
+            <table class="to-cards pl-war-t">
+              <thead><tr><th scope="col">Office</th><th scope="col">Model</th><th scope="col" class="num">Units</th><th scope="col">Warranty ends</th><th scope="col">After the warranty</th></tr></thead>
+              <tbody data-items>
+                {WAR.rows.map((r) => (
+                  <tr>
+                    <td data-label="Office"><a href={href(`/devices/?site=${r.site}`)}>{r.office}</a></td>
+                    <td data-label="Model">{r.model ? <a href={href(`/models/${r.model}/`)}>{r.name}</a> : r.name}</td>
+                    <td data-label="Units" class="num">{r.n}</td>
+                    <td data-label="Warranty ends">{warSpan(r)}</td>
+                    <td data-label="After the warranty">{r.covered === r.n ? r.support.join(', ') : r.covered ? `${r.support.join(', ')} for ${r.covered} of ${r.n}` : <span class="pl-war-bare">No support contract</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p class="faint pl-note">Warranty dates are demo values on each unit's record, counted from its purchase. A unit whose warranty has ended and has no support contract is repaired or replaced at Aigna's cost.</p>
+        </div>
       </Section>
     </div>
 
@@ -575,6 +608,7 @@ const scenarioFor = scenarios[0];
     boot();
     document.addEventListener('astro:page-load', boot);
   </script>
+  <Arrive />
 </Shell>
 <style is:global>
   .content.pl { gap: 20px; padding-top: 18px; }
@@ -582,6 +616,12 @@ const scenarioFor = scenarios[0];
   .pl-view, .pl-year { display: grid; gap: 20px; }
   .pl-year-pill { font-weight: 600; }
   .pl-note { margin: 0; font-size: var(--fs-code); line-height: 1.45; }
+  /* Warranties ending: the answer, the strip by month, then the table. */
+  .pl-war { gap: 12px; }
+  .pl-war-a { margin: 0; font: var(--fw-title) var(--fs-h3)/1.3 var(--font-display); color: var(--text); }
+  .pl-war-a b { font-weight: inherit; }
+  .pl-war-t { width: 100%; font-size: var(--fs-support); }
+  .pl-war-bare { color: var(--amber-ink); font-weight: var(--fw-name); }
   .pl-table th.r, .pl-table td.r { text-align: right; }
   .pl-table td small { font-size: var(--fs-mark); }
   .pl-table a { color: inherit; text-decoration: none; } .pl-table a:hover { text-decoration: underline; text-underline-offset: 2px; }

@@ -80,7 +80,7 @@ for (const [id, s] of Object.entries(spacesRaw)) {
   // wiring or stage count sees them.
   const spareKit = (inst.spare_units ?? []).map((u, i) => {
     const cls = models[u.model]?.class;
-    const unit = { serial: u.serial, asset_tag: u.asset_tag, stage: 'spare', installed: null, arrived: u.arrived, notes: u.notes };
+    const unit = { serial: u.serial, asset_tag: u.asset_tag, stage: 'spare', installed: null, arrived: u.arrived, notes: u.notes, purchase: u.purchase, warranty: u.warranty, support: u.support };
     return { position: `spare#${i + 1}`, key: 'spare', model: u.model, cls, role: className(cls), spare: true, cabinet: u.cabinet, shelf: u.shelf, units: [unit], current: unit };
   });
   spaces[id] = { id, ...s, type: spaceTypes[s.space_type], option, fitted: inst.fitted ?? [], positions, spareKit, olderKit: older.filter((p) => !p.units[0].retired), retiredKit: older.filter((p) => p.units[0].retired), stages, attention, notes: [...(s.notes ?? []), ...(inst.notes ?? [])] };
