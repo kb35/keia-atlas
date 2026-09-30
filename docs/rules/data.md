@@ -12,7 +12,7 @@ Data lives in `data/`, a folder per kind of thing, each checked by the JSON Sche
 
 ### F2. Checks stop the build
 
-`npm run validate` checks every file and cross-checks references: cables fit both ends, no port is used twice, enough outlets, unique serials and asset tags. Then `npm test` and `npx astro build`.
+`npm run validate` checks every file and cross-checks references: cables fit both ends, no port is used twice, enough outlets, unique serials and asset tags. Then `npm test` and `npx astro build`. It also reports standards coverage: every must rule in `data/standards/` names how it is proved (`record:` a field, `on-site` or `connect`), and the report lists each rule whose field no record carries, so a rule is never written that no page can show (`tools/coverage.mjs`).
 
 - **Why:** a wrong fact caught at build time never reaches a technician.
 - **Do:** run all three before committing.

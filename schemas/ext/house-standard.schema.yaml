@@ -79,6 +79,16 @@ properties:
               check: { description: "How an integrator or engineer proves it is done.", type: string }
               house: { description: "True when this is Aigna's own choice, not a public standard's requirement.", type: boolean }
               sources: { description: "Ids from this file's references.", type: array, items: { $ref: "#/$defs/slug" } }
+              record:
+                description: >-
+                  How the check is proved, so a rule is never written that no record carries (tools/coverage.mjs). A
+                  record field as folder:key.path ("sites:change_window", "installs:warranty.ends"), found anywhere in
+                  a record of that folder; on-site (a measurement, photo or certificate in the handover pack); or
+                  connect (read from the system that runs it). One, or a list. The validator reports every must rule
+                  whose field no record carries.
+                oneOf:
+                  - { $ref: "#/$defs/proof" }
+                  - { type: array, minItems: 1, uniqueItems: true, items: { $ref: "#/$defs/proof" } }
   references:
     description: "Public standards and vendor documents the rules lean on. Named, summarised in our own words, never quoted."
     type: array
@@ -98,3 +108,4 @@ properties:
   demo: { const: true }
 $defs:
   slug: { type: string, pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
+  proof: { type: string, pattern: "^(on-site|connect|[a-z0-9-]+:[a-z0-9_]+(\\.[a-z0-9_]+)*)$" }

@@ -51,6 +51,7 @@ sections:
         rule: Put every device on the VLAN for its purpose from the VLAN plan, set on the switch port or the Wi-Fi network, never on the device itself.
         why: The firewall rules and monitoring are written per VLAN, so a device on the wrong one is either blocked or too exposed.
         check: The switch port's native VLAN matches the plan for the device recorded on that port in Keia Atlas.
+        record: [house-values:vlans, installs:vlan]
         house: true
         sources: [ieee-802-1q, unifi-vlans]
       - id: no-vlan-1
@@ -58,12 +59,14 @@ sections:
         rule: Leave VLAN 1 unused, and shut down or park unused switch ports on an empty VLAN.
         why: VLAN 1 is every switch's default, so anything plugged in by accident lands on it.
         check: No active port has VLAN 1 as its native VLAN; unused ports are disabled.
+        record: connect
         house: true
       - id: av-not-routed
         level: must
         rule: Keep the AV VLAN (Dante, Q-SYS, AV over IP) on the in-room AV switch with its own IGMP querier, and do not route it.
         why: AV multicast floods a network that is not set up for it; keeping it in the room keeps the office network quiet and the audio clean.
         check: The AV switch's uplink does not carry VLAN 40; the room's audio runs with the uplink unplugged.
+        record: on-site
         house: true
         sources: [netgear-av]
       - id: 802-1x
@@ -81,18 +84,21 @@ sections:
         rule: Give every fixed device its address by a DHCP reservation, not by typing a static address on the device.
         why: The address can change centrally without a site visit, and the reservation proves the MAC address in the record is right.
         check: The device shows DHCP on; the reservation's MAC address matches Keia Atlas.
+        record: installs:mac
         house: true
       - id: hostname
         level: must
         rule: "Name every device site-room-prefix and number, for example dub-321-sw01: the site code, the room number without its dot, the device class's prefix and its number in the room."
         why: One name finds the device in DNS, device management, monitoring and Keia Atlas.
         check: Forward and reverse DNS resolve the name; the same name is in every system.
+        record: installs:hostname
         house: true
       - id: ntp
         level: must
         rule: Point every device at the site's NTP servers (handed out by DHCP), and set its time zone to the site's.
         why: Logs line up only when clocks agree, and schedules (display timers, updates) run at the right hour.
         check: The device's clock is within a second of the NTP server.
+        record: house-values:time_servers
         house: true
   - id: poe-uplinks
     title: PoE and uplinks
@@ -102,6 +108,7 @@ sections:
         rule: Plan PoE per port from the device's class (802.3at for access points, video bars and panels; 802.3bt where a device needs it) and keep the switch within its budget with 20% spare.
         why: A switch over its PoE budget turns off the lowest priority ports without warning.
         check: The switch's PoE use in the controller is under 80% of its budget at handover.
+        record: device-models:power.poe_budget_w
         house: true
         sources: [ieee-802-3bt]
       - id: poe-priority
@@ -115,6 +122,7 @@ sections:
         rule: Connect every access switch to the core with two fibre uplinks of at least 10 Gb/s, bundled as one link (LACP).
         why: One failed fibre, optic or port does not cut off a floor, and both links carry traffic.
         check: Unplug one uplink during commissioning; nothing drops.
+        record: on-site
         house: true
         sources: [ieee-802-1ax]
       - id: firmware
@@ -122,6 +130,7 @@ sections:
         rule: Turn off automatic firmware updates and apply the release the Lab has passed, in a change window.
         why: An update that restarts a switch drops every room on it; the Lab finds problems first.
         check: The controller's update setting is manual, and every switch runs the fleet standard.
+        record: firmware:releases
         house: true
         sources: [unifi-updates]
 references:

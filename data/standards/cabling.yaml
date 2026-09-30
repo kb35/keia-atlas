@@ -36,6 +36,7 @@ sections:
         rule: Install Cat6A (Class EA) for every new copper run from the patch panel to an outlet.
         why: Cat6A carries 10 Gb/s over the full 100 m channel and runs cooler with high-power PoE, so the cable outlives two or three generations of the devices on it.
         check: The cable jacket print and the certification report both say Category 6A for every link.
+        record: runs:type
         sources: [tia-568-2, tia-tsb-162]
       - id: shielding
         level: should
@@ -49,12 +50,14 @@ sections:
         rule: Use cable with the fire rating the building needs, and at least Euroclass Cca-s1b,d1,a1 in Europe or CMP or CMR in the Americas where cable runs in air-handling spaces or risers.
         why: Cable is a large fire load in ceilings and risers; building control and insurers check the rating.
         check: The rating printed on the jacket matches the building specification, and the declaration of performance is in the handover pack.
+        record: on-site
         sources: [eu-cpr, nec-800]
       - id: fibre-backbone
         level: must
         rule: Run OM4 multimode fibre between comms rooms in the same building, and OS2 singlemode between buildings or for runs over 150 m, with at least 12 cores each way.
         why: OM4 carries 10 and 25 Gb/s uplinks inside a building; singlemode has no practical length limit for a campus. Spare cores make a failed core a patch change, not a new run.
         check: The fibre test report shows each core's loss within budget, and the panel label says OM4 or OS2 with the core count.
+        record: runs:test.loss_db
         house: true
         sources: [tia-568-3]
   - id: runs
@@ -65,30 +68,35 @@ sections:
         rule: Keep every permanent link at 90 m or less, and the patch cords at both ends at 10 m or less in total.
         why: The 100 m channel limit is what the performance figures assume; a longer link fails at 10 Gb/s even if it passes a continuity test.
         check: The certification report's length for every link is 90 m or less.
+        record: runs:test.length_m
         sources: [tia-568-2]
       - id: support
         level: must
         rule: Support cable on J-hooks, tray or basket no more than 1.5 m apart, never on the ceiling grid, pipes or other services.
         why: Unsupported cable sags and stretches, which changes its twist and its performance; ceilings are opened by other trades.
         check: Walk the route with the ceiling tiles out before handover; photograph each run.
+        record: on-site
         sources: [tia-569]
       - id: bend-and-pull
         level: must
         rule: Keep the bend radius at least four times the cable's diameter and pull with no more than 110 N (about 11 kg) on a four-pair cable.
         why: Tight bends and hard pulls deform the pairs; the damage does not show until the link is tested.
         check: No kinks at hooks or in back boxes; any link that fails return loss is re-run, not re-terminated.
+        record: on-site
         sources: [tia-568-2]
       - id: power-separation
         level: must
         rule: Keep data cable apart from mains power cable as the local wiring rules require, and cross it at right angles.
         why: Running beside power adds noise, and in many countries it breaks the wiring regulations.
         check: Inspect the route before the ceiling closes; no shared containment with power unless it is segregated.
+        record: on-site
         sources: [tia-569, en-50174]
       - id: fire-stopping
         level: must
         rule: Reseal every wall, floor and riser the cable passes through with a fire-stop product rated for that barrier.
         why: An open penetration lets fire and smoke through a fire compartment.
         check: Each penetration has a fire-stop label and a photo in the handover pack.
+        record: on-site
         sources: [tia-569]
   - id: termination
     title: Terminating and testing
@@ -98,6 +106,7 @@ sections:
         rule: Terminate every jack and panel to T568B, the same at both ends, everywhere.
         why: One scheme means any patch cord works and nobody has to check which scheme a site used. T568A is equally valid; mixing them is what breaks links.
         check: The wire map on the certification report passes for every link.
+        record: runs:test.result
         house: true
         sources: [tia-568-2]
       - id: untwist
@@ -105,12 +114,14 @@ sections:
         rule: Keep the pairs twisted to within 13 mm of the termination point and keep the jacket on up to the jack.
         why: Untwisted pairs cause crosstalk, which is the most common reason a Cat6A link fails its test.
         check: The certification report passes NEXT with margin; spot check terminations by eye.
+        record: runs:test.margin_db
         sources: [tia-568-2]
       - id: certify
         level: must
         rule: Certify every permanent link to Cat6A with a calibrated certification tester (not a continuity tester), and save the native results file.
         why: Only a certification test proves the link carries 10 Gb/s; the results are the evidence for the manufacturer's warranty.
         check: The handover pack has one results file per outlet, all Pass, with no Pass* (marginal) results, and the tester's calibration date.
+        record: runs:test.result
         sources: [tia-1152]
       - id: warranty
         level: should
@@ -127,12 +138,14 @@ sections:
         rule: Use the patch cord colour for the cable's purpose from the colour and label standard (blue user data, green AV, yellow uplinks and singlemode, red critical, aqua multimode, grey management and feed B power, purple console, black feed A power, orange temporary).
         why: A rack can be read from the door, and a critical cable is never unplugged by mistake.
         check: Keia Atlas checks every recorded cable's colour against its purpose; on site, compare the rack against the standard's colours.
+        record: cables:colour
         house: true
       - id: label-format
         level: must
         rule: Label both ends of every cable, and every panel port and outlet, in the format SITE-ROOM-RACK-UNIT-PORT, printed on a white self-laminating wrap within 50 mm of the plug.
         why: The other end can be found by reading, not tracing, and the record in Keia Atlas uses the same name.
         check: Pick ten cables at random in each rack; both ends read correctly and match Keia Atlas.
+        record: runs:id
         house: true
         sources: [tia-606]
       - id: outlet-label
@@ -140,6 +153,7 @@ sections:
         rule: Label each outlet face plate with the panel port it goes to, and the matching panel port with the room and outlet.
         why: Moves and faults start at the outlet; the label takes a technician straight to the right port.
         check: The outlet schedule in the handover pack matches the labels on a walk of the floor.
+        record: runs:to.outlet
         sources: [tia-606]
 references:
   - id: tia-568-2
