@@ -30,8 +30,8 @@ import HealthGlyph from './HealthGlyph.astro';
 //         people (id to first name), to (the floor's page), zoom (the link zooms into the office plan), title.
 // vtHere  the plan's picture is the one a thumbnail of this floor grows into (the office page sets it).
 interface Props { site: string; floor: string; cables?: boolean; highlight?: string | null; interactive?: boolean; detail?: 'plan' | 'thumb';
-  frame?: { VW: number; VH: number }; health?: Record<string, { h: string; why?: string; who?: string | null }>; people?: Record<string, string>; to?: string; zoom?: boolean; title?: string; vtHere?: boolean }
-const { site, floor, cables = false, highlight = null, interactive = false, detail = 'plan', frame, health = {}, people = {}, to, zoom = false, title, vtHere = false } = Astro.props;
+  frame?: { VW: number; VH: number }; health?: Record<string, { h: string; why?: string; who?: string | null }>; people?: Record<string, string>; to?: string; zoom?: boolean; title?: string; vtHere?: boolean; live?: boolean }
+const { site, floor, cables = false, highlight = null, interactive = false, detail = 'plan', frame, health = {}, people = {}, to, zoom = false, title, vtHere = false, live = false } = Astro.props;
 const M = building(site);
 const P = planOf(M, floor);
 const F = P?.F ?? null;
@@ -64,7 +64,7 @@ const thumbSvg = thumb && P ? [
   '<g class="fm-t-fill">',
   ...F.core.filter((c) => !c.circulation && c.kind !== 'lift-lobby').map((c) => `<rect class="fm-t-core" ${rA(c.rect)}/>`),
   ...rooms.filter((r) => !P.single(r)).flatMap((r) => r.desks.filter((d) => d.at).map((d) => `<rect class="fm-t-desk" x="${n2(d.at[0] - 0.72)}" y="${n2(Y(d.at[1]) - 0.35)}" width="1.44" height="0.7"/>`)),
-  ...rooms.filter((r) => P.single(r)).map((r) => `<rect class="fm-t-room${isComms(r) ? ' fm-t-comms' : ''}" data-fm-t-room="${r.id}"${tState(r) ? ` data-h="${tState(r)}"` : ''} ${rA(r.rect)}/>`),
+  ...rooms.filter((r) => P.single(r)).map((r) => `<rect class="fm-t-room${isComms(r) ? ' fm-t-comms' : ''}" data-fm-t-room="${r.id}"${live ? ` data-loc-room="${r.id}"` : ''}${tState(r) ? ` data-h="${tState(r)}"` : ''} ${rA(r.rect)}/>`),
   '</g>',
 ].join('') : '';
 const coreLabel = { stair: 'Stairs', lift: 'Lifts', riser: 'Riser', toilets: 'WC' };
@@ -239,8 +239,8 @@ const GLYPH = shape('fine');
   const still = () => { const r = D.documentElement; return r.dataset.reduced === 'true' || /^(off|reduced)$/.test(r.dataset.motion ?? '') || (r.dataset.reduced !== 'false' && matchMedia('(prefers-reduced-motion: reduce)').matches); };
   // The peek for a space, made when it is first pointed at or focused (hundreds of spaces, one small card each time).
   function peekOf(el: HTMLElement) {
-    if (el.querySelector('template')) return;
-    const s = el.dataset.h || (el.closest('[data-stale]') ? 'stale' : 'fine'), why = el.dataset.why, who = el.dataset.who;
+    el.querySelector("template")?.remove();
+    const s = el.dataset.h || (el.dataset.st === 'problem' ? 'fault' : el.closest('[data-stale]') ? 'stale' : 'fine'), why = el.dataset.why, who = el.dataset.who;
     const t = D.createElement('template'); t.setAttribute('data-peek-body', '');
     t.innerHTML = `<b class="peek-h">${esc(el.dataset.name ?? '')}</b><small>${glyph(s, { size: 12 })} ${esc((WORD as any)[s] ?? s)}${why ? ` · ${esc(why)}` : s === 'fine' ? ' · nothing open' : ''}${who ? ` · With ${esc(who)}` : ''}</small>`;
     el.appendChild(t);
@@ -278,7 +278,26 @@ const GLYPH = shape('fine');
     D.addEventListener('rs:space-state', (e: any) => set(e.detail?.id, e.detail?.h, e.detail?.why));
     W.rsFloorThumbs = { set };
   }
-  D.addEventListener('astro:page-load', () => { if (D.documentElement.hasAttribute('data-stale')) feed(true); });
+  // A live thumbnail (live): the simulation marks each space's drawing (data-st on its rect); its link over it follows,
+  // so the glyph, the peek and the keyboard agree with the tint.
+  function follow() {
+    D.querySelectorAll<HTMLElement>('[data-fm-thumb]').forEach((t) => {
+      if ((t as any).__fmLive || !t.querySelector('[data-loc-room]')) return;
+      (t as any).__fmLive = true;
+      const sync = (r: Element) => {
+        const id = r.getAttribute('data-fm-t-room'), a = id && t.querySelector<HTMLElement>(`.fm-t-hit[data-fm-space="${CSS.escape(id)}"]`);
+        if (!a) return;
+        const st = r.getAttribute('data-st') ?? '';
+        if (a.dataset.st === st) return;
+        a.dataset.st = st;
+        if (!a.dataset.h) { a.tabIndex = st === 'problem' ? 0 : -1; a.setAttribute('aria-label', `${a.dataset.name}: ${st === 'problem' ? 'Fault, not working now' : 'Fine'}`); }
+      };
+      t.querySelectorAll('[data-loc-room]').forEach(sync);
+      new MutationObserver((ms) => ms.forEach((m) => sync(m.target as Element))).observe(t, { subtree: true, attributes: true, attributeFilter: ['data-st'] });
+    });
+  }
+  follow();
+  D.addEventListener('astro:page-load', () => { follow(); if (D.documentElement.hasAttribute('data-stale')) feed(true); });
 </script>
 
 <style>
@@ -440,6 +459,11 @@ const GLYPH = shape('fine');
   .fm-t-room[data-h="fault"], .fm-t-room[data-h="stale"] { fill: var(--h-fault-soft); stroke: var(--h-fault); stroke-width: .22; }
   .fm-t-room[data-h="stale"] { stroke-dasharray: .35 .25; }
   .fm-t-room[data-h="progress"] { fill: var(--h-progress-soft); stroke: var(--h-progress); stroke-width: .14; }
+  /* live: the office pages' simulation (src/lib/locations-client.mjs) sets data-st on each space; a space not working
+     takes the fault's wash and, drawn by CSS (the glyph's mask), its glyph. In use and free stay calm. */
+  .fm-t-room[data-st="problem"] { fill: var(--h-fault-soft); stroke: var(--h-fault); stroke-width: .22; }
+  .fm-t-hit[data-st="problem"]:not(:has(.hg))::after { content: ""; width: min(12px, calc(var(--fm-g) * 68cqw)); aspect-ratio: 1; background: var(--h-fault);
+    -webkit-mask: var(--hg-mask-fault) center / contain no-repeat; mask: var(--hg-mask-fault) center / contain no-repeat; }
   /* The feed is not reporting: nothing can be called fine, so the fine spaces' edges turn dashed, in place. */
   .fm-thumb[data-stale] .fm-t-room:not([data-h]) { stroke: var(--h-fault); stroke-dasharray: .35 .25; }
   /* The spaces themselves: links over their shapes, for the peek, the keyboard and the zoom's picture box. */

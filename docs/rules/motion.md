@@ -102,7 +102,7 @@ Health glyphs (`HealthGlyph.astro`, `.hg`; UI-V2 section 6) arrive quiet, then c
 
 ### M9. When not to animate
 
-Not text being read. Not numbers: a figure changes in place, never counts up, and a bar is drawn at its value. Not charts, sparklines or small multiples: they are drawn still and updated by redraw. Not things the person did not cause, with three exceptions that happen once: glyphs coming on at load, a new signal, a live change by a colleague. Not decoration on a loop. Stagger at most 12 list items, then show the rest together.
+Not text being read. Not numbers: a figure changes in place, never counts up, and a bar is drawn at its value. Not charts, sparklines or small multiples: they are drawn still and updated by redraw (a floor thumbnail draws in once and eases a changed space in place, row 41). Not things the person did not cause, with three exceptions that happen once: glyphs coming on at load, a new signal, a live change by a colleague. Not decoration on a loop. Stagger at most 12 list items, then show the rest together.
 
 - **Why:** motion that explains nothing hides motion that does; and data is read from still pictures.
 - **Do:** ask "what changed?" If nothing did, nothing moves.
@@ -196,6 +196,7 @@ Each interaction on a page is one of these rows (MOTION-V2 section 4), with its 
 | 38 | A run joins a rule's strip | The new square grows from its centre once at the right end (`--dur-enter`); the words under the strip change in place | Appears at once |
 | 39 | Front door: a lifecycle stage left alone (Plan, Deliver, Maintain, Fix, Improve, the five proofs) | The one place on the site that loops (`src/lib/front-loop.mjs`, Keith's rule for the landing page, 30 Sept 2026): the stage plays its sequence on the tokens, eases into its final frame, holds it 3 to 4 s, cross-fades back to its first frame (`--dur-exit` out, `--dur-state` in; nothing plays backwards) and plays again. It pauses off screen and in a hidden tab, each stage adds its own random beat so no two loop in step, and a click, hover or focus yields to the visitor for 8 s. No "Play again" buttons anywhere | The finished frame, still, no loop |
 | 40 | View as: open a role, find, choose | The picker grows from the control that opened it (`rsPopIn`) and shrinks back to it. A role with several people opens a panel on the row under its tile: the panel grows out of the tile (from the tile's width to the row's, and downwards) on `--spring-settle`, the rows below slide down on the same spring, the card's height eases with them, and the people enter `--stagger` apart over `--dur-enter`; the tiles never change order. Closing folds the panel back into its tile over `--dur-exit`. A second press starts from where things are. Finding dims what does not match and moves nothing. Choosing closes the picker, then `rsPickWho` (row 26) | Opens, closes and dims at once |
+| 41 | A floor's thumbnail (FloorMap `detail="thumb"`: Home, region, leadership, vendor, office cards) | Draws in once when it first shows: the slab's edge draws on (`km-draw`, `--dur-enter`), then the spaces fade up (`--dur-state`, a `--dur-pop` beat later); never again on that page. A space's state change eases its tint and glyph in place (`--dur-state`, `km-ring`; a new glyph grows in with `km-on`). Pressing a space zooms into it (row 6, the space's box grows into its picture); pressing the floor zooms into the office plan on that floor, the thumbnail growing into the plan (`plan-<site>-<floor>`, the same picture box) | Drawn at once; the zoom is a cross-fade |
 
 A list that appears with the page (a card grid, a list of rows) makes one quiet stagger, once: the first 12 items rise into place `--stagger` apart, the rest together; filtering, sorting and live changes never replay it.
 
@@ -210,7 +211,7 @@ A list that appears with the page (a card grid, a list of rows) makes one quiet 
 - The page under the pointer (M6).
 - A fine glyph. Nothing that is fine pulses, breathes or glows.
 - The floor plan: it never pans or zooms on its own.
-- Sparklines, small multiples and charts: drawn still, updated by redraw.
+- Sparklines, small multiples and charts: drawn still, updated by redraw (a floor thumbnail: row 41).
 - Focus rings and error text.
 - An empty Restricted slot for a partner: drawn at once with its reason.
 
