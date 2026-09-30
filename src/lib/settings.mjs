@@ -44,11 +44,34 @@ export const TEXT_STEPS = [
 ];
 
 // Reset the demo (Settings › Demo): every demo record, module, capability and person goes back to how the demo
-// starts. What is yours stays: the look, light or dark, density, where pages open, accessibility, agents, the
+// starts. What is yours stays: the look, light or dark, density, where pages open, accessibility, the
 // lessons you finished, recent searches and how you like each list shown (the *-view keys).
-export const PERSONAL_KEYS = ['rs4-skin', 'rs4-theme', 'rs4-look-v', 'rs4-agents', 'rs6-density', 'rs6-depth', 'rs7-a11y', 'rs7-skin-before', 'rs4-learn', 'rs4-tour', 'rs5-tour', 'rs4-search-recent', 'rs-cfg-all'];
+export const PERSONAL_KEYS = ['rs4-skin', 'rs4-theme', 'rs4-look-v', 'rs6-density', 'rs6-depth', 'rs7-a11y', 'rs7-skin-before', 'rs4-learn', 'rs4-tour', 'rs5-tour', 'rs4-search-recent', 'rs-cfg-all'];
 
 /** Of the keys in this browser's storage, the ones Reset the demo removes. Pure, so the tests read it too. */
 export function demoResetKeys(keys) {
   return keys.filter((k) => /^rs\d?-/.test(k) && !PERSONAL_KEYS.includes(k) && !/-view$/.test(k));
+}
+
+// Where each module and capability lives in Keia Atlas, for the Organisation page's "Go to" links. A capability may
+// name its own page with `to` in src/lib/modules.mjs; otherwise it is here; otherwise it goes to its module's place.
+export const MODULE_HOME = {
+  locations: { to: '/locations/', place: 'Locations' }, services: { to: '/services/', place: 'Services' }, assets: { to: '/assets/', place: 'Assets' },
+  support: { to: '/support/', place: 'Support' }, projects: { to: '/projects/', place: 'Projects' }, vendors: { to: '/vendors/', place: 'Vendors' },
+  team: { to: '/team/', place: 'Team' }, knowledge: { to: '/known-issues/', place: 'Knowledge' },
+};
+export const CAPABILITY_HOME = {
+  'room-accessibility': { to: '/rooms/', place: 'Spaces' }, 'cable-tests': { to: '/rooms/', place: 'Spaces' },
+  'certified-platforms': { to: '/rooms/', place: 'Spaces' }, 'out-of-service': { to: '/rooms/', place: 'Spaces' },
+  circuits: { to: '/locations/offices/', place: 'Offices' }, 'comms-environment': { to: '/locations/offices/', place: 'Offices' },
+  'change-windows': { to: '/locations/offices/', place: 'Offices' }, 'meeting-quality': { to: '/usage/quality/', place: 'Meeting quality' },
+  licences: { to: '/assets/licences/', place: 'Licences' }, warranty: { to: '/devices/', place: 'Units' }, cves: { to: '/assets/security-flaws/', place: 'Security flaws' },
+  credentials: { to: '/assets/certificates/', place: 'Certificates' }, 'config-backups': { to: '/assets/config-backups/', place: 'Config backups' },
+  alerts: { to: '/support/alerts/', place: 'Alert rules' }, 'repeat-faults': { to: '/support/', place: 'Support' },
+  maintenance: { to: '/work/checks/', place: 'Room checks' }, engagements: { to: '/vendors/', place: 'Vendors' }, oncall: { to: '/team/', place: 'Team' },
+};
+/** Where a capability ({ id, module, to?, place? } from the registry) lives: { to, place }. */
+export function capabilityHome(c) {
+  if (c.to) return { to: c.to, place: c.place ?? MODULE_HOME[c.module]?.place ?? c.label };
+  return CAPABILITY_HOME[c.id] ?? MODULE_HOME[c.module] ?? { to: '/', place: 'Home' };
 }

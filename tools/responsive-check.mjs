@@ -38,6 +38,8 @@ const WHO = opt('who', '');
 // The pages to check: every archetype, and the pages most often used at small sizes.
 const PAGES = [
   ['home', '/'],
+  ['settings', '/settings/'],
+  ['settings-org', '/settings/organisation/'],
   ['support', '/support/'],
   ['work-list', '/work/list/'],
   ['schedule-day', '/work/schedule/?view=day'],

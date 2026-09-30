@@ -1,16 +1,15 @@
 ---
 /* Settings › You (/settings/#you; UX-V2 §5.2 and §5.3; rule P11): the look, light or dark, density, where pages
-   open and whether agents show. Each is a row: its name, one line of what it does, its control.
-   Stored in this browser as before: rs4-skin, rs4-theme and rs4-agents (for the browser), rs6-density and rs6-depth
+   open. Each is a row: its name, one line of what it does, its control.
+   Stored in this browser as before: rs4-skin and rs4-theme (for the browser), rs6-density and rs6-depth
    (per person, src/lib/depth.mjs), all applied before first paint by the Shell's boot script.
    Motion: a look or a mode cross-fades the page (rsTheme) while the ring round the chosen look and the segment
    markers slide (M12); density eases rows and cards to their new size together, holding what you were looking at
-   (rsChange, MOTION-V2 4.25); agents grow and shrink what they add (rsChange); the depth line changes its words.
+   (rsChange, MOTION-V2 4.25); the depth line changes its words.
    Reduced motion: every change is at once. */
 import { LOOKS, MODES } from '../lib/settings.mjs';
 const DENSITY = [{ id: 'comfortable', name: 'Comfortable' }, { id: 'compact', name: 'Compact' }];
 const DEPTH = [{ id: 'band', name: 'Band' }, { id: 'summary', name: 'Summary' }, { id: 'record', name: 'Record' }, { id: 'raw', name: 'Raw' }];
-const AGENTS = [{ id: 'on', name: 'Show' }, { id: 'off', name: 'Hide' }];
 ---
 <ul class="card st-list" data-st-you>
   <li class="st-item st-block" data-fi data-find="look theme colours studio enterprise high contrast drawing set playful style">
@@ -44,12 +43,6 @@ const AGENTS = [{ id: 'on', name: 'Show' }, { id: 'off', name: 'Hide' }];
       {DEPTH.map((m) => (<label><input type="radio" name="st-depth" value={m.id} /><span>{m.name}</span></label>))}
     </div>
   </li>
-  <li class="st-item st-stack" data-fi data-find="agents automation automatic helpers show hide">
-    <div class="st-item-t"><b id="st-agents-l">Agents</b><small>Automatic work on projects and jobs</small></div>
-    <div class="st-seg" role="radiogroup" aria-labelledby="st-agents-l" data-seg>
-      {AGENTS.map((m) => (<label><input type="radio" name="st-agents" value={m.id} /><span>{m.name}</span></label>))}
-    </div>
-  </li>
 </ul>
 
 <script is:inline data-astro-rerun define:vars={{ LOOKS }}>
@@ -74,10 +67,9 @@ const AGENTS = [{ id: 'on', name: 'Show' }, { id: 'off', name: 'Hide' }];
       if (first) { mk.classList.add('on'); void mk.offsetWidth; mk.style.transition = ''; }
     }
     function sync() {
-      var s = get('rs4-skin', 'studio'), t = get('rs4-theme', 'system'), ag = get('rs4-agents', 'on'), d = R.getAttribute('data-density') || 'comfortable';
+      var s = get('rs4-skin', 'studio'), t = get('rs4-theme', 'system'), d = R.getAttribute('data-density') || 'comfortable';
       box.querySelectorAll('input[name=st-skin]').forEach(function (i) { i.checked = i.value === s; });
       box.querySelectorAll('input[name=st-mode]').forEach(function (i) { i.checked = i.value === t; });
-      box.querySelectorAll('input[name=st-agents]').forEach(function (i) { i.checked = i.value === ag; });
       box.querySelectorAll('input[name=st-density]').forEach(function (i) { i.checked = i.value === d; });
       var ln = box.querySelector('[data-look-note]'); if (ln) ln.textContent = NOTE[s] || NOTE.studio;
       // One layer for every kind of page, or "Mixed" when "Open pages like this here" has set some kinds deeper than others.
@@ -95,7 +87,6 @@ const AGENTS = [{ id: 'on', name: 'Show' }, { id: 'off', name: 'Hide' }];
       var i = e.target, v = i.value;
       if (i.name === 'st-skin') { put('rs4-skin', v); W.rsTheme(function () { W.rsApplyTheme(); if (W.rsSyncMode) W.rsSyncMode(); sync(); }, v); }
       if (i.name === 'st-mode') { put('rs4-theme', v); W.rsTheme(function () { W.rsApplyTheme(); if (W.rsSyncMode) W.rsSyncMode(); }); }
-      if (i.name === 'st-agents') W.rsSetAgents(v);
       if (i.name === 'st-density') {
         var all = read('rs6-density'); all[who()] = v; write('rs6-density', all);
         var set = function () { R.setAttribute('data-density', v); };

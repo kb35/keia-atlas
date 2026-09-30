@@ -27,7 +27,7 @@ const ABOUT = [
 ];
 ---
 <Shell title="Settings" section="settings" crumbs={[{ label: 'Settings' }]}>
-  <PageBand overline="Settings" title="Settings" lede="How Keia Atlas looks, moves and reads for you. Saved in this browser only." />
+  <PageBand overline="Settings" title="Settings" answer="Studio look · light or dark by your device · default text" lede="How Keia Atlas looks, moves and reads for you. Saved in this browser only." />
   <div class="content st-page">
     <FilterBar placeholder="Find a setting" label="Find a setting" noun={['setting', 'settings']} scope=".st-page" />
     <div class="st-layout">
@@ -81,9 +81,9 @@ const ABOUT = [
     var W = window, D = document;
     var links = Array.prototype.slice.call(nav.querySelectorAll('[data-st-to]'));
     var secs = links.map(function (a) { return D.getElementById(a.dataset.stTo); });
-    // Where you are: the section whose heading has passed under the bar last (the first one at the top).
+    // Where you are: the last section whose heading is in the top third of the window (the first one at the top).
     function here() {
-      var lim = (W.rsTopLimit ? W.rsTopLimit() : 64) + 24, cur = secs[0];
+      var lim = Math.max((W.rsTopLimit ? W.rsTopLimit() : 64) + 24, innerHeight * 0.35), cur = secs[0];
       secs.forEach(function (s) { if (s && s.getClientRects().length && s.getBoundingClientRect().top <= lim) cur = s; });
       if (innerHeight + scrollY >= D.documentElement.scrollHeight - 4) { var last = secs.filter(function (s) { return s && s.getClientRects().length; }).pop(); if (last) cur = last; }
       links.forEach(function (a) { if (cur && a.dataset.stTo === cur.id) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current'); });
@@ -93,6 +93,19 @@ const ABOUT = [
     addEventListener('scroll', onScroll, { passive: true });
     // A section the find box has emptied leaves the list too.
     D.addEventListener('fb:change', function () { if (!nav.isConnected) return; links.forEach(function (a, i) { a.classList.toggle('st-gone', !!secs[i] && secs[i].classList.contains('fb-out')); }); here(); });
+    // The band's answer: your look, light or dark, and text size, as they are now.
+    var LOOK = { studio: 'Studio', enterprise: 'Enterprise', contrast: 'High contrast', drawing: 'Drawing set', classic: 'Playful' };
+    var MODE = { system: 'light or dark by your device', light: 'light', dark: 'dark' };
+    var TEXT = { 'default': 'default text', larger: 'larger text', largest: 'largest text' };
+    var answer = function () {
+      if (!nav.isConnected || !W.rsAnswer) return;
+      var g = function (k, d) { try { return localStorage.getItem(k) || d; } catch (_) { return d; } };
+      var a = W.rsA11y ? W.rsA11y() : { text: 'default' };
+      W.rsAnswer((LOOK[g('rs4-skin', 'studio')] || 'Studio') + ' look · ' + (MODE[g('rs4-theme', 'system')] || MODE.system) + ' · ' + (TEXT[a.text] || TEXT['default']));
+    };
+    ['rs:settings-change', 'rs:a11y', 'rs:demo-change'].forEach(function (ev) { D.addEventListener(ev, function () { setTimeout(answer, 0); }); });
+    D.addEventListener('astro:page-load', answer, { once: true });
+    D.addEventListener('change', function (e) { if (nav.isConnected && e.target && /^(st-skin|st-mode|a11y-text|a11y-contrast)$/.test(e.target.name)) setTimeout(answer, 0); });
     // The Organisation row counts what is on now.
     W.rsOrgSummary = function () {
       var el = D.querySelector('[data-org-sum]'); if (!el || !W.rsModules) return;
@@ -103,6 +116,9 @@ const ABOUT = [
     D.addEventListener('rs:demo-change', function () { if (nav.isConnected) W.rsOrgSummary(); });
     if (D.readyState === 'loading') D.addEventListener('DOMContentLoaded', function () { W.rsOrgSummary(); }, { once: true }); else W.rsOrgSummary();
     here();
+    // An address with #accessibility lands after this script: mark it once the page has scrolled there.
+    addEventListener('hashchange', here);
+    setTimeout(here, 350);
   })();
 </script>
 
@@ -120,7 +136,7 @@ const ABOUT = [
   /* A phone or a narrow window: the sections as a grid at the top, three across, every name whole. */
   @media (max-width: 899px) {
     .st-layout { grid-template-columns: minmax(0, 1fr); gap: 28px; }
-    .st-nav { position: static; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 4px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-2); }
+    .st-nav { position: static; grid-template-columns: repeat(auto-fill, minmax(min(100%, 7.6em), 1fr)); font-size: 13px; gap: 6px; padding: 4px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-2); }
     .st-nav a { justify-content: center; gap: 6px; min-height: 44px; padding: 8px 6px; font-size: 13px; white-space: nowrap; }
     .st-nav a :global(svg) { display: none; }
     .st-nav a[aria-current] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, .12), 0 0 0 1px var(--line); }

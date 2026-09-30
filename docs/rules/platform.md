@@ -28,7 +28,7 @@ Report offers Propose an edit, New firmware found or Urgent issue, filled in wit
 
 ### P4. View as
 
-Anyone can see Keia Atlas as any role: from their name in the sidebar, the ribbon's Change, Settings (on a phone too) or the palette ("> Liam"). View as shows roles first, grouped by team; a role with one person switches at once, a role with several opens to show them (`src/components/ViewAs.astro`). Role changes what comes first, never what exists; vendors alone see less.
+Anyone can see Keia Atlas as any role: from their name in the sidebar, the ribbon's Change, the gear's quick menu and the Settings page (on a phone too) or the palette ("> Liam"). View as is one sheet: a find field, three suggested people, then every role as a list grouped by team, each with one whole line on what it is for and its people as named chips (`src/components/ViewAs.astro`). Role changes what comes first, never what exists; vendors alone see less.
 
 - **Why:** people learn each other's jobs.
 - **Do:** order a role's first screen (Home) and its place tabs by role; the sidebar keeps one order for everyone (L3).
@@ -36,7 +36,7 @@ Anyone can see Keia Atlas as any role: from their name in the sidebar, the ribbo
 
 ### P5. Simulated data says so
 
-There are no stages: every page belongs to a module (its place in the sidebar), and while Settings › Modules has that module Off, the page says so and offers to switch it on (`Shell.astro`; `minStage` is retired and ignored). Invented numbers (usage, costs, scenarios) carry the dashed "Simulated" tag, and made-up figures that change as you watch "Simulated live", both from `SimTag` in the band's overline row.
+There are no stages: every page belongs to a module (its place in the sidebar), and while Organisation settings (`/settings/organisation/`) has that module Off, the page says so and offers to switch it on (`Shell.astro`; `minStage` is retired and ignored). Invented numbers (usage, costs, scenarios) carry the dashed "Simulated" tag, and made-up figures that change as you watch "Simulated live", both from `SimTag` in the band's overline row.
 
 - **Why:** trust depends on knowing what is real.
 - **Do:** label simulated numbers where they appear.
@@ -100,9 +100,17 @@ Routine work runs only under a standing rule a named owner approved once (`data/
 
 ### P13. Capabilities are switched on when they are needed
 
-The bigger items a team adds when it needs them (licences, room checks, out of service, alert rules, certificates, security flaws, config backups, meeting quality and the rest) are capabilities of a module, each On, Connected or Off in Settings › Modules, nested under its module (`src/lib/modules.mjs`, `SettingsModules.astro`). A capability is off while its module is Off or anything it `requires` is off. The registry in `modules.mjs` is the one list of ids. The page head writes `data-feat-off` and `data-feat-conn` on `<html>` before first paint (`rs6-features`), and `featureCss()` takes away every element marked `data-feature="<id>"` while it is off; a `Section` (or a box marked `data-feat-wrap`) whose content is all gated by one capability goes with it, heading and all; a section that holds several capabilities' cards carries `data-feat-any="<ids>"` with the rule `featureAnyCss(ids)` puts beside it, and goes when all of them are off. A work item that belongs to a capability (a room check round) carries `feature`, and the Schedule leaves it out while it is off. A Connected capability shows its source mark (`FeatureSource`, "from Datadog").
+The bigger items a team adds when it needs them (licences, room checks, out of service, alert rules, certificates, security flaws, config backups, meeting quality and the rest) are capabilities of a module, each On, Connected or Off in Organisation settings (`/settings/organisation/`), inside its module's card (`src/lib/modules.mjs`, `SettingsModules.astro`). The page draws every module and capability from the registry, so a new one needs no change there. A capability is off while its module is Off or anything it `requires` is off. The registry in `modules.mjs` is the one list of ids. The page head writes `data-feat-off` and `data-feat-conn` on `<html>` before first paint (`rs6-features`), and `featureCss()` takes away every element marked `data-feature="<id>"` while it is off; a `Section` (or a box marked `data-feat-wrap`) whose content is all gated by one capability goes with it, heading and all; a section that holds several capabilities' cards carries `data-feat-any="<ids>"` with the rule `featureAnyCss(ids)` puts beside it, and goes when all of them are off. A work item that belongs to a capability (a room check round) carries `feature`, and the Schedule leaves it out while it is off. A Connected capability shows its source mark (`FeatureSource`, "from Datadog").
 
 - **Why:** Keith's rule (30 Sept 2026): switched off, a capability leaves no trace, so nothing ever looks missing; switched on, it is there in full.
 - **Do:** mark the section, card, figure (`KeyNumbers` `feature`), tab (NAV `feature`) or answer fragment with `data-feature`; check `featureOn(id)` when the site is built and `window.rsFeatureOn(id)` in a script before writing an answer or a count; redraw on `rs:demo-change` (`detail.what` is `features` or `modules`); give a page that belongs to one capability a gate that says it is switched off, with its own Switch on.
 - **Don't:** leave a heading, an empty card, a zero or a sentence behind for something switched off, or register a capability anywhere but `modules.mjs`.
 
+
+### P14. Settings: mine, the organisation's, and the demo's
+
+The gear opens a short quick menu: who you view as, light or dark, the look, text size, and links to All settings, Accessibility and Organisation (`src/components/Settings.astro`). It never scrolls. `/settings/` holds a person's own settings in short sections (You, Accessibility, Organisation as a link, Demo, About), each a heading and a list of rows, with a find box and a section list (`src/lib/settings.mjs`). `/settings/organisation/` holds what an admin sets for everyone: the modules and their capabilities, labelled "Organisation · affects everyone". Controls that exist only for the demo (View as, time away, Reset the demo) sit together under Demo and say so.
+
+- **Why:** Keith (30 Sept 2026): "way too much in that one settings button". A person should not have to scroll past the organisation's switches to change their own look.
+- **Do:** put a new personal setting in a section of `/settings/` as a row (name, one line, control), give it `data-fi` and `data-find` so the find box reaches it, and keep its storage key applied before first paint. Put anything that changes Keia Atlas for everyone on the Organisation page.
+- **Don't:** add to the quick menu (six things at most, nothing wraps), cut a label short, or put a three-way pill on every row of a phone list.

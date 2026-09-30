@@ -10,7 +10,7 @@ We aim for [WCAG 2.2](https://www.w3.org/TR/WCAG22/) level AA, which is also wha
 
 ## Change it for yourself
 
-Open **Settings** (the gear at the bottom of the sidebar, or at the top right on a phone) and go to **Accessibility**. Every choice applies at once, and you switch it back the same way. The choices are kept in this browser, for you, whoever you view the demo as.
+Open **Settings** (the gear at the bottom of the sidebar, or at the top right on a phone) and choose **Accessibility**, or go straight to [Settings › Accessibility](../../settings/#accessibility). Text size is also in the gear's short menu. Every choice applies at once, and you switch it back the same way. The choices are kept in this browser, for you, whoever you view the demo as.
 
 | Setting | What it does |
 |---|---|

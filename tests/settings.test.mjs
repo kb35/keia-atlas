@@ -11,7 +11,7 @@ import { join, extname } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { MODULES, CAPABILITIES } from '../src/lib/modules.mjs';
-import { SECTIONS, PERSONAL_KEYS, demoResetKeys, LOOKS } from '../src/lib/settings.mjs';
+import { SECTIONS, PERSONAL_KEYS, demoResetKeys, LOOKS, capabilityHome } from '../src/lib/settings.mjs';
 import { VERBS } from '../src/lib/verbs.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -41,11 +41,11 @@ test('the palette offers Open settings, Accessibility settings and Organisation 
 
 test('every storage key and every before-first-paint setting is kept', () => {
   const shell = read('src/layouts/Shell.astro');
-  for (const k of ['rs4-skin', 'rs4-theme', 'rs4-agents', 'rs6-density', 'rs6-modules', 'rs6-features', 'rs5-who', 'rs4-who', 'rs5-me']) assert.ok(shell.includes(`'${k}'`), `${k} read by the Shell`);
+  for (const k of ['rs4-skin', 'rs4-theme', 'rs6-density', 'rs6-modules', 'rs6-features', 'rs5-who', 'rs4-who', 'rs5-me']) assert.ok(shell.includes(`'${k}'`), `${k} read by the Shell`);
   assert.ok(/A11Y_BOOT/.test(shell), 'rs7-a11y applied in the head');
   const you = read('src/components/SettingsPersonal.astro');
   for (const k of ['rs4-skin', 'rs4-theme', 'rs6-density', 'rs6-depth']) assert.ok(you.includes(`'${k}'`), `${k} written by Settings › You`);
-  assert.ok(/rsSetAgents/.test(you), 'agents');
+  assert.ok(!/rsSetAgents|st-agents/.test(you) && shell.includes("removeItem('rs4-agents')"), 'the Agents switch is retired, and its key cleared');
   assert.ok(/rsSetA11y/.test(read('src/components/SettingsA11y.astro')), 'accessibility through rs7-a11y');
   const demo = read('src/components/SettingsDemo.astro');
   assert.ok(demo.includes("'rs6-leave'") && demo.includes("'rs6-welcomed'"), 'time away');
@@ -71,6 +71,14 @@ test('built: every module and every capability in the registry has its row on th
   const missing = CAPABILITIES.filter((c) => !html.includes(`data-cap-row="${c.id}"`)).map((c) => c.id);
   assert.deepEqual(missing, [], 'every capability is listed');
   for (const c of CAPABILITIES) assert.ok(html.includes(`data-cap-sw="${c.id}"`), `${c.id} has its switch`);
+  assert.equal((html.match(/class="oc-go"/g) || []).length, CAPABILITIES.length, 'every capability links to where it lives');
+});
+
+test('every capability has somewhere to go', () => {
+  for (const c of CAPABILITIES) {
+    const h = capabilityHome(c);
+    assert.ok(h.to.startsWith('/') && h.place, `${c.id}`);
+  }
 });
 
 test('built: the ways into Settings land on the right place', { skip: !built && 'run npm run build first' }, () => {
