@@ -1,4 +1,5 @@
 // One-off generator, 30 Sept 2026: the Dublin floors pilot. Run once; its output is committed.
+// Superseded for the layout by tools/migrations/2026-09-30-realistic-floors-dub.mjs: rerunning this undoes that.
 // Later the same day tools/migrations/2026-09-30-office-floors.mjs moved the access points it writes into units in
 // each floor's open-area install (data/installs/dub/dub-<floor>-open.yaml); run that after this if this is ever rerun.
 //

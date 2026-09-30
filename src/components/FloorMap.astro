@@ -1,7 +1,9 @@
 ---
 // A floor plan to scale, drawn from the building model in src/lib/floors.mjs: the outline, the
 // core, corridors and named areas, every room at its place with its number and door, the comms room's rack, the
-// riser, the trays (and, with `cables`, every run on the floor in its purpose colour) and the access points. It is
+// riser, the trays (and, with `cables`, every run on the floor in its purpose colour) and the access points. Each kind
+// of space and building element has its own tint or symbol (stair treads, a cross per lift car, hatched stores, each
+// desk drawn, filled when assigned), named in the key below the plan. It is
 // the check on the data, and the 3D view's other half (decision 0030): the phone view, the keyboard route and the
 // view when a browser can't draw 3D. The fictional label (rule F9) is always shown.
 //
@@ -36,7 +38,28 @@ const label = (r) => r.number ?? r.name;
 const roomName = (r) => `${r.number ? `${r.number} ` : ''}${r.name}`;
 const apModel = (a) => (a.model === 'unifi-u7-pro-max' ? 'U7 Pro Max' : 'U7 Pro');
 const pick = (key, name) => (interactive ? { 'data-sel': key, tabindex: 0, role: 'button', 'aria-label': name, 'aria-pressed': 'false' } : {});
-const coreLabel = { stair: 'Stairs', lift: 'Lifts', riser: 'Riser', toilets: 'WC', store: 'Store' };
+const coreLabel = { stair: 'Stairs', lift: 'Lifts', riser: 'Riser', toilets: 'WC' };
+// What each space is, for its fill and the key (rooms.md R10): one look per kind, the same in the 3D views.
+const KIND_OF = (t) => (t === 'mdf' || t === 'idf' ? 'comms' : t === 'workstation-assigned' ? 'assigned' : t?.startsWith('workstation') ? 'flex'
+  : t === 'reception-concierge' ? 'reception' : ['pantry', 'pantry-expanded', 'cafeteria'].includes(t) ? 'pantry' : ['copy-print-room', 'it-store'].includes(t) ? 'print'
+  : t === 'focus-room' || t === 'office' || t?.startsWith('huddle-room') ? 'small' : 'meeting');
+const KEY_WORD = { meeting: 'Meeting rooms', small: 'Focus, huddle and offices', reception: 'Reception', pantry: 'Pantry and café', print: 'Print and storage', flex: 'Flex desks', assigned: 'Assigned desks', comms: 'Comms room',
+  stair: 'Stairs', lift: 'Lifts', toilets: 'Toilets', riser: 'Riser', store: 'Stores and ducts', 'town-hall': 'Town hall', breakout: 'Breakout', corridor: 'Corridors' };
+const coreKind = (k) => (k === 'shaft' || k === 'plant' ? 'store' : k);
+const pid = `fm-${site}-${floor}`;
+const present = F ? [...new Set([
+  ...rooms.map((r) => KIND_OF(r.space_type)),
+  ...F.core.filter((c) => !c.circulation).map((c) => coreKind(c.kind)),
+  ...F.areas.map((a) => a.kind),
+  'corridor',
+])] : [];
+const KEY_ORDER = ['meeting', 'small', 'reception', 'pantry', 'print', 'flex', 'assigned', 'town-hall', 'breakout', 'corridor', 'stair', 'lift', 'toilets', 'riser', 'comms', 'store'];
+const keyItems = KEY_ORDER.filter((k) => present.includes(k));
+// A lift bank's cars, side by side along its long side.
+const cars = (c) => {
+  const n = c.count ?? 1, [x0, y0, x1, y1] = c.rect, alongX = x1 - x0 >= y1 - y0;
+  return Array.from({ length: n }, (_, i) => (alongX ? [x0 + ((x1 - x0) / n) * i, y0, x0 + ((x1 - x0) / n) * (i + 1), y1] : [x0, y0 + ((y1 - y0) / n) * i, x1, y0 + ((y1 - y0) / n) * (i + 1)]));
+};
 // Each room's health glyph (UI-V2 §6), drawn at the room's centre under its number once the page gives the room a
 // live state (data-st): Fine (in --quiet: the plan colours nothing that is fine) or Fault. CSS shows the one that applies.
 const GLYPHS = `<g class="fm-g-fine">${shape('fine')}</g><g class="fm-g-fault">${shape('fault')}</g>`;
@@ -46,21 +69,32 @@ const GLYPHS = `<g class="fm-g-fine">${shape('fine')}</g><g class="fm-g-fault">$
     <svg viewBox={`${-pad} ${-pad} ${W + pad * 2} ${H + pad * 2}`} role="group" aria-label={`${M.siteName}, ${F.name}: floor plan`} data-fm-svg>
       <g data-fm-plan>
         <polygon class="fm-outline" points={pts(F.outline)} />
+        <defs>
+          <pattern id={`${pid}-treads`} patternUnits="userSpaceOnUse" width="1" height="0.28"><line x1="0" y1="0.14" x2="1" y2="0.14" class="fm-tread" /></pattern>
+          <pattern id={`${pid}-hatch`} patternUnits="userSpaceOnUse" width="0.5" height="0.5" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="0.5" class="fm-hatch" /></pattern>
+        </defs>
         {F.areas.map((a) => <rect class={`fm-area fm-area-${a.kind}`} {...rectAttrs(a.rect)}><title>{a.name}</title></rect>)}
         {F.corridors.map((c) => <rect class="fm-corridor" {...rectAttrs(c.rect)}><title>{c.name}</title></rect>)}
         {F.core.map((c) => (
-          <g class={`fm-core fm-core-${c.kind}`}>
+          <g class={`fm-core fm-core-${coreKind(c.kind)}`}>
             <rect {...rectAttrs(c.rect)}><title>{c.name}</title></rect>
-            {coreLabel[c.kind] && c.rect[2] - c.rect[0] > 2.5 && <text x={(c.rect[0] + c.rect[2]) / 2} y={Y((c.rect[1] + c.rect[3]) / 2)}>{coreLabel[c.kind]}</text>}
+            {c.kind === 'stair' && <rect class="fm-pat" {...rectAttrs(c.rect)} style={`fill:url(#${pid}-treads)`} />}
+            {c.kind === 'stair' && <line class="fm-sym" x1={(c.rect[0] + c.rect[2]) / 2} x2={(c.rect[0] + c.rect[2]) / 2} y1={Y(c.rect[3]) + 0.5} y2={Y(c.rect[1]) - 0.5} />}
+            {coreKind(c.kind) === 'store' && <rect class="fm-pat" {...rectAttrs(c.rect)} style={`fill:url(#${pid}-hatch)`} />}
+            {c.kind === 'lift' && cars(c).map((q) => (
+              <g class="fm-car"><rect {...rectAttrs([q[0] + 0.15, q[1] + 0.15, q[2] - 0.15, q[3] - 0.15])} /><line x1={q[0] + 0.15} y1={Y(q[1] + 0.15)} x2={q[2] - 0.15} y2={Y(q[3] - 0.15)} /><line x1={q[0] + 0.15} y1={Y(q[3] - 0.15)} x2={q[2] - 0.15} y2={Y(q[1] + 0.15)} /></g>
+            ))}
+            {coreLabel[c.kind] && c.kind !== 'lift' && c.kind !== 'stair' && Math.min(c.rect[2] - c.rect[0], c.rect[3] - c.rect[1]) > 1.2 && <text x={(c.rect[0] + c.rect[2]) / 2} y={Y((c.rect[1] + c.rect[3]) / 2)}>{coreLabel[c.kind]}</text>}
           </g>
         ))}
+        {F.areas.filter((a) => a.kind !== 'open-office' && a.rect[2] - a.rect[0] > 4).map((a) => <text class="fm-area-word" x={a.rect[0] + 0.4} y={Y(a.rect[3]) + 0.8}>{a.name}</text>)}
         {rooms.map((r) => {
           const door = doorOf(r);
           return (
-            <g class:list={['fm-room', { 'fm-bank': r.count > 1, 'fm-comms': ['mdf', 'idf'].includes(r.space_type), 'fm-on': r.id === highlight }]} {...pick(`room:${r.id}`, roomName(r))} data-vt-rec={interactive ? r.id : undefined}>
+            <g class:list={['fm-room', `fm-k-${KIND_OF(r.space_type)}`, { 'fm-bank': r.count > 1, 'fm-comms': ['mdf', 'idf'].includes(r.space_type), 'fm-on': r.id === highlight }]} {...pick(`room:${r.id}`, roomName(r))} data-vt-rec={interactive ? r.id : undefined}>
               <rect {...rectAttrs(r.rect)}><title>{`${roomName(r)}${r.variations.length ? `: ${r.variations.map((v) => v.text).join('; ')}` : ''}`}</title></rect>
               {r.geo.odd.filter((o) => o.rect).map((o) => <rect class="fm-odd" {...rectAttrs(o.rect)} />)}
-              {r.desks.map((d) => <circle class="fm-desk" cx={d.at[0]} cy={Y(d.at[1])} r="0.28" />)}
+              {r.desks.map((d) => <rect class="fm-desk" x={d.at[0] - 0.72} y={Y(d.at[1]) - 0.35} width="1.44" height="0.7" />)}
               {door && <line class="fm-door" x1={door[0][0]} y1={Y(door[0][1])} x2={door[1][0]} y2={Y(door[1][1])} />}
               {r.geo.entry && r.count === 1 && <circle class="fm-entry" cx={r.geo.entry[0]} cy={Y(r.geo.entry[1])} r="0.18" />}
               <text x={(r.rect[0] + r.rect[2]) / 2} y={Y((r.rect[1] + r.rect[3]) / 2)}>{label(r)}</text>
@@ -91,6 +125,16 @@ const GLYPHS = `<g class="fm-g-fine">${shape('fine')}</g><g class="fm-g-fault">$
         <g class="fm-north" transform={`translate(${W - 0.6} ${H + 0.75})`} aria-hidden="true"><path d="M0,-0.6 L0.35,0.35 L0,0.15 L-0.35,0.35 Z" /><text x="0.9" y="0.1">N</text></g>
       </g>
     </svg>
+    <ul class="fm-key" aria-label="Key to the plan">
+      {keyItems.map((k) => (
+        <li><svg viewBox="0 0 16 12" aria-hidden="true" class={`fm-sw fm-sw-${k}`}><rect x="0.5" y="0.5" width="15" height="11" />
+          {k === 'stair' && [3, 6, 9].map((y) => <line x1="1" x2="15" y1={y} y2={y} />)}
+          {k === 'lift' && <><line x1="1" y1="1" x2="15" y2="11" /><line x1="1" y1="11" x2="15" y2="1" /></>}
+          {k === 'store' && [4, 9, 14, 19].map((x) => <line x1={x - 4} y1="11" x2={x} y2="1" />)}
+          {(k === 'flex' || k === 'assigned') && <><rect class="fm-sw-desk" x="3" y="3" width="4.5" height="2.6" /><rect class="fm-sw-desk" x="8.5" y="3" width="4.5" height="2.6" /><rect class="fm-sw-desk" x="3" y="6.4" width="4.5" height="2.6" /><rect class="fm-sw-desk" x="8.5" y="6.4" width="4.5" height="2.6" /></>}
+        </svg>{KEY_WORD[k]}</li>
+      ))}
+    </ul>
     <figcaption><Restricted view="floorPlan" /> {F.fictional}</figcaption>
   </figure>
 )}
@@ -129,13 +173,31 @@ const GLYPHS = `<g class="fm-g-fine">${shape('fine')}</g><g class="fm-g-fault">$
   .floormap { margin: 0; min-width: 0; }
   .floormap svg { width: 100%; height: auto; display: block; font-family: var(--font-sans); }
   .fm-outline { fill: var(--surface, var(--bg)); stroke: var(--line-strong); stroke-width: 0.12; }
-  .fm-area { fill: var(--green-soft); opacity: 0.5; }
-  .fm-area-town-hall { fill: var(--amber-soft); opacity: 0.8; }
-  .fm-corridor { fill: var(--grey-soft); }
-  .fm-core rect { fill: var(--grey-soft); stroke: var(--line); stroke-width: 0.05; }
-  .fm-core-lift-lobby rect { opacity: 0.6; }
+  /* One look per kind (rooms.md R10), shared with the key below the plan and the 3D views: soft tints only, so the
+     live state (a fault in its own colour) still reads first. */
+  .floormap {
+    --fm-meeting: color-mix(in srgb, var(--blue) 13%, var(--bg)); --fm-small: color-mix(in srgb, var(--violet) 13%, var(--bg));
+    --fm-reception: color-mix(in srgb, var(--green) 16%, var(--bg)); --fm-pantry: color-mix(in srgb, var(--amber) 20%, var(--bg));
+    --fm-print: color-mix(in srgb, var(--grey) 18%, var(--bg)); --fm-comms: var(--surface-2);
+    --fm-core: color-mix(in srgb, var(--grey) 22%, var(--bg)); --fm-wc: color-mix(in srgb, var(--blue) 22%, var(--bg));
+    --fm-corr: color-mix(in srgb, var(--grey) 9%, var(--bg)); --fm-hall: color-mix(in srgb, var(--amber) 11%, var(--bg)); --fm-break: color-mix(in srgb, var(--green) 9%, var(--bg));
+  }
+  .fm-area { fill: var(--fm-break); }
+  .fm-area-town-hall { fill: var(--fm-hall); }
+  .fm-area-open-office { fill: none; }
+  .fm-area-word { font-size: 0.6px; fill: var(--text-2, var(--ink)); font-style: italic; dominant-baseline: middle; }
+  .fm-corridor { fill: var(--fm-corr); }
+  .fm-core rect { fill: var(--fm-core); stroke: var(--line-strong); stroke-width: 0.05; }
+  .fm-core-toilets rect { fill: var(--fm-wc); }
+  .fm-core-lift-lobby rect { fill: var(--fm-corr); stroke: none; }
+  .fm-core rect.fm-pat { stroke: none; }
+  .fm-tread, .fm-hatch { stroke: var(--text-3, var(--line-strong)); stroke-width: 0.05; }
+  .fm-sym, .fm-car line { stroke: var(--line-strong); stroke-width: 0.05; }
+  .fm-core .fm-car rect { fill: var(--bg); }
   .fm-core text { font-size: 0.7px; fill: var(--text-2, var(--ink)); text-anchor: middle; dominant-baseline: middle; }
-  .fm-room rect { fill: var(--bg); stroke: var(--ink); stroke-width: 0.08; transition: fill var(--dur-state) var(--ease-settle), stroke var(--dur-state) var(--ease-settle), opacity var(--dur-state) var(--ease-settle); }
+  .fm-room rect { fill: var(--fm-fill, var(--bg)); stroke: var(--ink); stroke-width: 0.08; transition: fill var(--dur-state) var(--ease-settle), stroke var(--dur-state) var(--ease-settle), opacity var(--dur-state) var(--ease-settle); }
+  .fm-k-meeting { --fm-fill: var(--fm-meeting); } .fm-k-small { --fm-fill: var(--fm-small); } .fm-k-reception { --fm-fill: var(--fm-reception); }
+  .fm-k-pantry { --fm-fill: var(--fm-pantry); } .fm-k-print { --fm-fill: var(--fm-print); } .fm-k-comms { --fm-fill: var(--fm-comms); }
   .fm-bank > rect { fill: none; stroke-dasharray: 0.3 0.2; stroke: var(--line-strong); }
   .fm-comms > rect { fill: var(--surface-2); }
   .fm-on > rect { stroke: var(--accent); stroke-width: 0.2; }
@@ -143,7 +205,21 @@ const GLYPHS = `<g class="fm-g-fine">${shape('fine')}</g><g class="fm-g-fault">$
   .fm-scale text, .fm-north text { font-size: 0.8px; fill: var(--text-2, var(--ink)); dominant-baseline: middle; }
   .fm-north path { fill: var(--text-2, var(--ink)); }
   .fm-odd { fill: var(--line-strong) !important; stroke: none !important; }
-  .fm-desk { fill: var(--line-strong); }
+  .fm-room rect.fm-desk { fill: var(--bg); stroke: var(--text-2, var(--ink)); stroke-width: 0.05; stroke-dasharray: none; }
+  .fm-k-assigned rect.fm-desk { fill: var(--text-2, var(--ink)); }
+  .fm-key { list-style: none; margin: 0.6rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.35rem 1rem; font-size: 0.78rem; color: var(--text-2, var(--ink)); }
+  .fm-key li { display: inline-flex; align-items: center; gap: 0.4rem; }
+  .floormap svg.fm-sw { width: 1.1rem; height: 0.85rem; flex: none; overflow: hidden; display: inline-block; }
+  .fm-sw > rect { fill: var(--bg); stroke: var(--ink); stroke-width: 1; }
+  .fm-sw line { stroke: var(--line-strong); stroke-width: 0.8; }
+  .fm-sw-meeting > rect { fill: var(--fm-meeting); } .fm-sw-small > rect { fill: var(--fm-small); } .fm-sw-reception > rect { fill: var(--fm-reception); }
+  .fm-sw-pantry > rect { fill: var(--fm-pantry); } .fm-sw-print > rect { fill: var(--fm-print); } .fm-sw-comms > rect { fill: var(--fm-comms); }
+  .fm-sw-flex > rect, .fm-sw-assigned > rect { fill: none; stroke: var(--line-strong); stroke-dasharray: 2 1.5; }
+  .fm-sw .fm-sw-desk { fill: var(--bg); stroke: var(--text-2, var(--ink)); stroke-width: 0.6; stroke-dasharray: none; }
+  .fm-sw-assigned .fm-sw-desk { fill: var(--text-2, var(--ink)); }
+  .fm-sw-town-hall > rect { fill: var(--fm-hall); stroke: none; } .fm-sw-breakout > rect { fill: var(--fm-break); stroke: none; } .fm-sw-corridor > rect { fill: var(--fm-corr); stroke: none; }
+  .fm-sw-stair > rect, .fm-sw-lift > rect, .fm-sw-store > rect { fill: var(--fm-core); stroke: var(--line-strong); } .fm-sw-toilets > rect { fill: var(--fm-wc); stroke: var(--line-strong); }
+  .fm-sw-riser > rect { fill: var(--blue-soft); stroke: var(--blue); }
   .fm-door { stroke: var(--surface, var(--bg)); stroke-width: 0.16; }
   .fm-entry { fill: var(--c-lan); }
   .fm-tray { fill: none; stroke: var(--amber); stroke-width: 0.18; stroke-linecap: round; stroke-linejoin: round; transition: stroke var(--dur-state) var(--ease-settle), opacity var(--dur-state) var(--ease-settle); }
@@ -162,9 +238,9 @@ const GLYPHS = `<g class="fm-g-fine">${shape('fine')}</g><g class="fm-g-fault">$
   .fm-pick [data-sel]:not(.fm-run) { cursor: pointer; }
   .fm-pick [data-sel]:focus { outline: none; }
   .fm-pick [data-sel]:focus-visible > rect:not(.fm-hit), .fm-pick [data-sel]:focus-visible > circle:not(.fm-hit) { stroke: var(--focus, var(--accent)); stroke-width: 0.3; }
-  .fm-room[data-st=use] > rect { fill: var(--surface-3); }
-  .fm-room[data-st=free] > rect { fill: var(--bg); }
-  .fm-room[data-st=closed] > rect { fill: var(--surface-2); }
+  .fm-room[data-st=use] > rect:not(.fm-desk) { fill: color-mix(in srgb, var(--fm-fill, var(--bg)) 93%, var(--ink)); }
+  .fm-room[data-st=free] > rect:not(.fm-desk) { fill: var(--fm-fill, var(--bg)); }
+  .fm-room[data-st=closed] > rect:not(.fm-desk) { fill: var(--surface-2); }
   .fm-room[data-st=problem] > rect { fill: var(--h-fault-soft); stroke: var(--h-fault); stroke-width: 0.22; }
   .fm-g { display: none; pointer-events: none; }
   .fm-g :global(.hg-s) { fill: none; stroke: currentColor; stroke-width: 2.4; }

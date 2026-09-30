@@ -127,7 +127,7 @@ async function withEdit(file, from, to) {
 }
 
 test('a room moved onto another is caught', async () => {
-  const errors = await withEdit('data/spaces/dub/dub-3-08.yaml', 'x_m: 54.6', 'x_m: 52.6');
+  const errors = await withEdit('data/spaces/dub/dub-3-08.yaml', 'x_m: 32.06', 'x_m: 30.06');
   assert.ok(errors.some((e) => e.includes('dub-3-08.yaml') && e.includes('overlaps')), errors.join('\n'));
 });
 
@@ -138,7 +138,7 @@ test('a panel port used twice, and the outlet it left, are caught', async () => 
 });
 
 test('a run longer than the permanent link limit is caught', async () => {
-  const errors = await withEdit('data/runs/dub.yaml', 'length_m: 61\n', 'length_m: 92\n');
+  const errors = await withEdit('data/runs/dub.yaml', 'length_m: 52.8\n', 'length_m: 92\n');
   assert.ok(errors.some((e) => e.includes('longer than the 90 m permanent link limit')), errors.join('\n'));
 });
 

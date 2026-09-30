@@ -61,12 +61,17 @@ const hot = [floorCentre, swanTop, barAt];
 
 // ---- What the 3D scene needs, inline (no fetch): each floor, every room, the story's devices where they sit.
 const r2 = (v) => Math.round(v * 100) / 100;
+// A space's kind, as the floor plan's key has it (src/components/FloorMap.astro).
+const kindOf = (t) => (t === 'mdf' || t === 'idf' ? 'comms' : t?.startsWith('workstation') ? 'desks' : t === 'reception-concierge' ? 'reception'
+  : ['pantry', 'pantry-expanded', 'cafeteria'].includes(t) ? 'pantry' : ['copy-print-room', 'it-store'].includes(t) ? 'print'
+  : t === 'focus-room' || t === 'office' || t?.startsWith('huddle-room') ? 'small' : 'meeting');
 const peekOf = (r) => { const n = (r.positions ?? []).reduce((k, p) => k + (p.units?.length ?? 0), 0); return r.id === ROOM ? `Fault · video bar offline since ${STORY.since} · With ${STORY.who}` : `Fine · ${n === 1 ? '1 device' : `${n} devices`}`; };
 const DEV_WORDS = { 'display#1': 'Display 1', 'display#2': 'Display 2', 'video-bar': 'Video bar', 'touch-controller': 'Touch controller', 'scheduler-panel': 'Scheduler panel' };
 const nudge = (o) => { const [x, y, z] = o.at; return o.surface === 'back' ? [x - 0.45, y, z] : o.surface === 'floor' ? [x, y, z + 0.45] : o.surface === 'left' ? [x, y + 0.35, z] : [x, y, z]; };
 const D3 = {
-  floors: M.floors.map((f) => ({ id: f.id, name: f.name, level: f.level_m, outline: f.outline, core: f.core.map((c) => ({ r: c.rect.map(r2), flat: !!c.circulation || c.kind === 'lift-lobby' })), corr: f.corridors.map((c) => c.rect.map(r2)), areas: f.areas.map((a) => a.rect.map(r2)) })),
-  rooms: Object.values(M.rooms).filter((r) => r.rect).map((r) => ({ id: r.id, no: r.number ?? '', n: `${r.number ? `${r.number} ` : ''}${r.name}`, f: r.floor, r: r.rect.map(r2), h: 1, peek: peekOf(r) })),
+  floors: M.floors.map((f) => ({ id: f.id, name: f.name, level: f.level_m, outline: f.outline, core: f.core.map((c) => ({ r: c.rect.map(r2), kind: c.kind, flat: !!c.circulation || c.kind === 'lift-lobby' })), corr: f.corridors.map((c) => c.rect.map(r2)), areas: f.areas.map((a) => a.rect.map(r2)) })),
+  rooms: Object.values(M.rooms).filter((r) => r.rect).map((r) => ({ id: r.id, no: r.number ?? '', n: `${r.number ? `${r.number} ` : ''}${r.name}`, f: r.floor, r: r.rect.map(r2), h: 1, peek: peekOf(r),
+    k: kindOf(r.space_type), ...(r.count > 1 ? { bank: 1, desks: r.desks.map((d) => d.at.slice(0, 2).map(r2)) } : {}) })),
   story: { room: ROOM, floor: FLOOR, devices: M.rooms[ROOM].outlets.filter((o) => DEV_WORDS[o.dev]).map((o) => ({ key: o.dev, label: DEV_WORDS[o.dev], at: nudge(o).map(r2), fault: o.dev === DEVICE })) },
 };
 
@@ -91,7 +96,7 @@ const P = (t, pts) => t.pts(pts);
       <svg class="hz-svg" viewBox={`0 0 ${VW} ${VH}`} aria-hidden="true">
         <defs><filter id="hz-shadow" x="-20%" y="-40%" width="140%" height="200%"><feGaussianBlur stdDeviation="14" /></filter></defs>
         <polygon class="hz-ground" points={P(fb, B.ground.map(([x, y]) => [x, y + 2.2]))} filter="url(#hz-shadow)" />
-        {B.prims.map((p) => <polygon class:list={['hz-p', `hz-${p.kind}`, { 'is-fault': p.room?.id === ROOM }]} points={P(fb, p.pts)} />)}
+        {B.prims.map((p) => <polygon class:list={['hz-p', `hz-${p.kind}`, p.room && `hz-k-${kindOf(p.room.space_type)}`, { 'is-fault': p.room?.id === ROOM }]} points={P(fb, p.pts)} />)}
         {B.rings.map((r) => {
           const fault = r.room.id === ROOM, at = fb.T(r.at);
           return <g class:list={['hz-ring', { 'is-fault': fault }]}>{ring(fault ? 'fault' : 'fine', at, fault ? rb * 1.35 : rb, fault ? 1.5 : 1.1).map(({ tag, attrs }) => tag === 'circle' ? <circle {...attrs} stroke={attrs.stroke ?? 'currentColor'} /> : <path {...attrs} stroke="currentColor" />)}</g>;
@@ -104,7 +109,7 @@ const P = (t, pts) => t.pts(pts);
     <div class="hz-layer is-off" data-hz-layer data-hx={hot[1][0]} data-hy={hot[1][1]} data-s={S[1].toFixed(3)} data-cap={LEVELS[1].cap}>
       <svg class="hz-svg" viewBox={`0 0 ${VW} ${VH}`} aria-hidden="true">
         <polygon class="hz-ground" points={P(ff, FL.prims[2].pts.map(([x, y]) => [x, y + 2.6]))} filter="url(#hz-shadow)" />
-        {FL.prims.map((p) => <polygon class:list={['hz-p', `hz-${p.kind}`, { 'is-fault': p.room?.id === ROOM }]} points={P(ff, p.pts)} />)}
+        {FL.prims.map((p) => <polygon class:list={['hz-p', `hz-${p.kind}`, p.room && `hz-k-${kindOf(p.room.space_type)}`, { 'is-fault': p.room?.id === ROOM }]} points={P(ff, p.pts)} />)}
         {FL.rings.map((r) => {
           const fault = r.room.id === ROOM, at = ff.T(r.at), top = ff.T(r.top);
           const wide = (r.room.rect[2] - r.room.rect[0]) * (r.room.rect[3] - r.room.rect[1]) > 9;
@@ -335,17 +340,20 @@ const P = (t, pts) => t.pts(pts);
     --hz-bg: #EFE9DF; --hz-light: #FFFDF9; --hz-glow: rgba(226, 122, 58, .16);
     --hz-slab-top: #E4DCCF; --hz-slab-east: #C8BEAE; --hz-slab-north: #D6CCBC; --hz-corr: #DBD2C3; --hz-core: #CFC5B5; --hz-area: #E0D8CA;
     --hz-top: #FBF9F5; --hz-east: #D3CABB; --hz-north: #E5DED2; --hz-edge: rgba(28, 26, 23, .16); --hz-ground: rgba(40, 30, 15, .32);
+    --hz-k-meeting: #EEF1F6; --hz-k-small: #F2EEF6; --hz-k-shared: #F8EFDF; --hz-wc: #D6DBE2; --hz-desk: #F6F2EA;
     display: grid; gap: 14px; min-width: 0;
   }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .hz {
     --hz-bg: #15130F; --hz-light: #2B2621; --hz-glow: rgba(238, 138, 78, .12);
     --hz-slab-top: #2A2621; --hz-slab-east: #121110; --hz-slab-north: #1A1815; --hz-corr: #322E28; --hz-core: #221F1B; --hz-area: #2E2A24;
     --hz-top: #4A453E; --hz-east: #221F1B; --hz-north: #2E2A25; --hz-edge: rgba(255, 235, 210, .09); --hz-ground: rgba(0, 0, 0, .7);
+    --hz-k-meeting: #434850; --hz-k-small: #48434F; --hz-k-shared: #4F4739; --hz-wc: #2C3138; --hz-desk: #5A544B;
   } }
   :root[data-theme="dark"] .hz {
     --hz-bg: #15130F; --hz-light: #2B2621; --hz-glow: rgba(238, 138, 78, .12);
     --hz-slab-top: #2A2621; --hz-slab-east: #121110; --hz-slab-north: #1A1815; --hz-corr: #322E28; --hz-core: #221F1B; --hz-area: #2E2A24;
     --hz-top: #4A453E; --hz-east: #221F1B; --hz-north: #2E2A25; --hz-edge: rgba(255, 235, 210, .09); --hz-ground: rgba(0, 0, 0, .7);
+    --hz-k-meeting: #434850; --hz-k-small: #48434F; --hz-k-shared: #4F4739; --hz-wc: #2C3138; --hz-desk: #5A544B;
   }
 
   .hz-stage {
@@ -370,6 +378,10 @@ const P = (t, pts) => t.pts(pts);
   .hz-slab-top { fill: var(--hz-slab-top); } .hz-slab-east { fill: var(--hz-slab-east); } .hz-slab-north { fill: var(--hz-slab-north); }
   .hz-corr { fill: var(--hz-corr); stroke: none; } .hz-core { fill: var(--hz-core); stroke: none; }
   .hz-room-top { fill: var(--hz-top); } .hz-room-east { fill: var(--hz-east); } .hz-room-north { fill: var(--hz-north); }
+  .hz-room-top.hz-k-meeting { fill: var(--hz-k-meeting); } .hz-room-top.hz-k-small { fill: var(--hz-k-small); }
+  .hz-room-top.hz-k-reception, .hz-room-top.hz-k-pantry, .hz-room-top.hz-k-print { fill: var(--hz-k-shared); }
+  .hz-room-top.hz-k-desks { fill: var(--hz-corr); }
+  .hz-desk-top { fill: var(--hz-desk); } .hz-desk-east { fill: var(--hz-east); } .hz-desk-north { fill: var(--hz-north); }
   .hz-room-top.is-fault { fill: color-mix(in srgb, var(--h-fault, var(--red)) 22%, var(--hz-top)); }
   .hz-room-east.is-fault { fill: color-mix(in srgb, var(--h-fault, var(--red)) 18%, var(--hz-east)); }
   .hz-room-north.is-fault { fill: color-mix(in srgb, var(--h-fault, var(--red)) 18%, var(--hz-north)); }

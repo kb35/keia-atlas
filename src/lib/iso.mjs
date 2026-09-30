@@ -59,8 +59,15 @@ export function isoFloor(F, rooms, { z = 0, h = 1, slab = 0.4, ringLift = 0.35 }
   for (const c of F.corridors) prims.push({ kind: 'corr', pts: rectPts(c.rect).map(([x, y]) => iso(x, y, z)) });
   for (const c of F.core) prims.push({ kind: 'core', pts: rectPts(c.rect).map(([x, y]) => iso(x, y, z)), core: c.kind });
   const rings = [];
-  for (const r of drawOrder(rooms.filter((r) => r.rect))) {
-    const P = prism(r.rect, z, z + h);
+  // Desks stand in the open: a bank is a flat outline on the floor with each desk on it, low.
+  const desks = rooms.filter((r) => r.rect && r.count > 1).flatMap((r) => (r.desks ?? []).filter((d) => d.at).map((d) => ({ rect: [d.at[0] - 0.7, d.at[1] - 0.34, d.at[0] + 0.7, d.at[1] + 0.34], desk: true })));
+  for (const r of drawOrder([...rooms.filter((r) => r.rect), ...desks])) {
+    if (r.desk) {
+      const P = prism(r.rect, z, z + 0.4);
+      prims.push({ kind: 'desk-north', pts: P.north }, { kind: 'desk-east', pts: P.east }, { kind: 'desk-top', pts: P.top });
+      continue;
+    }
+    const P = prism(r.rect, z, z + (r.count > 1 ? 0.03 : h));
     prims.push({ kind: 'room-north', pts: P.north, room: r }, { kind: 'room-east', pts: P.east, room: r }, { kind: 'room-top', pts: P.top, room: r });
     const cx = (r.rect[0] + r.rect[2]) / 2, cy = (r.rect[1] + r.rect[3]) / 2;
     rings.push({ room: r, at: iso(cx, cy, z + h + ringLift), top: iso(cx, cy, z + h) });
