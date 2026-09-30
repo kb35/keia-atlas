@@ -133,7 +133,7 @@ The scope rule: Keia owns the record of what is in the building and the work on 
 | Locations | Floor plans, every device a health circle, who is on site | Incidents lit in their space; the change calendar on the floor |
 | Services | A map per service; levels within or past target | Incidents, changes and vendors on the map; experience measures |
 | Support | One queue for incidents, requests, problems and changes; hand-offs; standing rules | The incident story on the space drawing; changes written from work |
-| Projects | Playbooks; a programme that is always current; deploy batches that verify instead of tick | The as-built record becomes the operational record; lessons into setup guides |
+| Projects | Playbooks; a programme that is always current; deploy work that is verified, not ticked: batches by default; by room, by floor or one at a time where the team works that way | The as-built record becomes the operational record; lessons into setup guides |
 | Vendors | Contracts and end dates; cases; performance from the record | The vendor as a peer in the flow, scoped to the job |
 | Knowledge | Runbooks, lessons, guides, glossary, with owners and review dates | Fixes captured where work closes |
 
