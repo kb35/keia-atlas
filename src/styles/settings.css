@@ -1,0 +1,93 @@
+/* Settings: the shared controls of the quick menu (Settings.astro), /settings/ and /settings/organisation/.
+   One family, calm and roomy (Keith, 30 Sept 2026: "way too cramped"): a label never cut short, a line of words
+   under it, the control on the right; 24 px or more between groups, 12 to 16 px between rows. */
+
+/* A segmented control: one marker slides to the chosen word (rsMarker, M12). The radios stay in the page for the
+   keyboard (arrow keys move the choice) and for screen readers. */
+.st-seg { display: inline-flex; flex: none; padding: 3px; gap: 2px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); width: max-content; max-width: 100%; }
+.st-seg label { cursor: pointer; }
+.st-seg input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.st-seg span { display: block; padding: 7px 14px; border-radius: 999px; font: 600 13px/1.2 var(--font-sans); color: var(--text-2); white-space: nowrap; transition: color var(--dur-state) var(--ease-settle); }
+.st-seg label:hover span { color: var(--text); }
+.st-seg label:has(input:checked) span { color: var(--text); }
+.st-seg label:has(input:focus-visible) span { outline: 2px solid var(--focus); outline-offset: 1px; }
+.st-seg label:has(input:disabled) { cursor: default; opacity: .55; }
+.st-seg .rs-mark { background: var(--surface); box-shadow: 0 1px 2px rgba(0, 0, 0, .14), 0 0 0 1px var(--line); }
+.st-seg.st-seg-sm span { padding: 5px 11px; font-size: 12.5px; }
+
+/* A switch (iOS style): the whole row is its label; the knob slides. role="switch" on the checkbox. */
+.st-switch { position: relative; display: inline-flex; align-items: center; flex: none; min-width: 44px; min-height: 44px; justify-content: flex-end; cursor: pointer; }
+.st-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.st-switch .sw { position: relative; width: 42px; height: 26px; border-radius: 999px; background: var(--surface-3); box-shadow: inset 0 0 0 1px var(--line-strong); transition: background-color var(--dur-state) var(--ease-settle), box-shadow var(--dur-state) var(--ease-settle); }
+.st-switch .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 3px rgba(0, 0, 0, .25); transition: transform var(--dur-state) var(--ease-settle); }
+.st-switch input:checked + .sw { background: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.st-switch input:checked + .sw::after { transform: translateX(16px); }
+.st-switch input:focus-visible + .sw { outline: 2px solid var(--focus); outline-offset: 2px; }
+.st-switch input:disabled + .sw { opacity: .5; }
+.st-switch:has(input:disabled) { cursor: default; }
+
+/* A list of settings in one card: each row a name, one line under it, and its control on the right. */
+.st-list { display: grid; padding: 0; margin: 0; list-style: none; container: st-list / inline-size; }
+.st-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px 20px; padding: 16px 22px; min-height: 64px; }
+.st-item + .st-item { border-top: 1px solid var(--line); }
+.st-item-t { display: grid; gap: 3px; min-width: 0; }
+.st-item-t > b, .st-item-t > label > b { font: 600 var(--fs-name, 14px)/1.35 var(--font-sans); color: var(--text); }
+.st-item-t > small { font-size: var(--fs-support, 13px); line-height: 1.45; color: var(--text-2); }
+.st-item-t > small.st-note { color: var(--text-3); }
+/* A switch row: the name and the switch on one line, its line of words under the name (iOS style). */
+.st-item:has(> .st-switch) { grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 2px 20px; }
+.st-item:has(> .st-switch) > .st-item-t { grid-column: 1; grid-row: 1; }
+.st-item:has(> .st-switch) > label.st-item-t { cursor: pointer; }
+.st-item:has(> .st-switch) > .st-switch { grid-column: 2; grid-row: 1 / span 2; }
+.st-item:has(> .st-switch) > .st-sub { grid-column: 1; grid-row: 2; font-size: var(--fs-support, 13px); line-height: 1.45; color: var(--text-2); }
+/* A row whose control is wide (a segmented choice of four, the looks) puts it under the words when the card is narrow. */
+.st-item.st-block { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+@container st-list (max-width: 560px) {
+  .st-item.st-stack { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .st-item { padding: 16px 18px; }
+}
+.st-item.fb-out + .st-item, .st-item[hidden] + .st-item { border-top: 1px solid var(--line); }
+.st-list > .st-item:not(.fb-out):not([hidden]) ~ .st-item { border-top: 1px solid var(--line); }
+.st-list > .st-item.fb-out ~ .st-item:not(.fb-out) { border-top: 1px solid var(--line); }
+
+/* A row that is a link to another page. */
+.st-list .st-link { padding: 0; }
+.st-list .st-link:first-child a { border-top-left-radius: var(--radius-lg); border-top-right-radius: var(--radius-lg); }
+.st-list .st-link:not(:last-child) a { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.st-list .st-link a { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 20px; padding: 16px 22px; color: inherit; text-decoration: none; border-radius: 0 0 var(--radius-lg) var(--radius-lg); transition: background var(--dur-hover) var(--ease-settle); }
+.st-list .st-link a:hover { background: var(--surface-2); }
+.st-list .st-link a > span:last-child { font-size: 20px; color: var(--text-3); }
+
+/* The looks: a swatch and a name. The chosen one is marked by a ring that slides from look to look. */
+.st-looks { position: relative; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.st-look { position: relative; z-index: 1; display: grid; justify-items: center; gap: 10px; padding: 14px 8px 12px; border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer; text-align: center; transition: background var(--dur-hover) var(--ease-settle), border-color var(--dur-state) var(--ease-settle); }
+.st-look:hover { background: var(--surface-2); }
+.st-look input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.st-look b { font: 600 13px/1.25 var(--font-sans); white-space: nowrap; transition: color var(--dur-state) var(--ease-settle); }
+.st-look:has(input:checked) { border-color: transparent; }
+.st-look:has(input:checked) b { color: var(--accent-ink); }
+.st-look:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+.st-look-mark { position: absolute; left: 0; top: 0; z-index: 0; border-radius: var(--radius); background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); pointer-events: none; transition: transform var(--dur-morph) var(--ease-settle), width var(--dur-morph) var(--ease-settle), height var(--dur-morph) var(--ease-settle); }
+.st-look-mark:not(.on) { opacity: 0; }
+.st-swatch { display: grid; grid-template-columns: repeat(2, 1fr); flex: none; width: 36px; height: 36px; border-radius: 50%; overflow: hidden; border: 1px solid var(--line-strong); transform: rotate(45deg); }
+@container st-list (max-width: 560px) {
+  /* A phone: two across, the swatch beside the name, so no name is ever squeezed. */
+  .st-looks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .st-look { grid-template-columns: auto minmax(0, 1fr); justify-items: start; align-items: center; padding: 10px 12px; text-align: left; }
+  .st-look .st-swatch { width: 28px; height: 28px; }
+}
+/* While the page cross-fades to a new look, the markers in here still slide (motion.css turns other easing off). */
+@media (prefers-reduced-motion: no-preference) {
+  :root.rs-theming .st-look-mark { transition: transform var(--dur-morph) var(--ease-settle), width var(--dur-morph) var(--ease-settle), height var(--dur-morph) var(--ease-settle) !important; }
+  :root.rs-theming .st-seg .rs-mark, :root.rs-theming .qm .rs-mark { transition: transform var(--dur-morph) var(--ease-settle), width var(--dur-morph) var(--ease-settle) !important; }
+}
+
+/* Who you view as: one row that opens View as (it grows from here). */
+.st-who { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.st-who .avatar { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-ink); font: 650 13px/1 var(--font-sans); }
+.st-who-t { display: grid; gap: 2px; min-width: 0; }
+.st-who-t b { font: 600 var(--fs-name, 14px)/1.3 var(--font-sans); }
+.st-who-t small { font-size: var(--fs-support, 13px); color: var(--text-2); }
+
+/* The Demo section says what it is. */
+.st-demo-tag { display: inline-flex; align-items: center; padding: 3px 10px; border: 1px dashed var(--line-strong); border-radius: 999px; font: 600 var(--fs-code, 12.5px)/1.3 var(--font-sans); color: var(--text-2); white-space: nowrap; }

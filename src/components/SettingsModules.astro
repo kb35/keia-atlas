@@ -1,91 +1,216 @@
 ---
-/* Settings › Modules (src/lib/modules.mjs): each module On, Connected or Off, with its capabilities nested under it,
-   each On, Connected or Off too (Keith's rule, 30 Sept 2026: the bigger items are switched on when they are needed,
-   so nothing ever looks missing). One line per capability, no box of its own and nothing that scrolls inside.
-   A module that is Off folds its capabilities away (they are off with it); a capability whose `requires` is off
-   stays in its row, switched off, and says what it waits for.
-   Saved in this browser: rs6-modules and rs6-features. Applied by the boot script in the page head (Shell.astro).
-   Motion (M12, row 26): the choice marker slides; the page behind changes through rsChange (what a capability marks
-   collapses or grows in place, the rest slides) and so does this list when a module folds its capabilities.
-   Reduced motion: every change is at once. */
-import { MODULES, MODULE_STATES, CAPABILITIES } from '../lib/modules.mjs';
+/* Organisation settings (/settings/organisation/; src/lib/modules.mjs): every module as a card, each On, Connected or
+   Off, with its capabilities inside it, each On, Connected or Off too (Keith's rule, 30 Sept 2026: the bigger items
+   are switched on when they are needed, so nothing ever looks missing). Everything is drawn from the registry
+   (MODULES and CAPABILITIES), so a capability another change registers shows here with nothing else to do.
+   One control for both sizes of screen: a switch for on or off, and, while on, where its records come from
+   (Built in or Connected, with the source named). A module Off folds its capabilities away (they are off with it);
+   a capability whose `requires` is off stays in its row, switched off, and says what it waits for.
+   Saved in this browser: rs6-modules and rs6-features, applied by the boot script in the page head (Shell.astro).
+   Motion (M12, row 26): the switch knob and the segment markers slide; the page changes through rsChange (what a
+   switch adds grows, what it takes away shrinks, the rest slides); a card's capabilities open from the card itself
+   (a <details>, km-disclose). Reduced motion: every change is at once. */
+import { MODULES, CAPABILITIES } from '../lib/modules.mjs';
 const capsOf = (id) => CAPABILITIES.filter((c) => c.module === id);
 const LABEL = Object.fromEntries(MODULES.map((m) => [m.id, m.label]));
 const capWords = Object.fromEntries(CAPABILITIES.map((c) => [c.id, c.label]));
-// A module Off folds its capabilities away (keyed on <html>, so it is right before first paint and rsChange can move it).
-const foldCss = MODULES.map((m) => `:root[data-off~="${m.id}"] .settings [data-caps-of="${m.id}"]{display:none}`).join('');
+const lc = (s) => String(s ?? '').toLowerCase();
+// Keyed on <html>, so it is right before first paint and rsChange can move it: a module Off folds its capabilities
+// and its source choice away and says so; a capability off hides its source choice.
+const foldCss = MODULES.map((m) => `:root[data-off~="${m.id}"] [data-caps-of="${m.id}"],:root[data-off~="${m.id}"] [data-mod-src="${m.id}"]{display:none}`
+  + `:root:not([data-off~="${m.id}"]) [data-mod-offnote="${m.id}"]{display:none}`).join('')
+  + CAPABILITIES.map((c) => `:root[data-feat-off~="${c.id}"] [data-cap-src="${c.id}"]{display:none}`).join('');
 ---
-<fieldset data-help="shell.modules" class="set-mods">
-  <legend class="overline">Modules</legend>
-  <ul class="mods">
-    {MODULES.map((m) => {
-      const caps = capsOf(m.id);
-      const off = caps.length ? `Off: not in the sidebar, nor its ${caps.length === 1 ? 'capability' : `${caps.length} capabilities`}` : 'Off: not in the sidebar';
-      return (
-        <li class="mod" data-mod-row={m.id}>
-          <span class="mod-n"><b id={`mod-${m.id}`}>{m.label}</b><small data-mod-note={m.id} data-on={m.what} data-conn={`Connected: from ${m.source}`} data-off={off}>{m.what}</small></span>
-          <span class="seg-s" data-seg role="radiogroup" aria-labelledby={`mod-${m.id}`}>
-            {MODULE_STATES.map((st) => (<label><input type="radio" name={`mod-${m.id}`} value={st.id} data-mod={m.id} /><span>{st.label}</span></label>))}
+<div class="om-list" data-om>
+  {MODULES.map((m) => {
+    const caps = capsOf(m.id);
+    const find = lc(`${m.label} ${m.what} ${m.source} ${caps.map((c) => `${c.label} ${c.what} ${c.source}`).join(' ')}`);
+    return (
+      <article class="card om" id={m.id} data-mod-card={m.id} data-fi data-find={find} data-f-state="on" data-help="shell.modules">
+        <div class="om-head">
+          <div class="om-t">
+            <h2 id={`om-${m.id}`}>{m.label}</h2>
+            <p>{m.what}</p>
+          </div>
+          <label class="st-switch"><input type="checkbox" role="switch" data-mod-sw={m.id} aria-labelledby={`om-${m.id}`} aria-describedby={`om-${m.id}-n`} /><span class="sw" aria-hidden="true"></span></label>
+        </div>
+        <div class="om-src" data-mod-src={m.id}>
+          <span class="st-seg st-seg-sm" role="radiogroup" aria-label={`Where ${m.label} records come from`} data-seg>
+            <label><input type="radio" name={`mod-${m.id}`} value="on" data-mod={m.id} /><span>Built in</span></label>
+            <label><input type="radio" name={`mod-${m.id}`} value="connected" data-mod={m.id} /><span>Connected</span></label>
           </span>
-          {caps.length > 0 && (
-            <ul class="caps" data-caps-of={m.id} aria-label={`${m.label} capabilities`}>
+          <small id={`om-${m.id}-n`} data-mod-note={m.id} data-on="Built into Keia Atlas" data-conn={`From ${m.source}`}>Built into Keia Atlas</small>
+        </div>
+        <p class="om-off" data-mod-offnote={m.id}>Off for everyone: not in the sidebar{caps.length ? `, and its ${caps.length === 1 ? 'capability is' : `${caps.length} capabilities are`} off with it` : ''}.</p>
+        {caps.length > 0 && (
+          <details class="om-caps" data-caps-of={m.id}>
+            <summary><span><b>Capabilities</b> <span class="om-count" data-cap-count={m.id}>{caps.length} of {caps.length} on</span></span><svg class="om-chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg></summary>
+            <ul aria-label={`${m.label} capabilities`}>
               {caps.map((c) => (
-                <li class="cap" data-cap-row={c.id} data-help="shell.capability" data-help-name={c.label}>
-                  <span class="cap-n" title={`${c.label}: ${c.what}`}><b id={`cap-${c.id}`}>{c.label}</b><small data-cap-note={c.id} data-on={c.what} data-conn={`from ${c.source}`} data-off="off, nothing of it shows">{c.what}</small></span>
-                  <span class="seg-s seg-cap" data-seg role="radiogroup" aria-labelledby={`cap-${c.id}`}>
-                    {MODULE_STATES.map((st) => (<label><input type="radio" name={`cap-${c.id}`} value={st.id} data-cap={c.id} /><span>{st.label}</span></label>))}
-                  </span>
+                <li class="oc" data-cap-row={c.id} data-cap-text={lc(`${c.label} ${c.what} ${c.source}`)} data-help="shell.capability" data-help-name={c.label}>
+                  <div class="oc-t">
+                    <b id={`cap-${c.id}`}>{c.label}</b>
+                    <span class="oc-what"><span class="oc-w" id={`cap-${c.id}-w`}>{c.what}</span><button type="button" class="oc-more" data-more hidden aria-expanded="false" aria-controls={`cap-${c.id}-w`}>More</button></span>
+                    <small class="oc-held" data-cap-held hidden></small>
+                    <span class="oc-src" data-cap-src={c.id}>
+                      <span class="st-seg st-seg-sm" role="radiogroup" aria-label={`Where ${c.label} records come from`} data-seg>
+                        <label><input type="radio" name={`cap-${c.id}`} value="on" data-cap={c.id} /><span>Built in</span></label>
+                        <label><input type="radio" name={`cap-${c.id}`} value="connected" data-cap={c.id} /><span>Connected</span></label>
+                      </span>
+                      <small data-cap-note={c.id} data-conn={`From ${c.source}`}>Built in</small>
+                    </span>
+                  </div>
+                  <label class="st-switch"><input type="checkbox" role="switch" data-cap-sw={c.id} aria-labelledby={`cap-${c.id}`} aria-describedby={`cap-${c.id}-w`} /><span class="sw" aria-hidden="true"></span></label>
                 </li>
               ))}
             </ul>
-          )}
-        </li>
-      );
-    })}
-  </ul>
-</fieldset>
+          </details>
+        )}
+      </article>
+    );
+  })}
+</div>
 
-<script is:inline data-astro-rerun define:vars={{ LABEL, capWords, REQ: Object.fromEntries(CAPABILITIES.map((c) => [c.id, [c.module, ...(c.requires ?? [])]])) }}>
+<script is:inline data-astro-rerun define:vars={{ LABEL, capWords, REQ: Object.fromEntries(CAPABILITIES.map((c) => [c.id, [c.module, ...(c.requires ?? [])]])), CAPS_OF: Object.fromEntries(MODULES.map((m) => [m.id, capsOf(m.id).map((c) => c.id)])), CAP_DEF: Object.fromEntries(CAPABILITIES.map((c) => [c.id, c.state])) }}>
   (function () {
-    var dlg = document.querySelector('dialog#settings'); if (!dlg) return;
-    var W = window;
+    var box = document.querySelector('[data-om]'); if (!box || box.__om) return; box.__om = true;
+    var W = window, D = document;
     var name = function (id) { return LABEL[id] || capWords[id] || id; };
-    // Each row says what it is when On, where it comes from when Connected, and that it is gone when Off. A capability
-    // held off by its module or by what it requires keeps its row, switched off, and says what it waits for.
+    // What On means when you switch something back on: what it was before you switched it off, or Built in.
+    var was = {};
+    var bar = function () { return D.querySelector('[data-fb]'); };
     function sync() {
       var mods = W.rsModules ? W.rsModules() : {}, feats = W.rsFeatures ? W.rsFeatures() : {}, chosen = W.rsFeatureChoice ? W.rsFeatureChoice() : {};
-      dlg.querySelectorAll('input[data-mod]').forEach(function (i) { i.checked = i.value === (mods[i.dataset.mod] || 'on'); });
-      dlg.querySelectorAll('[data-mod-note]').forEach(function (n) {
-        var v = mods[n.dataset.modNote] || 'on';
-        n.textContent = v === 'connected' ? n.dataset.conn : v === 'off' ? n.dataset.off : n.dataset.on;
+      box.querySelectorAll('[data-mod-card]').forEach(function (card) {
+        var id = card.dataset.modCard, v = mods[id] || 'on';
+        card.querySelector('[data-mod-sw]').checked = v !== 'off';
+        card.querySelectorAll('input[data-mod]').forEach(function (i) { i.checked = i.value === v; });
+        var n = card.querySelector('[data-mod-note]'); n.textContent = v === 'connected' ? n.dataset.conn : n.dataset.on;
+        card.classList.toggle('is-off', v === 'off');
+        var states = [v];
+        var on = 0, all = CAPS_OF[id] || [];
+        all.forEach(function (c) { var s = feats[c] || 'off'; if (s !== 'off') on++; if (states.indexOf(s) < 0) states.push(s); });
+        var cnt = card.querySelector('[data-cap-count]');
+        if (cnt) cnt.textContent = on + ' of ' + all.length + ' on';
+        card.dataset.fState = states.join('|');
       });
-      dlg.querySelectorAll('[data-cap-row]').forEach(function (row) {
+      // Each capability: its switch, where it comes from, and, when something above it is off, what it waits for.
+      box.querySelectorAll('[data-cap-row]').forEach(function (row) {
         var id = row.dataset.capRow, v = feats[id] || 'off', by = null;
-        // Held off: the first of its module and what it requires that is off, while it was not switched off itself.
         if (v === 'off' && chosen[id] !== 'off') (REQ[id] || []).some(function (r) { var s = r in feats ? feats[r] : mods[r]; if (s === 'off') { by = r; return true; } return false; });
         row.classList.toggle('is-held', !!by);
-        row.querySelectorAll('input[data-cap]').forEach(function (i) { i.checked = i.value === v; i.disabled = !!by; });
-        var n = row.querySelector('[data-cap-note]');
-        n.classList.toggle('is-note', !!by || v === 'connected');   // a phone shows the line only when it says more than the name
-        n.textContent = by ? 'off while ' + name(by) + ' is off' : v === 'connected' ? n.dataset.conn : v === 'off' ? n.dataset.off : n.dataset.on;
+        var sw = row.querySelector('[data-cap-sw]'); sw.checked = v !== 'off'; sw.disabled = !!by;
+        row.querySelectorAll('input[data-cap]').forEach(function (i) { i.checked = i.value === v; });
+        var n = row.querySelector('[data-cap-note]'); n.textContent = v === 'connected' ? n.dataset.conn : 'Built in';
+        var h = row.querySelector('[data-cap-held]'); h.hidden = !by; h.textContent = by ? 'Off while ' + name(by) + ' is off' : '';
       });
-      dlg.querySelectorAll('.set-mods [data-seg]').forEach(function (g) {
+      box.querySelectorAll('[data-seg]').forEach(function (g) {
         if (W.rsMarker) W.rsMarker(g, function () { var i = g.querySelector('input:checked'); return i && i.closest('label'); });
       });
+      var b = bar(); if (b && b.rsFilter) b.rsFilter.refresh();
+      more();
+      if (W.rsOrgSummary) W.rsOrgSummary();
     }
-    if (dlg.__rsModules) { sync(); return; }
-    dlg.__rsModules = true;
-    dlg.addEventListener('change', function (e) {
-      var i = e.target;
-      if (i.dataset.mod) W.rsSetModule(i.dataset.mod, i.value);
-      if (i.dataset.cap) W.rsSetFeature(i.dataset.cap, i.value);
-      if (i.dataset.mod || i.dataset.cap) sync();
+    // A capability's line is one line; when it is cut short, More shows it whole (and Less folds it again).
+    function more() {
+      box.querySelectorAll('.oc').forEach(function (row) {
+        var w = row.querySelector('.oc-w'), btn = row.querySelector('[data-more]');
+        if (!w.offsetParent || row.classList.contains('is-open')) return;
+        btn.hidden = w.scrollWidth <= w.clientWidth + 1;
+      });
+    }
+    box.addEventListener('click', function (e) {
+      var btn = e.target.closest && e.target.closest('[data-more]'); if (!btn) return;
+      var row = btn.closest('.oc'), open = !row.classList.contains('is-open');
+      row.classList.toggle('is-open', open); btn.textContent = open ? 'Less' : 'More'; btn.setAttribute('aria-expanded', String(open));
     });
-    // Settings syncs itself as it opens; follow it, and follow a change made anywhere else (a page's own Switch on).
-    new MutationObserver(function () { if (dlg.open) sync(); }).observe(dlg, { attributes: true, attributeFilter: ['open'] });
-    document.addEventListener('rs:demo-change', function () { var d = document.querySelector('dialog#settings'); if (d && d.open && d === dlg) sync(); });
-    sync();
+    box.addEventListener('change', function (e) {
+      var i = e.target, mods = W.rsModules(), feats = W.rsFeatures();
+      if (i.dataset.modSw) {
+        var id = i.dataset.modSw;
+        if (!i.checked) { was['m:' + id] = mods[id]; W.rsSetModule(id, 'off'); }
+        else W.rsSetModule(id, was['m:' + id] && was['m:' + id] !== 'off' ? was['m:' + id] : 'on');
+      } else if (i.dataset.capSw) {
+        var c = i.dataset.capSw;
+        if (!i.checked) { was['c:' + c] = feats[c]; W.rsSetFeature(c, 'off'); }
+        else W.rsSetFeature(c, was['c:' + c] && was['c:' + c] !== 'off' ? was['c:' + c] : CAP_DEF[c] === 'connected' ? 'connected' : 'on');
+      } else if (i.dataset.mod) W.rsSetModule(i.dataset.mod, i.value);
+      else if (i.dataset.cap) W.rsSetFeature(i.dataset.cap, i.value);
+      else return;
+      sync();
+    });
+    // Find: the cards that match stay; inside them, the capabilities that match are shown open and the rest dimmed.
+    D.addEventListener('fb:change', function () {
+      if (!box.isConnected) return;
+      var b = bar(), q = b ? (b.querySelector('input[type=search], input[data-fb-q], input') || {}).value || '' : '';
+      var toks = String(q).toLowerCase().trim().split(/\s+/).filter(Boolean);
+      box.querySelectorAll('[data-mod-card]').forEach(function (card) {
+        var d = card.querySelector('details'); if (!d) return;
+        var any = false;
+        d.querySelectorAll('[data-cap-row]').forEach(function (row) {
+          var ok = !toks.length || toks.every(function (k) { return row.dataset.capText.indexOf(k) >= 0; });
+          row.classList.toggle('oc-dim', !!toks.length && !ok);
+          if (ok && toks.length) any = true;
+        });
+        if (any && !d.open && !card.classList.contains('fb-out')) d.open = true;
+      });
+      more();
+    });
+    box.addEventListener('toggle', function () { requestAnimationFrame(more); }, true);
+    D.addEventListener('rs:demo-change', function () { if (box.isConnected) sync(); });
+    if (W.ResizeObserver) new ResizeObserver(function () { more(); }).observe(box);
+    // Deep links (/settings/organisation/#assets) open that module's capabilities.
+    var h = location.hash.slice(1), card = h && box.querySelector('[data-mod-card="' + h + '"] details');
+    if (card) card.open = true;
+    W.rsOrgSync = sync;
+    // (on a first visit the Shell's helpers, rsModules, rsMarker and the rest, are defined after this script)
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { sync(); }, { once: true }); else sync();
   })();
 </script>
 
 <style is:global set:html={foldCss}></style>
+<style is:global>
+  .om-list { display: grid; gap: 16px; }
+  .om { display: grid; gap: 14px; padding: 20px 22px; scroll-margin-top: calc(var(--mast-h, 56px) + 72px); }
+  .om-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 16px; }
+  .om-t { display: grid; gap: 4px; min-width: 0; }
+  .om-t h2 { font: 600 var(--fs-h3, 15px)/1.3 var(--font-sans); margin: 0; }
+  .om-t p { margin: 0; font-size: var(--fs-support, 13px); line-height: 1.45; color: var(--text-2); }
+  .om-head .st-switch { margin: -9px 0; }
+  .om-src { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .om-src small, .oc-src small { font-size: var(--fs-code, 12.5px); color: var(--text-2); }
+  .om-off { margin: 0; font-size: var(--fs-support, 13px); color: var(--text-2); }
+  .om.is-off .om-t h2 { color: var(--text-2); }
+
+  /* The capabilities: a disclosure that opens from the card itself (km-disclose). */
+  .om-caps { border-top: 1px solid var(--line); margin: 0 -22px -20px; }
+  .om-caps > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 12px 22px; cursor: pointer; list-style: none; font-size: var(--fs-body, 14px); border-radius: 0 0 var(--radius-lg) var(--radius-lg); transition: background var(--dur-hover) var(--ease-settle); }
+  .om-caps > summary::-webkit-details-marker { display: none; }
+  .om-caps > summary:hover { background: var(--surface-2); }
+  .om-caps > summary b { font-weight: 600; }
+  .om-count { color: var(--text-2); margin-left: 6px; font-variant-numeric: tabular-nums; }
+  .om-chev { color: var(--text-3); transition: transform var(--dur-state) var(--ease-settle); }
+  .om-caps[open] > summary { border-radius: 0; }
+  .om-caps[open] .om-chev { transform: rotate(180deg); }
+  .om-caps ul { list-style: none; margin: 0; padding: 0 22px 8px; }
+  .oc { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 16px; padding: 14px 0; border-top: 1px solid var(--line); transition: opacity var(--dur-state) var(--ease-settle); }
+  .oc-t { display: grid; gap: 4px; min-width: 0; }
+  .oc-t > b { font: 600 var(--fs-name, 14px)/1.35 var(--font-sans); }
+  /* One line of what it adds; More shows the rest. The name above is never cut. */
+  .oc-what { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: var(--fs-support, 13px); line-height: 1.45; color: var(--text-2); }
+  .oc-w { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .oc.is-open .oc-w { white-space: normal; overflow: visible; }
+  .oc-more { flex: none; padding: 0; border: 0; background: none; color: var(--accent-ink); font: 600 var(--fs-code, 12.5px)/1.45 var(--font-sans); cursor: pointer; }
+  .oc-more:hover { text-decoration: underline; }
+  .oc-held { font-size: var(--fs-code, 12.5px); color: var(--text-2); }
+  .oc-src { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 6px; }
+  .oc .st-switch { margin: -9px 0; }
+  .oc.is-held .oc-t > b { color: var(--text-2); }
+  .oc.oc-dim { opacity: .45; }
+  @media (max-width: 599px) {
+    .om { padding: 18px 16px; }
+    .om-caps { margin: 0 -16px -18px; }
+    .om-caps > summary { padding: 12px 16px; }
+    .om-caps ul { padding: 0 16px 8px; }
+  }
+</style>

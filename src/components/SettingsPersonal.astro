@@ -1,92 +1,118 @@
 ---
-/* The person's own settings inside Settings (UX-V2 §5.2 and §5.3; rule P11): density, where pages open, and the demo
-   switch for coming back from leave. Stored per person in this browser: rs6-density, rs6-depth (src/lib/depth.mjs; Where pages open sets one layer for every kind of page),
-   rs6-leave and rs6-welcomed. Density is applied before first paint by the Shell's boot script (html[data-density]).
-   Motion: density eases rows and cards to their new size together, holding what you were looking at (rsChange,
-   MOTION-V2 4.25); the reset line changes its words and nothing else (4.27). */
-import '../styles/density.css';
+/* Settings › You (/settings/#you; UX-V2 §5.2 and §5.3; rule P11): the look, light or dark, density, where pages
+   open and whether agents show. Each is a row: its name, one line of what it does, its control.
+   Stored in this browser as before: rs4-skin, rs4-theme and rs4-agents (for the browser), rs6-density and rs6-depth
+   (per person, src/lib/depth.mjs), all applied before first paint by the Shell's boot script.
+   Motion: a look or a mode cross-fades the page (rsTheme) while the ring round the chosen look and the segment
+   markers slide (M12); density eases rows and cards to their new size together, holding what you were looking at
+   (rsChange, MOTION-V2 4.25); agents grow and shrink what they add (rsChange); the depth line changes its words.
+   Reduced motion: every change is at once. */
+import { LOOKS, MODES } from '../lib/settings.mjs';
+const DENSITY = [{ id: 'comfortable', name: 'Comfortable' }, { id: 'compact', name: 'Compact' }];
+const DEPTH = [{ id: 'band', name: 'Band' }, { id: 'summary', name: 'Summary' }, { id: 'record', name: 'Record' }, { id: 'raw', name: 'Raw' }];
+const AGENTS = [{ id: 'on', name: 'Show' }, { id: 'off', name: 'Hide' }];
 ---
-<div class="set-row set-personal">
-  <fieldset data-help="settings.density">
-    <legend class="overline">Density</legend>
-    <div class="seg-s" data-seg>
-      <label><input type="radio" name="density" value="comfortable" /><span>Comfortable</span></label>
-      <label><input type="radio" name="density" value="compact" /><span>Compact</span></label>
+<ul class="card st-list" data-st-you>
+  <li class="st-item st-block" data-fi data-find="look theme colours studio enterprise high contrast drawing set playful style">
+    <div class="st-item-t"><b id="st-look-l">Look</b><small data-look-note>{LOOKS[0].name}: {LOOKS[0].note}</small></div>
+    <div class="st-looks" role="radiogroup" aria-labelledby="st-look-l">
+      <span class="st-look-mark" aria-hidden="true"></span>
+      {LOOKS.map((l) => (
+        <label class="st-look">
+          <input type="radio" name="st-skin" value={l.id} />
+          <span class="st-swatch" aria-hidden="true">{l.sw.map((c) => <i style={`background:${c}`}></i>)}</span>
+          <b>{l.name}</b>
+        </label>
+      ))}
     </div>
-  </fieldset>
-  <fieldset data-help="settings.depth">
-    <legend class="overline">Where pages open</legend>
-    <div class="seg-s" data-seg>
-      <label><input type="radio" name="depth" value="band" /><span>Band</span></label>
-      <label><input type="radio" name="depth" value="summary" /><span>Summary</span></label>
-      <label><input type="radio" name="depth" value="record" /><span>Record</span></label>
-      <label><input type="radio" name="depth" value="raw" /><span>Raw</span></label>
+  </li>
+  <li class="st-item st-stack" data-fi data-find="appearance light dark auto mode colour theme night" data-help="shell.mode">
+    <div class="st-item-t"><b id="st-mode-l">Appearance</b><small>Auto follows your device</small></div>
+    <div class="st-seg" role="radiogroup" aria-labelledby="st-mode-l" data-seg>
+      {MODES.map((m) => (<label><input type="radio" name="st-mode" value={m.id} /><span>{m.name}</span></label>))}
     </div>
-    <small class="faint set-note" data-depth-note>Every page opens at the top.</small>
-  </fieldset>
-</div>
-<fieldset data-help="settings.leave">
-  <legend class="overline">Demo: time away</legend>
-  <label class="set-switch"><input type="checkbox" name="leave" data-leave /><span class="sw" aria-hidden="true"></span><span>Anna is back today from two weeks' leave <small class="faint">Her Home opens on Welcome back, once; Marcus sees the cover card until then</small></span></label>
-</fieldset>
+  </li>
+  <li class="st-item st-stack" data-fi data-find="density compact comfortable rows spacing dense" data-help="settings.density">
+    <div class="st-item-t"><b id="st-density-l">Density</b><small>Smaller rows and cards. Nothing hidden.</small></div>
+    <div class="st-seg" role="radiogroup" aria-labelledby="st-density-l" data-seg>
+      {DENSITY.map((m) => (<label><input type="radio" name="st-density" value={m.id} /><span>{m.name}</span></label>))}
+    </div>
+  </li>
+  <li class="st-item st-stack" data-fi data-find="where pages open depth layer band summary record raw" data-help="settings.depth">
+    <div class="st-item-t"><b id="st-depth-l">Where pages open</b><small data-depth-note>Every page opens at the top.</small></div>
+    <div class="st-seg" role="radiogroup" aria-labelledby="st-depth-l" data-seg>
+      {DEPTH.map((m) => (<label><input type="radio" name="st-depth" value={m.id} /><span>{m.name}</span></label>))}
+    </div>
+  </li>
+  <li class="st-item st-stack" data-fi data-find="agents automation automatic helpers show hide">
+    <div class="st-item-t"><b id="st-agents-l">Agents</b><small>Automatic work on projects and jobs</small></div>
+    <div class="st-seg" role="radiogroup" aria-labelledby="st-agents-l" data-seg>
+      {AGENTS.map((m) => (<label><input type="radio" name="st-agents" value={m.id} /><span>{m.name}</span></label>))}
+    </div>
+  </li>
+</ul>
 
-<script is:inline data-astro-rerun>
+<script is:inline data-astro-rerun define:vars={{ LOOKS }}>
   (function () {
-    var dlg = document.querySelector('dialog#settings'); if (!dlg) return;
+    var box = document.querySelector('[data-st-you]'); if (!box || box.__st) return; box.__st = true;
     var W = window, R = document.documentElement;
     var who = function () { return W.rsWhoId ? W.rsWhoId() : 'anna'; };
     var KINDS = ['home', 'space', 'device', 'job', 'service', 'project', 'office', 'vendor'];
+    var get = function (k, d) { try { return localStorage.getItem(k) || d; } catch (_) { return d; } };
+    var put = function (k, v) { try { localStorage.setItem(k, v); } catch (_) {} };
     var read = function (k) { try { return JSON.parse(localStorage.getItem(k) || '{}') || {}; } catch (_) { return {}; } };
     var write = function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
+    var NOTE = {}; LOOKS.forEach(function (l) { NOTE[l.id] = l.name + ': ' + l.note; });
+    // The ring on the chosen look slides from card to card (and row to row on a phone).
+    function markLook() {
+      var g = box.querySelector('.st-looks'), mk = g.querySelector('.st-look-mark'), on = g.querySelector('.st-look:has(input:checked)');
+      if (!on || !on.offsetWidth) { mk.classList.remove('on'); return; }
+      var first = !mk.classList.contains('on');
+      if (first) mk.style.transition = 'none';
+      mk.style.width = on.offsetWidth + 'px'; mk.style.height = on.offsetHeight + 'px';
+      mk.style.transform = 'translate(' + on.offsetLeft + 'px,' + on.offsetTop + 'px)';
+      if (first) { mk.classList.add('on'); void mk.offsetWidth; mk.style.transition = ''; }
+    }
     function sync() {
-      var d = R.getAttribute('data-density') || 'comfortable';
-      dlg.querySelectorAll('input[name=density]').forEach(function (i) { i.checked = i.value === d; });
-      var on = false; try { on = localStorage.getItem('rs6-leave') === 'on'; } catch (_) {}
-      var lv = dlg.querySelector('[data-leave]'); if (lv) lv.checked = on;
+      var s = get('rs4-skin', 'studio'), t = get('rs4-theme', 'system'), ag = get('rs4-agents', 'on'), d = R.getAttribute('data-density') || 'comfortable';
+      box.querySelectorAll('input[name=st-skin]').forEach(function (i) { i.checked = i.value === s; });
+      box.querySelectorAll('input[name=st-mode]').forEach(function (i) { i.checked = i.value === t; });
+      box.querySelectorAll('input[name=st-agents]').forEach(function (i) { i.checked = i.value === ag; });
+      box.querySelectorAll('input[name=st-density]').forEach(function (i) { i.checked = i.value === d; });
+      var ln = box.querySelector('[data-look-note]'); if (ln) ln.textContent = NOTE[s] || NOTE.studio;
       // One layer for every kind of page, or "Mixed" when "Open pages like this here" has set some kinds deeper than others.
       var mine = read('rs6-depth')[who()] || {}, vals = KINDS.map(function (k) { return mine[k] || 'band'; });
       var same = vals.every(function (v) { return v === vals[0]; });
-      dlg.querySelectorAll('input[name=depth]').forEach(function (i) { i.checked = same && i.value === vals[0]; });
-      var note = dlg.querySelector('[data-depth-note]');
+      box.querySelectorAll('input[name=st-depth]').forEach(function (i) { i.checked = same && i.value === vals[0]; });
+      var note = box.querySelector('[data-depth-note]');
       if (note) note.textContent = !same ? 'Mixed: some pages open deeper than others.' : vals[0] === 'band' ? 'Every page opens at the top.' : 'Every page opens at its ' + vals[0] + ' layer.';
+      markLook();
+      box.querySelectorAll('[data-seg]').forEach(function (g) {
+        if (W.rsMarker) W.rsMarker(g, function () { var i = g.querySelector('input:checked'); return i && i.closest('label'); });
+      });
     }
-    if (dlg.__rsPersonal) { sync(); return; }
-    dlg.__rsPersonal = true;
-    dlg.addEventListener('change', function (e) {
-      var i = e.target;
-      if (i.name === 'density') {
-        var all = read('rs6-density'); all[who()] = i.value; write('rs6-density', all);
-        var set = function () { R.setAttribute('data-density', i.value); };
+    box.addEventListener('change', function (e) {
+      var i = e.target, v = i.value;
+      if (i.name === 'st-skin') { put('rs4-skin', v); W.rsTheme(function () { W.rsApplyTheme(); if (W.rsSyncMode) W.rsSyncMode(); sync(); }, v); }
+      if (i.name === 'st-mode') { put('rs4-theme', v); W.rsTheme(function () { W.rsApplyTheme(); if (W.rsSyncMode) W.rsSyncMode(); }); }
+      if (i.name === 'st-agents') W.rsSetAgents(v);
+      if (i.name === 'st-density') {
+        var all = read('rs6-density'); all[who()] = v; write('rs6-density', all);
+        var set = function () { R.setAttribute('data-density', v); };
         if (W.rsChange) W.rsChange(set); else set();
       }
-      if (i.name === 'depth') {
-        var all = read('rs6-depth');
-        if (i.value === 'band') delete all[who()]; else all[who()] = KINDS.reduce(function (o, k) { o[k] = i.value; return o; }, {});
-        write('rs6-depth', all);
+      if (i.name === 'st-depth') {
+        var dp = read('rs6-depth');
+        if (v === 'band') delete dp[who()]; else dp[who()] = KINDS.reduce(function (o, k) { o[k] = v; return o; }, {});
+        write('rs6-depth', dp);
         if (W.rsDepthLabels) W.rsDepthLabels();
-        sync();
       }
-      if (i.name === 'leave') {
-        try { if (i.checked) { localStorage.setItem('rs6-leave', 'on'); localStorage.removeItem('rs6-welcomed'); } else localStorage.removeItem('rs6-leave'); } catch (_) {}
-        document.dispatchEvent(new CustomEvent('rs:leave', { detail: { on: i.checked } }));
-      }
+      sync();
     });
-    // Settings calls its own sync when it opens; follow it.
-    new MutationObserver(function () { if (dlg.open) { sync(); if (dlg.__rsPlace) dlg.__rsPlace(); } }).observe(dlg, { attributes: true, attributeFilter: ['open'] });
-    sync();
+    // The quick menu, View as and Reset the demo change these too: follow them.
+    ['rs:settings-change', 'rs:demo-change', 'rs:a11y'].forEach(function (ev) { document.addEventListener(ev, function () { if (box.isConnected) sync(); }); });
+    if (W.ResizeObserver) new ResizeObserver(function () { markLook(); }).observe(box);
+    // (on a first visit the Shell's helpers, rsModules, rsMarker and the rest, are defined after this script)
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { sync(); }, { once: true }); else sync();
   })();
 </script>
-
-<style is:global>
-  .settings .set-personal { grid-template-columns: auto 1fr; align-items: start; }
-  .settings .set-note { display: block; margin-top: 6px; font-size: 12px; }
-  .settings .set-switch { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13.5px; }
-  .settings .set-switch small { display: block; font-size: 12px; }
-  .settings .set-switch input { position: absolute; opacity: 0; pointer-events: none; }
-  .settings .set-switch .sw { position: relative; flex: none; width: 34px; height: 20px; border-radius: 999px; background: var(--surface-3); box-shadow: inset 0 0 0 1px var(--line-strong); transition: background-color var(--dur-state) var(--ease-settle); }
-  .settings .set-switch .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px rgba(0, 0, 0, .2); transition: transform var(--dur-state) var(--ease-settle); }
-  .settings .set-switch input:checked + .sw { background: var(--ink); }
-  .settings .set-switch input:checked + .sw::after { transform: translateX(14px); }
-  .settings .set-switch input:focus-visible + .sw { outline: 2px solid var(--focus); outline-offset: 2px; }
-  @media (max-width: 420px) { .settings .set-personal { grid-template-columns: 1fr; } }
-</style>
