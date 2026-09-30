@@ -8,7 +8,9 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
-import { warrantyWords, supportWords, monthsUntil, endingSoon, money } from '../src/lib/cover.mjs';
+import { warrantyWords, supportWords, monthsUntil, endingSoon, money, renewalWords } from '../src/lib/cover.mjs';
+import { TARGETS, upsWords, tempWords, envAnswer, simulatedTemp } from '../src/lib/environment.mjs';
+import { hoursWords, daysWords, windowWords, nextWindow, plusHour } from '../src/lib/hours.mjs';
 import { FEATURES_ADDED } from '../src/lib/features-added.mjs';
 import { rotaAt, lineFor, outOfHours, localAt, utcOf, whenWords } from '../src/lib/oncall.mjs';
 import { PEOPLE } from '../src/lib/demo.mjs';
@@ -125,4 +127,68 @@ test('every rota: someone on call today, people on the team, and a backup who is
     assert.ok(r.demo, `${r.region} is marked demo`);
     for (const w of r.weeks) assert.ok(ids.has(w.person) && ids.has(w.backup) && w.person !== w.backup, `${r.region} ${w.from}`);
   }
+});
+
+// ---- Internet circuits -----------------------------------------------------------------------------------------
+
+test('every circuit is recorded in full: ID, bandwidth, service level, support desk and renewal, marked demo', () => {
+  const all = load('circuits').flatMap((f) => f.circuits);
+  assert.equal(all.length, 12);
+  for (const c of all) {
+    assert.ok(c.circuit_id && c.bandwidth !== 'Not recorded' && c.sla?.availability && c.support?.desk && c.contract?.renews && c.demo, c.id);
+    assert.ok(/^Carrier (One|Two)\b/.test(c.support.desk), `${c.id}: the carrier's desk, never a person`);
+    assert.ok(!/\+?\d[\d ()-]{7,}/.test(JSON.stringify(c.support)), `${c.id}: no phone number in the record`);
+  }
+  assert.equal(renewalWords('2026-12-31', TODAY).text, 'Renews in 3 months');
+  assert.equal(renewalWords('2027-09-30', TODAY).text, 'Renews 30 Sep 2027');
+});
+
+// ---- The comms room's power and temperature ----------------------------------------------------------------------
+
+test('the targets are the standards\' own numbers', () => {
+  const std = Object.fromEntries(load('standards').filter((s) => s.sections).map((s) => [s.id, s]));
+  const rule = (sid, rid) => std[sid].sections.flatMap((x) => x.rules ?? []).find((r) => r.id === rid).rule;
+  assert.match(rule('power', 'ups-runtime'), new RegExp(`${TARGETS.runtimeMin} minutes`));
+  assert.match(rule('power', 'ups-size'), new RegExp(`${TARGETS.loadMaxPct}%`));
+  assert.match(rule('racks', 'temperature'), new RegExp(`${TARGETS.tempC[0]} and ${TARGETS.tempC[1]} degrees`));
+});
+
+test('the UPS and the room say what is wrong first', () => {
+  assert.equal(upsWords({ runtime_min: 22, load_pct: 41, measured: '2026-03-12' }).answer, 'UPS runs 22 min at 41% load, inside the standard');
+  assert.equal(upsWords({ runtime_min: 17, load_pct: 83, measured: '2026-02-24' }).answer, 'UPS load 83%, over the 80% limit');
+  assert.equal(upsWords({ runtime_min: 12, load_pct: 64, measured: '2025-08-14' }).answer, 'UPS runs 12 min, under the 15 minutes the standard asks');
+  assert.equal(tempWords(29.1).ok, false);
+  assert.equal(envAnswer(null, 22.4), 'the room is at 22.4 °C');
+  const t = simulatedTemp('dub-3-21');
+  assert.ok(t >= 20.5 && t <= 25.5 && simulatedTemp('dub-3-21') === t, 'the simulated reading is steady and in a normal range');
+});
+
+test('every comms room with a rack has its power and temperature record, and nothing else does', () => {
+  const racked = new Set(load('racks').map((r) => r.space));
+  for (const s of load('spaces')) {
+    const comms = ['mdf', 'idf'].includes(s.space_type);
+    if (comms && racked.has(s.id)) assert.ok(s.power?.ups && s.power.feeds?.length === 2 && s.environment?.probe && s.power.demo, `${s.id} has its record`);
+    if (!comms) assert.ok(!s.power && !s.environment, `${s.id} is not a comms room`);
+  }
+});
+
+// ---- Office hours and change windows -----------------------------------------------------------------------------
+
+test('every office has its hours and a change window; home offices have neither', () => {
+  for (const s of load('sites')) {
+    if (s.kind === 'office') assert.ok(s.office_hours?.demo && s.change_window?.demo, s.id);
+    else assert.ok(!s.office_hours && !s.change_window, s.id);
+  }
+});
+
+test('hours and windows in words, and when the window next opens', () => {
+  assert.equal(hoursWords({ days: ['mon', 'tue', 'wed', 'thu', 'fri'], open: '07:00', close: '19:00' }), '07:00 to 19:00, Monday to Friday');
+  assert.equal(daysWords(['tue', 'thu']), 'Tuesday and Thursday');
+  const w = { day: 'thu', from: '22:00', to: '02:00' };
+  assert.equal(windowWords(w, { long: true }), 'Thursday 22:00 to 02:00 the next morning');
+  assert.equal(nextWindow(w, '2026-09-28T12:00').text, 'Thursday 1 Oct, 22:00 to 02:00');
+  assert.equal(nextWindow(w, '2026-10-01T12:00').text, 'tonight, 22:00 to 02:00');
+  assert.equal(nextWindow(w, '2026-10-02T01:30').open, true, 'still open in the small hours of Friday');
+  assert.equal(nextWindow(w, '2026-09-30T09:00').text, 'tomorrow, 22:00 to 02:00');
+  assert.equal(plusHour('19:00'), '20:00');
 });

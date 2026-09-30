@@ -26,6 +26,12 @@ import { WORK_KIND } from '../../lib/work.mjs';
 import { office, liveModelFor, REGION_SHORT, ROLE_WORD, LIGHT_WORD, OPEN_Q, roomTitle, INC_WORD } from '../../lib/locations.mjs';
 import { recHere } from '../../lib/vt.mjs';
 import { storeOf } from '../../lib/stock.mjs';
+import Restricted from '../../components/Restricted.astro';
+import Arrive from '../../components/Arrive.astro';
+import { renewalWords } from '../../lib/cover.mjs';
+import { hoursWords, windowWords, nextWindow, daysWords } from '../../lib/hours.mjs';
+import { localAt } from '../../lib/oncall.mjs';
+import { DEMO_NOW_UTC } from '../../lib/oncall-view.mjs';
 
 interface Props { site: string }
 const o = office(Astro.props.site);
@@ -86,6 +92,19 @@ const incSpaces = new Set(o.inc.map((v) => v.space.id)).size;
 // Lenses and Replay (UX-V2 §2.5 and §8): each space's reading under every lens, and each floor's open jobs over time.
 const LENS_JSON = M ? JSON.stringify(officeLenses(o.id)).replace(/</g, '\\u003c') : '';
 const JOBS = M ? replayJobs(o.id) : {};
+// Internet circuits in full (the overlooked items, #8): what the carrier needs on a call, and when each contract renews.
+const CIRC = (M?.circuits ?? []).map((c) => ({ ...c, renew: renewalWords(c.contract?.renews, DEMO_TODAY) }));
+const roleWord = (c) => (c.role === 'primary' ? 'primary' : 'backup');
+const soonest = CIRC.filter((c) => c.renew?.soon).sort((a, b) => a.contract.renews.localeCompare(b.contract.renews))[0];
+const CIRC_ANSWER = CIRC.length
+  ? `${CIRC.length === 1 ? 'One circuit' : `${CIRC.length} circuits`}: ${CIRC.map((c) => `${c.bandwidth && c.bandwidth !== 'Not recorded' ? c.bandwidth.replace(/ symmetric$/, '') : 'bandwidth not recorded'} ${roleWord(c)}`).join(', ')}${soonest ? ` · ${soonest.provider} ${soonest.renew.text.charAt(0).toLowerCase()}${soonest.renew.text.slice(1)}` : ''}`
+  : null;
+// Office hours and the change window (#7): in the office's own time, with when the window next opens.
+const LOCAL = s.time_zone ? localAt(s.time_zone, DEMO_NOW_UTC) : null;
+const NEXT_WIN = s.change_window && LOCAL ? nextWindow(s.change_window, LOCAL) : null;
+const HOURS_ANSWER = s.office_hours || s.change_window
+  ? [s.office_hours ? `Open ${s.office_hours.open} to ${s.office_hours.close}, ${daysWords(s.office_hours.days)}` : null, NEXT_WIN ? `next change window ${NEXT_WIN.text}` : null].filter(Boolean).join(' · ')
+  : null;
 const ANSWER = incSpaces ? `${plural(incSpaces, 'space')} not working now` : `All spaces working · no open incidents`;
 ---
 <Shell title={s.name} section="office" crumbs={[{ label: 'Locations', to: '/locations/' }, { label: REGION_SHORT[s.region], to: `/locations/${s.region}/` }, { label: s.name }]} about={{ kind: 'office', label: s.name, to: `/locations/${o.id}/` }}>
@@ -170,7 +189,7 @@ const ANSWER = incSpaces ? `${plural(incSpaces, 'space')} not working now` : `Al
             {M.circuits.map((c) => <li><b>{c.provider}</b><small>{c.role === 'primary' ? 'Primary' : 'Backup'} · {c.type}{c.bandwidth && c.bandwidth !== 'Not recorded' ? ` · ${c.bandwidth}` : ''}</small></li>)}
           </ul>
         ) : <p class="faint">Circuits not modelled yet. They come with the office's floor file.</p>}
-        {M && <a class="tl-all" href={href(`/locations/${o.id}/3d/`)}>Follow them in 3D →</a>}
+        {CIRC.length > 0 ? <a class="tl-all" href="#circuits">Circuit IDs and support ↓</a> : M && <a class="tl-all" href={href(`/locations/${o.id}/3d/`)}>Follow them in 3D →</a>}
       </div>
       <div class="card side-card s-3" data-help="loc.comms">
         <h3>Comms rooms</h3>
@@ -249,6 +268,32 @@ const ANSWER = incSpaces ? `${plural(incSpaces, 'space')} not working now` : `Al
       <a slot="aside" href={href(`/cables/?site=${o.id}`)}>Cables at {s.name} →</a>
     </Section>
 
+    {CIRC.length > 0 && (
+      <Section title="Internet circuits" id="circuits" help="loc.circuits" data-feature="circuits" data-arrive>
+        <span slot="aside"><Restricted view="circuits" /> <a href={href(`/locations/${o.id}/3d/`)}>Follow them in 3D</a></span>
+        <p class="ci-answer">{CIRC_ANSWER}</p>
+        <div class="g12 ci-grid">
+          {CIRC.map((c) => (
+            <article class:list={['card side-card ci', CIRC.length === 1 ? 's-12' : 's-6']} aria-labelledby={`ci-${c.id}`}>
+              <header class="ci-h">
+                <h3 id={`ci-${c.id}`}>{c.provider}</h3>
+                <span class="pill plain">{c.role === 'primary' ? 'Primary' : 'Backup'}</span>
+              </header>
+              <p class="ci-bw">{c.bandwidth && c.bandwidth !== 'Not recorded' ? <><b class="rs-tick">{c.bandwidth.replace(/ .*$/, '')}</b> {c.bandwidth.replace(/^\S+ /, '')}</> : <span class="faint">Bandwidth not recorded</span>}</p>
+              <dl class="kv ci-kv">
+                {c.circuit_id && <div><dt>Circuit ID</dt><dd><span class="mono">{c.circuit_id}</span></dd></div>}
+                {c.sla && <div><dt>Service level</dt><dd>{[c.sla.availability ? `${c.sla.availability} available` : null, c.sla.restore ? `restored within ${c.sla.restore}` : null, c.sla.hours].filter(Boolean).join(', ')}</dd></div>}
+                {c.support && <div><dt>Support</dt><dd>{c.support.desk}{c.support.hours ? `, ${c.support.hours}` : ''}{c.support.account && <>; account <span class="mono">{c.support.account}</span></>}</dd></div>}
+                {c.renew && <div><dt>Contract</dt><dd><span class:list={{ 'ci-soon': c.renew.soon }}>{c.renew.text}</span>{c.renew.soon ? <span class="faint"> ({c.renew.date})</span> : ''}{c.contract?.term_months ? <span class="faint">, {c.contract.term_months}-month term</span> : ''}</dd></div>}
+                <div><dt>Kind</dt><dd>{c.type}</dd></div>
+              </dl>
+              {c.demo && <p class="ci-foot faint">Carrier details are demo values <span class="demo-val" data-help="unit.demo-value">Demo value</span>. The carrier's phone number is kept in the paging tool, not here.</p>}
+            </article>
+          ))}
+        </div>
+      </Section>
+    )}
+
     <Section title="Open work and incidents" id="work" help="loc.openwork">
       <GuideLive where="office" site={o.id} />
       <div class="ow">
@@ -292,6 +337,29 @@ const ANSWER = incSpaces ? `${plural(incSpaces, 'space')} not working now` : `Al
       </div>
     </Section>
 
+    {HOURS_ANSWER && (
+      <Section title="Hours and change window" id="hours" help="loc.hours" data-feature="change-windows" data-arrive>
+        <p class="hw-answer">{HOURS_ANSWER}</p>
+        <div class="g12">
+          {s.office_hours && (
+            <div class="card side-card s-6 hw">
+              <h3>Office hours</h3>
+              <p class="hw-big"><b class="rs-tick">{s.office_hours.open}</b> to <b class="rs-tick">{s.office_hours.close}</b></p>
+              <p class="hw-sub">{daysWords(s.office_hours.days)}, {s.time_zone.split('/')[1].replace(/_/g, ' ')} time. Displays and signage turn on at opening and off an hour after closing.</p>
+            </div>
+          )}
+          {s.change_window && (
+            <div class="card side-card s-6 hw">
+              <h3>Change window</h3>
+              <p class="hw-big"><b class="rs-tick">{s.change_window.from}</b> to <b class="rs-tick">{s.change_window.to}</b></p>
+              <p class="hw-sub">Every {windowWords(s.change_window, { long: true }).replace(/ .*$/, '')}{s.change_window.to <= s.change_window.from ? ', running into the next morning' : ''}. Firmware, switch and Wi-Fi changes that could interrupt a meeting happen here, as the <a href={href('/standards/network/')}>network</a> and <a href={href('/standards/wifi/')}>Wi-Fi</a> standards ask.{NEXT_WIN && <> Next: <b>{NEXT_WIN.text}</b>.</>}</p>
+            </div>
+          )}
+        </div>
+        {(s.office_hours?.demo || s.change_window?.demo) && <p class="faint hw-foot">Hours and window are demo values <span class="demo-val" data-help="unit.demo-value">Demo value</span>.</p>}
+      </Section>
+    )}
+
     <Section title="Facts" id="facts" help="loc.facts">
       <dl class="kv ofc-facts">
         {FACTS.map(([a, b]) => <div><dt>{a}</dt><dd>{b}</dd></div>)}
@@ -314,6 +382,7 @@ const ANSWER = incSpaces ? `${plural(incSpaces, 'space')} not working now` : `Al
     init();
     document.addEventListener('astro:page-load', init);
   </script>
+  <Arrive />
 </Shell>
 
 <style>
@@ -413,6 +482,22 @@ const ANSWER = incSpaces ? `${plural(incSpaces, 'space')} not working now` : `Al
   .ri-p { font: 500 var(--fs-overline)/1 var(--font-mono); padding: 3px 5px; border-radius: 4px; background: var(--surface-2); }
   .ri-p.p-1, .ri-p.p-2 { background: var(--red-soft); color: var(--red-ink); }
   .ofc-facts div { grid-template-columns: 180px minmax(0, 1fr); }
+  /* Internet circuits and hours: the answer, then a card each. */
+  .ci-answer, .hw-answer { margin: 0 0 12px; font: var(--fw-title) var(--fs-h3)/1.35 var(--font-display); color: var(--text); }
+  .ci { gap: 10px; }
+  .ci-h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .ci-h h3 { margin: 0; }
+  .ci-bw { margin: 0; font-size: var(--fs-support); color: var(--text-2); }
+  .ci-bw b { font: var(--fw-title) 26px/1.1 var(--font-display, var(--font-sans)); color: var(--text); }
+  .ci-kv div { grid-template-columns: 120px minmax(0, 1fr); }
+  .ci-kv dd { text-align: left; }
+  .ci-soon { color: var(--amber-ink); font-weight: var(--fw-name); }
+  .ci-foot, .hw-foot { margin: 0; font-size: var(--fs-code); }
+  .hw-foot { margin-top: 10px; }
+  .hw { gap: 6px; }
+  .hw-big { margin: 0; font-size: var(--fs-body); color: var(--text-2); }
+  .hw-big b { font: var(--fw-title) 26px/1.1 var(--font-display, var(--font-sans)); color: var(--text); }
+  .hw-sub { margin: 0; font-size: var(--fs-support); color: var(--text-2); line-height: 1.45; }
   @container content (max-width: 699px) {
     .ow { grid-template-columns: minmax(0, 1fr); }
     .td-lights a { grid-template-columns: auto minmax(0, 1fr); }

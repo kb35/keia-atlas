@@ -90,7 +90,7 @@ function ctxFor(u, plan) {
   return {
     unit: { ...u, records: (u.records ?? []).map((r) => r.id) },
     room: { id: room.id, number: room.number ?? null, name: room.name },
-    site: { id: u.site, code: site.code, name: site.name, region: site.region, time_zone: site.time_zone ?? null, countryName: site.country ? countryName(site.country) : null },
+    site: { id: u.site, code: site.code, name: site.name, region: site.region, time_zone: site.time_zone ?? null, countryName: site.country ? countryName(site.country) : null, office_hours: site.office_hours ?? null },
     regionName: REGION_LABEL[site.region] ?? site.region,
     cfg, house: HOUSE, vlanName: VLAN_NAME, systems: SYSTEM_NAME,
     platforms: cfg ? HOUSE.platforms.filter((p) => p.configurations.includes(cfg.id)) : [],

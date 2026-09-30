@@ -89,3 +89,12 @@ export function endingSoon(units, today, months = 12) {
     : `No warranty ends in the next ${months} months`;
   return { count: soon.length, bare, answer, rows: list, bars };
 }
+
+/** A contract's renewal: { text, soon, date }. "Renews in 3 months" within `soonMonths`, else "Renews 31 Mar 2027". */
+export function renewalWords(date, today, soonMonths = 6) {
+  if (!date) return null;
+  if (date < today) return { text: `Ended ${dayMonthYear(date)}`, soon: true, ended: true, date: dayMonthYear(date) };
+  const m = monthsUntil(today, date);
+  if (m <= soonMonths) { const h = howLong(today, date); return { text: `Renews in ${h.n} ${h.unit}`, soon: true, n: h.n, unit: h.unit, date: dayMonthYear(date) }; }
+  return { text: `Renews ${dayMonthYear(date)}`, soon: false, date: dayMonthYear(date) };
+}

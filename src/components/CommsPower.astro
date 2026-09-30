@@ -1,0 +1,86 @@
+---
+/* CommsPower: a comms room's power and temperature against the house standards (the overlooked items, #9). The answer
+   first, then three gauges, each with the standard's mark: the UPS runtime against 15 minutes, its load against 80%,
+   and the room's temperature against 18 to 27 degrees C. Runtime and load are the room's record (demo values, as
+   measured at the last timed test); the temperature reading is simulated and says so. Shows only what the room holds:
+   with no record and no probe, it is not drawn.
+   Props: space (the space, with power and environment), rackUps (the UPS model's name, from the rack). */
+import { upsWords, tempWords, simulatedTemp, envAnswer, TARGETS } from '../lib/environment.mjs';
+import { href } from '../lib/data.mjs';
+interface Props { space: any; rackUps?: string | null }
+const { space, rackUps = null } = Astro.props;
+const ups = space.power?.ups ?? null;
+const U = upsWords(ups);
+const T = space.environment ? tempWords(simulatedTemp(space.id)) : null;
+const answer = envAnswer(ups, T?.c ?? null);
+const pct = (v, max) => Math.max(0, Math.min(100, (v / max) * 100));
+const rtMax = Math.max(TARGETS.runtimeMin * 2.5, U?.runtime.n ?? 0);
+const TMIN = 10, TMAX = 35;
+const tPos = (c) => pct(c - TMIN, TMAX - TMIN);
+---
+{(U || T) && (
+  <section class="card cp" id="power" aria-labelledby="cp-h" data-feature="comms-environment" data-arrive data-help="comms.environment">
+    <header class="cp-head">
+      <h3 id="cp-h">Power and temperature</h3>
+      <span class="cp-std faint">Against the <a href={href('/standards/power/')}>power</a> and <a href={href('/standards/racks/')}>racks</a> standards</span>
+    </header>
+    <p class:list={['cp-a', { 'is-bad': (U && !U.ok) || (T && !T.ok) }]}>{answer}</p>
+    <div class="cp-g">
+      {U && (
+        <div class="cp-m" data-help="comms.environment">
+          <p class="cp-l">UPS runtime <span class="faint">{rackUps ? `· ${rackUps}` : ''}</span></p>
+          <p class="cp-n"><b class:list={['rs-tick', { bad: !U.runtime.ok }]}>{U.runtime.n}</b> min <span class="faint">at least {U.runtime.target}</span></p>
+          <div class="cp-bar" role="img" aria-label={`${U.runtime.n} minutes of runtime; the standard asks for at least ${U.runtime.target}`}>
+            <i class:list={{ bad: !U.runtime.ok }} style={`width:${pct(U.runtime.n, rtMax)}%`}></i><b class="cp-mark" style={`left:${pct(U.runtime.target, rtMax)}%`}></b>
+          </div>
+        </div>
+      )}
+      {U && (
+        <div class="cp-m">
+          <p class="cp-l">UPS load</p>
+          <p class="cp-n"><b class:list={['rs-tick', { bad: !U.load.ok }]}>{U.load.n}</b>% <span class="faint">at most {U.load.target}%</span></p>
+          <div class="cp-bar" role="img" aria-label={`${U.load.n}% of the UPS's rating; the standard allows at most ${U.load.target}%`}>
+            <i class:list={{ bad: !U.load.ok }} style={`width:${pct(U.load.n, 100)}%`}></i><b class="cp-mark" style={`left:${U.load.target}%`}></b>
+          </div>
+        </div>
+      )}
+      {T && (
+        <div class="cp-m">
+          <p class="cp-l">Temperature <span class="sim-t is-sim" title="A made-up reading for the demo. With the monitoring feed, this is the probe's last reading.">Simulated</span></p>
+          <p class="cp-n"><b class:list={['rs-tick', { bad: !T.ok }]}>{T.c.toFixed(1)}</b> °C <span class="faint">{T.lo} to {T.hi}</span></p>
+          <div class="cp-bar cp-temp" role="img" aria-label={`${T.c.toFixed(1)} degrees C; the standard's range is ${T.lo} to ${T.hi}`}>
+            <span class="cp-band" style={`left:${tPos(T.lo)}%;width:${tPos(T.hi) - tPos(T.lo)}%`}></span><b class:list={['cp-dot', { bad: !T.ok }]} style={`left:${tPos(T.c)}%`}></b>
+          </div>
+        </div>
+      )}
+    </div>
+    <p class="cp-foot faint">
+      {U && <>Runtime and load as measured at the last timed test, {U.measured} <span class="demo-val" data-help="unit.demo-value">Demo value</span>. </>}
+      {space.environment && <>Temperature from the {space.environment.probe.charAt(0).toLowerCase() + space.environment.probe.slice(1)}{space.environment.reports_to ? `, reporting to ${space.environment.reports_to.toLowerCase()}` : ''}; live readings come by connector.</>}
+    </p>
+  </section>
+)}
+
+<style>
+  .cp { padding: 16px 20px; display: grid; gap: 12px; margin-top: var(--gutter); }
+  .cp-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+  .cp-head h3 { margin: 0; }
+  .cp-std { font-size: var(--fs-code); }
+  .cp-a { margin: 0; font: var(--fw-title) var(--fs-h3)/1.3 var(--font-display); color: var(--text); }
+  .cp-a.is-bad { color: var(--red-ink); }
+  .cp-g { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 24px; }
+  @container content (max-width: 699px) { .cp-g { grid-template-columns: minmax(0, 1fr); } }
+  .cp-m { display: grid; gap: 4px; min-width: 0; }
+  .cp-l { margin: 0; font-size: var(--fs-code); color: var(--text-2); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .cp-n { margin: 0; font-size: var(--fs-support); color: var(--text-2); }
+  .cp-n b { font: var(--fw-title) 26px/1.1 var(--font-display, var(--font-sans)); color: var(--text); }
+  .cp-n b.bad { color: var(--red-ink); }
+  .cp-bar { position: relative; height: 8px; border-radius: 4px; background: var(--surface-3, var(--line)); margin-top: 4px; }
+  .cp-bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; background: var(--text-3); }
+  .cp-bar i.bad { background: var(--red); }
+  .cp-mark { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--text); border-radius: 1px; }
+  .cp-band { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--green) 35%, var(--surface-3, var(--line))); border-radius: 4px; }
+  .cp-dot { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--text); box-shadow: 0 0 0 2px var(--surface); }
+  .cp-dot.bad { background: var(--red); }
+  .cp-foot { margin: 0; font-size: var(--fs-code); line-height: 1.45; }
+</style>

@@ -37,7 +37,34 @@ properties:
         provider: { description: The provider's name (made up)., type: string }
         role: { enum: [primary, secondary] }
         type: { type: string }
-        bandwidth: { description: 'The contracted bandwidth, or "Not recorded".', type: string }
+        bandwidth: { description: 'The contracted bandwidth ("1 Gb/s symmetric"), or "Not recorded".', type: string }
+        circuit_id: { description: "The carrier's own reference for the circuit: the first thing they ask for on a call.", type: string, pattern: "^[A-Z0-9][A-Z0-9-]{3,40}$" }
+        sla:
+          description: The carrier's service level for this circuit.
+          type: object
+          additionalProperties: false
+          properties:
+            availability: { description: 'Promised availability ("99.95%").', type: string, pattern: "^[0-9]{2,3}(\\.[0-9]+)?%$" }
+            restore: { description: 'Time to restore after a fault is reported ("4 hours").', type: string }
+            hours: { description: 'When the carrier works a fault ("24/7").', type: string }
+        support:
+          description: How to reach the carrier about this circuit. A desk and an account reference, never a person's name or number.
+          type: object
+          additionalProperties: false
+          required: [desk]
+          properties:
+            desk: { description: "The carrier's support desk, by its name.", type: string }
+            account: { description: "Aigna's account reference with the carrier.", type: string, pattern: "^[A-Z0-9][A-Z0-9-]{3,40}$" }
+            hours: { type: string }
+        contract:
+          type: object
+          additionalProperties: false
+          required: [renews]
+          properties:
+            start: { type: string, format: date }
+            term_months: { type: integer, minimum: 1 }
+            renews: { description: "The day the contract ends unless it is renewed.", type: string, format: date }
+        demo: { description: "True when the circuit's details are made up for the demo.", const: true }
         entry: { description: The entry point (an id above)., type: string }
         lead_in:
           type: object

@@ -7,6 +7,9 @@
 //   - one rota per region; it covers sites of that region, and every site belongs to one rota;
 //   - everyone named is on the team (src/lib/demo.mjs) and not a vendor; nobody backs themselves up;
 //   - the weeks follow on, seven days apart, each starting on the handover day.
+// A comms room's power and temperature (schemas/ext/space.schema.yaml): on comms rooms only; feeds A and B once each,
+// never one circuit. An internet circuit's contract renews after it starts. An office's hours close after they open,
+// a change window closes at another time than it opens, and neither is on a remote site.
 //
 // Each check returns { file, at, message } like the others in crossrefs.mjs.
 import { PEOPLE } from '../src/lib/demo.mjs';
@@ -69,6 +72,28 @@ export function crossCheckOperations(records) {
       const rec = inFolder('on-call').find((r) => r.data.region === s.region);
       report(rec, ['covers'], `${s.name} (${sid}) is in ${s.region} but no rota covers it`);
     }
+  }
+
+  // A comms room's power and temperature record belongs to a comms room.
+  for (const rec of inFolder('spaces')) {
+    const d = rec.data;
+    for (const k of ['power', 'environment']) if (d[k] && !['mdf', 'idf'].includes(d.space_type)) report(rec, [k], `${k} is recorded for comms rooms only; ${d.name} is a ${d.space_type}`);
+    const feeds = d.power?.feeds ?? [];
+    if (new Set(feeds.map((f) => f.feed)).size !== feeds.length) report(rec, ['power', 'feeds'], 'each feed (A, B) is listed once');
+    if (feeds.length === 2 && feeds[0].board === feeds[1].board && feeds[0].way === feeds[1].way) report(rec, ['power', 'feeds'], 'feeds A and B share one circuit, so they are not two feeds');
+  }
+
+  // An internet circuit's contract renews after it starts; an office's change window opens and closes at different times.
+  for (const rec of inFolder('circuits')) {
+    rec.data.circuits.forEach((c, i) => {
+      if (c.contract?.start && c.contract.renews <= c.contract.start) report(rec, ['circuits', i, 'contract', 'renews'], `the contract renews (${c.contract.renews}) before it starts (${c.contract.start})`);
+    });
+  }
+  for (const [sid, s] of sites) {
+    const rec = inFolder('sites').find((r) => r.id === sid);
+    if (s.change_window && s.change_window.from === s.change_window.to) report(rec, ['change_window', 'to'], 'the change window must close at a different time from when it opens');
+    if (s.office_hours && s.office_hours.close <= s.office_hours.open) report(rec, ['office_hours', 'close'], 'the office must close after it opens');
+    if ((s.office_hours || s.change_window) && s.kind !== 'office') report(rec, [s.office_hours ? 'office_hours' : 'change_window'], 'office hours and a change window are for offices; a home office keeps its person\'s hours');
   }
 
   return problems;

@@ -71,7 +71,7 @@ Known errors (`data/known-issues/`, decision 0029) keep what the manufacturer pu
 Floor plans, trays, cable runs and circuits (`data/floors/`, `data/runs/`, `data/circuits/`) are invented for the demo, so every floor carries the label in `FICTION` (`src/lib/floors.mjs`): "Fictional floor plan: space sizes from the space types; layout, trays and cable lengths made up for the demo." Every map and 3D model shows it, and the checks fail a floor file without it. Labels on made-up things are generic: providers are "Carrier One" and "Carrier Two", never a real company; buildings have no street address; serials start `DEMO-`.
 
 - **Why:** a plan that looks real is easy to mistake for a survey; the label and generic names keep the demo honest and keep real companies' names off made-up faults.
-- **Do:** space sizes from the space types, within their area range; "Carrier Two (secondary, north duct)"; bandwidth "Not recorded" unless a house value says otherwise.
+- **Do:** space sizes from the space types, within their area range; "Carrier Two (secondary, north duct)"; a circuit's bandwidth, ID, service level and support desk made up for the demo and marked `demo: true`, with a desk and an account reference, never a person or a phone number.
 - **Don't:** a real provider's name, a real building's address, or a floor plan without the label.
 
 ### F10. Every fact carries a label, and the label decides who sees it
