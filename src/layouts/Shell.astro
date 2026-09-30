@@ -364,6 +364,18 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         });
         document.addEventListener('astro:after-swap', function () { if (window.__rsNavDir) document.documentElement.setAttribute('data-nav-dir', window.__rsNavDir); });
         document.addEventListener('astro:page-load', function () { setTimeout(function () { document.documentElement.removeAttribute('data-nav-dir'); }, 700); });
+        // The pinned bars under the top bar: their heights, so anything else that pins sits below them (base.css .sec-tabs).
+        (function () {
+          var R = document.documentElement, ro = window.ResizeObserver ? new ResizeObserver(function () { measure(); }) : null;
+          function h(el) { return el && !el.hidden && el.offsetParent !== null ? Math.round(el.getBoundingClientRect().height) : 0; }
+          function measure() {
+            var t = document.querySelector('.sec-tabs'), v = document.querySelector('.viewas');
+            R.style.setProperty('--tabs-h', h(t) + 'px'); R.style.setProperty('--viewas-h', h(v) + 'px');
+          }
+          function watch() { measure(); if (ro) { ro.disconnect(); ['.sec-tabs', '.viewas'].forEach(function (q) { var el = document.querySelector(q); if (el) ro.observe(el); }); } }
+          document.addEventListener('astro:page-load', watch); window.addEventListener('resize', measure);
+          if (document.readyState !== 'loading') watch(); else document.addEventListener('DOMContentLoaded', watch);
+        })();
         // Rule book, persist: name only the clicked item's drawing, so it flies into the next page's stage.
         document.addEventListener('astro:before-preparation', function (e) {
           var a = e.sourceElement && e.sourceElement.closest ? e.sourceElement.closest('a') : null;
@@ -750,7 +762,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
       var M = function () { return W.rsMotion ? W.rsMotion() : { reduced: true }; };
       // The line under the top bar (and under the filter bar while it sticks): content above it is out of sight.
       var topLimit = function () {
-        var m = D.querySelector('.mast'), t = m ? m.getBoundingClientRect().bottom : 0;
+        var m = D.querySelector('.mast'), t = m ? m.getBoundingClientRect().bottom : 0, st = D.querySelector('.sec-tabs'); if (st && getComputedStyle(st).position === 'sticky') t = Math.max(t, st.getBoundingClientRect().bottom);
         var fb = D.querySelector('main .fb[data-fb]');
         if (fb && getComputedStyle(fb).position === 'sticky') { var fr = fb.getBoundingClientRect(); if (fr.top <= t + 2) t = Math.max(t, fr.bottom); }
         return t;

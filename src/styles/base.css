@@ -54,7 +54,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: var(--weight-display
 }
 /* Frosted glass: content passing under the top bar (and any sticky bar under it) blurs and fades out
    instead of being cut off by a hard edge. The skirt is a short blurred gradient hanging below the bar. */
-.mast::after, .glass-bar::after {
+.mast::after, .glass-bar::after, .sec-tabs::after {
   content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 16px; pointer-events: none;
   height: 22px; background: linear-gradient(color-mix(in srgb, var(--bg, #F3F0E8) 92%, transparent), color-mix(in srgb, var(--bg, #F3F0E8) 0%, transparent));
 }
@@ -174,7 +174,7 @@ main { min-width: 0; container: main / inline-size; }
 .g12.top { align-items: start; }
 .g12 > * { grid-column: 1 / -1; min-width: 0; }
 /* A record's picture follows the page too, while a taller SidePanel beside it scrolls past (L8). */
-.g12 > .stick { position: sticky; top: calc(var(--mast-h, 60px) + 16px); align-self: start; }
+.g12 > .stick { position: sticky; top: calc(var(--mast-h, 60px) + var(--tabs-h, 0px) + var(--viewas-h, 0px) + 16px); align-self: start; }
 .g12 > .card.side-card { align-content: start; }
 .g12 > .s-3 { grid-column: span 3; } .g12 > .s-4 { grid-column: span 4; } .g12 > .s-5 { grid-column: span 5; }
 .g12 > .s-6 { grid-column: span 6; } .g12 > .s-7 { grid-column: span 7; } .g12 > .s-8 { grid-column: span 8; }
@@ -528,7 +528,13 @@ td small { display: block; color: var(--text-2); margin-top: 2px; }
 .nav a { padding: 8px 12px; font-size: 15px; }
 
 /* Tabs across the top of a place: the pages inside it. The marker slides between them. */
-.sec-tabs { display: flex; align-items: stretch; gap: 2px; padding: 0 var(--pad-x); box-shadow: inset 0 -1px 0 var(--line); background: var(--band); view-transition-name: sec-tabs; }
+.sec-tabs { display: flex; align-items: stretch; gap: 2px; padding: 0 var(--pad-x); box-shadow: inset 0 -1px 0 var(--line); background: var(--band); view-transition-name: sec-tabs; 
+  /* The section tabs stay pinned under the top bar (and the View as ribbon), so a place's sections are always one tap away.
+     Bars that pin below them add --tabs-h (measured in Shell.astro). */
+  position: sticky; top: calc(var(--mast-h) + env(safe-area-inset-top, 0px) + var(--viewas-h, 0px)); z-index: 18;
+  -webkit-backdrop-filter: saturate(170%) blur(22px); backdrop-filter: saturate(170%) blur(22px); }
+/* With tabs pinned under it, the top bar's own fade would wash over them: the tabs carry the fade instead. */
+:root:has(.sec-tabs) .mast::after { display: none; }
 /* The tabs never scroll sideways: the ones that do not fit go into More (Shell.astro). */
 .sec-list { display: flex; gap: 2px; flex: 1 1 auto; min-width: 0; overflow: hidden; }
 .sec-list > a.sec-x { display: none; }
