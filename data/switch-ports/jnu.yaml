@@ -1,0 +1,73 @@
+# Switch ports at the Juneau office: the VLAN table, and how every switch port is set with what is on its far end.
+# Made up for the demo; written by tools/migrations/2026-09-30-switch-ports.mjs. In a live setup the switch platform's
+# connector (UniFi, Meraki or Netgear) reads this; here it is recorded. The chain on each port (run, patch cord, unit)
+# is checked against the runs, the patch cords and the room wiring by tools/crossrefs-switchports.mjs.
+site: jnu
+read_at: "2026-09-30T06:00:00Z"
+vlans:
+  - { vlan: 10, subnet: 10.100.10.0/24, gateway: 10.100.10.1 }
+  - { vlan: 20, subnet: 10.100.20.0/22, gateway: 10.100.20.1 }
+  - { vlan: 30, subnet: 10.100.30.0/24, gateway: 10.100.30.1 }
+  - { vlan: 31, subnet: 10.100.31.0/24, gateway: 10.100.31.1 }
+  - { vlan: 40, subnet: 169.254.0.0/16, note: "Link-local in each room, on the in-room switch only; not routed" }
+  - { vlan: 50, subnet: 10.100.50.0/24, gateway: 10.100.50.1 }
+  - { vlan: 60, subnet: 10.100.60.0/24, gateway: 10.100.60.1 }
+  - { vlan: 70, subnet: 10.100.70.0/24, gateway: 10.100.70.1 }
+  - { vlan: 90, subnet: 10.100.90.0/23, gateway: 10.100.90.1 }
+switches:
+  # Core switch A · 2.08 Comms room (MDF), Rack 1, U18
+  - id: jnu-208-cs01
+    rack: jnu-2-08-r1
+    u: 18
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: jnu-208-as01, port: 49, patch: jnu-cb-02 } }  # trunk down to jnu-208-as01
+      - { port: 3, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { rack: jnu-2-08-r1, u: 21, patch: jnu-cb-05 } }  # Firewall A
+      - { port: 25, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: jnu-208-cs02, port: 25, patch: jnu-cb-04 } }  # trunk to jnu-208-cs02
+      - { port: 26, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: jnu-208-cs02, port: 26, patch: jnu-cb-04 } }  # trunk to jnu-208-cs02
+    disabled: "2,4-24,27-28"
+  # Core switch B · 2.08 Comms room (MDF), Rack 1, U17
+  - id: jnu-208-cs02
+    rack: jnu-2-08-r1
+    u: 17
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: jnu-208-as01, port: 50, patch: jnu-cb-03 } }  # trunk down to jnu-208-as01
+      - { port: 3, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { rack: jnu-2-08-r1, u: 20, patch: jnu-cb-06 } }  # Firewall B
+      - { port: 25, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: jnu-208-cs01, port: 25, patch: jnu-cb-04 } }  # trunk to jnu-208-cs01
+      - { port: 26, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: jnu-208-cs01, port: 26, patch: jnu-cb-04 } }  # trunk to jnu-208-cs01
+    disabled: "2,4-24,27-28"
+  # Access switch · 2.08 Comms room (MDF), Rack 1, U13
+  - id: jnu-208-as01
+    rack: jnu-2-08-r1
+    u: 13
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: access, native: 31, far: { run: JNU-2.08-R1-U14-P01, patch: jnu-cb-01, unit: AG-001435, unit_port: lan-1 } }  # 2.01 Pantry, display
+      - { port: 2, state: active, mode: access, native: 31, far: { run: JNU-2.08-R1-U14-P02, patch: jnu-cb-01, unit: AG-001436, unit_port: lan-1 } }  # 2.01 Pantry, signage player
+      - { port: 3, state: parked, far: { run: JNU-2.08-R1-U14-P03, patch: jnu-cb-01 } }  # 2.01 Pantry, data/behind-display#3, nothing plugged in
+      - { port: 4, state: parked, far: { run: JNU-2.08-R1-U14-P04, patch: jnu-cb-01 } }  # 2.01 Pantry, data/tbd#1, nothing plugged in
+      - { port: 5, state: active, mode: access, native: 31, far: { run: JNU-2.08-R1-U14-P05, patch: jnu-cb-01, unit: AG-000473, unit_port: lan-1 } }  # 2.02 Heron, display
+      - { port: 6, state: active, mode: access, native: 30, far: { run: JNU-2.08-R1-U14-P06, patch: jnu-cb-01, unit: AG-000474, unit_port: lan-1 } }  # 2.02 Heron, video bar
+      - { port: 7, state: active, mode: access, native: 30, far: { run: JNU-2.08-R1-U14-P07, patch: jnu-cb-01, unit: AG-000475, unit_port: lan-1 } }  # 2.02 Heron, touch controller
+      - { port: 8, state: active, mode: access, native: 30, far: { run: JNU-2.08-R1-U14-P08, patch: jnu-cb-01, unit: AG-000479, unit_port: lan-1 } }  # 2.03 Wren, video bar
+      - { port: 9, state: active, mode: access, native: 31, far: { run: JNU-2.08-R1-U14-P09, patch: jnu-cb-01, unit: AG-000478, unit_port: lan-1 } }  # 2.03 Wren, display
+      - { port: 10, state: active, mode: access, native: 20, far: { run: JNU-2.08-R1-U14-P10, patch: jnu-cb-01, unit: AG-000480, unit_port: lan-1 } }  # 2.04 Focus 2.04, monitor
+      - { port: 11, state: active, mode: access, native: 20, far: { run: JNU-2.08-R1-U14-P11, patch: jnu-cb-01, unit: AG-000481, unit_port: lan-1 } }  # 2.05 Focus 2.05, monitor
+      - { port: 12, state: active, mode: access, native: 70, far: { run: JNU-2.08-R1-U14-P12, patch: jnu-cb-01, unit: AG-000482, unit_port: lan-1 } }  # 2.06 Copy and print, printer
+      - { port: 13, state: active, mode: access, native: 20, far: { run: JNU-2.08-R1-U14-P13, patch: jnu-cb-01, unit: AG-000483, unit_port: lan-1 } }  # 2.07 Flex desks A, desk 01, monitor
+      - { port: 14, state: active, mode: access, native: 20, far: { run: JNU-2.08-R1-U14-P14, patch: jnu-cb-01, unit: AG-000484, unit_port: lan-1 } }  # 2.07 Flex desks A, desk 02, monitor
+      - { port: 15, state: active, mode: access, native: 20, far: { run: JNU-2.08-R1-U14-P15, patch: jnu-cb-01, unit: AG-000485, unit_port: lan-1 } }  # 2.07 Flex desks A, desk 03, monitor
+      - { port: 16, state: active, mode: access, native: 20, far: { run: JNU-2.08-R1-U14-P16, patch: jnu-cb-01, unit: AG-000486, unit_port: lan-1 } }  # 2.07 Flex desks A, desk 04, monitor
+      - { port: 17, state: active, mode: access, native: 20, far: { run: JNU-2.08-R1-U14-P17, patch: jnu-cb-01, unit: AG-000487, unit_port: lan-1 } }  # 2.07 Flex desks A, desk 05, monitor
+      - { port: 18, state: active, mode: access, native: 20, far: { run: JNU-2.08-R1-U14-P18, patch: jnu-cb-01, unit: AG-000488, unit_port: lan-1 } }  # 2.07 Flex desks A, desk 06, monitor
+      - { port: 19, state: active, mode: access, native: 20, far: { run: JNU-2.08-R1-U14-P19, patch: jnu-cb-01, unit: AG-000489, unit_port: lan-1 } }  # 2.07 Flex desks A, desk 07, monitor
+      - { port: 20, state: active, mode: access, native: 20, far: { run: JNU-2.08-R1-U14-P20, patch: jnu-cb-01, unit: AG-000490, unit_port: lan-1 } }  # 2.07 Flex desks A, desk 08, monitor
+      - { port: 21, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: JNU-2.08-R1-U14-P21, patch: jnu-cb-01, unit: AG-003286, unit_port: lan-1 } }  # access point jnu-2-ap01
+      - { port: 22, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: JNU-2.08-R1-U14-P22, patch: jnu-cb-01, unit: AG-003287, unit_port: lan-1 } }  # access point jnu-2-ap02
+      - { port: 23, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: JNU-2.08-R1-U14-P23, patch: jnu-cb-01, unit: AG-003288, unit_port: lan-1 } }  # access point jnu-2-ap03
+      - { port: 24, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: JNU-2.08-R1-U14-P24, patch: jnu-cb-01, unit: AG-003289, unit_port: lan-1 } }  # access point jnu-2-ap04
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: jnu-208-cs01, port: 1, patch: jnu-cb-02 } }  # trunk to jnu-208-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: jnu-208-cs02, port: 1, patch: jnu-cb-03 } }  # trunk to jnu-208-cs02
+    disabled: "25-48"
+demo: true

@@ -1,0 +1,425 @@
+# Switch ports at the Dublin office: the VLAN table, and how every switch port is set with what is on its far end.
+# Made up for the demo; written by tools/migrations/2026-09-30-switch-ports.mjs. In a live setup the switch platform's
+# connector (UniFi, Meraki or Netgear) reads this; here it is recorded. The chain on each port (run, patch cord, unit)
+# is checked against the runs, the patch cords and the room wiring by tools/crossrefs-switchports.mjs.
+site: dub
+read_at: "2026-09-30T06:00:00Z"
+vlans:
+  - { vlan: 10, subnet: 10.20.10.0/24, gateway: 10.20.10.1 }
+  - { vlan: 20, subnet: 10.20.20.0/22, gateway: 10.20.20.1 }
+  - { vlan: 30, subnet: 10.20.30.0/24, gateway: 10.20.30.1 }
+  - { vlan: 31, subnet: 10.20.31.0/24, gateway: 10.20.31.1 }
+  - { vlan: 40, subnet: 169.254.0.0/16, note: "Link-local in each room, on the in-room switch only; not routed" }
+  - { vlan: 50, subnet: 10.20.50.0/24, gateway: 10.20.50.1 }
+  - { vlan: 60, subnet: 10.20.60.0/24, gateway: 10.20.60.1 }
+  - { vlan: 70, subnet: 10.20.70.0/24, gateway: 10.20.70.1 }
+  - { vlan: 90, subnet: 10.20.90.0/23, gateway: 10.20.90.1 }
+switches:
+  # Core switch A · 3.21 Comms room (MDF), Rack 1, U19
+  - id: dub-321-cs01
+    rack: dub-3-21-r1
+    u: 19
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-321-as01, port: 49, patch: dub-cb-03 } }  # trunk down to dub-321-as01
+      - { port: 2, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-321-as02, port: 49, patch: dub-cb-05 } }  # trunk down to dub-321-as02
+      - { port: 3, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { rack: dub-3-21-r1, u: 22, patch: dub-cb-08 } }  # Firewall A
+      - { port: 4, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { rack: dub-3-21-r1, u: 26, patch: dub-cb-14 } }  # Wireless controller
+      - { port: 5, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-421-as01, port: 49, run: DUB-3.21-R1-U12-P01, patches: [dub-cb-16, dub-cb-28] } }  # trunk down to dub-421-as01
+      - { port: 6, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-421-as01, port: 50, run: DUB-3.21-R1-U12-P01, patches: [dub-cb-16, dub-cb-28] } }  # trunk down to dub-421-as01
+      - { port: 7, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-421-as03, port: 49, run: DUB-3.21-R1-U12-P01, patches: [dub-cb-58, dub-cb-55] } }  # trunk down to dub-421-as03
+      - { port: 8, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-421-as03, port: 50, run: DUB-3.21-R1-U12-P01, patches: [dub-cb-58, dub-cb-55] } }  # trunk down to dub-421-as03
+      - { port: 9, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-421-as05, port: 49, run: DUB-3.21-R1-U12-P01, patches: [dub-cb-60, dub-cb-57] } }  # trunk down to dub-421-as05
+      - { port: 10, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-421-as05, port: 50, run: DUB-3.21-R1-U12-P01, patches: [dub-cb-60, dub-cb-57] } }  # trunk down to dub-421-as05
+      - { port: 25, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-321-cs02, port: 25, patch: dub-cb-07 } }  # trunk to dub-321-cs02
+      - { port: 26, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-321-cs02, port: 26, patch: dub-cb-07 } }  # trunk to dub-321-cs02
+    disabled: "11-24,27-28"
+  # Core switch B · 3.21 Comms room (MDF), Rack 1, U20
+  - id: dub-321-cs02
+    rack: dub-3-21-r1
+    u: 20
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-321-as01, port: 50, patch: dub-cb-04 } }  # trunk down to dub-321-as01
+      - { port: 2, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-321-as02, port: 50, patch: dub-cb-06 } }  # trunk down to dub-321-as02
+      - { port: 3, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { rack: dub-3-21-r1, u: 23, patch: dub-cb-09 } }  # Firewall B
+      - { port: 4, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { rack: dub-3-21-r1, u: 26, patch: dub-cb-15 } }  # Wireless controller
+      - { port: 5, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-421-as02, port: 49, run: DUB-3.21-R1-U12-P01, patches: [dub-cb-17, dub-cb-29] } }  # trunk down to dub-421-as02
+      - { port: 6, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-421-as02, port: 50, run: DUB-3.21-R1-U12-P01, patches: [dub-cb-17, dub-cb-29] } }  # trunk down to dub-421-as02
+      - { port: 7, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-421-as04, port: 49, run: DUB-3.21-R1-U12-P01, patches: [dub-cb-59, dub-cb-56] } }  # trunk down to dub-421-as04
+      - { port: 8, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-421-as04, port: 50, run: DUB-3.21-R1-U12-P01, patches: [dub-cb-59, dub-cb-56] } }  # trunk down to dub-421-as04
+      - { port: 25, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-321-cs01, port: 25, patch: dub-cb-07 } }  # trunk to dub-321-cs01
+      - { port: 26, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-321-cs01, port: 26, patch: dub-cb-07 } }  # trunk to dub-321-cs01
+    disabled: "9-24,27-28"
+  # Access switch 1, third floor · 3.21 Comms room (MDF), Rack 1, U15
+  - id: dub-321-as01
+    rack: dub-3-21-r1
+    u: 15
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: access, native: 31, far: { run: DUB-3.21-R1-U06-P01, patch: dub-cb-01, unit: AG-000275, unit_port: lan-1 } }  # 3.01 Reception, display
+      - { port: 2, state: active, mode: access, native: 31, far: { run: DUB-3.21-R1-U06-P02, patch: dub-cb-01, unit: AG-000276, unit_port: lan-1 } }  # 3.01 Reception, signage player
+      - { port: 3, state: parked, far: { run: DUB-3.21-R1-U06-P03, patch: dub-cb-01 } }  # 3.01 Reception, data/behind-display#3, nothing plugged in
+      - { port: 4, state: parked, far: { run: DUB-3.21-R1-U06-P04, patch: dub-cb-01 } }  # 3.01 Reception, data/tbd#1, nothing plugged in
+      - { port: 5, state: active, mode: access, native: 31, far: { run: DUB-3.21-R1-U06-P05, patch: dub-cb-01, unit: AG-001431, unit_port: lan-1 } }  # 3.02 Pantry, display
+      - { port: 6, state: active, mode: access, native: 31, far: { run: DUB-3.21-R1-U06-P06, patch: dub-cb-01, unit: AG-001432, unit_port: lan-1 } }  # 3.02 Pantry, signage player
+      - { port: 7, state: parked, far: { run: DUB-3.21-R1-U06-P07, patch: dub-cb-01 } }  # 3.02 Pantry, data/behind-display#3, nothing plugged in
+      - { port: 8, state: parked, far: { run: DUB-3.21-R1-U06-P08, patch: dub-cb-01 } }  # 3.02 Pantry, data/tbd#1, nothing plugged in
+      - { port: 9, state: active, mode: access, native: 31, far: { run: DUB-3.21-R1-U06-P09, patch: dub-cb-01, unit: AG-000279, unit_port: lan-1 } }  # 3.03 Heron, display
+      - { port: 10, state: parked, far: { run: DUB-3.21-R1-U06-P10, patch: dub-cb-01 } }  # 3.03 Heron, data/behind-display#2, nothing plugged in
+      - { port: 11, state: active, mode: access, native: 30, far: { run: DUB-3.21-R1-U06-P11, patch: dub-cb-01, unit: AG-000281, unit_port: lan-1 } }  # 3.03 Heron, ptz camera
+      - { port: 12, state: active, mode: trunk, native: 10, tagged: [30], far: { run: DUB-3.21-R1-U06-P12, patch: dub-cb-01, unit: AG-000291, unit_port: lan-9 } }  # 3.03 Heron, network switch
+      - { port: 13, state: active, mode: access, native: 30, far: { run: DUB-3.21-R1-U06-P13, patch: dub-cb-01, unit: AG-000282, unit_port: lan-1 } }  # 3.03 Heron, touch controller
+      - { port: 14, state: parked, far: { run: DUB-3.21-R1-U06-P14, patch: dub-cb-01 } }  # 3.03 Heron, data/below-table#2, nothing plugged in
+      - { port: 15, state: parked, far: { run: DUB-3.21-R1-U06-P15, patch: dub-cb-01 } }  # 3.03 Heron, data/below-table#3, nothing plugged in
+      - { port: 16, state: parked, far: { run: DUB-3.21-R1-U06-P16, patch: dub-cb-01 } }  # 3.03 Heron, data/below-table#4, nothing plugged in
+      - { port: 17, state: parked, far: { run: DUB-3.21-R1-U06-P17, patch: dub-cb-01 } }  # 3.03 Heron, data/below-table#5, nothing plugged in
+      - { port: 18, state: parked, far: { run: DUB-3.21-R1-U06-P18, patch: dub-cb-01 } }  # 3.03 Heron, data/tbd#1, nothing plugged in
+      - { port: 19, state: parked, far: { run: DUB-3.21-R1-U06-P19, patch: dub-cb-01 } }  # 3.03 Heron, data/tbd#2, nothing plugged in
+      - { port: 20, state: parked, far: { run: DUB-3.21-R1-U06-P20, patch: dub-cb-01 } }  # 3.03 Heron, data/room-entrance#1, nothing plugged in
+      - { port: 21, state: parked, far: { run: DUB-3.21-R1-U06-P21, patch: dub-cb-01 } }  # 3.03 Heron, data/ceiling#1, nothing plugged in
+      - { port: 22, state: active, mode: access, native: 31, far: { run: DUB-3.21-R1-U06-P22, patch: dub-cb-01, unit: AG-000296, unit_port: lan-1 } }  # 3.04 Curlew, display
+      - { port: 23, state: active, mode: access, native: 30, far: { run: DUB-3.21-R1-U06-P23, patch: dub-cb-01, unit: AG-000297, unit_port: lan-1 } }  # 3.04 Curlew, video bar
+      - { port: 24, state: parked, far: { run: DUB-3.21-R1-U06-P24, patch: dub-cb-01 } }  # 3.04 Curlew, data/behind-display#3, nothing plugged in
+      - { port: 25, state: parked, far: { run: DUB-3.21-R1-U06-P25, patch: dub-cb-01 } }  # 3.04 Curlew, data/behind-display#4, nothing plugged in
+      - { port: 26, state: active, mode: access, native: 30, far: { run: DUB-3.21-R1-U06-P26, patch: dub-cb-01, unit: AG-000298, unit_port: lan-1 } }  # 3.04 Curlew, touch controller
+      - { port: 27, state: parked, far: { run: DUB-3.21-R1-U06-P27, patch: dub-cb-01 } }  # 3.04 Curlew, data/below-table#2, nothing plugged in
+      - { port: 28, state: active, mode: access, native: 30, far: { run: DUB-3.21-R1-U06-P28, patch: dub-cb-01, unit: AG-000302, unit_port: lan-1 } }  # 3.04 Curlew, scheduler panel
+      - { port: 29, state: active, mode: access, native: 31, far: { run: DUB-3.21-R1-U06-P29, patch: dub-cb-01, unit: AG-000303, unit_port: lan-1 } }  # 3.05 Gannet, display 1
+      - { port: 30, state: active, mode: access, native: 30, far: { run: DUB-3.21-R1-U06-P30, patch: dub-cb-01, unit: AG-000305, unit_port: lan-1 } }  # 3.05 Gannet, video bar
+      - { port: 31, state: active, mode: access, native: 31, far: { run: DUB-3.21-R1-U06-P31, patch: dub-cb-01, unit: AG-000304, unit_port: lan-1 } }  # 3.05 Gannet, display 2
+      - { port: 32, state: parked, far: { run: DUB-3.21-R1-U06-P32, patch: dub-cb-01 } }  # 3.05 Gannet, data/behind-display#4, nothing plugged in
+      - { port: 33, state: active, mode: access, native: 30, far: { run: DUB-3.21-R1-U06-P33, patch: dub-cb-01, unit: AG-000306, unit_port: lan-1 } }  # 3.05 Gannet, touch controller
+      - { port: 34, state: parked, far: { run: DUB-3.21-R1-U06-P34, patch: dub-cb-01 } }  # 3.05 Gannet, data/below-table#2, nothing plugged in
+      - { port: 35, state: active, mode: access, native: 30, far: { run: DUB-3.21-R1-U06-P35, patch: dub-cb-01, unit: AG-000312, unit_port: lan-1 } }  # 3.05 Gannet, scheduler panel
+      - { port: 36, state: active, mode: access, native: 31, far: { run: DUB-3.21-R1-U06-P36, patch: dub-cb-01, unit: AG-000313, unit_port: lan-1 } }  # 3.06 Kestrel, display 1
+      - { port: 37, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: DUB-3.21-R1-U06-P37, patch: dub-cb-01, unit: AG-003101, unit_port: lan-1 } }  # access point dub-3-ap01
+      - { port: 38, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: DUB-3.21-R1-U06-P38, patch: dub-cb-01, unit: AG-003102, unit_port: lan-1 } }  # access point dub-3-ap02
+      - { port: 39, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: DUB-3.21-R1-U06-P39, patch: dub-cb-01, unit: AG-003103, unit_port: lan-1 } }  # access point dub-3-ap03
+      - { port: 40, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: DUB-3.21-R1-U06-P40, patch: dub-cb-01, unit: AG-003104, unit_port: lan-1 } }  # access point dub-3-ap04
+      - { port: 41, state: active, mode: access, native: 60, far: { run: DUB-3.21-R1-U06-P41, patch: dub-cb-61, unit: AG-003501, unit_port: lan-1 } }  # 3.01 Reception, cctv camera
+      - { port: 42, state: active, mode: access, native: 60, far: { run: DUB-3.21-R1-U06-P42, patch: dub-cb-61, unit: AG-003502, unit_port: lan-1 } }  # 3.01 Reception, door controller
+      - { port: 43, state: active, mode: access, native: 50, far: { run: DUB-3.21-R1-U06-P43, patch: dub-cb-62, unit: AG-003503, unit_port: lan-1 } }  # 3.01 Reception, environment sensor
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-321-cs01, port: 1, patch: dub-cb-03 } }  # trunk to dub-321-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-321-cs02, port: 1, patch: dub-cb-04 } }  # trunk to dub-321-cs02
+    disabled: "44-48"
+  # Access switch 2, third floor · 3.21 Comms room (MDF), Rack 1, U16
+  - id: dub-321-as02
+    rack: dub-3-21-r1
+    u: 16
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: access, native: 30, far: { run: DUB-3.21-R1-U09-P01, patch: dub-cb-02, unit: AG-000315, unit_port: lan-1 } }  # 3.06 Kestrel, video bar
+      - { port: 2, state: active, mode: access, native: 31, far: { run: DUB-3.21-R1-U09-P02, patch: dub-cb-02, unit: AG-000314, unit_port: lan-1 } }  # 3.06 Kestrel, display 2
+      - { port: 3, state: parked, far: { run: DUB-3.21-R1-U09-P03, patch: dub-cb-02 } }  # 3.06 Kestrel, data/behind-display#4, nothing plugged in
+      - { port: 4, state: active, mode: access, native: 30, far: { run: DUB-3.21-R1-U09-P04, patch: dub-cb-02, unit: AG-000316, unit_port: lan-1 } }  # 3.06 Kestrel, touch controller
+      - { port: 5, state: parked, far: { run: DUB-3.21-R1-U09-P05, patch: dub-cb-02 } }  # 3.06 Kestrel, data/below-table#2, nothing plugged in
+      - { port: 6, state: parked, far: { run: DUB-3.21-R1-U09-P06, patch: dub-cb-02 } }  # 3.06 Kestrel, data/room-entrance#1, nothing plugged in
+      - { port: 7, state: active, mode: access, native: 31, far: { run: DUB-3.21-R1-U09-P07, patch: dub-cb-02, unit: AG-000320, unit_port: lan-1 } }  # 3.07 Peregrine, display
+      - { port: 8, state: active, mode: access, native: 30, far: { run: DUB-3.21-R1-U09-P08, patch: dub-cb-02, unit: AG-000321, unit_port: lan-1 } }  # 3.07 Peregrine, video bar
+      - { port: 9, state: parked, far: { run: DUB-3.21-R1-U09-P09, patch: dub-cb-02 } }  # 3.07 Peregrine, data/behind-display#3, nothing plugged in
+      - { port: 10, state: parked, far: { run: DUB-3.21-R1-U09-P10, patch: dub-cb-02 } }  # 3.07 Peregrine, data/behind-display#4, nothing plugged in
+      - { port: 11, state: active, mode: access, native: 30, far: { run: DUB-3.21-R1-U09-P11, patch: dub-cb-02, unit: AG-000322, unit_port: lan-1 } }  # 3.07 Peregrine, touch controller
+      - { port: 12, state: parked, far: { run: DUB-3.21-R1-U09-P12, patch: dub-cb-02 } }  # 3.07 Peregrine, data/below-table#2, nothing plugged in
+      - { port: 13, state: active, mode: access, native: 30, far: { run: DUB-3.21-R1-U09-P13, patch: dub-cb-02, unit: AG-000325, unit_port: lan-1 } }  # 3.07 Peregrine, scheduler panel
+      - { port: 14, state: active, mode: access, native: 31, far: { run: DUB-3.21-R1-U09-P14, patch: dub-cb-02, unit: AG-000326, unit_port: lan-1 } }  # 3.08 Barn Owl, display
+      - { port: 15, state: active, mode: access, native: 30, far: { run: DUB-3.21-R1-U09-P15, patch: dub-cb-02, unit: AG-000327, unit_port: lan-1 } }  # 3.08 Barn Owl, video bar
+      - { port: 16, state: parked, far: { run: DUB-3.21-R1-U09-P16, patch: dub-cb-02 } }  # 3.08 Barn Owl, data/behind-display#3, nothing plugged in
+      - { port: 17, state: parked, far: { run: DUB-3.21-R1-U09-P17, patch: dub-cb-02 } }  # 3.08 Barn Owl, data/behind-display#4, nothing plugged in
+      - { port: 18, state: active, mode: access, native: 30, far: { run: DUB-3.21-R1-U09-P18, patch: dub-cb-02, unit: AG-000328, unit_port: lan-1 } }  # 3.08 Barn Owl, touch controller
+      - { port: 19, state: parked, far: { run: DUB-3.21-R1-U09-P19, patch: dub-cb-02 } }  # 3.08 Barn Owl, data/below-table#2, nothing plugged in
+      - { port: 20, state: active, mode: access, native: 30, far: { run: DUB-3.21-R1-U09-P20, patch: dub-cb-02, unit: AG-000332, unit_port: lan-1 } }  # 3.08 Barn Owl, scheduler panel
+      - { port: 21, state: active, mode: access, native: 31, far: { run: DUB-3.21-R1-U09-P21, patch: dub-cb-02, unit: AG-000333, unit_port: lan-1 } }  # 3.09 Whooper Swan, display 1
+      - { port: 22, state: active, mode: trunk, native: 10, tagged: [30], far: { run: DUB-3.21-R1-U09-P22, patch: dub-cb-02, unit: AG-000339, unit_port: lan-9 } }  # 3.09 Whooper Swan, network switch
+      - { port: 23, state: parked, far: { run: DUB-3.21-R1-U09-P23, patch: dub-cb-02 } }  # 3.09 Whooper Swan, data/behind-display#3, nothing plugged in
+      - { port: 24, state: active, mode: access, native: 20, far: { run: DUB-3.21-R1-U09-P24, patch: dub-cb-02, unit: AG-000334, unit_port: lan-1 } }  # 3.09 Whooper Swan, display 2
+      - { port: 25, state: active, mode: access, native: 30, far: { run: DUB-3.21-R1-U09-P25, patch: dub-cb-02, unit: AG-000335, unit_port: lan-1 } }  # 3.09 Whooper Swan, video bar
+      - { port: 26, state: active, mode: access, native: 30, far: { run: DUB-3.21-R1-U09-P26, patch: dub-cb-02, unit: AG-000336, unit_port: lan-1 } }  # 3.09 Whooper Swan, touch controller
+      - { port: 27, state: parked, far: { run: DUB-3.21-R1-U09-P27, patch: dub-cb-02 } }  # 3.09 Whooper Swan, data/below-table#2, nothing plugged in
+      - { port: 28, state: active, mode: access, native: 30, far: { run: DUB-3.21-R1-U09-P28, patch: dub-cb-02, unit: AG-000345, unit_port: lan-1 } }  # 3.09 Whooper Swan, scheduler panel
+      - { port: 29, state: active, mode: access, native: 31, far: { run: DUB-3.21-R1-U09-P29, patch: dub-cb-02, unit: AG-000346, unit_port: lan-1 } }  # 3.10 Oystercatcher, display main
+      - { port: 30, state: active, mode: access, native: 30, far: { run: DUB-3.21-R1-U09-P30, patch: dub-cb-02, unit: AG-000348, unit_port: lan-1 } }  # 3.10 Oystercatcher, video bar
+      - { port: 31, state: active, mode: access, native: 31, far: { run: DUB-3.21-R1-U09-P31, patch: dub-cb-02, unit: AG-000347, unit_port: lan-1 } }  # 3.10 Oystercatcher, display second
+      - { port: 32, state: parked, far: { run: DUB-3.21-R1-U09-P32, patch: dub-cb-02 } }  # 3.10 Oystercatcher, data/behind-display#4, nothing plugged in
+      - { port: 33, state: active, mode: access, native: 30, far: { run: DUB-3.21-R1-U09-P33, patch: dub-cb-02, unit: AG-000349, unit_port: lan-1 } }  # 3.10 Oystercatcher, touch controller
+      - { port: 34, state: parked, far: { run: DUB-3.21-R1-U09-P34, patch: dub-cb-02 } }  # 3.10 Oystercatcher, data/below-table#2, nothing plugged in
+      - { port: 35, state: parked, far: { run: DUB-3.21-R1-U09-P35, patch: dub-cb-02 } }  # 3.10 Oystercatcher, data/room-entrance#1, nothing plugged in
+      - { port: 36, state: active, mode: access, native: 30, far: { run: DUB-3.21-R1-U09-P36, patch: dub-cb-02, unit: AG-000352, unit_port: lan-1 } }  # 3.11 Lapwing, desk video device
+      - { port: 37, state: parked, far: { run: DUB-3.21-R1-U09-P37, patch: dub-cb-02 } }  # 3.11 Lapwing, data/wall-below-table#2, nothing plugged in
+      - { port: 38, state: active, mode: access, native: 30, far: { run: DUB-3.21-R1-U09-P38, patch: dub-cb-02, unit: AG-000353, unit_port: lan-1 } }  # 3.11 Lapwing, scheduler panel
+      - { port: 39, state: active, mode: access, native: 70, far: { run: DUB-3.21-R1-U09-P39, patch: dub-cb-02, unit: AG-000354, unit_port: lan-1 } }  # 3.12 Copy and print, printer
+      - { port: 40, state: parked, far: { run: DUB-3.21-R1-U09-P40, patch: dub-cb-02 } }  # 3.12 Copy and print, data/wall#2, nothing plugged in
+      - { port: 41, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: DUB-3.21-R1-U09-P41, patch: dub-cb-02, unit: AG-003105, unit_port: lan-1 } }  # access point dub-3-ap05
+      - { port: 42, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: DUB-3.21-R1-U09-P42, patch: dub-cb-02, unit: AG-003106, unit_port: lan-1 } }  # access point dub-3-ap06
+      - { port: 43, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: DUB-3.21-R1-U09-P43, patch: dub-cb-02, unit: AG-003107, unit_port: lan-1 } }  # access point dub-3-ap07
+      - { port: 44, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: DUB-3.21-R1-U09-P44, patch: dub-cb-02, unit: AG-003108, unit_port: lan-1 } }  # access point dub-3-ap08
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-321-cs01, port: 2, patch: dub-cb-05 } }  # trunk to dub-321-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-321-cs02, port: 2, patch: dub-cb-06 } }  # trunk to dub-321-cs02
+    disabled: "45-48"
+  # Access switch 1 · 4.21 Comms room (IDF), Rack 1, U37
+  - id: dub-421-as01
+    rack: dub-4-21-r1
+    u: 37
+    platform: unifi
+    ports:
+      - { port: 1, state: active, mode: access, native: 31, far: { run: DUB-4.21-R1-U38-P01, patch: dub-cb-25, unit: AG-000355, unit_port: lan-1 } }  # 4.01 Kingfisher, display
+      - { port: 2, state: parked, far: { run: DUB-4.21-R1-U38-P02, patch: dub-cb-25 } }  # 4.01 Kingfisher, data/behind-display#3, nothing plugged in
+      - { port: 3, state: parked, far: { run: DUB-4.21-R1-U38-P03, patch: dub-cb-25 } }  # 4.01 Kingfisher, data/behind-display#4, nothing plugged in
+      - { port: 4, state: active, mode: access, native: 30, far: { run: DUB-4.21-R1-U38-P04, patch: dub-cb-25, unit: AG-000357, unit_port: lan-1 } }  # 4.01 Kingfisher, touch controller
+      - { port: 5, state: parked, far: { run: DUB-4.21-R1-U38-P05, patch: dub-cb-25 } }  # 4.01 Kingfisher, data/below-table#2, nothing plugged in
+      - { port: 6, state: active, mode: access, native: 30, far: { run: DUB-4.21-R1-U38-P06, patch: dub-cb-25, unit: AG-000361, unit_port: lan-1 } }  # 4.01 Kingfisher, scheduler panel
+      - { port: 7, state: active, mode: access, native: 31, far: { run: DUB-4.21-R1-U38-P07, patch: dub-cb-25, unit: AG-000362, unit_port: lan-1 } }  # 4.02 Cormorant, display 1
+      - { port: 8, state: active, mode: access, native: 31, far: { run: DUB-4.21-R1-U38-P08, patch: dub-cb-25, unit: AG-000363, unit_port: lan-1 } }  # 4.02 Cormorant, display 2
+      - { port: 9, state: parked, far: { run: DUB-4.21-R1-U38-P09, patch: dub-cb-25 } }  # 4.02 Cormorant, data/behind-display#4, nothing plugged in
+      - { port: 10, state: active, mode: access, native: 30, far: { run: DUB-4.21-R1-U38-P10, patch: dub-cb-25, unit: AG-000365, unit_port: lan-1 } }  # 4.02 Cormorant, touch controller
+      - { port: 11, state: parked, far: { run: DUB-4.21-R1-U38-P11, patch: dub-cb-25 } }  # 4.02 Cormorant, data/below-table#2, nothing plugged in
+      - { port: 12, state: parked, far: { run: DUB-4.21-R1-U38-P12, patch: dub-cb-25 } }  # 4.02 Cormorant, data/room-entrance#1, nothing plugged in
+      - { port: 13, state: active, mode: access, native: 31, far: { run: DUB-4.21-R1-U38-P13, patch: dub-cb-25, unit: AG-000369, unit_port: lan-1 } }  # 4.03 Wren, display
+      - { port: 14, state: parked, far: { run: DUB-4.21-R1-U38-P14, patch: dub-cb-25 } }  # 4.03 Wren, data/behind-display#3, nothing plugged in
+      - { port: 15, state: active, mode: access, native: 30, far: { run: DUB-4.21-R1-U38-P15, patch: dub-cb-25, unit: AG-000371, unit_port: lan-1 } }  # 4.03 Wren, touch controller
+      - { port: 16, state: parked, far: { run: DUB-4.21-R1-U38-P16, patch: dub-cb-25 } }  # 4.03 Wren, data/wall-below-table#2, nothing plugged in
+      - { port: 17, state: active, mode: access, native: 30, far: { run: DUB-4.21-R1-U38-P17, patch: dub-cb-25, unit: AG-000374, unit_port: lan-1 } }  # 4.03 Wren, scheduler panel
+      - { port: 18, state: active, mode: access, native: 31, far: { run: DUB-4.21-R1-U38-P18, patch: dub-cb-25, unit: AG-000375, unit_port: lan-1 } }  # 4.04 Robin, display
+      - { port: 19, state: parked, far: { run: DUB-4.21-R1-U38-P19, patch: dub-cb-25 } }  # 4.04 Robin, data/behind-display#3, nothing plugged in
+      - { port: 20, state: active, mode: access, native: 30, far: { run: DUB-4.21-R1-U38-P20, patch: dub-cb-25, unit: AG-000377, unit_port: lan-1 } }  # 4.04 Robin, touch controller
+      - { port: 21, state: parked, far: { run: DUB-4.21-R1-U38-P21, patch: dub-cb-25 } }  # 4.04 Robin, data/wall-below-table#2, nothing plugged in
+      - { port: 22, state: active, mode: access, native: 1, far: { run: DUB-4.21-R1-U38-P22, patch: dub-cb-25, unit: AG-000380, unit_port: lan-1 } }  # 4.04 Robin, scheduler panel
+      - { port: 23, state: active, mode: access, native: 31, far: { run: DUB-4.21-R1-U38-P23, patch: dub-cb-25, unit: AG-000381, unit_port: lan-1 } }  # 4.05 Goldcrest, display
+      - { port: 24, state: parked, far: { run: DUB-4.21-R1-U38-P24, patch: dub-cb-25 } }  # 4.05 Goldcrest, data/behind-display#3, nothing plugged in
+      - { port: 25, state: parked, far: { run: DUB-4.21-R1-U38-P25, patch: dub-cb-25 } }  # 4.05 Goldcrest, data/behind-display#4, nothing plugged in
+      - { port: 26, state: active, mode: access, native: 30, far: { run: DUB-4.21-R1-U38-P26, patch: dub-cb-25, unit: AG-000383, unit_port: lan-1 } }  # 4.05 Goldcrest, touch controller
+      - { port: 27, state: parked, far: { run: DUB-4.21-R1-U38-P27, patch: dub-cb-25 } }  # 4.05 Goldcrest, data/below-table#2, nothing plugged in
+      - { port: 28, state: active, mode: access, native: 31, far: { run: DUB-4.21-R1-U38-P28, patch: dub-cb-25, unit: AG-000387, unit_port: lan-1 } }  # 4.06 Stonechat, display
+      - { port: 29, state: parked, far: { run: DUB-4.21-R1-U38-P29, patch: dub-cb-25 } }  # 4.06 Stonechat, data/behind-display#3, nothing plugged in
+      - { port: 30, state: active, mode: access, native: 30, far: { run: DUB-4.21-R1-U38-P30, patch: dub-cb-25, unit: AG-000389, unit_port: lan-1 } }  # 4.06 Stonechat, touch controller
+      - { port: 31, state: parked, far: { run: DUB-4.21-R1-U38-P31, patch: dub-cb-25 } }  # 4.06 Stonechat, data/wall-behind-storage#2, nothing plugged in
+      - { port: 32, state: active, mode: access, native: 31, far: { run: DUB-4.21-R1-U38-P32, patch: dub-cb-25, unit: AG-000392, unit_port: lan-1 } }  # 4.07 Goldfinch, display
+      - { port: 33, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: DUB-4.21-R1-U38-P33, patch: dub-cb-25, unit: AG-003109, unit_port: lan-1 } }  # access point dub-4-ap01
+      - { port: 34, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: DUB-4.21-R1-U38-P34, patch: dub-cb-25, unit: AG-003110, unit_port: lan-1 } }  # access point dub-4-ap02
+      - { port: 35, state: parked, far: { run: DUB-4.21-R1-U38-P35, patch: dub-cb-25 } }  # 4.07 Goldfinch, data/behind-display#3, nothing plugged in
+      - { port: 36, state: active, mode: access, native: 31, far: { run: DUB-4.21-R1-U38-P36, patch: dub-cb-25, unit: AG-000394, unit_port: lan-1 } }  # 4.08 Chaffinch, display
+      - { port: 37, state: parked, far: { run: DUB-4.21-R1-U38-P37, patch: dub-cb-25 } }  # 4.08 Chaffinch, data/behind-display#3, nothing plugged in
+      - { port: 38, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U38-P38, patch: dub-cb-25, unit: AG-000396, unit_port: lan-1 } }  # 4.09 Focus 4.09, monitor
+      - { port: 39, state: parked, far: { run: DUB-4.21-R1-U38-P39, patch: dub-cb-25 } }  # 4.09 Focus 4.09, data/table-top#2, nothing plugged in
+      - { port: 40, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U38-P40, patch: dub-cb-25, unit: AG-000397, unit_port: lan-1 } }  # 4.10 Focus 4.10, monitor
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-321-cs01, port: 5, run: DUB-3.21-R1-U12-P01, patches: [dub-cb-28, dub-cb-16] } }  # trunk to dub-321-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-321-cs01, port: 6, run: DUB-3.21-R1-U12-P01, patches: [dub-cb-28, dub-cb-16] } }  # trunk to dub-321-cs01
+    disabled: "41-48"
+  # Access switch 2 · 4.21 Comms room (IDF), Rack 1, U33
+  - id: dub-421-as02
+    rack: dub-4-21-r1
+    u: 33
+    platform: unifi
+    ports:
+      - { port: 1, state: parked, far: { run: DUB-4.21-R1-U34-P01, patch: dub-cb-26 } }  # 4.10 Focus 4.10, data/table-top#2, nothing plugged in
+      - { port: 2, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U34-P02, patch: dub-cb-26, unit: AG-000398, unit_port: lan-1 } }  # 4.11 Focus 4.11, monitor
+      - { port: 3, state: parked, far: { run: DUB-4.21-R1-U34-P03, patch: dub-cb-26 } }  # 4.11 Focus 4.11, data/table-top#2, nothing plugged in
+      - { port: 4, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U34-P04, patch: dub-cb-26, unit: AG-000399, unit_port: lan-1 } }  # 4.12 Focus 4.12, monitor
+      - { port: 5, state: parked, far: { run: DUB-4.21-R1-U34-P05, patch: dub-cb-26 } }  # 4.12 Focus 4.12, data/table-top#2, nothing plugged in
+      - { port: 6, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U34-P06, patch: dub-cb-26, unit: AG-000400, unit_port: lan-1 } }  # 4.13 Office 4.13, monitor
+      - { port: 7, state: parked, far: { run: DUB-4.21-R1-U34-P07, patch: dub-cb-26 } }  # 4.13 Office 4.13, data/wall-below-table#2, nothing plugged in
+      - { port: 8, state: active, mode: access, native: 30, far: { run: DUB-4.21-R1-U34-P08, patch: dub-cb-26, unit: AG-000401, unit_port: lan-1 } }  # 4.13 Office 4.13, scheduler panel
+      - { port: 9, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U34-P09, patch: dub-cb-26, unit: AG-000402, unit_port: lan-1 } }  # 4.14 Office 4.14, monitor
+      - { port: 10, state: parked, far: { run: DUB-4.21-R1-U34-P10, patch: dub-cb-26 } }  # 4.14 Office 4.14, data/wall-below-table#2, nothing plugged in
+      - { port: 11, state: active, mode: access, native: 30, far: { run: DUB-4.21-R1-U34-P11, patch: dub-cb-26, unit: AG-000403, unit_port: lan-1 } }  # 4.14 Office 4.14, scheduler panel
+      - { port: 12, state: active, mode: access, native: 31, far: { run: DUB-4.21-R1-U34-P12, patch: dub-cb-26, unit: AG-001433, unit_port: lan-1 } }  # 4.15 Pantry, display
+      - { port: 13, state: active, mode: access, native: 31, far: { run: DUB-4.21-R1-U34-P13, patch: dub-cb-26, unit: AG-001434, unit_port: lan-1 } }  # 4.15 Pantry, signage player
+      - { port: 14, state: parked, far: { run: DUB-4.21-R1-U34-P14, patch: dub-cb-26 } }  # 4.15 Pantry, data/behind-display#3, nothing plugged in
+      - { port: 15, state: parked, far: { run: DUB-4.21-R1-U34-P15, patch: dub-cb-26 } }  # 4.15 Pantry, data/tbd#1, nothing plugged in
+      - { port: 16, state: active, mode: access, native: 70, far: { run: DUB-4.21-R1-U34-P16, patch: dub-cb-26, unit: AG-000404, unit_port: lan-1 } }  # 4.16 Copy and print, printer
+      - { port: 17, state: parked, far: { run: DUB-4.21-R1-U34-P17, patch: dub-cb-26 } }  # 4.16 Copy and print, data/wall#2, nothing plugged in
+      - { port: 18, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U34-P18, patch: dub-cb-26, unit: AG-000405, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 01, monitor
+      - { port: 19, state: parked, far: { run: DUB-4.21-R1-U34-P19, patch: dub-cb-26 } }  # 4.17 Flex desks A, desk-01/data/table-top#2, nothing plugged in
+      - { port: 20, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U34-P20, patch: dub-cb-26, unit: AG-000406, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 02, monitor
+      - { port: 21, state: parked, far: { run: DUB-4.21-R1-U34-P21, patch: dub-cb-26 } }  # 4.17 Flex desks A, desk-02/data/table-top#2, nothing plugged in
+      - { port: 22, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U34-P22, patch: dub-cb-26, unit: AG-000407, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 03, monitor
+      - { port: 23, state: parked, far: { run: DUB-4.21-R1-U34-P23, patch: dub-cb-26 } }  # 4.17 Flex desks A, desk-03/data/table-top#2, nothing plugged in
+      - { port: 24, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U34-P24, patch: dub-cb-26, unit: AG-000408, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 04, monitor
+      - { port: 25, state: parked, far: { run: DUB-4.21-R1-U34-P25, patch: dub-cb-26 } }  # 4.17 Flex desks A, desk-04/data/table-top#2, nothing plugged in
+      - { port: 26, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U34-P26, patch: dub-cb-26, unit: AG-000409, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 05, monitor
+      - { port: 27, state: parked, far: { run: DUB-4.21-R1-U34-P27, patch: dub-cb-26 } }  # 4.17 Flex desks A, desk-05/data/table-top#2, nothing plugged in
+      - { port: 28, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U34-P28, patch: dub-cb-26, unit: AG-000410, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 06, monitor
+      - { port: 29, state: parked, far: { run: DUB-4.21-R1-U34-P29, patch: dub-cb-26 } }  # 4.17 Flex desks A, desk-06/data/table-top#2, nothing plugged in
+      - { port: 30, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U34-P30, patch: dub-cb-26, unit: AG-000411, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 07, monitor
+      - { port: 31, state: parked, far: { run: DUB-4.21-R1-U34-P31, patch: dub-cb-26 } }  # 4.17 Flex desks A, desk-07/data/table-top#2, nothing plugged in
+      - { port: 32, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U34-P32, patch: dub-cb-26, unit: AG-000412, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 08, monitor
+      - { port: 33, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: DUB-4.21-R1-U34-P33, patch: dub-cb-26, unit: AG-003111, unit_port: lan-1 } }  # access point dub-4-ap03
+      - { port: 34, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: DUB-4.21-R1-U34-P34, patch: dub-cb-26, unit: AG-003112, unit_port: lan-1 } }  # access point dub-4-ap04
+      - { port: 35, state: parked, far: { run: DUB-4.21-R1-U34-P35, patch: dub-cb-26 } }  # 4.17 Flex desks A, desk-08/data/table-top#2, nothing plugged in
+      - { port: 36, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U34-P36, patch: dub-cb-26, unit: AG-000413, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 09, monitor
+      - { port: 37, state: parked, far: { run: DUB-4.21-R1-U34-P37, patch: dub-cb-26 } }  # 4.17 Flex desks A, desk-09/data/table-top#2, nothing plugged in
+      - { port: 38, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U34-P38, patch: dub-cb-26, unit: AG-000414, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 10, monitor
+      - { port: 39, state: parked, far: { run: DUB-4.21-R1-U34-P39, patch: dub-cb-26 } }  # 4.17 Flex desks A, desk-10/data/table-top#2, nothing plugged in
+      - { port: 40, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U34-P40, patch: dub-cb-26, unit: AG-000415, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 11, monitor
+      - { port: 47, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { rack: dub-4-21-r1, u: 18, patch: dub-cb-30 } }  # AV switch on a shelf
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-321-cs02, port: 5, run: DUB-3.21-R1-U12-P01, patches: [dub-cb-29, dub-cb-17] } }  # trunk to dub-321-cs02
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-321-cs02, port: 6, run: DUB-3.21-R1-U12-P01, patches: [dub-cb-29, dub-cb-17] } }  # trunk to dub-321-cs02
+    disabled: "41-46,48"
+  # Access switch 3 · 4.21 Comms room (IDF), Rack 1, U29
+  - id: dub-421-as03
+    rack: dub-4-21-r1
+    u: 29
+    platform: unifi
+    ports:
+      - { port: 1, state: parked, far: { run: DUB-4.21-R1-U30-P01, patch: dub-cb-52 } }  # 4.17 Flex desks A, desk-11/data/table-top#2, nothing plugged in
+      - { port: 2, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U30-P02, patch: dub-cb-52, unit: AG-000416, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 12, monitor
+      - { port: 3, state: parked, far: { run: DUB-4.21-R1-U30-P03, patch: dub-cb-52 } }  # 4.17 Flex desks A, desk-12/data/table-top#2, nothing plugged in
+      - { port: 4, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U30-P04, patch: dub-cb-52, unit: AG-000417, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 13, monitor
+      - { port: 5, state: parked, far: { run: DUB-4.21-R1-U30-P05, patch: dub-cb-52 } }  # 4.17 Flex desks A, desk-13/data/table-top#2, nothing plugged in
+      - { port: 6, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U30-P06, patch: dub-cb-52, unit: AG-000418, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 14, monitor
+      - { port: 7, state: parked, far: { run: DUB-4.21-R1-U30-P07, patch: dub-cb-52 } }  # 4.17 Flex desks A, desk-14/data/table-top#2, nothing plugged in
+      - { port: 8, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U30-P08, patch: dub-cb-52, unit: AG-000419, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 15, monitor
+      - { port: 9, state: parked, far: { run: DUB-4.21-R1-U30-P09, patch: dub-cb-52 } }  # 4.17 Flex desks A, desk-15/data/table-top#2, nothing plugged in
+      - { port: 10, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U30-P10, patch: dub-cb-52, unit: AG-000420, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 16, monitor
+      - { port: 11, state: parked, far: { run: DUB-4.21-R1-U30-P11, patch: dub-cb-52 } }  # 4.17 Flex desks A, desk-16/data/table-top#2, nothing plugged in
+      - { port: 12, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U30-P12, patch: dub-cb-52, unit: AG-000421, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 17, monitor
+      - { port: 13, state: parked, far: { run: DUB-4.21-R1-U30-P13, patch: dub-cb-52 } }  # 4.17 Flex desks A, desk-17/data/table-top#2, nothing plugged in
+      - { port: 14, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U30-P14, patch: dub-cb-52, unit: AG-000422, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 18, monitor
+      - { port: 15, state: parked, far: { run: DUB-4.21-R1-U30-P15, patch: dub-cb-52 } }  # 4.17 Flex desks A, desk-18/data/table-top#2, nothing plugged in
+      - { port: 16, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U30-P16, patch: dub-cb-52, unit: AG-000423, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 19, monitor
+      - { port: 17, state: parked, far: { run: DUB-4.21-R1-U30-P17, patch: dub-cb-52 } }  # 4.17 Flex desks A, desk-19/data/table-top#2, nothing plugged in
+      - { port: 18, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U30-P18, patch: dub-cb-52, unit: AG-000424, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 20, monitor
+      - { port: 19, state: parked, far: { run: DUB-4.21-R1-U30-P19, patch: dub-cb-52 } }  # 4.17 Flex desks A, desk-20/data/table-top#2, nothing plugged in
+      - { port: 20, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U30-P20, patch: dub-cb-52, unit: AG-000425, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 21, monitor
+      - { port: 21, state: parked, far: { run: DUB-4.21-R1-U30-P21, patch: dub-cb-52 } }  # 4.17 Flex desks A, desk-21/data/table-top#2, nothing plugged in
+      - { port: 22, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U30-P22, patch: dub-cb-52, unit: AG-000426, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 22, monitor
+      - { port: 23, state: parked, far: { run: DUB-4.21-R1-U30-P23, patch: dub-cb-52 } }  # 4.17 Flex desks A, desk-22/data/table-top#2, nothing plugged in
+      - { port: 24, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U30-P24, patch: dub-cb-52, unit: AG-000427, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 23, monitor
+      - { port: 25, state: parked, far: { run: DUB-4.21-R1-U30-P25, patch: dub-cb-52 } }  # 4.17 Flex desks A, desk-23/data/table-top#2, nothing plugged in
+      - { port: 26, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U30-P26, patch: dub-cb-52, unit: AG-000428, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 24, monitor
+      - { port: 27, state: parked, far: { run: DUB-4.21-R1-U30-P27, patch: dub-cb-52 } }  # 4.17 Flex desks A, desk-24/data/table-top#2, nothing plugged in
+      - { port: 28, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U30-P28, patch: dub-cb-52, unit: AG-000429, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 25, monitor
+      - { port: 29, state: parked, far: { run: DUB-4.21-R1-U30-P29, patch: dub-cb-52 } }  # 4.17 Flex desks A, desk-25/data/table-top#2, nothing plugged in
+      - { port: 30, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U30-P30, patch: dub-cb-52, unit: AG-000430, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 26, monitor
+      - { port: 31, state: parked, far: { run: DUB-4.21-R1-U30-P31, patch: dub-cb-52 } }  # 4.17 Flex desks A, desk-26/data/table-top#2, nothing plugged in
+      - { port: 32, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U30-P32, patch: dub-cb-52, unit: AG-000431, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 27, monitor
+      - { port: 33, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: DUB-4.21-R1-U30-P33, patch: dub-cb-52, unit: AG-003113, unit_port: lan-1 } }  # access point dub-4-ap05
+      - { port: 34, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: DUB-4.21-R1-U30-P34, patch: dub-cb-52, unit: AG-003114, unit_port: lan-1 } }  # access point dub-4-ap06
+      - { port: 35, state: parked, far: { run: DUB-4.21-R1-U30-P35, patch: dub-cb-52 } }  # 4.17 Flex desks A, desk-27/data/table-top#2, nothing plugged in
+      - { port: 36, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U30-P36, patch: dub-cb-52, unit: AG-000432, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 28, monitor
+      - { port: 37, state: parked, far: { run: DUB-4.21-R1-U30-P37, patch: dub-cb-52 } }  # 4.17 Flex desks A, desk-28/data/table-top#2, nothing plugged in
+      - { port: 38, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U30-P38, patch: dub-cb-52, unit: AG-000433, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 29, monitor
+      - { port: 39, state: parked, far: { run: DUB-4.21-R1-U30-P39, patch: dub-cb-52 } }  # 4.17 Flex desks A, desk-29/data/table-top#2, nothing plugged in
+      - { port: 40, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U30-P40, patch: dub-cb-52, unit: AG-000434, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 30, monitor
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-321-cs01, port: 7, run: DUB-3.21-R1-U12-P01, patches: [dub-cb-55, dub-cb-58] } }  # trunk to dub-321-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-321-cs01, port: 8, run: DUB-3.21-R1-U12-P01, patches: [dub-cb-55, dub-cb-58] } }  # trunk to dub-321-cs01
+    disabled: "41-48"
+  # Access switch 4 · 4.21 Comms room (IDF), Rack 1, U25
+  - id: dub-421-as04
+    rack: dub-4-21-r1
+    u: 25
+    platform: unifi
+    ports:
+      - { port: 1, state: parked, far: { run: DUB-4.21-R1-U26-P01, patch: dub-cb-53 } }  # 4.17 Flex desks A, desk-30/data/table-top#2, nothing plugged in
+      - { port: 2, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U26-P02, patch: dub-cb-53, unit: AG-000435, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 31, monitor
+      - { port: 3, state: parked, far: { run: DUB-4.21-R1-U26-P03, patch: dub-cb-53 } }  # 4.17 Flex desks A, desk-31/data/table-top#2, nothing plugged in
+      - { port: 4, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U26-P04, patch: dub-cb-53, unit: AG-000436, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 32, monitor
+      - { port: 5, state: parked, far: { run: DUB-4.21-R1-U26-P05, patch: dub-cb-53 } }  # 4.17 Flex desks A, desk-32/data/table-top#2, nothing plugged in
+      - { port: 6, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U26-P06, patch: dub-cb-53, unit: AG-000437, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 33, monitor
+      - { port: 7, state: parked, far: { run: DUB-4.21-R1-U26-P07, patch: dub-cb-53 } }  # 4.17 Flex desks A, desk-33/data/table-top#2, nothing plugged in
+      - { port: 8, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U26-P08, patch: dub-cb-53, unit: AG-000438, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 34, monitor
+      - { port: 9, state: parked, far: { run: DUB-4.21-R1-U26-P09, patch: dub-cb-53 } }  # 4.17 Flex desks A, desk-34/data/table-top#2, nothing plugged in
+      - { port: 10, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U26-P10, patch: dub-cb-53, unit: AG-000439, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 35, monitor
+      - { port: 11, state: parked, far: { run: DUB-4.21-R1-U26-P11, patch: dub-cb-53 } }  # 4.17 Flex desks A, desk-35/data/table-top#2, nothing plugged in
+      - { port: 12, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U26-P12, patch: dub-cb-53, unit: AG-000440, unit_port: lan-1 } }  # 4.17 Flex desks A, desk 36, monitor
+      - { port: 13, state: parked, far: { run: DUB-4.21-R1-U26-P13, patch: dub-cb-53 } }  # 4.17 Flex desks A, desk-36/data/table-top#2, nothing plugged in
+      - { port: 14, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U26-P14, patch: dub-cb-53, unit: AG-000441, unit_port: lan-1 } }  # 4.18 Flex desks B, desk 01, monitor hub
+      - { port: 15, state: parked, far: { run: DUB-4.21-R1-U26-P15, patch: dub-cb-53 } }  # 4.18 Flex desks B, desk-01/data/table-top#2, nothing plugged in
+      - { port: 16, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U26-P16, patch: dub-cb-53, unit: AG-000443, unit_port: lan-1 } }  # 4.18 Flex desks B, desk 02, monitor hub
+      - { port: 17, state: parked, far: { run: DUB-4.21-R1-U26-P17, patch: dub-cb-53 } }  # 4.18 Flex desks B, desk-02/data/table-top#2, nothing plugged in
+      - { port: 18, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U26-P18, patch: dub-cb-53, unit: AG-000445, unit_port: lan-1 } }  # 4.18 Flex desks B, desk 03, monitor hub
+      - { port: 19, state: parked, far: { run: DUB-4.21-R1-U26-P19, patch: dub-cb-53 } }  # 4.18 Flex desks B, desk-03/data/table-top#2, nothing plugged in
+      - { port: 20, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U26-P20, patch: dub-cb-53, unit: AG-000447, unit_port: lan-1 } }  # 4.18 Flex desks B, desk 04, monitor hub
+      - { port: 21, state: parked, far: { run: DUB-4.21-R1-U26-P21, patch: dub-cb-53 } }  # 4.18 Flex desks B, desk-04/data/table-top#2, nothing plugged in
+      - { port: 22, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U26-P22, patch: dub-cb-53, unit: AG-000449, unit_port: lan-1 } }  # 4.18 Flex desks B, desk 05, monitor hub
+      - { port: 23, state: parked, far: { run: DUB-4.21-R1-U26-P23, patch: dub-cb-53 } }  # 4.18 Flex desks B, desk-05/data/table-top#2, nothing plugged in
+      - { port: 24, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U26-P24, patch: dub-cb-53, unit: AG-000451, unit_port: lan-1 } }  # 4.18 Flex desks B, desk 06, monitor hub
+      - { port: 25, state: parked, far: { run: DUB-4.21-R1-U26-P25, patch: dub-cb-53 } }  # 4.18 Flex desks B, desk-06/data/table-top#2, nothing plugged in
+      - { port: 26, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U26-P26, patch: dub-cb-53, unit: AG-000453, unit_port: lan-1 } }  # 4.18 Flex desks B, desk 07, monitor hub
+      - { port: 27, state: parked, far: { run: DUB-4.21-R1-U26-P27, patch: dub-cb-53 } }  # 4.18 Flex desks B, desk-07/data/table-top#2, nothing plugged in
+      - { port: 28, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U26-P28, patch: dub-cb-53, unit: AG-000455, unit_port: lan-1 } }  # 4.18 Flex desks B, desk 08, monitor hub
+      - { port: 29, state: parked, far: { run: DUB-4.21-R1-U26-P29, patch: dub-cb-53 } }  # 4.18 Flex desks B, desk-08/data/table-top#2, nothing plugged in
+      - { port: 30, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U26-P30, patch: dub-cb-53, unit: AG-000458, unit_port: lan-1 } }  # 4.19 Flex desks C, desk 01, network adapter
+      - { port: 31, state: parked, far: { run: DUB-4.21-R1-U26-P31, patch: dub-cb-53 } }  # 4.19 Flex desks C, desk-01/data/table-top#2, nothing plugged in
+      - { port: 32, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U26-P32, patch: dub-cb-53, unit: AG-000460, unit_port: lan-1 } }  # 4.19 Flex desks C, desk 02, network adapter
+      - { port: 33, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: DUB-4.21-R1-U26-P33, patch: dub-cb-53, unit: AG-003115, unit_port: lan-1 } }  # access point dub-4-ap07
+      - { port: 34, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: DUB-4.21-R1-U26-P34, patch: dub-cb-53, unit: AG-003116, unit_port: lan-1 } }  # access point dub-4-ap08
+      - { port: 35, state: parked, far: { run: DUB-4.21-R1-U26-P35, patch: dub-cb-53 } }  # 4.19 Flex desks C, desk-02/data/table-top#2, nothing plugged in
+      - { port: 36, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U26-P36, patch: dub-cb-53, unit: AG-000462, unit_port: lan-1 } }  # 4.19 Flex desks C, desk 03, network adapter
+      - { port: 37, state: parked, far: { run: DUB-4.21-R1-U26-P37, patch: dub-cb-53 } }  # 4.19 Flex desks C, desk-03/data/table-top#2, nothing plugged in
+      - { port: 38, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U26-P38, patch: dub-cb-53, unit: AG-000464, unit_port: lan-1 } }  # 4.19 Flex desks C, desk 04, network adapter
+      - { port: 39, state: parked, far: { run: DUB-4.21-R1-U26-P39, patch: dub-cb-53 } }  # 4.19 Flex desks C, desk-04/data/table-top#2, nothing plugged in
+      - { port: 40, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U26-P40, patch: dub-cb-53, unit: AG-000466, unit_port: lan-1 } }  # 4.19 Flex desks C, desk 05, network adapter
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-321-cs02, port: 7, run: DUB-3.21-R1-U12-P01, patches: [dub-cb-56, dub-cb-59] } }  # trunk to dub-321-cs02
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-321-cs02, port: 8, run: DUB-3.21-R1-U12-P01, patches: [dub-cb-56, dub-cb-59] } }  # trunk to dub-321-cs02
+    disabled: "41-48"
+  # Access switch 5 · 4.21 Comms room (IDF), Rack 1, U21
+  - id: dub-421-as05
+    rack: dub-4-21-r1
+    u: 21
+    platform: unifi
+    ports:
+      - { port: 1, state: parked, far: { run: DUB-4.21-R1-U22-P01, patch: dub-cb-54 } }  # 4.19 Flex desks C, desk-05/data/table-top#2, nothing plugged in
+      - { port: 2, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U22-P02, patch: dub-cb-54, unit: AG-000468, unit_port: lan-1 } }  # 4.19 Flex desks C, desk 06, network adapter
+      - { port: 3, state: parked, far: { run: DUB-4.21-R1-U22-P03, patch: dub-cb-54 } }  # 4.19 Flex desks C, desk-06/data/table-top#2, nothing plugged in
+      - { port: 4, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U22-P04, patch: dub-cb-54, unit: AG-000470, unit_port: lan-1 } }  # 4.19 Flex desks C, desk 07, network adapter
+      - { port: 5, state: parked, far: { run: DUB-4.21-R1-U22-P05, patch: dub-cb-54 } }  # 4.19 Flex desks C, desk-07/data/table-top#2, nothing plugged in
+      - { port: 6, state: active, mode: access, native: 20, far: { run: DUB-4.21-R1-U22-P06, patch: dub-cb-54, unit: AG-000472, unit_port: lan-1 } }  # 4.19 Flex desks C, desk 08, network adapter
+      - { port: 7, state: parked, far: { run: DUB-4.21-R1-U22-P07, patch: dub-cb-54 } }  # 4.19 Flex desks C, desk-08/data/table-top#2, nothing plugged in
+      - { port: 8, state: parked, far: { run: DUB-4.21-R1-U22-P08, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-01/data/table-top#1, nothing plugged in
+      - { port: 9, state: parked, far: { run: DUB-4.21-R1-U22-P09, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-01/data/table-top#2, nothing plugged in
+      - { port: 10, state: parked, far: { run: DUB-4.21-R1-U22-P10, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-02/data/table-top#1, nothing plugged in
+      - { port: 11, state: parked, far: { run: DUB-4.21-R1-U22-P11, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-02/data/table-top#2, nothing plugged in
+      - { port: 12, state: parked, far: { run: DUB-4.21-R1-U22-P12, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-03/data/table-top#1, nothing plugged in
+      - { port: 13, state: parked, far: { run: DUB-4.21-R1-U22-P13, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-03/data/table-top#2, nothing plugged in
+      - { port: 14, state: parked, far: { run: DUB-4.21-R1-U22-P14, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-04/data/table-top#1, nothing plugged in
+      - { port: 15, state: parked, far: { run: DUB-4.21-R1-U22-P15, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-04/data/table-top#2, nothing plugged in
+      - { port: 16, state: parked, far: { run: DUB-4.21-R1-U22-P16, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-05/data/table-top#1, nothing plugged in
+      - { port: 17, state: parked, far: { run: DUB-4.21-R1-U22-P17, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-05/data/table-top#2, nothing plugged in
+      - { port: 18, state: parked, far: { run: DUB-4.21-R1-U22-P18, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-06/data/table-top#1, nothing plugged in
+      - { port: 19, state: parked, far: { run: DUB-4.21-R1-U22-P19, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-06/data/table-top#2, nothing plugged in
+      - { port: 20, state: parked, far: { run: DUB-4.21-R1-U22-P20, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-07/data/table-top#1, nothing plugged in
+      - { port: 21, state: parked, far: { run: DUB-4.21-R1-U22-P21, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-07/data/table-top#2, nothing plugged in
+      - { port: 22, state: parked, far: { run: DUB-4.21-R1-U22-P22, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-08/data/table-top#1, nothing plugged in
+      - { port: 23, state: parked, far: { run: DUB-4.21-R1-U22-P23, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-08/data/table-top#2, nothing plugged in
+      - { port: 24, state: parked, far: { run: DUB-4.21-R1-U22-P24, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-09/data/table-top#1, nothing plugged in
+      - { port: 25, state: parked, far: { run: DUB-4.21-R1-U22-P25, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-09/data/table-top#2, nothing plugged in
+      - { port: 26, state: parked, far: { run: DUB-4.21-R1-U22-P26, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-10/data/table-top#1, nothing plugged in
+      - { port: 27, state: parked, far: { run: DUB-4.21-R1-U22-P27, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-10/data/table-top#2, nothing plugged in
+      - { port: 28, state: parked, far: { run: DUB-4.21-R1-U22-P28, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-11/data/table-top#1, nothing plugged in
+      - { port: 29, state: parked, far: { run: DUB-4.21-R1-U22-P29, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-11/data/table-top#2, nothing plugged in
+      - { port: 30, state: parked, far: { run: DUB-4.21-R1-U22-P30, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-12/data/table-top#1, nothing plugged in
+      - { port: 31, state: parked, far: { run: DUB-4.21-R1-U22-P31, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-12/data/table-top#2, nothing plugged in
+      - { port: 32, state: parked, far: { run: DUB-4.21-R1-U22-P32, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-13/data/table-top#1, nothing plugged in
+      - { port: 33, state: parked, far: { run: DUB-4.21-R1-U22-P33, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-13/data/table-top#2, nothing plugged in
+      - { port: 34, state: parked, far: { run: DUB-4.21-R1-U22-P34, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-14/data/table-top#1, nothing plugged in
+      - { port: 35, state: parked, far: { run: DUB-4.21-R1-U22-P35, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-14/data/table-top#2, nothing plugged in
+      - { port: 36, state: parked, far: { run: DUB-4.21-R1-U22-P36, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-15/data/table-top#1, nothing plugged in
+      - { port: 37, state: parked, far: { run: DUB-4.21-R1-U22-P37, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-15/data/table-top#2, nothing plugged in
+      - { port: 38, state: parked, far: { run: DUB-4.21-R1-U22-P38, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-16/data/table-top#1, nothing plugged in
+      - { port: 39, state: parked, far: { run: DUB-4.21-R1-U22-P39, patch: dub-cb-54 } }  # 4.20 Assigned desks D, desk-16/data/table-top#2, nothing plugged in
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-321-cs01, port: 9, run: DUB-3.21-R1-U12-P01, patches: [dub-cb-57, dub-cb-60] } }  # trunk to dub-321-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: dub-321-cs01, port: 10, run: DUB-3.21-R1-U12-P01, patches: [dub-cb-57, dub-cb-60] } }  # trunk to dub-321-cs01
+    disabled: "40-48"
+  # Heron, network switch · 3.03 Heron
+  - id: dub-303-sw01
+    space: dub-3-03
+    position: network-switch
+    platform: netgear
+    ports:
+      - { port: lan-1, state: active, mode: access, native: 30, far: { unit: AG-000280, unit_port: lan-1 } }  # codec
+      - { port: lan-2, state: active, mode: access, native: 40, far: { unit: AG-000280, unit_port: lan-2 } }  # codec, AV network in the room
+      - { port: lan-3, state: active, mode: access, native: 40, far: { unit: AG-000285, unit_port: lan-1 } }  # ceiling microphone, AV network in the room
+      - { port: lan-9, state: active, mode: trunk, native: 10, tagged: [30], far: { switch: dub-321-as01, port: 12 } }  # uplink to dub-321-as01 port 12
+    disabled: [lan-4, lan-5, lan-6, lan-7, lan-8, sfp-1, lan-10]
+  # Whooper Swan, network switch · 3.09 Whooper Swan
+  - id: dub-309-sw01
+    space: dub-3-09
+    position: network-switch
+    platform: netgear
+    ports:
+      - { port: lan-1, state: active, mode: access, native: 40, far: { unit: AG-000335, unit_port: lan-2 } }  # video bar, AV network in the room
+      - { port: lan-2, state: active, mode: access, native: 30, far: { unit: AG-000340, unit_port: lan-1 } }  # switcher
+      - { port: lan-9, state: active, mode: trunk, native: 10, tagged: [30], far: { switch: dub-321-as02, port: 22 } }  # uplink to dub-321-as02 port 22
+    disabled: [lan-3, lan-4, lan-5, lan-6, lan-7, lan-8, sfp-1, lan-10]
+demo: true

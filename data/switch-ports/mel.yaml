@@ -1,0 +1,223 @@
+# Switch ports at the Melbourne office: the VLAN table, and how every switch port is set with what is on its far end.
+# Made up for the demo; written by tools/migrations/2026-09-30-switch-ports.mjs. In a live setup the switch platform's
+# connector (UniFi, Meraki or Netgear) reads this; here it is recorded. The chain on each port (run, patch cord, unit)
+# is checked against the runs, the patch cords and the room wiring by tools/crossrefs-switchports.mjs.
+site: mel
+read_at: "2026-09-30T06:00:00Z"
+vlans:
+  - { vlan: 10, subnet: 10.70.10.0/24, gateway: 10.70.10.1 }
+  - { vlan: 20, subnet: 10.70.20.0/22, gateway: 10.70.20.1 }
+  - { vlan: 30, subnet: 10.70.30.0/24, gateway: 10.70.30.1 }
+  - { vlan: 31, subnet: 10.70.31.0/24, gateway: 10.70.31.1 }
+  - { vlan: 40, subnet: 169.254.0.0/16, note: "Link-local in each room, on the in-room switch only; not routed" }
+  - { vlan: 50, subnet: 10.70.50.0/24, gateway: 10.70.50.1 }
+  - { vlan: 60, subnet: 10.70.60.0/24, gateway: 10.70.60.1 }
+  - { vlan: 70, subnet: 10.70.70.0/24, gateway: 10.70.70.1 }
+  - { vlan: 90, subnet: 10.70.90.0/23, gateway: 10.70.90.1 }
+switches:
+  # Core switch A · 8.17 Comms room (MDF), Rack 1, U22
+  - id: mel-817-cs01
+    rack: mel-8-17-r1
+    u: 22
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: mel-817-as01, port: 49, patch: mel-cb-13 } }  # trunk down to mel-817-as01
+      - { port: 2, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: mel-817-as02, port: 49, patch: mel-cb-15 } }  # trunk down to mel-817-as02
+      - { port: 3, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: mel-817-as03, port: 49, patch: mel-cb-17 } }  # trunk down to mel-817-as03
+      - { port: 4, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: mel-817-as04, port: 49, patch: mel-cb-19 } }  # trunk down to mel-817-as04
+      - { port: 5, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { rack: mel-8-17-r1, u: 25, patch: mel-cb-22 } }  # Firewall A
+      - { port: 6, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { rack: mel-8-17-r1, u: 29, patch: mel-cb-28 } }  # Wireless controller
+      - { port: 25, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: mel-817-cs02, port: 25, patch: mel-cb-21 } }  # trunk to mel-817-cs02
+      - { port: 26, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: mel-817-cs02, port: 26, patch: mel-cb-21 } }  # trunk to mel-817-cs02
+    disabled: "7-24,27-28"
+  # Core switch B · 8.17 Comms room (MDF), Rack 1, U23
+  - id: mel-817-cs02
+    rack: mel-8-17-r1
+    u: 23
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: mel-817-as01, port: 50, patch: mel-cb-14 } }  # trunk down to mel-817-as01
+      - { port: 2, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: mel-817-as02, port: 50, patch: mel-cb-16 } }  # trunk down to mel-817-as02
+      - { port: 3, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: mel-817-as03, port: 50, patch: mel-cb-18 } }  # trunk down to mel-817-as03
+      - { port: 4, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: mel-817-as04, port: 50, patch: mel-cb-20 } }  # trunk down to mel-817-as04
+      - { port: 5, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { rack: mel-8-17-r1, u: 26, patch: mel-cb-23 } }  # Firewall B
+      - { port: 6, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { rack: mel-8-17-r1, u: 29, patch: mel-cb-29 } }  # Wireless controller
+      - { port: 25, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: mel-817-cs01, port: 25, patch: mel-cb-21 } }  # trunk to mel-817-cs01
+      - { port: 26, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: mel-817-cs01, port: 26, patch: mel-cb-21 } }  # trunk to mel-817-cs01
+    disabled: "7-24,27-28"
+  # Access switch 1, Level 8 · 8.17 Comms room (MDF), Rack 1, U16
+  - id: mel-817-as01
+    rack: mel-8-17-r1
+    u: 16
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: access, native: 31, far: { run: MEL-8.17-R1-U06-P01, patch: mel-cb-10, unit: AG-000491, unit_port: lan-1 } }  # 8.01 Reception, display
+      - { port: 2, state: active, mode: access, native: 31, far: { run: MEL-8.17-R1-U06-P02, patch: mel-cb-10, unit: AG-000492, unit_port: lan-1 } }  # 8.01 Reception, signage player
+      - { port: 3, state: parked, far: { run: MEL-8.17-R1-U06-P03, patch: mel-cb-10 } }  # 8.01 Reception, data/behind-display#3, nothing plugged in
+      - { port: 4, state: parked, far: { run: MEL-8.17-R1-U06-P04, patch: mel-cb-10 } }  # 8.01 Reception, data/tbd#1, nothing plugged in
+      - { port: 5, state: active, mode: access, native: 31, far: { run: MEL-8.17-R1-U06-P05, patch: mel-cb-10, unit: AG-001437, unit_port: lan-1 } }  # 8.02 Pantry, display
+      - { port: 6, state: active, mode: access, native: 31, far: { run: MEL-8.17-R1-U06-P06, patch: mel-cb-10, unit: AG-001438, unit_port: lan-1 } }  # 8.02 Pantry, signage player
+      - { port: 7, state: parked, far: { run: MEL-8.17-R1-U06-P07, patch: mel-cb-10 } }  # 8.02 Pantry, data/behind-display#3, nothing plugged in
+      - { port: 8, state: parked, far: { run: MEL-8.17-R1-U06-P08, patch: mel-cb-10 } }  # 8.02 Pantry, data/tbd#1, nothing plugged in
+      - { port: 9, state: active, mode: access, native: 31, far: { run: MEL-8.17-R1-U06-P09, patch: mel-cb-10, unit: AG-000495, unit_port: lan-1 } }  # 8.03 Heron, display
+      - { port: 10, state: active, mode: access, native: 30, far: { run: MEL-8.17-R1-U06-P10, patch: mel-cb-10, unit: AG-000496, unit_port: lan-1 } }  # 8.03 Heron, video bar
+      - { port: 11, state: parked, far: { run: MEL-8.17-R1-U06-P11, patch: mel-cb-10 } }  # 8.03 Heron, data/behind-display#3, nothing plugged in
+      - { port: 12, state: parked, far: { run: MEL-8.17-R1-U06-P12, patch: mel-cb-10 } }  # 8.03 Heron, data/behind-display#4, nothing plugged in
+      - { port: 13, state: active, mode: access, native: 30, far: { run: MEL-8.17-R1-U06-P13, patch: mel-cb-10, unit: AG-000497, unit_port: lan-1 } }  # 8.03 Heron, touch controller
+      - { port: 14, state: parked, far: { run: MEL-8.17-R1-U06-P14, patch: mel-cb-10 } }  # 8.03 Heron, data/below-table#2, nothing plugged in
+      - { port: 15, state: active, mode: access, native: 30, far: { run: MEL-8.17-R1-U06-P15, patch: mel-cb-10, unit: AG-000504, unit_port: lan-1 } }  # 8.03 Heron, scheduler panel
+      - { port: 16, state: active, mode: access, native: 31, far: { run: MEL-8.17-R1-U06-P16, patch: mel-cb-10, unit: AG-000505, unit_port: lan-1 } }  # 8.04 Curlew, display 1
+      - { port: 17, state: active, mode: access, native: 30, far: { run: MEL-8.17-R1-U06-P17, patch: mel-cb-10, unit: AG-000507, unit_port: lan-1 } }  # 8.04 Curlew, video bar
+      - { port: 18, state: active, mode: access, native: 31, far: { run: MEL-8.17-R1-U06-P18, patch: mel-cb-10, unit: AG-000506, unit_port: lan-1 } }  # 8.04 Curlew, display 2
+      - { port: 19, state: parked, far: { run: MEL-8.17-R1-U06-P19, patch: mel-cb-10 } }  # 8.04 Curlew, data/behind-display#4, nothing plugged in
+      - { port: 20, state: active, mode: access, native: 30, far: { run: MEL-8.17-R1-U06-P20, patch: mel-cb-10, unit: AG-000508, unit_port: lan-1 } }  # 8.04 Curlew, touch controller
+      - { port: 21, state: parked, far: { run: MEL-8.17-R1-U06-P21, patch: mel-cb-10 } }  # 8.04 Curlew, data/below-table#2, nothing plugged in
+      - { port: 22, state: parked, far: { run: MEL-8.17-R1-U06-P22, patch: mel-cb-10 } }  # 8.04 Curlew, data/room-entrance#1, nothing plugged in
+      - { port: 23, state: active, mode: access, native: 31, far: { run: MEL-8.17-R1-U06-P23, patch: mel-cb-10, unit: AG-000511, unit_port: lan-1 } }  # 8.05 Gannet, display 1
+      - { port: 24, state: active, mode: access, native: 30, far: { run: MEL-8.17-R1-U06-P24, patch: mel-cb-10, unit: AG-000513, unit_port: lan-1 } }  # 8.05 Gannet, video bar
+      - { port: 25, state: active, mode: access, native: 31, far: { run: MEL-8.17-R1-U06-P25, patch: mel-cb-10, unit: AG-000512, unit_port: lan-1 } }  # 8.05 Gannet, display 2
+      - { port: 26, state: parked, far: { run: MEL-8.17-R1-U06-P26, patch: mel-cb-10 } }  # 8.05 Gannet, data/behind-display#4, nothing plugged in
+      - { port: 27, state: active, mode: access, native: 30, far: { run: MEL-8.17-R1-U06-P27, patch: mel-cb-10, unit: AG-000514, unit_port: lan-1 } }  # 8.05 Gannet, touch controller
+      - { port: 28, state: parked, far: { run: MEL-8.17-R1-U06-P28, patch: mel-cb-10 } }  # 8.05 Gannet, data/below-table#2, nothing plugged in
+      - { port: 29, state: parked, far: { run: MEL-8.17-R1-U06-P29, patch: mel-cb-10 } }  # 8.05 Gannet, data/room-entrance#1, nothing plugged in
+      - { port: 30, state: active, mode: access, native: 31, far: { run: MEL-8.17-R1-U06-P30, patch: mel-cb-10, unit: AG-000518, unit_port: lan-1 } }  # 8.06 Kestrel, display
+      - { port: 31, state: active, mode: access, native: 30, far: { run: MEL-8.17-R1-U06-P31, patch: mel-cb-10, unit: AG-000519, unit_port: lan-1 } }  # 8.06 Kestrel, video bar
+      - { port: 32, state: parked, far: { run: MEL-8.17-R1-U06-P32, patch: mel-cb-10 } }  # 8.06 Kestrel, data/behind-display#3, nothing plugged in
+      - { port: 33, state: parked, far: { run: MEL-8.17-R1-U06-P33, patch: mel-cb-10 } }  # 8.06 Kestrel, data/behind-display#4, nothing plugged in
+      - { port: 34, state: active, mode: access, native: 30, far: { run: MEL-8.17-R1-U06-P34, patch: mel-cb-10, unit: AG-000520, unit_port: lan-1 } }  # 8.06 Kestrel, touch controller
+      - { port: 35, state: parked, far: { run: MEL-8.17-R1-U06-P35, patch: mel-cb-10 } }  # 8.06 Kestrel, data/below-table#2, nothing plugged in
+      - { port: 36, state: active, mode: access, native: 30, far: { run: MEL-8.17-R1-U06-P36, patch: mel-cb-10, unit: AG-000523, unit_port: lan-1 } }  # 8.06 Kestrel, scheduler panel
+      - { port: 37, state: active, mode: access, native: 31, far: { run: MEL-8.17-R1-U06-P37, patch: mel-cb-10, unit: AG-000524, unit_port: lan-1 } }  # 8.07 Peregrine, display
+      - { port: 38, state: active, mode: access, native: 30, far: { run: MEL-8.17-R1-U06-P38, patch: mel-cb-10, unit: AG-000525, unit_port: lan-1 } }  # 8.07 Peregrine, video bar
+      - { port: 39, state: parked, far: { run: MEL-8.17-R1-U06-P39, patch: mel-cb-10 } }  # 8.07 Peregrine, data/behind-display#3, nothing plugged in
+      - { port: 40, state: parked, far: { run: MEL-8.17-R1-U06-P40, patch: mel-cb-10 } }  # 8.07 Peregrine, data/behind-display#4, nothing plugged in
+      - { port: 41, state: active, mode: access, native: 30, far: { run: MEL-8.17-R1-U06-P41, patch: mel-cb-10, unit: AG-000526, unit_port: lan-1 } }  # 8.07 Peregrine, touch controller
+      - { port: 42, state: parked, far: { run: MEL-8.17-R1-U06-P42, patch: mel-cb-10 } }  # 8.07 Peregrine, data/below-table#2, nothing plugged in
+      - { port: 43, state: parked, far: { run: MEL-8.17-R1-U06-P43, patch: mel-cb-10 } }  # 8.07 Peregrine, data/room-entrance#1, nothing plugged in
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: mel-817-cs01, port: 1, patch: mel-cb-13 } }  # trunk to mel-817-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: mel-817-cs02, port: 1, patch: mel-cb-14 } }  # trunk to mel-817-cs02
+    disabled: "44-48"
+  # Access switch 2, Level 8 · 8.17 Comms room (MDF), Rack 1, U17
+  - id: mel-817-as02
+    rack: mel-8-17-r1
+    u: 17
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: access, native: 31, far: { run: MEL-8.17-R1-U09-P01, patch: mel-cb-11, unit: AG-000530, unit_port: lan-1 } }  # 8.08 Barn Owl, display 1
+      - { port: 2, state: active, mode: trunk, native: 10, tagged: [30], far: { run: MEL-8.17-R1-U09-P02, patch: mel-cb-11, unit: AG-000536, unit_port: lan-9 } }  # 8.08 Barn Owl, network switch
+      - { port: 3, state: parked, far: { run: MEL-8.17-R1-U09-P03, patch: mel-cb-11 } }  # 8.08 Barn Owl, data/behind-display#3, nothing plugged in
+      - { port: 4, state: active, mode: access, native: 31, far: { run: MEL-8.17-R1-U09-P04, patch: mel-cb-11, unit: AG-000531, unit_port: lan-1 } }  # 8.08 Barn Owl, display 2
+      - { port: 5, state: active, mode: access, native: 30, far: { run: MEL-8.17-R1-U09-P05, patch: mel-cb-11, unit: AG-000532, unit_port: lan-1 } }  # 8.08 Barn Owl, video bar
+      - { port: 6, state: active, mode: access, native: 30, far: { run: MEL-8.17-R1-U09-P06, patch: mel-cb-11, unit: AG-000533, unit_port: lan-1 } }  # 8.08 Barn Owl, touch controller
+      - { port: 7, state: parked, far: { run: MEL-8.17-R1-U09-P07, patch: mel-cb-11 } }  # 8.08 Barn Owl, data/below-table#2, nothing plugged in
+      - { port: 8, state: active, mode: access, native: 30, far: { run: MEL-8.17-R1-U09-P08, patch: mel-cb-11, unit: AG-000542, unit_port: lan-1 } }  # 8.08 Barn Owl, scheduler panel
+      - { port: 9, state: active, mode: access, native: 31, far: { run: MEL-8.17-R1-U09-P09, patch: mel-cb-11, unit: AG-000543, unit_port: lan-1 } }  # 8.09 Wren, display
+      - { port: 10, state: active, mode: access, native: 30, far: { run: MEL-8.17-R1-U09-P10, patch: mel-cb-11, unit: AG-000544, unit_port: lan-1 } }  # 8.09 Wren, video bar (through the poe injector)
+      - { port: 11, state: parked, far: { run: MEL-8.17-R1-U09-P11, patch: mel-cb-11 } }  # 8.09 Wren, data/behind-display#3, nothing plugged in
+      - { port: 12, state: active, mode: access, native: 30, far: { run: MEL-8.17-R1-U09-P12, patch: mel-cb-11, unit: AG-000545, unit_port: lan-1 } }  # 8.09 Wren, touch controller
+      - { port: 13, state: parked, far: { run: MEL-8.17-R1-U09-P13, patch: mel-cb-11 } }  # 8.09 Wren, data/wall-below-table#2, nothing plugged in
+      - { port: 14, state: active, mode: access, native: 30, far: { run: MEL-8.17-R1-U09-P14, patch: mel-cb-11, unit: AG-000548, unit_port: lan-1 } }  # 8.09 Wren, scheduler panel
+      - { port: 15, state: active, mode: access, native: 30, far: { run: MEL-8.17-R1-U09-P15, patch: mel-cb-11, unit: AG-000550, unit_port: lan-1 } }  # 8.10 Robin, video bar
+      - { port: 16, state: active, mode: access, native: 31, far: { run: MEL-8.17-R1-U09-P16, patch: mel-cb-11, unit: AG-000549, unit_port: lan-1 } }  # 8.10 Robin, display
+      - { port: 17, state: parked, far: { run: MEL-8.17-R1-U09-P17, patch: mel-cb-11 } }  # 8.10 Robin, data/behind-display#3, nothing plugged in
+      - { port: 18, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U09-P18, patch: mel-cb-11, unit: AG-000551, unit_port: lan-1 } }  # 8.11 Focus 8.11, monitor
+      - { port: 19, state: parked, far: { run: MEL-8.17-R1-U09-P19, patch: mel-cb-11 } }  # 8.11 Focus 8.11, data/table-top#2, nothing plugged in
+      - { port: 20, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U09-P20, patch: mel-cb-11, unit: AG-000552, unit_port: lan-1 } }  # 8.12 Focus 8.12, monitor
+      - { port: 21, state: parked, far: { run: MEL-8.17-R1-U09-P21, patch: mel-cb-11 } }  # 8.12 Focus 8.12, data/table-top#2, nothing plugged in
+      - { port: 22, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U09-P22, patch: mel-cb-11, unit: AG-000553, unit_port: lan-1 } }  # 8.13 Office 8.13, monitor
+      - { port: 23, state: parked, far: { run: MEL-8.17-R1-U09-P23, patch: mel-cb-11 } }  # 8.13 Office 8.13, data/wall-below-table#2, nothing plugged in
+      - { port: 24, state: active, mode: access, native: 30, far: { run: MEL-8.17-R1-U09-P24, patch: mel-cb-11, unit: AG-000555, unit_port: lan-1 } }  # 8.13 Office 8.13, scheduler panel
+      - { port: 25, state: active, mode: access, native: 70, far: { run: MEL-8.17-R1-U09-P25, patch: mel-cb-11, unit: AG-000556, unit_port: lan-1 } }  # 8.14 Copy and print, printer
+      - { port: 26, state: parked, far: { run: MEL-8.17-R1-U09-P26, patch: mel-cb-11 } }  # 8.14 Copy and print, data/wall#2, nothing plugged in
+      - { port: 27, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U09-P27, patch: mel-cb-11, unit: AG-000557, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 01, monitor
+      - { port: 28, state: parked, far: { run: MEL-8.17-R1-U09-P28, patch: mel-cb-11 } }  # 8.15 Flex desks A, desk-01/data/table-top#2, nothing plugged in
+      - { port: 29, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U09-P29, patch: mel-cb-11, unit: AG-000558, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 02, monitor
+      - { port: 30, state: parked, far: { run: MEL-8.17-R1-U09-P30, patch: mel-cb-11 } }  # 8.15 Flex desks A, desk-02/data/table-top#2, nothing plugged in
+      - { port: 31, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U09-P31, patch: mel-cb-11, unit: AG-000559, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 03, monitor
+      - { port: 32, state: parked, far: { run: MEL-8.17-R1-U09-P32, patch: mel-cb-11 } }  # 8.15 Flex desks A, desk-03/data/table-top#2, nothing plugged in
+      - { port: 33, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U09-P33, patch: mel-cb-11, unit: AG-000560, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 04, monitor
+      - { port: 34, state: parked, far: { run: MEL-8.17-R1-U09-P34, patch: mel-cb-11 } }  # 8.15 Flex desks A, desk-04/data/table-top#2, nothing plugged in
+      - { port: 35, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U09-P35, patch: mel-cb-11, unit: AG-000561, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 05, monitor
+      - { port: 36, state: parked, far: { run: MEL-8.17-R1-U09-P36, patch: mel-cb-11 } }  # 8.15 Flex desks A, desk-05/data/table-top#2, nothing plugged in
+      - { port: 37, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U09-P37, patch: mel-cb-11, unit: AG-000562, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 06, monitor
+      - { port: 38, state: parked, far: { run: MEL-8.17-R1-U09-P38, patch: mel-cb-11 } }  # 8.15 Flex desks A, desk-06/data/table-top#2, nothing plugged in
+      - { port: 39, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U09-P39, patch: mel-cb-11, unit: AG-000563, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 07, monitor
+      - { port: 40, state: parked, far: { run: MEL-8.17-R1-U09-P40, patch: mel-cb-11 } }  # 8.15 Flex desks A, desk-07/data/table-top#2, nothing plugged in
+      - { port: 41, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U09-P41, patch: mel-cb-11, unit: AG-000564, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 08, monitor
+      - { port: 42, state: parked, far: { run: MEL-8.17-R1-U09-P42, patch: mel-cb-11 } }  # 8.15 Flex desks A, desk-08/data/table-top#2, nothing plugged in
+      - { port: 43, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U09-P43, patch: mel-cb-11, unit: AG-000565, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 09, monitor
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: mel-817-cs01, port: 2, patch: mel-cb-15 } }  # trunk to mel-817-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: mel-817-cs02, port: 2, patch: mel-cb-16 } }  # trunk to mel-817-cs02
+    disabled: "44-48"
+  # Access switch 3, Level 8 · 8.17 Comms room (MDF), Rack 1, U18
+  - id: mel-817-as03
+    rack: mel-8-17-r1
+    u: 18
+    platform: meraki
+    ports:
+      - { port: 1, state: parked, far: { run: MEL-8.17-R1-U12-P01, patch: mel-cb-12 } }  # 8.15 Flex desks A, desk-09/data/table-top#2, nothing plugged in
+      - { port: 2, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U12-P02, patch: mel-cb-12, unit: AG-000566, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 10, monitor
+      - { port: 3, state: parked, far: { run: MEL-8.17-R1-U12-P03, patch: mel-cb-12 } }  # 8.15 Flex desks A, desk-10/data/table-top#2, nothing plugged in
+      - { port: 4, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U12-P04, patch: mel-cb-12, unit: AG-000567, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 11, monitor
+      - { port: 5, state: parked, far: { run: MEL-8.17-R1-U12-P05, patch: mel-cb-12 } }  # 8.15 Flex desks A, desk-11/data/table-top#2, nothing plugged in
+      - { port: 6, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U12-P06, patch: mel-cb-12, unit: AG-000568, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 12, monitor
+      - { port: 7, state: parked, far: { run: MEL-8.17-R1-U12-P07, patch: mel-cb-12 } }  # 8.15 Flex desks A, desk-12/data/table-top#2, nothing plugged in
+      - { port: 8, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U12-P08, patch: mel-cb-12, unit: AG-000569, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 13, monitor
+      - { port: 9, state: parked, far: { run: MEL-8.17-R1-U12-P09, patch: mel-cb-12 } }  # 8.15 Flex desks A, desk-13/data/table-top#2, nothing plugged in
+      - { port: 10, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U12-P10, patch: mel-cb-12, unit: AG-000570, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 14, monitor
+      - { port: 11, state: parked, far: { run: MEL-8.17-R1-U12-P11, patch: mel-cb-12 } }  # 8.15 Flex desks A, desk-14/data/table-top#2, nothing plugged in
+      - { port: 12, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U12-P12, patch: mel-cb-12, unit: AG-000571, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 15, monitor
+      - { port: 13, state: parked, far: { run: MEL-8.17-R1-U12-P13, patch: mel-cb-12 } }  # 8.15 Flex desks A, desk-15/data/table-top#2, nothing plugged in
+      - { port: 14, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U12-P14, patch: mel-cb-12, unit: AG-000572, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 16, monitor
+      - { port: 15, state: parked, far: { run: MEL-8.17-R1-U12-P15, patch: mel-cb-12 } }  # 8.15 Flex desks A, desk-16/data/table-top#2, nothing plugged in
+      - { port: 16, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U12-P16, patch: mel-cb-12, unit: AG-000573, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 17, monitor
+      - { port: 17, state: parked, far: { run: MEL-8.17-R1-U12-P17, patch: mel-cb-12 } }  # 8.15 Flex desks A, desk-17/data/table-top#2, nothing plugged in
+      - { port: 18, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U12-P18, patch: mel-cb-12, unit: AG-000574, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 18, monitor
+      - { port: 19, state: parked, far: { run: MEL-8.17-R1-U12-P19, patch: mel-cb-12 } }  # 8.15 Flex desks A, desk-18/data/table-top#2, nothing plugged in
+      - { port: 20, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U12-P20, patch: mel-cb-12, unit: AG-000575, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 19, monitor
+      - { port: 21, state: parked, far: { run: MEL-8.17-R1-U12-P21, patch: mel-cb-12 } }  # 8.15 Flex desks A, desk-19/data/table-top#2, nothing plugged in
+      - { port: 22, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U12-P22, patch: mel-cb-12, unit: AG-000576, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 20, monitor
+      - { port: 23, state: parked, far: { run: MEL-8.17-R1-U12-P23, patch: mel-cb-12 } }  # 8.15 Flex desks A, desk-20/data/table-top#2, nothing plugged in
+      - { port: 24, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U12-P24, patch: mel-cb-12, unit: AG-000577, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 21, monitor
+      - { port: 25, state: parked, far: { run: MEL-8.17-R1-U12-P25, patch: mel-cb-12 } }  # 8.15 Flex desks A, desk-21/data/table-top#2, nothing plugged in
+      - { port: 26, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U12-P26, patch: mel-cb-12, unit: AG-000578, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 22, monitor
+      - { port: 27, state: parked, far: { run: MEL-8.17-R1-U12-P27, patch: mel-cb-12 } }  # 8.15 Flex desks A, desk-22/data/table-top#2, nothing plugged in
+      - { port: 28, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U12-P28, patch: mel-cb-12, unit: AG-000579, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 23, monitor
+      - { port: 29, state: parked, far: { run: MEL-8.17-R1-U12-P29, patch: mel-cb-12 } }  # 8.15 Flex desks A, desk-23/data/table-top#2, nothing plugged in
+      - { port: 30, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U12-P30, patch: mel-cb-12, unit: AG-000580, unit_port: lan-1 } }  # 8.15 Flex desks A, desk 24, monitor
+      - { port: 31, state: parked, far: { run: MEL-8.17-R1-U12-P31, patch: mel-cb-12 } }  # 8.15 Flex desks A, desk-24/data/table-top#2, nothing plugged in
+      - { port: 32, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U12-P32, patch: mel-cb-12, unit: AG-000582, unit_port: lan-1 } }  # 8.16 Flex desks B, desk 01, network adapter
+      - { port: 33, state: parked, far: { run: MEL-8.17-R1-U12-P33, patch: mel-cb-12 } }  # 8.16 Flex desks B, desk-01/data/table-top#2, nothing plugged in
+      - { port: 34, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U12-P34, patch: mel-cb-12, unit: AG-000584, unit_port: lan-1 } }  # 8.16 Flex desks B, desk 02, network adapter
+      - { port: 35, state: parked, far: { run: MEL-8.17-R1-U12-P35, patch: mel-cb-12 } }  # 8.16 Flex desks B, desk-02/data/table-top#2, nothing plugged in
+      - { port: 36, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U12-P36, patch: mel-cb-12, unit: AG-000586, unit_port: lan-1 } }  # 8.16 Flex desks B, desk 03, network adapter
+      - { port: 37, state: parked, far: { run: MEL-8.17-R1-U12-P37, patch: mel-cb-12 } }  # 8.16 Flex desks B, desk-03/data/table-top#2, nothing plugged in
+      - { port: 38, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U12-P38, patch: mel-cb-12, unit: AG-000588, unit_port: lan-1 } }  # 8.16 Flex desks B, desk 04, network adapter
+      - { port: 39, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U12-P39, patch: mel-cb-12, unit: AG-000590, unit_port: lan-1 } }  # 8.16 Flex desks B, desk 05, network adapter
+      - { port: 40, state: active, mode: access, native: 20, far: { run: MEL-8.17-R1-U12-P40, patch: mel-cb-12, unit: AG-000592, unit_port: lan-1 } }  # 8.16 Flex desks B, desk 06, network adapter
+      - { port: 41, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: MEL-8.17-R1-U12-P41, patch: mel-cb-12, unit: AG-003276, unit_port: lan-1 } }  # access point mel-8-ap01
+      - { port: 42, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: MEL-8.17-R1-U12-P42, patch: mel-cb-12, unit: AG-003277, unit_port: lan-1 } }  # access point mel-8-ap02
+      - { port: 43, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: MEL-8.17-R1-U12-P43, patch: mel-cb-12, unit: AG-003278, unit_port: lan-1 } }  # access point mel-8-ap03
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: mel-817-cs01, port: 3, patch: mel-cb-17 } }  # trunk to mel-817-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: mel-817-cs02, port: 3, patch: mel-cb-18 } }  # trunk to mel-817-cs02
+    disabled: "44-48"
+  # Access switch 4, Level 8 · 8.17 Comms room (MDF), Rack 1, U19
+  - id: mel-817-as04
+    rack: mel-8-17-r1
+    u: 19
+    platform: meraki
+    ports:
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: mel-817-cs01, port: 4, patch: mel-cb-19 } }  # trunk to mel-817-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: mel-817-cs02, port: 4, patch: mel-cb-20 } }  # trunk to mel-817-cs02
+    disabled: "1-48"
+  # Barn Owl, network switch · 8.08 Barn Owl
+  - id: mel-808-sw01
+    space: mel-8-08
+    position: network-switch
+    platform: netgear
+    ports:
+      - { port: lan-1, state: active, mode: access, native: 40, far: { unit: AG-000532, unit_port: lan-2 } }  # video bar, AV network in the room
+      - { port: lan-2, state: active, mode: access, native: 30, far: { unit: AG-000537, unit_port: lan-1 } }  # switcher
+      - { port: lan-9, state: active, mode: trunk, native: 10, tagged: [30], far: { switch: mel-817-as02, port: 2 } }  # uplink to mel-817-as02 port 2
+    disabled: [lan-3, lan-4, lan-5, lan-6, lan-7, lan-8, sfp-1, lan-10]
+demo: true

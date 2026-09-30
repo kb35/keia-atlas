@@ -1,0 +1,720 @@
+# Switch ports at the New York office: the VLAN table, and how every switch port is set with what is on its far end.
+# Made up for the demo; written by tools/migrations/2026-09-30-switch-ports.mjs. In a live setup the switch platform's
+# connector (UniFi, Meraki or Netgear) reads this; here it is recorded. The chain on each port (run, patch cord, unit)
+# is checked against the runs, the patch cords and the room wiring by tools/crossrefs-switchports.mjs.
+site: nyc
+read_at: "2026-09-30T06:00:00Z"
+vlans:
+  - { vlan: 10, subnet: 10.10.10.0/24, gateway: 10.10.10.1 }
+  - { vlan: 20, subnet: 10.10.20.0/22, gateway: 10.10.20.1 }
+  - { vlan: 30, subnet: 10.10.30.0/24, gateway: 10.10.30.1 }
+  - { vlan: 31, subnet: 10.10.31.0/24, gateway: 10.10.31.1 }
+  - { vlan: 40, subnet: 169.254.0.0/16, note: "Link-local in each room, on the in-room switch only; not routed" }
+  - { vlan: 50, subnet: 10.10.50.0/24, gateway: 10.10.50.1 }
+  - { vlan: 60, subnet: 10.10.60.0/24, gateway: 10.10.60.1 }
+  - { vlan: 70, subnet: 10.10.70.0/24, gateway: 10.10.70.1 }
+  - { vlan: 90, subnet: 10.10.90.0/23, gateway: 10.10.90.1 }
+switches:
+  # Core switch A · 20.14 Comms room (MDF), Rack 1, U20
+  - id: nyc-2014-cs01
+    rack: nyc-20-14-r1
+    u: 20
+    platform: unifi
+    ports:
+      - { port: 1, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-as01, port: 49, patch: nyc-cb-19 } }  # trunk down to nyc-2014-as01
+      - { port: 2, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-as02, port: 49, patch: nyc-cb-21 } }  # trunk down to nyc-2014-as02
+      - { port: 3, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-as03, port: 49, patch: nyc-cb-23 } }  # trunk down to nyc-2014-as03
+      - { port: 4, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { rack: nyc-20-14-r1, u: 23, patch: nyc-cb-26 } }  # Gateway A
+      - { port: 5, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2123-as01, port: 49, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-32, nyc-cb-55] } }  # trunk down to nyc-2123-as01
+      - { port: 6, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2123-as01, port: 50, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-32, nyc-cb-55] } }  # trunk down to nyc-2123-as01
+      - { port: 7, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2123-as03, port: 49, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-34, nyc-cb-57] } }  # trunk down to nyc-2123-as03
+      - { port: 8, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2123-as03, port: 50, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-34, nyc-cb-57] } }  # trunk down to nyc-2123-as03
+      - { port: 9, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2123-as05, port: 49, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-36, nyc-cb-59] } }  # trunk down to nyc-2123-as05
+      - { port: 10, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2123-as05, port: 50, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-36, nyc-cb-59] } }  # trunk down to nyc-2123-as05
+      - { port: 11, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2222-as01, port: 49, run: NYC-20.14-R1-U12-P13, patches: [nyc-cb-38, nyc-cb-72] } }  # trunk down to nyc-2222-as01
+      - { port: 12, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2222-as01, port: 50, run: NYC-20.14-R1-U12-P13, patches: [nyc-cb-38, nyc-cb-72] } }  # trunk down to nyc-2222-as01
+      - { port: 13, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2222-as03, port: 49, run: NYC-20.14-R1-U12-P13, patches: [nyc-cb-40, nyc-cb-74] } }  # trunk down to nyc-2222-as03
+      - { port: 14, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2222-as03, port: 50, run: NYC-20.14-R1-U12-P13, patches: [nyc-cb-40, nyc-cb-74] } }  # trunk down to nyc-2222-as03
+      - { port: 15, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2222-as05, port: 49, run: NYC-20.14-R1-U12-P13, patches: [nyc-cb-42, nyc-cb-76] } }  # trunk down to nyc-2222-as05
+      - { port: 16, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2222-as05, port: 50, run: NYC-20.14-R1-U12-P13, patches: [nyc-cb-42, nyc-cb-76] } }  # trunk down to nyc-2222-as05
+      - { port: 25, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs02, port: 25, patch: nyc-cb-25 } }  # trunk to nyc-2014-cs02
+      - { port: 26, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs02, port: 26, patch: nyc-cb-25 } }  # trunk to nyc-2014-cs02
+    disabled: "17-24,27-32"
+  # Core switch B · 20.14 Comms room (MDF), Rack 1, U21
+  - id: nyc-2014-cs02
+    rack: nyc-20-14-r1
+    u: 21
+    platform: unifi
+    ports:
+      - { port: 1, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-as01, port: 50, patch: nyc-cb-20 } }  # trunk down to nyc-2014-as01
+      - { port: 2, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-as02, port: 50, patch: nyc-cb-22 } }  # trunk down to nyc-2014-as02
+      - { port: 3, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-as03, port: 50, patch: nyc-cb-24 } }  # trunk down to nyc-2014-as03
+      - { port: 4, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { rack: nyc-20-14-r1, u: 24, patch: nyc-cb-27 } }  # Gateway B
+      - { port: 5, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2123-as02, port: 49, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-33, nyc-cb-56] } }  # trunk down to nyc-2123-as02
+      - { port: 6, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2123-as02, port: 50, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-33, nyc-cb-56] } }  # trunk down to nyc-2123-as02
+      - { port: 7, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2123-as04, port: 49, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-35, nyc-cb-58] } }  # trunk down to nyc-2123-as04
+      - { port: 8, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2123-as04, port: 50, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-35, nyc-cb-58] } }  # trunk down to nyc-2123-as04
+      - { port: 9, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2123-as06, port: 49, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-37, nyc-cb-60] } }  # trunk down to nyc-2123-as06
+      - { port: 10, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2123-as06, port: 50, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-37, nyc-cb-60] } }  # trunk down to nyc-2123-as06
+      - { port: 11, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2222-as02, port: 49, run: NYC-20.14-R1-U12-P13, patches: [nyc-cb-39, nyc-cb-73] } }  # trunk down to nyc-2222-as02
+      - { port: 12, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2222-as02, port: 50, run: NYC-20.14-R1-U12-P13, patches: [nyc-cb-39, nyc-cb-73] } }  # trunk down to nyc-2222-as02
+      - { port: 13, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2222-as04, port: 49, run: NYC-20.14-R1-U12-P13, patches: [nyc-cb-41, nyc-cb-75] } }  # trunk down to nyc-2222-as04
+      - { port: 14, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2222-as04, port: 50, run: NYC-20.14-R1-U12-P13, patches: [nyc-cb-41, nyc-cb-75] } }  # trunk down to nyc-2222-as04
+      - { port: 25, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs01, port: 25, patch: nyc-cb-25 } }  # trunk to nyc-2014-cs01
+      - { port: 26, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs01, port: 26, patch: nyc-cb-25 } }  # trunk to nyc-2014-cs01
+    disabled: "15-24,27-32"
+  # Access switch 1, Level 20 · 20.14 Comms room (MDF), Rack 1, U15
+  - id: nyc-2014-as01
+    rack: nyc-20-14-r1
+    u: 15
+    platform: unifi
+    ports:
+      - { port: 1, state: active, mode: access, native: 31, far: { run: NYC-20.14-R1-U06-P01, patch: nyc-cb-17, unit: AG-000593, unit_port: lan-1 } }  # 20.01 Reception, display
+      - { port: 2, state: active, mode: access, native: 31, far: { run: NYC-20.14-R1-U06-P02, patch: nyc-cb-17, unit: AG-000594, unit_port: lan-1 } }  # 20.01 Reception, signage player
+      - { port: 3, state: parked, far: { run: NYC-20.14-R1-U06-P03, patch: nyc-cb-17 } }  # 20.01 Reception, data/behind-display#3, nothing plugged in
+      - { port: 4, state: parked, far: { run: NYC-20.14-R1-U06-P04, patch: nyc-cb-17 } }  # 20.01 Reception, data/tbd#1, nothing plugged in
+      - { port: 5, state: active, mode: access, native: 31, far: { run: NYC-20.14-R1-U06-P05, patch: nyc-cb-17, unit: AG-001439, unit_port: lan-1 } }  # 20.02 Cafeteria, display
+      - { port: 6, state: active, mode: access, native: 31, far: { run: NYC-20.14-R1-U06-P06, patch: nyc-cb-17, unit: AG-001440, unit_port: lan-1 } }  # 20.02 Cafeteria, signage player
+      - { port: 7, state: parked, far: { run: NYC-20.14-R1-U06-P07, patch: nyc-cb-17 } }  # 20.02 Cafeteria, data/behind-display#3, nothing plugged in
+      - { port: 8, state: parked, far: { run: NYC-20.14-R1-U06-P08, patch: nyc-cb-17 } }  # 20.02 Cafeteria, data/tbd#1, nothing plugged in
+      - { port: 9, state: active, mode: access, native: 31, far: { run: NYC-20.14-R1-U06-P09, patch: nyc-cb-17, unit: AG-001441, unit_port: lan-1 } }  # 20.03 Pantry, display
+      - { port: 10, state: active, mode: access, native: 31, far: { run: NYC-20.14-R1-U06-P10, patch: nyc-cb-17, unit: AG-001442, unit_port: lan-1 } }  # 20.03 Pantry, signage player
+      - { port: 11, state: parked, far: { run: NYC-20.14-R1-U06-P11, patch: nyc-cb-17 } }  # 20.03 Pantry, data/behind-display#3, nothing plugged in
+      - { port: 12, state: parked, far: { run: NYC-20.14-R1-U06-P12, patch: nyc-cb-17 } }  # 20.03 Pantry, data/tbd#1, nothing plugged in
+      - { port: 13, state: active, mode: access, native: 31, far: { run: NYC-20.14-R1-U06-P13, patch: nyc-cb-17, unit: AG-000595, unit_port: lan-1 } }  # 20.04 Heron, display 1
+      - { port: 14, state: parked, far: { run: NYC-20.14-R1-U06-P14, patch: nyc-cb-17 } }  # 20.04 Heron, data/behind-display#2, nothing plugged in
+      - { port: 15, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U06-P15, patch: nyc-cb-17, unit: AG-000598, unit_port: lan-1 } }  # 20.04 Heron, ptz camera
+      - { port: 16, state: active, mode: trunk, native: 10, tagged: [30], far: { run: NYC-20.14-R1-U06-P16, patch: nyc-cb-17, unit: AG-000607, unit_port: lan-9 } }  # 20.04 Heron, network switch
+      - { port: 17, state: active, mode: access, native: 31, far: { run: NYC-20.14-R1-U06-P17, patch: nyc-cb-17, unit: AG-000596, unit_port: lan-1 } }  # 20.04 Heron, display 2
+      - { port: 18, state: parked, far: { run: NYC-20.14-R1-U06-P18, patch: nyc-cb-17 } }  # 20.04 Heron, data/behind-display#6, nothing plugged in
+      - { port: 19, state: parked, far: { run: NYC-20.14-R1-U06-P19, patch: nyc-cb-17 } }  # 20.04 Heron, data/behind-display#7, nothing plugged in
+      - { port: 20, state: parked, far: { run: NYC-20.14-R1-U06-P20, patch: nyc-cb-17 } }  # 20.04 Heron, data/behind-display#8, nothing plugged in
+      - { port: 21, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U06-P21, patch: nyc-cb-17, unit: AG-000599, unit_port: lan-1 } }  # 20.04 Heron, touch controller
+      - { port: 22, state: parked, far: { run: NYC-20.14-R1-U06-P22, patch: nyc-cb-17 } }  # 20.04 Heron, data/below-table#2, nothing plugged in
+      - { port: 23, state: parked, far: { run: NYC-20.14-R1-U06-P23, patch: nyc-cb-17 } }  # 20.04 Heron, data/below-table#3, nothing plugged in
+      - { port: 24, state: parked, far: { run: NYC-20.14-R1-U06-P24, patch: nyc-cb-17 } }  # 20.04 Heron, data/below-table#4, nothing plugged in
+      - { port: 25, state: parked, far: { run: NYC-20.14-R1-U06-P25, patch: nyc-cb-17 } }  # 20.04 Heron, data/below-table#5, nothing plugged in
+      - { port: 26, state: parked, far: { run: NYC-20.14-R1-U06-P26, patch: nyc-cb-17 } }  # 20.04 Heron, data/tbd#1, nothing plugged in
+      - { port: 27, state: parked, far: { run: NYC-20.14-R1-U06-P27, patch: nyc-cb-17 } }  # 20.04 Heron, data/tbd#2, nothing plugged in
+      - { port: 28, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U06-P28, patch: nyc-cb-17, unit: AG-000614, unit_port: lan-1 } }  # 20.04 Heron, scheduler panel
+      - { port: 29, state: parked, far: { run: NYC-20.14-R1-U06-P29, patch: nyc-cb-17 } }  # 20.04 Heron, data/ceiling#1, nothing plugged in
+      - { port: 30, state: active, mode: access, native: 31, far: { run: NYC-20.14-R1-U06-P30, patch: nyc-cb-17, unit: AG-000615, unit_port: lan-1 } }  # 20.05 Curlew, display 1
+      - { port: 31, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U06-P31, patch: nyc-cb-17, unit: AG-000623, unit_port: lan-1 } }  # 20.05 Curlew, video bar
+      - { port: 32, state: active, mode: access, native: 31, far: { run: NYC-20.14-R1-U06-P32, patch: nyc-cb-17, unit: AG-000616, unit_port: lan-1 } }  # 20.05 Curlew, display 2
+      - { port: 33, state: parked, far: { run: NYC-20.14-R1-U06-P33, patch: nyc-cb-17 } }  # 20.05 Curlew, data/behind-display#4, nothing plugged in
+      - { port: 34, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U06-P34, patch: nyc-cb-17, unit: AG-000618, unit_port: lan-1 } }  # 20.05 Curlew, touch controller
+      - { port: 35, state: parked, far: { run: NYC-20.14-R1-U06-P35, patch: nyc-cb-17 } }  # 20.05 Curlew, data/below-table#2, nothing plugged in
+      - { port: 36, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U06-P36, patch: nyc-cb-17, unit: AG-000622, unit_port: lan-1 } }  # 20.05 Curlew, scheduler panel
+      - { port: 37, state: active, mode: access, native: 31, far: { run: NYC-20.14-R1-U06-P37, patch: nyc-cb-17, unit: AG-000624, unit_port: lan-1 } }  # 20.06 Gannet, display 1
+      - { port: 38, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U06-P38, patch: nyc-cb-17, unit: AG-000626, unit_port: lan-1 } }  # 20.06 Gannet, video bar
+      - { port: 39, state: active, mode: access, native: 31, far: { run: NYC-20.14-R1-U06-P39, patch: nyc-cb-17, unit: AG-000625, unit_port: lan-1 } }  # 20.06 Gannet, display 2
+      - { port: 40, state: parked, far: { run: NYC-20.14-R1-U06-P40, patch: nyc-cb-17 } }  # 20.06 Gannet, data/behind-display#4, nothing plugged in
+      - { port: 41, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U06-P41, patch: nyc-cb-17, unit: AG-000627, unit_port: lan-1 } }  # 20.06 Gannet, touch controller
+      - { port: 42, state: parked, far: { run: NYC-20.14-R1-U06-P42, patch: nyc-cb-17 } }  # 20.06 Gannet, data/below-table#2, nothing plugged in
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs01, port: 1, patch: nyc-cb-19 } }  # trunk to nyc-2014-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs02, port: 1, patch: nyc-cb-20 } }  # trunk to nyc-2014-cs02
+    disabled: "43-48"
+  # Access switch 2, Level 20 · 20.14 Comms room (MDF), Rack 1, U16
+  - id: nyc-2014-as02
+    rack: nyc-20-14-r1
+    u: 16
+    platform: unifi
+    ports:
+      - { port: 1, state: parked, far: { run: NYC-20.14-R1-U09-P01, patch: nyc-cb-18 } }  # 20.06 Gannet, data/room-entrance#1, nothing plugged in
+      - { port: 2, state: active, mode: access, native: 31, far: { run: NYC-20.14-R1-U09-P02, patch: nyc-cb-18, unit: AG-000630, unit_port: lan-1 } }  # 20.07 Kestrel, display 1
+      - { port: 3, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U09-P03, patch: nyc-cb-18, unit: AG-000632, unit_port: lan-1 } }  # 20.07 Kestrel, video bar
+      - { port: 4, state: active, mode: access, native: 31, far: { run: NYC-20.14-R1-U09-P04, patch: nyc-cb-18, unit: AG-000631, unit_port: lan-1 } }  # 20.07 Kestrel, display 2
+      - { port: 5, state: parked, far: { run: NYC-20.14-R1-U09-P05, patch: nyc-cb-18 } }  # 20.07 Kestrel, data/behind-display#4, nothing plugged in
+      - { port: 6, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U09-P06, patch: nyc-cb-18, unit: AG-000633, unit_port: lan-1 } }  # 20.07 Kestrel, touch controller
+      - { port: 7, state: parked, far: { run: NYC-20.14-R1-U09-P07, patch: nyc-cb-18 } }  # 20.07 Kestrel, data/below-table#2, nothing plugged in
+      - { port: 8, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U09-P08, patch: nyc-cb-18, unit: AG-000636, unit_port: lan-1 } }  # 20.07 Kestrel, scheduler panel
+      - { port: 9, state: active, mode: access, native: 31, far: { run: NYC-20.14-R1-U09-P09, patch: nyc-cb-18, unit: AG-000637, unit_port: lan-1 } }  # 20.08 Peregrine, display
+      - { port: 10, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U09-P10, patch: nyc-cb-18, unit: AG-000638, unit_port: lan-1 } }  # 20.08 Peregrine, video bar
+      - { port: 11, state: parked, far: { run: NYC-20.14-R1-U09-P11, patch: nyc-cb-18 } }  # 20.08 Peregrine, data/behind-display#3, nothing plugged in
+      - { port: 12, state: parked, far: { run: NYC-20.14-R1-U09-P12, patch: nyc-cb-18 } }  # 20.08 Peregrine, data/behind-display#4, nothing plugged in
+      - { port: 13, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U09-P13, patch: nyc-cb-18, unit: AG-000639, unit_port: lan-1 } }  # 20.08 Peregrine, touch controller
+      - { port: 14, state: parked, far: { run: NYC-20.14-R1-U09-P14, patch: nyc-cb-18 } }  # 20.08 Peregrine, data/below-table#2, nothing plugged in
+      - { port: 15, state: parked, far: { run: NYC-20.14-R1-U09-P15, patch: nyc-cb-18 } }  # 20.08 Peregrine, data/room-entrance#1, nothing plugged in
+      - { port: 16, state: active, mode: access, native: 31, far: { run: NYC-20.14-R1-U09-P16, patch: nyc-cb-18, unit: AG-000643, unit_port: lan-1 } }  # 20.09 Barn Owl, display
+      - { port: 17, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U09-P17, patch: nyc-cb-18, unit: AG-000644, unit_port: lan-1 } }  # 20.09 Barn Owl, video bar
+      - { port: 18, state: parked, far: { run: NYC-20.14-R1-U09-P18, patch: nyc-cb-18 } }  # 20.09 Barn Owl, data/behind-display#3, nothing plugged in
+      - { port: 19, state: parked, far: { run: NYC-20.14-R1-U09-P19, patch: nyc-cb-18 } }  # 20.09 Barn Owl, data/behind-display#4, nothing plugged in
+      - { port: 20, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U09-P20, patch: nyc-cb-18, unit: AG-000645, unit_port: lan-1 } }  # 20.09 Barn Owl, touch controller
+      - { port: 21, state: parked, far: { run: NYC-20.14-R1-U09-P21, patch: nyc-cb-18 } }  # 20.09 Barn Owl, data/below-table#2, nothing plugged in
+      - { port: 22, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U09-P22, patch: nyc-cb-18, unit: AG-000651, unit_port: lan-1 } }  # 20.09 Barn Owl, scheduler panel
+      - { port: 23, state: active, mode: access, native: 31, far: { run: NYC-20.14-R1-U09-P23, patch: nyc-cb-18, unit: AG-000652, unit_port: lan-1 } }  # 20.10 Whooper Swan, display 1
+      - { port: 24, state: active, mode: trunk, native: 10, tagged: [30], far: { run: NYC-20.14-R1-U09-P24, patch: nyc-cb-18, unit: AG-000658, unit_port: lan-9 } }  # 20.10 Whooper Swan, network switch
+      - { port: 25, state: parked, far: { run: NYC-20.14-R1-U09-P25, patch: nyc-cb-18 } }  # 20.10 Whooper Swan, data/behind-display#3, nothing plugged in
+      - { port: 26, state: active, mode: access, native: 31, far: { run: NYC-20.14-R1-U09-P26, patch: nyc-cb-18, unit: AG-000653, unit_port: lan-1 } }  # 20.10 Whooper Swan, display 2
+      - { port: 27, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U09-P27, patch: nyc-cb-18, unit: AG-000654, unit_port: lan-1 } }  # 20.10 Whooper Swan, video bar
+      - { port: 28, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U09-P28, patch: nyc-cb-18, unit: AG-000655, unit_port: lan-1 } }  # 20.10 Whooper Swan, touch controller
+      - { port: 29, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U09-P29, patch: nyc-cb-18, unit: AG-000664, unit_port: lan-1 } }  # 20.10 Whooper Swan, scheduler panel
+      - { port: 30, state: active, mode: access, native: 31, far: { run: NYC-20.14-R1-U09-P30, patch: nyc-cb-18, unit: AG-000665, unit_port: lan-1 } }  # 20.11 Oystercatcher, display main
+      - { port: 31, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U09-P31, patch: nyc-cb-18, unit: AG-000667, unit_port: lan-1 } }  # 20.11 Oystercatcher, video bar
+      - { port: 32, state: active, mode: access, native: 31, far: { run: NYC-20.14-R1-U09-P32, patch: nyc-cb-18, unit: AG-000666, unit_port: lan-1 } }  # 20.11 Oystercatcher, display second
+      - { port: 33, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U09-P33, patch: nyc-cb-18, unit: AG-000668, unit_port: lan-1 } }  # 20.11 Oystercatcher, touch controller
+      - { port: 34, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U09-P34, patch: nyc-cb-18, unit: AG-000671, unit_port: lan-1 } }  # 20.11 Oystercatcher, scheduler panel
+      - { port: 35, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U09-P35, patch: nyc-cb-18, unit: AG-000672, unit_port: lan-1 } }  # 20.12 Lapwing, desk video device
+      - { port: 36, state: active, mode: access, native: 30, far: { run: NYC-20.14-R1-U09-P36, patch: nyc-cb-18, unit: AG-000673, unit_port: lan-1 } }  # 20.12 Lapwing, scheduler panel
+      - { port: 37, state: active, mode: access, native: 20, far: { run: NYC-20.14-R1-U09-P37, patch: nyc-cb-18, unit: AG-000674, unit_port: lan-1 } }  # 20.13 Copy and print, printer
+      - { port: 38, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: NYC-20.14-R1-U09-P38, patch: nyc-cb-18, unit: AG-003232, unit_port: lan-1 } }  # access point nyc-20-ap01
+      - { port: 39, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: NYC-20.14-R1-U09-P39, patch: nyc-cb-18, unit: AG-003233, unit_port: lan-1 } }  # access point nyc-20-ap02
+      - { port: 40, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: NYC-20.14-R1-U09-P40, patch: nyc-cb-18, unit: AG-003234, unit_port: lan-1 } }  # access point nyc-20-ap03
+      - { port: 41, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: NYC-20.14-R1-U09-P41, patch: nyc-cb-18, unit: AG-003235, unit_port: lan-1 } }  # access point nyc-20-ap04
+      - { port: 42, state: active, mode: access, native: 60, far: { run: NYC-20.14-R1-U09-P42, patch: nyc-cb-83, unit: AG-003511, unit_port: lan-1 } }  # 20.01 Reception, cctv camera
+      - { port: 43, state: active, mode: access, native: 60, far: { run: NYC-20.14-R1-U09-P43, patch: nyc-cb-83, unit: AG-003512, unit_port: lan-1 } }  # 20.01 Reception, door controller
+      - { port: 44, state: active, mode: access, native: 50, far: { run: NYC-20.14-R1-U09-P44, patch: nyc-cb-84, unit: AG-003513, unit_port: lan-1 } }  # 20.01 Reception, environment sensor
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs01, port: 2, patch: nyc-cb-21 } }  # trunk to nyc-2014-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs02, port: 2, patch: nyc-cb-22 } }  # trunk to nyc-2014-cs02
+    disabled: "45-48"
+  # Access switch 3, Level 20 · 20.14 Comms room (MDF), Rack 1, U17
+  - id: nyc-2014-as03
+    rack: nyc-20-14-r1
+    u: 17
+    platform: unifi
+    ports:
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs01, port: 3, patch: nyc-cb-23 } }  # trunk to nyc-2014-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs02, port: 3, patch: nyc-cb-24 } }  # trunk to nyc-2014-cs02
+    disabled: "1-48"
+  # Access switch 1 · 21.23 Comms room (IDF), Rack 1, U37
+  - id: nyc-2123-as01
+    rack: nyc-21-23-r1
+    u: 37
+    platform: unifi
+    ports:
+      - { port: 1, state: active, mode: access, native: 31, far: { run: NYC-21.23-R1-U38-P01, patch: nyc-cb-49, unit: AG-000675, unit_port: lan-1 } }  # 21.01 Kingfisher, display 1
+      - { port: 2, state: active, mode: access, native: 31, far: { run: NYC-21.23-R1-U38-P02, patch: nyc-cb-49, unit: AG-000676, unit_port: lan-1 } }  # 21.01 Kingfisher, display 2
+      - { port: 3, state: parked, far: { run: NYC-21.23-R1-U38-P03, patch: nyc-cb-49 } }  # 21.01 Kingfisher, data/behind-display#4, nothing plugged in
+      - { port: 4, state: active, mode: access, native: 30, far: { run: NYC-21.23-R1-U38-P04, patch: nyc-cb-49, unit: AG-000678, unit_port: lan-1 } }  # 21.01 Kingfisher, touch controller
+      - { port: 5, state: parked, far: { run: NYC-21.23-R1-U38-P05, patch: nyc-cb-49 } }  # 21.01 Kingfisher, data/below-table#2, nothing plugged in
+      - { port: 6, state: active, mode: access, native: 30, far: { run: NYC-21.23-R1-U38-P06, patch: nyc-cb-49, unit: AG-000681, unit_port: lan-1 } }  # 21.01 Kingfisher, scheduler panel
+      - { port: 7, state: active, mode: access, native: 31, far: { run: NYC-21.23-R1-U38-P07, patch: nyc-cb-49, unit: AG-000682, unit_port: lan-1 } }  # 21.02 Cormorant, display 1
+      - { port: 8, state: active, mode: access, native: 31, far: { run: NYC-21.23-R1-U38-P08, patch: nyc-cb-49, unit: AG-000683, unit_port: lan-1 } }  # 21.02 Cormorant, display 2
+      - { port: 9, state: parked, far: { run: NYC-21.23-R1-U38-P09, patch: nyc-cb-49 } }  # 21.02 Cormorant, data/behind-display#4, nothing plugged in
+      - { port: 10, state: active, mode: access, native: 30, far: { run: NYC-21.23-R1-U38-P10, patch: nyc-cb-49, unit: AG-000685, unit_port: lan-1 } }  # 21.02 Cormorant, touch controller
+      - { port: 11, state: parked, far: { run: NYC-21.23-R1-U38-P11, patch: nyc-cb-49 } }  # 21.02 Cormorant, data/below-table#2, nothing plugged in
+      - { port: 12, state: active, mode: access, native: 30, far: { run: NYC-21.23-R1-U38-P12, patch: nyc-cb-49, unit: AG-000691, unit_port: lan-1 } }  # 21.02 Cormorant, scheduler panel
+      - { port: 13, state: active, mode: access, native: 31, far: { run: NYC-21.23-R1-U38-P13, patch: nyc-cb-49, unit: AG-000692, unit_port: lan-1 } }  # 21.03 Chough, display 1
+      - { port: 14, state: active, mode: access, native: 31, far: { run: NYC-21.23-R1-U38-P14, patch: nyc-cb-49, unit: AG-000693, unit_port: lan-1 } }  # 21.03 Chough, display 2
+      - { port: 15, state: parked, far: { run: NYC-21.23-R1-U38-P15, patch: nyc-cb-49 } }  # 21.03 Chough, data/behind-display#4, nothing plugged in
+      - { port: 16, state: active, mode: access, native: 30, far: { run: NYC-21.23-R1-U38-P16, patch: nyc-cb-49, unit: AG-000695, unit_port: lan-1 } }  # 21.03 Chough, touch controller
+      - { port: 17, state: parked, far: { run: NYC-21.23-R1-U38-P17, patch: nyc-cb-49 } }  # 21.03 Chough, data/below-table#2, nothing plugged in
+      - { port: 18, state: active, mode: access, native: 30, far: { run: NYC-21.23-R1-U38-P18, patch: nyc-cb-49, unit: AG-000699, unit_port: lan-1 } }  # 21.03 Chough, scheduler panel
+      - { port: 19, state: active, mode: access, native: 31, far: { run: NYC-21.23-R1-U38-P19, patch: nyc-cb-49, unit: AG-000700, unit_port: lan-1 } }  # 21.04 Puffin, display 1
+      - { port: 20, state: active, mode: access, native: 31, far: { run: NYC-21.23-R1-U38-P20, patch: nyc-cb-49, unit: AG-000701, unit_port: lan-1 } }  # 21.04 Puffin, display 2
+      - { port: 21, state: parked, far: { run: NYC-21.23-R1-U38-P21, patch: nyc-cb-49 } }  # 21.04 Puffin, data/behind-display#4, nothing plugged in
+      - { port: 22, state: active, mode: access, native: 30, far: { run: NYC-21.23-R1-U38-P22, patch: nyc-cb-49, unit: AG-000703, unit_port: lan-1 } }  # 21.04 Puffin, touch controller
+      - { port: 23, state: parked, far: { run: NYC-21.23-R1-U38-P23, patch: nyc-cb-49 } }  # 21.04 Puffin, data/below-table#2, nothing plugged in
+      - { port: 24, state: parked, far: { run: NYC-21.23-R1-U38-P24, patch: nyc-cb-49 } }  # 21.04 Puffin, data/room-entrance#1, nothing plugged in
+      - { port: 25, state: active, mode: access, native: 31, far: { run: NYC-21.23-R1-U38-P25, patch: nyc-cb-49, unit: AG-000707, unit_port: lan-1 } }  # 21.05 Skylark, display 1
+      - { port: 26, state: active, mode: trunk, native: 10, tagged: [30], far: { run: NYC-21.23-R1-U38-P26, patch: nyc-cb-49, unit: AG-000713, unit_port: lan-9 } }  # 21.05 Skylark, network switch
+      - { port: 27, state: parked, far: { run: NYC-21.23-R1-U38-P27, patch: nyc-cb-49 } }  # 21.05 Skylark, data/behind-display#3, nothing plugged in
+      - { port: 28, state: active, mode: access, native: 31, far: { run: NYC-21.23-R1-U38-P28, patch: nyc-cb-49, unit: AG-000708, unit_port: lan-1 } }  # 21.05 Skylark, display 2
+      - { port: 29, state: active, mode: access, native: 30, far: { run: NYC-21.23-R1-U38-P29, patch: nyc-cb-49, unit: AG-000710, unit_port: lan-1 } }  # 21.05 Skylark, touch controller
+      - { port: 30, state: parked, far: { run: NYC-21.23-R1-U38-P30, patch: nyc-cb-49 } }  # 21.05 Skylark, data/below-table#2, nothing plugged in
+      - { port: 31, state: parked, far: { run: NYC-21.23-R1-U38-P31, patch: nyc-cb-49 } }  # 21.05 Skylark, data/room-entrance#1, nothing plugged in
+      - { port: 32, state: active, mode: access, native: 31, far: { run: NYC-21.23-R1-U38-P32, patch: nyc-cb-49, unit: AG-000719, unit_port: lan-1 } }  # 21.06 Wren, display
+      - { port: 33, state: parked, far: { run: NYC-21.23-R1-U38-P33, patch: nyc-cb-49 } }  # 21.06 Wren, data/behind-display#3, nothing plugged in
+      - { port: 34, state: active, mode: access, native: 30, far: { run: NYC-21.23-R1-U38-P34, patch: nyc-cb-49, unit: AG-000721, unit_port: lan-1 } }  # 21.06 Wren, touch controller
+      - { port: 35, state: parked, far: { run: NYC-21.23-R1-U38-P35, patch: nyc-cb-49 } }  # 21.06 Wren, data/wall-below-table#2, nothing plugged in
+      - { port: 36, state: active, mode: access, native: 30, far: { run: NYC-21.23-R1-U38-P36, patch: nyc-cb-49, unit: AG-000724, unit_port: lan-1 } }  # 21.06 Wren, scheduler panel
+      - { port: 37, state: active, mode: access, native: 31, far: { run: NYC-21.23-R1-U38-P37, patch: nyc-cb-49, unit: AG-000725, unit_port: lan-1 } }  # 21.07 Robin, display
+      - { port: 38, state: parked, far: { run: NYC-21.23-R1-U38-P38, patch: nyc-cb-49 } }  # 21.07 Robin, data/behind-display#3, nothing plugged in
+      - { port: 39, state: active, mode: access, native: 30, far: { run: NYC-21.23-R1-U38-P39, patch: nyc-cb-49, unit: AG-000727, unit_port: lan-1 } }  # 21.07 Robin, touch controller
+      - { port: 40, state: parked, far: { run: NYC-21.23-R1-U38-P40, patch: nyc-cb-49 } }  # 21.07 Robin, data/wall-below-table#2, nothing plugged in
+      - { port: 41, state: active, mode: access, native: 30, far: { run: NYC-21.23-R1-U38-P41, patch: nyc-cb-49, unit: AG-000730, unit_port: lan-1 } }  # 21.07 Robin, scheduler panel
+      - { port: 42, state: active, mode: access, native: 31, far: { run: NYC-21.23-R1-U38-P42, patch: nyc-cb-49, unit: AG-000731, unit_port: lan-1 } }  # 21.08 Goldcrest, display
+      - { port: 43, state: parked, far: { run: NYC-21.23-R1-U38-P43, patch: nyc-cb-49 } }  # 21.08 Goldcrest, data/behind-display#3, nothing plugged in
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs01, port: 5, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-55, nyc-cb-32] } }  # trunk to nyc-2014-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs01, port: 6, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-55, nyc-cb-32] } }  # trunk to nyc-2014-cs01
+    disabled: "44-48"
+  # Access switch 2 · 21.23 Comms room (IDF), Rack 1, U33
+  - id: nyc-2123-as02
+    rack: nyc-21-23-r1
+    u: 33
+    platform: unifi
+    ports:
+      - { port: 1, state: parked, far: { run: NYC-21.23-R1-U34-P01, patch: nyc-cb-50 } }  # 21.08 Goldcrest, data/behind-display#4, nothing plugged in
+      - { port: 2, state: active, mode: access, native: 30, far: { run: NYC-21.23-R1-U34-P02, patch: nyc-cb-50, unit: AG-000733, unit_port: lan-1 } }  # 21.08 Goldcrest, touch controller
+      - { port: 3, state: parked, far: { run: NYC-21.23-R1-U34-P03, patch: nyc-cb-50 } }  # 21.08 Goldcrest, data/below-table#2, nothing plugged in
+      - { port: 4, state: active, mode: access, native: 30, far: { run: NYC-21.23-R1-U34-P04, patch: nyc-cb-50, unit: AG-000738, unit_port: lan-1 } }  # 21.09 Stonechat, video bar
+      - { port: 5, state: active, mode: access, native: 31, far: { run: NYC-21.23-R1-U34-P05, patch: nyc-cb-50, unit: AG-000737, unit_port: lan-1 } }  # 21.09 Stonechat, display
+      - { port: 6, state: parked, far: { run: NYC-21.23-R1-U34-P06, patch: nyc-cb-50 } }  # 21.09 Stonechat, data/behind-display#3, nothing plugged in
+      - { port: 7, state: active, mode: access, native: 30, far: { run: NYC-21.23-R1-U34-P07, patch: nyc-cb-50, unit: AG-000740, unit_port: lan-1 } }  # 21.10 Goldfinch, video bar
+      - { port: 8, state: active, mode: access, native: 31, far: { run: NYC-21.23-R1-U34-P08, patch: nyc-cb-50, unit: AG-000739, unit_port: lan-1 } }  # 21.10 Goldfinch, display
+      - { port: 9, state: parked, far: { run: NYC-21.23-R1-U34-P09, patch: nyc-cb-50 } }  # 21.10 Goldfinch, data/behind-display#3, nothing plugged in
+      - { port: 10, state: active, mode: access, native: 30, far: { run: NYC-21.23-R1-U34-P10, patch: nyc-cb-50, unit: AG-000742, unit_port: lan-1 } }  # 21.11 Chaffinch, video bar
+      - { port: 11, state: active, mode: access, native: 31, far: { run: NYC-21.23-R1-U34-P11, patch: nyc-cb-50, unit: AG-000741, unit_port: lan-1 } }  # 21.11 Chaffinch, display
+      - { port: 12, state: parked, far: { run: NYC-21.23-R1-U34-P12, patch: nyc-cb-50 } }  # 21.11 Chaffinch, data/behind-display#3, nothing plugged in
+      - { port: 13, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U34-P13, patch: nyc-cb-50, unit: AG-000743, unit_port: lan-1 } }  # 21.12 Focus 21.12, monitor
+      - { port: 14, state: parked, far: { run: NYC-21.23-R1-U34-P14, patch: nyc-cb-50 } }  # 21.12 Focus 21.12, data/table-top#2, nothing plugged in
+      - { port: 15, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U34-P15, patch: nyc-cb-50, unit: AG-000744, unit_port: lan-1 } }  # 21.13 Focus 21.13, monitor
+      - { port: 16, state: parked, far: { run: NYC-21.23-R1-U34-P16, patch: nyc-cb-50 } }  # 21.13 Focus 21.13, data/table-top#2, nothing plugged in
+      - { port: 17, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U34-P17, patch: nyc-cb-50, unit: AG-000745, unit_port: lan-1 } }  # 21.14 Focus 21.14, monitor
+      - { port: 18, state: parked, far: { run: NYC-21.23-R1-U34-P18, patch: nyc-cb-50 } }  # 21.14 Focus 21.14, data/table-top#2, nothing plugged in
+      - { port: 19, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U34-P19, patch: nyc-cb-50, unit: AG-000746, unit_port: lan-1 } }  # 21.15 Office 21.15, monitor
+      - { port: 20, state: parked, far: { run: NYC-21.23-R1-U34-P20, patch: nyc-cb-50 } }  # 21.15 Office 21.15, data/wall-below-table#2, nothing plugged in
+      - { port: 21, state: parked, far: { run: NYC-21.23-R1-U34-P21, patch: nyc-cb-50 } }  # 21.15 Office 21.15, data/room-entrance#1, nothing plugged in
+      - { port: 22, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U34-P22, patch: nyc-cb-50, unit: AG-000748, unit_port: lan-1 } }  # 21.16 Office 21.16, monitor
+      - { port: 23, state: parked, far: { run: NYC-21.23-R1-U34-P23, patch: nyc-cb-50 } }  # 21.16 Office 21.16, data/wall-below-table#2, nothing plugged in
+      - { port: 24, state: active, mode: access, native: 30, far: { run: NYC-21.23-R1-U34-P24, patch: nyc-cb-50, unit: AG-000749, unit_port: lan-1 } }  # 21.16 Office 21.16, scheduler panel
+      - { port: 25, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U34-P25, patch: nyc-cb-50, unit: AG-000750, unit_port: lan-1 } }  # 21.17 Office 21.17, monitor
+      - { port: 26, state: parked, far: { run: NYC-21.23-R1-U34-P26, patch: nyc-cb-50 } }  # 21.17 Office 21.17, data/wall-below-table#2, nothing plugged in
+      - { port: 27, state: active, mode: access, native: 30, far: { run: NYC-21.23-R1-U34-P27, patch: nyc-cb-50, unit: AG-000751, unit_port: lan-1 } }  # 21.17 Office 21.17, scheduler panel
+      - { port: 28, state: active, mode: access, native: 31, far: { run: NYC-21.23-R1-U34-P28, patch: nyc-cb-50, unit: AG-001443, unit_port: lan-1 } }  # 21.18 Pantry, display
+      - { port: 29, state: active, mode: access, native: 31, far: { run: NYC-21.23-R1-U34-P29, patch: nyc-cb-50, unit: AG-001444, unit_port: lan-1 } }  # 21.18 Pantry, signage player
+      - { port: 30, state: parked, far: { run: NYC-21.23-R1-U34-P30, patch: nyc-cb-50 } }  # 21.18 Pantry, data/behind-display#3, nothing plugged in
+      - { port: 31, state: parked, far: { run: NYC-21.23-R1-U34-P31, patch: nyc-cb-50 } }  # 21.18 Pantry, data/tbd#1, nothing plugged in
+      - { port: 32, state: active, mode: access, native: 70, far: { run: NYC-21.23-R1-U34-P32, patch: nyc-cb-50, unit: AG-000752, unit_port: lan-1 } }  # 21.19 Copy and print, printer
+      - { port: 33, state: parked, far: { run: NYC-21.23-R1-U34-P33, patch: nyc-cb-50 } }  # 21.19 Copy and print, data/wall#2, nothing plugged in
+      - { port: 34, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U34-P34, patch: nyc-cb-50, unit: AG-000753, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 01, monitor
+      - { port: 35, state: parked, far: { run: NYC-21.23-R1-U34-P35, patch: nyc-cb-50 } }  # 21.20 Flex desks A, desk-01/data/table-top#2, nothing plugged in
+      - { port: 36, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U34-P36, patch: nyc-cb-50, unit: AG-000754, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 02, monitor
+      - { port: 37, state: parked, far: { run: NYC-21.23-R1-U34-P37, patch: nyc-cb-50 } }  # 21.20 Flex desks A, desk-02/data/table-top#2, nothing plugged in
+      - { port: 38, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U34-P38, patch: nyc-cb-50, unit: AG-000755, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 03, monitor
+      - { port: 39, state: parked, far: { run: NYC-21.23-R1-U34-P39, patch: nyc-cb-50 } }  # 21.20 Flex desks A, desk-03/data/table-top#2, nothing plugged in
+      - { port: 40, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U34-P40, patch: nyc-cb-50, unit: AG-000756, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 04, monitor
+      - { port: 41, state: parked, far: { run: NYC-21.23-R1-U34-P41, patch: nyc-cb-50 } }  # 21.20 Flex desks A, desk-04/data/table-top#2, nothing plugged in
+      - { port: 42, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U34-P42, patch: nyc-cb-50, unit: AG-000757, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 05, monitor
+      - { port: 43, state: parked, far: { run: NYC-21.23-R1-U34-P43, patch: nyc-cb-50 } }  # 21.20 Flex desks A, desk-05/data/table-top#2, nothing plugged in
+      - { port: 47, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { rack: nyc-21-23-r1, u: 16, patch: nyc-cb-61 } }  # AV switch on a shelf
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs02, port: 5, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-56, nyc-cb-33] } }  # trunk to nyc-2014-cs02
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs02, port: 6, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-56, nyc-cb-33] } }  # trunk to nyc-2014-cs02
+    disabled: "44-46,48"
+  # Access switch 3 · 21.23 Comms room (IDF), Rack 1, U29
+  - id: nyc-2123-as03
+    rack: nyc-21-23-r1
+    u: 29
+    platform: unifi
+    ports:
+      - { port: 1, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U30-P01, patch: nyc-cb-51, unit: AG-000758, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 06, monitor
+      - { port: 2, state: parked, far: { run: NYC-21.23-R1-U30-P02, patch: nyc-cb-51 } }  # 21.20 Flex desks A, desk-06/data/table-top#2, nothing plugged in
+      - { port: 3, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U30-P03, patch: nyc-cb-51, unit: AG-000759, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 07, monitor
+      - { port: 4, state: parked, far: { run: NYC-21.23-R1-U30-P04, patch: nyc-cb-51 } }  # 21.20 Flex desks A, desk-07/data/table-top#2, nothing plugged in
+      - { port: 5, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U30-P05, patch: nyc-cb-51, unit: AG-000760, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 08, monitor
+      - { port: 6, state: parked, far: { run: NYC-21.23-R1-U30-P06, patch: nyc-cb-51 } }  # 21.20 Flex desks A, desk-08/data/table-top#2, nothing plugged in
+      - { port: 7, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U30-P07, patch: nyc-cb-51, unit: AG-000761, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 09, monitor
+      - { port: 8, state: parked, far: { run: NYC-21.23-R1-U30-P08, patch: nyc-cb-51 } }  # 21.20 Flex desks A, desk-09/data/table-top#2, nothing plugged in
+      - { port: 9, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U30-P09, patch: nyc-cb-51, unit: AG-000762, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 10, monitor
+      - { port: 10, state: parked, far: { run: NYC-21.23-R1-U30-P10, patch: nyc-cb-51 } }  # 21.20 Flex desks A, desk-10/data/table-top#2, nothing plugged in
+      - { port: 11, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U30-P11, patch: nyc-cb-51, unit: AG-000763, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 11, monitor
+      - { port: 12, state: parked, far: { run: NYC-21.23-R1-U30-P12, patch: nyc-cb-51 } }  # 21.20 Flex desks A, desk-11/data/table-top#2, nothing plugged in
+      - { port: 13, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U30-P13, patch: nyc-cb-51, unit: AG-000764, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 12, monitor
+      - { port: 14, state: parked, far: { run: NYC-21.23-R1-U30-P14, patch: nyc-cb-51 } }  # 21.20 Flex desks A, desk-12/data/table-top#2, nothing plugged in
+      - { port: 15, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U30-P15, patch: nyc-cb-51, unit: AG-000765, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 13, monitor
+      - { port: 16, state: parked, far: { run: NYC-21.23-R1-U30-P16, patch: nyc-cb-51 } }  # 21.20 Flex desks A, desk-13/data/table-top#2, nothing plugged in
+      - { port: 17, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U30-P17, patch: nyc-cb-51, unit: AG-000766, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 14, monitor
+      - { port: 18, state: parked, far: { run: NYC-21.23-R1-U30-P18, patch: nyc-cb-51 } }  # 21.20 Flex desks A, desk-14/data/table-top#2, nothing plugged in
+      - { port: 19, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U30-P19, patch: nyc-cb-51, unit: AG-000767, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 15, monitor
+      - { port: 20, state: parked, far: { run: NYC-21.23-R1-U30-P20, patch: nyc-cb-51 } }  # 21.20 Flex desks A, desk-15/data/table-top#2, nothing plugged in
+      - { port: 21, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U30-P21, patch: nyc-cb-51, unit: AG-000768, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 16, monitor
+      - { port: 22, state: parked, far: { run: NYC-21.23-R1-U30-P22, patch: nyc-cb-51 } }  # 21.20 Flex desks A, desk-16/data/table-top#2, nothing plugged in
+      - { port: 23, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U30-P23, patch: nyc-cb-51, unit: AG-000769, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 17, monitor
+      - { port: 24, state: parked, far: { run: NYC-21.23-R1-U30-P24, patch: nyc-cb-51 } }  # 21.20 Flex desks A, desk-17/data/table-top#2, nothing plugged in
+      - { port: 25, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U30-P25, patch: nyc-cb-51, unit: AG-000770, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 18, monitor
+      - { port: 26, state: parked, far: { run: NYC-21.23-R1-U30-P26, patch: nyc-cb-51 } }  # 21.20 Flex desks A, desk-18/data/table-top#2, nothing plugged in
+      - { port: 27, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U30-P27, patch: nyc-cb-51, unit: AG-000771, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 19, monitor
+      - { port: 28, state: parked, far: { run: NYC-21.23-R1-U30-P28, patch: nyc-cb-51 } }  # 21.20 Flex desks A, desk-19/data/table-top#2, nothing plugged in
+      - { port: 29, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U30-P29, patch: nyc-cb-51, unit: AG-000772, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 20, monitor
+      - { port: 30, state: parked, far: { run: NYC-21.23-R1-U30-P30, patch: nyc-cb-51 } }  # 21.20 Flex desks A, desk-20/data/table-top#2, nothing plugged in
+      - { port: 31, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U30-P31, patch: nyc-cb-51, unit: AG-000773, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 21, monitor
+      - { port: 32, state: parked, far: { run: NYC-21.23-R1-U30-P32, patch: nyc-cb-51 } }  # 21.20 Flex desks A, desk-21/data/table-top#2, nothing plugged in
+      - { port: 33, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U30-P33, patch: nyc-cb-51, unit: AG-000774, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 22, monitor
+      - { port: 34, state: parked, far: { run: NYC-21.23-R1-U30-P34, patch: nyc-cb-51 } }  # 21.20 Flex desks A, desk-22/data/table-top#2, nothing plugged in
+      - { port: 35, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U30-P35, patch: nyc-cb-51, unit: AG-000775, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 23, monitor
+      - { port: 36, state: parked, far: { run: NYC-21.23-R1-U30-P36, patch: nyc-cb-51 } }  # 21.20 Flex desks A, desk-23/data/table-top#2, nothing plugged in
+      - { port: 37, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U30-P37, patch: nyc-cb-51, unit: AG-000776, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 24, monitor
+      - { port: 38, state: parked, far: { run: NYC-21.23-R1-U30-P38, patch: nyc-cb-51 } }  # 21.20 Flex desks A, desk-24/data/table-top#2, nothing plugged in
+      - { port: 39, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U30-P39, patch: nyc-cb-51, unit: AG-000777, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 25, monitor
+      - { port: 40, state: parked, far: { run: NYC-21.23-R1-U30-P40, patch: nyc-cb-51 } }  # 21.20 Flex desks A, desk-25/data/table-top#2, nothing plugged in
+      - { port: 41, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U30-P41, patch: nyc-cb-51, unit: AG-000778, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 26, monitor
+      - { port: 42, state: parked, far: { run: NYC-21.23-R1-U30-P42, patch: nyc-cb-51 } }  # 21.20 Flex desks A, desk-26/data/table-top#2, nothing plugged in
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs01, port: 7, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-57, nyc-cb-34] } }  # trunk to nyc-2014-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs01, port: 8, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-57, nyc-cb-34] } }  # trunk to nyc-2014-cs01
+    disabled: "43-48"
+  # Access switch 4 · 21.23 Comms room (IDF), Rack 1, U25
+  - id: nyc-2123-as04
+    rack: nyc-21-23-r1
+    u: 25
+    platform: unifi
+    ports:
+      - { port: 1, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U26-P01, patch: nyc-cb-52, unit: AG-000779, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 27, monitor
+      - { port: 2, state: parked, far: { run: NYC-21.23-R1-U26-P02, patch: nyc-cb-52 } }  # 21.20 Flex desks A, desk-27/data/table-top#2, nothing plugged in
+      - { port: 3, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U26-P03, patch: nyc-cb-52, unit: AG-000780, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 28, monitor
+      - { port: 4, state: parked, far: { run: NYC-21.23-R1-U26-P04, patch: nyc-cb-52 } }  # 21.20 Flex desks A, desk-28/data/table-top#2, nothing plugged in
+      - { port: 5, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U26-P05, patch: nyc-cb-52, unit: AG-000781, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 29, monitor
+      - { port: 6, state: parked, far: { run: NYC-21.23-R1-U26-P06, patch: nyc-cb-52 } }  # 21.20 Flex desks A, desk-29/data/table-top#2, nothing plugged in
+      - { port: 7, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U26-P07, patch: nyc-cb-52, unit: AG-000782, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 30, monitor
+      - { port: 8, state: parked, far: { run: NYC-21.23-R1-U26-P08, patch: nyc-cb-52 } }  # 21.20 Flex desks A, desk-30/data/table-top#2, nothing plugged in
+      - { port: 9, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U26-P09, patch: nyc-cb-52, unit: AG-000783, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 31, monitor
+      - { port: 10, state: parked, far: { run: NYC-21.23-R1-U26-P10, patch: nyc-cb-52 } }  # 21.20 Flex desks A, desk-31/data/table-top#2, nothing plugged in
+      - { port: 11, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U26-P11, patch: nyc-cb-52, unit: AG-000784, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 32, monitor
+      - { port: 12, state: parked, far: { run: NYC-21.23-R1-U26-P12, patch: nyc-cb-52 } }  # 21.20 Flex desks A, desk-32/data/table-top#2, nothing plugged in
+      - { port: 13, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U26-P13, patch: nyc-cb-52, unit: AG-000785, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 33, monitor
+      - { port: 14, state: parked, far: { run: NYC-21.23-R1-U26-P14, patch: nyc-cb-52 } }  # 21.20 Flex desks A, desk-33/data/table-top#2, nothing plugged in
+      - { port: 15, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U26-P15, patch: nyc-cb-52, unit: AG-000786, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 34, monitor
+      - { port: 16, state: parked, far: { run: NYC-21.23-R1-U26-P16, patch: nyc-cb-52 } }  # 21.20 Flex desks A, desk-34/data/table-top#2, nothing plugged in
+      - { port: 17, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U26-P17, patch: nyc-cb-52, unit: AG-000787, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 35, monitor
+      - { port: 18, state: parked, far: { run: NYC-21.23-R1-U26-P18, patch: nyc-cb-52 } }  # 21.20 Flex desks A, desk-35/data/table-top#2, nothing plugged in
+      - { port: 19, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U26-P19, patch: nyc-cb-52, unit: AG-000788, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 36, monitor
+      - { port: 20, state: parked, far: { run: NYC-21.23-R1-U26-P20, patch: nyc-cb-52 } }  # 21.20 Flex desks A, desk-36/data/table-top#2, nothing plugged in
+      - { port: 21, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U26-P21, patch: nyc-cb-52, unit: AG-000789, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 37, monitor
+      - { port: 22, state: parked, far: { run: NYC-21.23-R1-U26-P22, patch: nyc-cb-52 } }  # 21.20 Flex desks A, desk-37/data/table-top#2, nothing plugged in
+      - { port: 23, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U26-P23, patch: nyc-cb-52, unit: AG-000790, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 38, monitor
+      - { port: 24, state: parked, far: { run: NYC-21.23-R1-U26-P24, patch: nyc-cb-52 } }  # 21.20 Flex desks A, desk-38/data/table-top#2, nothing plugged in
+      - { port: 25, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U26-P25, patch: nyc-cb-52, unit: AG-000791, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 39, monitor
+      - { port: 26, state: parked, far: { run: NYC-21.23-R1-U26-P26, patch: nyc-cb-52 } }  # 21.20 Flex desks A, desk-39/data/table-top#2, nothing plugged in
+      - { port: 27, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U26-P27, patch: nyc-cb-52, unit: AG-000792, unit_port: lan-1 } }  # 21.20 Flex desks A, desk 40, monitor
+      - { port: 28, state: parked, far: { run: NYC-21.23-R1-U26-P28, patch: nyc-cb-52 } }  # 21.20 Flex desks A, desk-40/data/table-top#2, nothing plugged in
+      - { port: 29, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U26-P29, patch: nyc-cb-52, unit: AG-000793, unit_port: lan-1 } }  # 21.21 Flex desks B, desk 01, monitor hub
+      - { port: 30, state: parked, far: { run: NYC-21.23-R1-U26-P30, patch: nyc-cb-52 } }  # 21.21 Flex desks B, desk-01/data/table-top#2, nothing plugged in
+      - { port: 31, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U26-P31, patch: nyc-cb-52, unit: AG-000795, unit_port: lan-1 } }  # 21.21 Flex desks B, desk 02, monitor hub
+      - { port: 32, state: parked, far: { run: NYC-21.23-R1-U26-P32, patch: nyc-cb-52 } }  # 21.21 Flex desks B, desk-02/data/table-top#2, nothing plugged in
+      - { port: 33, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U26-P33, patch: nyc-cb-52, unit: AG-000797, unit_port: lan-1 } }  # 21.21 Flex desks B, desk 03, monitor hub
+      - { port: 34, state: parked, far: { run: NYC-21.23-R1-U26-P34, patch: nyc-cb-52 } }  # 21.21 Flex desks B, desk-03/data/table-top#2, nothing plugged in
+      - { port: 35, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U26-P35, patch: nyc-cb-52, unit: AG-000799, unit_port: lan-1 } }  # 21.21 Flex desks B, desk 04, monitor hub
+      - { port: 36, state: parked, far: { run: NYC-21.23-R1-U26-P36, patch: nyc-cb-52 } }  # 21.21 Flex desks B, desk-04/data/table-top#2, nothing plugged in
+      - { port: 37, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U26-P37, patch: nyc-cb-52, unit: AG-000801, unit_port: lan-1 } }  # 21.21 Flex desks B, desk 05, monitor hub
+      - { port: 38, state: parked, far: { run: NYC-21.23-R1-U26-P38, patch: nyc-cb-52 } }  # 21.21 Flex desks B, desk-05/data/table-top#2, nothing plugged in
+      - { port: 39, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U26-P39, patch: nyc-cb-52, unit: AG-000803, unit_port: lan-1 } }  # 21.21 Flex desks B, desk 06, monitor hub
+      - { port: 40, state: parked, far: { run: NYC-21.23-R1-U26-P40, patch: nyc-cb-52 } }  # 21.21 Flex desks B, desk-06/data/table-top#2, nothing plugged in
+      - { port: 41, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U26-P41, patch: nyc-cb-52, unit: AG-000805, unit_port: lan-1 } }  # 21.21 Flex desks B, desk 07, monitor hub
+      - { port: 42, state: parked, far: { run: NYC-21.23-R1-U26-P42, patch: nyc-cb-52 } }  # 21.21 Flex desks B, desk-07/data/table-top#2, nothing plugged in
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs02, port: 7, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-58, nyc-cb-35] } }  # trunk to nyc-2014-cs02
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs02, port: 8, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-58, nyc-cb-35] } }  # trunk to nyc-2014-cs02
+    disabled: "43-48"
+  # Access switch 5 · 21.23 Comms room (IDF), Rack 1, U21
+  - id: nyc-2123-as05
+    rack: nyc-21-23-r1
+    u: 21
+    platform: unifi
+    ports:
+      - { port: 1, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U22-P01, patch: nyc-cb-53, unit: AG-000807, unit_port: lan-1 } }  # 21.21 Flex desks B, desk 08, monitor hub
+      - { port: 2, state: parked, far: { run: NYC-21.23-R1-U22-P02, patch: nyc-cb-53 } }  # 21.21 Flex desks B, desk-08/data/table-top#2, nothing plugged in
+      - { port: 3, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U22-P03, patch: nyc-cb-53, unit: AG-000809, unit_port: lan-1 } }  # 21.21 Flex desks B, desk 09, monitor hub
+      - { port: 4, state: parked, far: { run: NYC-21.23-R1-U22-P04, patch: nyc-cb-53 } }  # 21.21 Flex desks B, desk-09/data/table-top#2, nothing plugged in
+      - { port: 5, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U22-P05, patch: nyc-cb-53, unit: AG-000811, unit_port: lan-1 } }  # 21.21 Flex desks B, desk 10, monitor hub
+      - { port: 6, state: parked, far: { run: NYC-21.23-R1-U22-P06, patch: nyc-cb-53 } }  # 21.21 Flex desks B, desk-10/data/table-top#2, nothing plugged in
+      - { port: 7, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U22-P07, patch: nyc-cb-53, unit: AG-000813, unit_port: lan-1 } }  # 21.21 Flex desks B, desk 11, monitor hub
+      - { port: 8, state: parked, far: { run: NYC-21.23-R1-U22-P08, patch: nyc-cb-53 } }  # 21.21 Flex desks B, desk-11/data/table-top#2, nothing plugged in
+      - { port: 9, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U22-P09, patch: nyc-cb-53, unit: AG-000815, unit_port: lan-1 } }  # 21.21 Flex desks B, desk 12, monitor hub
+      - { port: 10, state: parked, far: { run: NYC-21.23-R1-U22-P10, patch: nyc-cb-53 } }  # 21.21 Flex desks B, desk-12/data/table-top#2, nothing plugged in
+      - { port: 11, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U22-P11, patch: nyc-cb-53, unit: AG-000818, unit_port: lan-1 } }  # 21.22 Flex desks C, desk 01, network adapter
+      - { port: 12, state: parked, far: { run: NYC-21.23-R1-U22-P12, patch: nyc-cb-53 } }  # 21.22 Flex desks C, desk-01/data/table-top#2, nothing plugged in
+      - { port: 13, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U22-P13, patch: nyc-cb-53, unit: AG-000820, unit_port: lan-1 } }  # 21.22 Flex desks C, desk 02, network adapter
+      - { port: 14, state: parked, far: { run: NYC-21.23-R1-U22-P14, patch: nyc-cb-53 } }  # 21.22 Flex desks C, desk-02/data/table-top#2, nothing plugged in
+      - { port: 15, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U22-P15, patch: nyc-cb-53, unit: AG-000822, unit_port: lan-1 } }  # 21.22 Flex desks C, desk 03, network adapter
+      - { port: 16, state: parked, far: { run: NYC-21.23-R1-U22-P16, patch: nyc-cb-53 } }  # 21.22 Flex desks C, desk-03/data/table-top#2, nothing plugged in
+      - { port: 17, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U22-P17, patch: nyc-cb-53, unit: AG-000824, unit_port: lan-1 } }  # 21.22 Flex desks C, desk 04, network adapter
+      - { port: 18, state: parked, far: { run: NYC-21.23-R1-U22-P18, patch: nyc-cb-53 } }  # 21.22 Flex desks C, desk-04/data/table-top#2, nothing plugged in
+      - { port: 19, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U22-P19, patch: nyc-cb-53, unit: AG-000826, unit_port: lan-1 } }  # 21.22 Flex desks C, desk 05, network adapter
+      - { port: 20, state: parked, far: { run: NYC-21.23-R1-U22-P20, patch: nyc-cb-53 } }  # 21.22 Flex desks C, desk-05/data/table-top#2, nothing plugged in
+      - { port: 21, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U22-P21, patch: nyc-cb-53, unit: AG-000828, unit_port: lan-1 } }  # 21.22 Flex desks C, desk 06, network adapter
+      - { port: 22, state: parked, far: { run: NYC-21.23-R1-U22-P22, patch: nyc-cb-53 } }  # 21.22 Flex desks C, desk-06/data/table-top#2, nothing plugged in
+      - { port: 23, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U22-P23, patch: nyc-cb-53, unit: AG-000830, unit_port: lan-1 } }  # 21.22 Flex desks C, desk 07, network adapter
+      - { port: 24, state: parked, far: { run: NYC-21.23-R1-U22-P24, patch: nyc-cb-53 } }  # 21.22 Flex desks C, desk-07/data/table-top#2, nothing plugged in
+      - { port: 25, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U22-P25, patch: nyc-cb-53, unit: AG-000832, unit_port: lan-1 } }  # 21.22 Flex desks C, desk 08, network adapter
+      - { port: 26, state: parked, far: { run: NYC-21.23-R1-U22-P26, patch: nyc-cb-53 } }  # 21.22 Flex desks C, desk-08/data/table-top#2, nothing plugged in
+      - { port: 27, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U22-P27, patch: nyc-cb-53, unit: AG-000834, unit_port: lan-1 } }  # 21.22 Flex desks C, desk 09, network adapter
+      - { port: 28, state: parked, far: { run: NYC-21.23-R1-U22-P28, patch: nyc-cb-53 } }  # 21.22 Flex desks C, desk-09/data/table-top#2, nothing plugged in
+      - { port: 29, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U22-P29, patch: nyc-cb-53, unit: AG-000836, unit_port: lan-1 } }  # 21.22 Flex desks C, desk 10, network adapter
+      - { port: 30, state: parked, far: { run: NYC-21.23-R1-U22-P30, patch: nyc-cb-53 } }  # 21.22 Flex desks C, desk-10/data/table-top#2, nothing plugged in
+      - { port: 31, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U22-P31, patch: nyc-cb-53, unit: AG-000838, unit_port: lan-1 } }  # 21.22 Flex desks C, desk 11, network adapter
+      - { port: 32, state: parked, far: { run: NYC-21.23-R1-U22-P32, patch: nyc-cb-53 } }  # 21.22 Flex desks C, desk-11/data/table-top#2, nothing plugged in
+      - { port: 33, state: active, mode: access, native: 20, far: { run: NYC-21.23-R1-U22-P33, patch: nyc-cb-53, unit: AG-000840, unit_port: lan-1 } }  # 21.22 Flex desks C, desk 12, network adapter
+      - { port: 34, state: parked, far: { run: NYC-21.23-R1-U22-P34, patch: nyc-cb-53 } }  # 21.22 Flex desks C, desk-12/data/table-top#2, nothing plugged in
+      - { port: 35, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: NYC-21.23-R1-U22-P35, patch: nyc-cb-53, unit: AG-003236, unit_port: lan-1 } }  # access point nyc-21-ap01
+      - { port: 36, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: NYC-21.23-R1-U22-P36, patch: nyc-cb-53, unit: AG-003237, unit_port: lan-1 } }  # access point nyc-21-ap02
+      - { port: 37, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: NYC-21.23-R1-U22-P37, patch: nyc-cb-53, unit: AG-003238, unit_port: lan-1 } }  # access point nyc-21-ap03
+      - { port: 38, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: NYC-21.23-R1-U22-P38, patch: nyc-cb-53, unit: AG-003239, unit_port: lan-1 } }  # access point nyc-21-ap04
+      - { port: 39, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: NYC-21.23-R1-U22-P39, patch: nyc-cb-53, unit: AG-003240, unit_port: lan-1 } }  # access point nyc-21-ap05
+      - { port: 40, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: NYC-21.23-R1-U22-P40, patch: nyc-cb-53, unit: AG-003241, unit_port: lan-1 } }  # access point nyc-21-ap06
+      - { port: 41, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: NYC-21.23-R1-U22-P41, patch: nyc-cb-53, unit: AG-003242, unit_port: lan-1 } }  # access point nyc-21-ap07
+      - { port: 42, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: NYC-21.23-R1-U22-P42, patch: nyc-cb-53, unit: AG-003243, unit_port: lan-1 } }  # access point nyc-21-ap08
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs01, port: 9, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-59, nyc-cb-36] } }  # trunk to nyc-2014-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs01, port: 10, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-59, nyc-cb-36] } }  # trunk to nyc-2014-cs01
+    disabled: "43-48"
+  # Access switch 6 · 21.23 Comms room (IDF), Rack 1, U19
+  - id: nyc-2123-as06
+    rack: nyc-21-23-r1
+    u: 19
+    platform: unifi
+    ports:
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs02, port: 9, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-60, nyc-cb-37] } }  # trunk to nyc-2014-cs02
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs02, port: 10, run: NYC-20.14-R1-U12-P01, patches: [nyc-cb-60, nyc-cb-37] } }  # trunk to nyc-2014-cs02
+    disabled: "1-48"
+  # Access switch 1 · 22.22 Comms room (IDF), Rack 1, U37
+  - id: nyc-2222-as01
+    rack: nyc-22-22-r1
+    u: 37
+    platform: unifi
+    ports:
+      - { port: 1, state: active, mode: access, native: 31, far: { run: NYC-22.22-R1-U38-P01, patch: nyc-cb-67, unit: AG-000841, unit_port: lan-1 } }  # 22.01 Corncrake, display
+      - { port: 2, state: parked, far: { run: NYC-22.22-R1-U38-P02, patch: nyc-cb-67 } }  # 22.01 Corncrake, data/behind-display#2, nothing plugged in
+      - { port: 3, state: active, mode: access, native: 30, far: { run: NYC-22.22-R1-U38-P03, patch: nyc-cb-67, unit: AG-000843, unit_port: lan-1 } }  # 22.01 Corncrake, ptz camera
+      - { port: 4, state: active, mode: trunk, native: 10, tagged: [30], far: { run: NYC-22.22-R1-U38-P04, patch: nyc-cb-67, unit: AG-000853, unit_port: lan-9 } }  # 22.01 Corncrake, network switch
+      - { port: 5, state: active, mode: access, native: 30, far: { run: NYC-22.22-R1-U38-P05, patch: nyc-cb-67, unit: AG-000844, unit_port: lan-1 } }  # 22.01 Corncrake, touch controller
+      - { port: 6, state: parked, far: { run: NYC-22.22-R1-U38-P06, patch: nyc-cb-67 } }  # 22.01 Corncrake, data/below-table#2, nothing plugged in
+      - { port: 7, state: parked, far: { run: NYC-22.22-R1-U38-P07, patch: nyc-cb-67 } }  # 22.01 Corncrake, data/below-table#3, nothing plugged in
+      - { port: 8, state: parked, far: { run: NYC-22.22-R1-U38-P08, patch: nyc-cb-67 } }  # 22.01 Corncrake, data/below-table#4, nothing plugged in
+      - { port: 9, state: parked, far: { run: NYC-22.22-R1-U38-P09, patch: nyc-cb-67 } }  # 22.01 Corncrake, data/below-table#5, nothing plugged in
+      - { port: 10, state: parked, far: { run: NYC-22.22-R1-U38-P10, patch: nyc-cb-67 } }  # 22.01 Corncrake, data/tbd#1, nothing plugged in
+      - { port: 11, state: parked, far: { run: NYC-22.22-R1-U38-P11, patch: nyc-cb-67 } }  # 22.01 Corncrake, data/tbd#2, nothing plugged in
+      - { port: 12, state: active, mode: access, native: 30, far: { run: NYC-22.22-R1-U38-P12, patch: nyc-cb-67, unit: AG-000858, unit_port: lan-1 } }  # 22.01 Corncrake, scheduler panel
+      - { port: 13, state: parked, far: { run: NYC-22.22-R1-U38-P13, patch: nyc-cb-67 } }  # 22.01 Corncrake, data/ceiling#1, nothing plugged in
+      - { port: 14, state: active, mode: access, native: 31, far: { run: NYC-22.22-R1-U38-P14, patch: nyc-cb-67, unit: AG-000859, unit_port: lan-1 } }  # 22.02 Merlin, display
+      - { port: 15, state: parked, far: { run: NYC-22.22-R1-U38-P15, patch: nyc-cb-67 } }  # 22.02 Merlin, data/behind-display#3, nothing plugged in
+      - { port: 16, state: parked, far: { run: NYC-22.22-R1-U38-P16, patch: nyc-cb-67 } }  # 22.02 Merlin, data/behind-display#4, nothing plugged in
+      - { port: 17, state: active, mode: access, native: 30, far: { run: NYC-22.22-R1-U38-P17, patch: nyc-cb-67, unit: AG-000861, unit_port: lan-1 } }  # 22.02 Merlin, touch controller
+      - { port: 18, state: parked, far: { run: NYC-22.22-R1-U38-P18, patch: nyc-cb-67 } }  # 22.02 Merlin, data/below-table#2, nothing plugged in
+      - { port: 19, state: parked, far: { run: NYC-22.22-R1-U38-P19, patch: nyc-cb-67 } }  # 22.02 Merlin, data/room-entrance#1, nothing plugged in
+      - { port: 20, state: active, mode: access, native: 31, far: { run: NYC-22.22-R1-U38-P20, patch: nyc-cb-67, unit: AG-000865, unit_port: lan-1 } }  # 22.03 Jay, display
+      - { port: 21, state: parked, far: { run: NYC-22.22-R1-U38-P21, patch: nyc-cb-67 } }  # 22.03 Jay, data/behind-display#3, nothing plugged in
+      - { port: 22, state: parked, far: { run: NYC-22.22-R1-U38-P22, patch: nyc-cb-67 } }  # 22.03 Jay, data/behind-display#4, nothing plugged in
+      - { port: 23, state: active, mode: access, native: 30, far: { run: NYC-22.22-R1-U38-P23, patch: nyc-cb-67, unit: AG-000867, unit_port: lan-1 } }  # 22.03 Jay, touch controller
+      - { port: 24, state: parked, far: { run: NYC-22.22-R1-U38-P24, patch: nyc-cb-67 } }  # 22.03 Jay, data/below-table#2, nothing plugged in
+      - { port: 25, state: parked, far: { run: NYC-22.22-R1-U38-P25, patch: nyc-cb-67 } }  # 22.03 Jay, data/room-entrance#1, nothing plugged in
+      - { port: 26, state: active, mode: access, native: 31, far: { run: NYC-22.22-R1-U38-P26, patch: nyc-cb-67, unit: AG-000870, unit_port: lan-1 } }  # 22.04 Magpie, display 1
+      - { port: 27, state: active, mode: access, native: 31, far: { run: NYC-22.22-R1-U38-P27, patch: nyc-cb-67, unit: AG-000871, unit_port: lan-1 } }  # 22.04 Magpie, display 2
+      - { port: 28, state: parked, far: { run: NYC-22.22-R1-U38-P28, patch: nyc-cb-67 } }  # 22.04 Magpie, data/behind-display#4, nothing plugged in
+      - { port: 29, state: active, mode: access, native: 30, far: { run: NYC-22.22-R1-U38-P29, patch: nyc-cb-67, unit: AG-000873, unit_port: lan-1 } }  # 22.04 Magpie, touch controller
+      - { port: 30, state: parked, far: { run: NYC-22.22-R1-U38-P30, patch: nyc-cb-67 } }  # 22.04 Magpie, data/below-table#2, nothing plugged in
+      - { port: 31, state: active, mode: access, native: 30, far: { run: NYC-22.22-R1-U38-P31, patch: nyc-cb-67, unit: AG-000876, unit_port: lan-1 } }  # 22.04 Magpie, scheduler panel
+      - { port: 32, state: active, mode: access, native: 31, far: { run: NYC-22.22-R1-U38-P32, patch: nyc-cb-67, unit: AG-000877, unit_port: lan-1 } }  # 22.05 Starling, display 1
+      - { port: 33, state: active, mode: access, native: 31, far: { run: NYC-22.22-R1-U38-P33, patch: nyc-cb-67, unit: AG-000878, unit_port: lan-1 } }  # 22.05 Starling, display 2
+      - { port: 34, state: parked, far: { run: NYC-22.22-R1-U38-P34, patch: nyc-cb-67 } }  # 22.05 Starling, data/behind-display#4, nothing plugged in
+      - { port: 35, state: active, mode: access, native: 30, far: { run: NYC-22.22-R1-U38-P35, patch: nyc-cb-67, unit: AG-000880, unit_port: lan-1 } }  # 22.05 Starling, touch controller
+      - { port: 36, state: parked, far: { run: NYC-22.22-R1-U38-P36, patch: nyc-cb-67 } }  # 22.05 Starling, data/below-table#2, nothing plugged in
+      - { port: 37, state: active, mode: access, native: 30, far: { run: NYC-22.22-R1-U38-P37, patch: nyc-cb-67, unit: AG-000884, unit_port: lan-1 } }  # 22.05 Starling, scheduler panel
+      - { port: 38, state: active, mode: access, native: 30, far: { run: NYC-22.22-R1-U38-P38, patch: nyc-cb-67, unit: AG-000885, unit_port: lan-1 } }  # 22.06 Swallow, desk video device
+      - { port: 39, state: parked, far: { run: NYC-22.22-R1-U38-P39, patch: nyc-cb-67 } }  # 22.06 Swallow, data/wall-below-table#2, nothing plugged in
+      - { port: 40, state: active, mode: access, native: 30, far: { run: NYC-22.22-R1-U38-P40, patch: nyc-cb-67, unit: AG-000886, unit_port: lan-1 } }  # 22.06 Swallow, scheduler panel
+      - { port: 41, state: active, mode: access, native: 31, far: { run: NYC-22.22-R1-U38-P41, patch: nyc-cb-67, unit: AG-000887, unit_port: lan-1 } }  # 22.07 Siskin, display
+      - { port: 42, state: parked, far: { run: NYC-22.22-R1-U38-P42, patch: nyc-cb-67 } }  # 22.07 Siskin, data/behind-display#3, nothing plugged in
+      - { port: 43, state: parked, far: { run: NYC-22.22-R1-U38-P43, patch: nyc-cb-67 } }  # 22.07 Siskin, data/room-entrance#1, nothing plugged in
+      - { port: 44, state: active, mode: access, native: 31, far: { run: NYC-22.22-R1-U38-P44, patch: nyc-cb-67, unit: AG-000889, unit_port: lan-1 } }  # 22.08 Linnet, display
+      - { port: 45, state: parked, far: { run: NYC-22.22-R1-U38-P45, patch: nyc-cb-67 } }  # 22.08 Linnet, data/behind-display#3, nothing plugged in
+      - { port: 46, state: parked, far: { run: NYC-22.22-R1-U38-P46, patch: nyc-cb-67 } }  # 22.08 Linnet, data/room-entrance#1, nothing plugged in
+      - { port: 47, state: active, mode: access, native: 31, far: { run: NYC-22.22-R1-U38-P47, patch: nyc-cb-67, unit: AG-000891, unit_port: lan-1 } }  # 22.09 Treecreeper, display
+      - { port: 48, state: parked, far: { run: NYC-22.22-R1-U38-P48, patch: nyc-cb-67 } }  # 22.09 Treecreeper, data/behind-display#3, nothing plugged in
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs01, port: 11, run: NYC-20.14-R1-U12-P13, patches: [nyc-cb-72, nyc-cb-38] } }  # trunk to nyc-2014-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs01, port: 12, run: NYC-20.14-R1-U12-P13, patches: [nyc-cb-72, nyc-cb-38] } }  # trunk to nyc-2014-cs01
+  # Access switch 2 · 22.22 Comms room (IDF), Rack 1, U33
+  - id: nyc-2222-as02
+    rack: nyc-22-22-r1
+    u: 33
+    platform: unifi
+    ports:
+      - { port: 1, state: active, mode: access, native: 31, far: { run: NYC-22.22-R1-U34-P01, patch: nyc-cb-68, unit: AG-000893, unit_port: lan-1 } }  # 22.10 Blue Tit, display
+      - { port: 2, state: parked, far: { run: NYC-22.22-R1-U34-P02, patch: nyc-cb-68 } }  # 22.10 Blue Tit, data/behind-display#3, nothing plugged in
+      - { port: 3, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U34-P03, patch: nyc-cb-68, unit: AG-000895, unit_port: lan-1 } }  # 22.11 Focus 22.11, monitor
+      - { port: 4, state: parked, far: { run: NYC-22.22-R1-U34-P04, patch: nyc-cb-68 } }  # 22.11 Focus 22.11, data/table-top#2, nothing plugged in
+      - { port: 5, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U34-P05, patch: nyc-cb-68, unit: AG-000896, unit_port: lan-1 } }  # 22.12 Focus 22.12, monitor
+      - { port: 6, state: parked, far: { run: NYC-22.22-R1-U34-P06, patch: nyc-cb-68 } }  # 22.12 Focus 22.12, data/table-top#2, nothing plugged in
+      - { port: 7, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U34-P07, patch: nyc-cb-68, unit: AG-000897, unit_port: lan-1 } }  # 22.13 Focus 22.13, monitor
+      - { port: 8, state: parked, far: { run: NYC-22.22-R1-U34-P08, patch: nyc-cb-68 } }  # 22.13 Focus 22.13, data/table-top#2, nothing plugged in
+      - { port: 9, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U34-P09, patch: nyc-cb-68, unit: AG-000898, unit_port: lan-1 } }  # 22.14 Office 22.14, monitor
+      - { port: 10, state: parked, far: { run: NYC-22.22-R1-U34-P10, patch: nyc-cb-68 } }  # 22.14 Office 22.14, data/wall-below-table#2, nothing plugged in
+      - { port: 11, state: active, mode: access, native: 30, far: { run: NYC-22.22-R1-U34-P11, patch: nyc-cb-68, unit: AG-000899, unit_port: lan-1 } }  # 22.14 Office 22.14, scheduler panel
+      - { port: 12, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U34-P12, patch: nyc-cb-68, unit: AG-000900, unit_port: lan-1 } }  # 22.15 Office 22.15, monitor
+      - { port: 13, state: parked, far: { run: NYC-22.22-R1-U34-P13, patch: nyc-cb-68 } }  # 22.15 Office 22.15, data/wall-below-table#2, nothing plugged in
+      - { port: 14, state: active, mode: access, native: 30, far: { run: NYC-22.22-R1-U34-P14, patch: nyc-cb-68, unit: AG-000901, unit_port: lan-1 } }  # 22.15 Office 22.15, scheduler panel
+      - { port: 15, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U34-P15, patch: nyc-cb-68, unit: AG-000902, unit_port: lan-1 } }  # 22.16 Office 22.16, monitor
+      - { port: 16, state: parked, far: { run: NYC-22.22-R1-U34-P16, patch: nyc-cb-68 } }  # 22.16 Office 22.16, data/wall-below-table#2, nothing plugged in
+      - { port: 17, state: parked, far: { run: NYC-22.22-R1-U34-P17, patch: nyc-cb-68 } }  # 22.16 Office 22.16, data/room-entrance#1, nothing plugged in
+      - { port: 18, state: active, mode: access, native: 31, far: { run: NYC-22.22-R1-U34-P18, patch: nyc-cb-68, unit: AG-001445, unit_port: lan-1 } }  # 22.17 Pantry, display
+      - { port: 19, state: active, mode: access, native: 31, far: { run: NYC-22.22-R1-U34-P19, patch: nyc-cb-68, unit: AG-001446, unit_port: lan-1 } }  # 22.17 Pantry, signage player
+      - { port: 20, state: parked, far: { run: NYC-22.22-R1-U34-P20, patch: nyc-cb-68 } }  # 22.17 Pantry, data/behind-display#3, nothing plugged in
+      - { port: 21, state: parked, far: { run: NYC-22.22-R1-U34-P21, patch: nyc-cb-68 } }  # 22.17 Pantry, data/tbd#1, nothing plugged in
+      - { port: 22, state: active, mode: access, native: 70, far: { run: NYC-22.22-R1-U34-P22, patch: nyc-cb-68, unit: AG-000903, unit_port: lan-1 } }  # 22.18 Copy and print, printer
+      - { port: 23, state: parked, far: { run: NYC-22.22-R1-U34-P23, patch: nyc-cb-68 } }  # 22.18 Copy and print, data/wall#2, nothing plugged in
+      - { port: 24, state: parked, far: { run: NYC-22.22-R1-U34-P24, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-01/data/table-top#1, nothing plugged in
+      - { port: 25, state: parked, far: { run: NYC-22.22-R1-U34-P25, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-01/data/table-top#2, nothing plugged in
+      - { port: 26, state: parked, far: { run: NYC-22.22-R1-U34-P26, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-02/data/table-top#1, nothing plugged in
+      - { port: 27, state: parked, far: { run: NYC-22.22-R1-U34-P27, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-02/data/table-top#2, nothing plugged in
+      - { port: 28, state: parked, far: { run: NYC-22.22-R1-U34-P28, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-03/data/table-top#1, nothing plugged in
+      - { port: 29, state: parked, far: { run: NYC-22.22-R1-U34-P29, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-03/data/table-top#2, nothing plugged in
+      - { port: 30, state: parked, far: { run: NYC-22.22-R1-U34-P30, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-04/data/table-top#1, nothing plugged in
+      - { port: 31, state: parked, far: { run: NYC-22.22-R1-U34-P31, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-04/data/table-top#2, nothing plugged in
+      - { port: 32, state: parked, far: { run: NYC-22.22-R1-U34-P32, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-05/data/table-top#1, nothing plugged in
+      - { port: 33, state: parked, far: { run: NYC-22.22-R1-U34-P33, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-05/data/table-top#2, nothing plugged in
+      - { port: 34, state: parked, far: { run: NYC-22.22-R1-U34-P34, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-06/data/table-top#1, nothing plugged in
+      - { port: 35, state: parked, far: { run: NYC-22.22-R1-U34-P35, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-06/data/table-top#2, nothing plugged in
+      - { port: 36, state: parked, far: { run: NYC-22.22-R1-U34-P36, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-07/data/table-top#1, nothing plugged in
+      - { port: 37, state: parked, far: { run: NYC-22.22-R1-U34-P37, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-07/data/table-top#2, nothing plugged in
+      - { port: 38, state: parked, far: { run: NYC-22.22-R1-U34-P38, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-08/data/table-top#1, nothing plugged in
+      - { port: 39, state: parked, far: { run: NYC-22.22-R1-U34-P39, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-08/data/table-top#2, nothing plugged in
+      - { port: 40, state: parked, far: { run: NYC-22.22-R1-U34-P40, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-09/data/table-top#1, nothing plugged in
+      - { port: 41, state: parked, far: { run: NYC-22.22-R1-U34-P41, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-09/data/table-top#2, nothing plugged in
+      - { port: 42, state: parked, far: { run: NYC-22.22-R1-U34-P42, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-10/data/table-top#1, nothing plugged in
+      - { port: 43, state: parked, far: { run: NYC-22.22-R1-U34-P43, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-10/data/table-top#2, nothing plugged in
+      - { port: 44, state: parked, far: { run: NYC-22.22-R1-U34-P44, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-11/data/table-top#1, nothing plugged in
+      - { port: 45, state: parked, far: { run: NYC-22.22-R1-U34-P45, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-11/data/table-top#2, nothing plugged in
+      - { port: 46, state: parked, far: { run: NYC-22.22-R1-U34-P46, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-12/data/table-top#1, nothing plugged in
+      - { port: 47, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { rack: nyc-22-22-r1, u: 20, patch: nyc-cb-77 } }  # AV switch on a shelf
+      - { port: 48, state: parked, far: { run: NYC-22.22-R1-U34-P48, patch: nyc-cb-68 } }  # 22.19 Assigned desks D, desk-13/data/table-top#1, nothing plugged in
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs02, port: 11, run: NYC-20.14-R1-U12-P13, patches: [nyc-cb-73, nyc-cb-39] } }  # trunk to nyc-2014-cs02
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs02, port: 12, run: NYC-20.14-R1-U12-P13, patches: [nyc-cb-73, nyc-cb-39] } }  # trunk to nyc-2014-cs02
+  # Access switch 3 · 22.22 Comms room (IDF), Rack 1, U29
+  - id: nyc-2222-as03
+    rack: nyc-22-22-r1
+    u: 29
+    platform: unifi
+    ports:
+      - { port: 1, state: parked, far: { run: NYC-22.22-R1-U30-P01, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-13/data/table-top#2, nothing plugged in
+      - { port: 2, state: parked, far: { run: NYC-22.22-R1-U30-P02, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-14/data/table-top#1, nothing plugged in
+      - { port: 3, state: parked, far: { run: NYC-22.22-R1-U30-P03, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-14/data/table-top#2, nothing plugged in
+      - { port: 4, state: parked, far: { run: NYC-22.22-R1-U30-P04, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-15/data/table-top#1, nothing plugged in
+      - { port: 5, state: parked, far: { run: NYC-22.22-R1-U30-P05, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-15/data/table-top#2, nothing plugged in
+      - { port: 6, state: parked, far: { run: NYC-22.22-R1-U30-P06, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-16/data/table-top#1, nothing plugged in
+      - { port: 7, state: parked, far: { run: NYC-22.22-R1-U30-P07, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-16/data/table-top#2, nothing plugged in
+      - { port: 8, state: parked, far: { run: NYC-22.22-R1-U30-P08, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-17/data/table-top#1, nothing plugged in
+      - { port: 9, state: parked, far: { run: NYC-22.22-R1-U30-P09, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-17/data/table-top#2, nothing plugged in
+      - { port: 10, state: parked, far: { run: NYC-22.22-R1-U30-P10, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-18/data/table-top#1, nothing plugged in
+      - { port: 11, state: parked, far: { run: NYC-22.22-R1-U30-P11, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-18/data/table-top#2, nothing plugged in
+      - { port: 12, state: parked, far: { run: NYC-22.22-R1-U30-P12, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-19/data/table-top#1, nothing plugged in
+      - { port: 13, state: parked, far: { run: NYC-22.22-R1-U30-P13, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-19/data/table-top#2, nothing plugged in
+      - { port: 14, state: parked, far: { run: NYC-22.22-R1-U30-P14, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-20/data/table-top#1, nothing plugged in
+      - { port: 15, state: parked, far: { run: NYC-22.22-R1-U30-P15, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-20/data/table-top#2, nothing plugged in
+      - { port: 16, state: parked, far: { run: NYC-22.22-R1-U30-P16, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-21/data/table-top#1, nothing plugged in
+      - { port: 17, state: parked, far: { run: NYC-22.22-R1-U30-P17, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-21/data/table-top#2, nothing plugged in
+      - { port: 18, state: parked, far: { run: NYC-22.22-R1-U30-P18, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-22/data/table-top#1, nothing plugged in
+      - { port: 19, state: parked, far: { run: NYC-22.22-R1-U30-P19, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-22/data/table-top#2, nothing plugged in
+      - { port: 20, state: parked, far: { run: NYC-22.22-R1-U30-P20, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-23/data/table-top#1, nothing plugged in
+      - { port: 21, state: parked, far: { run: NYC-22.22-R1-U30-P21, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-23/data/table-top#2, nothing plugged in
+      - { port: 22, state: parked, far: { run: NYC-22.22-R1-U30-P22, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-24/data/table-top#1, nothing plugged in
+      - { port: 23, state: parked, far: { run: NYC-22.22-R1-U30-P23, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-24/data/table-top#2, nothing plugged in
+      - { port: 24, state: parked, far: { run: NYC-22.22-R1-U30-P24, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-25/data/table-top#1, nothing plugged in
+      - { port: 25, state: parked, far: { run: NYC-22.22-R1-U30-P25, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-25/data/table-top#2, nothing plugged in
+      - { port: 26, state: parked, far: { run: NYC-22.22-R1-U30-P26, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-26/data/table-top#1, nothing plugged in
+      - { port: 27, state: parked, far: { run: NYC-22.22-R1-U30-P27, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-26/data/table-top#2, nothing plugged in
+      - { port: 28, state: parked, far: { run: NYC-22.22-R1-U30-P28, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-27/data/table-top#1, nothing plugged in
+      - { port: 29, state: parked, far: { run: NYC-22.22-R1-U30-P29, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-27/data/table-top#2, nothing plugged in
+      - { port: 30, state: parked, far: { run: NYC-22.22-R1-U30-P30, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-28/data/table-top#1, nothing plugged in
+      - { port: 31, state: parked, far: { run: NYC-22.22-R1-U30-P31, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-28/data/table-top#2, nothing plugged in
+      - { port: 32, state: parked, far: { run: NYC-22.22-R1-U30-P32, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-29/data/table-top#1, nothing plugged in
+      - { port: 33, state: parked, far: { run: NYC-22.22-R1-U30-P33, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-29/data/table-top#2, nothing plugged in
+      - { port: 34, state: parked, far: { run: NYC-22.22-R1-U30-P34, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-30/data/table-top#1, nothing plugged in
+      - { port: 35, state: parked, far: { run: NYC-22.22-R1-U30-P35, patch: nyc-cb-69 } }  # 22.19 Assigned desks D, desk-30/data/table-top#2, nothing plugged in
+      - { port: 36, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U30-P36, patch: nyc-cb-69, unit: AG-000905, unit_port: lan-1 } }  # 22.20 Assigned desks E, desk 01, network adapter
+      - { port: 37, state: parked, far: { run: NYC-22.22-R1-U30-P37, patch: nyc-cb-69 } }  # 22.20 Assigned desks E, desk-01/data/table-top#2, nothing plugged in
+      - { port: 38, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U30-P38, patch: nyc-cb-69, unit: AG-000907, unit_port: lan-1 } }  # 22.20 Assigned desks E, desk 02, network adapter
+      - { port: 39, state: parked, far: { run: NYC-22.22-R1-U30-P39, patch: nyc-cb-69 } }  # 22.20 Assigned desks E, desk-02/data/table-top#2, nothing plugged in
+      - { port: 40, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U30-P40, patch: nyc-cb-69, unit: AG-000909, unit_port: lan-1 } }  # 22.20 Assigned desks E, desk 03, network adapter
+      - { port: 41, state: parked, far: { run: NYC-22.22-R1-U30-P41, patch: nyc-cb-69 } }  # 22.20 Assigned desks E, desk-03/data/table-top#2, nothing plugged in
+      - { port: 42, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U30-P42, patch: nyc-cb-69, unit: AG-000911, unit_port: lan-1 } }  # 22.20 Assigned desks E, desk 04, network adapter
+      - { port: 43, state: parked, far: { run: NYC-22.22-R1-U30-P43, patch: nyc-cb-69 } }  # 22.20 Assigned desks E, desk-04/data/table-top#2, nothing plugged in
+      - { port: 44, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U30-P44, patch: nyc-cb-69, unit: AG-000913, unit_port: lan-1 } }  # 22.20 Assigned desks E, desk 05, network adapter
+      - { port: 45, state: parked, far: { run: NYC-22.22-R1-U30-P45, patch: nyc-cb-69 } }  # 22.20 Assigned desks E, desk-05/data/table-top#2, nothing plugged in
+      - { port: 46, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U30-P46, patch: nyc-cb-69, unit: AG-000915, unit_port: lan-1 } }  # 22.20 Assigned desks E, desk 06, network adapter
+      - { port: 47, state: parked, far: { run: NYC-22.22-R1-U30-P47, patch: nyc-cb-69 } }  # 22.20 Assigned desks E, desk-06/data/table-top#2, nothing plugged in
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs01, port: 13, run: NYC-20.14-R1-U12-P13, patches: [nyc-cb-74, nyc-cb-40] } }  # trunk to nyc-2014-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs01, port: 14, run: NYC-20.14-R1-U12-P13, patches: [nyc-cb-74, nyc-cb-40] } }  # trunk to nyc-2014-cs01
+    disabled: "48"
+  # Access switch 4 · 22.22 Comms room (IDF), Rack 1, U25
+  - id: nyc-2222-as04
+    rack: nyc-22-22-r1
+    u: 25
+    platform: unifi
+    ports:
+      - { port: 1, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U26-P01, patch: nyc-cb-70, unit: AG-000917, unit_port: lan-1 } }  # 22.20 Assigned desks E, desk 07, network adapter
+      - { port: 2, state: parked, far: { run: NYC-22.22-R1-U26-P02, patch: nyc-cb-70 } }  # 22.20 Assigned desks E, desk-07/data/table-top#2, nothing plugged in
+      - { port: 3, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U26-P03, patch: nyc-cb-70, unit: AG-000919, unit_port: lan-1 } }  # 22.20 Assigned desks E, desk 08, network adapter
+      - { port: 4, state: parked, far: { run: NYC-22.22-R1-U26-P04, patch: nyc-cb-70 } }  # 22.20 Assigned desks E, desk-08/data/table-top#2, nothing plugged in
+      - { port: 5, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U26-P05, patch: nyc-cb-70, unit: AG-000921, unit_port: lan-1 } }  # 22.20 Assigned desks E, desk 09, network adapter
+      - { port: 6, state: parked, far: { run: NYC-22.22-R1-U26-P06, patch: nyc-cb-70 } }  # 22.20 Assigned desks E, desk-09/data/table-top#2, nothing plugged in
+      - { port: 7, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U26-P07, patch: nyc-cb-70, unit: AG-000923, unit_port: lan-1 } }  # 22.20 Assigned desks E, desk 10, network adapter
+      - { port: 8, state: parked, far: { run: NYC-22.22-R1-U26-P08, patch: nyc-cb-70 } }  # 22.20 Assigned desks E, desk-10/data/table-top#2, nothing plugged in
+      - { port: 9, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U26-P09, patch: nyc-cb-70, unit: AG-000924, unit_port: lan-1 } }  # 22.21 Flex desks F, desk 01, monitor
+      - { port: 10, state: parked, far: { run: NYC-22.22-R1-U26-P10, patch: nyc-cb-70 } }  # 22.21 Flex desks F, desk-01/data/table-top#2, nothing plugged in
+      - { port: 11, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U26-P11, patch: nyc-cb-70, unit: AG-000925, unit_port: lan-1 } }  # 22.21 Flex desks F, desk 02, monitor
+      - { port: 12, state: parked, far: { run: NYC-22.22-R1-U26-P12, patch: nyc-cb-70 } }  # 22.21 Flex desks F, desk-02/data/table-top#2, nothing plugged in
+      - { port: 13, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U26-P13, patch: nyc-cb-70, unit: AG-000926, unit_port: lan-1 } }  # 22.21 Flex desks F, desk 03, monitor
+      - { port: 14, state: parked, far: { run: NYC-22.22-R1-U26-P14, patch: nyc-cb-70 } }  # 22.21 Flex desks F, desk-03/data/table-top#2, nothing plugged in
+      - { port: 15, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U26-P15, patch: nyc-cb-70, unit: AG-000927, unit_port: lan-1 } }  # 22.21 Flex desks F, desk 04, monitor
+      - { port: 16, state: parked, far: { run: NYC-22.22-R1-U26-P16, patch: nyc-cb-70 } }  # 22.21 Flex desks F, desk-04/data/table-top#2, nothing plugged in
+      - { port: 17, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U26-P17, patch: nyc-cb-70, unit: AG-000928, unit_port: lan-1 } }  # 22.21 Flex desks F, desk 05, monitor
+      - { port: 18, state: parked, far: { run: NYC-22.22-R1-U26-P18, patch: nyc-cb-70 } }  # 22.21 Flex desks F, desk-05/data/table-top#2, nothing plugged in
+      - { port: 19, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U26-P19, patch: nyc-cb-70, unit: AG-000929, unit_port: lan-1 } }  # 22.21 Flex desks F, desk 06, monitor
+      - { port: 20, state: parked, far: { run: NYC-22.22-R1-U26-P20, patch: nyc-cb-70 } }  # 22.21 Flex desks F, desk-06/data/table-top#2, nothing plugged in
+      - { port: 21, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U26-P21, patch: nyc-cb-70, unit: AG-000930, unit_port: lan-1 } }  # 22.21 Flex desks F, desk 07, monitor
+      - { port: 22, state: parked, far: { run: NYC-22.22-R1-U26-P22, patch: nyc-cb-70 } }  # 22.21 Flex desks F, desk-07/data/table-top#2, nothing plugged in
+      - { port: 23, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U26-P23, patch: nyc-cb-70, unit: AG-000931, unit_port: lan-1 } }  # 22.21 Flex desks F, desk 08, monitor
+      - { port: 24, state: parked, far: { run: NYC-22.22-R1-U26-P24, patch: nyc-cb-70 } }  # 22.21 Flex desks F, desk-08/data/table-top#2, nothing plugged in
+      - { port: 25, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U26-P25, patch: nyc-cb-70, unit: AG-000932, unit_port: lan-1 } }  # 22.21 Flex desks F, desk 09, monitor
+      - { port: 26, state: parked, far: { run: NYC-22.22-R1-U26-P26, patch: nyc-cb-70 } }  # 22.21 Flex desks F, desk-09/data/table-top#2, nothing plugged in
+      - { port: 27, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U26-P27, patch: nyc-cb-70, unit: AG-000933, unit_port: lan-1 } }  # 22.21 Flex desks F, desk 10, monitor
+      - { port: 28, state: parked, far: { run: NYC-22.22-R1-U26-P28, patch: nyc-cb-70 } }  # 22.21 Flex desks F, desk-10/data/table-top#2, nothing plugged in
+      - { port: 29, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U26-P29, patch: nyc-cb-70, unit: AG-000934, unit_port: lan-1 } }  # 22.21 Flex desks F, desk 11, monitor
+      - { port: 30, state: parked, far: { run: NYC-22.22-R1-U26-P30, patch: nyc-cb-70 } }  # 22.21 Flex desks F, desk-11/data/table-top#2, nothing plugged in
+      - { port: 31, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U26-P31, patch: nyc-cb-70, unit: AG-000935, unit_port: lan-1 } }  # 22.21 Flex desks F, desk 12, monitor
+      - { port: 32, state: parked, far: { run: NYC-22.22-R1-U26-P32, patch: nyc-cb-70 } }  # 22.21 Flex desks F, desk-12/data/table-top#2, nothing plugged in
+      - { port: 33, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U26-P33, patch: nyc-cb-70, unit: AG-000936, unit_port: lan-1 } }  # 22.21 Flex desks F, desk 13, monitor
+      - { port: 34, state: parked, far: { run: NYC-22.22-R1-U26-P34, patch: nyc-cb-70 } }  # 22.21 Flex desks F, desk-13/data/table-top#2, nothing plugged in
+      - { port: 35, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U26-P35, patch: nyc-cb-70, unit: AG-000937, unit_port: lan-1 } }  # 22.21 Flex desks F, desk 14, monitor
+      - { port: 36, state: parked, far: { run: NYC-22.22-R1-U26-P36, patch: nyc-cb-70 } }  # 22.21 Flex desks F, desk-14/data/table-top#2, nothing plugged in
+      - { port: 37, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U26-P37, patch: nyc-cb-70, unit: AG-000938, unit_port: lan-1 } }  # 22.21 Flex desks F, desk 15, monitor
+      - { port: 38, state: parked, far: { run: NYC-22.22-R1-U26-P38, patch: nyc-cb-70 } }  # 22.21 Flex desks F, desk-15/data/table-top#2, nothing plugged in
+      - { port: 39, state: active, mode: access, native: 20, far: { run: NYC-22.22-R1-U26-P39, patch: nyc-cb-70, unit: AG-000939, unit_port: lan-1 } }  # 22.21 Flex desks F, desk 16, monitor
+      - { port: 40, state: parked, far: { run: NYC-22.22-R1-U26-P40, patch: nyc-cb-70 } }  # 22.21 Flex desks F, desk-16/data/table-top#2, nothing plugged in
+      - { port: 41, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: NYC-22.22-R1-U26-P41, patch: nyc-cb-70, unit: AG-003244, unit_port: lan-1 } }  # access point nyc-22-ap01
+      - { port: 42, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: NYC-22.22-R1-U26-P42, patch: nyc-cb-70, unit: AG-003245, unit_port: lan-1 } }  # access point nyc-22-ap02
+      - { port: 43, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: NYC-22.22-R1-U26-P43, patch: nyc-cb-70, unit: AG-003246, unit_port: lan-1 } }  # access point nyc-22-ap03
+      - { port: 44, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: NYC-22.22-R1-U26-P44, patch: nyc-cb-70, unit: AG-003247, unit_port: lan-1 } }  # access point nyc-22-ap04
+      - { port: 45, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: NYC-22.22-R1-U26-P45, patch: nyc-cb-70, unit: AG-003248, unit_port: lan-1 } }  # access point nyc-22-ap05
+      - { port: 46, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: NYC-22.22-R1-U26-P46, patch: nyc-cb-70, unit: AG-003249, unit_port: lan-1 } }  # access point nyc-22-ap06
+      - { port: 47, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: NYC-22.22-R1-U26-P47, patch: nyc-cb-70, unit: AG-003250, unit_port: lan-1 } }  # access point nyc-22-ap07
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs02, port: 13, run: NYC-20.14-R1-U12-P13, patches: [nyc-cb-75, nyc-cb-41] } }  # trunk to nyc-2014-cs02
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs02, port: 14, run: NYC-20.14-R1-U12-P13, patches: [nyc-cb-75, nyc-cb-41] } }  # trunk to nyc-2014-cs02
+    disabled: "48"
+  # Access switch 5 · 22.22 Comms room (IDF), Rack 1, U23
+  - id: nyc-2222-as05
+    rack: nyc-22-22-r1
+    u: 23
+    platform: unifi
+    ports:
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs01, port: 15, run: NYC-20.14-R1-U12-P13, patches: [nyc-cb-76, nyc-cb-42] } }  # trunk to nyc-2014-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: nyc-2014-cs01, port: 16, run: NYC-20.14-R1-U12-P13, patches: [nyc-cb-76, nyc-cb-42] } }  # trunk to nyc-2014-cs01
+    disabled: "1-48"
+  # Heron, network switch · 20.04 Heron
+  - id: nyc-2004-sw01
+    space: nyc-20-04
+    position: network-switch
+    platform: netgear
+    ports:
+      - { port: lan-1, state: active, mode: access, native: 30, far: { unit: AG-000597, unit_port: lan-1 } }  # codec
+      - { port: lan-2, state: active, mode: access, native: 40, far: { unit: AG-000597, unit_port: lan-2 } }  # codec, AV network in the room
+      - { port: lan-9, state: active, mode: trunk, native: 10, tagged: [30, 40], far: { switch: nyc-2014-as01, port: 16 } }  # uplink to nyc-2014-as01 port 16
+    disabled: [lan-3, lan-4, lan-5, lan-6, lan-7, lan-8, sfp-1, lan-10]
+  # Whooper Swan, network switch · 20.10 Whooper Swan
+  - id: nyc-2010-sw01
+    space: nyc-20-10
+    position: network-switch
+    platform: netgear
+    ports:
+      - { port: lan-1, state: active, mode: access, native: 40, far: { unit: AG-000654, unit_port: lan-2 } }  # video bar, AV network in the room
+      - { port: lan-2, state: active, mode: access, native: 30, far: { unit: AG-000659, unit_port: lan-1 } }  # switcher
+      - { port: lan-9, state: active, mode: trunk, native: 10, tagged: [30], far: { switch: nyc-2014-as02, port: 24 } }  # uplink to nyc-2014-as02 port 24
+    disabled: [lan-3, lan-4, lan-5, lan-6, lan-7, lan-8, sfp-1, lan-10]
+  # Skylark, network switch · 21.05 Skylark
+  - id: nyc-2105-sw01
+    space: nyc-21-05
+    position: network-switch
+    platform: netgear
+    ports:
+      - { port: lan-1, state: active, mode: access, native: 30, far: { unit: AG-000709, unit_port: lan-2 } }  # video bar
+      - { port: lan-2, state: active, mode: access, native: 30, far: { unit: AG-000714, unit_port: lan-1 } }  # switcher
+      - { port: lan-9, state: active, mode: trunk, native: 10, tagged: [30], far: { switch: nyc-2123-as01, port: 26 } }  # uplink to nyc-2123-as01 port 26
+    disabled: [lan-3, lan-4, lan-5, lan-6, lan-7, lan-8, sfp-1, lan-10]
+  # Corncrake, network switch · 22.01 Corncrake
+  - id: nyc-2201-sw01
+    space: nyc-22-01
+    position: network-switch
+    platform: netgear
+    ports:
+      - { port: lan-1, state: active, mode: access, native: 30, far: { unit: AG-000842, unit_port: lan-1 } }  # codec
+      - { port: lan-2, state: active, mode: access, native: 40, far: { unit: AG-000842, unit_port: lan-2 } }  # codec, AV network in the room
+      - { port: lan-3, state: active, mode: access, native: 40, far: { unit: AG-000847, unit_port: lan-1 } }  # ceiling microphone, AV network in the room
+      - { port: lan-9, state: active, mode: trunk, native: 10, tagged: [30], far: { switch: nyc-2222-as01, port: 4 } }  # uplink to nyc-2222-as01 port 4
+    disabled: [lan-4, lan-5, lan-6, lan-7, lan-8, sfp-1, lan-10]
+demo: true

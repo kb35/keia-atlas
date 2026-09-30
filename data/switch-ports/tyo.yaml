@@ -1,0 +1,220 @@
+# Switch ports at the Tokyo office: the VLAN table, and how every switch port is set with what is on its far end.
+# Made up for the demo; written by tools/migrations/2026-09-30-switch-ports.mjs. In a live setup the switch platform's
+# connector (UniFi, Meraki or Netgear) reads this; here it is recorded. The chain on each port (run, patch cord, unit)
+# is checked against the runs, the patch cords and the room wiring by tools/crossrefs-switchports.mjs.
+site: tyo
+read_at: "2026-09-30T06:00:00Z"
+vlans:
+  - { vlan: 10, subnet: 10.80.10.0/24, gateway: 10.80.10.1 }
+  - { vlan: 20, subnet: 10.80.20.0/22, gateway: 10.80.20.1 }
+  - { vlan: 30, subnet: 10.80.30.0/24, gateway: 10.80.30.1 }
+  - { vlan: 31, subnet: 10.80.31.0/24, gateway: 10.80.31.1 }
+  - { vlan: 40, subnet: 169.254.0.0/16, note: "Link-local in each room, on the in-room switch only; not routed" }
+  - { vlan: 50, subnet: 10.80.50.0/24, gateway: 10.80.50.1 }
+  - { vlan: 60, subnet: 10.80.60.0/24, gateway: 10.80.60.1 }
+  - { vlan: 70, subnet: 10.80.70.0/24, gateway: 10.80.70.1 }
+  - { vlan: 90, subnet: 10.80.90.0/23, gateway: 10.80.90.1 }
+switches:
+  # Core switch A · 15.19 Comms room (MDF), Rack 1, U22
+  - id: tyo-1519-cs01
+    rack: tyo-15-19-r1
+    u: 22
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tyo-1519-as01, port: 49, patch: tyo-cb-13 } }  # trunk down to tyo-1519-as01
+      - { port: 2, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tyo-1519-as02, port: 49, patch: tyo-cb-15 } }  # trunk down to tyo-1519-as02
+      - { port: 3, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tyo-1519-as03, port: 49, patch: tyo-cb-17 } }  # trunk down to tyo-1519-as03
+      - { port: 4, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tyo-1519-as04, port: 49, patch: tyo-cb-19 } }  # trunk down to tyo-1519-as04
+      - { port: 5, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { rack: tyo-15-19-r1, u: 25, patch: tyo-cb-22 } }  # Firewall A
+      - { port: 6, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { rack: tyo-15-19-r1, u: 29, patch: tyo-cb-28 } }  # Wireless controller
+      - { port: 25, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tyo-1519-cs02, port: 25, patch: tyo-cb-21 } }  # trunk to tyo-1519-cs02
+      - { port: 26, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tyo-1519-cs02, port: 26, patch: tyo-cb-21 } }  # trunk to tyo-1519-cs02
+    disabled: "7-24,27-28"
+  # Core switch B · 15.19 Comms room (MDF), Rack 1, U23
+  - id: tyo-1519-cs02
+    rack: tyo-15-19-r1
+    u: 23
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tyo-1519-as01, port: 50, patch: tyo-cb-14 } }  # trunk down to tyo-1519-as01
+      - { port: 2, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tyo-1519-as02, port: 50, patch: tyo-cb-16 } }  # trunk down to tyo-1519-as02
+      - { port: 3, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tyo-1519-as03, port: 50, patch: tyo-cb-18 } }  # trunk down to tyo-1519-as03
+      - { port: 4, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tyo-1519-as04, port: 50, patch: tyo-cb-20 } }  # trunk down to tyo-1519-as04
+      - { port: 5, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { rack: tyo-15-19-r1, u: 26, patch: tyo-cb-23 } }  # Firewall B
+      - { port: 6, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { rack: tyo-15-19-r1, u: 29, patch: tyo-cb-29 } }  # Wireless controller
+      - { port: 25, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tyo-1519-cs01, port: 25, patch: tyo-cb-21 } }  # trunk to tyo-1519-cs01
+      - { port: 26, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tyo-1519-cs01, port: 26, patch: tyo-cb-21 } }  # trunk to tyo-1519-cs01
+    disabled: "7-24,27-28"
+  # Access switch 1, 15th floor · 15.19 Comms room (MDF), Rack 1, U16
+  - id: tyo-1519-as01
+    rack: tyo-15-19-r1
+    u: 16
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: access, native: 31, far: { run: TYO-15.19-R1-U06-P01, patch: tyo-cb-10, unit: AG-001065, unit_port: lan-1 } }  # 15.01 Reception, display
+      - { port: 2, state: active, mode: access, native: 31, far: { run: TYO-15.19-R1-U06-P02, patch: tyo-cb-10, unit: AG-001066, unit_port: lan-1 } }  # 15.01 Reception, signage player
+      - { port: 3, state: parked, far: { run: TYO-15.19-R1-U06-P03, patch: tyo-cb-10 } }  # 15.01 Reception, data/behind-display#3, nothing plugged in
+      - { port: 4, state: parked, far: { run: TYO-15.19-R1-U06-P04, patch: tyo-cb-10 } }  # 15.01 Reception, data/tbd#1, nothing plugged in
+      - { port: 5, state: active, mode: access, native: 31, far: { run: TYO-15.19-R1-U06-P05, patch: tyo-cb-10, unit: AG-001447, unit_port: lan-1 } }  # 15.02 Pantry, display
+      - { port: 6, state: active, mode: access, native: 31, far: { run: TYO-15.19-R1-U06-P06, patch: tyo-cb-10, unit: AG-001448, unit_port: lan-1 } }  # 15.02 Pantry, signage player
+      - { port: 7, state: parked, far: { run: TYO-15.19-R1-U06-P07, patch: tyo-cb-10 } }  # 15.02 Pantry, data/behind-display#3, nothing plugged in
+      - { port: 8, state: parked, far: { run: TYO-15.19-R1-U06-P08, patch: tyo-cb-10 } }  # 15.02 Pantry, data/tbd#1, nothing plugged in
+      - { port: 9, state: active, mode: access, native: 31, far: { run: TYO-15.19-R1-U06-P09, patch: tyo-cb-10, unit: AG-001067, unit_port: lan-1 } }  # 15.03 Heron, display
+      - { port: 10, state: active, mode: access, native: 30, far: { run: TYO-15.19-R1-U06-P10, patch: tyo-cb-10, unit: AG-001068, unit_port: lan-1 } }  # 15.03 Heron, video bar
+      - { port: 11, state: parked, far: { run: TYO-15.19-R1-U06-P11, patch: tyo-cb-10 } }  # 15.03 Heron, data/behind-display#3, nothing plugged in
+      - { port: 12, state: parked, far: { run: TYO-15.19-R1-U06-P12, patch: tyo-cb-10 } }  # 15.03 Heron, data/behind-display#4, nothing plugged in
+      - { port: 13, state: active, mode: access, native: 30, far: { run: TYO-15.19-R1-U06-P13, patch: tyo-cb-10, unit: AG-001069, unit_port: lan-1 } }  # 15.03 Heron, touch controller
+      - { port: 14, state: parked, far: { run: TYO-15.19-R1-U06-P14, patch: tyo-cb-10 } }  # 15.03 Heron, data/below-table#2, nothing plugged in
+      - { port: 15, state: active, mode: access, native: 30, far: { run: TYO-15.19-R1-U06-P15, patch: tyo-cb-10, unit: AG-001076, unit_port: lan-1 } }  # 15.03 Heron, scheduler panel
+      - { port: 16, state: active, mode: access, native: 31, far: { run: TYO-15.19-R1-U06-P16, patch: tyo-cb-10, unit: AG-001077, unit_port: lan-1 } }  # 15.04 Curlew, display
+      - { port: 17, state: active, mode: access, native: 30, far: { run: TYO-15.19-R1-U06-P17, patch: tyo-cb-10, unit: AG-001078, unit_port: lan-1 } }  # 15.04 Curlew, video bar
+      - { port: 18, state: parked, far: { run: TYO-15.19-R1-U06-P18, patch: tyo-cb-10 } }  # 15.04 Curlew, data/behind-display#3, nothing plugged in
+      - { port: 19, state: parked, far: { run: TYO-15.19-R1-U06-P19, patch: tyo-cb-10 } }  # 15.04 Curlew, data/behind-display#4, nothing plugged in
+      - { port: 20, state: active, mode: access, native: 30, far: { run: TYO-15.19-R1-U06-P20, patch: tyo-cb-10, unit: AG-001079, unit_port: lan-1 } }  # 15.04 Curlew, touch controller
+      - { port: 21, state: parked, far: { run: TYO-15.19-R1-U06-P21, patch: tyo-cb-10 } }  # 15.04 Curlew, data/below-table#2, nothing plugged in
+      - { port: 22, state: active, mode: access, native: 30, far: { run: TYO-15.19-R1-U06-P22, patch: tyo-cb-10, unit: AG-001082, unit_port: lan-1 } }  # 15.04 Curlew, scheduler panel
+      - { port: 23, state: active, mode: access, native: 31, far: { run: TYO-15.19-R1-U06-P23, patch: tyo-cb-10, unit: AG-001083, unit_port: lan-1 } }  # 15.05 Gannet, display
+      - { port: 24, state: active, mode: access, native: 30, far: { run: TYO-15.19-R1-U06-P24, patch: tyo-cb-10, unit: AG-001084, unit_port: lan-1 } }  # 15.05 Gannet, video bar
+      - { port: 25, state: parked, far: { run: TYO-15.19-R1-U06-P25, patch: tyo-cb-10 } }  # 15.05 Gannet, data/behind-display#3, nothing plugged in
+      - { port: 26, state: parked, far: { run: TYO-15.19-R1-U06-P26, patch: tyo-cb-10 } }  # 15.05 Gannet, data/behind-display#4, nothing plugged in
+      - { port: 27, state: active, mode: access, native: 30, far: { run: TYO-15.19-R1-U06-P27, patch: tyo-cb-10, unit: AG-001085, unit_port: lan-1 } }  # 15.05 Gannet, touch controller
+      - { port: 28, state: parked, far: { run: TYO-15.19-R1-U06-P28, patch: tyo-cb-10 } }  # 15.05 Gannet, data/below-table#2, nothing plugged in
+      - { port: 29, state: active, mode: access, native: 30, far: { run: TYO-15.19-R1-U06-P29, patch: tyo-cb-10, unit: AG-001089, unit_port: lan-1 } }  # 15.05 Gannet, scheduler panel
+      - { port: 30, state: active, mode: access, native: 31, far: { run: TYO-15.19-R1-U06-P30, patch: tyo-cb-10, unit: AG-001090, unit_port: lan-1 } }  # 15.06 Kestrel, display
+      - { port: 31, state: active, mode: access, native: 30, far: { run: TYO-15.19-R1-U06-P31, patch: tyo-cb-10, unit: AG-001091, unit_port: lan-1 } }  # 15.06 Kestrel, video bar
+      - { port: 32, state: parked, far: { run: TYO-15.19-R1-U06-P32, patch: tyo-cb-10 } }  # 15.06 Kestrel, data/behind-display#3, nothing plugged in
+      - { port: 33, state: parked, far: { run: TYO-15.19-R1-U06-P33, patch: tyo-cb-10 } }  # 15.06 Kestrel, data/behind-display#4, nothing plugged in
+      - { port: 34, state: active, mode: access, native: 30, far: { run: TYO-15.19-R1-U06-P34, patch: tyo-cb-10, unit: AG-001092, unit_port: lan-1 } }  # 15.06 Kestrel, touch controller
+      - { port: 35, state: parked, far: { run: TYO-15.19-R1-U06-P35, patch: tyo-cb-10 } }  # 15.06 Kestrel, data/below-table#2, nothing plugged in
+      - { port: 36, state: active, mode: access, native: 30, far: { run: TYO-15.19-R1-U06-P36, patch: tyo-cb-10, unit: AG-001099, unit_port: lan-1 } }  # 15.06 Kestrel, scheduler panel
+      - { port: 37, state: active, mode: access, native: 31, far: { run: TYO-15.19-R1-U06-P37, patch: tyo-cb-10, unit: AG-001100, unit_port: lan-1 } }  # 15.07 Peregrine, display
+      - { port: 38, state: active, mode: access, native: 30, far: { run: TYO-15.19-R1-U06-P38, patch: tyo-cb-10, unit: AG-001101, unit_port: lan-1 } }  # 15.07 Peregrine, video bar
+      - { port: 39, state: parked, far: { run: TYO-15.19-R1-U06-P39, patch: tyo-cb-10 } }  # 15.07 Peregrine, data/behind-display#3, nothing plugged in
+      - { port: 40, state: parked, far: { run: TYO-15.19-R1-U06-P40, patch: tyo-cb-10 } }  # 15.07 Peregrine, data/behind-display#4, nothing plugged in
+      - { port: 41, state: active, mode: access, native: 30, far: { run: TYO-15.19-R1-U06-P41, patch: tyo-cb-10, unit: AG-001102, unit_port: lan-1 } }  # 15.07 Peregrine, touch controller
+      - { port: 42, state: parked, far: { run: TYO-15.19-R1-U06-P42, patch: tyo-cb-10 } }  # 15.07 Peregrine, data/below-table#2, nothing plugged in
+      - { port: 43, state: active, mode: access, native: 30, far: { run: TYO-15.19-R1-U06-P43, patch: tyo-cb-10, unit: AG-001106, unit_port: lan-1 } }  # 15.07 Peregrine, scheduler panel
+      - { port: 44, state: active, mode: access, native: 31, far: { run: TYO-15.19-R1-U06-P44, patch: tyo-cb-10, unit: AG-001107, unit_port: lan-1 } }  # 15.08 Wren, display
+      - { port: 45, state: active, mode: access, native: 30, far: { run: TYO-15.19-R1-U06-P45, patch: tyo-cb-10, unit: AG-001108, unit_port: lan-1 } }  # 15.08 Wren, video bar (through the poe injector)
+      - { port: 46, state: parked, far: { run: TYO-15.19-R1-U06-P46, patch: tyo-cb-10 } }  # 15.08 Wren, data/behind-display#3, nothing plugged in
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tyo-1519-cs01, port: 1, patch: tyo-cb-13 } }  # trunk to tyo-1519-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tyo-1519-cs02, port: 1, patch: tyo-cb-14 } }  # trunk to tyo-1519-cs02
+    disabled: "47-48"
+  # Access switch 2, 15th floor · 15.19 Comms room (MDF), Rack 1, U17
+  - id: tyo-1519-as02
+    rack: tyo-15-19-r1
+    u: 17
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: access, native: 30, far: { run: TYO-15.19-R1-U09-P01, patch: tyo-cb-11, unit: AG-001109, unit_port: lan-1 } }  # 15.08 Wren, touch controller
+      - { port: 2, state: parked, far: { run: TYO-15.19-R1-U09-P02, patch: tyo-cb-11 } }  # 15.08 Wren, data/wall-below-table#2, nothing plugged in
+      - { port: 3, state: active, mode: access, native: 30, far: { run: TYO-15.19-R1-U09-P03, patch: tyo-cb-11, unit: AG-001112, unit_port: lan-1 } }  # 15.08 Wren, scheduler panel
+      - { port: 4, state: active, mode: access, native: 31, far: { run: TYO-15.19-R1-U09-P04, patch: tyo-cb-11, unit: AG-001113, unit_port: lan-1 } }  # 15.09 Robin, display
+      - { port: 5, state: active, mode: access, native: 30, far: { run: TYO-15.19-R1-U09-P05, patch: tyo-cb-11, unit: AG-001114, unit_port: lan-1 } }  # 15.09 Robin, video bar (through the poe injector)
+      - { port: 6, state: parked, far: { run: TYO-15.19-R1-U09-P06, patch: tyo-cb-11 } }  # 15.09 Robin, data/behind-display#3, nothing plugged in
+      - { port: 7, state: active, mode: access, native: 30, far: { run: TYO-15.19-R1-U09-P07, patch: tyo-cb-11, unit: AG-001115, unit_port: lan-1 } }  # 15.09 Robin, touch controller
+      - { port: 8, state: parked, far: { run: TYO-15.19-R1-U09-P08, patch: tyo-cb-11 } }  # 15.09 Robin, data/wall-below-table#2, nothing plugged in
+      - { port: 9, state: active, mode: access, native: 30, far: { run: TYO-15.19-R1-U09-P09, patch: tyo-cb-11, unit: AG-001118, unit_port: lan-1 } }  # 15.09 Robin, scheduler panel
+      - { port: 10, state: active, mode: access, native: 30, far: { run: TYO-15.19-R1-U09-P10, patch: tyo-cb-11, unit: AG-001120, unit_port: lan-1 } }  # 15.10 Goldcrest, video bar
+      - { port: 11, state: active, mode: access, native: 31, far: { run: TYO-15.19-R1-U09-P11, patch: tyo-cb-11, unit: AG-001119, unit_port: lan-1 } }  # 15.10 Goldcrest, display
+      - { port: 12, state: parked, far: { run: TYO-15.19-R1-U09-P12, patch: tyo-cb-11 } }  # 15.10 Goldcrest, data/behind-display#3, nothing plugged in
+      - { port: 13, state: active, mode: access, native: 30, far: { run: TYO-15.19-R1-U09-P13, patch: tyo-cb-11, unit: AG-001122, unit_port: lan-1 } }  # 15.11 Stonechat, video bar
+      - { port: 14, state: active, mode: access, native: 31, far: { run: TYO-15.19-R1-U09-P14, patch: tyo-cb-11, unit: AG-001121, unit_port: lan-1 } }  # 15.11 Stonechat, display
+      - { port: 15, state: parked, far: { run: TYO-15.19-R1-U09-P15, patch: tyo-cb-11 } }  # 15.11 Stonechat, data/behind-display#3, nothing plugged in
+      - { port: 16, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U09-P16, patch: tyo-cb-11, unit: AG-001123, unit_port: lan-1 } }  # 15.12 Focus 15.12, monitor
+      - { port: 17, state: parked, far: { run: TYO-15.19-R1-U09-P17, patch: tyo-cb-11 } }  # 15.12 Focus 15.12, data/table-top#2, nothing plugged in
+      - { port: 18, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U09-P18, patch: tyo-cb-11, unit: AG-001124, unit_port: lan-1 } }  # 15.13 Focus 15.13, monitor
+      - { port: 19, state: parked, far: { run: TYO-15.19-R1-U09-P19, patch: tyo-cb-11 } }  # 15.13 Focus 15.13, data/table-top#2, nothing plugged in
+      - { port: 20, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U09-P20, patch: tyo-cb-11, unit: AG-001125, unit_port: lan-1 } }  # 15.14 Focus 15.14, monitor
+      - { port: 21, state: parked, far: { run: TYO-15.19-R1-U09-P21, patch: tyo-cb-11 } }  # 15.14 Focus 15.14, data/table-top#2, nothing plugged in
+      - { port: 22, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U09-P22, patch: tyo-cb-11, unit: AG-001126, unit_port: lan-1 } }  # 15.15 Office 15.15, monitor
+      - { port: 23, state: parked, far: { run: TYO-15.19-R1-U09-P23, patch: tyo-cb-11 } }  # 15.15 Office 15.15, data/wall-below-table#2, nothing plugged in
+      - { port: 24, state: parked, far: { run: TYO-15.19-R1-U09-P24, patch: tyo-cb-11 } }  # 15.15 Office 15.15, data/room-entrance#1, nothing plugged in
+      - { port: 25, state: active, mode: access, native: 70, far: { run: TYO-15.19-R1-U09-P25, patch: tyo-cb-11, unit: AG-001128, unit_port: lan-1 } }  # 15.16 Copy and print, printer
+      - { port: 26, state: parked, far: { run: TYO-15.19-R1-U09-P26, patch: tyo-cb-11 } }  # 15.16 Copy and print, data/wall#2, nothing plugged in
+      - { port: 27, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U09-P27, patch: tyo-cb-11, unit: AG-001129, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 01, monitor
+      - { port: 28, state: parked, far: { run: TYO-15.19-R1-U09-P28, patch: tyo-cb-11 } }  # 15.17 Flex desks A, desk-01/data/table-top#2, nothing plugged in
+      - { port: 29, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U09-P29, patch: tyo-cb-11, unit: AG-001130, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 02, monitor
+      - { port: 30, state: parked, far: { run: TYO-15.19-R1-U09-P30, patch: tyo-cb-11 } }  # 15.17 Flex desks A, desk-02/data/table-top#2, nothing plugged in
+      - { port: 31, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U09-P31, patch: tyo-cb-11, unit: AG-001131, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 03, monitor
+      - { port: 32, state: parked, far: { run: TYO-15.19-R1-U09-P32, patch: tyo-cb-11 } }  # 15.17 Flex desks A, desk-03/data/table-top#2, nothing plugged in
+      - { port: 33, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U09-P33, patch: tyo-cb-11, unit: AG-001132, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 04, monitor
+      - { port: 34, state: parked, far: { run: TYO-15.19-R1-U09-P34, patch: tyo-cb-11 } }  # 15.17 Flex desks A, desk-04/data/table-top#2, nothing plugged in
+      - { port: 35, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U09-P35, patch: tyo-cb-11, unit: AG-001133, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 05, monitor
+      - { port: 36, state: parked, far: { run: TYO-15.19-R1-U09-P36, patch: tyo-cb-11 } }  # 15.17 Flex desks A, desk-05/data/table-top#2, nothing plugged in
+      - { port: 37, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U09-P37, patch: tyo-cb-11, unit: AG-001134, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 06, monitor
+      - { port: 38, state: parked, far: { run: TYO-15.19-R1-U09-P38, patch: tyo-cb-11 } }  # 15.17 Flex desks A, desk-06/data/table-top#2, nothing plugged in
+      - { port: 39, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U09-P39, patch: tyo-cb-11, unit: AG-001135, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 07, monitor
+      - { port: 40, state: parked, far: { run: TYO-15.19-R1-U09-P40, patch: tyo-cb-11 } }  # 15.17 Flex desks A, desk-07/data/table-top#2, nothing plugged in
+      - { port: 41, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U09-P41, patch: tyo-cb-11, unit: AG-001136, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 08, monitor
+      - { port: 42, state: parked, far: { run: TYO-15.19-R1-U09-P42, patch: tyo-cb-11 } }  # 15.17 Flex desks A, desk-08/data/table-top#2, nothing plugged in
+      - { port: 43, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U09-P43, patch: tyo-cb-11, unit: AG-001137, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 09, monitor
+      - { port: 44, state: parked, far: { run: TYO-15.19-R1-U09-P44, patch: tyo-cb-11 } }  # 15.17 Flex desks A, desk-09/data/table-top#2, nothing plugged in
+      - { port: 45, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U09-P45, patch: tyo-cb-11, unit: AG-001138, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 10, monitor
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tyo-1519-cs01, port: 2, patch: tyo-cb-15 } }  # trunk to tyo-1519-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tyo-1519-cs02, port: 2, patch: tyo-cb-16 } }  # trunk to tyo-1519-cs02
+    disabled: "46-48"
+  # Access switch 3, 15th floor · 15.19 Comms room (MDF), Rack 1, U18
+  - id: tyo-1519-as03
+    rack: tyo-15-19-r1
+    u: 18
+    platform: meraki
+    ports:
+      - { port: 1, state: parked, far: { run: TYO-15.19-R1-U12-P01, patch: tyo-cb-12 } }  # 15.17 Flex desks A, desk-10/data/table-top#2, nothing plugged in
+      - { port: 2, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U12-P02, patch: tyo-cb-12, unit: AG-001139, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 11, monitor
+      - { port: 3, state: parked, far: { run: TYO-15.19-R1-U12-P03, patch: tyo-cb-12 } }  # 15.17 Flex desks A, desk-11/data/table-top#2, nothing plugged in
+      - { port: 4, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U12-P04, patch: tyo-cb-12, unit: AG-001140, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 12, monitor
+      - { port: 5, state: parked, far: { run: TYO-15.19-R1-U12-P05, patch: tyo-cb-12 } }  # 15.17 Flex desks A, desk-12/data/table-top#2, nothing plugged in
+      - { port: 6, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U12-P06, patch: tyo-cb-12, unit: AG-001141, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 13, monitor
+      - { port: 7, state: parked, far: { run: TYO-15.19-R1-U12-P07, patch: tyo-cb-12 } }  # 15.17 Flex desks A, desk-13/data/table-top#2, nothing plugged in
+      - { port: 8, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U12-P08, patch: tyo-cb-12, unit: AG-001142, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 14, monitor
+      - { port: 9, state: parked, far: { run: TYO-15.19-R1-U12-P09, patch: tyo-cb-12 } }  # 15.17 Flex desks A, desk-14/data/table-top#2, nothing plugged in
+      - { port: 10, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U12-P10, patch: tyo-cb-12, unit: AG-001143, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 15, monitor
+      - { port: 11, state: parked, far: { run: TYO-15.19-R1-U12-P11, patch: tyo-cb-12 } }  # 15.17 Flex desks A, desk-15/data/table-top#2, nothing plugged in
+      - { port: 12, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U12-P12, patch: tyo-cb-12, unit: AG-001144, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 16, monitor
+      - { port: 13, state: parked, far: { run: TYO-15.19-R1-U12-P13, patch: tyo-cb-12 } }  # 15.17 Flex desks A, desk-16/data/table-top#2, nothing plugged in
+      - { port: 14, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U12-P14, patch: tyo-cb-12, unit: AG-001145, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 17, monitor
+      - { port: 15, state: parked, far: { run: TYO-15.19-R1-U12-P15, patch: tyo-cb-12 } }  # 15.17 Flex desks A, desk-17/data/table-top#2, nothing plugged in
+      - { port: 16, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U12-P16, patch: tyo-cb-12, unit: AG-001146, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 18, monitor
+      - { port: 17, state: parked, far: { run: TYO-15.19-R1-U12-P17, patch: tyo-cb-12 } }  # 15.17 Flex desks A, desk-18/data/table-top#2, nothing plugged in
+      - { port: 18, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U12-P18, patch: tyo-cb-12, unit: AG-001147, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 19, monitor
+      - { port: 19, state: parked, far: { run: TYO-15.19-R1-U12-P19, patch: tyo-cb-12 } }  # 15.17 Flex desks A, desk-19/data/table-top#2, nothing plugged in
+      - { port: 20, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U12-P20, patch: tyo-cb-12, unit: AG-001148, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 20, monitor
+      - { port: 21, state: parked, far: { run: TYO-15.19-R1-U12-P21, patch: tyo-cb-12 } }  # 15.17 Flex desks A, desk-20/data/table-top#2, nothing plugged in
+      - { port: 22, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U12-P22, patch: tyo-cb-12, unit: AG-001149, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 21, monitor
+      - { port: 23, state: parked, far: { run: TYO-15.19-R1-U12-P23, patch: tyo-cb-12 } }  # 15.17 Flex desks A, desk-21/data/table-top#2, nothing plugged in
+      - { port: 24, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U12-P24, patch: tyo-cb-12, unit: AG-001150, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 22, monitor
+      - { port: 25, state: parked, far: { run: TYO-15.19-R1-U12-P25, patch: tyo-cb-12 } }  # 15.17 Flex desks A, desk-22/data/table-top#2, nothing plugged in
+      - { port: 26, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U12-P26, patch: tyo-cb-12, unit: AG-001151, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 23, monitor
+      - { port: 27, state: parked, far: { run: TYO-15.19-R1-U12-P27, patch: tyo-cb-12 } }  # 15.17 Flex desks A, desk-23/data/table-top#2, nothing plugged in
+      - { port: 28, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U12-P28, patch: tyo-cb-12, unit: AG-001152, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 24, monitor
+      - { port: 29, state: parked, far: { run: TYO-15.19-R1-U12-P29, patch: tyo-cb-12 } }  # 15.17 Flex desks A, desk-24/data/table-top#2, nothing plugged in
+      - { port: 30, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U12-P30, patch: tyo-cb-12, unit: AG-001153, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 25, monitor
+      - { port: 31, state: parked, far: { run: TYO-15.19-R1-U12-P31, patch: tyo-cb-12 } }  # 15.17 Flex desks A, desk-25/data/table-top#2, nothing plugged in
+      - { port: 32, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U12-P32, patch: tyo-cb-12, unit: AG-001154, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 26, monitor
+      - { port: 33, state: parked, far: { run: TYO-15.19-R1-U12-P33, patch: tyo-cb-12 } }  # 15.17 Flex desks A, desk-26/data/table-top#2, nothing plugged in
+      - { port: 34, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U12-P34, patch: tyo-cb-12, unit: AG-001155, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 27, monitor
+      - { port: 35, state: parked, far: { run: TYO-15.19-R1-U12-P35, patch: tyo-cb-12 } }  # 15.17 Flex desks A, desk-27/data/table-top#2, nothing plugged in
+      - { port: 36, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U12-P36, patch: tyo-cb-12, unit: AG-001156, unit_port: lan-1 } }  # 15.17 Flex desks A, desk 28, monitor
+      - { port: 37, state: parked, far: { run: TYO-15.19-R1-U12-P37, patch: tyo-cb-12 } }  # 15.17 Flex desks A, desk-28/data/table-top#2, nothing plugged in
+      - { port: 38, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U12-P38, patch: tyo-cb-12, unit: AG-001158, unit_port: lan-1 } }  # 15.18 Flex desks B, desk 01, network adapter
+      - { port: 39, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U12-P39, patch: tyo-cb-12, unit: AG-001160, unit_port: lan-1 } }  # 15.18 Flex desks B, desk 02, network adapter
+      - { port: 40, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U12-P40, patch: tyo-cb-12, unit: AG-001162, unit_port: lan-1 } }  # 15.18 Flex desks B, desk 03, network adapter
+      - { port: 41, state: active, mode: access, native: 20, far: { run: TYO-15.19-R1-U12-P41, patch: tyo-cb-12, unit: AG-001164, unit_port: lan-1 } }  # 15.18 Flex desks B, desk 04, network adapter
+      - { port: 42, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: TYO-15.19-R1-U12-P42, patch: tyo-cb-12, unit: AG-003279, unit_port: lan-1 } }  # access point tyo-15-ap01
+      - { port: 43, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: TYO-15.19-R1-U12-P43, patch: tyo-cb-12, unit: AG-003280, unit_port: lan-1 } }  # access point tyo-15-ap02
+      - { port: 44, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: TYO-15.19-R1-U12-P44, patch: tyo-cb-12, unit: AG-003281, unit_port: lan-1 } }  # access point tyo-15-ap03
+      - { port: 45, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: TYO-15.19-R1-U12-P45, patch: tyo-cb-12, unit: AG-003282, unit_port: lan-1 } }  # access point tyo-15-ap04
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tyo-1519-cs01, port: 3, patch: tyo-cb-17 } }  # trunk to tyo-1519-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tyo-1519-cs02, port: 3, patch: tyo-cb-18 } }  # trunk to tyo-1519-cs02
+    disabled: "46-48"
+  # Access switch 4, 15th floor · 15.19 Comms room (MDF), Rack 1, U19
+  - id: tyo-1519-as04
+    rack: tyo-15-19-r1
+    u: 19
+    platform: meraki
+    ports:
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tyo-1519-cs01, port: 4, patch: tyo-cb-19 } }  # trunk to tyo-1519-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tyo-1519-cs02, port: 4, patch: tyo-cb-20 } }  # trunk to tyo-1519-cs02
+    disabled: "1-48"
+demo: true

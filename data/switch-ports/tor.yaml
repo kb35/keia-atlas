@@ -1,0 +1,91 @@
+# Switch ports at the Toronto office: the VLAN table, and how every switch port is set with what is on its far end.
+# Made up for the demo; written by tools/migrations/2026-09-30-switch-ports.mjs. In a live setup the switch platform's
+# connector (UniFi, Meraki or Netgear) reads this; here it is recorded. The chain on each port (run, patch cord, unit)
+# is checked against the runs, the patch cords and the room wiring by tools/crossrefs-switchports.mjs.
+site: tor
+read_at: "2026-09-30T06:00:00Z"
+vlans:
+  - { vlan: 10, subnet: 10.50.10.0/24, gateway: 10.50.10.1 }
+  - { vlan: 20, subnet: 10.50.20.0/22, gateway: 10.50.20.1 }
+  - { vlan: 30, subnet: 10.50.30.0/24, gateway: 10.50.30.1 }
+  - { vlan: 31, subnet: 10.50.31.0/24, gateway: 10.50.31.1 }
+  - { vlan: 40, subnet: 169.254.0.0/16, note: "Link-local in each room, on the in-room switch only; not routed" }
+  - { vlan: 50, subnet: 10.50.50.0/24, gateway: 10.50.50.1 }
+  - { vlan: 60, subnet: 10.50.60.0/24, gateway: 10.50.60.1 }
+  - { vlan: 70, subnet: 10.50.70.0/24, gateway: 10.50.70.1 }
+  - { vlan: 90, subnet: 10.50.90.0/23, gateway: 10.50.90.1 }
+switches:
+  # Core switch A · 7.08 Comms room (MDF), Rack 1, U18
+  - id: tor-708-cs01
+    rack: tor-7-08-r1
+    u: 18
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tor-708-as01, port: 49, patch: tor-cb-02 } }  # trunk down to tor-708-as01
+      - { port: 3, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { rack: tor-7-08-r1, u: 21, patch: tor-cb-05 } }  # Firewall A
+      - { port: 25, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tor-708-cs02, port: 25, patch: tor-cb-04 } }  # trunk to tor-708-cs02
+      - { port: 26, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tor-708-cs02, port: 26, patch: tor-cb-04 } }  # trunk to tor-708-cs02
+    disabled: "2,4-24,27-28"
+  # Core switch B · 7.08 Comms room (MDF), Rack 1, U17
+  - id: tor-708-cs02
+    rack: tor-7-08-r1
+    u: 17
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tor-708-as01, port: 50, patch: tor-cb-03 } }  # trunk down to tor-708-as01
+      - { port: 3, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { rack: tor-7-08-r1, u: 20, patch: tor-cb-06 } }  # Firewall B
+      - { port: 25, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tor-708-cs01, port: 25, patch: tor-cb-04 } }  # trunk to tor-708-cs01
+      - { port: 26, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tor-708-cs01, port: 26, patch: tor-cb-04 } }  # trunk to tor-708-cs01
+    disabled: "2,4-24,27-28"
+  # Access switch · 7.08 Comms room (MDF), Rack 1, U13
+  - id: tor-708-as01
+    rack: tor-7-08-r1
+    u: 13
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: access, native: 31, far: { run: TOR-7.08-R1-U14-P01, patch: tor-cb-01, unit: AG-001385, unit_port: lan-1 } }  # 7.01 Kestrel, display 1
+      - { port: 2, state: active, mode: access, native: 30, far: { run: TOR-7.08-R1-U14-P02, patch: tor-cb-01, unit: AG-001387, unit_port: lan-1 } }  # 7.01 Kestrel, video bar
+      - { port: 3, state: active, mode: access, native: 31, far: { run: TOR-7.08-R1-U14-P03, patch: tor-cb-01, unit: AG-001386, unit_port: lan-1 } }  # 7.01 Kestrel, display 2
+      - { port: 4, state: parked, far: { run: TOR-7.08-R1-U14-P04, patch: tor-cb-01 } }  # 7.01 Kestrel, data/behind-display#4, nothing plugged in
+      - { port: 5, state: active, mode: access, native: 30, far: { run: TOR-7.08-R1-U14-P05, patch: tor-cb-01, unit: AG-001388, unit_port: lan-1 } }  # 7.01 Kestrel, touch controller
+      - { port: 6, state: parked, far: { run: TOR-7.08-R1-U14-P06, patch: tor-cb-01 } }  # 7.01 Kestrel, data/below-table#2, nothing plugged in
+      - { port: 7, state: parked, far: { run: TOR-7.08-R1-U14-P07, patch: tor-cb-01 } }  # 7.01 Kestrel, data/room-entrance#1, nothing plugged in
+      - { port: 8, state: active, mode: access, native: 31, far: { run: TOR-7.08-R1-U14-P08, patch: tor-cb-01, unit: AG-001391, unit_port: lan-1 } }  # 7.02 Heron, display
+      - { port: 9, state: active, mode: access, native: 30, far: { run: TOR-7.08-R1-U14-P09, patch: tor-cb-01, unit: AG-001392, unit_port: lan-1 } }  # 7.02 Heron, video bar
+      - { port: 10, state: parked, far: { run: TOR-7.08-R1-U14-P10, patch: tor-cb-01 } }  # 7.02 Heron, data/behind-display#3, nothing plugged in
+      - { port: 11, state: parked, far: { run: TOR-7.08-R1-U14-P11, patch: tor-cb-01 } }  # 7.02 Heron, data/behind-display#4, nothing plugged in
+      - { port: 12, state: active, mode: access, native: 30, far: { run: TOR-7.08-R1-U14-P12, patch: tor-cb-01, unit: AG-001393, unit_port: lan-1 } }  # 7.02 Heron, touch controller
+      - { port: 13, state: parked, far: { run: TOR-7.08-R1-U14-P13, patch: tor-cb-01 } }  # 7.02 Heron, data/below-table#2, nothing plugged in
+      - { port: 14, state: parked, far: { run: TOR-7.08-R1-U14-P14, patch: tor-cb-01 } }  # 7.02 Heron, data/room-entrance#1, nothing plugged in
+      - { port: 15, state: active, mode: access, native: 31, far: { run: TOR-7.08-R1-U14-P15, patch: tor-cb-01, unit: AG-001396, unit_port: lan-1 } }  # 7.03 Curlew, display 1
+      - { port: 16, state: active, mode: trunk, native: 10, tagged: [30], far: { run: TOR-7.08-R1-U14-P16, patch: tor-cb-01, unit: AG-001402, unit_port: lan-9 } }  # 7.03 Curlew, network switch
+      - { port: 17, state: parked, far: { run: TOR-7.08-R1-U14-P17, patch: tor-cb-01 } }  # 7.03 Curlew, data/behind-display#3, nothing plugged in
+      - { port: 18, state: active, mode: access, native: 31, far: { run: TOR-7.08-R1-U14-P18, patch: tor-cb-01, unit: AG-001397, unit_port: lan-1 } }  # 7.03 Curlew, display 2
+      - { port: 19, state: active, mode: access, native: 30, far: { run: TOR-7.08-R1-U14-P19, patch: tor-cb-01, unit: AG-001398, unit_port: lan-1 } }  # 7.03 Curlew, video bar
+      - { port: 20, state: active, mode: access, native: 30, far: { run: TOR-7.08-R1-U14-P20, patch: tor-cb-01, unit: AG-001399, unit_port: lan-1 } }  # 7.03 Curlew, touch controller
+      - { port: 21, state: active, mode: access, native: 31, far: { run: TOR-7.08-R1-U14-P21, patch: tor-cb-01, unit: AG-001408, unit_port: lan-1 } }  # 7.04 Wren, display
+      - { port: 22, state: active, mode: access, native: 30, far: { run: TOR-7.08-R1-U14-P22, patch: tor-cb-01, unit: AG-001409, unit_port: lan-1 } }  # 7.04 Wren, video bar (through the poe injector)
+      - { port: 23, state: active, mode: access, native: 30, far: { run: TOR-7.08-R1-U14-P23, patch: tor-cb-01, unit: AG-001410, unit_port: lan-1 } }  # 7.04 Wren, touch controller
+      - { port: 24, state: active, mode: access, native: 31, far: { run: TOR-7.08-R1-U14-P24, patch: tor-cb-01, unit: AG-001414, unit_port: lan-1 } }  # 7.05 Robin, display
+      - { port: 25, state: active, mode: access, native: 30, far: { run: TOR-7.08-R1-U14-P25, patch: tor-cb-01, unit: AG-001415, unit_port: lan-1 } }  # 7.05 Robin, video bar (through the poe injector)
+      - { port: 26, state: active, mode: access, native: 30, far: { run: TOR-7.08-R1-U14-P26, patch: tor-cb-01, unit: AG-001416, unit_port: lan-1 } }  # 7.05 Robin, touch controller
+      - { port: 27, state: active, mode: access, native: 20, far: { run: TOR-7.08-R1-U14-P27, patch: tor-cb-01, unit: AG-001420, unit_port: lan-1 } }  # 7.06 Goldcrest, monitor
+      - { port: 28, state: active, mode: access, native: 70, far: { run: TOR-7.08-R1-U14-P28, patch: tor-cb-01, unit: AG-001421, unit_port: lan-1 } }  # 7.07 Copy and print, printer
+      - { port: 29, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: TOR-7.08-R1-U14-P29, patch: tor-cb-01, unit: AG-003268, unit_port: lan-1 } }  # access point tor-7-ap01
+      - { port: 30, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: TOR-7.08-R1-U14-P30, patch: tor-cb-01, unit: AG-003269, unit_port: lan-1 } }  # access point tor-7-ap02
+      - { port: 31, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: TOR-7.08-R1-U14-P31, patch: tor-cb-01, unit: AG-003270, unit_port: lan-1 } }  # access point tor-7-ap03
+      - { port: 32, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: TOR-7.08-R1-U14-P32, patch: tor-cb-01, unit: AG-003271, unit_port: lan-1 } }  # access point tor-7-ap04
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tor-708-cs01, port: 1, patch: tor-cb-02 } }  # trunk to tor-708-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: tor-708-cs02, port: 1, patch: tor-cb-03 } }  # trunk to tor-708-cs02
+    disabled: "33-48"
+  # Curlew, network switch · 7.03 Curlew
+  - id: tor-703-sw01
+    space: tor-7-03
+    position: network-switch
+    platform: netgear
+    ports:
+      - { port: lan-1, state: active, mode: access, native: 40, far: { unit: AG-001398, unit_port: lan-2 } }  # video bar, AV network in the room
+      - { port: lan-2, state: active, mode: access, native: 30, far: { unit: AG-001403, unit_port: lan-1 } }  # switcher
+      - { port: lan-9, state: active, mode: trunk, native: 10, tagged: [30], far: { switch: tor-708-as01, port: 16 } }  # uplink to tor-708-as01 port 16
+    disabled: [lan-3, lan-4, lan-5, lan-6, lan-7, lan-8, sfp-1, lan-10]
+demo: true

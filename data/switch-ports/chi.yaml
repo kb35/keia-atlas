@@ -1,0 +1,354 @@
+# Switch ports at the Chicago office: the VLAN table, and how every switch port is set with what is on its far end.
+# Made up for the demo; written by tools/migrations/2026-09-30-switch-ports.mjs. In a live setup the switch platform's
+# connector (UniFi, Meraki or Netgear) reads this; here it is recorded. The chain on each port (run, patch cord, unit)
+# is checked against the runs, the patch cords and the room wiring by tools/crossrefs-switchports.mjs.
+site: chi
+read_at: "2026-09-30T06:00:00Z"
+vlans:
+  - { vlan: 10, subnet: 10.40.10.0/24, gateway: 10.40.10.1 }
+  - { vlan: 20, subnet: 10.40.20.0/22, gateway: 10.40.20.1 }
+  - { vlan: 30, subnet: 10.40.30.0/24, gateway: 10.40.30.1 }
+  - { vlan: 31, subnet: 10.40.31.0/24, gateway: 10.40.31.1 }
+  - { vlan: 40, subnet: 169.254.0.0/16, note: "Link-local in each room, on the in-room switch only; not routed" }
+  - { vlan: 50, subnet: 10.40.50.0/24, gateway: 10.40.50.1 }
+  - { vlan: 60, subnet: 10.40.60.0/24, gateway: 10.40.60.1 }
+  - { vlan: 70, subnet: 10.40.70.0/24, gateway: 10.40.70.1 }
+  - { vlan: 90, subnet: 10.40.90.0/23, gateway: 10.40.90.1 }
+switches:
+  # Core switch A · 12.11 Comms room (MDF), Rack 1, U19
+  - id: chi-1211-cs01
+    rack: chi-12-11-r1
+    u: 19
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1211-as01, port: 49, patch: chi-cb-12 } }  # trunk down to chi-1211-as01
+      - { port: 2, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1211-as02, port: 49, patch: chi-cb-14 } }  # trunk down to chi-1211-as02
+      - { port: 3, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { rack: chi-12-11-r1, u: 22, patch: chi-cb-17 } }  # Firewall A
+      - { port: 4, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { rack: chi-12-11-r1, u: 26, patch: chi-cb-23 } }  # Wireless controller
+      - { port: 5, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1320-as01, port: 49, run: CHI-12.11-R1-U12-P01, patches: [chi-cb-25, chi-cb-41] } }  # trunk down to chi-1320-as01
+      - { port: 6, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1320-as01, port: 50, run: CHI-12.11-R1-U12-P01, patches: [chi-cb-25, chi-cb-41] } }  # trunk down to chi-1320-as01
+      - { port: 7, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1320-as03, port: 49, run: CHI-12.11-R1-U12-P01, patches: [chi-cb-27, chi-cb-43] } }  # trunk down to chi-1320-as03
+      - { port: 8, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1320-as03, port: 50, run: CHI-12.11-R1-U12-P01, patches: [chi-cb-27, chi-cb-43] } }  # trunk down to chi-1320-as03
+      - { port: 25, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1211-cs02, port: 25, patch: chi-cb-16 } }  # trunk to chi-1211-cs02
+      - { port: 26, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1211-cs02, port: 26, patch: chi-cb-16 } }  # trunk to chi-1211-cs02
+    disabled: "9-24,27-28"
+  # Core switch B · 12.11 Comms room (MDF), Rack 1, U20
+  - id: chi-1211-cs02
+    rack: chi-12-11-r1
+    u: 20
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1211-as01, port: 50, patch: chi-cb-13 } }  # trunk down to chi-1211-as01
+      - { port: 2, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1211-as02, port: 50, patch: chi-cb-15 } }  # trunk down to chi-1211-as02
+      - { port: 3, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { rack: chi-12-11-r1, u: 23, patch: chi-cb-18 } }  # Firewall B
+      - { port: 4, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { rack: chi-12-11-r1, u: 26, patch: chi-cb-24 } }  # Wireless controller
+      - { port: 5, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1320-as02, port: 49, run: CHI-12.11-R1-U12-P01, patches: [chi-cb-26, chi-cb-42] } }  # trunk down to chi-1320-as02
+      - { port: 6, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1320-as02, port: 50, run: CHI-12.11-R1-U12-P01, patches: [chi-cb-26, chi-cb-42] } }  # trunk down to chi-1320-as02
+      - { port: 7, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1320-as04, port: 49, run: CHI-12.11-R1-U12-P01, patches: [chi-cb-28, chi-cb-44] } }  # trunk down to chi-1320-as04
+      - { port: 8, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1320-as04, port: 50, run: CHI-12.11-R1-U12-P01, patches: [chi-cb-28, chi-cb-44] } }  # trunk down to chi-1320-as04
+      - { port: 25, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1211-cs01, port: 25, patch: chi-cb-16 } }  # trunk to chi-1211-cs01
+      - { port: 26, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1211-cs01, port: 26, patch: chi-cb-16 } }  # trunk to chi-1211-cs01
+    disabled: "9-24,27-28"
+  # Access switch 1, Level 12 · 12.11 Comms room (MDF), Rack 1, U15
+  - id: chi-1211-as01
+    rack: chi-12-11-r1
+    u: 15
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: access, native: 31, far: { run: CHI-12.11-R1-U06-P01, patch: chi-cb-10, unit: AG-000001, unit_port: lan-1 } }  # 12.01 Reception, display
+      - { port: 2, state: active, mode: access, native: 31, far: { run: CHI-12.11-R1-U06-P02, patch: chi-cb-10, unit: AG-000002, unit_port: lan-1 } }  # 12.01 Reception, signage player
+      - { port: 3, state: parked, far: { run: CHI-12.11-R1-U06-P03, patch: chi-cb-10 } }  # 12.01 Reception, data/behind-display#3, nothing plugged in
+      - { port: 4, state: parked, far: { run: CHI-12.11-R1-U06-P04, patch: chi-cb-10 } }  # 12.01 Reception, data/tbd#1, nothing plugged in
+      - { port: 5, state: active, mode: access, native: 31, far: { run: CHI-12.11-R1-U06-P05, patch: chi-cb-10, unit: AG-001427, unit_port: lan-1 } }  # 12.02 Cafeteria, display
+      - { port: 6, state: active, mode: access, native: 31, far: { run: CHI-12.11-R1-U06-P06, patch: chi-cb-10, unit: AG-001428, unit_port: lan-1 } }  # 12.02 Cafeteria, signage player
+      - { port: 7, state: parked, far: { run: CHI-12.11-R1-U06-P07, patch: chi-cb-10 } }  # 12.02 Cafeteria, data/behind-display#3, nothing plugged in
+      - { port: 8, state: parked, far: { run: CHI-12.11-R1-U06-P08, patch: chi-cb-10 } }  # 12.02 Cafeteria, data/tbd#1, nothing plugged in
+      - { port: 9, state: active, mode: access, native: 31, far: { run: CHI-12.11-R1-U06-P09, patch: chi-cb-10, unit: AG-000003, unit_port: lan-1 } }  # 12.03 Heron, display 1
+      - { port: 10, state: active, mode: access, native: 30, far: { run: CHI-12.11-R1-U06-P10, patch: chi-cb-10, unit: AG-000005, unit_port: lan-1 } }  # 12.03 Heron, video bar
+      - { port: 11, state: active, mode: access, native: 31, far: { run: CHI-12.11-R1-U06-P11, patch: chi-cb-10, unit: AG-000004, unit_port: lan-1 } }  # 12.03 Heron, display 2
+      - { port: 12, state: parked, far: { run: CHI-12.11-R1-U06-P12, patch: chi-cb-10 } }  # 12.03 Heron, data/behind-display#4, nothing plugged in
+      - { port: 13, state: active, mode: access, native: 30, far: { run: CHI-12.11-R1-U06-P13, patch: chi-cb-10, unit: AG-000006, unit_port: lan-1 } }  # 12.03 Heron, touch controller
+      - { port: 14, state: parked, far: { run: CHI-12.11-R1-U06-P14, patch: chi-cb-10 } }  # 12.03 Heron, data/below-table#2, nothing plugged in
+      - { port: 15, state: active, mode: access, native: 30, far: { run: CHI-12.11-R1-U06-P15, patch: chi-cb-10, unit: AG-000013, unit_port: lan-1 } }  # 12.03 Heron, scheduler panel
+      - { port: 16, state: active, mode: access, native: 31, far: { run: CHI-12.11-R1-U06-P16, patch: chi-cb-10, unit: AG-000014, unit_port: lan-1 } }  # 12.04 Curlew, display 1
+      - { port: 17, state: active, mode: access, native: 30, far: { run: CHI-12.11-R1-U06-P17, patch: chi-cb-10, unit: AG-000016, unit_port: lan-1 } }  # 12.04 Curlew, video bar
+      - { port: 18, state: active, mode: access, native: 31, far: { run: CHI-12.11-R1-U06-P18, patch: chi-cb-10, unit: AG-000015, unit_port: lan-1 } }  # 12.04 Curlew, display 2
+      - { port: 19, state: parked, far: { run: CHI-12.11-R1-U06-P19, patch: chi-cb-10 } }  # 12.04 Curlew, data/behind-display#4, nothing plugged in
+      - { port: 20, state: active, mode: access, native: 30, far: { run: CHI-12.11-R1-U06-P20, patch: chi-cb-10, unit: AG-000017, unit_port: lan-1 } }  # 12.04 Curlew, touch controller
+      - { port: 21, state: parked, far: { run: CHI-12.11-R1-U06-P21, patch: chi-cb-10 } }  # 12.04 Curlew, data/below-table#2, nothing plugged in
+      - { port: 22, state: parked, far: { run: CHI-12.11-R1-U06-P22, patch: chi-cb-10 } }  # 12.04 Curlew, data/room-entrance#1, nothing plugged in
+      - { port: 23, state: active, mode: access, native: 31, far: { run: CHI-12.11-R1-U06-P23, patch: chi-cb-10, unit: AG-000020, unit_port: lan-1 } }  # 12.05 Gannet, display 1
+      - { port: 24, state: active, mode: access, native: 30, far: { run: CHI-12.11-R1-U06-P24, patch: chi-cb-10, unit: AG-000022, unit_port: lan-1 } }  # 12.05 Gannet, video bar
+      - { port: 25, state: active, mode: access, native: 31, far: { run: CHI-12.11-R1-U06-P25, patch: chi-cb-10, unit: AG-000021, unit_port: lan-1 } }  # 12.05 Gannet, display 2
+      - { port: 26, state: parked, far: { run: CHI-12.11-R1-U06-P26, patch: chi-cb-10 } }  # 12.05 Gannet, data/behind-display#4, nothing plugged in
+      - { port: 27, state: active, mode: access, native: 30, far: { run: CHI-12.11-R1-U06-P27, patch: chi-cb-10, unit: AG-000023, unit_port: lan-1 } }  # 12.05 Gannet, touch controller
+      - { port: 28, state: parked, far: { run: CHI-12.11-R1-U06-P28, patch: chi-cb-10 } }  # 12.05 Gannet, data/below-table#2, nothing plugged in
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1211-cs01, port: 1, patch: chi-cb-12 } }  # trunk to chi-1211-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1211-cs02, port: 1, patch: chi-cb-13 } }  # trunk to chi-1211-cs02
+    disabled: "29-48"
+  # Access switch 2, Level 12 · 12.11 Comms room (MDF), Rack 1, U16
+  - id: chi-1211-as02
+    rack: chi-12-11-r1
+    u: 16
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: access, native: 30, far: { run: CHI-12.11-R1-U09-P01, patch: chi-cb-11, unit: AG-000027, unit_port: lan-1 } }  # 12.05 Gannet, scheduler panel
+      - { port: 2, state: active, mode: access, native: 31, far: { run: CHI-12.11-R1-U09-P02, patch: chi-cb-11, unit: AG-000028, unit_port: lan-1 } }  # 12.06 Kestrel, display
+      - { port: 3, state: active, mode: access, native: 30, far: { run: CHI-12.11-R1-U09-P03, patch: chi-cb-11, unit: AG-000029, unit_port: lan-1 } }  # 12.06 Kestrel, video bar
+      - { port: 4, state: parked, far: { run: CHI-12.11-R1-U09-P04, patch: chi-cb-11 } }  # 12.06 Kestrel, data/behind-display#3, nothing plugged in
+      - { port: 5, state: parked, far: { run: CHI-12.11-R1-U09-P05, patch: chi-cb-11 } }  # 12.06 Kestrel, data/behind-display#4, nothing plugged in
+      - { port: 6, state: active, mode: access, native: 30, far: { run: CHI-12.11-R1-U09-P06, patch: chi-cb-11, unit: AG-000030, unit_port: lan-1 } }  # 12.06 Kestrel, touch controller
+      - { port: 7, state: parked, far: { run: CHI-12.11-R1-U09-P07, patch: chi-cb-11 } }  # 12.06 Kestrel, data/below-table#2, nothing plugged in
+      - { port: 8, state: active, mode: access, native: 30, far: { run: CHI-12.11-R1-U09-P08, patch: chi-cb-11, unit: AG-000033, unit_port: lan-1 } }  # 12.06 Kestrel, scheduler panel
+      - { port: 9, state: active, mode: access, native: 31, far: { run: CHI-12.11-R1-U09-P09, patch: chi-cb-11, unit: AG-000034, unit_port: lan-1 } }  # 12.07 Peregrine, display
+      - { port: 10, state: active, mode: access, native: 30, far: { run: CHI-12.11-R1-U09-P10, patch: chi-cb-11, unit: AG-000035, unit_port: lan-1 } }  # 12.07 Peregrine, video bar
+      - { port: 11, state: parked, far: { run: CHI-12.11-R1-U09-P11, patch: chi-cb-11 } }  # 12.07 Peregrine, data/behind-display#3, nothing plugged in
+      - { port: 12, state: parked, far: { run: CHI-12.11-R1-U09-P12, patch: chi-cb-11 } }  # 12.07 Peregrine, data/behind-display#4, nothing plugged in
+      - { port: 13, state: active, mode: access, native: 30, far: { run: CHI-12.11-R1-U09-P13, patch: chi-cb-11, unit: AG-000036, unit_port: lan-1 } }  # 12.07 Peregrine, touch controller
+      - { port: 14, state: active, mode: access, native: 30, far: { run: CHI-12.11-R1-U09-P14, patch: chi-cb-11, unit: AG-000039, unit_port: lan-1 } }  # 12.07 Peregrine, scheduler panel
+      - { port: 15, state: active, mode: access, native: 31, far: { run: CHI-12.11-R1-U09-P15, patch: chi-cb-11, unit: AG-000040, unit_port: lan-1 } }  # 12.08 Barn Owl, display 1
+      - { port: 16, state: active, mode: trunk, native: 10, tagged: [30], far: { run: CHI-12.11-R1-U09-P16, patch: chi-cb-11, unit: AG-000046, unit_port: lan-9 } }  # 12.08 Barn Owl, network switch
+      - { port: 17, state: active, mode: access, native: 31, far: { run: CHI-12.11-R1-U09-P17, patch: chi-cb-11, unit: AG-000041, unit_port: lan-1 } }  # 12.08 Barn Owl, display 2
+      - { port: 18, state: active, mode: access, native: 30, far: { run: CHI-12.11-R1-U09-P18, patch: chi-cb-11, unit: AG-000042, unit_port: lan-1 } }  # 12.08 Barn Owl, video bar
+      - { port: 19, state: active, mode: access, native: 30, far: { run: CHI-12.11-R1-U09-P19, patch: chi-cb-11, unit: AG-000043, unit_port: lan-1 } }  # 12.08 Barn Owl, touch controller
+      - { port: 20, state: active, mode: access, native: 30, far: { run: CHI-12.11-R1-U09-P20, patch: chi-cb-11, unit: AG-000052, unit_port: lan-1 } }  # 12.08 Barn Owl, scheduler panel
+      - { port: 21, state: active, mode: access, native: 30, far: { run: CHI-12.11-R1-U09-P21, patch: chi-cb-11, unit: AG-000053, unit_port: lan-1 } }  # 12.09 Whooper Swan, desk video device
+      - { port: 22, state: active, mode: access, native: 30, far: { run: CHI-12.11-R1-U09-P22, patch: chi-cb-11, unit: AG-000054, unit_port: lan-1 } }  # 12.09 Whooper Swan, scheduler panel
+      - { port: 23, state: active, mode: access, native: 70, far: { run: CHI-12.11-R1-U09-P23, patch: chi-cb-11, unit: AG-000055, unit_port: lan-1 } }  # 12.10 Copy and print, printer
+      - { port: 24, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: CHI-12.11-R1-U09-P24, patch: chi-cb-11, unit: AG-003251, unit_port: lan-1 } }  # access point chi-12-ap01
+      - { port: 25, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: CHI-12.11-R1-U09-P25, patch: chi-cb-11, unit: AG-003252, unit_port: lan-1 } }  # access point chi-12-ap02
+      - { port: 26, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: CHI-12.11-R1-U09-P26, patch: chi-cb-11, unit: AG-003253, unit_port: lan-1 } }  # access point chi-12-ap03
+      - { port: 27, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: CHI-12.11-R1-U09-P27, patch: chi-cb-11, unit: AG-003254, unit_port: lan-1 } }  # access point chi-12-ap04
+      - { port: 28, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: CHI-12.11-R1-U09-P28, patch: chi-cb-11, unit: AG-003255, unit_port: lan-1 } }  # access point chi-12-ap05
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1211-cs01, port: 2, patch: chi-cb-14 } }  # trunk to chi-1211-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1211-cs02, port: 2, patch: chi-cb-15 } }  # trunk to chi-1211-cs02
+    disabled: "29-48"
+  # Access switch 1 · 13.20 Comms room (IDF), Rack 1, U37
+  - id: chi-1320-as01
+    rack: chi-13-20-r1
+    u: 37
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: access, native: 31, far: { run: CHI-13.20-R1-U38-P01, patch: chi-cb-36, unit: AG-000056, unit_port: lan-1 } }  # 13.01 Oystercatcher, display
+      - { port: 2, state: parked, far: { run: CHI-13.20-R1-U38-P02, patch: chi-cb-36 } }  # 13.01 Oystercatcher, data/behind-display#3, nothing plugged in
+      - { port: 3, state: parked, far: { run: CHI-13.20-R1-U38-P03, patch: chi-cb-36 } }  # 13.01 Oystercatcher, data/behind-display#4, nothing plugged in
+      - { port: 4, state: active, mode: access, native: 30, far: { run: CHI-13.20-R1-U38-P04, patch: chi-cb-36, unit: AG-000058, unit_port: lan-1 } }  # 13.01 Oystercatcher, touch controller
+      - { port: 5, state: parked, far: { run: CHI-13.20-R1-U38-P05, patch: chi-cb-36 } }  # 13.01 Oystercatcher, data/below-table#2, nothing plugged in
+      - { port: 6, state: parked, far: { run: CHI-13.20-R1-U38-P06, patch: chi-cb-36 } }  # 13.01 Oystercatcher, data/room-entrance#1, nothing plugged in
+      - { port: 7, state: active, mode: access, native: 31, far: { run: CHI-13.20-R1-U38-P07, patch: chi-cb-36, unit: AG-000061, unit_port: lan-1 } }  # 13.02 Lapwing, display 1
+      - { port: 8, state: active, mode: access, native: 31, far: { run: CHI-13.20-R1-U38-P08, patch: chi-cb-36, unit: AG-000062, unit_port: lan-1 } }  # 13.02 Lapwing, display 2
+      - { port: 9, state: parked, far: { run: CHI-13.20-R1-U38-P09, patch: chi-cb-36 } }  # 13.02 Lapwing, data/behind-display#4, nothing plugged in
+      - { port: 10, state: active, mode: access, native: 30, far: { run: CHI-13.20-R1-U38-P10, patch: chi-cb-36, unit: AG-000064, unit_port: lan-1 } }  # 13.02 Lapwing, touch controller
+      - { port: 11, state: parked, far: { run: CHI-13.20-R1-U38-P11, patch: chi-cb-36 } }  # 13.02 Lapwing, data/below-table#2, nothing plugged in
+      - { port: 12, state: active, mode: access, native: 30, far: { run: CHI-13.20-R1-U38-P12, patch: chi-cb-36, unit: AG-000071, unit_port: lan-1 } }  # 13.02 Lapwing, scheduler panel
+      - { port: 13, state: active, mode: access, native: 31, far: { run: CHI-13.20-R1-U38-P13, patch: chi-cb-36, unit: AG-000072, unit_port: lan-1 } }  # 13.03 Kingfisher, display 1
+      - { port: 14, state: active, mode: access, native: 31, far: { run: CHI-13.20-R1-U38-P14, patch: chi-cb-36, unit: AG-000073, unit_port: lan-1 } }  # 13.03 Kingfisher, display 2
+      - { port: 15, state: parked, far: { run: CHI-13.20-R1-U38-P15, patch: chi-cb-36 } }  # 13.03 Kingfisher, data/behind-display#4, nothing plugged in
+      - { port: 16, state: active, mode: access, native: 30, far: { run: CHI-13.20-R1-U38-P16, patch: chi-cb-36, unit: AG-000075, unit_port: lan-1 } }  # 13.03 Kingfisher, touch controller
+      - { port: 17, state: parked, far: { run: CHI-13.20-R1-U38-P17, patch: chi-cb-36 } }  # 13.03 Kingfisher, data/below-table#2, nothing plugged in
+      - { port: 18, state: active, mode: access, native: 30, far: { run: CHI-13.20-R1-U38-P18, patch: chi-cb-36, unit: AG-000079, unit_port: lan-1 } }  # 13.03 Kingfisher, scheduler panel
+      - { port: 19, state: active, mode: access, native: 31, far: { run: CHI-13.20-R1-U38-P19, patch: chi-cb-36, unit: AG-000080, unit_port: lan-1 } }  # 13.04 Cormorant, display main
+      - { port: 20, state: active, mode: access, native: 31, far: { run: CHI-13.20-R1-U38-P20, patch: chi-cb-36, unit: AG-000081, unit_port: lan-1 } }  # 13.04 Cormorant, display second
+      - { port: 21, state: parked, far: { run: CHI-13.20-R1-U38-P21, patch: chi-cb-36 } }  # 13.04 Cormorant, data/behind-display#4, nothing plugged in
+      - { port: 22, state: active, mode: access, native: 30, far: { run: CHI-13.20-R1-U38-P22, patch: chi-cb-36, unit: AG-000083, unit_port: lan-1 } }  # 13.04 Cormorant, touch controller
+      - { port: 23, state: parked, far: { run: CHI-13.20-R1-U38-P23, patch: chi-cb-36 } }  # 13.04 Cormorant, data/below-table#2, nothing plugged in
+      - { port: 24, state: active, mode: access, native: 30, far: { run: CHI-13.20-R1-U38-P24, patch: chi-cb-36, unit: AG-000089, unit_port: lan-1 } }  # 13.04 Cormorant, scheduler panel
+      - { port: 25, state: active, mode: access, native: 31, far: { run: CHI-13.20-R1-U38-P25, patch: chi-cb-36, unit: AG-000090, unit_port: lan-1 } }  # 13.05 Wren, display
+      - { port: 26, state: parked, far: { run: CHI-13.20-R1-U38-P26, patch: chi-cb-36 } }  # 13.05 Wren, data/behind-display#3, nothing plugged in
+      - { port: 27, state: active, mode: access, native: 30, far: { run: CHI-13.20-R1-U38-P27, patch: chi-cb-36, unit: AG-000092, unit_port: lan-1 } }  # 13.05 Wren, touch controller
+      - { port: 28, state: parked, far: { run: CHI-13.20-R1-U38-P28, patch: chi-cb-36 } }  # 13.05 Wren, data/wall-below-table#2, nothing plugged in
+      - { port: 29, state: active, mode: access, native: 30, far: { run: CHI-13.20-R1-U38-P29, patch: chi-cb-36, unit: AG-000095, unit_port: lan-1 } }  # 13.05 Wren, scheduler panel
+      - { port: 30, state: active, mode: access, native: 31, far: { run: CHI-13.20-R1-U38-P30, patch: chi-cb-36, unit: AG-000096, unit_port: lan-1 } }  # 13.06 Robin, display
+      - { port: 31, state: parked, far: { run: CHI-13.20-R1-U38-P31, patch: chi-cb-36 } }  # 13.06 Robin, data/behind-display#3, nothing plugged in
+      - { port: 32, state: active, mode: access, native: 30, far: { run: CHI-13.20-R1-U38-P32, patch: chi-cb-36, unit: AG-000098, unit_port: lan-1 } }  # 13.06 Robin, touch controller
+      - { port: 33, state: parked, far: { run: CHI-13.20-R1-U38-P33, patch: chi-cb-36 } }  # 13.06 Robin, data/wall-below-table#2, nothing plugged in
+      - { port: 34, state: parked, far: { run: CHI-13.20-R1-U38-P34, patch: chi-cb-36 } }  # 13.06 Robin, data/room-entrance#1, nothing plugged in
+      - { port: 35, state: active, mode: access, native: 31, far: { run: CHI-13.20-R1-U38-P35, patch: chi-cb-36, unit: AG-000101, unit_port: lan-1 } }  # 13.07 Goldcrest, display
+      - { port: 36, state: parked, far: { run: CHI-13.20-R1-U38-P36, patch: chi-cb-36 } }  # 13.07 Goldcrest, data/behind-display#3, nothing plugged in
+      - { port: 37, state: active, mode: access, native: 31, far: { run: CHI-13.20-R1-U38-P37, patch: chi-cb-36, unit: AG-000103, unit_port: lan-1 } }  # 13.08 Stonechat, display
+      - { port: 38, state: parked, far: { run: CHI-13.20-R1-U38-P38, patch: chi-cb-36 } }  # 13.08 Stonechat, data/behind-display#3, nothing plugged in
+      - { port: 39, state: active, mode: access, native: 30, far: { run: CHI-13.20-R1-U38-P39, patch: chi-cb-36, unit: AG-000106, unit_port: lan-1 } }  # 13.09 Goldfinch, video bar
+      - { port: 40, state: active, mode: access, native: 31, far: { run: CHI-13.20-R1-U38-P40, patch: chi-cb-36, unit: AG-000105, unit_port: lan-1 } }  # 13.09 Goldfinch, display
+      - { port: 41, state: parked, far: { run: CHI-13.20-R1-U38-P41, patch: chi-cb-36 } }  # 13.09 Goldfinch, data/behind-display#3, nothing plugged in
+      - { port: 42, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U38-P42, patch: chi-cb-36, unit: AG-000107, unit_port: lan-1 } }  # 13.10 Focus 13.10, monitor
+      - { port: 43, state: parked, far: { run: CHI-13.20-R1-U38-P43, patch: chi-cb-36 } }  # 13.10 Focus 13.10, data/table-top#2, nothing plugged in
+      - { port: 44, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U38-P44, patch: chi-cb-36, unit: AG-000108, unit_port: lan-1 } }  # 13.11 Focus 13.11, monitor
+      - { port: 45, state: parked, far: { run: CHI-13.20-R1-U38-P45, patch: chi-cb-36 } }  # 13.11 Focus 13.11, data/table-top#2, nothing plugged in
+      - { port: 46, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U38-P46, patch: chi-cb-36, unit: AG-000109, unit_port: lan-1 } }  # 13.12 Focus 13.12, monitor
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1211-cs01, port: 5, run: CHI-12.11-R1-U12-P01, patches: [chi-cb-41, chi-cb-25] } }  # trunk to chi-1211-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1211-cs01, port: 6, run: CHI-12.11-R1-U12-P01, patches: [chi-cb-41, chi-cb-25] } }  # trunk to chi-1211-cs01
+    disabled: "47-48"
+  # Access switch 2 · 13.20 Comms room (IDF), Rack 1, U33
+  - id: chi-1320-as02
+    rack: chi-13-20-r1
+    u: 33
+    platform: meraki
+    ports:
+      - { port: 1, state: parked, far: { run: CHI-13.20-R1-U34-P01, patch: chi-cb-37 } }  # 13.12 Focus 13.12, data/table-top#2, nothing plugged in
+      - { port: 2, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U34-P02, patch: chi-cb-37, unit: AG-000110, unit_port: lan-1 } }  # 13.13 Office 13.13, monitor
+      - { port: 3, state: parked, far: { run: CHI-13.20-R1-U34-P03, patch: chi-cb-37 } }  # 13.13 Office 13.13, data/wall-below-table#2, nothing plugged in
+      - { port: 4, state: active, mode: access, native: 30, far: { run: CHI-13.20-R1-U34-P04, patch: chi-cb-37, unit: AG-000111, unit_port: lan-1 } }  # 13.13 Office 13.13, scheduler panel
+      - { port: 5, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U34-P05, patch: chi-cb-37, unit: AG-000112, unit_port: lan-1 } }  # 13.14 Office 13.14, monitor
+      - { port: 6, state: parked, far: { run: CHI-13.20-R1-U34-P06, patch: chi-cb-37 } }  # 13.14 Office 13.14, data/wall-below-table#2, nothing plugged in
+      - { port: 7, state: parked, far: { run: CHI-13.20-R1-U34-P07, patch: chi-cb-37 } }  # 13.14 Office 13.14, data/room-entrance#1, nothing plugged in
+      - { port: 8, state: active, mode: access, native: 31, far: { run: CHI-13.20-R1-U34-P08, patch: chi-cb-37, unit: AG-001449, unit_port: lan-1 } }  # 13.15 Pantry, display
+      - { port: 9, state: active, mode: access, native: 31, far: { run: CHI-13.20-R1-U34-P09, patch: chi-cb-37, unit: AG-001450, unit_port: lan-1 } }  # 13.15 Pantry, signage player
+      - { port: 10, state: parked, far: { run: CHI-13.20-R1-U34-P10, patch: chi-cb-37 } }  # 13.15 Pantry, data/behind-display#3, nothing plugged in
+      - { port: 11, state: parked, far: { run: CHI-13.20-R1-U34-P11, patch: chi-cb-37 } }  # 13.15 Pantry, data/tbd#1, nothing plugged in
+      - { port: 12, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U34-P12, patch: chi-cb-37, unit: AG-000115, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 01, monitor
+      - { port: 13, state: parked, far: { run: CHI-13.20-R1-U34-P13, patch: chi-cb-37 } }  # 13.16 Flex desks A, desk-01/data/table-top#2, nothing plugged in
+      - { port: 14, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U34-P14, patch: chi-cb-37, unit: AG-000116, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 02, monitor
+      - { port: 15, state: parked, far: { run: CHI-13.20-R1-U34-P15, patch: chi-cb-37 } }  # 13.16 Flex desks A, desk-02/data/table-top#2, nothing plugged in
+      - { port: 16, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U34-P16, patch: chi-cb-37, unit: AG-000117, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 03, monitor
+      - { port: 17, state: parked, far: { run: CHI-13.20-R1-U34-P17, patch: chi-cb-37 } }  # 13.16 Flex desks A, desk-03/data/table-top#2, nothing plugged in
+      - { port: 18, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U34-P18, patch: chi-cb-37, unit: AG-000118, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 04, monitor
+      - { port: 19, state: parked, far: { run: CHI-13.20-R1-U34-P19, patch: chi-cb-37 } }  # 13.16 Flex desks A, desk-04/data/table-top#2, nothing plugged in
+      - { port: 20, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U34-P20, patch: chi-cb-37, unit: AG-000119, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 05, monitor
+      - { port: 21, state: parked, far: { run: CHI-13.20-R1-U34-P21, patch: chi-cb-37 } }  # 13.16 Flex desks A, desk-05/data/table-top#2, nothing plugged in
+      - { port: 22, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U34-P22, patch: chi-cb-37, unit: AG-000120, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 06, monitor
+      - { port: 23, state: parked, far: { run: CHI-13.20-R1-U34-P23, patch: chi-cb-37 } }  # 13.16 Flex desks A, desk-06/data/table-top#2, nothing plugged in
+      - { port: 24, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U34-P24, patch: chi-cb-37, unit: AG-000121, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 07, monitor
+      - { port: 25, state: parked, far: { run: CHI-13.20-R1-U34-P25, patch: chi-cb-37 } }  # 13.16 Flex desks A, desk-07/data/table-top#2, nothing plugged in
+      - { port: 26, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U34-P26, patch: chi-cb-37, unit: AG-000122, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 08, monitor
+      - { port: 27, state: parked, far: { run: CHI-13.20-R1-U34-P27, patch: chi-cb-37 } }  # 13.16 Flex desks A, desk-08/data/table-top#2, nothing plugged in
+      - { port: 28, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U34-P28, patch: chi-cb-37, unit: AG-000123, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 09, monitor
+      - { port: 29, state: parked, far: { run: CHI-13.20-R1-U34-P29, patch: chi-cb-37 } }  # 13.16 Flex desks A, desk-09/data/table-top#2, nothing plugged in
+      - { port: 30, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U34-P30, patch: chi-cb-37, unit: AG-000124, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 10, monitor
+      - { port: 31, state: parked, far: { run: CHI-13.20-R1-U34-P31, patch: chi-cb-37 } }  # 13.16 Flex desks A, desk-10/data/table-top#2, nothing plugged in
+      - { port: 32, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U34-P32, patch: chi-cb-37, unit: AG-000125, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 11, monitor
+      - { port: 33, state: parked, far: { run: CHI-13.20-R1-U34-P33, patch: chi-cb-37 } }  # 13.16 Flex desks A, desk-11/data/table-top#2, nothing plugged in
+      - { port: 34, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U34-P34, patch: chi-cb-37, unit: AG-000126, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 12, monitor
+      - { port: 35, state: parked, far: { run: CHI-13.20-R1-U34-P35, patch: chi-cb-37 } }  # 13.16 Flex desks A, desk-12/data/table-top#2, nothing plugged in
+      - { port: 36, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U34-P36, patch: chi-cb-37, unit: AG-000127, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 13, monitor
+      - { port: 37, state: parked, far: { run: CHI-13.20-R1-U34-P37, patch: chi-cb-37 } }  # 13.16 Flex desks A, desk-13/data/table-top#2, nothing plugged in
+      - { port: 38, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U34-P38, patch: chi-cb-37, unit: AG-000128, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 14, monitor
+      - { port: 39, state: parked, far: { run: CHI-13.20-R1-U34-P39, patch: chi-cb-37 } }  # 13.16 Flex desks A, desk-14/data/table-top#2, nothing plugged in
+      - { port: 40, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U34-P40, patch: chi-cb-37, unit: AG-000129, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 15, monitor
+      - { port: 41, state: parked, far: { run: CHI-13.20-R1-U34-P41, patch: chi-cb-37 } }  # 13.16 Flex desks A, desk-15/data/table-top#2, nothing plugged in
+      - { port: 42, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U34-P42, patch: chi-cb-37, unit: AG-000130, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 16, monitor
+      - { port: 43, state: parked, far: { run: CHI-13.20-R1-U34-P43, patch: chi-cb-37 } }  # 13.16 Flex desks A, desk-16/data/table-top#2, nothing plugged in
+      - { port: 44, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U34-P44, patch: chi-cb-37, unit: AG-000131, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 17, monitor
+      - { port: 45, state: parked, far: { run: CHI-13.20-R1-U34-P45, patch: chi-cb-37 } }  # 13.16 Flex desks A, desk-17/data/table-top#2, nothing plugged in
+      - { port: 47, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { rack: chi-13-20-r1, u: 22, patch: chi-cb-45 } }  # AV switch on a shelf
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1211-cs02, port: 5, run: CHI-12.11-R1-U12-P01, patches: [chi-cb-42, chi-cb-26] } }  # trunk to chi-1211-cs02
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1211-cs02, port: 6, run: CHI-12.11-R1-U12-P01, patches: [chi-cb-42, chi-cb-26] } }  # trunk to chi-1211-cs02
+    disabled: "46,48"
+  # Access switch 3 · 13.20 Comms room (IDF), Rack 1, U29
+  - id: chi-1320-as03
+    rack: chi-13-20-r1
+    u: 29
+    platform: meraki
+    ports:
+      - { port: 1, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U30-P01, patch: chi-cb-38, unit: AG-000132, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 18, monitor
+      - { port: 2, state: parked, far: { run: CHI-13.20-R1-U30-P02, patch: chi-cb-38 } }  # 13.16 Flex desks A, desk-18/data/table-top#2, nothing plugged in
+      - { port: 3, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U30-P03, patch: chi-cb-38, unit: AG-000133, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 19, monitor
+      - { port: 4, state: parked, far: { run: CHI-13.20-R1-U30-P04, patch: chi-cb-38 } }  # 13.16 Flex desks A, desk-19/data/table-top#2, nothing plugged in
+      - { port: 5, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U30-P05, patch: chi-cb-38, unit: AG-000134, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 20, monitor
+      - { port: 6, state: parked, far: { run: CHI-13.20-R1-U30-P06, patch: chi-cb-38 } }  # 13.16 Flex desks A, desk-20/data/table-top#2, nothing plugged in
+      - { port: 7, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U30-P07, patch: chi-cb-38, unit: AG-000135, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 21, monitor
+      - { port: 8, state: parked, far: { run: CHI-13.20-R1-U30-P08, patch: chi-cb-38 } }  # 13.16 Flex desks A, desk-21/data/table-top#2, nothing plugged in
+      - { port: 9, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U30-P09, patch: chi-cb-38, unit: AG-000136, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 22, monitor
+      - { port: 10, state: parked, far: { run: CHI-13.20-R1-U30-P10, patch: chi-cb-38 } }  # 13.16 Flex desks A, desk-22/data/table-top#2, nothing plugged in
+      - { port: 11, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U30-P11, patch: chi-cb-38, unit: AG-000137, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 23, monitor
+      - { port: 12, state: parked, far: { run: CHI-13.20-R1-U30-P12, patch: chi-cb-38 } }  # 13.16 Flex desks A, desk-23/data/table-top#2, nothing plugged in
+      - { port: 13, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U30-P13, patch: chi-cb-38, unit: AG-000138, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 24, monitor
+      - { port: 14, state: parked, far: { run: CHI-13.20-R1-U30-P14, patch: chi-cb-38 } }  # 13.16 Flex desks A, desk-24/data/table-top#2, nothing plugged in
+      - { port: 15, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U30-P15, patch: chi-cb-38, unit: AG-000139, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 25, monitor
+      - { port: 16, state: parked, far: { run: CHI-13.20-R1-U30-P16, patch: chi-cb-38 } }  # 13.16 Flex desks A, desk-25/data/table-top#2, nothing plugged in
+      - { port: 17, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U30-P17, patch: chi-cb-38, unit: AG-000140, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 26, monitor
+      - { port: 18, state: parked, far: { run: CHI-13.20-R1-U30-P18, patch: chi-cb-38 } }  # 13.16 Flex desks A, desk-26/data/table-top#2, nothing plugged in
+      - { port: 19, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U30-P19, patch: chi-cb-38, unit: AG-000141, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 27, monitor
+      - { port: 20, state: parked, far: { run: CHI-13.20-R1-U30-P20, patch: chi-cb-38 } }  # 13.16 Flex desks A, desk-27/data/table-top#2, nothing plugged in
+      - { port: 21, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U30-P21, patch: chi-cb-38, unit: AG-000142, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 28, monitor
+      - { port: 22, state: parked, far: { run: CHI-13.20-R1-U30-P22, patch: chi-cb-38 } }  # 13.16 Flex desks A, desk-28/data/table-top#2, nothing plugged in
+      - { port: 23, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U30-P23, patch: chi-cb-38, unit: AG-000143, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 29, monitor
+      - { port: 24, state: parked, far: { run: CHI-13.20-R1-U30-P24, patch: chi-cb-38 } }  # 13.16 Flex desks A, desk-29/data/table-top#2, nothing plugged in
+      - { port: 25, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U30-P25, patch: chi-cb-38, unit: AG-000144, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 30, monitor
+      - { port: 26, state: parked, far: { run: CHI-13.20-R1-U30-P26, patch: chi-cb-38 } }  # 13.16 Flex desks A, desk-30/data/table-top#2, nothing plugged in
+      - { port: 27, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U30-P27, patch: chi-cb-38, unit: AG-000145, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 31, monitor
+      - { port: 28, state: parked, far: { run: CHI-13.20-R1-U30-P28, patch: chi-cb-38 } }  # 13.16 Flex desks A, desk-31/data/table-top#2, nothing plugged in
+      - { port: 29, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U30-P29, patch: chi-cb-38, unit: AG-000146, unit_port: lan-1 } }  # 13.16 Flex desks A, desk 32, monitor
+      - { port: 30, state: parked, far: { run: CHI-13.20-R1-U30-P30, patch: chi-cb-38 } }  # 13.16 Flex desks A, desk-32/data/table-top#2, nothing plugged in
+      - { port: 31, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U30-P31, patch: chi-cb-38, unit: AG-000147, unit_port: lan-1 } }  # 13.17 Flex desks B, desk 01, monitor
+      - { port: 32, state: parked, far: { run: CHI-13.20-R1-U30-P32, patch: chi-cb-38 } }  # 13.17 Flex desks B, desk-01/data/table-top#2, nothing plugged in
+      - { port: 33, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U30-P33, patch: chi-cb-38, unit: AG-000148, unit_port: lan-1 } }  # 13.17 Flex desks B, desk 02, monitor
+      - { port: 34, state: parked, far: { run: CHI-13.20-R1-U30-P34, patch: chi-cb-38 } }  # 13.17 Flex desks B, desk-02/data/table-top#2, nothing plugged in
+      - { port: 35, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U30-P35, patch: chi-cb-38, unit: AG-000149, unit_port: lan-1 } }  # 13.17 Flex desks B, desk 03, monitor
+      - { port: 36, state: parked, far: { run: CHI-13.20-R1-U30-P36, patch: chi-cb-38 } }  # 13.17 Flex desks B, desk-03/data/table-top#2, nothing plugged in
+      - { port: 37, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U30-P37, patch: chi-cb-38, unit: AG-000150, unit_port: lan-1 } }  # 13.17 Flex desks B, desk 04, monitor
+      - { port: 38, state: parked, far: { run: CHI-13.20-R1-U30-P38, patch: chi-cb-38 } }  # 13.17 Flex desks B, desk-04/data/table-top#2, nothing plugged in
+      - { port: 39, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U30-P39, patch: chi-cb-38, unit: AG-000151, unit_port: lan-1 } }  # 13.17 Flex desks B, desk 05, monitor
+      - { port: 40, state: parked, far: { run: CHI-13.20-R1-U30-P40, patch: chi-cb-38 } }  # 13.17 Flex desks B, desk-05/data/table-top#2, nothing plugged in
+      - { port: 41, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U30-P41, patch: chi-cb-38, unit: AG-000152, unit_port: lan-1 } }  # 13.17 Flex desks B, desk 06, monitor
+      - { port: 42, state: parked, far: { run: CHI-13.20-R1-U30-P42, patch: chi-cb-38 } }  # 13.17 Flex desks B, desk-06/data/table-top#2, nothing plugged in
+      - { port: 43, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U30-P43, patch: chi-cb-38, unit: AG-000153, unit_port: lan-1 } }  # 13.17 Flex desks B, desk 07, monitor
+      - { port: 44, state: parked, far: { run: CHI-13.20-R1-U30-P44, patch: chi-cb-38 } }  # 13.17 Flex desks B, desk-07/data/table-top#2, nothing plugged in
+      - { port: 45, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U30-P45, patch: chi-cb-38, unit: AG-000154, unit_port: lan-1 } }  # 13.17 Flex desks B, desk 08, monitor
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1211-cs01, port: 7, run: CHI-12.11-R1-U12-P01, patches: [chi-cb-43, chi-cb-27] } }  # trunk to chi-1211-cs01
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1211-cs01, port: 8, run: CHI-12.11-R1-U12-P01, patches: [chi-cb-43, chi-cb-27] } }  # trunk to chi-1211-cs01
+    disabled: "46-48"
+  # Access switch 4 · 13.20 Comms room (IDF), Rack 1, U25
+  - id: chi-1320-as04
+    rack: chi-13-20-r1
+    u: 25
+    platform: meraki
+    ports:
+      - { port: 1, state: parked, far: { run: CHI-13.20-R1-U26-P01, patch: chi-cb-39 } }  # 13.17 Flex desks B, desk-08/data/table-top#2, nothing plugged in
+      - { port: 2, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U26-P02, patch: chi-cb-39, unit: AG-000156, unit_port: lan-1 } }  # 13.18 Flex desks C, desk 01, network adapter
+      - { port: 3, state: parked, far: { run: CHI-13.20-R1-U26-P03, patch: chi-cb-39 } }  # 13.18 Flex desks C, desk-01/data/table-top#2, nothing plugged in
+      - { port: 4, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U26-P04, patch: chi-cb-39, unit: AG-000158, unit_port: lan-1 } }  # 13.18 Flex desks C, desk 02, network adapter
+      - { port: 5, state: parked, far: { run: CHI-13.20-R1-U26-P05, patch: chi-cb-39 } }  # 13.18 Flex desks C, desk-02/data/table-top#2, nothing plugged in
+      - { port: 6, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U26-P06, patch: chi-cb-39, unit: AG-000160, unit_port: lan-1 } }  # 13.18 Flex desks C, desk 03, network adapter
+      - { port: 7, state: parked, far: { run: CHI-13.20-R1-U26-P07, patch: chi-cb-39 } }  # 13.18 Flex desks C, desk-03/data/table-top#2, nothing plugged in
+      - { port: 8, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U26-P08, patch: chi-cb-39, unit: AG-000162, unit_port: lan-1 } }  # 13.18 Flex desks C, desk 04, network adapter
+      - { port: 9, state: parked, far: { run: CHI-13.20-R1-U26-P09, patch: chi-cb-39 } }  # 13.18 Flex desks C, desk-04/data/table-top#2, nothing plugged in
+      - { port: 10, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U26-P10, patch: chi-cb-39, unit: AG-000164, unit_port: lan-1 } }  # 13.18 Flex desks C, desk 05, network adapter
+      - { port: 11, state: parked, far: { run: CHI-13.20-R1-U26-P11, patch: chi-cb-39 } }  # 13.18 Flex desks C, desk-05/data/table-top#2, nothing plugged in
+      - { port: 12, state: active, mode: access, native: 20, far: { run: CHI-13.20-R1-U26-P12, patch: chi-cb-39, unit: AG-000166, unit_port: lan-1 } }  # 13.18 Flex desks C, desk 06, network adapter
+      - { port: 13, state: parked, far: { run: CHI-13.20-R1-U26-P13, patch: chi-cb-39 } }  # 13.18 Flex desks C, desk-06/data/table-top#2, nothing plugged in
+      - { port: 14, state: parked, far: { run: CHI-13.20-R1-U26-P14, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-01/data/table-top#1, nothing plugged in
+      - { port: 15, state: parked, far: { run: CHI-13.20-R1-U26-P15, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-01/data/table-top#2, nothing plugged in
+      - { port: 16, state: parked, far: { run: CHI-13.20-R1-U26-P16, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-02/data/table-top#1, nothing plugged in
+      - { port: 17, state: parked, far: { run: CHI-13.20-R1-U26-P17, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-02/data/table-top#2, nothing plugged in
+      - { port: 18, state: parked, far: { run: CHI-13.20-R1-U26-P18, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-03/data/table-top#1, nothing plugged in
+      - { port: 19, state: parked, far: { run: CHI-13.20-R1-U26-P19, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-03/data/table-top#2, nothing plugged in
+      - { port: 20, state: parked, far: { run: CHI-13.20-R1-U26-P20, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-04/data/table-top#1, nothing plugged in
+      - { port: 21, state: parked, far: { run: CHI-13.20-R1-U26-P21, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-04/data/table-top#2, nothing plugged in
+      - { port: 22, state: parked, far: { run: CHI-13.20-R1-U26-P22, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-05/data/table-top#1, nothing plugged in
+      - { port: 23, state: parked, far: { run: CHI-13.20-R1-U26-P23, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-05/data/table-top#2, nothing plugged in
+      - { port: 24, state: parked, far: { run: CHI-13.20-R1-U26-P24, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-06/data/table-top#1, nothing plugged in
+      - { port: 25, state: parked, far: { run: CHI-13.20-R1-U26-P25, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-06/data/table-top#2, nothing plugged in
+      - { port: 26, state: parked, far: { run: CHI-13.20-R1-U26-P26, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-07/data/table-top#1, nothing plugged in
+      - { port: 27, state: parked, far: { run: CHI-13.20-R1-U26-P27, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-07/data/table-top#2, nothing plugged in
+      - { port: 28, state: parked, far: { run: CHI-13.20-R1-U26-P28, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-08/data/table-top#1, nothing plugged in
+      - { port: 29, state: parked, far: { run: CHI-13.20-R1-U26-P29, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-08/data/table-top#2, nothing plugged in
+      - { port: 30, state: parked, far: { run: CHI-13.20-R1-U26-P30, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-09/data/table-top#1, nothing plugged in
+      - { port: 31, state: parked, far: { run: CHI-13.20-R1-U26-P31, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-09/data/table-top#2, nothing plugged in
+      - { port: 32, state: parked, far: { run: CHI-13.20-R1-U26-P32, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-10/data/table-top#1, nothing plugged in
+      - { port: 33, state: parked, far: { run: CHI-13.20-R1-U26-P33, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-10/data/table-top#2, nothing plugged in
+      - { port: 34, state: parked, far: { run: CHI-13.20-R1-U26-P34, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-11/data/table-top#1, nothing plugged in
+      - { port: 35, state: parked, far: { run: CHI-13.20-R1-U26-P35, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-11/data/table-top#2, nothing plugged in
+      - { port: 36, state: parked, far: { run: CHI-13.20-R1-U26-P36, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-12/data/table-top#1, nothing plugged in
+      - { port: 37, state: parked, far: { run: CHI-13.20-R1-U26-P37, patch: chi-cb-39 } }  # 13.19 Assigned desks D, desk-12/data/table-top#2, nothing plugged in
+      - { port: 38, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: CHI-13.20-R1-U26-P38, patch: chi-cb-39, unit: AG-003256, unit_port: lan-1 } }  # access point chi-13-ap01
+      - { port: 39, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: CHI-13.20-R1-U26-P39, patch: chi-cb-39, unit: AG-003257, unit_port: lan-1 } }  # access point chi-13-ap02
+      - { port: 40, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: CHI-13.20-R1-U26-P40, patch: chi-cb-39, unit: AG-003258, unit_port: lan-1 } }  # access point chi-13-ap03
+      - { port: 41, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: CHI-13.20-R1-U26-P41, patch: chi-cb-39, unit: AG-003259, unit_port: lan-1 } }  # access point chi-13-ap04
+      - { port: 42, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: CHI-13.20-R1-U26-P42, patch: chi-cb-39, unit: AG-003260, unit_port: lan-1 } }  # access point chi-13-ap05
+      - { port: 43, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: CHI-13.20-R1-U26-P43, patch: chi-cb-39, unit: AG-003261, unit_port: lan-1 } }  # access point chi-13-ap06
+      - { port: 44, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: CHI-13.20-R1-U26-P44, patch: chi-cb-39, unit: AG-003262, unit_port: lan-1 } }  # access point chi-13-ap07
+      - { port: 45, state: active, mode: trunk, native: 10, tagged: [20, 90], far: { run: CHI-13.20-R1-U26-P45, patch: chi-cb-39, unit: AG-003263, unit_port: lan-1 } }  # access point chi-13-ap08
+      - { port: 49, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1211-cs02, port: 7, run: CHI-12.11-R1-U12-P01, patches: [chi-cb-44, chi-cb-28] } }  # trunk to chi-1211-cs02
+      - { port: 50, state: active, mode: trunk, native: 10, tagged: [20, 30, 31, 50, 60, 70, 90], far: { switch: chi-1211-cs02, port: 8, run: CHI-12.11-R1-U12-P01, patches: [chi-cb-44, chi-cb-28] } }  # trunk to chi-1211-cs02
+    disabled: "46-48"
+  # Barn Owl, network switch · 12.08 Barn Owl
+  - id: chi-1208-sw01
+    space: chi-12-08
+    position: network-switch
+    platform: netgear
+    ports:
+      - { port: lan-1, state: active, mode: access, native: 40, far: { unit: AG-000042, unit_port: lan-2 } }  # video bar, AV network in the room
+      - { port: lan-2, state: active, mode: access, native: 30, far: { unit: AG-000047, unit_port: lan-1 } }  # switcher
+      - { port: lan-9, state: active, mode: trunk, native: 10, tagged: [30], far: { switch: chi-1211-as02, port: 16 } }  # uplink to chi-1211-as02 port 16
+    disabled: [lan-3, lan-4, lan-5, lan-6, lan-7, lan-8, sfp-1, lan-10]
+demo: true
