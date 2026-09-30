@@ -25,6 +25,8 @@ Thank you for looking. Keia Atlas is Apache 2.0, Copyright Red Hat, Inc., create
    CI runs the same three in this order. The tests that read the built pages are skipped if `dist/` does not exist yet, so build first to run them all.
 
    For a page: check it at 375, 768, 1024, 1280, 1440 and 1920 wide (`node tools/responsive-check.mjs`), in light and dark, and with reduced motion on.
+
+   For glitches inside a page (a label spilling out of its box, a cut-off name, overlapping avatars, an icon off its line, console errors, broken links) at three widths and three text sizes: build, run `npx astro preview --port 4499`, then `npm run glitch` (add `--quick` for a short run); it writes a ranked report to `../notes/audit/`.
 5. **Open a pull request** that says what changed and why, with a screenshot for anything visual. The template asks for a short checklist. Small, complete pull requests are merged faster than large ones.
 6. **Add a line to the changelog** under `Unreleased` in [CHANGELOG.md](CHANGELOG.md) if people will notice the change.
 

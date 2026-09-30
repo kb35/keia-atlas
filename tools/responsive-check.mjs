@@ -24,6 +24,7 @@
 import { existsSync, readdirSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { PAGES } from './check-pages.mjs';
 
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : d; };
@@ -34,79 +35,6 @@ const ONLY = opt('only', '');
 const SHOTS = opt('shots', '');
 const DARK = flag('dark');
 const WHO = opt('who', '');
-
-// The pages to check: every archetype, and the pages most often used at small sizes.
-const PAGES = [
-  ['home', '/'],
-  ['settings', '/settings/'],
-  ['settings-org', '/settings/organisation/'],
-  ['support', '/support/'],
-  ['work-list', '/work/list/'],
-  ['schedule-day', '/work/schedule/?view=day'],
-  ['schedule-week', '/work/schedule/?view=week'],
-  ['schedule-month', '/work/schedule/?view=month'],
-  ['schedule-year', '/work/schedule/?view=year'],
-  ['projects', '/projects/'],
-  ['project', '/projects/prj-09/'],
-  ['project-integrate', '/projects/prj-09/integrate/'],
-  ['deliver-type', '/projects/prj-14/integrate/?by=type'], ['deliver-room', '/projects/prj-14/integrate/?by=room'], ['deliver-floor', '/projects/prj-14/integrate/?by=floor'],
-  ['deliver-one', '/projects/prj-14/integrate/?by=one'], ['deliver-set', '/projects/prj-14/integrate/?by=set'],
-  ['task', '/projects/prj-09/tasks/t-0901/'],
-  ['incidents', '/incidents/'],
-  ['incident', '/incidents/inc0041121/'],
-  ['incident-known-issue', '/incidents/inc0041205/'],
-  ['known-issues', '/known-issues/'],
-  ['known-issue', '/known-issues/poly-tc10-restart/'],
-  ['office-3d', '/locations/dub/3d/'],
-  ['office-3d-plan', '/locations/dub/3d/?view=plan&sel=room:dub-3-05'],
-  ['maker-case', '/known-issues/cases/mc-001/'],
-  ['maker-case-new', '/known-issues/cases/new-poly-expansion-microphone--far-end-cannot-hear/'],
-  ['playbooks', '/playbooks/'],
-  ['playbook', '/playbooks/av-refresh/'],
-  ['refresh', '/refresh/'],
-  ['planning', '/work/planning/'],
-  ['planning-scenarios', '/work/planning/#scenarios'],
-  ['planning-capacity', '/work/planning/#capacity'],
-  ['lab', '/lab/'],
-  ['changes', '/changes/'],
-  ['edit', '/edit/'],
-  // Other places (owned by other helpers; checked with --all)
-  ['locations', '/locations/'], ['offices', '/locations/offices/'], ['region', '/locations/emea/'], ['office', '/locations/dub/'], ['office-plain', '/locations/lon/'], ['home-offices', '/locations/emea/home-offices/'],
-  ['services', '/services/'], ['service-av', '/services/av/'], ['service-network', '/services/network/'], ['service-infrastructure', '/services/infrastructure/'],
-  ['service-security', '/services/security/'], ['service-print', '/services/print/'], ['service-collaboration', '/services/collaboration/'], ['service-wifi', '/services/wifi/'],
-  ['service-events', '/services/events/'], ['event', '/services/events/evt-03/'], ['event-past', '/services/events/evt-01/'],
-  ['spares', '/spares/'], ['store', '/spares/dub/'],
-  ['assets', '/assets/', 'other'],
-  ['rooms', '/rooms/', 'other'],
-  ['room-profiles', '/room-profiles/', 'other'],
-  ['room-profile', '/room-profiles/conference-room-large/', 'other'],   // the size picker and the drawing beside its Key
-  ['devices', '/devices/', 'other'],
-  ['unit', '/device/?tag=AG-000028', 'other'],
-  ['profiles', '/profiles/', 'other'],
-  ['models', '/models/', 'other'],
-  ['model', '/models/poly-studio-x52/', 'other'], ['room', '/rooms/chi-12-01/', 'other'],
-  ['team', '/team/', 'other'],
-  ['vendors', '/vendors/', 'other'], ['vendor-record', '/vendors/keystone/', 'other'], ['vendors-access', '/vendors/access/', 'other'], ['vendor-job', '/vendor/jobs/inc0041214/', 'other'],
-  // Organisations and engagements (docs/service-providers.md): the client's side, and the provider's own (--who sam).
-  ['vendor-engagement', '/vendors/northlight/engagement/', 'other'],
-  ['portfolio', '/portfolio/', 'other'], ['portfolio-client', '/portfolio/aigna-northlight/', 'other'], ['portfolio-client-fw', '/portfolio/fenwater-northlight/', 'other'], ['portfolio-engagement', '/portfolio/aigna-northlight/engagement/', 'other'],
-  // A provider's sales (--who sam): the pipeline, a design, its quote, the statement of work and the handoff.
-  ['sales', '/portfolio/sales/', 'other'], ['sales-design', '/portfolio/sales/opp-2611/', 'other'], ['sales-quote', '/portfolio/sales/opp-2611/quote/', 'other'], ['sales-sow', '/portfolio/sales/opp-2611/sow/', 'other'], ['sales-accept', '/portfolio/sales/opp-2611/accept/', 'other'], ['sales-accepted', '/portfolio/sales/opp-2602/accept/', 'other'], ['sales-design-fw', '/portfolio/sales/opp-2613/', 'other'],
-  // A provider's operations (src/lib/provider-ops.mjs), as Sam Okafor (--who sam).
-  ['ops-stock', '/portfolio/ops/', 'other'], ['ops-orders', '/portfolio/ops/orders/', 'other'], ['ops-crews', '/portfolio/ops/crews/', 'other'], ['ops-visits', '/portfolio/ops/visits/', 'other'], ['ops-rams', '/portfolio/ops/rams/', 'other'], ['ops-rams-doc', '/portfolio/ops/rams/nl-2318/', 'other'], ['ops-handover', '/portfolio/ops/handover/', 'other'], ['ops-handover-doc', '/portfolio/ops/handover/ho-nl-2240/', 'other'],
-  ['usage', '/usage/', 'other'],
-  ['learn', '/learn/', 'other'],
-  // The capabilities (src/lib/modules.mjs): their own pages, and the space and unit pages that carry their cards
-  ['cap-licences', '/assets/licences/'], ['cap-checks', '/work/checks/'], ['cap-alerts', '/support/alerts/'], ['cap-alert', '/support/alerts/ar-01/'],
-  ['cap-certificates', '/assets/certificates/'], ['cap-flaws', '/assets/security-flaws/'], ['cap-backups', '/assets/config-backups/'], ['cap-quality', '/usage/quality/'],
-  ['cap-out-of-service', '/rooms/dub-4-01/'], ['cap-upkeep', '/rooms/nyc-20-05/'], ['cap-unit', '/device/?tag=AG-000335'],
-  // The front door and the method pages
-  ['welcome', '/welcome/'],
-  ['method', '/method/'], ['method-building', '/method/start-from-the-building/'], ['method-capture', '/method/capture-dont-ask/'],
-  ['method-answer', '/method/answer-first/'], ['method-own', '/method/own-it-hand-it-on/'], ['method-learn', '/method/learn-as-you-go/'],
-  ['method-problems', '/method/problems/'], ['method-modules', '/method/modules/'], ['method-work', '/method/how-the-work-gets-done/'],
-  ['method-trust', '/method/trust/'], ['method-words', '/method/words/'],
-];
 
 async function loadPlaywright() {
   const tries = [];
