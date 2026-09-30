@@ -1,0 +1,246 @@
+---
+/* GuideReport: the two-tap report on the room guide (UI-V2 §8.12, UX-V2 flow 4.6).
+   Three views in one place, and the page never leaves:
+     start   two big buttons: Something not working (tap 1) and Request something
+     list    the buttons become the symptoms this room's kit can have; one tap sends (tap 2)
+     sent    the status, read back in plain words (PEOPLE-SCAN principle 7): who has it, when it is expected,
+             the steps so far, then "Did it work for you?". Below it, what the report filled in, and two
+             optional extras (a note, a way to be told). No field is required at any step.
+   The script is mountReport in src/lib/guide-client.mjs: it records the incident through the live layer, reads
+   its status back (from this window or a technician's), and moves between the views with the motion library
+   (the box eases to its new height; the With chip slides; reduced motion changes at once).
+   Without scripts, the first button is a link to the report page, which opens at the list. */
+import HealthGlyph from './HealthGlyph.astro';
+interface Sym { id: string; label: string; hint: string }
+interface Props {
+  room: Record<string, any>;
+  symptoms: Sym[];
+  reportHref: string;
+  requestHref: string;
+  back?: string;              // on the report page: where "Back" goes when the list is the page
+  open?: boolean;             // start at the list (the report page)
+  known?: string | null;      // what we already know, one line, shown above the list
+}
+const { room, symptoms, reportHref, requestHref, back, open = false, known = null } = Astro.props;
+const owner = room.owner;
+const ICON: Record<string, string> = {
+  picture: '<rect x="4" y="6" width="24" height="16" rx="2"/><path d="M12 27h8M16 22v5"/>',
+  sound: '<path d="M5 12h5l7-6v20l-7-6H5z"/><path d="M22 12.5l6 7M28 12.5l-6 7"/>',
+  camera: '<path d="M4 10h5l2-3h10l2 3h5v15H4z"/><circle cx="16" cy="17" r="5"/>',
+  join: '<rect x="3" y="9" width="18" height="14" rx="3"/><path d="M21 14l8-4v12l-8-4"/>',
+  panel: '<rect x="5" y="9" width="22" height="15" rx="3"/><path d="M11 29h10"/><path d="M14 16.5l2 2 3.5-4"/>',
+  booking: '<rect x="8" y="4" width="16" height="24" rx="3"/><path d="M12 10h8M12 14h8M12 18h5"/>',
+  other: '<circle cx="16" cy="16" r="12"/><path d="M12.5 12.5a3.5 3.5 0 1 1 5 3.2c-1 .5-1.5 1.2-1.5 2.3"/><path d="M16 22.5v.3"/>',
+};
+const data = { room, symptoms: symptoms.map((s) => ({ id: s.id, label: s.label })) };
+---
+<section class="gr" data-guide-report data-view={open ? 'list' : 'start'} aria-label="Tell us about a problem">
+  <script type="application/json" set:html={JSON.stringify(data)}></script>
+
+  <div class="gr-view gr-start" data-gr-view="start" hidden={open}>
+    <a class="gr-act gr-bad" href={reportHref} data-gr-open data-help="guide.report">
+      <span class="gr-act-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" /><path d="M12 7.5v5.5M12 16.3v.2" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" /></svg></span>
+      <span><b>Something not working</b><small>Tell us in two taps</small></span>
+      <span class="gr-go" aria-hidden="true">→</span>
+    </a>
+    <a class="gr-act" href={requestHref} data-help="guide.request">
+      <span class="gr-act-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" /></svg></span>
+      <span><b>Request something</b><small>Help, a change, or home office kit</small></span>
+      <span class="gr-go" aria-hidden="true">→</span>
+    </a>
+  </div>
+
+  <div class="gr-view gr-list" data-gr-view="list" hidden={!open}>
+    <header class="gr-list-h">
+      <h2 tabindex="-1" data-gr-focus="list">What's not working?</h2>
+      <p>One tap sends it. We fill in the room for you.</p>
+    </header>
+    {known && <p class="gr-known"><b>We already know:</b> {known} You can still tell us about anything else.</p>}
+    <ul class="gr-syms" role="list" data-help="guide.symptoms">
+      {symptoms.map((s, i) => (
+        <li style={`--i:${i}`}>
+          <button type="button" class="gr-sym" data-symptom={s.id}>
+            <span class="gr-sym-ic" aria-hidden="true"><svg viewBox="0 0 32 32" set:html={ICON[s.id] ?? ICON.other} /></span>
+            <span class="gr-sym-t"><b>{s.label}</b><small>{s.hint}</small></span>
+            <span class="gr-go" aria-hidden="true">→</span>
+          </button>
+        </li>
+      ))}
+    </ul>
+    {back ? <a class="gr-back" href={back}><span aria-hidden="true">←</span> Back to the room</a> : <button type="button" class="gr-back" data-gr-back><span aria-hidden="true">←</span> Back</button>}
+    <noscript><p class="gr-small">This needs JavaScript. Tell the office team at reception instead.</p></noscript>
+  </div>
+
+  <div class="gr-view gr-sent" data-gr-view="sent" hidden aria-live="polite">
+    <div class="gr-status" data-help="guide.status">
+      <span class="gr-big" data-gr-glyph><HealthGlyph state="review" size={40} title="Reported" /></span>
+      <div class="gr-status-t">
+        <h2 tabindex="-1" data-gr-focus="sent" data-gr-head>Reported</h2>
+        <p data-gr-line></p>
+        {owner && (
+          <span class="km-chip gr-chip" data-gr-chip data-help="guide.with">
+            <span class="km-chip-body"><span class="km-chip-mark" data-kind="person">{owner.initials}</span><span class="km-chip-text">Ready for {owner.first}</span></span>
+          </span>
+        )}
+      </div>
+    </div>
+
+    <ol class="gr-steps" data-gr-steps data-help="guide.steps">
+      {['reported', 'with', 'fixed'].map((k) => (
+        <li data-step={k}><span data-step-glyph><HealthGlyph state="planned" size={24} /></span><span><b data-step-word></b><small data-step-at></small></span></li>
+      ))}
+    </ol>
+
+    <div class="gr-ask" data-gr-ask hidden>
+      <p><b>Did it work for you?</b></p>
+      <div class="gr-ask-b">
+        <button type="button" class="gr-yes" data-gr-answer="yes">Yes, it works</button>
+        <button type="button" class="gr-no" data-gr-answer="no">No, still not working</button>
+      </div>
+    </div>
+
+    <div class="gr-extra" data-help="guide.extra">
+      <details class="gr-opt" data-gr-opt="note">
+        <summary>Add a note <i>optional</i></summary>
+        <form class="gr-form" data-gr-save="note"><label><span class="sr-only">Your note</span><input type="text" name="v" maxlength="140" placeholder="For example: only the left screen" autocomplete="off" enterkeyhint="done" /></label><button type="submit" class="btn small">Add</button></form>
+      </details>
+      <details class="gr-opt" data-gr-opt="contact">
+        <summary>Tell me when it's fixed <i>optional</i></summary>
+        <form class="gr-form" data-gr-save="contact"><label><span class="sr-only">Email or phone</span><input type="text" name="v" maxlength="80" placeholder="Email or phone" autocomplete="email" inputmode="email" enterkeyhint="done" /></label><button type="submit" class="btn small">Save</button></form>
+        <p class="gr-small">Kept with this report only, in this browser (demo).</p>
+      </details>
+      <p class="gr-saved" data-gr-saved hidden></p>
+    </div>
+
+    <div class="gr-demo" data-gr-demo data-help="guide.demo">
+      <span class="sim-t is-sim">Simulated</span>
+      <span class="gr-demo-t" data-gr-demo-text>{owner ? `${owner.first} takes it in a few seconds.` : 'The team takes it in a few seconds.'}</span>
+      <button type="button" class="btn small ghost" data-gr-next>Next step</button>
+    </div>
+
+    <details class="gr-fields" open data-help="guide.sent">
+      <summary><b>What we sent</b><small data-gr-ref></small></summary>
+      <dl data-gr-fields></dl>
+      <p class="gr-small">Filled in from the QR code, the room's kit and the time. You typed nothing.</p>
+    </details>
+
+    <div class="gr-after">
+      <button type="button" class="btn ghost" data-gr-again>Report something else</button>
+    </div>
+  </div>
+</section>
+
+<style>
+  .gr { display: grid; }
+  .gr-view { display: grid; gap: 10px; }
+  .gr-view[hidden] { display: none; }
+
+  /* Start: the two big buttons (min 64 px, UI-V2 §8.12). The report is the one action, so it takes the accent. */
+  .gr-act { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 14px; align-items: center; min-height: 72px; padding: 14px 16px; border-radius: var(--radius-lg); background: var(--surface); border: var(--border-card); color: var(--text); text-decoration: none; -webkit-tap-highlight-color: transparent; transition: background-color var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle), transform var(--dur-press) var(--ease-settle); }
+  .gr-act:hover { color: var(--text); border-color: var(--line-strong); }
+  .gr-act:active, .gr-sym:active { transform: scale(var(--press-scale, .98)); }
+  .gr-act b, .gr-sym b { display: block; font: var(--fw-title) var(--g-fs-lead)/1.25 var(--font-display); }
+  .gr-act small, .gr-sym small { display: block; font-size: var(--g-fs-support); color: var(--text-2); margin-top: 2px; line-height: 1.35; }
+  .gr-act-ic { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); color: var(--text-2); }
+  .gr-act-ic svg { width: 24px; height: 24px; }
+  .gr-bad { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+  .gr-bad:hover { color: var(--on-ink); border-color: var(--ink); background: color-mix(in srgb, var(--ink) 90%, var(--accent)); }
+  .gr-bad small { color: color-mix(in srgb, var(--on-ink) 75%, transparent); }
+  .gr-bad .gr-act-ic { background: var(--accent); color: var(--on-accent); }
+  .gr-go { font-size: var(--g-fs-lead); color: var(--text-3); }
+  .gr-bad .gr-go { color: var(--on-ink); }
+
+  /* List: the symptoms, each one tap. They come in once, a stagger apart (M13). */
+  .gr-list-h h2 { font: var(--fw-title) var(--g-fs-h)/1.15 var(--font-display); outline: none; }
+  .gr-list-h p { margin: 4px 0 0; color: var(--text-2); font-size: var(--g-fs-support); }
+  .gr-known { margin: 0; padding: 10px 12px; border-radius: var(--radius); background: var(--h-progress-soft); font-size: var(--g-fs-support); line-height: 1.45; }
+  .gr-syms { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+  .gr-view:not([hidden]) .gr-syms li { animation: rise var(--dur-enter) var(--ease-settle) backwards; animation-delay: calc(var(--i) * var(--stagger)); }
+  .gr-sym { width: 100%; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 64px; padding: 10px 14px; text-align: left; border-radius: var(--radius-lg); border: var(--border-card); background: var(--surface); color: var(--text); font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background-color var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle), transform var(--dur-press) var(--ease-settle); }
+  .gr-sym b { font-size: var(--g-fs-body); }
+  @media (hover: hover) { .gr-sym:hover { background: var(--surface-2); border-color: var(--line-strong); } }
+  .gr-sym:focus-visible, .gr-act:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .gr-sym.picked { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--surface)); }
+  .gr-sym-ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--surface-2); color: var(--text); }
+  .gr-sym.picked .gr-sym-ic { background: var(--accent); color: var(--on-accent); }
+  .gr-sym-ic svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+  .gr-back { justify-self: start; display: inline-flex; gap: 6px; align-items: center; min-height: 44px; padding: 0 4px; border: 0; background: none; font: 600 var(--g-fs-support) var(--font-sans); color: var(--text-2); text-decoration: none; cursor: pointer; }
+  .gr-back:hover { color: var(--text); }
+
+  /* Sent: the status first, in one glance; then the steps; then what was sent. */
+  .gr-sent { gap: 14px; }
+  .gr-status { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 14px; align-items: start; padding: 18px 16px; border-radius: var(--radius-lg); background: var(--surface); border: var(--border-card); }
+  .gr-big { padding-top: 2px; }
+  .gr-status-t { display: grid; gap: 6px; justify-items: start; min-width: 0; }
+  .gr-status h2 { font: var(--fw-title) var(--g-fs-h)/1.15 var(--font-display); outline: none; }
+  .gr-status p { margin: 0; font-size: var(--g-fs-body); line-height: 1.45; color: var(--text); }
+  .gr-chip { margin-top: 4px; font: var(--fw-name) var(--fs-code)/1 var(--font-sans); background: var(--h-progress-soft); color: var(--text); }
+  .gr-chip[hidden] { display: none; }
+  .gr-chip[data-ready] { background: transparent; box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .gr-chip :global(.km-chip-mark) { background: var(--ink); color: var(--on-ink); font: 600 9px/1 var(--font-sans); }
+
+  .gr-steps { margin: 0; padding: 0 4px; list-style: none; display: grid; gap: 0; }
+  .gr-steps li { position: relative; display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 12px; align-items: start; padding: 0 0 14px; }
+  .gr-steps li:last-child { padding-bottom: 0; }
+  .gr-steps li:not(:last-child)::after { content: ""; position: absolute; left: 11px; top: 26px; bottom: 2px; width: 2px; border-radius: 1px; background: var(--line); }
+  .gr-steps li[data-done]:not(:last-child)::after { background: color-mix(in srgb, var(--h-fine) 45%, var(--line)); }
+  .gr-steps b { display: block; font-size: var(--g-fs-body); font-weight: var(--fw-name); line-height: 24px; }
+  .gr-steps small { display: block; font: 500 var(--fs-code)/1.3 var(--font-mono); color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .gr-steps li:not([data-done]) b { color: var(--text-2); }
+  /* A step not reached yet is drawn quietly: only what has happened, or is happening, takes colour. */
+  .gr-steps :global(.hg[data-state="planned"]) { color: var(--text-3); }
+
+  .gr-ask { display: grid; gap: 10px; padding: 16px; border-radius: var(--radius-lg); background: var(--h-fine-soft); }
+  .gr-ask[hidden] { display: none; }
+  .gr-ask p { margin: 0; font-size: var(--g-fs-lead); }
+  .gr-ask-b { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .gr-ask button { min-height: 52px; padding: 8px 12px; border-radius: var(--radius-lg); font: var(--fw-name) var(--g-fs-body)/1.2 var(--font-sans); cursor: pointer; transition: background-color var(--dur-hover) var(--ease-settle), transform var(--dur-press) var(--ease-settle); }
+  .gr-ask button:active { transform: scale(var(--press-scale, .98)); }
+  .gr-yes { border: 0; background: var(--ink); color: var(--on-ink); }
+  .gr-no { border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); }
+
+  .gr-extra { display: grid; gap: 6px; }
+  .gr-opt { border-radius: var(--radius); }
+  .gr-opt summary { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; font-weight: 600; font-size: var(--g-fs-support); color: var(--accent-ink, var(--accent)); list-style: none; }
+  .gr-opt summary::-webkit-details-marker { display: none; }
+  .gr-opt summary::before { content: "+"; width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; background: var(--surface-2); color: var(--text); font-weight: 600; }
+  .gr-opt[open] summary::before { content: "–"; }
+  .gr-opt i { font-style: normal; font-weight: 400; color: var(--text-3); }
+  .gr-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+  .gr-form input { font: 400 16px/1.3 var(--font-sans); min-height: 44px; padding: 8px 12px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); width: 100%; }
+  .gr-form input:focus { outline: 2px solid var(--focus); outline-offset: 1px; border-color: transparent; }
+  .gr-form .btn { min-height: 44px; }
+  .gr-saved { margin: 0; font-size: var(--g-fs-support); color: var(--text-2); }
+  .gr-saved[hidden] { display: none; }
+  .gr-small { margin: 6px 0 0; font-size: var(--fs-support); color: var(--text-3); }
+
+  .gr-demo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 12px; border-radius: var(--radius); border: 1px dashed var(--line-strong); font-size: var(--fs-support); color: var(--text-2); }
+  .gr-demo[hidden] { display: none; }
+  .gr-demo-t { flex: 1 1 160px; }
+  .gr-demo .btn { min-height: 36px; }
+
+  .gr-fields { border-radius: var(--radius-lg); background: var(--surface); border: var(--border-card); padding: 4px 16px; }
+  .gr-fields summary { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 48px; cursor: pointer; list-style: none; font-size: var(--g-fs-body); }
+  .gr-fields summary::-webkit-details-marker { display: none; }
+  .gr-fields summary small { font: 500 var(--fs-code)/1 var(--font-mono); color: var(--text-2); }
+  .gr-fields dl { margin: 0 0 4px; display: grid; grid-template-columns: minmax(96px, auto) minmax(0, 1fr); gap: 0; font-size: var(--g-fs-support); }
+  .gr-fields :global(dt), .gr-fields :global(dd) { margin: 0; padding: 8px 0; border-top: 1px solid var(--line); line-height: 1.4; }
+  .gr-fields :global(dt) { color: var(--text-2); padding-right: 14px; }
+  .gr-fields :global(dd) { color: var(--text); font-weight: var(--fw-name); overflow-wrap: anywhere; }
+  .gr-fields .gr-small { margin: 0 0 12px; }
+  .gr-after { display: flex; flex-wrap: wrap; gap: 10px; }
+  .gr-after .btn { min-height: 48px; }
+
+  @media (min-width: 600px) {
+    .gr-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 0; }
+    .gr-steps li { grid-template-columns: 24px minmax(0, 1fr); padding: 0; }
+    .gr-steps li:not(:last-child)::after { left: 30px; right: -6px; top: 11px; bottom: auto; width: auto; height: 2px; display: none; }
+  }
+  /* Wide, once sent: the status and its steps on the left, what was sent on the right (the page gives it the full width). */
+  @media (min-width: 900px) {
+    .gr-sent { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 20px; align-items: start; }
+    .gr-sent > * { grid-column: 1; }
+    .gr-sent > .gr-fields { grid-column: 2; grid-row: 1 / span 6; }
+  }
+  @media (prefers-reduced-motion: reduce) { .gr-view:not([hidden]) .gr-syms li { animation: none; } }
+</style>

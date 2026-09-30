@@ -767,8 +767,27 @@ const METHOD_PAGES = {
   'method.nav': e('Where this page sits', 'The four levels of the method and every page in reading order, with this one marked.', 'Select a page, or step to the previous or next one.'),
 };
 
+// ---- The room guide (/guide/<space>/): what people in the room see from the QR code ---------------------------
+const GUIDE = {
+  'page.guide': e('Room guide', def('room-guide'), 'Report a problem in two taps, ask for something, or read how the room works.', 'g:room-guide'),
+  'guide.brand': e('Room guide', 'The guide for the space whose QR code you scanned.', 'Select it to go back to the top of the guide.', 'g:room-guide'),
+  'guide.answer': e('Is this space working?', 'The answer in one line: working, or what we already know and who has it.', 'If it says a problem is known, there is no need to report it again.'),
+  'guide.known': e('We know', 'Problems in this space that the team already has, and when a fix is due.', 'Nothing to do. Report anything else that is not working.', 'g:incident'),
+  'guide.report': e('Something not working', 'The first of two taps. The buttons become a list of what can go wrong with this space\'s own kit.', 'Select it, then select what is wrong. That is all: the report is sent.', 'g:report'),
+  'guide.request': e('Request something', 'Ask for help in this space, a change to it, or kit for a home office.', 'Select it, pick one, then Send.', 'g:request'),
+  'guide.symptoms': e('What\'s not working?', 'The problems this space\'s kit can have. Each is one tap and sends the report, filled in with the space, the device, the time and the booking.', 'Select the one that fits, or Something else.', 'g:incident'),
+  'guide.status': e('Status', 'Where your report is now, in plain words: who has it, when it started and when a fix is expected. It changes here as the work moves on.', 'Nothing to do. When it says Fixed, tell us whether it worked for you.', 'g:incident'),
+  'guide.with': e('Who has it', def('with'), 'Nothing to do. It changes when someone takes the report.', 'g:with'),
+  'guide.steps': e('The steps', 'Reported, taken, fixed: each with its time, or the time it is expected by.', 'Nothing to do.'),
+  'guide.extra': e('Optional extras', 'A note for the technician, or an email or phone number to be told when it is fixed. Neither is needed.', 'Open one, type, then Add or Save.'),
+  'guide.demo': e('Simulated', 'The demo plays the technician\'s side: taking the report a few seconds after it arrives, and marking it fixed.', 'Select Next step to move it on now.'),
+  'guide.sent': e('What we sent', 'The incident the two taps made: the space, the likely device, the problem, the time, the booking, where it came from and a proposed priority. It came from a phone in the room; no name was kept.', 'Nothing to do. The reference is the one to quote.', 'g:incident'),
+  'guide.access': e('Access in this room', 'A hearing loop and its last test, live captions, assistive listening and step-free access, as tested.', 'Tell the office team if something here is not right.'),
+  'guide.privacy': e('Cameras and microphones', 'What the cameras and microphones in this space do and do not do, from Aigna\'s privacy records.', 'Nothing to do. Ask the office team for the full record.'),
+};
+
 export const HELP = {
-  ...METHOD_PAGES,
+  ...METHOD_PAGES, ...GUIDE,
   ...SHELL, ...PLACES, ...PAGES, ...PARTS, ...FILTER, ...HOME, ...OVERVIEW, ...SCHEDULE, ...INTEGRATE, ...INCIDENT,
   ...ROOM, ...UNIT, ...TEAM_KEYS, ...STANDARDS, ...OTHER, ...PROJECT, ...PLANNING, ...NUMBERS, ...TERMS, ...KNOWN_ISSUES, ...OFFICE3D, ...LOCATIONS, ...SERVICES,
 };
