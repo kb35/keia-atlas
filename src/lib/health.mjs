@@ -1,4 +1,4 @@
-// The health glyph set (UI-V2 §6): one family of rings, where the shape carries the state, a word sits beside it
+// The health glyph set (design notes): one family of rings, where the shape carries the state, a word sits beside it
 // and colour only reinforces. HealthGlyph.astro renders these on the server; scripts that draw rows in the
 // browser call glyph() for the same markup, and setGlyph() to change a glyph's state in place.
 //

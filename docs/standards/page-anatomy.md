@@ -168,7 +168,7 @@ The frame (sidebar, top bar, place tabs, padding) and the shared parts already c
 - A timeline or gantt: narrow the name column, then put each name above its bar (`ScheduleYear.astro`).
 - A closed pop-up takes no room (`display: none`, with `@starting-style` for its fade in); a hidden one past the window's edge widens the page.
 
-## 8. The answer sentence (v2, UI-V2 §8.1)
+## 8. The answer sentence (v2, design notes)
 
 Every page's band answers "is it all right?" in one line, before any figure or detail: `PageBand answer`. It leads with what someone has to act on, and says so calmly when nothing needs anyone. At most 25 words; it fits one line at 1440 px and two at 375. Plain words, no retired word (escalate, tier, blocked, pending, error, failed, overdue, warning, critical, stage, needs you); Space, Manufacturer, Known error, Waiting on, To review, Fault and Not working are the words. No person's name beside a count.
 

@@ -1,4 +1,4 @@
-// Lenses on the floor plan (UX-V2 §2.5, BUILD-PLAN V6 H1). One plan; the lens changes what each space's glyph and
+// Lenses on the floor plan (design notes, BUILD-PLAN V6 H1). One plan; the lens changes what each space's glyph and
 // label say. Pure: no data imports, so the rules are tested on their own (tests/lenses.test.mjs). The facts each rule
 // reads are gathered at build time by src/lib/lens-data.mjs; the plan's script (src/lib/lens-client.mjs) switches.
 //

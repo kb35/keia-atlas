@@ -1,4 +1,4 @@
-// Vendors and partners (UX-V2 §4.2, UI-V2 §3.6, CONNECT-SCAN §7.3, BLUEPRINT 6.3; BUILD-PLAN V7).
+// Vendors and partners (design notes, CONNECT-SCAN §7.3, BLUEPRINT 6.3; BUILD-PLAN V7).
 //
 // A partner (vendor, integrator, manufacturer) works inside Aigna's Atlas on the jobs handed to them, and on nothing
 // else. The rules this file keeps:
@@ -93,7 +93,7 @@ export function contractClock(job, now = NOW) {
 
 // ---- Job-scoped access (CONNECT 7.3 rule 3) ---------------------------------------------------------------------------
 // What a partner may open for a job, and what stays with Aigna. The shape of every page stays the same: a slot a
-// partner may not see is kept in place and says why (UI-V2 §3.6, CONNECT 7.2 rule 3).
+// partner may not see is kept in place and says why (design notes, CONNECT 7.2 rule 3).
 const SCOPE_WORDS = { space: 'this space', unit: 'this unit', buildsheet: 'its build sheet', timeline: 'the job\'s timeline', design: 'the space design', model: 'the model and its setup guide' };
 export const NOT_SHARED = [
   { id: 'floor', what: 'Floor plan', why: 'Not shared with partners' },
@@ -193,7 +193,7 @@ export function papersOf(id, now = NOW) {
   ];
 }
 
-// ---- One partner's Home (UI-V2 §3.6) ------------------------------------------------------------------------------------
+// ---- One partner's Home (design notes) ------------------------------------------------------------------------------------
 /** The jobs with one partner person, worst first (past the clock, then least time left), with each job's clock. */
 export function jobsFor(person, jobs = JOBS, now = NOW) {
   return jobs.filter((j) => j.person === person && j.state !== 'done')

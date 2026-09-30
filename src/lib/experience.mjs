@@ -1,4 +1,4 @@
-// Experience measures and service levels for each service (UX-V2 §3 service owner and §4.7 leadership, UI-V2 §3.7,
+// Experience measures and service levels for each service (design notes service owner and §4.7 leadership, design notes,
 // BUILD-PLAN V7). Four figures per service, counted per space and then per office, never per person:
 //   AV              meetings that started on time, spaces that worked first time, lost time per incident, reassignments
 //   Network         time every office was online, fixed first time, lost time per incident, reassignments

@@ -1,4 +1,4 @@
-// The record timeline's rows (UI-V2 §8.3): newest first, grouped by day, each entry a time, a glyph or verb mark, who,
+// The record timeline's rows (design notes): newest first, grouped by day, each entry a time, a glyph or verb mark, who,
 // what and where it came from. Automatic entries end with "How was this done?". Pure (no DOM): Timeline.astro draws
 // the rows on the server and src/lib/rules-client.mjs adds live ones in the browser with the same function.
 //

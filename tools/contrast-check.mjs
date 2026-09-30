@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* Contrast check for the health palette (UI-V2 5.2): every look, light and dark.
+/* Contrast check for the health palette (design notes): every look, light and dark.
    Reads src/styles/looks/*.css, resolves each look and mode the way the browser cascade would
    (selector matching, specificity, source order), then checks WCAG 2.x contrast ratios:
      --h-<state>      fill  >= 3:1   against --bg and --surface

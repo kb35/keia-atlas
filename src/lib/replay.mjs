@@ -1,4 +1,4 @@
-// Replay (UX-V2 §8, BUILD-PLAN V6 H3): a floor, or a job on it, over time. Pure: no data imports and no DOM, so it
+// Replay (design notes, BUILD-PLAN V6 H3): a floor, or a job on it, over time. Pure: no data imports and no DOM, so it
 // is tested on its own (tests/replay.test.mjs); src/lib/replay-client.mjs draws it and src/lib/lens-data.mjs feeds
 // it the jobs at build time.
 //

@@ -1,4 +1,4 @@
-// Who has a piece of work, in one record (UX-V2 §4.2 to §4.4, UI-V2 §8.5). Work has one named owner and moves as a
+// Who has a piece of work, in one record (design notes). Work has one named owner and moves as a
 // whole: Take, Hand to, Park and Resume each write a new record, and the With chip says who has it now.
 //
 // The record (what the live layer stores in the field `own` of a work item, src/lib/live.mjs):
@@ -19,7 +19,7 @@
 
 export const STATES = ['ready', 'with', 'parked', 'waiting', 'auto', 'unable', 'done'];
 export const VERBS = { take: 'Take', hand: 'Hand to', park: 'Park', resume: 'Resume' };
-// The chip's look for each case (UI-V2 §8.5): the key picks the fill and the mark.
+// The chip's look for each case (design notes): the key picks the fill and the mark.
 export const CHIP_KEYS = ['ready', 'mine', 'person', 'team', 'vendor', 'waiting', 'parked', 'auto', 'unable', 'done'];
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -107,7 +107,7 @@ export function handTo(own, target, why, who, at, { clock } = {}) {
   if (clock) r.clock = clock;
   return r;
 }
-/** Park: three lines, each optional (UX-V2 §4.4). An empty card still parks, and says so. */
+/** Park: three lines, each optional (design notes). An empty card still parks, and says so. */
 export function park(own, card, who, at) {
   const c = { where: (card?.where ?? '').trim(), next: (card?.next ?? '').trim(), question: (card?.question ?? '').trim() };
   return { s: 'parked', to: who, kind: 'person', at, by: who, park: c };

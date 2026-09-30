@@ -1,4 +1,4 @@
-// The With chip (UI-V2 §8.5, MOTION-V2 4.17): who has a piece of work, in one pill. WithChip.astro renders it on
+// The With chip (design notes, docs/rules/motion.md): who has a piece of work, in one pill. WithChip.astro renders it on
 // the server with chipHtml(); pages that draw rows in the browser use the same function, and setChip() to change it
 // in place. The chip is the one thing that slides between states: the old words and mark slide out to the left, the
 // new ones slide in from the right along the same line, and the pill's width eases to fit, on a critically damped

@@ -1,4 +1,4 @@
-// The audit log (Keia Method 2.9, "a record that cannot be quietly edited"; UX-V2 §6): the raw layer behind every
+// The audit log (Keia Method 2.9, "a record that cannot be quietly edited"; design notes): the raw layer behind every
 // "How was this done?" card. One trace per run: each step with its time, what it called, what came back, and the
 // rule's version; where AI drafted anything, the model, the region and the prompt version. The card is one link
 // away from its trace, never the other way round. Pure: no data, no browser (tests/rules.test.mjs).

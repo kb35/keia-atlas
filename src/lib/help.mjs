@@ -53,7 +53,7 @@ const SHELL = {
   'shell.capability': e('{name}', 'A capability of this module: a bigger piece a team switches on when it needs it, such as licences or room checks. Off takes every trace of it away, so nothing looks missing; Connected shows where its records come from.', 'Pick On, Connected or Off. The page behind changes in place. A capability that needs another module says so and waits for it.', 'l:modules'),
 };
 
-// The places (one per module, UX-V2 §2.1) and their tabs. "place" and "tab" are the general entries; the specific ones follow.
+// The places (one per module, design notes) and their tabs. "place" and "tab" are the general entries; the specific ones follow.
 const PLACES = {
   place: e('A place', 'One of the places in the sidebar. The pages inside it show as tabs across the top of the page.', 'Select it to go there.'),
   'place:home': e('Home', def('home-page'), 'Select it to see what is ready for you today.', 'l:home'),

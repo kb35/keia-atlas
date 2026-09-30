@@ -62,7 +62,7 @@ export function figuresHtml(st) {
   return f(st.sp.length, 'Space', 'Spaces') + f(st.meetings.length, 'Meeting', 'Meetings') + f(st.people, 'Person in them', 'People in them') + f(st.services.length, 'Service', 'Services');
 }
 
-/** The meetings it would hit, in time order: when, where, and a count of people (never names, UX-V2 §7.5). */
+/** The meetings it would hit, in time order: when, where, and a count of people (never names, design notes). */
 export const SHOW = { meetings: 6, spaces: 12 };
 const more = (n, what) => `<li class="br-more"><button type="button" class="btn small ghost" data-br-more="${what}">Show all ${n}</button></li>`;
 export function meetingsHtml(ex, st, now, base = '', all = false) {

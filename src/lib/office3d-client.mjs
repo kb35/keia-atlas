@@ -72,7 +72,7 @@ export function mount(root) {
     return null;
   };
   const LIGHT = { ok: 'ok', warn: 'warn', bad: 'bad', idle: 'off' };
-  // Each row's health glyph (UI-V2 §6); a hop with no health of its own keeps the plain path dot.
+  // Each row's health glyph (design notes); a hop with no health of its own keeps the plain path dot.
   const light = (s, title) => (s ? glyph(LIGHT[s] ?? 'off', { size: 12, title: title ?? HW[s] ?? '' }) : '<span class="o3-dot" aria-hidden="true"></span>');
   const roomName = (r) => `${r.no ? `${r.no} ` : ''}${r.n}`;
   const base = () => D?.base ?? '/';

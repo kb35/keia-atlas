@@ -33,7 +33,7 @@ import { springEasing } from '../lib/spring.mjs';
 // is the place it belongs to in NAV: while that module is Off, the page says so and offers to switch it on.
 const { title, crumbs = [], section = '', vendorOk = false, about } = Astro.props;
 const VENDOR_IDS = PEOPLE.filter((p) => p.vendor).map((p) => p.id);
-// The sidebar (UX-V2 §2.1): Home, then one entry per module in a fixed order, then Learn below a rule. Each is one
+// The sidebar (design notes): Home, then one entry per module in a fixed order, then Learn below a rule. Each is one
 // place; the pages inside it show as tabs at the top of the page, so the sidebar stays short and the same
 // everywhere. A module that is Off is absent (Settings › Modules); one that is Connected shows its source on hover.
 const NAV = [
@@ -149,7 +149,7 @@ const zoom = zoomTrail(here);
 const PLACE_WORDS = new Set(['Work', 'Devices', ...NAV.map((n) => n.label)]);
 const trail = zoom ?? crumbs.map((c, i) => (i === 0 && c.to && parent && c.label !== parent.label && PLACE_WORDS.has(c.label) ? { label: parent.label, to: parent.to } : c))
   .filter((c, i, all) => !(i === 0 && all.length > 1 && all[1].label === c.label));   // never "Vendors / Vendors"
-// The spring the zoom rides on (MOTION-V2 --spring-settle: 360 ms, no bounce), as a CSS easing.
+// The spring the zoom rides on (docs/rules/motion.md --spring-settle: 360 ms, no bounce), as a CSS easing.
 const EASE_SPRING = springEasing({ duration: 360, bounce: 0 });
 // A record page (not a list) is remembered as a recent object for the palette (⌘K, before you type).
 const recent = about && about.kind && about.kind !== 'page' ? JSON.stringify({ k: about.kind, t: about.label, u: here }) : undefined;
@@ -555,7 +555,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
   <SearchOverlay />
   <slot name="end" />
   <script>
-    // The zoom: levels, keys, the floor state, rsPath, rsZoom and rsGo (UX-V2 §2.2). Loaded once per visit.
+    // The zoom: levels, keys, the floor state, rsPath, rsZoom and rsGo (design notes). Loaded once per visit.
     import '../lib/zoom-client.mjs';
   </script>
   <script is:inline data-astro-rerun>
@@ -652,7 +652,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         morph: ms('--dur-morph', 520), enter: ms('--dur-enter', 440), exit: ms('--dur-exit', 240), page: ms('--dur-page', 420),
         state: ms('--dur-state', 300), hover: ms('--dur-hover', 140), pop: ms('--dur-pop', 200), flash: ms('--dur-flash', 800),
         delay: ms('--delay-enter', 24), stagger: ms('--stagger', 24),
-        /* v2 (MOTION-V2 section 2): the exit curve, press, zoom, chip, theme, Replay, the springs and the interaction layer. */
+        /* v2 (docs/rules/motion.md): the exit curve, press, zoom, chip, theme, Replay, the springs and the interaction layer. */
         exitEase: cs.getPropertyValue('--ease-exit').trim() || 'cubic-bezier(.4,0,1,1)',
         springEase: cs.getPropertyValue('--ease-spring').trim() || 'cubic-bezier(.22,1,.36,1)',
         spring: cs.getPropertyValue('--ease-spring').trim() || 'cubic-bezier(.22,1,.36,1)',

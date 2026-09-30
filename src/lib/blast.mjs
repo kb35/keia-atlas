@@ -1,4 +1,4 @@
-// The blast-radius explorer (UX-V2 §7, BUILD-PLAN V9) and the approval a change needs (SECURITY-SCAN 7 and 8;
+// The blast-radius explorer (design notes, BUILD-PLAN V9) and the approval a change needs (SECURITY-SCAN 7 and 8;
 // SYNTHESIS 2.5). Pure: it takes a building model (src/lib/floors.mjs) and works out what would lose its way to the
 // internet if something were off. src/lib/blast-view.mjs joins it to the site's data for the pages;
 // tests/blast.test.mjs checks it.
@@ -138,7 +138,7 @@ export function servicesOf(M, result, kindOf = () => null) {
 
 // ---- Meetings: simulated bookings for the next 24 hours ----------------------------------------------------------
 // There is no room booking feed in the demo, so each bookable space gets a made-up day of bookings from a seed of
-// its id: the same every build, labelled Simulated on the page. Attendees are a count, never names (UX-V2 §7.5).
+// its id: the same every build, labelled Simulated on the page. Attendees are a count, never names (design notes).
 const seedOf = (s) => [...String(s)].reduce((n, c) => (Math.imul(n ^ c.charCodeAt(0), 16777619) >>> 0), 2166136261);
 const rnd = (seed) => { let t = seed >>> 0; return () => { t = (t + 0x6d2b79f5) >>> 0; let r = Math.imul(t ^ (t >>> 15), 1 | t); r ^= r + Math.imul(r ^ (r >>> 7), 61 | r); return ((r ^ (r >>> 14)) >>> 0) / 4294967296; }; };
 export const DAY_HOURS = [8, 18];

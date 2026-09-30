@@ -1,6 +1,6 @@
 # Motion
 
-Motion explains a change. Something moves because it went somewhere, arrived, left or changed state; if nothing changed, nothing moves. This is the v2 motion system (MOTION-V2). Tokens and the shared moves are in `src/styles/motion.css`; the interaction layer (hover, press, focus, skeletons, toasts, lists appearing) is in `src/styles/craft.css` and `src/components/Motion.astro`; the shared scripts (`rsMotion`, `rsHold`, `rsMorphPanels`, and the controls family in M12: `rsTheme`, `rsChange`, `rsSwapBegin`, `rsMarker`, `rsPopIn`) are in `src/layouts/Shell.astro`; zero-bounce springs are in `src/lib/spring.mjs`.
+Motion explains a change. Something moves because it went somewhere, arrived, left or changed state; if nothing changed, nothing moves. This is the v2 motion system (design notes). Tokens and the shared moves are in `src/styles/motion.css`; the interaction layer (hover, press, focus, skeletons, toasts, lists appearing) is in `src/styles/craft.css` and `src/components/Motion.astro`; the shared scripts (`rsMotion`, `rsHold`, `rsMorphPanels`, and the controls family in M12: `rsTheme`, `rsChange`, `rsSwapBegin`, `rsMarker`, `rsPopIn`) are in `src/layouts/Shell.astro`; zero-bounce springs are in `src/lib/spring.mjs`.
 
 ### M1. Durations and curves are tokens
 
@@ -96,7 +96,7 @@ Reduced motion is on when the person says so, else when the site's switch does, 
 
 ### M8. Lights come on in turn
 
-Health glyphs (`HealthGlyph.astro`, `.hg`; UI-V2 section 6) arrive quiet, then come on once to their state, one after another (`--stagger` apart), as they scroll into view. The heartbeat ("checked 40 s ago") shows last. A later change of state eases in place over `--dur-state`. A check that is running shows the In progress arc, still; there is no spinner.
+Health glyphs (`HealthGlyph.astro`, `.hg`; design notes) arrive quiet, then come on once to their state, one after another (`--stagger` apart), as they scroll into view. The heartbeat ("checked 40 s ago") shows last. A later change of state eases in place over `--dur-state`. A check that is running shows the In progress arc, still; there is no spinner.
 
 - **Why:** it shows something was checked, not just asserted; and a still page reads as fine.
 - **Do:** use `HealthGlyph` (or `glyph()` from `src/lib/health.mjs` in a script, `.hg-m` in an inline script), with a word beside it.
@@ -140,7 +140,7 @@ Every control that changes what is on screen uses the same few moves on the same
 | A demo setting adds, removes or re-orders things (a module On, Connected or Off, agents, View as) | What leaves shrinks to its centre, what arrives grows from its centre, the rest (sidebar entries, place tabs, cards) slides; what you were looking at stays still on screen. A change that swaps the whole page (a page from a module that is switched off, the vendor gate) cross-fades the page instead | `rsSetStage(n)`, `rsSetAgents(v)`, `rsPickWho(id)` (all `rsChange`) |
 | Zooming one level along the map (region, office, floor, space, device, port), by a click, the path or `[` and `]` | The clicked shape becomes the next page's picture on the zero-bounce spring (`--dur-zoom`, `--ease-spring` from `src/lib/spring.mjs`); the page behind scales to `--zoom-scale` and fades; the path's new step slides in from the right, and a lost one slides out. A shape on a drawing (a room on the plan) is stood in for by a plain box (`.rs-zoom-proxy`). Two levels at once is the ordinary page move. A second move starts from where the first is (`rsZoom`). Reduced motion: the pages cross-fade; the step is simply there | `src/lib/zoom-client.mjs`, `nav.css` |
 | The palette (⌘K): Find, `>` Do, `?` Ask | Rows are drawn from memory on the keystroke's next frame and never animate while you type; `>` lists the page's own buttons (`data-verb`) and Enter presses the button | `SearchOverlay.astro`, `src/lib/verbs.mjs` |
-| Take, Hand to, Park, Resume (the With chip, MOTION-V2 4.17) | The chip's words and mark slide out to the left and the new ones in from the right along one line while its width eases, on a critically damped spring (`--dur-chip`, `src/lib/spring.mjs`); a second change mid-slide retargets from where the chip is, at its speed. The row then moves to its new list (persist), arrives (enter) or leaves (exit), the box held so nothing jumps; on another window the chip changes in place with a "Liam, just now" mark (M10). Reduced motion: the words swap at once | `setChip()` in `src/lib/withchip.mjs`; `morph()` in `src/lib/home-client.mjs` |
+| Take, Hand to, Park, Resume (the With chip, design notes) | The chip's words and mark slide out to the left and the new ones in from the right along one line while its width eases, on a critically damped spring (`--dur-chip`, `src/lib/spring.mjs`); a second change mid-slide retargets from where the chip is, at its speed. The row then moves to its new list (persist), arrives (enter) or leaves (exit), the box held so nothing jumps; on another window the chip changes in place with a "Liam, just now" mark (M10). Reduced motion: the words swap at once | `setChip()` in `src/lib/withchip.mjs`; `morph()` in `src/lib/home-client.mjs` |
 | Park or Hand to opens its short form in the row (4.20) | The form grows from the button that opened it (`--dur-pop`) inside a held box and shrinks away on Cancel or Escape (`--dur-exit`) | `openEdit()` in `src/lib/home-client.mjs` |
 | A new signal on Home (4.15) | Three things, once: the answer sentence cross-fades, the one figure eases to its tone, the row enters at its centre; a P1 also flashes the band's lower edge once (`--dur-flash`). Nothing pulses afterwards | `signal()` in `src/lib/home-client.mjs` |
 | Welcome back, Start the day (4.26) | The handover card's four places come in together a stagger apart; Start the day shrinks the card away while Home grows in (`rsChange`) | `HandoverCard.astro`, `rsChange` |
@@ -154,7 +154,7 @@ Every control that changes what is on screen uses the same few moves on the same
 
 ### M13. Every interaction has one row
 
-Each interaction on a page is one of these rows (MOTION-V2 section 4), with its reduced-motion equivalent. A new interaction adds a row in the same change.
+Each interaction on a page is one of these rows (design notes), with its reduced-motion equivalent. A new interaction adds a row in the same change.
 
 | # | Interaction | Full motion | Reduced motion |
 |---|---|---|---|

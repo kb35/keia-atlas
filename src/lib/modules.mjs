@@ -1,4 +1,4 @@
-// Modules (UX-V2 §2.1, decision of 30 Sept 2026: no stages, the full product, modular). Each place in the
+// Modules (design notes, decision of 30 Sept 2026: no stages, the full product, modular). Each place in the
 // sidebar after Home is one module, and each module is On (built in), Connected (its records come from a tool
 // the team already uses, through the connector layer) or Off (absent from the sidebar; its pages say so and
 // offer to switch it on). Settings › Modules sets them for this demo; the choice is kept in this browser

@@ -18,7 +18,7 @@
 //
 // Coordinates: building metres, x east and y north from the outline's south-west corner; the drawings' SVG y runs
 // down, so Y(y) flips it. Every drawing uses the same padding (PAD), so a thumbnail and the plan have the same
-// picture box and one can grow into the other (the shared-element zoom, MOTION-V2 4.6).
+// picture box and one can grow into the other (the shared-element zoom, docs/rules/motion.md).
 
 export const PAD = 1.5;
 
@@ -52,7 +52,7 @@ export function planOf(M, floorId) {
   };
 }
 
-// One scale for a set of plans (UI-V2 §8.7): the largest floor sets it.
+// One scale for a set of plans (design notes): the largest floor sets it.
 export function frameOf(plans) {
   const ok = plans.filter(Boolean);
   return { VW: Math.max(1, ...ok.map((p) => p.VW)), VH: Math.max(1, ...ok.map((p) => p.VH)) };

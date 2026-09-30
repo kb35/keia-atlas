@@ -1,6 +1,6 @@
-// Replay on the office plan, in the browser (UX-V2 §8, MOTION-V2 4.28). Replay.astro draws the frame; this fills it.
+// Replay on the office plan, in the browser (design notes, docs/rules/motion.md). Replay.astro draws the frame; this fills it.
 //
-// Frames are made when a window is chosen, before anything is shown (MOTION-V2 §6: still frames rendered ahead; Play
+// Frames are made when a window is chosen, before anything is shown (docs/rules/motion.md: still frames rendered ahead; Play
 // swaps prepared states). A day's frames are snapshots of the simulation (src/lib/livesim.mjs) at each hour; a job's
 // are its own events (src/lib/replay.mjs, fed at build time). Pressing a frame shows that moment on the plan through
 // the lens script (root.__lensApi.showFrame), with the Then mark, the past-tense sentence and "Replay · 07:52, 28 Sept"

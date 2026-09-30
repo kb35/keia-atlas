@@ -71,7 +71,7 @@ function openReport(room) {
 // ---- GuideReport: two taps, then the status read back ------------------------------------------------
 // Views: start (two buttons) → list (symptoms) → sent (status, steps, follow-up, what was sent). The box eases
 // to its new height (the held-box morph, --dur-morph) and the new view fades in (--dur-state); the With chip
-// slides between owners (km.chip, MOTION-V2 4.17); a status change eases the glyph in place and cross-fades the
+// slides between owners (km.chip, docs/rules/motion.md); a status change eases the glyph in place and cross-fades the
 // words once (4.15). Reduced motion: everything changes at once.
 const TAKE_AFTER_MS = 6000;   // simulated: the technician takes a new report a few seconds after it arrives
 function mountReport(root) {

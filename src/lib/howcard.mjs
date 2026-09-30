@@ -1,4 +1,4 @@
-// "How was this done?" (UX-V2 §6, UI-V2 §8.11): the card's markup, from howCard() in src/lib/rules.mjs. Pure (no
+// "How was this done?" (design notes): the card's markup, from howCard() in src/lib/rules.mjs. Pure (no
 // DOM), so HowCard.astro draws it on the server and src/lib/rules-client.mjs draws a new run's card in the browser
 // with the same function. The card itself (open, close, the motion) is HowCard.astro's.
 //

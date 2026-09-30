@@ -1,4 +1,4 @@
-// The job record's words (UI-V2 §3.5, UX-V2 §4.1 and §4.5): the answer sentence in the band, the impact line when it
+// The job record's words (design notes): the answer sentence in the band, the impact line when it
 // closes, and the hand-off count. Pure, so the page draws them on the server and its script redraws them in the
 // browser from the live layer with the same functions (tests/rules.test.mjs).
 

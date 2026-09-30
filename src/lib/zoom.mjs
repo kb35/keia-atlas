@@ -1,4 +1,4 @@
-// The path is the zoom (UX-V2 §2.2). Six levels, each a page or a state of one:
+// The path is the zoom (design notes). Six levels, each a page or a state of one:
 //   region  /locations/emea/                 office  /locations/dub/        floor  /locations/dub/?floor=3
 //   space   /rooms/dub-3-09/                 device  /device/?tag=AG-…      port   /device/?tag=AG-…#port-lan-1
 // The top bar's path for a page on the zoom is worked out here from its address, so it always reads

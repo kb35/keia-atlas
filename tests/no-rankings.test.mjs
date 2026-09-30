@@ -1,4 +1,4 @@
-// People are never ranked (UX-V2 §4.7 step 5, UI-V2 §10 "No person's name appears beside a count, rate or rank").
+// People are never ranked (design notes step 5, design notes "No person's name appears beside a count, rate or rank").
 // Leadership's Home names an owner ("Owner: Anna") but never counts, rates or ranks a person ("Tom: 12 closed this
 // week"). Checked three ways: the leadership model (src/lib/costs.mjs), the experience figures behind it, and, when the
 // site has been built, the text of Claire's sections on Home.

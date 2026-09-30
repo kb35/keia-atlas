@@ -260,7 +260,7 @@ export function reportStatus(r, { owner: who = null } = {}) {
     { key: 'fixed', state: fixed || r.followup?.ok ? 'fine' : 'planned', word: 'Fixed', at: fixed || r.followup?.ok ? hhmm(r.fixed.at) : `expected by ${hhmm(expect)}` },
   ];
   // `head` and `line` sit beside the With chip, which names who has it; `sentence` is the whole status in one
-  // line for anywhere without the chip (UX-V2 4.6: "With Liam · started 08:03 · expected by 08:30").
+  // line for anywhere without the chip (design notes: "With Liam · started 08:03 · expected by 08:30").
   if (reopened) return { step: 'reopened', glyph: 'progress', word: `With ${owner} again`, head: `Reopened at ${hhmm(r.followup.at)}`, line: `Not fixed for you, so it is back with ${owner}. Expected by ${hhmm(expect)}.`, sentence: `With ${owner} again · reopened ${hhmm(r.followup.at)} · expected by ${hhmm(expect)}`, steps, ask: false };
   if (r.followup?.ok) return { step: 'done', glyph: 'fine', word: 'Fixed', head: `Fixed at ${hhmm(r.fixed.at)}`, line: 'You said it works. Thank you for telling us.', sentence: `Fixed at ${hhmm(r.fixed.at)}`, steps, ask: false };
   if (fixed) return { step: 'fixed', glyph: 'fine', word: 'Fixed', head: `Fixed at ${hhmm(r.fixed.at)}`, line: `${owner} marked it fixed. Tell us below if it works for you.`, sentence: `Fixed at ${hhmm(r.fixed.at)}`, steps, ask: true };

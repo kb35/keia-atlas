@@ -1,4 +1,4 @@
-// The health glyphs and the heartbeat (UI-V2 §6, §8.6): states map, every glyph says its state in words, the
+// The health glyphs and the heartbeat (design notes): states map, every glyph says its state in words, the
 // heartbeat reads "checked N s ago" and turns into "Not reporting since" past its window, and no old status dot or
 // fault pulse is left in src/.
 import { test } from 'node:test';

@@ -1,7 +1,7 @@
-// The page's verbs for the palette's Do mode (⌘K, then ">"; UX-V2 §2.3). A verb is never only in the palette:
+// The page's verbs for the palette's Do mode (⌘K, then ">"; design notes). A verb is never only in the palette:
 // it is a button or link on the page that carries data-verb="<id>", and the palette lists the ones you can
 // see right now under the button's own name, then presses that button. So the palette can never do anything
-// the page cannot do by clicking, and every verb has the same name as its button (UI-V2 §10).
+// the page cannot do by clicking, and every verb has the same name as its button (design notes).
 //
 // A page's one band action (PageBand's action slot) is a verb too without marking it, under its own name.
 // VERBS names the verbs the method defines, with the words people might type for each, so ">hand" finds

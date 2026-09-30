@@ -1,6 +1,6 @@
 // Standing rules (src/lib/rules.mjs), the audit trace (src/lib/audit.mjs), the card's markup (src/lib/howcard.mjs)
 // and the job record's words (src/lib/incidentcore.mjs): the run machine, the caps and conditions, the way back each
-// rule declares, the default owner clock, evidence strength as a count, and the rules the card keeps (UX-V2 §6).
+// rule declares, the default owner clock, evidence strength as a count, and the rules the card keeps (design notes).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
