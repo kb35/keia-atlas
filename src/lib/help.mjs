@@ -863,6 +863,7 @@ const METHOD_PAGES = {
   'method.trust': e('What surrounds the record', 'The eight guarantees the method makes, drawn around the record they protect.', 'Read the table below for each one in full.'),
   'method.problems': e('Four of the costs', 'Figures from the method\'s table of problems, each with its source and year.', 'Read the table below for all of them.'),
   'method.words': e('The words, mapped', 'Every word on screen, its plain meaning, and what it maps to in ITIL, PMI and ISO.', 'Use your browser\'s find to look a word up.'),
+  'method.fits': e('How the ideas map', 'Each Keia idea, the practices of this framework it serves, and what Keia adds. The framework\'s own names; our descriptions.', 'Point at an idea above the table to light its row.'),
   'method.try': e('Try it in the demo', 'A few steps to see this practice in the demo, and who the demo opens as.', 'Select the button. View as switches to that person; Back to you returns.'),
   'method.nav': e('Where this page sits', 'The four levels of the method and every page in reading order, with this one marked.', 'Select a page, or step to the previous or next one.'),
 };
