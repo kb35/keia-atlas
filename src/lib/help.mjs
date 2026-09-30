@@ -33,7 +33,7 @@ const SHELL = {
   'shell.help': e('Help', 'The Help switch. While it is on, everything with a dotted outline explains itself when you point at it.', 'Select it, or press ?, to turn help on or off. Escape turns it off. On a touch screen, tap a dotted thing once to read about it and again to use it.', 'l:help'),
   'shell.report': e('Report', def('report'), 'Select it to propose an edit, log new firmware or raise an urgent issue about the page you are on. It goes to the person who owns it.', 'l:report'),
   'shell.mode': e('Colour mode', 'Switches between light and dark. Auto follows your computer until you choose.', 'Select it to flip between light and dark.'),
-  'shell.settings': e('Settings', 'The look of Keia Atlas, light or dark, whether agents show, and which modules are on. Saved in this browser only.', 'Select it to open Settings.', 'l:stages'),
+  'shell.settings': e('Settings', 'The look of Keia Atlas, light or dark, whether agents show, and which modules are on. Saved in this browser only.', 'Select it to open Settings.', 'l:modules'),
   'shell.account': e('Viewing as', 'Who this window is showing Keia Atlas as. The home page, the order of the sidebar and who your changes are recorded as follow it.', 'Select it to view as another role. Nobody is signed in for real: this is a demo, and each window keeps its own person.', 'g:view-as'),
   'shell.viewas': e('View as', def('view-as'), 'Pick a role, or type a role, place or team to find one.', 'g:view-as'),
   'shell.viewas-everyone': e('Everyone (overview)', 'Not a person: every role\'s first screen at once, for seeing the whole picture. A change made here is recorded as the demo admin.', 'Select it to see every role together.', 'g:view-as'),
@@ -43,8 +43,8 @@ const SHELL = {
   'shell.back-to-you': e('Back to you', 'Returns this window to the person it opened as.', 'Select it.', 'g:view-as'),
   'shell.more': e('More places', 'On a phone, the rest of the places in the sidebar are behind this button.', 'Select it to open them.'),
   'shell.tabs': e('The pages in this place', 'The tabs across the top are the pages inside this place. The one with the bar under it is where you are.', 'Select a tab to open that page.'),
-  'shell.module-gate': e('Switch it on', 'This page belongs to a module the demo has switched off, so it is not in the sidebar.', 'Select it to switch the module on for this demo.', 'l:stages'),
-  'shell.modules': e('Modules', 'Each place in the sidebar after Home is a module. On means it is built in; Connected means its records come from a tool the team already uses; Off takes it out of the sidebar.', 'Pick On, Connected or Off for each module. The sidebar changes at once.', 'l:stages'),
+  'shell.module-gate': e('Switch it on', 'This page belongs to a module the demo has switched off, so it is not in the sidebar.', 'Select it to switch the module on for this demo.', 'l:modules'),
+  'shell.modules': e('Modules', 'Each place in the sidebar after Home is a module. On means it is built in; Connected means its records come from a tool the team already uses; Off takes it out of the sidebar.', 'Pick On, Connected or Off for each module. The sidebar changes at once.', 'l:modules'),
 };
 
 // The places (one per module, UX-V2 §2.1) and their tabs. "place" and "tab" are the general entries; the specific ones follow.

@@ -72,6 +72,7 @@ const PAGES = [
   ['rooms', '/rooms/', 'other'],
   ['room-profiles', '/room-profiles/', 'other'],
   ['devices', '/devices/', 'other'],
+  ['unit', '/device/?tag=AG-000028', 'other'],
   ['profiles', '/profiles/', 'other'],
   ['models', '/models/', 'other'],
   ['team', '/team/', 'other'],

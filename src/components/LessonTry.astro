@@ -61,14 +61,17 @@ const HOME = [
     { k: 'tasks', h: 'Your tasks', rows: ['Install the new video bar in Curlew · 2 Oct', 'Swap the X72 in Skylark · 23 Oct'] },
   ] },
 ];
-const STAGE_TEXT = [
-  ['Knowledge', 'Holds the standard: space types, device types, setup guides and spaces.', 'Everything else, by hand, as today.'],
-  ['Live', 'Shows health and incidents from the asset register, device management and monitoring.', 'Fix what is red; decide what is urgent.'],
-  ['Process', 'Runs projects, playbooks, the year plan and the Lab.', 'Own the tasks; sign each gate.'],
-  ['Act', 'Makes an approved change in the other systems, then reads it back to check.', 'Approve every change before it is made.'],
-  ['Assist', 'Answers questions from the knowledge and the live evidence.', 'Check the answer; make the call.'],
-  ['Agents', 'Watches in the background and proposes tasks, with the evidence.', 'Accept, change or dismiss every proposal.'],
+// Modules and agents: the method's module table (docs/keia-method.md 2.7), and the one rule the try runs.
+const MODULES = [
+  ['Device catalogue', 'Models with cited facts, ports and drawings; standards; setup guides'],
+  ['Locations', 'Floor plans, every device a health circle, who is on site'],
+  ['Services', 'A map per service; levels within or past target'],
+  ['Support', 'One queue for incidents, requests, problems and changes; hand-offs; standing rules'],
+  ['Projects', 'Playbooks; a programme that is always current; deploy batches that verify instead of tick'],
+  ['Vendors', 'Contracts and end dates; cases; performance from the record'],
+  ['Knowledge', 'Runbooks, lessons, guides, glossary, with owners and review dates'],
 ];
+const MODULE_STATES = ['On', 'Connected', 'Off'];
 // How a room works: a fault, found the way the team really does it. Start from the report, look
 // remotely, follow the signal from source to screen, fix and test on site, then record it. The wiring
 // is Curlew's own (large, dual display): the table cable goes to the HDBaseT transmitter in the table
@@ -487,29 +490,28 @@ const tick = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke
   </div>
 )}
 
-{id === 'stages' && (
-  <div class="tr tr-stg" data-tr="stages">
-    <label class="sg-l" for="sg-range">Switched on, up to: <b data-sg-n>{STAGE_TEXT[0][0]}</b></label>
-    <input id="sg-range" type="range" min="1" max="6" step="1" value="1" data-sg-range />
-    <ol class="sg-ladder" aria-hidden="true">{STAGE_TEXT.map((s, i) => <li class={i === 0 ? 'on' : ''} data-sg={i + 1}><span class="mono">{i + 1}</span>{s[0]}</li>)}</ol>
-    <div class="sg-cols" data-sg-host>
-      {STAGE_TEXT.map((s, i) => (
-        <div class="sg-pane" data-sg-pane={i + 1} hidden={i > 0}>
-          <div><small>Keia Atlas does by itself</small><p>{s[1]}</p></div>
-          <div><small>People decide</small><p>{s[2]}</p></div>
-        </div>
+{id === 'modules' && (
+  <div class="tr tr-mod" data-tr="modules">
+    <ul class="md-list" data-md-list>
+      {MODULES.map(([name, what], i) => (
+        <li class="md-row" data-md-row data-state={i === 0 ? 'on' : 'off'}>
+          <div class="md-t"><b>{name}</b><span>{what}</span><em class="md-src" data-md-src hidden>from an outside tool, with its source and time on each figure</em></div>
+          <div class="md-seg" role="radiogroup" aria-label={`${name}: On, Connected or Off`}>
+            {MODULE_STATES.map((st) => <button type="button" role="radio" aria-checked={(i === 0 ? 'On' : 'Off') === st ? 'true' : 'false'} data-md-s={st.toLowerCase()}>{st}</button>)}
+          </div>
+        </li>
       ))}
-    </div>
-    <div class="sg-agent">
-      <p class="sg-ah"><Icon name="agent" size={18} /><b>Refresh planner</b><span class="faint">an agent</span></p>
-      <p><small>Noticed</small>Four more X52s at the New York office pass their years in service next quarter.</p>
-      <p><small>Proposes</small>Add them to PRJ-12 as a second batch.</p>
-      <div class="sg-btns" data-sg-btns>
-        <button type="button" class="btn small primary" data-sg-d="Accepted: a task is added to PRJ-12 for the project manager.">Accept</button>
-        <button type="button" class="btn small" data-sg-d="Changed: you moved it to next year's plan instead.">Change</button>
-        <button type="button" class="btn small ghost" data-sg-d="Dismissed: nothing happens, and the agent remembers why.">Dismiss</button>
+    </ul>
+    <p class="md-sum" aria-live="polite"><b data-md-sum>1 On, 0 Connected, 6 Off.</b> The smallest useful setup is the device catalogue.</p>
+    <div class="md-rule">
+      <p class="md-rh"><Icon name="agent" size={18} /><b>The DNS rule</b><span class="faint">a standing rule · owner: Niamh</span></p>
+      <p><small>What it may do</small>Routine work that can be put back, within its limits. Nothing outside the rule runs.</p>
+      <div class="md-btns">
+        <button type="button" class="btn small primary" data-md-run="back">A record has drifted (it can be put back)</button>
+        <button type="button" class="btn small" data-md-run="firmware">A firmware update is due (it cannot be put back)</button>
       </div>
-      <p class="sg-out" data-sg-out hidden></p>
+      <p class="md-out" data-md-out hidden></p>
     </div>
+    <p class="tr-hint" data-hint-out aria-live="polite"></p>
   </div>
 )}
