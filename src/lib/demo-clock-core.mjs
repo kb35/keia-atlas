@@ -60,6 +60,9 @@ export const DATE_FIELDS = {
   'meeting-quality': { shift: ['read_at'] },
   'model-choices': { shift: ['since', 'review'] },
   'on-call': { shift: ['weeks[].from'] },
+  // Experience centres: events and demo kit are story, so they move with the demo.
+  events: { shift: ['date', 'checks.content', 'checks.recording', 'checks.room_tests.*', 'demo_kit[].out', 'demo_kit[].back'] },
+  'demo-kit': { shift: ['units[].charged_at', 'units[].tested'] },
   // An integrator's own records (Northlight AV, data/providers/): all story, so every date moves with the demo.
   providers: { shift: ['counted', 'jobs[].days[]', 'orders[].expected', 'orders[].raised', 'orders[].received', 'packs[].accepted.at', 'packs[].handed_over', 'packs[].sent', 'packs[].training[].on', 'people[].certs[].expires', 'reviews[].generated', 'reviews[].reviewed', 'rota[].from', 'rota[].to', 'surveys[].surveyed', 'visits[].days[]', 'accepted', 'design.surveyed', 'lost.on', 'opened', 'updated', 'versions[].date'] },
   'out-of-service': { shift: ['since', 'until'] },
