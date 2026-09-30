@@ -1,9 +1,10 @@
 // What the guide's pages need about one room, worked out once at build time (files starting with _ are
 // not pages). `forClient` is the little the browser needs to make a report or a request and read its status back.
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { parse } from 'yaml';
-import { spaces, sites, KIND, href } from '../../lib/data.mjs';
+import { loadYaml } from '../../lib/demo-clock.mjs';
+import { spaces, sites, KIND, href, DEMO_TODAY } from '../../lib/data.mjs';
 import { incidentList, byUrgency } from '../../lib/incidents.mjs';
 import { PEOPLE } from '../../lib/demo.mjs';
 import { loadPrivacy, recordFor, isSensing } from '../../lib/privacy.mjs';
@@ -16,10 +17,10 @@ let access = null;
 function loadAccess() {
   if (access) return access;
   const dir = path.join(process.cwd(), 'data', 'accessibility');
-  access = existsSync(dir) ? Object.fromEntries(readdirSync(dir).filter((f) => f.endsWith('.yaml')).map((f) => [f.slice(0, -5), parse(readFileSync(path.join(dir, f), 'utf8'))])) : {};
+  access = existsSync(dir) ? Object.fromEntries(readdirSync(dir).filter((f) => f.endsWith('.yaml')).map((f) => [f.slice(0, -5), loadYaml(path.join(dir, f))])) : {};
   return access;
 }
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = DEMO_TODAY;
 const titleOf = (x) => (x.number ? `${x.number} ${x.name}` : x.name);
 
 // The nearest room at the site whose loop passed a test in the last year: same floor first.

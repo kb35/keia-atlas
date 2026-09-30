@@ -2,10 +2,10 @@
 // list of every unit in the fleet that each capability's pure rules work from. Pages import the views from here; the
 // rules themselves are in licences.mjs, checks.mjs, outofservice.mjs, alerts.mjs, credentials.mjs, flaws.mjs,
 // backups.mjs and quality.mjs, which load nothing, so tests run them alone.
-import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { readdirSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { parse } from 'yaml';
-import { spaces, sites, models, classes, DEMO_TODAY, href, KIND } from './data.mjs';
+import { loadYaml } from './demo-clock.mjs';
+import { spaces, sites, models, classes, DEMO_TODAY, CLOCK, demoShift, href, KIND } from './data.mjs';
 import { sentence, subjectOf, routeWords, simulatedAlerts, alertCounts } from './alerts.mjs';
 import { credentialRows, credentialSummary, expiryWords, LEVEL_WORD } from './credentials.mjs';
 import { flawRows, flawSummary, flawsForUnit, SEVERITY_WORD, SEVERITY_TONE, FIX_WORD } from './flaws.mjs';
@@ -28,7 +28,7 @@ export function readRecords(folder) {
       if (n.startsWith('.')) continue;
       const f = path.join(d, n);
       if (statSync(f).isDirectory()) walk(f);
-      else if (n.endsWith('.yaml')) out.push(parse(readFileSync(f, 'utf8')));
+      else if (n.endsWith('.yaml')) out.push(loadYaml(f));
     }
   };
   walk(dir);
@@ -66,10 +66,16 @@ for (const [sid, s] of Object.entries(sites)) {
 }
 export const hearingLoops = {};
 for (const a of readRecords('accessibility')) for (const [sid, r] of Object.entries(a.rooms ?? {})) if (r.hearing_loop?.tested) hearingLoops[sid] = r.hearing_loop.tested;
+// The rounds are worked out on the calendar the demo was written on (the anchor), then moved with the rolling demo
+// clock (docs/rules/data.md F12), so the story holds on any build date: the same rounds due this week, the same one
+// overdue. A round's weekday stays; its week of the month may not.
+const back = (d) => addDays(d, -CLOCK.offsetDays);
+const anchorToday = back(DEMO_TODAY);
 export const checkRounds = rounds(checkPlans, {
-  spaces: Object.values(spaces).map((s) => ({ id: s.id, site: s.site, type: s.space_type })), techs: techOf, loops: hearingLoops,
-  from: addDays(DEMO_TODAY, -62), to: addDays(DEMO_TODAY, 120), today: DEMO_TODAY,
-});
+  spaces: Object.values(spaces).map((s) => ({ id: s.id, site: s.site, type: s.space_type })), techs: techOf,
+  loops: Object.fromEntries(Object.entries(hearingLoops).map(([k, v]) => [k, back(v)])),
+  from: addDays(anchorToday, -62), to: addDays(anchorToday, 120), today: anchorToday,
+}).map((r) => ({ ...r, id: r.id.replace(r.date, demoShift(r.date)), date: demoShift(r.date), ...(r.last ? { last: demoShift(r.last) } : {}) }));
 export const checkTotals = checksSummary(checkRounds, DEMO_TODAY);
 export const checkWork = checkRounds.map((r) => checkItem(r, { link: href, siteName: (s) => sites[s]?.name ?? s, spaceTitle }));
 

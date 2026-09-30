@@ -1,16 +1,15 @@
 // Planning: the baseline plan by financial year, built once from the data (projects, the work plan, the comms
 // room sizing, the team and data/planning/*.yaml), and everything the Planning page and its script need to
 // price it, add scenarios to it and check it against the team's hours. The rules are in planningcore.mjs.
-import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { parse } from 'yaml';
+import { loadYaml } from './demo-clock.mjs';
 import { sites, siteStats, projects, plans, classes, commsRooms, SITE_ORDER, DEMO_TODAY, className, PROJECT_KIND } from './data.mjs';
 import { policy, dueList, NOW_YEAR } from './refresh.mjs';
 import { PEOPLE } from './demo.mjs';
 import { commsFacts, sizeFor } from './comms.mjs';
 import { ROLES, REGIONS, fyOf, fyId, fyLabel, fySpan, fyOfDue, groupOf, emptyYear, yearTotals, applyScenario, compare, effectWords, PROJECT_ROLE_TO_ROLE, roleHours, unitEur } from './planningcore.mjs';
 
-const readPlanning = (name) => parse(readFileSync(path.join(process.cwd(), `data/planning/${name}.yaml`), 'utf8'));
+const readPlanning = (name) => loadYaml(path.join(process.cwd(), `data/planning/${name}.yaml`));
 export const ratios = readPlanning('ratios');
 export const headcount = readPlanning('headcount');
 export const budget = readPlanning('budget');

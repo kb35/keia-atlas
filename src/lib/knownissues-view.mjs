@@ -4,9 +4,9 @@
 //
 // Each unit's firmware version is simulated the same way as the Devices overview (src/lib/livemodel.mjs):
 // most units on the standard, about one in twelve a release behind. Stage 2 reads it from device management.
-import { readFileSync, readdirSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import path from 'node:path';
-import { parse } from 'yaml';
+import { loadYaml } from './demo-clock.mjs';
 import { spaces, sites, models, classes, vendors, projects, advisories, SITE_ORDER, firmwareLines, firmwareFor, standardFirmware, modelName, src, deviceName, DEMO_TODAY, KIND } from './data.mjs';
 import { incidentList, when, RES_LABEL } from './incidents.mjs';
 import { seedOf, rand } from './livesim.mjs';
@@ -17,7 +17,7 @@ export * from './knownissues.mjs';
 
 const read = (folder) => {
   const dir = path.join(process.cwd(), 'data', folder);
-  return readdirSync(dir).filter((n) => n.endsWith('.yaml')).sort().map((n) => parse(readFileSync(path.join(dir, n), 'utf8')));
+  return readdirSync(dir).filter((n) => n.endsWith('.yaml')).sort().map((n) => loadYaml(path.join(dir, n)));
 };
 export const feeds = read('known-issues');
 export const makerCases = read('maker-cases');

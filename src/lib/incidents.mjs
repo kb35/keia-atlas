@@ -2,9 +2,10 @@
 // how long it has been in each state, and the history around it. Worked out once at build time.
 import { incidents, spaces, sites, projects, INC_STATE, className, modelName, incidentPath } from './data.mjs';
 import { PEOPLE } from './demo.mjs';
+import { demoShift } from './demo-clock.mjs';
 
 // The demo's "now": the morning of DEMO_TODAY, after the last ticket in the sample data came in.
-export const DEMO_NOW = '2026-09-28T12:00';
+export const DEMO_NOW = demoShift('2026-09-28T12:00');
 export const HOLD_LABEL = { 'awaiting-caller': 'Waiting for the caller', 'awaiting-vendor': 'Waiting for the vendor', 'awaiting-change': 'Waiting for a change', 'awaiting-parts': 'Waiting for parts' };
 export const RES_LABEL = { fixed: 'Fixed', workaround: 'Workaround', 'no-fault-found': 'No fault found', duplicate: 'Duplicate', cancelled: 'Cancelled' };
 export const STATE_ORDER = ['new', 'in-progress', 'on-hold', 'resolved'];
