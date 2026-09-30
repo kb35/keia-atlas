@@ -1,0 +1,11 @@
+---
+/* RulesData: the standing rules as JSON for the browser (src/lib/rules-client.mjs reads #rs-rules), so the "How was
+   this done?" card can be drawn for whoever is viewing and runs made in the demo join the ones in the data. Small:
+   five rules and their recorded runs (the quiet nightly runs are left out; the strip draws them on the server). */
+import { RULE_LIST, PEOPLE_MAP, LOG_PATH, href } from '../lib/rules-view.mjs';
+import { DEMO_TODAY } from '../lib/data.mjs';
+const keep = ['id', 'name', 'title', 'owner', 'service', 'approved', 'verb', 'reversal', 'conditions', 'caps', 'steps', 'reads', 'rules_out', 'not_checked', 'window'];
+const rules = Object.fromEntries(RULE_LIST.map((r) => [r.id, { ...Object.fromEntries(keep.filter((k) => r[k] != null).map((k) => [k, r[k]])), runs: r.runs }]));
+const json = JSON.stringify({ rules, people: PEOPLE_MAP, today: DEMO_TODAY, log: href(LOG_PATH) }).replace(/</g, '\\u003c');
+---
+<script type="application/json" id="rs-rules" set:html={json} />

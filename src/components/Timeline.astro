@@ -1,0 +1,135 @@
+---
+/* Timeline: the record's events, newest first, grouped by day (UI-V2 §8.3). Each entry is a time (Mono), a glyph or
+   the kind's mark, who (a person, a team, "rule: DNS rule (Niamh)"), what, and where it came from. Automatic entries
+   end with "How was this done?". Filters above: All, People, Rules, Connectors, Changes, each with its count.
+   Props:  entries  the rows (see src/lib/timeline.mjs)
+           today    the demo's day, for "Today, 28 Sept"
+           id       the list's id, so a script can add a row: window.rsTimelineAdd(id, entry, { by })
+           label    what the timeline is of, for screen readers
+   Motion: a live row enters at its centre once (--dur-enter) inside a held box (rsHold), with a "Liam, just now"
+   mark when someone else made it (M10). Filters swap rows at once inside a held box; the marker slides (M12).
+   The day label sticks under the top bar while its rows are in view. Nothing scrolls inside the timeline. */
+import { KINDS, listHtml } from '../lib/timeline.mjs';
+interface Entry { at: string; kind: string; who: string; what: string; [k: string]: unknown }
+interface Props { entries: Entry[]; today: string; id?: string; label?: string }
+const { entries, today, id = 'timeline', label = 'Timeline' } = Astro.props;
+const count = (k: string) => (k === 'all' ? entries.length : entries.filter((e) => e.kind === k).length);
+---
+<div class="tl" data-tl={id} data-tl-today={today}>
+  <div class="tl-f" role="group" aria-label={`Show on the ${label.toLowerCase()}`} data-help="timeline.filter">
+    {KINDS.map((k, i) => (
+      <button type="button" class="tl-fb" data-tl-f={k.id} aria-pressed={i === 0 ? 'true' : 'false'} hidden={k.id !== 'all' && count(k.id) === 0 && k.id !== 'rule'}>
+        {k.label} <span class="tl-c" data-tl-c={k.id}>{count(k.id)}</span>
+      </button>
+    ))}
+  </div>
+  <ol class="tl-l" aria-label={label} data-tl-list set:html={listHtml(entries, today)} />
+  <p class="tl-none" data-tl-none hidden>Nothing of this kind on the record yet.</p>
+</div>
+
+<script>
+  import { rowHtml, dayHtml, parts } from '../lib/timeline.mjs';
+  const W = window as any, D = document;
+  const M = () => (W.rsMotion ? W.rsMotion() : { reduced: true });
+  function apply(tl: HTMLElement) {
+    const on = tl.querySelector<HTMLElement>('[data-tl-f][aria-pressed="true"]')?.dataset.tlF ?? 'all';
+    const list = tl.querySelector<HTMLElement>('[data-tl-list]')!;
+    const days = new Set<string>();
+    list.querySelectorAll<HTMLElement>('.tl-row').forEach((r) => { const show = on === 'all' || r.dataset.tlKind === on; r.hidden = !show; if (show) days.add(r.dataset.tlDay ?? ''); });
+    list.querySelectorAll<HTMLElement>('.tl-day').forEach((d) => { d.hidden = !days.has(d.dataset.tlDayLabel ?? ''); });
+    tl.querySelector<HTMLElement>('[data-tl-none]')!.hidden = days.size > 0;
+  }
+  function counts(tl: HTMLElement) {
+    const rows = [...tl.querySelectorAll<HTMLElement>('.tl-row')];
+    tl.querySelectorAll<HTMLElement>('[data-tl-c]').forEach((c) => {
+      const k = c.dataset.tlC!; const n = k === 'all' ? rows.length : rows.filter((r) => r.dataset.tlKind === k).length;
+      c.textContent = String(n);
+      const b = c.closest<HTMLElement>('[data-tl-f]')!; if (n > 0) b.hidden = false;
+    });
+  }
+  /** Add a live row at the top of its day (a new day gets its label). `by` names someone else who made it (M10). */
+  W.rsTimelineAdd = (id: string, entry: any, { by = '' } = {}) => {
+    const tl = D.querySelector<HTMLElement>(`[data-tl="${CSS.escape(id)}"]`); if (!tl) return null;
+    if (entry.id && tl.querySelector(`[data-tl-id="${CSS.escape(entry.id)}"]`)) return null;
+    const list = tl.querySelector<HTMLElement>('[data-tl-list]')!, today = tl.dataset.tlToday || '';
+    const { day } = parts(entry.at);
+    let row: HTMLElement | null = null;
+    const put = () => {
+      // Newest first: the day's label goes before the first older day; the row before the first older row that day.
+      let label = list.querySelector<HTMLElement>(`[data-tl-day-label="${day}"]`);
+      if (!label) {
+        const t = D.createElement('template'); t.innerHTML = dayHtml(day, today); label = t.content.firstElementChild as HTMLElement;
+        const older = [...list.querySelectorAll<HTMLElement>('[data-tl-day-label]')].find((l) => (l.dataset.tlDayLabel ?? '') < day);
+        list.insertBefore(label, older ?? null);
+      }
+      const t = D.createElement('template'); t.innerHTML = rowHtml(entry); row = t.content.firstElementChild as HTMLElement;
+      const hm = parts(entry.at).hm;
+      let before: Element | null = null;
+      for (let el = label.nextElementSibling; el && !el.matches('.tl-day'); el = el.nextElementSibling) {
+        const t2 = el.querySelector('time')?.getAttribute('datetime') ?? '';
+        if (parts(t2).hm <= hm) { before = el; break; }
+      }
+      if (before) list.insertBefore(row, before);
+      else { let end: Element = label; while (end.nextElementSibling && !end.nextElementSibling.matches('.tl-day')) end = end.nextElementSibling; end.after(row); }
+      counts(tl); apply(tl);
+    };
+    if (W.rsHold) W.rsHold(tl, put); else put();
+    const m = M();
+    if (row && !m.reduced && (row as HTMLElement).animate) (row as HTMLElement).animate([{ opacity: 0, transform: 'scale(.97)' }, { opacity: 1, transform: 'none' }], { duration: m.enter, easing: m.ease });
+    if (row && by && W.rsMarkChanged) W.rsMarkChanged((row as HTMLElement).querySelector('.tl-w'), by);
+    return row;
+  };
+  function init() {
+    D.querySelectorAll<HTMLElement>('[data-tl]').forEach((tl) => {
+      if (tl.dataset.tlOn) return; tl.dataset.tlOn = '1';
+      const group = tl.querySelector<HTMLElement>('.tl-f')!;
+      W.rsMarkerWatch?.(group, '[aria-pressed=true]:not([hidden])');
+      group.addEventListener('click', (e) => {
+        const b = (e.target as HTMLElement).closest<HTMLElement>('[data-tl-f]'); if (!b) return;
+        group.querySelectorAll('[data-tl-f]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        if (W.rsHold) W.rsHold(tl, () => apply(tl)); else apply(tl);
+      });
+    });
+  }
+  D.addEventListener('astro:page-load', init);
+</script>
+
+<style is:global>
+  .tl { display: grid; gap: 12px; }
+  .tl-f { display: inline-flex; flex-wrap: wrap; justify-self: start; max-width: 100%; padding: 3px; gap: 2px; border-radius: var(--pill-radius); border: 1px solid var(--line); background: var(--surface); }
+  .tl-fb { appearance: none; border: 0; background: none; min-height: 32px; padding: 0 12px; border-radius: var(--pill-radius); font: var(--fw-name) var(--fs-support)/1 var(--font-sans); color: var(--text-2); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: color var(--dur-state) var(--ease-settle), background var(--dur-hover) var(--ease-settle); }
+  .tl-fb:hover { color: var(--text); background: var(--surface-2); }
+  .tl-fb[aria-pressed="true"] { color: var(--on-ink); }
+  .tl-f:not(.rs-marked) .tl-fb[aria-pressed="true"] { background: var(--ink); }
+  .tl-fb[hidden] { display: none; }
+  .tl-c { font: 500 var(--fs-mark)/1 var(--font-mono); font-variant-numeric: tabular-nums; opacity: .8; }
+  .tl-l { list-style: none; margin: 0; padding: 0; display: grid; }
+  .tl-day { position: sticky; top: calc(var(--mast-h, 60px) + 0px); z-index: 1; padding: 10px 0 6px; background: var(--bg); }
+  .tl-day span { font: 500 var(--fs-overline)/1 var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); }
+  .tl-day[hidden], .tl-row[hidden] { display: none; }
+  .tl-row { position: relative; display: grid; grid-template-columns: 52px 24px minmax(0, 1fr); gap: 12px; padding: 9px 0; align-items: start; }
+  /* The spine: a hairline through the nodes, broken at each day label. */
+  .tl-row::before { content: ""; position: absolute; left: calc(52px + 12px + 11.5px); top: 0; bottom: 0; width: 1px; background: var(--line); }
+  .tl-day + .tl-row::before { top: 16px; }
+  .tl-t { font: 500 var(--fs-code)/1.4 var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text-2); padding-top: 2px; }
+  .tl-n { position: relative; z-index: 1; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--bg); }
+  .tl-mk { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: var(--surface-2); color: var(--text-2); }
+  .tl-mk svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .tl-mk-rule { box-shadow: inset 0 0 0 1px var(--line-strong); background: var(--surface); }
+  .tl-b { min-width: 0; display: grid; gap: 2px; }
+  .tl-w { margin: 0; font-size: var(--fs-body); line-height: 1.45; overflow-wrap: anywhere; position: relative; }
+  .tl-who { font-weight: var(--fw-name); }
+  .tl-w a { color: inherit; }
+  .tl-how { color: var(--text-3); white-space: nowrap; }
+  .tl-m { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: var(--fs-support); color: var(--text-2); }
+  .tl-src { font: 500 var(--fs-mark)/1.5 var(--font-mono); color: var(--quiet); padding: 0 5px; border: 1px solid var(--line); border-radius: 4px; }
+  .tl-none { margin: 0; color: var(--text-2); font-size: var(--fs-body); }
+  @media (max-width: 599px) {
+    .tl-row { grid-template-columns: 24px minmax(0, 1fr); column-gap: 10px; row-gap: 0; }
+    .tl-row::before { left: 11.5px; }
+    .tl-t { grid-column: 2; grid-row: 1; padding: 0; }
+    .tl-n { grid-column: 1; grid-row: 1 / span 2; }
+    .tl-b { grid-column: 2; }
+    .tl-fb { min-height: 40px; }
+  }
+</style>
