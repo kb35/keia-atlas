@@ -32,19 +32,11 @@ const LEGACY = {
 /** One of the seven states for any state word the site already uses ('ok', 'warn', 'bad', 'off', 'good'...). */
 export const stateOf = (s) => (STATES.includes(s) ? s : LEGACY[String(s ?? '').toLowerCase()] ?? 'off');
 
-// Points on the ring, angles in degrees clockwise from 12 o'clock, centre 8 8, radius 6 (a 16 unit box).
-const P = (a) => { const r = (a * Math.PI) / 180; return `${(8 + 6 * Math.sin(r)).toFixed(3)} ${(8 - 6 * Math.cos(r)).toFixed(3)}`; };
-const arc = (a1, a2) => `<path class="hg-s" d="M${P(a1)}A6 6 0 ${a2 - a1 > 180 ? 1 : 0} 1 ${P(a2)}"/>`;
-const SHAPE = {
-  fine: '<circle class="hg-s" cx="8" cy="8" r="6"/>',
-  review: arc(65, 365),
-  fault: `${arc(30, 150)}${arc(210, 330)}<circle class="hg-dot" cx="8" cy="8" r="1.5"/>`,
-  stale: '<circle class="hg-s hg-dash" cx="8" cy="8" r="6" stroke-dasharray="2.4 2.3"/>',
-  progress: arc(90, 360),
-  planned: '<circle class="hg-s hg-thin" cx="8" cy="8" r="6"/>',
-  // The slash runs from 10 o'clock (300°) to 4 o'clock (120°).
-  off: '<circle class="hg-s hg-thin" cx="8" cy="8" r="6"/><line class="hg-s hg-thin" x1="2.804" y1="5" x2="13.196" y2="11"/>',
-};
+// The km-ring (notes/logo/LIBRARY.md, motion 3): every state is the same circle with a dash pattern set by the
+// state (src/styles/motion-library.css), plus the fault's dot and the off slash, so a state change eases in place
+// instead of swapping shapes. data-s names the state in the markup; the pattern comes from .hg[data-state].
+const RING = (s) => `<circle class="hg-s hg-ring" data-s="${s}" pathLength="1" cx="8" cy="8" r="6"/><circle class="hg-dot" cx="8" cy="8" r="1.5"/><line class="hg-s hg-thin hg-slash" pathLength="1" x1="2.804" y1="5" x2="13.196" y2="11"/>`;
+const SHAPE = Object.fromEntries(['fine', 'review', 'fault', 'stale', 'progress', 'planned', 'off'].map((s) => [s, RING(s)]));
 
 /** The inner SVG shapes for a state (the 16 unit box). */
 export const shape = (state) => SHAPE[stateOf(state)];
@@ -77,8 +69,8 @@ export function setGlyph(el, state, { title, word } = {}) {
   const s = stateOf(state);
   if (el.dataset.state !== s) {
     el.dataset.state = s;
-    const svg = el.querySelector('svg');
-    if (svg) svg.innerHTML = SHAPE[s];
+    const ring = el.querySelector('.hg-ring');
+    if (ring) ring.setAttribute('data-s', s); else { const svg = el.querySelector('svg'); if (svg) svg.innerHTML = SHAPE[s]; }
   }
   const w = el.querySelector('.hg-w');
   if (w) w.textContent = typeof word === 'string' ? word : WORD[s];

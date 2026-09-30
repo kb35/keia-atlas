@@ -1,0 +1,142 @@
+/* Keia motion library (notes/logo/LIBRARY.md): twelve micro-motions, one language, the site's single source for
+   them. Ported from notes/logo/motion-library.css: its token block is gone (the tokens are in motion.css, per look),
+   type comes from the scale in craft.css, and Fine is drawn in its calm colour, not --quiet.
+   Rules (MOTION-V2 section 1): a motion explains a change, plays once, never overshoots, and has a reduced-motion
+   form that keeps the meaning. Every duration is a token times --km-t, which is 1 normally and 0 under reduced
+   motion, so one switch turns every motion into its end state. Class prefix km-; scripts in src/lib/motion-library.js. */
+
+:root {
+  --km-t: 1;
+  --km-pop:   calc(var(--dur-pop)   * var(--km-t));
+  --km-exit:  calc(var(--dur-exit)  * var(--km-t));
+  --km-state: calc(var(--dur-state) * var(--km-t));
+  --km-zoom:  calc(var(--dur-zoom)  * var(--km-t));
+  --km-enter: calc(var(--dur-enter) * var(--km-t));
+  --km-chip:  calc(var(--dur-chip)  * var(--km-t));
+  --km-flash: calc(var(--dur-flash) * var(--km-t));
+  --km-stagger: calc(var(--stagger) * var(--km-t));
+}
+@media (prefers-reduced-motion: reduce) { :root:not([data-reduced="false"]) { --km-t: 0; } }
+:root[data-reduced="true"] { --km-t: 0; }
+
+/* ---------- 2. km-draw: a stroke draws on, once. Any path with pathLength="1". ----------
+   Static markup is the end frame (drawn). .km-play on the element or an ancestor runs it; --km-delay staggers it. */
+@keyframes km-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+.km-draw { stroke-dasharray: 1; stroke-dashoffset: 0; }
+.km-play .km-draw, .km-draw.km-play { animation: km-draw var(--km-state) var(--ease-settle) both; animation-delay: calc(var(--km-delay, 0ms) * var(--km-t)); }
+
+/* ---------- 1. km-logo: the slot for the mark's one-time animation (two km-draw strokes, the second a beat later). */
+.km-logo { width: 32px; height: 32px; display: block; }
+.km-logo .km-logo-a { --km-delay: 0ms; }
+.km-logo .km-logo-b { --km-delay: var(--dur-state); }
+
+/* ---------- km-on: a light coming on. A thing appears in place, once: grows from --pop-scale with opacity. */
+@keyframes km-on { from { opacity: 0; transform: scale(var(--pop-scale)); } }
+.km-on { transform-box: fill-box; transform-origin: center; }
+.km-play .km-on, .km-on.km-play { animation: km-on var(--km-pop) var(--ease-settle) both; animation-delay: calc((var(--km-delay, 0ms) + var(--i, 0) * var(--stagger)) * var(--km-t)); }
+
+/* ---------- 3. km-ring: the health glyph (HealthGlyph.astro, glyph() in src/lib/health.mjs). ----------
+   One circle (pathLength 1, dash offset fixed at -.3333, so the pattern starts at 7 o'clock) draws every state as a
+   dash pattern of four entries, so a state change is one stroke-dasharray transition: the ring breaks, notches or
+   dashes in place (--dur-state). The fault's dot grows; the off slash draws. Coming on (M8, .lit): the ring closes
+   from 7 o'clock both ways and meets at 1 o'clock, once. Colour: the state's fill token; Fine is calm, not grey. */
+.hg-ring { stroke-dashoffset: -.3333; stroke-dasharray: .5 0 .5 0;
+  transition: stroke-dasharray var(--km-state) var(--ease-settle), stroke-width var(--km-state) var(--ease-settle); }
+.hg-ring[data-s="review"] { stroke-dasharray: .4167 .1667 .4167 0; }
+.hg-ring[data-s="fault"] { stroke-dasharray: .3333 .1667 .3333 .1667; }
+.hg-ring[data-s="progress"] { stroke-dasharray: .4167 .25 .3333 0; }
+.hg-ring[data-s="stale"] { stroke-dasharray: .0637 .0613 .0637 .0613; }
+.hg .hg-ring[data-s="planned"], .hg .hg-ring[data-s="off"] { stroke-width: calc(var(--hg-thin) * 16 / var(--hg-px, 16)); }
+.hg-dot { transform-box: fill-box; transform-origin: center; transform: scale(0); transition: transform var(--km-state) var(--ease-settle); }
+.hg-ring[data-s="fault"] ~ .hg-dot { transform: scale(1); }
+.hg-slash { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset var(--km-state) var(--ease-settle); }
+.hg-ring[data-s="off"] ~ .hg-slash { stroke-dashoffset: 0; }
+@keyframes km-ring-on { from { stroke-dasharray: 0 1 0 0; } }
+.hg.lit .hg-ring { animation: km-ring-on var(--km-flash) var(--ease-settle) both; }
+.hg.lit svg { animation: none; }   /* the ring closing replaces the older scale-in */
+
+/* ---------- 4. km-chip: the With chip. Text and mark slide left out, the new ones in; the width eases (held box). */
+.km-chip { position: relative; display: inline-flex; align-items: center; height: 28px; padding: 0 10px 0 5px; border-radius: 999px;
+  background: var(--h-progress-soft, var(--surface-2)); color: inherit; font: var(--fw-name) var(--fs-code)/1 var(--font-sans); white-space: nowrap; overflow: hidden;
+  transition: width var(--km-chip) var(--ease-settle); }
+.km-chip-body { display: inline-flex; align-items: center; gap: 7px; }
+.km-chip-body.km-leaving { position: absolute; left: 5px; top: 0; height: 100%; pointer-events: none; }
+.km-chip-mark { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  background: var(--ink); color: var(--on-ink); font: 600 8.5px/1 var(--font-sans); letter-spacing: .02em; }
+.km-chip-mark[data-kind="team"] { border-radius: 4px; }
+.km-chip-mark[data-kind="vendor"] { background: transparent; color: inherit; box-shadow: inset 0 0 0 1.5px currentColor; }
+.km-chip-mark[data-kind="rule"] { background: transparent; color: inherit; box-shadow: inset 0 0 0 1.5px currentColor; border-radius: 3px; }
+.km-chip .km-chip-when { color: var(--text-2); font-weight: 500; }
+
+/* ---------- 5. km-peek: a peek inside a container (the plan, the hero) grows from its anchor after --peek-rest; moving
+   to a neighbour slides it. The site-wide hover card is Peek.astro, which makes the same move. */
+.km-peek { position: absolute; z-index: 2; min-width: 160px; padding: 8px 10px; border-radius: var(--radius, 8px); background: var(--surface); color: var(--text);
+  box-shadow: var(--shadow-lg); border: var(--border-card); font-size: var(--fs-code); line-height: 1.35; pointer-events: none;
+  opacity: 0; transform: scale(var(--pop-scale)); transform-origin: var(--km-origin, left top);
+  transition: opacity var(--km-pop) var(--ease-settle), transform var(--km-pop) var(--ease-settle), translate var(--km-pop) var(--ease-settle); }
+.km-peek.km-open { opacity: 1; transform: none; }
+.km-peek b { font-weight: var(--fw-title); }
+
+/* ---------- 6. km-heartbeat: text only. Its words change; nothing moves. Stale eases to fault ink, once.
+   The band's heartbeat is Heartbeat.astro (src/lib/heartbeat.mjs), which keeps the same rule. */
+.km-heartbeat { font: 500 var(--fs-code)/1.4 var(--font-mono); font-variant-numeric: tabular-nums; color: var(--quiet); text-underline-offset: 3px; transition: color var(--km-state) var(--ease-settle); }
+.km-heartbeat.km-stale { color: var(--h-fault-ink); text-decoration: underline dashed; }
+
+/* ---------- 7. km-zoom: one level in or out inside a frame (the front door's hero). Between pages the zoom is the
+   Shell's (src/lib/zoom-client.mjs, nav.css), which makes the same move on the same spring. */
+.km-zoom { position: relative; overflow: hidden; border-radius: var(--radius-lg); }
+.km-zoom-plan, .km-zoom-page { position: absolute; inset: 0; transform-origin: center; }
+.km-zoom-page { visibility: hidden; transform-origin: 0 0; }
+.km-zoom[data-level="page"] .km-zoom-page { visibility: visible; }
+.km-zoom[data-level="page"] .km-zoom-plan { visibility: hidden; }
+.km-zoom [data-zoom] { cursor: pointer; }
+.km-zoom-path { display: flex; gap: 6px; align-items: center; font: 500 var(--fs-mark)/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.km-zoom-path .km-step { display: inline-block; }
+.km-zoom-path .km-step.km-in { animation: km-step-in var(--km-pop) var(--ease-settle) both; }
+@keyframes km-step-in { from { opacity: 0; transform: translateX(8px); } }
+
+/* ---------- 8. km-toggle: a switch (role="switch", aria-checked). The knob travels on --dur-pop; the track on --dur-state. */
+.km-toggle { position: relative; width: 40px; height: 24px; padding: 0; border: 0; border-radius: 999px; cursor: pointer; flex: none;
+  background: var(--surface-3); transition: background-color var(--km-state) var(--ease-settle); }
+.km-toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .25); transition: transform var(--km-pop) var(--ease-settle); }
+.km-toggle[aria-checked="true"] { background: var(--ink); }
+.km-toggle[aria-checked="true"]::after { transform: translateX(16px); }
+
+/* ---------- 9. km-copy: "Copy" cross-fades to "Copied" and a small tick draws; the words return after --dur-linger. */
+.km-copy { position: relative; display: inline-grid; align-items: center; font: var(--fw-name) var(--fs-code)/1 var(--font-sans); padding: 6px 10px; border-radius: var(--btn-radius, 6px);
+  border: 1px solid var(--line-strong); background: transparent; color: inherit; cursor: pointer; }
+.km-copy > span { grid-area: 1 / 1; display: inline-flex; align-items: center; gap: 6px; transition: opacity var(--km-pop) var(--ease-settle); }
+.km-copy .km-copy-done { opacity: 0; }
+.km-copy.km-done .km-copy-idle { opacity: 0; }
+.km-copy.km-done .km-copy-done { opacity: 1; }
+.km-copy svg { width: 12px; height: 12px; display: block; }
+.km-copy .km-copy-done .km-draw { animation: none; stroke-dashoffset: 1; }
+.km-copy.km-done .km-copy-done .km-draw { animation: km-draw var(--km-state) var(--ease-settle) both; }
+
+/* ---------- 10. km-toast: rises from the bottom (--dur-enter), leaves downward (--dur-exit on --ease-exit); one at a
+   time, a second replaces the words in place. The site's host is fixed at the bottom of the window (Motion.astro). */
+.km-toast-host { position: fixed; left: 0; right: 0; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); z-index: 95; display: flex; justify-content: center; padding: 0 16px; pointer-events: none; }
+@media (max-width: 767px) { .km-toast-host { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); } }
+.km-toast { pointer-events: auto; display: inline-flex; align-items: center; gap: 10px; max-width: min(560px, 100%); padding: 9px 8px 9px 16px; border-radius: var(--radius-lg);
+  background: var(--ink); color: var(--on-ink); font: 500 var(--fs-body)/1.35 var(--font-sans); box-shadow: var(--shadow-lg);
+  animation: km-rise var(--km-enter) var(--ease-settle) both; }
+.km-toast.km-out { animation: km-sink var(--km-exit) var(--ease-exit) both; pointer-events: none; }
+.km-toast .km-toast-text { min-width: 0; transition: opacity var(--km-pop) var(--ease-settle); }
+.km-toast .km-toast-text.km-swap { opacity: 0; }
+.km-toast button { font: inherit; font-size: var(--fs-support); font-weight: var(--fw-title); background: transparent; border: 1px solid color-mix(in srgb, var(--on-ink) 35%, transparent); border-radius: var(--btn-radius, 999px); color: inherit; cursor: pointer; padding: 5px 12px; }
+.km-toast button.km-toast-x { border: 0; padding: 4px 8px; font-size: 18px; line-height: 1; opacity: .75; }
+.km-toast button:hover { background: color-mix(in srgb, var(--on-ink) 14%, transparent); opacity: 1; }
+@keyframes km-rise { from { opacity: 0; transform: translateY(12px); } }
+@keyframes km-sink { to { opacity: 0; transform: translateY(12px); } }
+@media print { .km-toast-host { display: none !important; } }
+
+/* ---------- 11. km-empty: the empty state's glyph, from the health family, thin and quiet; it comes on once (km-on)
+   each time the empty state appears. EmptyState.astro. */
+.km-empty-g { width: 40px; height: 40px; display: block; flex: none; fill: none; stroke: var(--quiet); stroke-width: 1; stroke-linecap: round; }
+
+/* ---------- 12. km-skeleton: slots at final size with a still --surface-2 wash; the wash goes and the content
+   cross-fades in; glyphs come on in turn; the heartbeat last. rsFill(box, fill) in Motion.astro. */
+.km-skel { position: relative; }
+.km-skel > .km-wash { position: absolute; inset: 0; z-index: 1; border-radius: inherit; background: var(--surface-2); pointer-events: none; transition: opacity var(--km-state) var(--ease-settle); }
+.km-skel.km-loaded > .km-wash { opacity: 0; }

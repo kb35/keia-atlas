@@ -38,6 +38,8 @@ Every move uses a token; nothing types a number. Scripts read the same values fr
 
 Retired: `--dur-pulse` (the fault pulse), `--dur-blink` (rack link lights), `--dur-fill` (bars filling to their value), and every loop on a working page.
 
+Each look sets its own tempo with these tokens (`motion.css`), so changing the look changes its motion as well as its colour: Studio is warm and calm (the values above); Enterprise is crisp (about a fifth shorter, a tighter curve and spring, a smaller press); Playful is a little livelier (a little longer, a deeper press, still no overshoot); High contrast moves as little as it can (short fades, no press, no stagger); the Drawing set's lines draw on.
+
 - **Why:** one rhythm reads as one system, and one edit retunes it.
 - **Do:** `transition: background-color var(--dur-hover) var(--ease-settle)`; an exit on `--ease-exit`.
 - **Don't:** `transition: all .3s ease`, or a number typed into a script.
@@ -221,3 +223,52 @@ A list that appears with the page (a card grid, a list of rows) makes one quiet 
 - **Why:** a move that drops frames reads as slowness, not polish.
 - **Do:** measure the heaviest move on a page with reduced CPU.
 - **Don't:** animate `width`, `top`, `box-shadow` or `filter` on a list.
+
+### M16. The motion budget: small places, never overwhelming
+
+1. **Motion only at a moment of change** the person caused or needs to know about. Never ambient, never decorative, never looping.
+2. **Hierarchy.** Navigation (zoom, page to page, card to page) is the largest move; then state change (a ring, the With chip, a section opening or closing); then feedback (hover, press, copy, a toggle); then text updates (the heartbeat's words), which do not move at all.
+3. **Budget per screen.** Outside the person's own action, at most one thing moves at a time. A new fault moves at most three things, once (M13, row 15). A list reveal is one quiet stagger, once per page load, never on a re-render.
+4. **Small by default.** Hover and press are the lightest moves (`--dur-hover` and `--dur-press`, no layout shift). Nothing larger than the element itself moves unless it is navigation.
+5. **Still places.** Data, tables, charts, numbers and reading text never animate.
+
+- **Why:** motion that is everywhere stops meaning anything, and a busy screen is tiring to work in all day.
+- **Do:** count what moves on a screen when nothing was pressed: it should be none, or one.
+- **Don't:** add a move to a page that already has one playing, or animate a figure, a table row or a chart.
+
+### M17. The motion library is the one source
+
+The twelve micro-motions of the Keia motion library (`notes/logo/LIBRARY.md`) live in `src/styles/motion-library.css` and `src/lib/motion-library.js` (`window.km`), loaded on every page by `src/components/Motion.astro`. Their durations and curves are the tokens in `motion.css`, so each look keeps its tempo; their spring is V2's (`src/lib/spring.mjs`, `--ease-spring`); `--km-t` is 0 under reduced motion, so every one of them lands on its end state.
+
+| # | Motion | In the site |
+|---|---|---|
+| 1 | `km-logo` | The mark's one-time draw (front door; the mark is not final) |
+| 2 | `km-draw` | Any stroke that draws on (`pathLength="1"`); the Drawing set's section rules |
+| 3 | `km-ring` | Every health glyph: `HealthGlyph.astro`, and `glyph()` and `setGlyph()` in `src/lib/health.mjs`. A state change eases the ring's dash pattern in place; M8's "coming on" is the ring closing |
+| 4 | `km-chip` | `km.chip()`, for `WithChip` (the Home round) |
+| 5 | `km-peek` | `Peek.astro` makes this move site-wide; `km.peek()` for a peek inside a frame |
+| 6 | `km-heartbeat` | `Heartbeat.astro` keeps the same rule (words only; stale once) |
+| 7 | `km-zoom` | Between pages, `src/lib/zoom-client.mjs`; inside a frame (the front door's hero), `km.zoomIn()` |
+| 8 | `km-toggle` | `.km-toggle` switches |
+| 9 | `km-copy` | `km.copy()`; the build sheet's copy buttons make the same move |
+| 10 | `km-toast` | `window.rsToast()` (Report, the Schedule) is `km.toast()` in a host at the foot of the window |
+| 11 | `km-empty` | `EmptyState.astro`: a thin planned ring that comes on once each time the empty state appears |
+| 12 | `km-skeleton` | `window.rsFill(box, fill)`: the wash only after `--skeleton-skip`, gone when the content arrives |
+
+- **Why:** one library, one set of tokens, one spring: the site moves as one thing.
+- **Do:** reach for a `km-` motion before writing a new one.
+- **Don't:** copy a motion's keyframes into a page.
+
+### M18. The motion map
+
+What moves where, page type by page type, so it can be audited. Everything not listed is still.
+
+| Page type | On arrival | On the person's action | On its own (at most one at a time) |
+|---|---|---|---|
+| Every page | `main` rises in (M5); glyphs come on in turn (M8, `km-ring`); a list in view makes one quiet stagger | Hover (row 1), press (row 2), focus (row 3); peeks (M11); toasts (`km-toast`) | The heartbeat's words; a live change by a colleague (M10) |
+| List (Spaces, Incidents, Assets, the Work list) | As every page | Filter, Sort, view switch (row 22); Show all (row 4); card to record (row 5) | A row entering or leaving when a signal arrives or clears (rows 15, 16) |
+| Record (a space, a device, a job) | As every page; the record's picture arrives by transform from its card | DetailTabs (row 4); the side panel's content cross-fades (row 10); zoom in and out (rows 6, 7); signal flow only while switched on (row 30) | A glyph's state easing once (row 15) |
+| Office and region | As every page | Select a space (row 10); change floor (row 8); zoom (row 6) | One glyph breaking once (row 15) |
+| Services | As every page | Filter the units (row 22) | A service's light changing once (row 15) |
+| Settings | Grows from its button (M11) | Look, light and dark (row 24); density (row 25); a module (row 26); markers slide (M12) | None |
+| Home, the front door, the method pages | Owned by their rounds, within this budget (M16) | | |
