@@ -10,8 +10,9 @@
 // its centre (--dur-enter), the plan's one ring closes. Reduced motion: every change at once; the chip's words swap.
 // Skipping Verify and closing anyway is allowed and honest: the close reads "Unable to complete: not verified".
 import HealthGlyph from '../HealthGlyph.astro';
+import WithChip from '../WithChip.astro';
 import { building } from '../../lib/floors.mjs';
-import { href } from '../../lib/data.mjs';
+import { href, DEMO_TODAY } from '../../lib/data.mjs';
 
 const M = building('dub');
 const F = M.floors.find((f) => f.id === '3');
@@ -40,12 +41,7 @@ const STEPS = [
       <h3 id="fx-t" class="fx-title"><HealthGlyph state="fault" size={24} title="video bar offline since 07:52" class="fx-glyph lit" /> Video bar offline · 3.09 Whooper Swan</h3>
       <p class="fx-answer" data-fx-answer aria-live="polite">Offline since 07:52. Booked 09:00, 8 people.</p>
       <div class="fx-with" data-fx-with aria-live="polite">
-        <span class="fx-chip"><span class="fx-track" data-fx-track>
-          <span class="fx-c">Ready for you</span>
-          <span class="fx-c">With you · since <span data-fx-when>08:10</span></span>
-          <span class="fx-c">Resolved · <span data-fx-took>21 min</span></span>
-          <span class="fx-c">Unable to complete · not verified</span>
-        </span></span>
+        <WithChip own={{ s: 'ready', to: 'liam', kind: 'person', at: `${DEMO_TODAY}T07:52:00` }} history={[{ at: `${DEMO_TODAY}T07:52:00`, text: 'Offered to Liam by the record' }]} />
       </div>
       <dl class="fx-facts">
         <div><dt>Unit</dt><dd>Poly Studio X72 · dub-309-vc01 <span class="fx-src">from the build sheet</span></dd></div>
@@ -90,20 +86,38 @@ const STEPS = [
 <script>
   import { motion } from '../../lib/motion-read.mjs';
   import { setGlyph } from '../../lib/health.mjs';
+  import { chipOf } from '../../lib/ownership.mjs';
+  import { setChip } from '../../lib/withchip.mjs';
 
   const ORDER = ['take', 'check', 'fix', 'verify', 'close'];
+  const PEOPLE = { liam: { name: 'Liam', first: 'Liam', initials: 'L' }, niamh: { name: 'Niamh', first: 'Niamh', initials: 'N' } };
   const clock = (mins: number) => { const t = 8 * 60 + 10 + mins; return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };
 
   function init(root: HTMLElement) {
     if ((root as any).__fx) return; (root as any).__fx = true;
     const q = <T extends HTMLElement>(s: string) => root.querySelector<T>(s)!;
     const steps = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-fx-step]'));
-    const log = q<HTMLOListElement>('[data-fx-log]'), track = q('[data-fx-track]'), answer = q('[data-fx-answer]');
+    const log = q<HTMLOListElement>('[data-fx-log]'), answer = q('[data-fx-answer]');
+    // The With chip (WithChip.astro), drawn for Liam as the viewer: "Ready for you", then "With you", then "Done".
+    const chipHost = q('[data-wc-host]'), today = chipHost.dataset.wcToday || '';
+    const own = (s: string, at: string, extra: Record<string, unknown> = {}) => ({ s, to: 'liam', kind: 'person', at: `${today}T${at}:00`, ...extra });
+    const chipTo = (rec: Record<string, unknown>, history?: { at: string; text: string }[]) => { const el = chipHost.querySelector<HTMLElement>('[data-wc]'); if (el) setChip(el, chipOf(rec, 'liam', { people: PEOPLE, today }), history ? { history } : {}); };
+    const history: { at: string; text: string }[] = [{ at: '07:52', text: 'Offered to you by the record' }];
+    // The front door has no Shell, so WithChip's own script is told who is looking: Liam, the Dublin technician.
+    const W = window as any;
+    if (!W.rsWhoId) W.rsWhoId = () => 'liam';
+    if (!W.RS_PEOPLE) W.RS_PEOPLE = [{ id: 'liam', name: 'Liam Doyle', initials: 'LD' }, { id: 'niamh', name: 'Niamh', initials: 'N' }];
+    chipTo(own('ready', '07:52'), history);
+    setTimeout(() => chipTo(own('ready', '07:52'), history), 0);
     const glyph = q('.fx-glyph'), ring = q('[data-fx-ring]'), room = q('[data-fx-room]'), planCap = q('[data-fx-plan-cap]'), beat = q('[data-fx-beat]');
     const done = q('[data-fx-done]'), how = q<HTMLButtonElement>('[data-fx-how]'), howCard = q('[data-fx-fact="how"]');
     const facts = (id: string) => Array.from(root.querySelectorAll<HTMLElement>(`[data-fx-fact="${id}"]`));
     let i = 0, mins = 0, verified = false;
-    const chip = (k: number) => { const m = motion(); track.style.transition = m.reduced ? 'none' : ''; track.style.transform = `translateY(${-k * 30}px)`; };
+    const chip = (k: number) => {
+      if (k === 1) { history.unshift({ at: clock(0), text: 'You took it' }); chipTo(own('with', clock(0)), history); }
+      if (k === 2) { history.unshift({ at: clock(4), text: 'You resolved it' }); chipTo(own('done', clock(4)), history); }
+      if (k === 3) { history.unshift({ at: clock(4), text: 'You closed it without a test' }); chipTo(own('done', clock(4)), history); }
+    };
     const entry = (t: string, what: string, src: string) => {
       const li = document.createElement('li');
       li.innerHTML = `<time>${t}</time><span>${what}</span><small>${src}</small>`;
@@ -129,7 +143,7 @@ const STEPS = [
       verify() { mins = 3; verified = true; root.querySelector('[data-fx-now2]')!.textContent = clock(3); reveal('verify'); entry(clock(3), '<b>Test call connected</b> · camera and audio fine', 'from the test'); answer.textContent = 'Verified: test call connected, camera and audio fine.'; },
       close() {
         mins = 4;
-        const took = `${20 + mins} min`; root.querySelector('[data-fx-took]')!.textContent = took;
+        const took = `${20 + mins} min`;
         if (!verified) { setGlyph(glyph, 'review', { title: 'closed without a test' }); chip(3); entry(clock(4), '<b>Closed without verifying</b> · Unable to complete: not verified', 'by Liam'); answer.textContent = 'Unable to complete: closed without a test. It stays To review.'; }
         else { reveal('ask'); chip(2); entry(clock(4), '<b>Resolved</b> · what fixed it: restart under the restart rule; codec hang after firmware 4.6.x', 'by Liam · kept on the known error, now used on 15'); answer.textContent = `Resolved in ${took}, before the 09:00 booking.`; }
         // The plan: the one ring closes, the room's tint goes, the floor is all fine.
@@ -171,9 +185,6 @@ const STEPS = [
   .fx-title { margin: 0; display: flex; align-items: center; gap: 10px; font: 600 clamp(18px, 1.8vw, 22px)/1.2 var(--font-sans); letter-spacing: -.02em; }
   .fx-answer { margin: 0; font-size: 14.5px; line-height: 1.4; }
   .fx-with { display: flex; }
-  .fx-chip { display: block; height: 30px; overflow: hidden; border-radius: 999px; background: var(--h-progress-soft, var(--blue-soft)); color: var(--h-progress-ink, var(--blue-ink)); max-width: 100%; }
-  .fx-track { display: block; transition: transform var(--dur-chip, 320ms) var(--ease-settle); }
-  .fx-c { display: block; height: 30px; line-height: 30px; padding: 0 14px; font-size: 13px; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .fx-facts { margin: 0; display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
   .fx-facts div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 4px 14px; align-items: baseline; }
   .fx-facts dt { font-size: 12.5px; color: var(--text-3); }
@@ -234,5 +245,5 @@ const STEPS = [
     .fx-facts div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
     .fx-step { grid-template-columns: 24px minmax(0, 1fr); }
   }
-  @media (prefers-reduced-motion: reduce) { .fx-track, .fp-room, .fp-ring * , .fx-step { transition: none; } .fx-fact-hid.is-in { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .fp-room, .fp-ring * , .fx-step { transition: none; } .fx-fact-hid.is-in { animation: none; } }
 </style>
