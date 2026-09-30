@@ -1,4 +1,5 @@
 # Connector common parts: the pieces every connected record shares (docs/connectors/model.md).
+# Canonical model v1. Every field is Experimental: fields are added, never renamed.
 #
 # A connected record is what a connector brought in from another system, in Keia's own shape.
 # Every one carries a source mark (which system, which record there, a link back, when it was last
@@ -76,9 +77,77 @@ $defs:
     type: object
 
   raw_redacted:
-    description: Paths in `raw` whose values were emptied because the field looked like a password, token or key.
+    description: >-
+      Paths in `raw` whose values were emptied on the way in: the field looked like a password, token or key, or
+      it named a person (a privacy decision, such as an asset's "checked out to").
     type: array
     items: { type: string }
+
+  seen:
+    description: >-
+      What other systems say about this record's fields, kept beside the owner's value and never written over it.
+      One list per field, one entry per system, each with its own mark. When a seen value differs from the owner's,
+      Keia raises a drift event (io.keia.drift.found) for a person to look at; nothing is overwritten.
+    type: object
+    propertyNames: { pattern: "^[a-z][a-z0-9_]*$" }
+    additionalProperties:
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required: [value, system, synced_at]
+        properties:
+          value: { description: The value that system holds. }
+          system: { $ref: "#/$defs/system" }
+          instance: { type: string, minLength: 1 }
+          record_id: { type: string, minLength: 1, description: "The record in that system that holds the value." }
+          url: { $ref: "#/$defs/link" }
+          synced_at: { $ref: "#/$defs/when", description: "When Keia last took a changed value from that system." }
+          differs: { const: true, description: "Set when the value differs from the owner's: a drift event was raised." }
+
+  team:
+    description: The team that looks after the record. A team, never a person.
+    type: string
+    minLength: 1
+
+  contacts:
+    description: Who to call about the record, by contact record (an organisation or a role at one), never a person's own details.
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [contact]
+      properties:
+        contact: { $ref: "#/$defs/id", description: A connected contact. }
+        role: { type: string, minLength: 1, description: "Why you would call them about this record (Carrier NOC, Maintenance)." }
+        priority: { type: integer, minimum: 1, maximum: 9, description: 1 is called first. }
+
+  status:
+    description: >-
+      Keia's status for the network kinds (network, address, connection, circuit, group): planned, reserved,
+      in-service, retired. Reserved is for networks and addresses held for later. Left out when the system's own
+      word does not map cleanly; a carrier's "Offline" is still in service, with "Offline" beside it.
+    enum: [planned, reserved, in-service, retired]
+
+  mac:
+    description: A MAC address, lower case, colon separated (00:00:5e:00:53:2a). Adapters normalise what they read.
+    type: string
+    pattern: "^([0-9a-f]{2}:){5}[0-9a-f]{2}$"
+
+  ip:
+    description: An IPv4 or IPv6 address, with or without a prefix length (192.0.2.10, 192.0.2.10/26, 2001:db8::10/64).
+    type: string
+    pattern: "^(([0-9]{1,3}\\.){3}[0-9]{1,3}|[0-9a-fA-F:]*:[0-9a-fA-F:.]*)(/[0-9]{1,3})?$"
+
+  prefix:
+    description: A subnet in CIDR form (192.0.2.64/26, 2001:db8:10::/64).
+    type: string
+    pattern: "^(([0-9]{1,3}\\.){3}[0-9]{1,3}|[0-9a-fA-F:]*:[0-9a-fA-F:.]*)/[0-9]{1,3}$"
+
+  day:
+    description: A date (2027-03-14).
+    type: string
+    format: date
 
   notes:
     type: array

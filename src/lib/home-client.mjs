@@ -11,7 +11,7 @@ import { navigate } from 'astro:transitions/client';
 import { cockpit, welcomeBand, rowState, planDay, dueWords, clock, spanWords } from './homecore.mjs';
 import { chipOf, verbsFor, apply, historyLine, clockWords, VERBS } from './ownership.mjs';
 import { chipHtml, setChip } from './withchip.mjs';
-import { glyph, setGlyph } from './health.mjs';
+import { glyph, setGlyph, tally } from './health.mjs';
 import { parkRead, parkEdit, slotsHtml } from './handover.mjs';
 
 const W = window, D = document;
@@ -129,6 +129,7 @@ function actionFor(model, me, all) {
     case 'pm': return me.roleId === 'programme' ? ['Open the year plan', '/work/schedule/?view=year'] : ['Open your projects', `/projects/?owner=${me.id}`];
     case 'lead': return ['Open Locations', '/locations/'];
     case 'vendor': return ['Open your installation', '/vendor/'];
+    case 'provider': return ['Open your clients', '/portfolio/'];
     default: return ['Team schedule', '/work/schedule/?view=day&scope=team'];
   }
 }
@@ -184,11 +185,11 @@ function pictures(model, viewer) {
   if (office) {
     const sh = C.siteHealth[office], nm = siteName(office);
     root.querySelector('[data-floors-name]').textContent = nm;
-    root.querySelector('[data-floors-say]').textContent = sh.fault.length || sh.review.length ? `${sh.fault.length ? `${sh.fault.length} with a fault` : ''}${sh.fault.length && sh.review.length ? ' · ' : ''}${sh.review.length ? `${sh.review.length} to review` : ''}` : `${sh.n} ready`;
+    root.querySelector('[data-floors-say]').textContent = tally(sh.fault.length, sh.review.length);
     const a = root.querySelector('[data-floors-link]'); a.setAttribute('href', link(`/locations/${office}/`)); a.innerHTML = `Open the office <span aria-hidden="true">→</span>`;
   }
   const est = C.offices.reduce((a, s) => ({ f: a.f + C.siteHealth[s].fault.length, r: a.r + C.siteHealth[s].review.length }), { f: 0, r: 0 });
-  root.querySelector('[data-estate-say]').textContent = `${C.offices.length} offices${est.f ? ` · ${est.f} with a fault` : ''}${est.r ? ` · ${est.r} to review` : ''}`;
+  root.querySelector('[data-estate-say]').textContent = `${C.offices.length} offices · ${tally(est.f, est.r)}`;
 }
 
 // Done automatically today, what changed overnight, knowledge to review: in the viewer's scope.

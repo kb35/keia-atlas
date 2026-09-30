@@ -52,6 +52,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { spring } from './spring.mjs';
 import { createLabels } from './hero-labels.mjs';
+import { clock } from './front-loop.mjs';
 
 // The interior palette and the lights (HeroZoom.astro sets them on .hz, light and dark), plus the two health colours.
 const TOKENS = ['--in-slab', '--in-room-floor', '--in-corr', '--in-rug', '--in-town', '--in-wall', '--in-feature', '--in-cap', '--in-core', '--in-wc', '--in-glass',
@@ -157,7 +158,7 @@ function wallPlan(f, rooms) {
 
 export function mountHero(host, D, hooks = {}, opts = {}) {
   const cs = getComputedStyle(host);
-  const reduced = opts.reduced ?? matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reduced = opts.reduced ?? (window.rsReducedNow ? window.rsReducedNow() : matchMedia('(prefers-reduced-motion: reduce)').matches);
   const DUR = { theme: ms(cs, '--dur-theme', 360), move: ms(cs, '--dur-hero-move', 1800), hold: ms(cs, '--dur-hero-hold', 700), state: ms(cs, '--dur-state', 300), stagger: ms(cs, '--stagger', 24), lift: ms(cs, '--dur-hero-lift', 1400) };
   let T = readTokens(host);
   let lifted = 0, focus = 0, shadowDirty = true;   // the fourth floor's lift, the story room's fit-out (0..1)
@@ -412,13 +413,19 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
   };
   // Near and far planes follow the distance, so depth stays precise at every level and nothing near is clipped.
   const planes = (r) => { const n = Math.min(2, Math.max(0.1, r * 0.02)), f = r * 5 + 150; if (Math.abs(camera.near - n) > 1e-3 || Math.abs(camera.far - f) > 0.5) { camera.near = n; camera.far = f; camera.updateProjectionMatrix(); } };
+  // Time for the moves, which stops while the picture is paused (WCAG 2.2.2; pause() and resume() below): every
+  // tween and timed change reads now(), and the sequence's waits are on a clock that pauses with it.
+  let pausedAt = 0, pausedFor = 0;
+  const now = () => (pausedAt || performance.now()) - pausedFor;
+  const clk = clock();
+  const later = (ms, fn) => clk.later(ms, fn);
   let tween = null;
   function moveTo(v, dur = DUR.move) {
     if (reduced || !dur) { tween = null; target.copy(v.target); camera.position.copy(v.pos); camera.lookAt(target); planes(v.pos.distanceTo(v.target)); controls.update(); requestRender(); return; }
     const s0 = new Spherical().setFromVector3(camera.position.clone().sub(target)), s1 = new Spherical().setFromVector3(v.pos.clone().sub(v.target));
     let dt = s1.theta - s0.theta; if (dt > Math.PI) dt -= 2 * Math.PI; if (dt < -Math.PI) dt += 2 * Math.PI;
     stepUp();
-    tween = { t0: performance.now(), s: spring({ duration: dur, bounce: 0 }), from: { t: target.clone(), s: s0 }, to: { t: v.target.clone(), s: s1, dt } };
+    tween = { t0: now(), s: spring({ duration: dur, bounce: 0 }), from: { t: target.clone(), s: s0 }, to: { t: v.target.clone(), s: s1, dt } };
     requestRender();
   }
   const sph = new Spherical(), off = new Vector3();
@@ -437,7 +444,7 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
   const anims = new Set();
   const animate = (dur, fn) => new Promise((res) => {
     if (reduced || !dur) { fn(1); requestRender(); res(); return; }
-    const a = { t0: performance.now(), s: spring({ duration: dur, bounce: 0 }), fn, res }; anims.add(a); requestRender();
+    const a = { t0: now(), s: spring({ duration: dur, bounce: 0 }), fn, res }; anims.add(a); requestRender();
   });
   function stepAnims(now) {
     for (const a of anims) { const t = now - a.t0, e = a.s.at(t); a.fn(e); if (t >= a.s.duration) { anims.delete(a); a.res(); } }
@@ -464,7 +471,7 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
   const setRing = (r, on) => { r.on = on; r.g.visible = on > 0.004; r.back.opacity = 0.92 * on; (r.state === 'fault' ? r.hot : r.quiet).opacity = on; };
   const ringsTo = (list, to) => { for (const r of list) toward(() => r.on, (v) => setRing(r, v), to, DUR.state); };
   const breakRing = (r) => { r.state = 'fault'; r.fine.visible = false; r.broken.visible = true; r.hot.opacity = r.on; r.quiet.opacity = 0; };
-  const sleep = (t) => new Promise((r) => setTimeout(r, reduced ? 0 : t));
+  const sleep = (t) => new Promise((r) => { if (reduced) setTimeout(r, 0); else later(t, r); });
 
   // ---- Rings face the camera and keep their size on screen.
   const tmp = new Vector3(), tmpQ = new Quaternion();
@@ -492,9 +499,9 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
   // ---- Drawing only while something moves, and only while the stage is on screen and the tab shown.
   let pending = false, alive = true, onScreen = true;
   function requestRender() { if (!pending && alive) { pending = true; requestAnimationFrame(frame); } }
-  function frame(now) {
+  function frame(ts) {
     pending = false; if (!alive) return;
-    const moving = stepTween(now), more = stepAnims(now), damping = controls.enabled && controls.update();
+    const t = now(), moving = !pausedAt && stepTween(t), more = !pausedAt && stepAnims(t), damping = controls.enabled && controls.update();
     if (!onScreen || document.hidden) return;   // resumes (from the current time) when it is seen again
     placeRings();
     if (shadowDirty) { renderer.shadowMap.needsUpdate = true; shadowDirty = false; }
@@ -502,7 +509,7 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
     const size = [renderer.domElement.clientWidth, renderer.domElement.clientHeight];
     labels.place(project, lifted, size, keepClear());
     hooks.onFrame?.(project);
-    if (moving || more || damping) { adapt(now); requestRender(); } else lastFrame = 0;
+    if (moving || more || damping) { adapt(ts); requestRender(); } else lastFrame = 0;
   }
   const v3 = new Vector3();
   function project(pos) {
@@ -554,14 +561,14 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
   const showDevRings = async (on) => {
     if (on) {
       if (story.ring.on > 0) { roomRingWas = story.ring.on; animate(DUR.state, (e) => setRing(story.ring, roomRingWas * (1 - e))); }
-      for (let i = 0; i < devRings.length; i++) { const r = devRings[i]; setTimeout(() => animate(DUR.state, (e) => setRing(r, e)), reduced ? 0 : i * DUR.stagger * 3); }
+      for (let i = 0; i < devRings.length; i++) { const r = devRings[i]; later(reduced ? 0 : i * DUR.stagger * 3, () => animate(DUR.state, (e) => setRing(r, e))); }
       await sleep(devRings.length * DUR.stagger * 3 + DUR.state);
       const vb = devRings.find((r) => r.g.userData.dev.fault); if (vb && vb.state !== 'fault') breakRing(vb); requestRender();
     } else { for (const r of devRings) setRing(r, 0); if (roomRingWas && story.ring.on < roomRingWas) { const from = story.ring.on; animate(DUR.state, (e) => setRing(story.ring, from + (roomRingWas - from) * e)); } }
     requestRender();
   };
   // The labels of a level arrive as the camera settles, a little after the move starts.
-  const wordsAt = (i, delay) => { const my = seq; const f = () => { if (seq === my && alive) { labels.level(i); requestRender(); } }; if (reduced || !delay) f(); else setTimeout(f, delay); };
+  const wordsAt = (i, delay) => { const my = seq; const f = () => { if (seq === my && alive) { labels.level(i); requestRender(); } }; if (reduced || !delay) f(); else later(delay, f); };
   let ringsShown = false;
   async function go(i, animateIt = true) {
     seq++; level = i; hooks.onLevel?.(i);
@@ -588,7 +595,7 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
     moveTo(VIEWS.floor()); liftTo(1); await sleep(DUR.move * 0.55); if (!alive_()) return false;
     labels.level(1); requestRender();
     const floorRings = [...roomObj.values()].filter((o) => o.r.f === D.story.floor).sort((a, b) => a.r.r[0] - b.r.r[0]).map((o) => o.ring);
-    floorRings.forEach((r, i) => setTimeout(() => { if (alive_()) animate(DUR.state, (e) => setRing(r, e)); }, i * DUR.stagger * 2));
+    floorRings.forEach((r, i) => later(i * DUR.stagger * 2, () => { if (alive_()) animate(DUR.state, (e) => setRing(r, e)); }));
     ringsShown = true;
     await sleep(floorRings.length * DUR.stagger * 2 + DUR.state + DUR.hold * 0.8); if (!alive_()) return false;
     breakRing(story.ring); requestRender(); hooks.onBeat?.();
@@ -643,6 +650,9 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
 
   return {
     run, reset, go: (i, a) => { ringsOn(); return go(i, a); }, goRoom, recolour, requestRender,
+    // Pause and play the sequence where it is: the camera, the rings and the waits all stop, and carry on from there.
+    pause() { if (pausedAt) return; pausedAt = performance.now(); clk.pause(); },
+    resume() { if (!pausedAt) return; pausedFor += performance.now() - pausedAt; pausedAt = 0; clk.resume(); requestRender(); },
     storyAt: () => project(at3(story.ring.g)),
     deviceAt: () => { const vb = devRings.find((r) => r.g.userData.dev.fault); return vb && vb.g.visible && vb.on > 0.5 ? project(at3(vb.g)) : null; },
     level: () => level,

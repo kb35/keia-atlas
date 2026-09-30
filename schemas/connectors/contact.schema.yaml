@@ -1,0 +1,32 @@
+# Connected contact (v1, Experimental): someone to call about a record, as another system knows them. An
+# organisation (a carrier, a vendor, a landlord) or a role at one ("Carrier One NOC"), with role phone numbers and
+# role mailboxes only. Never a private person's details: people come later from the identity provider, matched
+# on its ids, and this schema has no field for a person's name.
+# Files live in data/connected/<system>/contacts/<id>.yaml. See docs/connectors/model.md.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/connectors/contact
+title: Connected contact
+type: object
+additionalProperties: false
+required: [kind, id, name, type, source]
+properties:
+  kind: { const: contact }
+  id: { $ref: "common#/$defs/id" }
+  type:
+    description: "organisation: a company or body. role: a desk or team at one (a NOC, a service desk), never a named person."
+    enum: [organisation, role]
+  name: { type: string, minLength: 1, description: "The organisation's name, or the role's (Carrier One NOC)." }
+  organisation: { type: string, minLength: 1, description: "For a role: the organisation it belongs to." }
+  role: { type: string, minLength: 1, description: "For a role: what it does (NOC, Service desk, Account team)." }
+  phone: { type: string, pattern: "^\\+?[0-9][0-9 ()-]{3,}$", description: A role's or an organisation's phone number. }
+  email: { type: string, format: email, description: "A role mailbox (noc@...), never a person's own address." }
+  url: { $ref: "common#/$defs/link" }
+  hours: { type: string, minLength: 1, description: "When they answer (24x7, weekdays 08:00 to 18:00)." }
+  atlas_vendor: { $ref: "common#/$defs/id", description: "Keia's link to a vendor in data/vendors. Owned by Keia." }
+  notes: { $ref: "common#/$defs/notes" }
+  source: { $ref: "common#/$defs/source" }
+  field_sources: { $ref: "common#/$defs/field_sources" }
+  seen: { $ref: "common#/$defs/seen" }
+  raw: { $ref: "common#/$defs/raw" }
+  raw_redacted: { $ref: "common#/$defs/raw_redacted" }

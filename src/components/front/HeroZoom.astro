@@ -18,8 +18,10 @@
 //          data-hz-why); ?hero=still or ?hero=3d forces one.
 // The run loops on its own (Keith, 30 Sept): it settles on its end frame, holds a calm pause (--dur-hero-rest), cross-
 // fades back to its first frame and runs again. It waits while the stage is off screen or the tab is hidden, and ends
-// for good once the visitor takes over (the strip, a key, a drag or a click). There is no replay control.
-// Reduced motion: the space, still and labelled, no loop; every level a click away and changing at once.
+// for good once the visitor takes over (the strip, a key, a drag or a click). There is no replay control. A pause
+// button in the stage's corner (WCAG 2.2.2, src/lib/front-loop.mjs) freezes either loop where it is, camera and all.
+// Reduced motion: the floor, still and labelled, no loop and no button; every level a click away, changing at once.
+// Keep things still: the still floor, paused; Play runs the still loop from there.
 import { building } from '../../lib/floors.mjs';
 import { buildRoom } from '../../lib/room3d.mjs';
 import { roomItems } from '../../lib/scene.mjs';
@@ -213,6 +215,7 @@ const LEVELS = [
 
 <script>
   import { motion } from '../../lib/motion-read.mjs';
+  import { clock, addPicture, pauseButton, freezeMoves, stillWanted } from '../../lib/front-loop.mjs';
 
   const VW = 960, VH = 600;
   // A duration token in ms. The build writes "760ms" as ".76s", so the unit is read, not assumed.
@@ -300,20 +303,32 @@ const LEVELS = [
       setStrip(L); placePins();
     }
     // The loop's gate: it moves only while the stage is on screen and the tab is shown, and waits otherwise.
-    let inView = false;
+    let inView = false, held = false;
+    const clk = clock();
     const waiters: (() => void)[] = [];
-    const visible = () => inView && document.visibilityState === 'visible';
+    const visible = () => inView && !held && document.visibilityState === 'visible';
     const wake = () => { if (visible()) waiters.splice(0).forEach((f) => f()); };
     const whenVisible = () => (visible() ? Promise.resolve() : new Promise<void>((r) => waiters.push(r)));
     if ('IntersectionObserver' in window) new IntersectionObserver((es) => { inView = es[es.length - 1].intersectionRatio >= 0.4; wake(); }, { threshold: [0, 0.4] }).observe(stage); else inView = true;
     document.addEventListener('visibilitychange', wake);
-    const wait = (t: number) => new Promise<void>((r) => setTimeout(r, t));
+    const wait = (t: number) => new Promise<void>((r) => { clk.later(t, r); });
     // The visitor takes over: the loop ends (each loop owns one generation, so a newer loop also ends an older one).
-    const stop = () => { auto = false; gen++; };
+    // Pause and play (WCAG 2.2.2): the loop, its waits, its cross-fades and the 3D camera stop where they are, and
+    // carry on. One button, in the stage's corner, for the still loop and the 3D alike.
+    const capLive = (on: boolean) => cap.setAttribute('aria-live', on ? 'polite' : 'off');
+    let setBtn = (_p: boolean) => {}, btn: HTMLElement | null = null, removePicture = () => {};
+    const freeze = (on: boolean) => { if (on) clk.pause(); else clk.resume(); freezeMoves(root, on); if (on) hero?.pause?.(); else hero?.resume?.(); };
+    const picture = {
+      stage,
+      hold() { if (!auto || held) return; held = true; freeze(true); setBtn(true); },
+      resume() { if (!held) return; held = false; freeze(false); setBtn(false); wake(); },
+    };
+    const stop = () => { auto = false; gen++; if (held) { held = false; freeze(false); } capLive(true); btn?.remove(); btn = null; removePicture(); };
     // Still: building, floor, space, device, a step each; hold the end frame; cross-fade home; again.
     async function loopStill() {
       const my = ++gen, live = () => auto && my === gen;
-      if (reducedNow()) { goStill(2); return; }
+      if (reducedNow()) { goStill(1); return; }
+      capLive(false);
       for (;;) {
         await whenVisible(); if (!live()) return;
         await wait(hold * 2);
@@ -340,6 +355,7 @@ const LEVELS = [
       if (force === 'still') return 'asked';
       if (force === '3d') return null;
       const n = navigator as any;
+      if (stillWanted()) return 'keep-still';
       if (stage.clientWidth < 700) return 'narrow';
       if (n.connection?.saveData) return 'save-data';
       if (reducedNow()) return 'reduced-motion';
@@ -349,7 +365,8 @@ const LEVELS = [
       const mean = await probe(1000);
       return mean > 22 ? 'slow-frames' : null;
     }
-    const useStill = (why: string) => { root.dataset.hzMode = 'still'; root.dataset.hzWhy = why; if (auto) loopStill(); };
+    // Keep things still: the floor, its fault named, paused; Play starts the loop from there.
+    const useStill = (why: string) => { root.dataset.hzMode = 'still'; root.dataset.hzWhy = why; if (why === 'keep-still') goStill(1); if (auto) loopStill(); };
 
     // The device level in 3D: the product drawing over the scene, fading in; the scene stays behind it.
     let over = false;
@@ -373,6 +390,7 @@ const LEVELS = [
     async function loop3d(h: any) {
       const my = ++gen, live = () => auto && my === gen;
       if (reducedNow()) { h.run(); return; }
+      capLive(false); if (held) h.pause();
       for (;;) {
         await whenVisible(); if (!live()) return;
         const done = await h.run(); if (!done || !live()) return;
@@ -427,6 +445,18 @@ const LEVELS = [
     // The site's Motion Off (or pause) mid-run: the loop stops where it is; nothing is forced back.
     new MutationObserver(() => { if (reducedNow()) stop(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-motion', 'data-reduced'] });
 
+    // Reduced motion: no loop and no button (the loop draws the still floor, with its words). Otherwise the pause
+    // button, and the page's "Pause animations" and Keep things still reach this picture too.
+    if (!reducedNow() && !capture) {
+      removePicture = addPicture(picture);
+      setBtn = pauseButton(stage, 'the demo office', () => (held ? picture.resume() : picture.hold()));
+      btn = stage.querySelector(':scope > .rs-pause');
+      btn?.addEventListener('pointerdown', (e) => e.stopPropagation());
+      btn?.addEventListener('click', (e) => e.stopPropagation());
+      btn?.addEventListener('keydown', (e) => e.stopPropagation());
+      setBtn(false);
+      if (stillWanted()) picture.hold();
+    }
     // Decide after first paint, when the page is idle; three.js is fetched only for the 3D.
     const decide = async () => {
       const why = await stillBecause();

@@ -1,0 +1,882 @@
+# Switch ports at the New York office: its VLANs and prefixes, the kit that acts as one, the addresses, and every
+# switch interface with what it is connected to. Made up for the demo; written by tools/migrations/2026-09-30-switch-ports.mjs,
+# in NetBox's names (docs/connectors/netbox-ports.md). In a live setup NetBox and the switch platform's connector (UniFi,
+# Meraki or Netgear) fill it; here it is recorded. The record is the plan; `seen` is what the switch reports where it
+# differs (a drift finding). Each cable trace is checked against the patch cords, the runs and the room wiring by
+# tools/crossrefs-switchports.mjs.
+site: nyc
+vlan_group: nyc
+read_at: "2026-09-30T06:00:00Z"
+source: { system: keia, synced_at: "2026-09-30T06:00:00Z" }
+# The VLAN group: every VLAN in the plan, its role, its prefix (IPAM), the gateway, and where addresses come from.
+vlans:
+  - { vid: 10, role: management, prefix: 10.10.10.0/24, gateway: 10.10.10.1, reserved: 10.10.10.20-10.10.10.219, pool: 10.10.10.220-10.10.10.254 }
+  - { vid: 20, role: corporate, prefix: 10.10.20.0/22, gateway: 10.10.20.1, reserved: 10.10.20.20-10.10.20.219, pool: 10.10.21.1-10.10.23.254 }
+  - { vid: 30, role: room-systems, prefix: 10.10.30.0/24, gateway: 10.10.30.1, reserved: 10.10.30.20-10.10.30.219, pool: 10.10.30.220-10.10.30.254 }
+  - { vid: 31, role: displays-and-signage, prefix: 10.10.31.0/24, gateway: 10.10.31.1, reserved: 10.10.31.20-10.10.31.219, pool: 10.10.31.220-10.10.31.254 }
+  - { vid: 40, role: av, prefix: 169.254.0.0/16, note: "Link-local in each room, on the in-room switch only; not routed" }
+  - { vid: 50, role: building, prefix: 10.10.50.0/24, gateway: 10.10.50.1, reserved: 10.10.50.20-10.10.50.219, pool: 10.10.50.220-10.10.50.254 }
+  - { vid: 60, role: security, prefix: 10.10.60.0/24, gateway: 10.10.60.1, reserved: 10.10.60.20-10.10.60.219, pool: 10.10.60.220-10.10.60.254 }
+  - { vid: 70, role: printers, prefix: 10.10.70.0/24, gateway: 10.10.70.1, reserved: 10.10.70.20-10.10.70.219, pool: 10.10.70.220-10.10.70.254 }
+  - { vid: 90, role: guest, prefix: 10.10.90.0/23, gateway: 10.10.90.1, pool: 10.10.90.20-10.10.91.254 }
+# Kit that acts as one (NetBox: virtual chassis; an HA pair and a cluster are the same idea). A change to one member is a change to the group.
+groups:
+  - { id: nyc-fw, kind: ha-pair, name: "Firewalls A and B, an active and passive pair", members: [AG-001567, AG-001568] }
+# Addresses (IPAM): each networked unit in its VLAN's prefix, with its MAC and DNS name. Switches are static; the rest are DHCP reservations.
+addresses:
+  - { address: 10.10.10.20/24, device: AG-003232, interface: lan-1, mac: "02:D6:39:B2:FE:9D", dns_name: nyc-20-ap01.aigna.example, assignment: dhcp-reservation }  # nyc-20-ap01
+  - { address: 10.10.10.21/24, device: AG-003233, interface: lan-1, mac: "02:D7:39:B2:FE:9D", dns_name: nyc-20-ap02.aigna.example, assignment: dhcp-reservation }  # nyc-20-ap02
+  - { address: 10.10.10.22/24, device: AG-003234, interface: lan-1, mac: "02:D8:39:B2:FE:9D", dns_name: nyc-20-ap03.aigna.example, assignment: dhcp-reservation }  # nyc-20-ap03
+  - { address: 10.10.10.23/24, device: AG-003235, interface: lan-1, mac: "02:D9:39:B2:FE:9D", dns_name: nyc-20-ap04.aigna.example, assignment: dhcp-reservation }  # nyc-20-ap04
+  - { address: 10.10.10.24/24, device: AG-000607, mac: "02:65:EB:B0:FE:B6", dns_name: nyc-2004-sw01.aigna.example, assignment: dhcp-reservation }  # nyc-2004-sw01
+  - { address: 10.10.10.25/24, device: AG-000658, mac: "02:01:EC:B0:FE:C0", dns_name: nyc-2010-sw01.aigna.example, assignment: dhcp-reservation }  # nyc-2010-sw01
+  - { address: 10.10.10.2/24, device: AG-001571, dns_name: nyc-2014-as01.aigna.example, assignment: static }  # nyc-2014-as01
+  - { address: 10.10.10.3/24, device: nyc-2014-as02, dns_name: nyc-2014-as02.aigna.example, assignment: static }  # nyc-2014-as02
+  - { address: 10.10.10.4/24, device: nyc-2014-as03, dns_name: nyc-2014-as03.aigna.example, assignment: static }  # nyc-2014-as03
+  - { address: 10.10.10.5/24, device: AG-001569, dns_name: nyc-2014-cs01.aigna.example, assignment: static }  # nyc-2014-cs01
+  - { address: 10.10.10.6/24, device: AG-001570, dns_name: nyc-2014-cs02.aigna.example, assignment: static }  # nyc-2014-cs02
+  - { address: 10.10.10.26/24, device: AG-003236, interface: lan-1, mac: "02:DA:39:B2:FE:9D", dns_name: nyc-21-ap01.aigna.example, assignment: dhcp-reservation }  # nyc-21-ap01
+  - { address: 10.10.10.27/24, device: AG-003237, interface: lan-1, mac: "02:DB:39:B2:FE:9D", dns_name: nyc-21-ap02.aigna.example, assignment: dhcp-reservation }  # nyc-21-ap02
+  - { address: 10.10.10.28/24, device: AG-003238, interface: lan-1, mac: "02:DC:39:B2:FE:9D", dns_name: nyc-21-ap03.aigna.example, assignment: dhcp-reservation }  # nyc-21-ap03
+  - { address: 10.10.10.29/24, device: AG-003239, interface: lan-1, mac: "02:DD:39:B2:FE:9D", dns_name: nyc-21-ap04.aigna.example, assignment: dhcp-reservation }  # nyc-21-ap04
+  - { address: 10.10.10.30/24, device: AG-003240, interface: lan-1, mac: "02:F3:39:B2:FE:9F", dns_name: nyc-21-ap05.aigna.example, assignment: dhcp-reservation }  # nyc-21-ap05
+  - { address: 10.10.10.31/24, device: AG-003241, interface: lan-1, mac: "02:F4:39:B2:FE:9F", dns_name: nyc-21-ap06.aigna.example, assignment: dhcp-reservation }  # nyc-21-ap06
+  - { address: 10.10.10.32/24, device: AG-003242, interface: lan-1, mac: "02:F5:39:B2:FE:9F", dns_name: nyc-21-ap07.aigna.example, assignment: dhcp-reservation }  # nyc-21-ap07
+  - { address: 10.10.10.33/24, device: AG-003243, interface: lan-1, mac: "02:F6:39:B2:FE:9F", dns_name: nyc-21-ap08.aigna.example, assignment: dhcp-reservation }  # nyc-21-ap08
+  - { address: 10.10.10.34/24, device: AG-000713, mac: "02:41:EF:B0:FE:F4", dns_name: nyc-2105-sw01.aigna.example, assignment: dhcp-reservation }  # nyc-2105-sw01
+  - { address: 10.10.10.7/24, device: AG-001572, dns_name: nyc-2123-as01.aigna.example, assignment: static }  # nyc-2123-as01
+  - { address: 10.10.10.8/24, device: AG-001573, dns_name: nyc-2123-as02.aigna.example, assignment: static }  # nyc-2123-as02
+  - { address: 10.10.10.9/24, device: AG-001574, dns_name: nyc-2123-as03.aigna.example, assignment: static }  # nyc-2123-as03
+  - { address: 10.10.10.10/24, device: AG-001575, dns_name: nyc-2123-as04.aigna.example, assignment: static }  # nyc-2123-as04
+  - { address: 10.10.10.11/24, device: AG-001576, dns_name: nyc-2123-as05.aigna.example, assignment: static }  # nyc-2123-as05
+  - { address: 10.10.10.12/24, device: AG-001577, dns_name: nyc-2123-as06.aigna.example, assignment: static }  # nyc-2123-as06
+  - { address: 10.10.10.35/24, device: AG-003244, interface: lan-1, mac: "02:F7:39:B2:FE:9F", dns_name: nyc-22-ap01.aigna.example, assignment: dhcp-reservation }  # nyc-22-ap01
+  - { address: 10.10.10.36/24, device: AG-003245, interface: lan-1, mac: "02:F8:39:B2:FE:9F", dns_name: nyc-22-ap02.aigna.example, assignment: dhcp-reservation }  # nyc-22-ap02
+  - { address: 10.10.10.37/24, device: AG-003246, interface: lan-1, mac: "02:F9:39:B2:FE:9F", dns_name: nyc-22-ap03.aigna.example, assignment: dhcp-reservation }  # nyc-22-ap03
+  - { address: 10.10.10.38/24, device: AG-003247, interface: lan-1, mac: "02:FA:39:B2:FE:9F", dns_name: nyc-22-ap04.aigna.example, assignment: dhcp-reservation }  # nyc-22-ap04
+  - { address: 10.10.10.39/24, device: AG-003248, interface: lan-1, mac: "02:FB:39:B2:FE:9F", dns_name: nyc-22-ap05.aigna.example, assignment: dhcp-reservation }  # nyc-22-ap05
+  - { address: 10.10.10.40/24, device: AG-003249, interface: lan-1, mac: "02:FC:39:B2:FE:9F", dns_name: nyc-22-ap06.aigna.example, assignment: dhcp-reservation }  # nyc-22-ap06
+  - { address: 10.10.10.41/24, device: AG-003250, interface: lan-1, mac: "02:12:3A:B2:FE:A1", dns_name: nyc-22-ap07.aigna.example, assignment: dhcp-reservation }  # nyc-22-ap07
+  - { address: 10.10.10.42/24, device: AG-000853, mac: "02:7E:F3:B0:FE:37", dns_name: nyc-2201-sw01.aigna.example, assignment: dhcp-reservation }  # nyc-2201-sw01
+  - { address: 10.10.10.13/24, device: AG-001579, dns_name: nyc-2222-as01.aigna.example, assignment: static }  # nyc-2222-as01
+  - { address: 10.10.10.14/24, device: AG-001580, dns_name: nyc-2222-as02.aigna.example, assignment: static }  # nyc-2222-as02
+  - { address: 10.10.10.15/24, device: AG-001581, dns_name: nyc-2222-as03.aigna.example, assignment: static }  # nyc-2222-as03
+  - { address: 10.10.10.16/24, device: AG-001582, dns_name: nyc-2222-as04.aigna.example, assignment: static }  # nyc-2222-as04
+  - { address: 10.10.10.17/24, device: AG-001583, dns_name: nyc-2222-as05.aigna.example, assignment: static }  # nyc-2222-as05
+  - { address: 10.10.30.20/24, device: AG-000614, interface: lan-1, mac: "02:81:EB:B0:FE:B8", dns_name: nyc-2004-sch01.aigna.example, assignment: dhcp-reservation }  # nyc-2004-sch01
+  - { address: 10.10.30.21/24, device: AG-000599, interface: lan-1, mac: "02:BD:E8:B0:FE:8B", dns_name: nyc-2004-tc01.aigna.example, assignment: dhcp-reservation }  # nyc-2004-tc01
+  - { address: 10.10.30.22/24, device: AG-000597, interface: lan-1, mac: "02:BB:E8:B0:FE:8B", dns_name: nyc-2004-vc01.aigna.example, assignment: dhcp-reservation }  # nyc-2004-vc01
+  - { address: 10.10.30.23/24, device: AG-000622, interface: lan-1, mac: "02:9E:EB:B0:FE:B9", dns_name: nyc-2005-sch01.aigna.example, assignment: dhcp-reservation }  # nyc-2005-sch01
+  - { address: 10.10.30.24/24, device: AG-000618, interface: lan-1, mac: "02:85:EB:B0:FE:B8", dns_name: nyc-2005-tc01.aigna.example, assignment: dhcp-reservation }  # nyc-2005-tc01
+  - { address: 10.10.30.25/24, device: AG-000623, interface: lan-1, mac: "02:9F:EB:B0:FE:B9", dns_name: nyc-2005-vc01.aigna.example, assignment: dhcp-reservation }  # nyc-2005-vc01
+  - { address: 10.10.30.26/24, device: AG-000627, interface: lan-1, mac: "02:A3:EB:B0:FE:BA", dns_name: nyc-2006-tc01.aigna.example, assignment: dhcp-reservation }  # nyc-2006-tc01
+  - { address: 10.10.30.27/24, device: AG-000626, interface: lan-1, mac: "02:A2:EB:B0:FE:BA", dns_name: nyc-2006-vc01.aigna.example, assignment: dhcp-reservation }  # nyc-2006-vc01
+  - { address: 10.10.30.28/24, device: AG-000636, interface: lan-1, mac: "02:C1:EB:B0:FE:BC", dns_name: nyc-2007-sch01.aigna.example, assignment: dhcp-reservation }  # nyc-2007-sch01
+  - { address: 10.10.30.29/24, device: AG-000633, interface: lan-1, mac: "02:BE:EB:B0:FE:BB", dns_name: nyc-2007-tc01.aigna.example, assignment: dhcp-reservation }  # nyc-2007-tc01
+  - { address: 10.10.30.30/24, device: AG-000632, interface: lan-1, mac: "02:BD:EB:B0:FE:BB", dns_name: nyc-2007-vc01.aigna.example, assignment: dhcp-reservation }  # nyc-2007-vc01
+  - { address: 10.10.30.31/24, device: AG-000639, interface: lan-1, mac: "02:C4:EB:B0:FE:BC", dns_name: nyc-2008-tc01.aigna.example, assignment: dhcp-reservation }  # nyc-2008-tc01
+  - { address: 10.10.30.32/24, device: AG-000638, interface: lan-1, mac: "02:C3:EB:B0:FE:BC", dns_name: nyc-2008-vc01.aigna.example, assignment: dhcp-reservation }  # nyc-2008-vc01
+  - { address: 10.10.30.33/24, device: AG-000651, interface: lan-1, mac: "02:FA:EB:B0:FE:BF", dns_name: nyc-2009-sch01.aigna.example, assignment: dhcp-reservation }  # nyc-2009-sch01
+  - { address: 10.10.30.34/24, device: AG-000645, interface: lan-1, mac: "02:DF:EB:B0:FE:BD", dns_name: nyc-2009-tc01.aigna.example, assignment: dhcp-reservation }  # nyc-2009-tc01
+  - { address: 10.10.30.35/24, device: AG-000644, interface: lan-1, mac: "02:DE:EB:B0:FE:BD", dns_name: nyc-2009-vc01.aigna.example, assignment: dhcp-reservation }  # nyc-2009-vc01
+  - { address: 10.10.30.36/24, device: AG-000664, interface: lan-1, mac: "02:1C:EC:B0:FE:C1", dns_name: nyc-2010-sch01.aigna.example, assignment: dhcp-reservation }  # nyc-2010-sch01
+  - { address: 10.10.30.37/24, device: AG-000655, interface: lan-1, mac: "02:FE:EB:B0:FE:BF", dns_name: nyc-2010-tc01.aigna.example, assignment: dhcp-reservation }  # nyc-2010-tc01
+  - { address: 10.10.30.38/24, device: AG-000654, interface: lan-1, mac: "02:FD:EB:B0:FE:BF", dns_name: nyc-2010-vc01.aigna.example, assignment: dhcp-reservation }  # nyc-2010-vc01
+  - { address: 10.10.30.39/24, device: AG-000671, interface: lan-1, mac: "02:38:EC:B0:FE:C3", dns_name: nyc-2011-sch01.aigna.example, assignment: dhcp-reservation }  # nyc-2011-sch01
+  - { address: 10.10.30.40/24, device: AG-000668, interface: lan-1, mac: "02:20:EC:B0:FE:C2", dns_name: nyc-2011-tc01.aigna.example, assignment: dhcp-reservation }  # nyc-2011-tc01
+  - { address: 10.10.30.41/24, device: AG-000667, interface: lan-1, mac: "02:1F:EC:B0:FE:C1", dns_name: nyc-2011-vc01.aigna.example, assignment: dhcp-reservation }  # nyc-2011-vc01
+  - { address: 10.10.30.42/24, device: AG-000673, interface: lan-1, mac: "02:3A:EC:B0:FE:C3", dns_name: nyc-2012-sch01.aigna.example, assignment: dhcp-reservation }  # nyc-2012-sch01
+  - { address: 10.10.30.43/24, device: AG-000672, interface: lan-1, mac: "02:39:EC:B0:FE:C3", dns_name: nyc-2012-vc01.aigna.example, assignment: dhcp-reservation }  # nyc-2012-vc01
+  - { address: 10.10.30.44/24, device: AG-000681, interface: lan-1, mac: "02:57:EC:B0:FE:C5", dns_name: nyc-2101-sch01.aigna.example, assignment: dhcp-reservation }  # nyc-2101-sch01
+  - { address: 10.10.30.45/24, device: AG-000678, interface: lan-1, mac: "02:3F:EC:B0:FE:C3", dns_name: nyc-2101-tc01.aigna.example, assignment: dhcp-reservation }  # nyc-2101-tc01
+  - { address: 10.10.30.46/24, device: AG-000691, interface: lan-1, mac: "02:76:EC:B0:FE:C7", dns_name: nyc-2102-sch01.aigna.example, assignment: dhcp-reservation }  # nyc-2102-sch01
+  - { address: 10.10.30.47/24, device: AG-000685, interface: lan-1, mac: "02:5B:EC:B0:FE:C5", dns_name: nyc-2102-tc01.aigna.example, assignment: dhcp-reservation }  # nyc-2102-tc01
+  - { address: 10.10.30.48/24, device: AG-000699, interface: lan-1, mac: "02:7E:EC:B0:FE:C7", dns_name: nyc-2103-sch01.aigna.example, assignment: dhcp-reservation }  # nyc-2103-sch01
+  - { address: 10.10.30.49/24, device: AG-000695, interface: lan-1, mac: "02:7A:EC:B0:FE:C7", dns_name: nyc-2103-tc01.aigna.example, assignment: dhcp-reservation }  # nyc-2103-tc01
+  - { address: 10.10.30.50/24, device: AG-000703, interface: lan-1, mac: "02:22:EF:B0:FE:F2", dns_name: nyc-2104-tc01.aigna.example, assignment: dhcp-reservation }  # nyc-2104-tc01
+  - { address: 10.10.30.51/24, device: AG-000710, interface: lan-1, mac: "02:3E:EF:B0:FE:F3", dns_name: nyc-2105-tc01.aigna.example, assignment: dhcp-reservation }  # nyc-2105-tc01
+  - { address: 10.10.30.52/24, device: AG-000709, interface: lan-2, mac: "02:28:EF:B0:FE:F2", dns_name: nyc-2105-vc01.aigna.example, assignment: dhcp-reservation }  # nyc-2105-vc01
+  - { address: 10.10.30.53/24, device: AG-000724, interface: lan-1, mac: "02:61:EF:B0:FE:F6", dns_name: nyc-2106-sch01.aigna.example, assignment: dhcp-reservation }  # nyc-2106-sch01
+  - { address: 10.10.30.54/24, device: AG-000721, interface: lan-1, mac: "02:5E:EF:B0:FE:F5", dns_name: nyc-2106-tc01.aigna.example, assignment: dhcp-reservation }  # nyc-2106-tc01
+  - { address: 10.10.30.55/24, device: AG-000730, interface: lan-1, mac: "02:7C:EF:B0:FE:F7", dns_name: nyc-2107-sch01.aigna.example, assignment: dhcp-reservation }  # nyc-2107-sch01
+  - { address: 10.10.30.56/24, device: AG-000727, interface: lan-1, mac: "02:64:EF:B0:FE:F6", dns_name: nyc-2107-tc01.aigna.example, assignment: dhcp-reservation }  # nyc-2107-tc01
+  - { address: 10.10.30.57/24, device: AG-000733, interface: lan-1, mac: "02:7F:EF:B0:FE:F7", dns_name: nyc-2108-tc01.aigna.example, assignment: dhcp-reservation }  # nyc-2108-tc01
+  - { address: 10.10.30.58/24, device: AG-000738, interface: lan-1, mac: "02:84:EF:B0:FE:F8", dns_name: nyc-2109-vc01.aigna.example, assignment: dhcp-reservation }  # nyc-2109-vc01
+  - { address: 10.10.30.59/24, device: AG-000740, interface: lan-1, mac: "02:9B:EF:B0:FE:F9", dns_name: nyc-2110-vc01.aigna.example, assignment: dhcp-reservation }  # nyc-2110-vc01
+  - { address: 10.10.30.60/24, device: AG-000742, interface: lan-1, mac: "02:9D:EF:B0:FE:F9", dns_name: nyc-2111-vc01.aigna.example, assignment: dhcp-reservation }  # nyc-2111-vc01
+  - { address: 10.10.30.61/24, device: AG-000749, interface: lan-1, mac: "02:A4:EF:B0:FE:FA", dns_name: nyc-2116-sch01.aigna.example, assignment: dhcp-reservation }  # nyc-2116-sch01
+  - { address: 10.10.30.62/24, device: AG-000751, interface: lan-1, mac: "02:BB:EF:B0:FE:FB", dns_name: nyc-2117-sch01.aigna.example, assignment: dhcp-reservation }  # nyc-2117-sch01
+  - { address: 10.10.30.63/24, device: AG-000858, interface: lan-1, mac: "02:83:F3:B0:FE:38", dns_name: nyc-2201-sch01.aigna.example, assignment: dhcp-reservation }  # nyc-2201-sch01
+  - { address: 10.10.30.64/24, device: AG-000844, interface: lan-1, mac: "02:60:F3:B0:FE:36", dns_name: nyc-2201-tc01.aigna.example, assignment: dhcp-reservation }  # nyc-2201-tc01
+  - { address: 10.10.30.65/24, device: AG-000842, interface: lan-1, mac: "02:5E:F3:B0:FE:35", dns_name: nyc-2201-vc01.aigna.example, assignment: dhcp-reservation }  # nyc-2201-vc01
+  - { address: 10.10.30.66/24, device: AG-000861, interface: lan-1, mac: "02:9B:F3:B0:FE:39", dns_name: nyc-2202-tc01.aigna.example, assignment: dhcp-reservation }  # nyc-2202-tc01
+  - { address: 10.10.30.67/24, device: AG-000867, interface: lan-1, mac: "02:A1:F3:B0:FE:3A", dns_name: nyc-2203-tc01.aigna.example, assignment: dhcp-reservation }  # nyc-2203-tc01
+  - { address: 10.10.30.68/24, device: AG-000876, interface: lan-1, mac: "02:BF:F3:B0:FE:3B", dns_name: nyc-2204-sch01.aigna.example, assignment: dhcp-reservation }  # nyc-2204-sch01
+  - { address: 10.10.30.69/24, device: AG-000873, interface: lan-1, mac: "02:BC:F3:B0:FE:3B", dns_name: nyc-2204-tc01.aigna.example, assignment: dhcp-reservation }  # nyc-2204-tc01
+  - { address: 10.10.30.70/24, device: AG-000884, interface: lan-1, mac: "02:DC:F3:B0:FE:3D", dns_name: nyc-2205-sch01.aigna.example, assignment: dhcp-reservation }  # nyc-2205-sch01
+  - { address: 10.10.30.71/24, device: AG-000880, interface: lan-1, mac: "02:D8:F3:B0:FE:3D", dns_name: nyc-2205-tc01.aigna.example, assignment: dhcp-reservation }  # nyc-2205-tc01
+  - { address: 10.10.30.72/24, device: AG-000886, interface: lan-1, mac: "02:DE:F3:B0:FE:3D", dns_name: nyc-2206-sch01.aigna.example, assignment: dhcp-reservation }  # nyc-2206-sch01
+  - { address: 10.10.30.73/24, device: AG-000885, interface: lan-1, mac: "02:DD:F3:B0:FE:3D", dns_name: nyc-2206-vc01.aigna.example, assignment: dhcp-reservation }  # nyc-2206-vc01
+  - { address: 10.10.30.74/24, device: AG-000899, interface: lan-1, mac: "02:00:F4:B0:FE:40", dns_name: nyc-2214-sch01.aigna.example, assignment: dhcp-reservation }  # nyc-2214-sch01
+  - { address: 10.10.30.75/24, device: AG-000901, interface: lan-1, mac: "02:A2:F6:B0:FE:6A", dns_name: nyc-2215-sch01.aigna.example, assignment: dhcp-reservation }  # nyc-2215-sch01
+  - { address: 10.10.31.20/24, device: AG-000593, interface: lan-1, mac: "02:B7:E8:B0:FE:8B", dns_name: nyc-2001-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2001-dsp01
+  - { address: 10.10.31.21/24, device: AG-000594, interface: lan-1, mac: "02:B8:E8:B0:FE:8B", dns_name: nyc-2001-sig01.aigna.example, assignment: dhcp-reservation }  # nyc-2001-sig01
+  - { address: 10.10.31.22/24, device: AG-001439, interface: lan-1, mac: "02:A1:58:B1:FE:8A", dns_name: nyc-2002-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2002-dsp01
+  - { address: 10.10.31.23/24, device: AG-001440, interface: lan-1, mac: "02:B7:58:B1:FE:8B", dns_name: nyc-2002-sig01.aigna.example, assignment: dhcp-reservation }  # nyc-2002-sig01
+  - { address: 10.10.31.24/24, device: AG-001441, interface: lan-1, mac: "02:B8:58:B1:FE:8B", dns_name: nyc-2003-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2003-dsp01
+  - { address: 10.10.31.25/24, device: AG-001442, interface: lan-1, mac: "02:B9:58:B1:FE:8B", dns_name: nyc-2003-sig01.aigna.example, assignment: dhcp-reservation }  # nyc-2003-sig01
+  - { address: 10.10.31.26/24, device: AG-000595, interface: lan-1, mac: "02:B9:E8:B0:FE:8B", dns_name: nyc-2004-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2004-dsp01
+  - { address: 10.10.31.27/24, device: AG-000596, interface: lan-1, mac: "02:BA:E8:B0:FE:8B", dns_name: nyc-2004-dsp02.aigna.example, assignment: dhcp-reservation }  # nyc-2004-dsp02
+  - { address: 10.10.31.28/24, device: AG-000615, interface: lan-1, mac: "02:82:EB:B0:FE:B8", dns_name: nyc-2005-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2005-dsp01
+  - { address: 10.10.31.29/24, device: AG-000616, interface: lan-1, mac: "02:83:EB:B0:FE:B8", dns_name: nyc-2005-dsp02.aigna.example, assignment: dhcp-reservation }  # nyc-2005-dsp02
+  - { address: 10.10.31.30/24, device: AG-000624, interface: lan-1, mac: "02:A0:EB:B0:FE:BA", dns_name: nyc-2006-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2006-dsp01
+  - { address: 10.10.31.31/24, device: AG-000625, interface: lan-1, mac: "02:A1:EB:B0:FE:BA", dns_name: nyc-2006-dsp02.aigna.example, assignment: dhcp-reservation }  # nyc-2006-dsp02
+  - { address: 10.10.31.32/24, device: AG-000630, interface: lan-1, mac: "02:BB:EB:B0:FE:BB", dns_name: nyc-2007-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2007-dsp01
+  - { address: 10.10.31.33/24, device: AG-000631, interface: lan-1, mac: "02:BC:EB:B0:FE:BB", dns_name: nyc-2007-dsp02.aigna.example, assignment: dhcp-reservation }  # nyc-2007-dsp02
+  - { address: 10.10.31.34/24, device: AG-000637, interface: lan-1, mac: "02:C2:EB:B0:FE:BC", dns_name: nyc-2008-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2008-dsp01
+  - { address: 10.10.31.35/24, device: AG-000643, interface: lan-1, mac: "02:DD:EB:B0:FE:BD", dns_name: nyc-2009-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2009-dsp01
+  - { address: 10.10.31.36/24, device: AG-000652, interface: lan-1, mac: "02:FB:EB:B0:FE:BF", dns_name: nyc-2010-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2010-dsp01
+  - { address: 10.10.31.37/24, device: AG-000653, interface: lan-1, mac: "02:FC:EB:B0:FE:BF", dns_name: nyc-2010-dsp02.aigna.example, assignment: dhcp-reservation }  # nyc-2010-dsp02
+  - { address: 10.10.31.38/24, device: AG-000665, interface: lan-1, mac: "02:1D:EC:B0:FE:C1", dns_name: nyc-2011-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2011-dsp01
+  - { address: 10.10.31.39/24, device: AG-000666, interface: lan-1, mac: "02:1E:EC:B0:FE:C1", dns_name: nyc-2011-dsp02.aigna.example, assignment: dhcp-reservation }  # nyc-2011-dsp02
+  - { address: 10.10.31.40/24, device: AG-000675, interface: lan-1, mac: "02:3C:EC:B0:FE:C3", dns_name: nyc-2101-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2101-dsp01
+  - { address: 10.10.31.41/24, device: AG-000676, interface: lan-1, mac: "02:3D:EC:B0:FE:C3", dns_name: nyc-2101-dsp02.aigna.example, assignment: dhcp-reservation }  # nyc-2101-dsp02
+  - { address: 10.10.31.42/24, device: AG-000682, interface: lan-1, mac: "02:58:EC:B0:FE:C5", dns_name: nyc-2102-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2102-dsp01
+  - { address: 10.10.31.43/24, device: AG-000683, interface: lan-1, mac: "02:59:EC:B0:FE:C5", dns_name: nyc-2102-dsp02.aigna.example, assignment: dhcp-reservation }  # nyc-2102-dsp02
+  - { address: 10.10.31.44/24, device: AG-000692, interface: lan-1, mac: "02:77:EC:B0:FE:C7", dns_name: nyc-2103-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2103-dsp01
+  - { address: 10.10.31.45/24, device: AG-000693, interface: lan-1, mac: "02:78:EC:B0:FE:C7", dns_name: nyc-2103-dsp02.aigna.example, assignment: dhcp-reservation }  # nyc-2103-dsp02
+  - { address: 10.10.31.46/24, device: AG-000700, interface: lan-1, mac: "02:1F:EF:B0:FE:F1", dns_name: nyc-2104-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2104-dsp01
+  - { address: 10.10.31.47/24, device: AG-000701, interface: lan-1, mac: "02:20:EF:B0:FE:F2", dns_name: nyc-2104-dsp02.aigna.example, assignment: dhcp-reservation }  # nyc-2104-dsp02
+  - { address: 10.10.31.48/24, device: AG-000707, interface: lan-1, mac: "02:26:EF:B0:FE:F2", dns_name: nyc-2105-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2105-dsp01
+  - { address: 10.10.31.49/24, device: AG-000708, interface: lan-1, mac: "02:27:EF:B0:FE:F2", dns_name: nyc-2105-dsp02.aigna.example, assignment: dhcp-reservation }  # nyc-2105-dsp02
+  - { address: 10.10.31.50/24, device: AG-000719, interface: lan-1, mac: "02:47:EF:B0:FE:F4", dns_name: nyc-2106-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2106-dsp01
+  - { address: 10.10.31.51/24, device: AG-000725, interface: lan-1, mac: "02:62:EF:B0:FE:F6", dns_name: nyc-2107-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2107-dsp01
+  - { address: 10.10.31.52/24, device: AG-000731, interface: lan-1, mac: "02:7D:EF:B0:FE:F7", dns_name: nyc-2108-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2108-dsp01
+  - { address: 10.10.31.53/24, device: AG-000737, interface: lan-1, mac: "02:83:EF:B0:FE:F8", dns_name: nyc-2109-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2109-dsp01
+  - { address: 10.10.31.54/24, device: AG-000739, interface: lan-1, mac: "02:85:EF:B0:FE:F8", dns_name: nyc-2110-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2110-dsp01
+  - { address: 10.10.31.55/24, device: AG-000741, interface: lan-1, mac: "02:9C:EF:B0:FE:F9", dns_name: nyc-2111-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2111-dsp01
+  - { address: 10.10.31.56/24, device: AG-001443, interface: lan-1, mac: "02:BA:58:B1:FE:8B", dns_name: nyc-2118-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2118-dsp01
+  - { address: 10.10.31.57/24, device: AG-001444, interface: lan-1, mac: "02:BB:58:B1:FE:8B", dns_name: nyc-2118-sig01.aigna.example, assignment: dhcp-reservation }  # nyc-2118-sig01
+  - { address: 10.10.31.58/24, device: AG-000841, interface: lan-1, mac: "02:5D:F3:B0:FE:35", dns_name: nyc-2201-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2201-dsp01
+  - { address: 10.10.31.59/24, device: AG-000859, interface: lan-1, mac: "02:84:F3:B0:FE:38", dns_name: nyc-2202-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2202-dsp01
+  - { address: 10.10.31.60/24, device: AG-000865, interface: lan-1, mac: "02:9F:F3:B0:FE:39", dns_name: nyc-2203-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2203-dsp01
+  - { address: 10.10.31.61/24, device: AG-000870, interface: lan-1, mac: "02:B9:F3:B0:FE:3B", dns_name: nyc-2204-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2204-dsp01
+  - { address: 10.10.31.62/24, device: AG-000871, interface: lan-1, mac: "02:BA:F3:B0:FE:3B", dns_name: nyc-2204-dsp02.aigna.example, assignment: dhcp-reservation }  # nyc-2204-dsp02
+  - { address: 10.10.31.63/24, device: AG-000877, interface: lan-1, mac: "02:C0:F3:B0:FE:3C", dns_name: nyc-2205-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2205-dsp01
+  - { address: 10.10.31.64/24, device: AG-000878, interface: lan-1, mac: "02:C1:F3:B0:FE:3C", dns_name: nyc-2205-dsp02.aigna.example, assignment: dhcp-reservation }  # nyc-2205-dsp02
+  - { address: 10.10.31.65/24, device: AG-000887, interface: lan-1, mac: "02:DF:F3:B0:FE:3D", dns_name: nyc-2207-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2207-dsp01
+  - { address: 10.10.31.66/24, device: AG-000889, interface: lan-1, mac: "02:E1:F3:B0:FE:3E", dns_name: nyc-2208-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2208-dsp01
+  - { address: 10.10.31.67/24, device: AG-000891, interface: lan-1, mac: "02:F8:F3:B0:FE:3F", dns_name: nyc-2209-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2209-dsp01
+  - { address: 10.10.31.68/24, device: AG-000893, interface: lan-1, mac: "02:FA:F3:B0:FE:3F", dns_name: nyc-2210-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2210-dsp01
+  - { address: 10.10.31.69/24, device: AG-001445, interface: lan-1, mac: "02:BC:58:B1:FE:8B", dns_name: nyc-2217-dsp01.aigna.example, assignment: dhcp-reservation }  # nyc-2217-dsp01
+  - { address: 10.10.31.70/24, device: AG-001446, interface: lan-1, mac: "02:BD:58:B1:FE:8B", dns_name: nyc-2217-sig01.aigna.example, assignment: dhcp-reservation }  # nyc-2217-sig01
+  - { address: 10.10.50.20/24, device: AG-003513, interface: lan-1, mac: "02:DC:44:B2:FE:4D", dns_name: nyc-2001-bms01.aigna.example, assignment: dhcp-reservation }  # nyc-2001-bms01
+  - { address: 10.10.60.20/24, device: AG-003511, interface: lan-1, mac: "02:DA:44:B2:FE:4D", dns_name: nyc-2001-cam01.aigna.example, assignment: dhcp-reservation }  # nyc-2001-cam01
+  - { address: 10.10.60.21/24, device: AG-003512, interface: lan-1, mac: "02:DB:44:B2:FE:4D", dns_name: nyc-2001-door01.aigna.example, assignment: dhcp-reservation }  # nyc-2001-door01
+  - { address: 10.10.70.20/24, device: AG-000674, interface: lan-1, mac: "02:3B:EC:B0:FE:C3", dns_name: nyc-2013-prn01.aigna.example, assignment: dhcp-reservation }  # nyc-2013-prn01
+  - { address: 10.10.70.21/24, device: AG-000752, interface: lan-1, mac: "02:BC:EF:B0:FE:FB", dns_name: nyc-2119-prn01.aigna.example, assignment: dhcp-reservation }  # nyc-2119-prn01
+  - { address: 10.10.70.22/24, device: AG-000903, interface: lan-1, mac: "02:A4:F6:B0:FE:6A", dns_name: nyc-2218-prn01.aigna.example, assignment: dhcp-reservation }  # nyc-2218-prn01
+switches:
+  # Core switch A · 20.14 Comms room (MDF), Rack 1, U20
+  - id: nyc-2014-cs01
+    rack: nyc-20-14-r1
+    u: 20
+    platform: unifi
+    interfaces:
+      - { name: 1, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-19], device: nyc-2014-as01, interface: 49 } }  # trunk down to nyc-2014-as01
+      - { name: 2, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-21], device: nyc-2014-as02, interface: 49 } }  # trunk down to nyc-2014-as02
+      - { name: 3, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-23], device: nyc-2014-as03, interface: 49 } }  # trunk down to nyc-2014-as03
+      - { name: 4, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-26], device: AG-001567 } }  # Gateway A
+      - { name: 5, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-32, NYC-20.14-R1-U12-P01, nyc-cb-55], device: nyc-2123-as01, interface: 49 } }  # trunk down to nyc-2123-as01
+      - { name: 6, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-32, NYC-20.14-R1-U12-P01, nyc-cb-55], device: nyc-2123-as01, interface: 50 } }  # trunk down to nyc-2123-as01
+      - { name: 7, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-34, NYC-20.14-R1-U12-P01, nyc-cb-57], device: nyc-2123-as03, interface: 49 } }  # trunk down to nyc-2123-as03
+      - { name: 8, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-34, NYC-20.14-R1-U12-P01, nyc-cb-57], device: nyc-2123-as03, interface: 50 } }  # trunk down to nyc-2123-as03
+      - { name: 9, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-36, NYC-20.14-R1-U12-P01, nyc-cb-59], device: nyc-2123-as05, interface: 49 } }  # trunk down to nyc-2123-as05
+      - { name: 10, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-36, NYC-20.14-R1-U12-P01, nyc-cb-59], device: nyc-2123-as05, interface: 50 } }  # trunk down to nyc-2123-as05
+      - { name: 11, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-38, NYC-20.14-R1-U12-P13, nyc-cb-72], device: nyc-2222-as01, interface: 49 } }  # trunk down to nyc-2222-as01
+      - { name: 12, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-38, NYC-20.14-R1-U12-P13, nyc-cb-72], device: nyc-2222-as01, interface: 50 } }  # trunk down to nyc-2222-as01
+      - { name: 13, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-40, NYC-20.14-R1-U12-P13, nyc-cb-74], device: nyc-2222-as03, interface: 49 } }  # trunk down to nyc-2222-as03
+      - { name: 14, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-40, NYC-20.14-R1-U12-P13, nyc-cb-74], device: nyc-2222-as03, interface: 50 } }  # trunk down to nyc-2222-as03
+      - { name: 15, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-42, NYC-20.14-R1-U12-P13, nyc-cb-76], device: nyc-2222-as05, interface: 49 } }  # trunk down to nyc-2222-as05
+      - { name: 16, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-42, NYC-20.14-R1-U12-P13, nyc-cb-76], device: nyc-2222-as05, interface: 50 } }  # trunk down to nyc-2222-as05
+      - { name: 25, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-25], device: nyc-2014-cs02, interface: 25 } }  # trunk to nyc-2014-cs02
+      - { name: 26, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-25], device: nyc-2014-cs02, interface: 26 } }  # trunk to nyc-2014-cs02
+    disabled: "17-24,27-32"
+  # Core switch B · 20.14 Comms room (MDF), Rack 1, U21
+  - id: nyc-2014-cs02
+    rack: nyc-20-14-r1
+    u: 21
+    platform: unifi
+    interfaces:
+      - { name: 1, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-20], device: nyc-2014-as01, interface: 50 } }  # trunk down to nyc-2014-as01
+      - { name: 2, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-22], device: nyc-2014-as02, interface: 50 } }  # trunk down to nyc-2014-as02
+      - { name: 3, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-24], device: nyc-2014-as03, interface: 50 } }  # trunk down to nyc-2014-as03
+      - { name: 4, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-27], device: AG-001568 } }  # Gateway B
+      - { name: 5, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-33, NYC-20.14-R1-U12-P01, nyc-cb-56], device: nyc-2123-as02, interface: 49 } }  # trunk down to nyc-2123-as02
+      - { name: 6, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-33, NYC-20.14-R1-U12-P01, nyc-cb-56], device: nyc-2123-as02, interface: 50 } }  # trunk down to nyc-2123-as02
+      - { name: 7, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-35, NYC-20.14-R1-U12-P01, nyc-cb-58], device: nyc-2123-as04, interface: 49 } }  # trunk down to nyc-2123-as04
+      - { name: 8, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-35, NYC-20.14-R1-U12-P01, nyc-cb-58], device: nyc-2123-as04, interface: 50 } }  # trunk down to nyc-2123-as04
+      - { name: 9, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-37, NYC-20.14-R1-U12-P01, nyc-cb-60], device: nyc-2123-as06, interface: 49 } }  # trunk down to nyc-2123-as06
+      - { name: 10, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-37, NYC-20.14-R1-U12-P01, nyc-cb-60], device: nyc-2123-as06, interface: 50 } }  # trunk down to nyc-2123-as06
+      - { name: 11, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-39, NYC-20.14-R1-U12-P13, nyc-cb-73], device: nyc-2222-as02, interface: 49 } }  # trunk down to nyc-2222-as02
+      - { name: 12, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-39, NYC-20.14-R1-U12-P13, nyc-cb-73], device: nyc-2222-as02, interface: 50 } }  # trunk down to nyc-2222-as02
+      - { name: 13, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-41, NYC-20.14-R1-U12-P13, nyc-cb-75], device: nyc-2222-as04, interface: 49 } }  # trunk down to nyc-2222-as04
+      - { name: 14, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-41, NYC-20.14-R1-U12-P13, nyc-cb-75], device: nyc-2222-as04, interface: 50 } }  # trunk down to nyc-2222-as04
+      - { name: 25, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-25], device: nyc-2014-cs01, interface: 25 } }  # trunk to nyc-2014-cs01
+      - { name: 26, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-25], device: nyc-2014-cs01, interface: 26 } }  # trunk to nyc-2014-cs01
+    disabled: "15-24,27-32"
+  # Access switch 1, Level 20 · 20.14 Comms room (MDF), Rack 1, U15
+  - id: nyc-2014-as01
+    rack: nyc-20-14-r1
+    u: 15
+    platform: unifi
+    interfaces:
+      - { name: 1, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P01], device: AG-000593, interface: lan-1 } }  # 20.01 Reception, display
+      - { name: 2, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P02], device: AG-000594, interface: lan-1 } }  # 20.01 Reception, signage player
+      - { name: 3, enabled: false, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P03] } }  # 20.01 Reception, data/behind-display#3, nothing plugged in
+      - { name: 4, enabled: false, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P04] } }  # 20.01 Reception, data/tbd#1, nothing plugged in
+      - { name: 5, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P05], device: AG-001439, interface: lan-1 } }  # 20.02 Cafeteria, display
+      - { name: 6, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P06], device: AG-001440, interface: lan-1 } }  # 20.02 Cafeteria, signage player
+      - { name: 7, enabled: false, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P07] } }  # 20.02 Cafeteria, data/behind-display#3, nothing plugged in
+      - { name: 8, enabled: false, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P08] } }  # 20.02 Cafeteria, data/tbd#1, nothing plugged in
+      - { name: 9, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P09], device: AG-001441, interface: lan-1 } }  # 20.03 Pantry, display
+      - { name: 10, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P10], device: AG-001442, interface: lan-1 } }  # 20.03 Pantry, signage player
+      - { name: 11, enabled: false, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P11] } }  # 20.03 Pantry, data/behind-display#3, nothing plugged in
+      - { name: 12, enabled: false, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P12] } }  # 20.03 Pantry, data/tbd#1, nothing plugged in
+      - { name: 13, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P13], device: AG-000595, interface: lan-1 } }  # 20.04 Heron, display 1
+      - { name: 14, enabled: false, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P14] } }  # 20.04 Heron, data/behind-display#2, nothing plugged in
+      - { name: 15, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P15], device: AG-000598, interface: lan-1 } }  # 20.04 Heron, ptz camera
+      - { name: 16, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [30], connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P16], device: AG-000607, interface: lan-9 } }  # 20.04 Heron, network switch
+      - { name: 17, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P17], device: AG-000596, interface: lan-1 } }  # 20.04 Heron, display 2
+      - { name: 18, enabled: false, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P18] } }  # 20.04 Heron, data/behind-display#6, nothing plugged in
+      - { name: 19, enabled: false, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P19] } }  # 20.04 Heron, data/behind-display#7, nothing plugged in
+      - { name: 20, enabled: false, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P20] } }  # 20.04 Heron, data/behind-display#8, nothing plugged in
+      - { name: 21, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P21], device: AG-000599, interface: lan-1 } }  # 20.04 Heron, touch controller
+      - { name: 22, enabled: false, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P22] } }  # 20.04 Heron, data/below-table#2, nothing plugged in
+      - { name: 23, enabled: false, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P23] } }  # 20.04 Heron, data/below-table#3, nothing plugged in
+      - { name: 24, enabled: false, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P24] } }  # 20.04 Heron, data/below-table#4, nothing plugged in
+      - { name: 25, enabled: false, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P25] } }  # 20.04 Heron, data/below-table#5, nothing plugged in
+      - { name: 26, enabled: false, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P26] } }  # 20.04 Heron, data/tbd#1, nothing plugged in
+      - { name: 27, enabled: false, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P27] } }  # 20.04 Heron, data/tbd#2, nothing plugged in
+      - { name: 28, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P28], device: AG-000614, interface: lan-1 } }  # 20.04 Heron, scheduler panel
+      - { name: 29, enabled: false, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P29] } }  # 20.04 Heron, data/ceiling#1, nothing plugged in
+      - { name: 30, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P30], device: AG-000615, interface: lan-1 } }  # 20.05 Curlew, display 1
+      - { name: 31, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P31], device: AG-000623, interface: lan-1 } }  # 20.05 Curlew, video bar
+      - { name: 32, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P32], device: AG-000616, interface: lan-1 } }  # 20.05 Curlew, display 2
+      - { name: 33, enabled: false, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P33] } }  # 20.05 Curlew, data/behind-display#4, nothing plugged in
+      - { name: 34, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P34], device: AG-000618, interface: lan-1 } }  # 20.05 Curlew, touch controller
+      - { name: 35, enabled: false, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P35] } }  # 20.05 Curlew, data/below-table#2, nothing plugged in
+      - { name: 36, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P36], device: AG-000622, interface: lan-1 } }  # 20.05 Curlew, scheduler panel
+      - { name: 37, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P37], device: AG-000624, interface: lan-1 } }  # 20.06 Gannet, display 1
+      - { name: 38, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P38], device: AG-000626, interface: lan-1 } }  # 20.06 Gannet, video bar
+      - { name: 39, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P39], device: AG-000625, interface: lan-1 } }  # 20.06 Gannet, display 2
+      - { name: 40, enabled: false, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P40] } }  # 20.06 Gannet, data/behind-display#4, nothing plugged in
+      - { name: 41, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P41], device: AG-000627, interface: lan-1 } }  # 20.06 Gannet, touch controller
+      - { name: 42, enabled: false, connected: { cables: [nyc-cb-17, NYC-20.14-R1-U06-P42] } }  # 20.06 Gannet, data/below-table#2, nothing plugged in
+      - { name: 49, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-19], device: nyc-2014-cs01, interface: 1 } }  # trunk to nyc-2014-cs01
+      - { name: 50, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-20], device: nyc-2014-cs02, interface: 1 } }  # trunk to nyc-2014-cs02
+    disabled: "43-48"
+  # Access switch 2, Level 20 · 20.14 Comms room (MDF), Rack 1, U16
+  - id: nyc-2014-as02
+    rack: nyc-20-14-r1
+    u: 16
+    platform: unifi
+    interfaces:
+      - { name: 1, enabled: false, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P01] } }  # 20.06 Gannet, data/room-entrance#1, nothing plugged in
+      - { name: 2, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P02], device: AG-000630, interface: lan-1 } }  # 20.07 Kestrel, display 1
+      - { name: 3, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P03], device: AG-000632, interface: lan-1 } }  # 20.07 Kestrel, video bar
+      - { name: 4, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P04], device: AG-000631, interface: lan-1 } }  # 20.07 Kestrel, display 2
+      - { name: 5, enabled: false, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P05] } }  # 20.07 Kestrel, data/behind-display#4, nothing plugged in
+      - { name: 6, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P06], device: AG-000633, interface: lan-1 } }  # 20.07 Kestrel, touch controller
+      - { name: 7, enabled: false, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P07] } }  # 20.07 Kestrel, data/below-table#2, nothing plugged in
+      - { name: 8, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P08], device: AG-000636, interface: lan-1 } }  # 20.07 Kestrel, scheduler panel
+      - { name: 9, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P09], device: AG-000637, interface: lan-1 } }  # 20.08 Peregrine, display
+      - { name: 10, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P10], device: AG-000638, interface: lan-1 } }  # 20.08 Peregrine, video bar
+      - { name: 11, enabled: false, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P11] } }  # 20.08 Peregrine, data/behind-display#3, nothing plugged in
+      - { name: 12, enabled: false, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P12] } }  # 20.08 Peregrine, data/behind-display#4, nothing plugged in
+      - { name: 13, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P13], device: AG-000639, interface: lan-1 } }  # 20.08 Peregrine, touch controller
+      - { name: 14, enabled: false, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P14] } }  # 20.08 Peregrine, data/below-table#2, nothing plugged in
+      - { name: 15, enabled: false, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P15] } }  # 20.08 Peregrine, data/room-entrance#1, nothing plugged in
+      - { name: 16, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P16], device: AG-000643, interface: lan-1 } }  # 20.09 Barn Owl, display
+      - { name: 17, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P17], device: AG-000644, interface: lan-1 } }  # 20.09 Barn Owl, video bar
+      - { name: 18, enabled: false, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P18] } }  # 20.09 Barn Owl, data/behind-display#3, nothing plugged in
+      - { name: 19, enabled: false, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P19] } }  # 20.09 Barn Owl, data/behind-display#4, nothing plugged in
+      - { name: 20, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P20], device: AG-000645, interface: lan-1 } }  # 20.09 Barn Owl, touch controller
+      - { name: 21, enabled: false, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P21] } }  # 20.09 Barn Owl, data/below-table#2, nothing plugged in
+      - { name: 22, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P22], device: AG-000651, interface: lan-1 } }  # 20.09 Barn Owl, scheduler panel
+      - { name: 23, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P23], device: AG-000652, interface: lan-1 } }  # 20.10 Whooper Swan, display 1
+      - { name: 24, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [30], connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P24], device: AG-000658, interface: lan-9 } }  # 20.10 Whooper Swan, network switch
+      - { name: 25, enabled: false, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P25] } }  # 20.10 Whooper Swan, data/behind-display#3, nothing plugged in
+      - { name: 26, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P26], device: AG-000653, interface: lan-1 } }  # 20.10 Whooper Swan, display 2
+      - { name: 27, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P27], device: AG-000654, interface: lan-1 } }  # 20.10 Whooper Swan, video bar
+      - { name: 28, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P28], device: AG-000655, interface: lan-1 } }  # 20.10 Whooper Swan, touch controller
+      - { name: 29, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P29], device: AG-000664, interface: lan-1 } }  # 20.10 Whooper Swan, scheduler panel
+      - { name: 30, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P30], device: AG-000665, interface: lan-1 } }  # 20.11 Oystercatcher, display main
+      - { name: 31, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P31], device: AG-000667, interface: lan-1 } }  # 20.11 Oystercatcher, video bar
+      - { name: 32, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P32], device: AG-000666, interface: lan-1 } }  # 20.11 Oystercatcher, display second
+      - { name: 33, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P33], device: AG-000668, interface: lan-1 } }  # 20.11 Oystercatcher, touch controller
+      - { name: 34, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P34], device: AG-000671, interface: lan-1 } }  # 20.11 Oystercatcher, scheduler panel
+      - { name: 35, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P35], device: AG-000672, interface: lan-1 } }  # 20.12 Lapwing, desk video device
+      - { name: 36, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P36], device: AG-000673, interface: lan-1 } }  # 20.12 Lapwing, scheduler panel
+      - { name: 37, enabled: true, mode: access, untagged_vlan: 70, auth: mab, connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P37], device: AG-000674, interface: lan-1 }, seen: { untagged_vlan: 20, at: "2026-09-30T06:00:00Z" } }  # 20.13 Copy and print, printer; the switch reports otherwise
+      - { name: 38, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 90], connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P38], device: AG-003232, interface: lan-1 } }  # access point nyc-20-ap01
+      - { name: 39, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 90], connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P39], device: AG-003233, interface: lan-1 } }  # access point nyc-20-ap02
+      - { name: 40, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 90], connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P40], device: AG-003234, interface: lan-1 } }  # access point nyc-20-ap03
+      - { name: 41, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 90], connected: { cables: [nyc-cb-18, NYC-20.14-R1-U09-P41], device: AG-003235, interface: lan-1 } }  # access point nyc-20-ap04
+      - { name: 42, enabled: true, mode: access, untagged_vlan: 60, auth: mab, connected: { cables: [nyc-cb-83, NYC-20.14-R1-U09-P42], device: AG-003511, interface: lan-1 } }  # 20.01 Reception, cctv camera
+      - { name: 43, enabled: true, mode: access, untagged_vlan: 60, auth: mab, connected: { cables: [nyc-cb-83, NYC-20.14-R1-U09-P43], device: AG-003512, interface: lan-1 } }  # 20.01 Reception, door controller
+      - { name: 44, enabled: true, mode: access, untagged_vlan: 50, auth: mab, connected: { cables: [nyc-cb-84, NYC-20.14-R1-U09-P44], device: AG-003513, interface: lan-1 } }  # 20.01 Reception, environment sensor
+      - { name: 49, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-21], device: nyc-2014-cs01, interface: 2 } }  # trunk to nyc-2014-cs01
+      - { name: 50, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-22], device: nyc-2014-cs02, interface: 2 } }  # trunk to nyc-2014-cs02
+    disabled: "45-48"
+  # Access switch 3, Level 20 · 20.14 Comms room (MDF), Rack 1, U17
+  - id: nyc-2014-as03
+    rack: nyc-20-14-r1
+    u: 17
+    platform: unifi
+    interfaces:
+      - { name: 49, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-23], device: nyc-2014-cs01, interface: 3 } }  # trunk to nyc-2014-cs01
+      - { name: 50, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-24], device: nyc-2014-cs02, interface: 3 } }  # trunk to nyc-2014-cs02
+    disabled: "1-48"
+  # Access switch 1 · 21.23 Comms room (IDF), Rack 1, U37
+  - id: nyc-2123-as01
+    rack: nyc-21-23-r1
+    u: 37
+    platform: unifi
+    interfaces:
+      - { name: 1, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P01], device: AG-000675, interface: lan-1 } }  # 21.01 Kingfisher, display 1
+      - { name: 2, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P02], device: AG-000676, interface: lan-1 } }  # 21.01 Kingfisher, display 2
+      - { name: 3, enabled: false, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P03] } }  # 21.01 Kingfisher, data/behind-display#4, nothing plugged in
+      - { name: 4, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P04], device: AG-000678, interface: lan-1 } }  # 21.01 Kingfisher, touch controller
+      - { name: 5, enabled: false, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P05] } }  # 21.01 Kingfisher, data/below-table#2, nothing plugged in
+      - { name: 6, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P06], device: AG-000681, interface: lan-1 } }  # 21.01 Kingfisher, scheduler panel
+      - { name: 7, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P07], device: AG-000682, interface: lan-1 } }  # 21.02 Cormorant, display 1
+      - { name: 8, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P08], device: AG-000683, interface: lan-1 } }  # 21.02 Cormorant, display 2
+      - { name: 9, enabled: false, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P09] } }  # 21.02 Cormorant, data/behind-display#4, nothing plugged in
+      - { name: 10, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P10], device: AG-000685, interface: lan-1 } }  # 21.02 Cormorant, touch controller
+      - { name: 11, enabled: false, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P11] } }  # 21.02 Cormorant, data/below-table#2, nothing plugged in
+      - { name: 12, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P12], device: AG-000691, interface: lan-1 } }  # 21.02 Cormorant, scheduler panel
+      - { name: 13, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P13], device: AG-000692, interface: lan-1 } }  # 21.03 Chough, display 1
+      - { name: 14, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P14], device: AG-000693, interface: lan-1 } }  # 21.03 Chough, display 2
+      - { name: 15, enabled: false, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P15] } }  # 21.03 Chough, data/behind-display#4, nothing plugged in
+      - { name: 16, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P16], device: AG-000695, interface: lan-1 } }  # 21.03 Chough, touch controller
+      - { name: 17, enabled: false, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P17] } }  # 21.03 Chough, data/below-table#2, nothing plugged in
+      - { name: 18, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P18], device: AG-000699, interface: lan-1 } }  # 21.03 Chough, scheduler panel
+      - { name: 19, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P19], device: AG-000700, interface: lan-1 } }  # 21.04 Puffin, display 1
+      - { name: 20, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P20], device: AG-000701, interface: lan-1 } }  # 21.04 Puffin, display 2
+      - { name: 21, enabled: false, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P21] } }  # 21.04 Puffin, data/behind-display#4, nothing plugged in
+      - { name: 22, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P22], device: AG-000703, interface: lan-1 } }  # 21.04 Puffin, touch controller
+      - { name: 23, enabled: false, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P23] } }  # 21.04 Puffin, data/below-table#2, nothing plugged in
+      - { name: 24, enabled: false, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P24] } }  # 21.04 Puffin, data/room-entrance#1, nothing plugged in
+      - { name: 25, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P25], device: AG-000707, interface: lan-1 } }  # 21.05 Skylark, display 1
+      - { name: 26, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [30], connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P26], device: AG-000713, interface: lan-9 } }  # 21.05 Skylark, network switch
+      - { name: 27, enabled: false, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P27] } }  # 21.05 Skylark, data/behind-display#3, nothing plugged in
+      - { name: 28, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P28], device: AG-000708, interface: lan-1 } }  # 21.05 Skylark, display 2
+      - { name: 29, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P29], device: AG-000710, interface: lan-1 } }  # 21.05 Skylark, touch controller
+      - { name: 30, enabled: false, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P30] } }  # 21.05 Skylark, data/below-table#2, nothing plugged in
+      - { name: 31, enabled: false, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P31] } }  # 21.05 Skylark, data/room-entrance#1, nothing plugged in
+      - { name: 32, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P32], device: AG-000719, interface: lan-1 } }  # 21.06 Wren, display
+      - { name: 33, enabled: false, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P33] } }  # 21.06 Wren, data/behind-display#3, nothing plugged in
+      - { name: 34, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P34], device: AG-000721, interface: lan-1 } }  # 21.06 Wren, touch controller
+      - { name: 35, enabled: false, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P35] } }  # 21.06 Wren, data/wall-below-table#2, nothing plugged in
+      - { name: 36, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P36], device: AG-000724, interface: lan-1 } }  # 21.06 Wren, scheduler panel
+      - { name: 37, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P37], device: AG-000725, interface: lan-1 } }  # 21.07 Robin, display
+      - { name: 38, enabled: false, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P38] } }  # 21.07 Robin, data/behind-display#3, nothing plugged in
+      - { name: 39, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P39], device: AG-000727, interface: lan-1 } }  # 21.07 Robin, touch controller
+      - { name: 40, enabled: false, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P40] } }  # 21.07 Robin, data/wall-below-table#2, nothing plugged in
+      - { name: 41, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P41], device: AG-000730, interface: lan-1 } }  # 21.07 Robin, scheduler panel
+      - { name: 42, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P42], device: AG-000731, interface: lan-1 } }  # 21.08 Goldcrest, display
+      - { name: 43, enabled: false, connected: { cables: [nyc-cb-49, NYC-21.23-R1-U38-P43] } }  # 21.08 Goldcrest, data/behind-display#3, nothing plugged in
+      - { name: 49, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-55, NYC-20.14-R1-U12-P01, nyc-cb-32], device: nyc-2014-cs01, interface: 5 } }  # trunk to nyc-2014-cs01
+      - { name: 50, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-55, NYC-20.14-R1-U12-P01, nyc-cb-32], device: nyc-2014-cs01, interface: 6 } }  # trunk to nyc-2014-cs01
+    disabled: "44-48"
+  # Access switch 2 · 21.23 Comms room (IDF), Rack 1, U33
+  - id: nyc-2123-as02
+    rack: nyc-21-23-r1
+    u: 33
+    platform: unifi
+    interfaces:
+      - { name: 1, enabled: false, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P01] } }  # 21.08 Goldcrest, data/behind-display#4, nothing plugged in
+      - { name: 2, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P02], device: AG-000733, interface: lan-1 } }  # 21.08 Goldcrest, touch controller
+      - { name: 3, enabled: false, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P03] } }  # 21.08 Goldcrest, data/below-table#2, nothing plugged in
+      - { name: 4, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P04], device: AG-000738, interface: lan-1 } }  # 21.09 Stonechat, video bar
+      - { name: 5, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P05], device: AG-000737, interface: lan-1 } }  # 21.09 Stonechat, display
+      - { name: 6, enabled: false, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P06] } }  # 21.09 Stonechat, data/behind-display#3, nothing plugged in
+      - { name: 7, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P07], device: AG-000740, interface: lan-1 } }  # 21.10 Goldfinch, video bar
+      - { name: 8, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P08], device: AG-000739, interface: lan-1 } }  # 21.10 Goldfinch, display
+      - { name: 9, enabled: false, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P09] } }  # 21.10 Goldfinch, data/behind-display#3, nothing plugged in
+      - { name: 10, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P10], device: AG-000742, interface: lan-1 } }  # 21.11 Chaffinch, video bar
+      - { name: 11, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P11], device: AG-000741, interface: lan-1 } }  # 21.11 Chaffinch, display
+      - { name: 12, enabled: false, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P12] } }  # 21.11 Chaffinch, data/behind-display#3, nothing plugged in
+      - { name: 13, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P13], device: AG-000743, interface: lan-1 } }  # 21.12 Focus 21.12, monitor
+      - { name: 14, enabled: false, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P14] } }  # 21.12 Focus 21.12, data/table-top#2, nothing plugged in
+      - { name: 15, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P15], device: AG-000744, interface: lan-1 } }  # 21.13 Focus 21.13, monitor
+      - { name: 16, enabled: false, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P16] } }  # 21.13 Focus 21.13, data/table-top#2, nothing plugged in
+      - { name: 17, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P17], device: AG-000745, interface: lan-1 } }  # 21.14 Focus 21.14, monitor
+      - { name: 18, enabled: false, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P18] } }  # 21.14 Focus 21.14, data/table-top#2, nothing plugged in
+      - { name: 19, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P19], device: AG-000746, interface: lan-1 } }  # 21.15 Office 21.15, monitor
+      - { name: 20, enabled: false, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P20] } }  # 21.15 Office 21.15, data/wall-below-table#2, nothing plugged in
+      - { name: 21, enabled: false, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P21] } }  # 21.15 Office 21.15, data/room-entrance#1, nothing plugged in
+      - { name: 22, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P22], device: AG-000748, interface: lan-1 } }  # 21.16 Office 21.16, monitor
+      - { name: 23, enabled: false, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P23] } }  # 21.16 Office 21.16, data/wall-below-table#2, nothing plugged in
+      - { name: 24, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P24], device: AG-000749, interface: lan-1 } }  # 21.16 Office 21.16, scheduler panel
+      - { name: 25, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P25], device: AG-000750, interface: lan-1 } }  # 21.17 Office 21.17, monitor
+      - { name: 26, enabled: false, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P26] } }  # 21.17 Office 21.17, data/wall-below-table#2, nothing plugged in
+      - { name: 27, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P27], device: AG-000751, interface: lan-1 } }  # 21.17 Office 21.17, scheduler panel
+      - { name: 28, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P28], device: AG-001443, interface: lan-1 } }  # 21.18 Pantry, display
+      - { name: 29, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P29], device: AG-001444, interface: lan-1 } }  # 21.18 Pantry, signage player
+      - { name: 30, enabled: false, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P30] } }  # 21.18 Pantry, data/behind-display#3, nothing plugged in
+      - { name: 31, enabled: false, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P31] } }  # 21.18 Pantry, data/tbd#1, nothing plugged in
+      - { name: 32, enabled: true, mode: access, untagged_vlan: 70, auth: mab, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P32], device: AG-000752, interface: lan-1 } }  # 21.19 Copy and print, printer
+      - { name: 33, enabled: false, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P33] } }  # 21.19 Copy and print, data/wall#2, nothing plugged in
+      - { name: 34, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P34], device: AG-000753, interface: lan-1 } }  # 21.20 Flex desks A, desk 01, monitor
+      - { name: 35, enabled: false, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P35] } }  # 21.20 Flex desks A, desk-01/data/table-top#2, nothing plugged in
+      - { name: 36, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P36], device: AG-000754, interface: lan-1 } }  # 21.20 Flex desks A, desk 02, monitor
+      - { name: 37, enabled: false, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P37] } }  # 21.20 Flex desks A, desk-02/data/table-top#2, nothing plugged in
+      - { name: 38, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P38], device: AG-000755, interface: lan-1 } }  # 21.20 Flex desks A, desk 03, monitor
+      - { name: 39, enabled: false, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P39] } }  # 21.20 Flex desks A, desk-03/data/table-top#2, nothing plugged in
+      - { name: 40, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P40], device: AG-000756, interface: lan-1 } }  # 21.20 Flex desks A, desk 04, monitor
+      - { name: 41, enabled: false, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P41] } }  # 21.20 Flex desks A, desk-04/data/table-top#2, nothing plugged in
+      - { name: 42, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P42], device: AG-000757, interface: lan-1 } }  # 21.20 Flex desks A, desk 05, monitor
+      - { name: 43, enabled: false, connected: { cables: [nyc-cb-50, NYC-21.23-R1-U34-P43] } }  # 21.20 Flex desks A, desk-05/data/table-top#2, nothing plugged in
+      - { name: 47, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-61], device: AG-001578 } }  # AV switch on a shelf
+      - { name: 49, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-56, NYC-20.14-R1-U12-P01, nyc-cb-33], device: nyc-2014-cs02, interface: 5 } }  # trunk to nyc-2014-cs02
+      - { name: 50, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-56, NYC-20.14-R1-U12-P01, nyc-cb-33], device: nyc-2014-cs02, interface: 6 } }  # trunk to nyc-2014-cs02
+    disabled: "44-46,48"
+  # Access switch 3 · 21.23 Comms room (IDF), Rack 1, U29
+  - id: nyc-2123-as03
+    rack: nyc-21-23-r1
+    u: 29
+    platform: unifi
+    interfaces:
+      - { name: 1, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P01], device: AG-000758, interface: lan-1 } }  # 21.20 Flex desks A, desk 06, monitor
+      - { name: 2, enabled: false, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P02] } }  # 21.20 Flex desks A, desk-06/data/table-top#2, nothing plugged in
+      - { name: 3, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P03], device: AG-000759, interface: lan-1 } }  # 21.20 Flex desks A, desk 07, monitor
+      - { name: 4, enabled: false, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P04] } }  # 21.20 Flex desks A, desk-07/data/table-top#2, nothing plugged in
+      - { name: 5, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P05], device: AG-000760, interface: lan-1 } }  # 21.20 Flex desks A, desk 08, monitor
+      - { name: 6, enabled: false, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P06] } }  # 21.20 Flex desks A, desk-08/data/table-top#2, nothing plugged in
+      - { name: 7, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P07], device: AG-000761, interface: lan-1 } }  # 21.20 Flex desks A, desk 09, monitor
+      - { name: 8, enabled: false, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P08] } }  # 21.20 Flex desks A, desk-09/data/table-top#2, nothing plugged in
+      - { name: 9, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P09], device: AG-000762, interface: lan-1 } }  # 21.20 Flex desks A, desk 10, monitor
+      - { name: 10, enabled: false, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P10] } }  # 21.20 Flex desks A, desk-10/data/table-top#2, nothing plugged in
+      - { name: 11, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P11], device: AG-000763, interface: lan-1 } }  # 21.20 Flex desks A, desk 11, monitor
+      - { name: 12, enabled: false, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P12] } }  # 21.20 Flex desks A, desk-11/data/table-top#2, nothing plugged in
+      - { name: 13, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P13], device: AG-000764, interface: lan-1 } }  # 21.20 Flex desks A, desk 12, monitor
+      - { name: 14, enabled: false, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P14] } }  # 21.20 Flex desks A, desk-12/data/table-top#2, nothing plugged in
+      - { name: 15, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P15], device: AG-000765, interface: lan-1 } }  # 21.20 Flex desks A, desk 13, monitor
+      - { name: 16, enabled: false, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P16] } }  # 21.20 Flex desks A, desk-13/data/table-top#2, nothing plugged in
+      - { name: 17, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P17], device: AG-000766, interface: lan-1 } }  # 21.20 Flex desks A, desk 14, monitor
+      - { name: 18, enabled: false, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P18] } }  # 21.20 Flex desks A, desk-14/data/table-top#2, nothing plugged in
+      - { name: 19, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P19], device: AG-000767, interface: lan-1 } }  # 21.20 Flex desks A, desk 15, monitor
+      - { name: 20, enabled: false, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P20] } }  # 21.20 Flex desks A, desk-15/data/table-top#2, nothing plugged in
+      - { name: 21, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P21], device: AG-000768, interface: lan-1 } }  # 21.20 Flex desks A, desk 16, monitor
+      - { name: 22, enabled: false, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P22] } }  # 21.20 Flex desks A, desk-16/data/table-top#2, nothing plugged in
+      - { name: 23, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P23], device: AG-000769, interface: lan-1 } }  # 21.20 Flex desks A, desk 17, monitor
+      - { name: 24, enabled: false, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P24] } }  # 21.20 Flex desks A, desk-17/data/table-top#2, nothing plugged in
+      - { name: 25, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P25], device: AG-000770, interface: lan-1 } }  # 21.20 Flex desks A, desk 18, monitor
+      - { name: 26, enabled: false, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P26] } }  # 21.20 Flex desks A, desk-18/data/table-top#2, nothing plugged in
+      - { name: 27, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P27], device: AG-000771, interface: lan-1 } }  # 21.20 Flex desks A, desk 19, monitor
+      - { name: 28, enabled: false, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P28] } }  # 21.20 Flex desks A, desk-19/data/table-top#2, nothing plugged in
+      - { name: 29, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P29], device: AG-000772, interface: lan-1 } }  # 21.20 Flex desks A, desk 20, monitor
+      - { name: 30, enabled: false, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P30] } }  # 21.20 Flex desks A, desk-20/data/table-top#2, nothing plugged in
+      - { name: 31, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P31], device: AG-000773, interface: lan-1 } }  # 21.20 Flex desks A, desk 21, monitor
+      - { name: 32, enabled: false, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P32] } }  # 21.20 Flex desks A, desk-21/data/table-top#2, nothing plugged in
+      - { name: 33, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P33], device: AG-000774, interface: lan-1 } }  # 21.20 Flex desks A, desk 22, monitor
+      - { name: 34, enabled: false, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P34] } }  # 21.20 Flex desks A, desk-22/data/table-top#2, nothing plugged in
+      - { name: 35, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P35], device: AG-000775, interface: lan-1 } }  # 21.20 Flex desks A, desk 23, monitor
+      - { name: 36, enabled: false, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P36] } }  # 21.20 Flex desks A, desk-23/data/table-top#2, nothing plugged in
+      - { name: 37, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P37], device: AG-000776, interface: lan-1 } }  # 21.20 Flex desks A, desk 24, monitor
+      - { name: 38, enabled: false, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P38] } }  # 21.20 Flex desks A, desk-24/data/table-top#2, nothing plugged in
+      - { name: 39, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P39], device: AG-000777, interface: lan-1 } }  # 21.20 Flex desks A, desk 25, monitor
+      - { name: 40, enabled: false, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P40] } }  # 21.20 Flex desks A, desk-25/data/table-top#2, nothing plugged in
+      - { name: 41, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P41], device: AG-000778, interface: lan-1 } }  # 21.20 Flex desks A, desk 26, monitor
+      - { name: 42, enabled: false, connected: { cables: [nyc-cb-51, NYC-21.23-R1-U30-P42] } }  # 21.20 Flex desks A, desk-26/data/table-top#2, nothing plugged in
+      - { name: 49, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-57, NYC-20.14-R1-U12-P01, nyc-cb-34], device: nyc-2014-cs01, interface: 7 } }  # trunk to nyc-2014-cs01
+      - { name: 50, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-57, NYC-20.14-R1-U12-P01, nyc-cb-34], device: nyc-2014-cs01, interface: 8 } }  # trunk to nyc-2014-cs01
+    disabled: "43-48"
+  # Access switch 4 · 21.23 Comms room (IDF), Rack 1, U25
+  - id: nyc-2123-as04
+    rack: nyc-21-23-r1
+    u: 25
+    platform: unifi
+    interfaces:
+      - { name: 1, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P01], device: AG-000779, interface: lan-1 } }  # 21.20 Flex desks A, desk 27, monitor
+      - { name: 2, enabled: false, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P02] } }  # 21.20 Flex desks A, desk-27/data/table-top#2, nothing plugged in
+      - { name: 3, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P03], device: AG-000780, interface: lan-1 } }  # 21.20 Flex desks A, desk 28, monitor
+      - { name: 4, enabled: false, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P04] } }  # 21.20 Flex desks A, desk-28/data/table-top#2, nothing plugged in
+      - { name: 5, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P05], device: AG-000781, interface: lan-1 } }  # 21.20 Flex desks A, desk 29, monitor
+      - { name: 6, enabled: false, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P06] } }  # 21.20 Flex desks A, desk-29/data/table-top#2, nothing plugged in
+      - { name: 7, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P07], device: AG-000782, interface: lan-1 } }  # 21.20 Flex desks A, desk 30, monitor
+      - { name: 8, enabled: false, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P08] } }  # 21.20 Flex desks A, desk-30/data/table-top#2, nothing plugged in
+      - { name: 9, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P09], device: AG-000783, interface: lan-1 } }  # 21.20 Flex desks A, desk 31, monitor
+      - { name: 10, enabled: false, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P10] } }  # 21.20 Flex desks A, desk-31/data/table-top#2, nothing plugged in
+      - { name: 11, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P11], device: AG-000784, interface: lan-1 } }  # 21.20 Flex desks A, desk 32, monitor
+      - { name: 12, enabled: false, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P12] } }  # 21.20 Flex desks A, desk-32/data/table-top#2, nothing plugged in
+      - { name: 13, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P13], device: AG-000785, interface: lan-1 } }  # 21.20 Flex desks A, desk 33, monitor
+      - { name: 14, enabled: false, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P14] } }  # 21.20 Flex desks A, desk-33/data/table-top#2, nothing plugged in
+      - { name: 15, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P15], device: AG-000786, interface: lan-1 } }  # 21.20 Flex desks A, desk 34, monitor
+      - { name: 16, enabled: false, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P16] } }  # 21.20 Flex desks A, desk-34/data/table-top#2, nothing plugged in
+      - { name: 17, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P17], device: AG-000787, interface: lan-1 } }  # 21.20 Flex desks A, desk 35, monitor
+      - { name: 18, enabled: false, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P18] } }  # 21.20 Flex desks A, desk-35/data/table-top#2, nothing plugged in
+      - { name: 19, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P19], device: AG-000788, interface: lan-1 } }  # 21.20 Flex desks A, desk 36, monitor
+      - { name: 20, enabled: false, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P20] } }  # 21.20 Flex desks A, desk-36/data/table-top#2, nothing plugged in
+      - { name: 21, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P21], device: AG-000789, interface: lan-1 } }  # 21.20 Flex desks A, desk 37, monitor
+      - { name: 22, enabled: false, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P22] } }  # 21.20 Flex desks A, desk-37/data/table-top#2, nothing plugged in
+      - { name: 23, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P23], device: AG-000790, interface: lan-1 } }  # 21.20 Flex desks A, desk 38, monitor
+      - { name: 24, enabled: false, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P24] } }  # 21.20 Flex desks A, desk-38/data/table-top#2, nothing plugged in
+      - { name: 25, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P25], device: AG-000791, interface: lan-1 } }  # 21.20 Flex desks A, desk 39, monitor
+      - { name: 26, enabled: false, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P26] } }  # 21.20 Flex desks A, desk-39/data/table-top#2, nothing plugged in
+      - { name: 27, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P27], device: AG-000792, interface: lan-1 } }  # 21.20 Flex desks A, desk 40, monitor
+      - { name: 28, enabled: false, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P28] } }  # 21.20 Flex desks A, desk-40/data/table-top#2, nothing plugged in
+      - { name: 29, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P29], device: AG-000793, interface: lan-1 } }  # 21.21 Flex desks B, desk 01, monitor hub
+      - { name: 30, enabled: false, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P30] } }  # 21.21 Flex desks B, desk-01/data/table-top#2, nothing plugged in
+      - { name: 31, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P31], device: AG-000795, interface: lan-1 } }  # 21.21 Flex desks B, desk 02, monitor hub
+      - { name: 32, enabled: false, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P32] } }  # 21.21 Flex desks B, desk-02/data/table-top#2, nothing plugged in
+      - { name: 33, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P33], device: AG-000797, interface: lan-1 } }  # 21.21 Flex desks B, desk 03, monitor hub
+      - { name: 34, enabled: false, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P34] } }  # 21.21 Flex desks B, desk-03/data/table-top#2, nothing plugged in
+      - { name: 35, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P35], device: AG-000799, interface: lan-1 } }  # 21.21 Flex desks B, desk 04, monitor hub
+      - { name: 36, enabled: false, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P36] } }  # 21.21 Flex desks B, desk-04/data/table-top#2, nothing plugged in
+      - { name: 37, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P37], device: AG-000801, interface: lan-1 } }  # 21.21 Flex desks B, desk 05, monitor hub
+      - { name: 38, enabled: false, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P38] } }  # 21.21 Flex desks B, desk-05/data/table-top#2, nothing plugged in
+      - { name: 39, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P39], device: AG-000803, interface: lan-1 } }  # 21.21 Flex desks B, desk 06, monitor hub
+      - { name: 40, enabled: false, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P40] } }  # 21.21 Flex desks B, desk-06/data/table-top#2, nothing plugged in
+      - { name: 41, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P41], device: AG-000805, interface: lan-1 } }  # 21.21 Flex desks B, desk 07, monitor hub
+      - { name: 42, enabled: false, connected: { cables: [nyc-cb-52, NYC-21.23-R1-U26-P42] } }  # 21.21 Flex desks B, desk-07/data/table-top#2, nothing plugged in
+      - { name: 49, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-58, NYC-20.14-R1-U12-P01, nyc-cb-35], device: nyc-2014-cs02, interface: 7 } }  # trunk to nyc-2014-cs02
+      - { name: 50, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-58, NYC-20.14-R1-U12-P01, nyc-cb-35], device: nyc-2014-cs02, interface: 8 } }  # trunk to nyc-2014-cs02
+    disabled: "43-48"
+  # Access switch 5 · 21.23 Comms room (IDF), Rack 1, U21
+  - id: nyc-2123-as05
+    rack: nyc-21-23-r1
+    u: 21
+    platform: unifi
+    interfaces:
+      - { name: 1, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P01], device: AG-000807, interface: lan-1 } }  # 21.21 Flex desks B, desk 08, monitor hub
+      - { name: 2, enabled: false, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P02] } }  # 21.21 Flex desks B, desk-08/data/table-top#2, nothing plugged in
+      - { name: 3, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P03], device: AG-000809, interface: lan-1 } }  # 21.21 Flex desks B, desk 09, monitor hub
+      - { name: 4, enabled: false, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P04] } }  # 21.21 Flex desks B, desk-09/data/table-top#2, nothing plugged in
+      - { name: 5, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P05], device: AG-000811, interface: lan-1 } }  # 21.21 Flex desks B, desk 10, monitor hub
+      - { name: 6, enabled: false, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P06] } }  # 21.21 Flex desks B, desk-10/data/table-top#2, nothing plugged in
+      - { name: 7, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P07], device: AG-000813, interface: lan-1 } }  # 21.21 Flex desks B, desk 11, monitor hub
+      - { name: 8, enabled: false, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P08] } }  # 21.21 Flex desks B, desk-11/data/table-top#2, nothing plugged in
+      - { name: 9, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P09], device: AG-000815, interface: lan-1 } }  # 21.21 Flex desks B, desk 12, monitor hub
+      - { name: 10, enabled: false, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P10] } }  # 21.21 Flex desks B, desk-12/data/table-top#2, nothing plugged in
+      - { name: 11, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P11], device: AG-000818, interface: lan-1 } }  # 21.22 Flex desks C, desk 01, network adapter
+      - { name: 12, enabled: false, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P12] } }  # 21.22 Flex desks C, desk-01/data/table-top#2, nothing plugged in
+      - { name: 13, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P13], device: AG-000820, interface: lan-1 } }  # 21.22 Flex desks C, desk 02, network adapter
+      - { name: 14, enabled: false, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P14] } }  # 21.22 Flex desks C, desk-02/data/table-top#2, nothing plugged in
+      - { name: 15, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P15], device: AG-000822, interface: lan-1 } }  # 21.22 Flex desks C, desk 03, network adapter
+      - { name: 16, enabled: false, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P16] } }  # 21.22 Flex desks C, desk-03/data/table-top#2, nothing plugged in
+      - { name: 17, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P17], device: AG-000824, interface: lan-1 } }  # 21.22 Flex desks C, desk 04, network adapter
+      - { name: 18, enabled: false, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P18] } }  # 21.22 Flex desks C, desk-04/data/table-top#2, nothing plugged in
+      - { name: 19, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P19], device: AG-000826, interface: lan-1 } }  # 21.22 Flex desks C, desk 05, network adapter
+      - { name: 20, enabled: false, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P20] } }  # 21.22 Flex desks C, desk-05/data/table-top#2, nothing plugged in
+      - { name: 21, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P21], device: AG-000828, interface: lan-1 } }  # 21.22 Flex desks C, desk 06, network adapter
+      - { name: 22, enabled: false, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P22] } }  # 21.22 Flex desks C, desk-06/data/table-top#2, nothing plugged in
+      - { name: 23, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P23], device: AG-000830, interface: lan-1 } }  # 21.22 Flex desks C, desk 07, network adapter
+      - { name: 24, enabled: false, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P24] } }  # 21.22 Flex desks C, desk-07/data/table-top#2, nothing plugged in
+      - { name: 25, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P25], device: AG-000832, interface: lan-1 } }  # 21.22 Flex desks C, desk 08, network adapter
+      - { name: 26, enabled: false, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P26] } }  # 21.22 Flex desks C, desk-08/data/table-top#2, nothing plugged in
+      - { name: 27, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P27], device: AG-000834, interface: lan-1 } }  # 21.22 Flex desks C, desk 09, network adapter
+      - { name: 28, enabled: false, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P28] } }  # 21.22 Flex desks C, desk-09/data/table-top#2, nothing plugged in
+      - { name: 29, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P29], device: AG-000836, interface: lan-1 } }  # 21.22 Flex desks C, desk 10, network adapter
+      - { name: 30, enabled: false, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P30] } }  # 21.22 Flex desks C, desk-10/data/table-top#2, nothing plugged in
+      - { name: 31, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P31], device: AG-000838, interface: lan-1 } }  # 21.22 Flex desks C, desk 11, network adapter
+      - { name: 32, enabled: false, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P32] } }  # 21.22 Flex desks C, desk-11/data/table-top#2, nothing plugged in
+      - { name: 33, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P33], device: AG-000840, interface: lan-1 } }  # 21.22 Flex desks C, desk 12, network adapter
+      - { name: 34, enabled: false, connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P34] } }  # 21.22 Flex desks C, desk-12/data/table-top#2, nothing plugged in
+      - { name: 35, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 90], connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P35], device: AG-003236, interface: lan-1 } }  # access point nyc-21-ap01
+      - { name: 36, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 90], connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P36], device: AG-003237, interface: lan-1 } }  # access point nyc-21-ap02
+      - { name: 37, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 90], connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P37], device: AG-003238, interface: lan-1 } }  # access point nyc-21-ap03
+      - { name: 38, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 90], connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P38], device: AG-003239, interface: lan-1 } }  # access point nyc-21-ap04
+      - { name: 39, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 90], connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P39], device: AG-003240, interface: lan-1 } }  # access point nyc-21-ap05
+      - { name: 40, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 90], connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P40], device: AG-003241, interface: lan-1 } }  # access point nyc-21-ap06
+      - { name: 41, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 90], connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P41], device: AG-003242, interface: lan-1 } }  # access point nyc-21-ap07
+      - { name: 42, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 90], connected: { cables: [nyc-cb-53, NYC-21.23-R1-U22-P42], device: AG-003243, interface: lan-1 } }  # access point nyc-21-ap08
+      - { name: 49, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-59, NYC-20.14-R1-U12-P01, nyc-cb-36], device: nyc-2014-cs01, interface: 9 } }  # trunk to nyc-2014-cs01
+      - { name: 50, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-59, NYC-20.14-R1-U12-P01, nyc-cb-36], device: nyc-2014-cs01, interface: 10 } }  # trunk to nyc-2014-cs01
+    disabled: "43-48"
+  # Access switch 6 · 21.23 Comms room (IDF), Rack 1, U19
+  - id: nyc-2123-as06
+    rack: nyc-21-23-r1
+    u: 19
+    platform: unifi
+    interfaces:
+      - { name: 49, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-60, NYC-20.14-R1-U12-P01, nyc-cb-37], device: nyc-2014-cs02, interface: 9 } }  # trunk to nyc-2014-cs02
+      - { name: 50, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-60, NYC-20.14-R1-U12-P01, nyc-cb-37], device: nyc-2014-cs02, interface: 10 } }  # trunk to nyc-2014-cs02
+    disabled: "1-48"
+  # Access switch 1 · 22.22 Comms room (IDF), Rack 1, U37
+  - id: nyc-2222-as01
+    rack: nyc-22-22-r1
+    u: 37
+    platform: unifi
+    interfaces:
+      - { name: 1, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P01], device: AG-000841, interface: lan-1 } }  # 22.01 Corncrake, display
+      - { name: 2, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P02] } }  # 22.01 Corncrake, data/behind-display#2, nothing plugged in
+      - { name: 3, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P03], device: AG-000843, interface: lan-1 } }  # 22.01 Corncrake, ptz camera
+      - { name: 4, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [30], connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P04], device: AG-000853, interface: lan-9 } }  # 22.01 Corncrake, network switch
+      - { name: 5, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P05], device: AG-000844, interface: lan-1 } }  # 22.01 Corncrake, touch controller
+      - { name: 6, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P06] } }  # 22.01 Corncrake, data/below-table#2, nothing plugged in
+      - { name: 7, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P07] } }  # 22.01 Corncrake, data/below-table#3, nothing plugged in
+      - { name: 8, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P08] } }  # 22.01 Corncrake, data/below-table#4, nothing plugged in
+      - { name: 9, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P09] } }  # 22.01 Corncrake, data/below-table#5, nothing plugged in
+      - { name: 10, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P10] } }  # 22.01 Corncrake, data/tbd#1, nothing plugged in
+      - { name: 11, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P11] } }  # 22.01 Corncrake, data/tbd#2, nothing plugged in
+      - { name: 12, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P12], device: AG-000858, interface: lan-1 } }  # 22.01 Corncrake, scheduler panel
+      - { name: 13, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P13] } }  # 22.01 Corncrake, data/ceiling#1, nothing plugged in
+      - { name: 14, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P14], device: AG-000859, interface: lan-1 } }  # 22.02 Merlin, display
+      - { name: 15, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P15] } }  # 22.02 Merlin, data/behind-display#3, nothing plugged in
+      - { name: 16, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P16] } }  # 22.02 Merlin, data/behind-display#4, nothing plugged in
+      - { name: 17, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P17], device: AG-000861, interface: lan-1 } }  # 22.02 Merlin, touch controller
+      - { name: 18, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P18] } }  # 22.02 Merlin, data/below-table#2, nothing plugged in
+      - { name: 19, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P19] } }  # 22.02 Merlin, data/room-entrance#1, nothing plugged in
+      - { name: 20, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P20], device: AG-000865, interface: lan-1 } }  # 22.03 Jay, display
+      - { name: 21, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P21] } }  # 22.03 Jay, data/behind-display#3, nothing plugged in
+      - { name: 22, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P22] } }  # 22.03 Jay, data/behind-display#4, nothing plugged in
+      - { name: 23, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P23], device: AG-000867, interface: lan-1 } }  # 22.03 Jay, touch controller
+      - { name: 24, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P24] } }  # 22.03 Jay, data/below-table#2, nothing plugged in
+      - { name: 25, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P25] } }  # 22.03 Jay, data/room-entrance#1, nothing plugged in
+      - { name: 26, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P26], device: AG-000870, interface: lan-1 } }  # 22.04 Magpie, display 1
+      - { name: 27, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P27], device: AG-000871, interface: lan-1 } }  # 22.04 Magpie, display 2
+      - { name: 28, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P28] } }  # 22.04 Magpie, data/behind-display#4, nothing plugged in
+      - { name: 29, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P29], device: AG-000873, interface: lan-1 } }  # 22.04 Magpie, touch controller
+      - { name: 30, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P30] } }  # 22.04 Magpie, data/below-table#2, nothing plugged in
+      - { name: 31, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P31], device: AG-000876, interface: lan-1 } }  # 22.04 Magpie, scheduler panel
+      - { name: 32, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P32], device: AG-000877, interface: lan-1 } }  # 22.05 Starling, display 1
+      - { name: 33, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P33], device: AG-000878, interface: lan-1 } }  # 22.05 Starling, display 2
+      - { name: 34, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P34] } }  # 22.05 Starling, data/behind-display#4, nothing plugged in
+      - { name: 35, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P35], device: AG-000880, interface: lan-1 } }  # 22.05 Starling, touch controller
+      - { name: 36, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P36] } }  # 22.05 Starling, data/below-table#2, nothing plugged in
+      - { name: 37, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P37], device: AG-000884, interface: lan-1 } }  # 22.05 Starling, scheduler panel
+      - { name: 38, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P38], device: AG-000885, interface: lan-1 } }  # 22.06 Swallow, desk video device
+      - { name: 39, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P39] } }  # 22.06 Swallow, data/wall-below-table#2, nothing plugged in
+      - { name: 40, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P40], device: AG-000886, interface: lan-1 } }  # 22.06 Swallow, scheduler panel
+      - { name: 41, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P41], device: AG-000887, interface: lan-1 } }  # 22.07 Siskin, display
+      - { name: 42, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P42] } }  # 22.07 Siskin, data/behind-display#3, nothing plugged in
+      - { name: 43, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P43] } }  # 22.07 Siskin, data/room-entrance#1, nothing plugged in
+      - { name: 44, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P44], device: AG-000889, interface: lan-1 } }  # 22.08 Linnet, display
+      - { name: 45, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P45] } }  # 22.08 Linnet, data/behind-display#3, nothing plugged in
+      - { name: 46, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P46] } }  # 22.08 Linnet, data/room-entrance#1, nothing plugged in
+      - { name: 47, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P47], device: AG-000891, interface: lan-1 } }  # 22.09 Treecreeper, display
+      - { name: 48, enabled: false, connected: { cables: [nyc-cb-67, NYC-22.22-R1-U38-P48] } }  # 22.09 Treecreeper, data/behind-display#3, nothing plugged in
+      - { name: 49, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-72, NYC-20.14-R1-U12-P13, nyc-cb-38], device: nyc-2014-cs01, interface: 11 } }  # trunk to nyc-2014-cs01
+      - { name: 50, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-72, NYC-20.14-R1-U12-P13, nyc-cb-38], device: nyc-2014-cs01, interface: 12 } }  # trunk to nyc-2014-cs01
+  # Access switch 2 · 22.22 Comms room (IDF), Rack 1, U33
+  - id: nyc-2222-as02
+    rack: nyc-22-22-r1
+    u: 33
+    platform: unifi
+    interfaces:
+      - { name: 1, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P01], device: AG-000893, interface: lan-1 } }  # 22.10 Blue Tit, display
+      - { name: 2, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P02] } }  # 22.10 Blue Tit, data/behind-display#3, nothing plugged in
+      - { name: 3, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P03], device: AG-000895, interface: lan-1 } }  # 22.11 Focus 22.11, monitor
+      - { name: 4, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P04] } }  # 22.11 Focus 22.11, data/table-top#2, nothing plugged in
+      - { name: 5, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P05], device: AG-000896, interface: lan-1 } }  # 22.12 Focus 22.12, monitor
+      - { name: 6, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P06] } }  # 22.12 Focus 22.12, data/table-top#2, nothing plugged in
+      - { name: 7, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P07], device: AG-000897, interface: lan-1 } }  # 22.13 Focus 22.13, monitor
+      - { name: 8, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P08] } }  # 22.13 Focus 22.13, data/table-top#2, nothing plugged in
+      - { name: 9, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P09], device: AG-000898, interface: lan-1 } }  # 22.14 Office 22.14, monitor
+      - { name: 10, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P10] } }  # 22.14 Office 22.14, data/wall-below-table#2, nothing plugged in
+      - { name: 11, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P11], device: AG-000899, interface: lan-1 } }  # 22.14 Office 22.14, scheduler panel
+      - { name: 12, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P12], device: AG-000900, interface: lan-1 } }  # 22.15 Office 22.15, monitor
+      - { name: 13, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P13] } }  # 22.15 Office 22.15, data/wall-below-table#2, nothing plugged in
+      - { name: 14, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P14], device: AG-000901, interface: lan-1 } }  # 22.15 Office 22.15, scheduler panel
+      - { name: 15, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P15], device: AG-000902, interface: lan-1 } }  # 22.16 Office 22.16, monitor
+      - { name: 16, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P16] } }  # 22.16 Office 22.16, data/wall-below-table#2, nothing plugged in
+      - { name: 17, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P17] } }  # 22.16 Office 22.16, data/room-entrance#1, nothing plugged in
+      - { name: 18, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P18], device: AG-001445, interface: lan-1 } }  # 22.17 Pantry, display
+      - { name: 19, enabled: true, mode: access, untagged_vlan: 31, auth: mab, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P19], device: AG-001446, interface: lan-1 } }  # 22.17 Pantry, signage player
+      - { name: 20, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P20] } }  # 22.17 Pantry, data/behind-display#3, nothing plugged in
+      - { name: 21, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P21] } }  # 22.17 Pantry, data/tbd#1, nothing plugged in
+      - { name: 22, enabled: true, mode: access, untagged_vlan: 70, auth: mab, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P22], device: AG-000903, interface: lan-1 } }  # 22.18 Copy and print, printer
+      - { name: 23, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P23] } }  # 22.18 Copy and print, data/wall#2, nothing plugged in
+      - { name: 24, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P24] } }  # 22.19 Assigned desks D, desk-01/data/table-top#1, nothing plugged in
+      - { name: 25, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P25] } }  # 22.19 Assigned desks D, desk-01/data/table-top#2, nothing plugged in
+      - { name: 26, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P26] } }  # 22.19 Assigned desks D, desk-02/data/table-top#1, nothing plugged in
+      - { name: 27, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P27] } }  # 22.19 Assigned desks D, desk-02/data/table-top#2, nothing plugged in
+      - { name: 28, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P28] } }  # 22.19 Assigned desks D, desk-03/data/table-top#1, nothing plugged in
+      - { name: 29, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P29] } }  # 22.19 Assigned desks D, desk-03/data/table-top#2, nothing plugged in
+      - { name: 30, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P30] } }  # 22.19 Assigned desks D, desk-04/data/table-top#1, nothing plugged in
+      - { name: 31, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P31] } }  # 22.19 Assigned desks D, desk-04/data/table-top#2, nothing plugged in
+      - { name: 32, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P32] } }  # 22.19 Assigned desks D, desk-05/data/table-top#1, nothing plugged in
+      - { name: 33, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P33] } }  # 22.19 Assigned desks D, desk-05/data/table-top#2, nothing plugged in
+      - { name: 34, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P34] } }  # 22.19 Assigned desks D, desk-06/data/table-top#1, nothing plugged in
+      - { name: 35, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P35] } }  # 22.19 Assigned desks D, desk-06/data/table-top#2, nothing plugged in
+      - { name: 36, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P36] } }  # 22.19 Assigned desks D, desk-07/data/table-top#1, nothing plugged in
+      - { name: 37, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P37] } }  # 22.19 Assigned desks D, desk-07/data/table-top#2, nothing plugged in
+      - { name: 38, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P38] } }  # 22.19 Assigned desks D, desk-08/data/table-top#1, nothing plugged in
+      - { name: 39, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P39] } }  # 22.19 Assigned desks D, desk-08/data/table-top#2, nothing plugged in
+      - { name: 40, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P40] } }  # 22.19 Assigned desks D, desk-09/data/table-top#1, nothing plugged in
+      - { name: 41, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P41] } }  # 22.19 Assigned desks D, desk-09/data/table-top#2, nothing plugged in
+      - { name: 42, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P42] } }  # 22.19 Assigned desks D, desk-10/data/table-top#1, nothing plugged in
+      - { name: 43, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P43] } }  # 22.19 Assigned desks D, desk-10/data/table-top#2, nothing plugged in
+      - { name: 44, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P44] } }  # 22.19 Assigned desks D, desk-11/data/table-top#1, nothing plugged in
+      - { name: 45, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P45] } }  # 22.19 Assigned desks D, desk-11/data/table-top#2, nothing plugged in
+      - { name: 46, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P46] } }  # 22.19 Assigned desks D, desk-12/data/table-top#1, nothing plugged in
+      - { name: 47, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-77], device: AG-001584 } }  # AV switch on a shelf
+      - { name: 48, enabled: false, connected: { cables: [nyc-cb-68, NYC-22.22-R1-U34-P48] } }  # 22.19 Assigned desks D, desk-13/data/table-top#1, nothing plugged in
+      - { name: 49, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-73, NYC-20.14-R1-U12-P13, nyc-cb-39], device: nyc-2014-cs02, interface: 11 } }  # trunk to nyc-2014-cs02
+      - { name: 50, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-73, NYC-20.14-R1-U12-P13, nyc-cb-39], device: nyc-2014-cs02, interface: 12 } }  # trunk to nyc-2014-cs02
+  # Access switch 3 · 22.22 Comms room (IDF), Rack 1, U29
+  - id: nyc-2222-as03
+    rack: nyc-22-22-r1
+    u: 29
+    platform: unifi
+    interfaces:
+      - { name: 1, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P01] } }  # 22.19 Assigned desks D, desk-13/data/table-top#2, nothing plugged in
+      - { name: 2, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P02] } }  # 22.19 Assigned desks D, desk-14/data/table-top#1, nothing plugged in
+      - { name: 3, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P03] } }  # 22.19 Assigned desks D, desk-14/data/table-top#2, nothing plugged in
+      - { name: 4, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P04] } }  # 22.19 Assigned desks D, desk-15/data/table-top#1, nothing plugged in
+      - { name: 5, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P05] } }  # 22.19 Assigned desks D, desk-15/data/table-top#2, nothing plugged in
+      - { name: 6, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P06] } }  # 22.19 Assigned desks D, desk-16/data/table-top#1, nothing plugged in
+      - { name: 7, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P07] } }  # 22.19 Assigned desks D, desk-16/data/table-top#2, nothing plugged in
+      - { name: 8, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P08] } }  # 22.19 Assigned desks D, desk-17/data/table-top#1, nothing plugged in
+      - { name: 9, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P09] } }  # 22.19 Assigned desks D, desk-17/data/table-top#2, nothing plugged in
+      - { name: 10, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P10] } }  # 22.19 Assigned desks D, desk-18/data/table-top#1, nothing plugged in
+      - { name: 11, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P11] } }  # 22.19 Assigned desks D, desk-18/data/table-top#2, nothing plugged in
+      - { name: 12, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P12] } }  # 22.19 Assigned desks D, desk-19/data/table-top#1, nothing plugged in
+      - { name: 13, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P13] } }  # 22.19 Assigned desks D, desk-19/data/table-top#2, nothing plugged in
+      - { name: 14, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P14] } }  # 22.19 Assigned desks D, desk-20/data/table-top#1, nothing plugged in
+      - { name: 15, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P15] } }  # 22.19 Assigned desks D, desk-20/data/table-top#2, nothing plugged in
+      - { name: 16, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P16] } }  # 22.19 Assigned desks D, desk-21/data/table-top#1, nothing plugged in
+      - { name: 17, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P17] } }  # 22.19 Assigned desks D, desk-21/data/table-top#2, nothing plugged in
+      - { name: 18, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P18] } }  # 22.19 Assigned desks D, desk-22/data/table-top#1, nothing plugged in
+      - { name: 19, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P19] } }  # 22.19 Assigned desks D, desk-22/data/table-top#2, nothing plugged in
+      - { name: 20, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P20] } }  # 22.19 Assigned desks D, desk-23/data/table-top#1, nothing plugged in
+      - { name: 21, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P21] } }  # 22.19 Assigned desks D, desk-23/data/table-top#2, nothing plugged in
+      - { name: 22, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P22] } }  # 22.19 Assigned desks D, desk-24/data/table-top#1, nothing plugged in
+      - { name: 23, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P23] } }  # 22.19 Assigned desks D, desk-24/data/table-top#2, nothing plugged in
+      - { name: 24, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P24] } }  # 22.19 Assigned desks D, desk-25/data/table-top#1, nothing plugged in
+      - { name: 25, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P25] } }  # 22.19 Assigned desks D, desk-25/data/table-top#2, nothing plugged in
+      - { name: 26, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P26] } }  # 22.19 Assigned desks D, desk-26/data/table-top#1, nothing plugged in
+      - { name: 27, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P27] } }  # 22.19 Assigned desks D, desk-26/data/table-top#2, nothing plugged in
+      - { name: 28, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P28] } }  # 22.19 Assigned desks D, desk-27/data/table-top#1, nothing plugged in
+      - { name: 29, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P29] } }  # 22.19 Assigned desks D, desk-27/data/table-top#2, nothing plugged in
+      - { name: 30, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P30] } }  # 22.19 Assigned desks D, desk-28/data/table-top#1, nothing plugged in
+      - { name: 31, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P31] } }  # 22.19 Assigned desks D, desk-28/data/table-top#2, nothing plugged in
+      - { name: 32, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P32] } }  # 22.19 Assigned desks D, desk-29/data/table-top#1, nothing plugged in
+      - { name: 33, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P33] } }  # 22.19 Assigned desks D, desk-29/data/table-top#2, nothing plugged in
+      - { name: 34, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P34] } }  # 22.19 Assigned desks D, desk-30/data/table-top#1, nothing plugged in
+      - { name: 35, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P35] } }  # 22.19 Assigned desks D, desk-30/data/table-top#2, nothing plugged in
+      - { name: 36, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P36], device: AG-000905, interface: lan-1 } }  # 22.20 Assigned desks E, desk 01, network adapter
+      - { name: 37, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P37] } }  # 22.20 Assigned desks E, desk-01/data/table-top#2, nothing plugged in
+      - { name: 38, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P38], device: AG-000907, interface: lan-1 } }  # 22.20 Assigned desks E, desk 02, network adapter
+      - { name: 39, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P39] } }  # 22.20 Assigned desks E, desk-02/data/table-top#2, nothing plugged in
+      - { name: 40, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P40], device: AG-000909, interface: lan-1 } }  # 22.20 Assigned desks E, desk 03, network adapter
+      - { name: 41, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P41] } }  # 22.20 Assigned desks E, desk-03/data/table-top#2, nothing plugged in
+      - { name: 42, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P42], device: AG-000911, interface: lan-1 } }  # 22.20 Assigned desks E, desk 04, network adapter
+      - { name: 43, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P43] } }  # 22.20 Assigned desks E, desk-04/data/table-top#2, nothing plugged in
+      - { name: 44, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P44], device: AG-000913, interface: lan-1 } }  # 22.20 Assigned desks E, desk 05, network adapter
+      - { name: 45, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P45] } }  # 22.20 Assigned desks E, desk-05/data/table-top#2, nothing plugged in
+      - { name: 46, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P46], device: AG-000915, interface: lan-1 } }  # 22.20 Assigned desks E, desk 06, network adapter
+      - { name: 47, enabled: false, connected: { cables: [nyc-cb-69, NYC-22.22-R1-U30-P47] } }  # 22.20 Assigned desks E, desk-06/data/table-top#2, nothing plugged in
+      - { name: 49, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-74, NYC-20.14-R1-U12-P13, nyc-cb-40], device: nyc-2014-cs01, interface: 13 } }  # trunk to nyc-2014-cs01
+      - { name: 50, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-74, NYC-20.14-R1-U12-P13, nyc-cb-40], device: nyc-2014-cs01, interface: 14 } }  # trunk to nyc-2014-cs01
+    disabled: "48"
+  # Access switch 4 · 22.22 Comms room (IDF), Rack 1, U25
+  - id: nyc-2222-as04
+    rack: nyc-22-22-r1
+    u: 25
+    platform: unifi
+    interfaces:
+      - { name: 1, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P01], device: AG-000917, interface: lan-1 } }  # 22.20 Assigned desks E, desk 07, network adapter
+      - { name: 2, enabled: false, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P02] } }  # 22.20 Assigned desks E, desk-07/data/table-top#2, nothing plugged in
+      - { name: 3, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P03], device: AG-000919, interface: lan-1 } }  # 22.20 Assigned desks E, desk 08, network adapter
+      - { name: 4, enabled: false, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P04] } }  # 22.20 Assigned desks E, desk-08/data/table-top#2, nothing plugged in
+      - { name: 5, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P05], device: AG-000921, interface: lan-1 } }  # 22.20 Assigned desks E, desk 09, network adapter
+      - { name: 6, enabled: false, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P06] } }  # 22.20 Assigned desks E, desk-09/data/table-top#2, nothing plugged in
+      - { name: 7, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P07], device: AG-000923, interface: lan-1 } }  # 22.20 Assigned desks E, desk 10, network adapter
+      - { name: 8, enabled: false, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P08] } }  # 22.20 Assigned desks E, desk-10/data/table-top#2, nothing plugged in
+      - { name: 9, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P09], device: AG-000924, interface: lan-1 } }  # 22.21 Flex desks F, desk 01, monitor
+      - { name: 10, enabled: false, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P10] } }  # 22.21 Flex desks F, desk-01/data/table-top#2, nothing plugged in
+      - { name: 11, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P11], device: AG-000925, interface: lan-1 } }  # 22.21 Flex desks F, desk 02, monitor
+      - { name: 12, enabled: false, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P12] } }  # 22.21 Flex desks F, desk-02/data/table-top#2, nothing plugged in
+      - { name: 13, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P13], device: AG-000926, interface: lan-1 } }  # 22.21 Flex desks F, desk 03, monitor
+      - { name: 14, enabled: false, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P14] } }  # 22.21 Flex desks F, desk-03/data/table-top#2, nothing plugged in
+      - { name: 15, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P15], device: AG-000927, interface: lan-1 } }  # 22.21 Flex desks F, desk 04, monitor
+      - { name: 16, enabled: false, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P16] } }  # 22.21 Flex desks F, desk-04/data/table-top#2, nothing plugged in
+      - { name: 17, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P17], device: AG-000928, interface: lan-1 } }  # 22.21 Flex desks F, desk 05, monitor
+      - { name: 18, enabled: false, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P18] } }  # 22.21 Flex desks F, desk-05/data/table-top#2, nothing plugged in
+      - { name: 19, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P19], device: AG-000929, interface: lan-1 } }  # 22.21 Flex desks F, desk 06, monitor
+      - { name: 20, enabled: false, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P20] } }  # 22.21 Flex desks F, desk-06/data/table-top#2, nothing plugged in
+      - { name: 21, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P21], device: AG-000930, interface: lan-1 } }  # 22.21 Flex desks F, desk 07, monitor
+      - { name: 22, enabled: false, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P22] } }  # 22.21 Flex desks F, desk-07/data/table-top#2, nothing plugged in
+      - { name: 23, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P23], device: AG-000931, interface: lan-1 } }  # 22.21 Flex desks F, desk 08, monitor
+      - { name: 24, enabled: false, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P24] } }  # 22.21 Flex desks F, desk-08/data/table-top#2, nothing plugged in
+      - { name: 25, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P25], device: AG-000932, interface: lan-1 } }  # 22.21 Flex desks F, desk 09, monitor
+      - { name: 26, enabled: false, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P26] } }  # 22.21 Flex desks F, desk-09/data/table-top#2, nothing plugged in
+      - { name: 27, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P27], device: AG-000933, interface: lan-1 } }  # 22.21 Flex desks F, desk 10, monitor
+      - { name: 28, enabled: false, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P28] } }  # 22.21 Flex desks F, desk-10/data/table-top#2, nothing plugged in
+      - { name: 29, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P29], device: AG-000934, interface: lan-1 } }  # 22.21 Flex desks F, desk 11, monitor
+      - { name: 30, enabled: false, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P30] } }  # 22.21 Flex desks F, desk-11/data/table-top#2, nothing plugged in
+      - { name: 31, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P31], device: AG-000935, interface: lan-1 } }  # 22.21 Flex desks F, desk 12, monitor
+      - { name: 32, enabled: false, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P32] } }  # 22.21 Flex desks F, desk-12/data/table-top#2, nothing plugged in
+      - { name: 33, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P33], device: AG-000936, interface: lan-1 } }  # 22.21 Flex desks F, desk 13, monitor
+      - { name: 34, enabled: false, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P34] } }  # 22.21 Flex desks F, desk-13/data/table-top#2, nothing plugged in
+      - { name: 35, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P35], device: AG-000937, interface: lan-1 } }  # 22.21 Flex desks F, desk 14, monitor
+      - { name: 36, enabled: false, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P36] } }  # 22.21 Flex desks F, desk-14/data/table-top#2, nothing plugged in
+      - { name: 37, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P37], device: AG-000938, interface: lan-1 } }  # 22.21 Flex desks F, desk 15, monitor
+      - { name: 38, enabled: false, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P38] } }  # 22.21 Flex desks F, desk-15/data/table-top#2, nothing plugged in
+      - { name: 39, enabled: true, mode: access, untagged_vlan: 20, auth: dot1x, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P39], device: AG-000939, interface: lan-1 } }  # 22.21 Flex desks F, desk 16, monitor
+      - { name: 40, enabled: false, connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P40] } }  # 22.21 Flex desks F, desk-16/data/table-top#2, nothing plugged in
+      - { name: 41, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 90], connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P41], device: AG-003244, interface: lan-1 } }  # access point nyc-22-ap01
+      - { name: 42, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 90], connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P42], device: AG-003245, interface: lan-1 } }  # access point nyc-22-ap02
+      - { name: 43, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 90], connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P43], device: AG-003246, interface: lan-1 } }  # access point nyc-22-ap03
+      - { name: 44, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 90], connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P44], device: AG-003247, interface: lan-1 } }  # access point nyc-22-ap04
+      - { name: 45, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 90], connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P45], device: AG-003248, interface: lan-1 } }  # access point nyc-22-ap05
+      - { name: 46, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 90], connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P46], device: AG-003249, interface: lan-1 } }  # access point nyc-22-ap06
+      - { name: 47, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 90], connected: { cables: [nyc-cb-70, NYC-22.22-R1-U26-P47], device: AG-003250, interface: lan-1 } }  # access point nyc-22-ap07
+      - { name: 49, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-75, NYC-20.14-R1-U12-P13, nyc-cb-41], device: nyc-2014-cs02, interface: 13 } }  # trunk to nyc-2014-cs02
+      - { name: 50, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-75, NYC-20.14-R1-U12-P13, nyc-cb-41], device: nyc-2014-cs02, interface: 14 } }  # trunk to nyc-2014-cs02
+    disabled: "48"
+  # Access switch 5 · 22.22 Comms room (IDF), Rack 1, U23
+  - id: nyc-2222-as05
+    rack: nyc-22-22-r1
+    u: 23
+    platform: unifi
+    interfaces:
+      - { name: 49, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-76, NYC-20.14-R1-U12-P13, nyc-cb-42], device: nyc-2014-cs01, interface: 15 } }  # trunk to nyc-2014-cs01
+      - { name: 50, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [20, 30, 31, 50, 60, 70, 90], connected: { cables: [nyc-cb-76, NYC-20.14-R1-U12-P13, nyc-cb-42], device: nyc-2014-cs01, interface: 16 } }  # trunk to nyc-2014-cs01
+    disabled: "1-48"
+  # Heron, network switch · 20.04 Heron
+  - id: nyc-2004-sw01
+    space: nyc-20-04
+    position: network-switch
+    platform: netgear
+    interfaces:
+      - { name: lan-1, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { device: AG-000597, interface: lan-1 } }  # codec
+      - { name: lan-2, enabled: true, mode: access, untagged_vlan: 40, auth: mab, connected: { device: AG-000597, interface: lan-2 } }  # codec, AV network in the room
+      - { name: lan-9, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [30], connected: { cables: [NYC-20.14-R1-U06-P16, nyc-cb-17], device: nyc-2014-as01, interface: 16 }, seen: { tagged_vlans: [30, 40], at: "2026-09-30T06:00:00Z" } }  # uplink to nyc-2014-as01 port 16; the switch reports otherwise
+    disabled: [lan-3, lan-4, lan-5, lan-6, lan-7, lan-8, sfp-1, lan-10]
+  # Whooper Swan, network switch · 20.10 Whooper Swan
+  - id: nyc-2010-sw01
+    space: nyc-20-10
+    position: network-switch
+    platform: netgear
+    interfaces:
+      - { name: lan-1, enabled: true, mode: access, untagged_vlan: 40, auth: mab, connected: { device: AG-000654, interface: lan-2 } }  # video bar, AV network in the room
+      - { name: lan-2, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { device: AG-000659, interface: lan-1 } }  # switcher
+      - { name: lan-9, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [30], connected: { cables: [NYC-20.14-R1-U09-P24, nyc-cb-18], device: nyc-2014-as02, interface: 24 } }  # uplink to nyc-2014-as02 port 24
+    disabled: [lan-3, lan-4, lan-5, lan-6, lan-7, lan-8, sfp-1, lan-10]
+  # Skylark, network switch · 21.05 Skylark
+  - id: nyc-2105-sw01
+    space: nyc-21-05
+    position: network-switch
+    platform: netgear
+    interfaces:
+      - { name: lan-1, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { device: AG-000709, interface: lan-2 } }  # video bar
+      - { name: lan-2, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { device: AG-000714, interface: lan-1 } }  # switcher
+      - { name: lan-9, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [30], connected: { cables: [NYC-21.23-R1-U38-P26, nyc-cb-49], device: nyc-2123-as01, interface: 26 } }  # uplink to nyc-2123-as01 port 26
+    disabled: [lan-3, lan-4, lan-5, lan-6, lan-7, lan-8, sfp-1, lan-10]
+  # Corncrake, network switch · 22.01 Corncrake
+  - id: nyc-2201-sw01
+    space: nyc-22-01
+    position: network-switch
+    platform: netgear
+    interfaces:
+      - { name: lan-1, enabled: true, mode: access, untagged_vlan: 30, auth: mab, connected: { device: AG-000842, interface: lan-1 } }  # codec
+      - { name: lan-2, enabled: true, mode: access, untagged_vlan: 40, auth: mab, connected: { device: AG-000842, interface: lan-2 } }  # codec, AV network in the room
+      - { name: lan-3, enabled: true, mode: access, untagged_vlan: 40, auth: mab, connected: { device: AG-000847, interface: lan-1 } }  # ceiling microphone, AV network in the room
+      - { name: lan-9, enabled: true, mode: tagged, untagged_vlan: 10, tagged_vlans: [30], connected: { cables: [NYC-22.22-R1-U38-P04, nyc-cb-67], device: nyc-2222-as01, interface: 4 } }  # uplink to nyc-2222-as01 port 4
+    disabled: [lan-4, lan-5, lan-6, lan-7, lan-8, sfp-1, lan-10]
+demo: true

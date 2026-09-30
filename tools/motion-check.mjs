@@ -2,7 +2,7 @@
 /* Motion check (MOTION-V2 §6 and §7, docs/rules/motion.md M7): with prefers-reduced-motion: reduce, no script may
    animate. It opens pages in a browser set to reduced motion, does what a person does on them (zoom into a space
    on the floor plan and back out with [ and ], open the palette in each of its modes, switch a module off and on
-   in Settings, choose a port on a unit; open and close a disclosure, filter a list, scroll sections and charts into
+   in Settings, choose a port on a unit, press a space and a floor on a Home thumbnail; open and close a disclosure, filter a list, scroll sections and charts into
    view, switch a project's phase, hover a card), and fails when any Element.animate() call asks for a duration above 0.
    It runs every flow twice: once with the system set to reduced motion, and once with the system at full motion but
    the site's own switch on (html data-motion="off"), which must win.
@@ -77,6 +77,17 @@ const FLOWS = [
     await page.click('[data-rpl-play]'); await settle(page, 1500);
     await page.click('[data-rpl-now]'); await settle(page);
   }],
+  ['thumb', '/', async (page) => {
+    // The floor map's thumbnail on Home: a space changes state and back (tint and glyph), a space zooms open, and
+    // the card zooms into the office plan on its floor.
+    await page.evaluate(() => { document.dispatchEvent(new CustomEvent('rs:space-state', { detail: { id: 'dub-3-03', h: 'review', why: 'check' } })); }); await settle(page);
+    await page.evaluate(() => { document.dispatchEvent(new CustomEvent('rs:space-state', { detail: { id: 'dub-3-03', h: 'fine' } })); }); await settle(page);
+    await page.locator('.fm-t-hit:has(.hg):visible').first().click();
+    await page.waitForURL(/rooms\//, { waitUntil: 'commit' }); await settle(page);
+    await page.goBack(); await page.waitForURL(/keia-atlas\/$/, { waitUntil: 'commit' }); await settle(page);
+    await page.locator('a.fm-t-open:visible').first().click();
+    await page.waitForURL(/locations\/[a-z]+\/\?floor=/, { waitUntil: 'commit' }); await settle(page);
+  }],
   ['palette', '/', async (page) => {
     await key(page, '/'); await settle(page, 300);
     await page.keyboard.type('x52'); await settle(page, 300);
@@ -96,6 +107,13 @@ const FLOWS = [
     await page.locator('input[name="mod-vendors"][value="off"]').evaluate((i) => i.closest('label').click()); await settle(page);
     await page.locator('input[name="mod-vendors"][value="on"]').evaluate((i) => i.closest('label').click()); await settle(page);
     await key(page, 'Escape'); await settle(page, 400);
+  }],
+  ['deliver', '/projects/prj-14/integrate/', async (page) => {
+    // Deliver by: each way regroups the same units (km.regroup); One at a time's Next slides the next in (km.slide).
+    for (const by of ['type', 'room', 'one', 'set', 'floor']) {
+      await page.click(`[data-deliver-ctl] [data-by="${by}"]`); await settle(page);
+      if (by === 'one') { await page.click('[data-act="one-next"]'); await settle(page); }
+    }
   }],
   ['port', '/rooms/dub-3-09/', async (page) => {
     await page.locator('main a[href*="device/?tag="]:visible').first().click();

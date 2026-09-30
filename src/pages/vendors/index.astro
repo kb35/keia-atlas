@@ -10,6 +10,8 @@ import Section from '../../components/Section.astro';
 import EmptyState from '../../components/EmptyState.astro';
 import { vendors, sites, VENDOR_KIND, DEMO_TODAY, SITE_ORDER, modelName, fmtDate, href, plural } from '../../lib/data.mjs';
 import { person, REGION_SHORT } from '../../lib/demo.mjs';
+import { between, ROLE_WORDS } from '../../lib/engagements.mjs';
+import '../../styles/engagements.css';
 const ORDER = ['integration', 'service', 'manufacturer'];
 const list = Object.values(vendors).sort((a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind) || a.name.localeCompare(b.name));
 const days = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000);
@@ -111,6 +113,7 @@ const ROWS = list.map((v, i) => ({ id: v.id, i, name: v.name, left: leftOf(v) })
                 <ol>{v.gets.map((g) => <li><b>{GETS[g.when]}</b><span>{g.what}</span></li>)}</ol>
               </div>
             )}
+            {between('aigna', v.id) && <p class="vd-eng" data-feature="engagements">Engagement: {ROLE_WORDS[between('aigna', v.id).role]} · <a href={href(`/vendors/${v.id}/engagement/`)}>What they can see</a></p>}
             <footer class="vd-foot">
               {v.owner && <span>Managed by <a href={href(`/team/?p=${v.owner}`)}>{person(v.owner).name}</a></span>}
               {v.people?.length > 0 && <span>Portal: {v.people.map((p) => person(p).name).join(', ')} · <a href={href('/vendor/')}>See their view</a></span>}

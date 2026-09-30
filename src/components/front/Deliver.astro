@@ -114,7 +114,7 @@ const chipOwn = { s: 'with', to: 'brightwave', kind: 'vendor', name: 'Brightwave
   import { setSpace, showKit } from '../../lib/isofloor-client.mjs';
   import { chipOf } from '../../lib/ownership.mjs';
   import { setChip } from '../../lib/withchip.mjs';
-  import { loop } from '../../lib/front-loop.mjs';
+  import { loop, clock as loopClock } from '../../lib/front-loop.mjs';
 
   function init(root: HTMLElement) {
     if ((root as any).__dl) return; (root as any).__dl = true;
@@ -129,8 +129,8 @@ const chipOwn = { s: 'with', to: 'brightwave', kind: 'vendor', name: 'Brightwave
     if (!W.rsWhoId) W.rsWhoId = () => 'liam';
     if (!W.RS_PEOPLE) W.RS_PEOPLE = [{ id: 'liam', name: 'Liam Doyle', initials: 'LD' }, { id: 'nora', name: 'Nora', initials: 'N' }];
     const PEOPLE = { liam: { name: 'Liam Doyle', first: 'Liam', initials: 'LD' } };
-    let timers: number[] = [], t0 = 0;
-    const later = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
+    const clk = loopClock(); let t0 = 0;
+    const later = (ms: number, fn: () => void) => { clk.later(ms, fn); };
     const batchEl = (id: string) => root.querySelector<HTMLElement>(`[data-dl-batch="${id}"]`)!;
     const setBatch = (id: string, s: string) => { const el = batchEl(id); if (!el) return; el.dataset.state = s; setGlyph(el.querySelector('.hg'), s); };
     const counts = (n: number) => { checked.textContent = `${n} of ${N} devices`; root.querySelectorAll<HTMLElement>('[data-dl-n]').forEach((x) => { const short = x.dataset.dlN === 'addr' && n > D.batches[0].units ? 1 : 0; x.textContent = `${n - short} of ${N}`; }); };
@@ -140,7 +140,7 @@ const chipOwn = { s: 'with', to: 'brightwave', kind: 'vendor', name: 'Brightwave
 
     // The frame at the end of the sequence, all at once (reduced motion, and the reset before Play again).
     const reset = () => {
-      timers.forEach(clearTimeout); timers = [];
+      clk.clear();
       showKit(svg, '', false);
       root.querySelectorAll<HTMLElement>('[data-ifl-ring]').forEach((r) => setSpace(svg, r.dataset.iflRing!, 'planned'));
       D.batches.forEach((b: any) => setBatch(b.id, 'planned'));
@@ -190,7 +190,7 @@ const chipOwn = { s: 'with', to: 'brightwave', kind: 'vendor', name: 'Brightwave
     };
     // Astro's own chip script redraws the chip at page load from its data; the sequence's chip state wins after that.
     if (motion().reduced) { finish(); return; }
-    loop(root.querySelector<HTMLElement>('.dl-stage')!, { play: run, reset });
+    loop(root.querySelector<HTMLElement>('.dl-stage')!, { play: run, reset, finish, clock: clk });
   }
   const boot = () => document.querySelectorAll<HTMLElement>('[data-dl]').forEach(init);
   boot();

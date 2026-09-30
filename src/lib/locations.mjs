@@ -122,19 +122,5 @@ export function liveModelFor(siteIds = null) {
   return { ...m, units, rooms };
 }
 
-// A small plan of an office's first floor for a card: the outline and the rooms, north up, no words.
-export function planThumb(siteId) {
-  if (!hasFloors(siteId)) return null;
-  const M = building(siteId);
-  const F = M.floors[0];
-  const W = Math.max(...F.outline.map((p) => p[0])), H = Math.max(...F.outline.map((p) => p[1]));
-  const Y = (y) => H - y;
-  return {
-    W, H, floor: F.name, more: M.floors.length - 1,
-    outline: F.outline.map(([x, y]) => `${x},${Y(y)}`).join(' '),
-    rooms: Object.values(M.rooms).filter((r) => r.floor === F.id && r.rect).map((r) => ({ id: r.id, x: r.rect[0], y: Y(r.rect[3]), w: r.rect[2] - r.rect[0], h: r.rect[3] - r.rect[1], comms: ['mdf', 'idf'].includes(r.space_type) })),
-  };
-}
-
 export const officeHref =(id) => href(`/locations/${id}/`);
 export const INC_WORD = INC_STATE;

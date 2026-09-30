@@ -19,13 +19,20 @@ export const km = {
      or the older data-reduced="true"), else the system's prefers-reduced-motion. data-motion="full" (or
      data-reduced="false") keeps motion on even when the system asks for less. */
   reduced() {
+    // The one question (window.rsReducedNow, src/lib/a11y.mjs): Settings › Accessibility › Motion first.
+    if (typeof window.rsReducedNow === 'function') return window.rsReducedNow();
     const m = root.dataset.motion;
     if (m === 'off' || m === 'reduced') return true;
     if (m === 'full' || m === 'on') return false;
     if (root.dataset.reduced === 'true') return true;
+    if (/^(off|reduced)$/.test(root.dataset.motion || '')) return true;
     if (root.dataset.reduced === 'false') return false;
     return matchMedia('(prefers-reduced-motion: reduce)').matches;
   },
+  /* Keep things still (Settings › Accessibility, or the front page's Pause animations): the site-wide grammar's
+     moves (settle, disclose, tick, draw-in, lift) land at once, as under reduced motion. Moves the person asks for
+     elsewhere (a zoom, a menu) keep their motion setting. */
+  still() { return km.reduced() || root.getAttribute('data-still') === 'on'; },
   t: {
     get pop() { return tokenMs('--dur-pop', 200); },
     get exit() { return tokenMs('--dur-exit', 240); },
@@ -242,6 +249,62 @@ export const km = {
     return leave;
   },
 
+  /* km-regroup (M2 persist, FLIP): the same things, sorted into new groups. Everything keyed data-vk inside
+     `box` is measured, swap() redraws the groups, and each keyed thing that is on both sides travels from where
+     it was to where it is now (--dur-morph, the zero-bounce spring). A keyed thing that was not there before
+     fades in where it lands; the groups' own chrome (anything marked [data-km-chrome]) fades in with it, so the
+     new groups form around the things arriving in them. The box eases from its old height to its new one.
+     Only what is on screen, or lands on screen, moves (at most 400 things). Reduced motion: swap() only. */
+  regroup(box, swap) {
+    if (!box || km.reduced() || !box.animate) { swap(); return () => {}; }
+    const vh = innerHeight, near = (r) => r && r.bottom > -80 && r.top < vh + 80;
+    const before = new Map();
+    box.querySelectorAll('[data-vk]').forEach((el) => { const r = el.getBoundingClientRect(); if (r.width || r.height) before.set(el.dataset.vk, r); });
+    const h0 = box.getBoundingClientRect().height;
+    swap();
+    const h1 = box.getBoundingClientRect().height, d = tokenMs('--dur-morph', 520), ease = km.spring(), anims = [];
+    if (Math.abs(h1 - h0) > 2) anims.push(box.animate([{ height: `${h0}px`, overflow: 'clip' }, { height: `${h1}px`, overflow: 'clip' }], { duration: d, easing: km.t.settle }));
+    let n = 0;
+    box.querySelectorAll('[data-vk]').forEach((el) => {
+      if (n >= 400) return;
+      const a = before.get(el.dataset.vk), b = el.getBoundingClientRect();
+      if (!b.width && !b.height) return;
+      if (a && (near(a) || near(b))) {
+        const dx = a.left - b.left, dy = a.top - b.top;
+        if (Math.abs(dx) + Math.abs(dy) < 1) return;
+        n++;
+        anims.push(el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: d, easing: ease }));
+      } else if (!a && near(b)) {
+        n++;
+        anims.push(el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: km.t.enter, delay: km.t.stagger, easing: km.t.settle, fill: 'backwards' }));
+      }
+    });
+    box.querySelectorAll('[data-km-chrome]').forEach((el) => { if (near(el.getBoundingClientRect())) anims.push(el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: km.t.enter, delay: km.t.stagger, easing: km.t.settle, fill: 'backwards' })); });
+    return () => anims.forEach((an) => an.cancel());
+  },
+
+  /* km-slide (M12, a step): the next thing in a sequence slides in from the side you stepped towards while the
+     last one slides out the other way and fades, on one line; the box eases to the new height. dir 1 is next,
+     -1 is back. swap() puts the new content in `el`. Reduced motion: swap() only. */
+  slide(el, swap, { dir = 1 } = {}) {
+    if (!el || km.reduced() || !el.animate) { swap(); return; }
+    const r0 = el.getBoundingClientRect();
+    const ghost = el.cloneNode(true);
+    ghost.setAttribute('aria-hidden', 'true'); ghost.inert = true;
+    ghost.querySelectorAll('[id],[data-slot],[data-help]').forEach((x) => { x.removeAttribute('id'); x.removeAttribute('data-slot'); x.removeAttribute('data-help'); });
+    swap();
+    const r1 = el.getBoundingClientRect(), host = el.parentElement;
+    const cs = getComputedStyle(host);
+    if (cs.position === 'static') host.style.position = 'relative';
+    Object.assign(ghost.style, { position: 'absolute', left: `${r0.left - host.getBoundingClientRect().left}px`, top: `${r0.top - host.getBoundingClientRect().top}px`, width: `${r0.width}px`, margin: '0', pointerEvents: 'none', zIndex: '1' });
+    host.appendChild(ghost);
+    const shift = 28 * dir, d = km.t.enter;
+    ghost.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: `translateX(${-shift}px)` }], { duration: km.t.exit, easing: km.t.exitCurve, fill: 'forwards' }).onfinish = () => ghost.remove();
+    el.animate([{ opacity: 0, transform: `translateX(${shift}px)` }, { opacity: 1, transform: 'none' }], { duration: d, delay: km.t.exit / 3, easing: km.spring(), fill: 'backwards' });
+    if (Math.abs(r1.height - r0.height) > 2) el.animate([{ minHeight: `${r0.height}px` }, { minHeight: `${r1.height}px` }], { duration: tokenMs('--dur-morph', 520), easing: km.t.settle });
+    setTimeout(() => { ghost.remove(); if (cs.position === 'static') host.style.position = ''; }, tokenMs('--dur-morph', 520) + d);
+  },
+
   /* km-skeleton: the wash goes, content cross-fades in, glyphs come on in turn, the heartbeat last (all in CSS). */
   skeleton(el) {
     el.classList.remove('km-loaded');
@@ -288,7 +351,7 @@ export const km = {
      waiting section at once (used when the page changes). Reduced motion: nothing waits. */
   settle(scope, sel = 'section.sec, [data-settle]') {
     // An automated browser (a full-page screenshot, a check) sees every section in its place: nothing waits.
-    if (!scope || km.reduced() || !('IntersectionObserver' in window) || (navigator.webdriver && !window.__kmSettleAlways)) return () => {};
+    if (!scope || km.still() || !('IntersectionObserver' in window) || (navigator.webdriver && !window.__kmSettleAlways)) return () => {};
     const vh = innerHeight, all = [...scope.querySelectorAll(sel)];
     const els = all.filter((el) => {
       if (el.closest('[data-no-settle], [hidden], dialog, .peek')) return false;
@@ -322,7 +385,7 @@ export const km = {
     const sum = d.querySelector(':scope > summary');
     if (!sum) { d.open = open; return; }
     if (d.__km) { d.__km(); d.__km = null; }
-    if (km.reduced() || !d.animate) { d.open = open; return; }
+    if (km.still() || !d.animate) { d.open = open; return; }
     const kids = () => [...d.children].filter((k) => k !== sum && k.nodeType === 1);
     const floating = (k) => /absolute|fixed/.test(getComputedStyle(k).position);
     if (open) d.open = true;
@@ -361,7 +424,7 @@ export const km = {
      It never counts through the numbers in between (M9): the figure is exact on every frame, only its place eases.
      from: the old text, to tell up from down. Reduced motion: the new value is simply there. */
   tick(el, from = '') {
-    if (!el || km.reduced() || !el.animate) return;
+    if (!el || km.still() || !el.animate) return;
     const num = (s) => { const m = String(s).replace(/,/g, '').match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : NaN; };
     const a = num(from), b = num(el.textContent);
     const dir = isNaN(a) || isNaN(b) || a === b ? 1 : (b > a ? 1 : -1);
@@ -405,7 +468,7 @@ export const km = {
      Transform and stroke only, over --dur-morph, once. After that a chart is redrawn still (M9). Reduced
      motion: the chart is simply there. */
   drawIn(el, { delay = 0 } = {}) {
-    if (!el || km.reduced() || !el.animate) return;
+    if (!el || km.still() || !el.animate) return;
     const d = km.t.morph, ease = km.t.settle, st = km.t.stagger;
     const lines = el.matches('svg') ? [...el.querySelectorAll('path, polyline, line')].filter((p) => !p.closest('defs')) : [...el.querySelectorAll('svg.spk path, [data-draw]')];
     lines.forEach((p, i) => {
@@ -442,7 +505,7 @@ export const km = {
   BARS: '[data-chart-bar], .sp-bar, .cfc-bar, .cf-prog-bar, .vd-bar, .vrec-bar, .hbar, .bud-bar, .task-bar, .pbs-bar, .mdp-bar, .lv-bar, .lv-hbar, .sv-hbar, .pl-mbar, .pl-kbar, .pl-hbar, .wp-bars',
   /* Draw every chart in scope in once as it first comes into view. Returns a function that stops watching. */
   watchCharts(scope, sel = '[data-chart], svg.spk') {
-    if (!scope || km.reduced() || !('IntersectionObserver' in window)) return () => {};
+    if (!scope || km.still() || !('IntersectionObserver' in window)) return () => {};
     const els = [...scope.querySelectorAll(`${sel}, ${km.BARS}`)].filter((el) => !el.closest('[data-no-draw], .sm-grid') && !(el.parentElement && el.parentElement.closest(km.BARS)));
     if (!els.length) return () => {};
     let n = 0;

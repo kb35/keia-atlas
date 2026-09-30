@@ -1,7 +1,7 @@
 // The method pages under /method/, in reading order, with the level each belongs to and the thing to try in the
 // demo. Titles and text come from docs/keia-method.md (src/lib/method.mjs); this file only orders the pages and
 // says where "Try it in the demo" goes and as whom (View as). Each try is something the v0.1 demo really does.
-import { IDEAS, SECTIONS, FITS } from '../../lib/method.mjs';
+import { IDEAS, SEC2, FITS } from '../../lib/method.mjs';
 
 // Who a "Try it" opens the demo as. Names are the demo's made-up people (src/lib/demo.mjs).
 export const PEOPLE = {
@@ -97,18 +97,18 @@ const TRY = {
   },
   level1: {
     to: '/', as: 'liam', label: 'Open Home as Liam',
-    steps: ['Open Home as Liam: the page opens with its answer, then four figures.', 'Press ? and point at anything: the help explains the screen you are on.'],
+    steps: ['Open Home as Liam, the technician in the story: his page opens with one line, then four figures.', 'Select a figure: it opens the list it counts.', 'Press ? and point at anything: the help explains the screen you are on.'],
   },
 };
 
-const sec = (num) => SECTIONS[num];
-// Level 2 in the method's own order (2.1 to 2.9), then Level 3.
+// Level 2 in the method's own order: the five ideas, then where to start, routine work, trust and the evidence (each
+// found by its title, so a renumbered section keeps its address), then Level 3.
 export const PAGES = [
-  { slug: 'problems', num: '2.1', level: 2, title: sec('2.1').title, short: 'The problems' },
   ...IDEAS.map((i) => ({ slug: i.slug, num: i.num, level: 2, title: i.name, short: i.name, idea: i.n })),
-  { slug: 'modules', num: '2.7', level: 2, title: sec('2.7').title, short: 'Modules' },
-  { slug: 'how-the-work-gets-done', num: '2.8', level: 2, title: sec('2.8').title, short: 'How the work gets done' },
-  { slug: 'trust', num: '2.9', level: 2, title: sec('2.9').title, short: 'Trust' },
+  { slug: 'modules', num: SEC2.modules.num, level: 2, title: SEC2.modules.title, short: 'Start anywhere' },
+  { slug: 'how-the-work-gets-done', num: SEC2.routine.num, level: 2, title: SEC2.routine.title, short: 'Routine work' },
+  { slug: 'trust', num: SEC2.trust.num, level: 2, title: SEC2.trust.title, short: 'Trust' },
+  { slug: 'problems', num: SEC2.problems.num, level: 2, title: SEC2.problems.title, short: 'The evidence' },
   { slug: 'words', num: '3.1', level: 3, title: 'Words, mapped to ITIL, PMI and ISO', short: 'Words' },
 ].map((p) => ({ ...p, to: `/method/${p.slug}/`, try: TRY[p.slug] }));
 
@@ -129,7 +129,7 @@ export const LEVEL1_TRY = TRY.level1;
 export const pageBySlug = (slug) => PAGES.find((p) => p.slug === slug);
 export const LEVELS = [
   { n: 0, name: 'The sentence', time: 'five seconds' },
-  { n: 1, name: 'One screen', time: 'minutes' },
-  { n: 2, name: 'The practices', time: 'an afternoon' },
+  { n: 1, name: 'The short version', time: 'ten minutes' },
+  { n: 2, name: 'The detail', time: 'an afternoon' },
   { n: 3, name: 'The reference', time: 'as needed' },
 ];

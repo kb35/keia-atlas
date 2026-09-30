@@ -38,6 +38,11 @@ export const stateOf = (s) => (STATES.includes(s) ? s : LEGACY[String(s ?? '').t
 const RING = (s) => `<circle class="hg-s hg-ring" data-s="${s}" pathLength="1" cx="8" cy="8" r="6"/><circle class="hg-dot" cx="8" cy="8" r="1.5"/><line class="hg-s hg-thin hg-slash" pathLength="1" x1="2.804" y1="5" x2="13.196" y2="11"/>`;
 const SHAPE = Object.fromEntries(['fine', 'review', 'fault', 'stale', 'progress', 'planned', 'off'].map((s) => [s, RING(s)]));
 
+/** A count of what is not fine, in the site's words: "1 fault", "2 to review", "1 fault · 2 to review", or "All fine". */
+export const tally = (fault = 0, review = 0) => (fault || review
+  ? [fault && `${fault} fault${fault === 1 ? '' : 's'}`, review && `${review} to review`].filter(Boolean).join(' · ')
+  : 'All fine');
+
 /** The inner SVG shapes for a state (the 16 unit box). */
 export const shape = (state) => SHAPE[stateOf(state)];
 

@@ -1,34 +1,259 @@
 # The Keia Method
 
-A way of running IT from one living record of every room, device and job: kept by the work itself, readable in a minute, as deep as you need.
+Five ideas for running workplace technology, built on one shared record of every space.
 
-Read Level 1 in minutes. Read Level 2 in an afternoon. Level 3 is for looking things up, and How it fits maps the method to ITIL, ISO, PMI and the other frameworks IT people already know. There is no exam; people get good by using it.
-
----
-
-## Level 1: one screen
-
-Workplace IT runs on a console per vendor, forms that ask what the alert already said, and knowledge that leaves when people do. Keia keeps one record of every room, device and job, written as the work happens, with a named owner on each. It keeps the words ITIL people know. Start small; go as deep as you like.
-
-**Five ideas**
-
-1. **Start from the building.** Every room, device and job has one living record, read from the place outwards and shared by everyone who touches it. *Open the office: the floor plan, every device as a circle, who is on site, what is open. Click the room, then the device, then the port.*
-2. **Capture, don't ask.** The systems already know the device, the place, the time and the last change; a person is asked only for what only a person knows. *An alert becomes an incident already filled in. Closing it asks one thing: "What fixed it?"*
-3. **Answer first.** Every page opens with whether things are all right, then four figures, then the evidence, down to the raw record. Quiet when fine; one signal, once, when not. *"All services within target" opens to seven incidents, then to the device log.*
-4. **Own it, hand it on.** Every job has one named owner until the person is back working. It moves as a whole, with its context, to a colleague, a team, a vendor, or a rule someone owns. *"Now with Network team: needs a switch config change."*
-5. **Learn as you go.** The guide sits beside the device, the fix is kept where it was found, the help explains the screen you are on. Full for a first-timer, fading as skill grows. *A new technician sets up a video bar right first time; on her fifth, the checklist is shorter.*
-
-**Eight words you need:** Incident (something is broken), Request (someone wants something), Problem (the cause behind repeating incidents), Change (a planned alteration to something in service), Service (what IT provides, with an owner and a target), Ready for you, With (who holds the work now, and why), Waiting on (what it is stopped for).
-
-**How routine work gets done.** Software may do routine work (reboot, re-apply a setting, re-sync, update a record) only under a standing rule a named person approved once, within caps, and only where the action can be put back. Anything irreversible is a proposal a person confirms. Every automatic action shows what it read, what it did and why, with Undo or Roll back where one exists. Keia works with AI switched off.
-
-**Where it comes from.** Keia keeps ITIL's nouns and PMI's project structure and puts them on one record. It changes the verbs: capture instead of ask, hand on instead of escalate, a rule someone owns instead of a board for routine work.
+Level 1 takes ten minutes. Level 2 takes an afternoon. Level 3 is for looking things up, and How it fits maps the method to ITIL, ISO, PMI and the other frameworks IT people already know. There is no exam; people get good by using it.
 
 ---
 
-## Level 2: the practices
+## Level 1: the short version
 
-### 2.1 The problems it answers
+The Keia Method is a way of working for the teams who look after an organisation's meeting rooms, screens, networks and home-office kit. Most of that work is pieced together from vendor consoles, forms and memory, so faults are found by the people trying to use a room, and what was learnt leaves with whoever learnt it. The method is five habits built around one shared record of every space and what is in it. A team can keep that record in a spreadsheet. Keia Atlas is open-source software that keeps it for you and connects to the service desk and monitoring tools you already run.
+
+### One morning, before and after
+
+**Before.** At 08:40 a manager walks into meeting room 3.09 to set up a 9:00 client call. The screen stays blank. She fills in the service desk form: the building, the room, the asset number on the device, a description. The desk passes it to the AV team, who ask her for a photo. The AV technician suspects the network; the network team asks which switch port the room uses, and nobody knows. The call starts 25 minutes late, on a laptop. Three weeks later it happens again, and the technician who found the fix is on leave.
+
+**After.** The same room, the same fault, and a team that works the Keia way. This team uses Keia Atlas, so some steps happen by themselves; with a spreadsheet, the same steps are done by hand.
+
+- **07:52** The video bar in 3.09 goes offline, and the team's monitoring tool raises an alert. The record already lists what is in the room, what each device plugs into, and the 9:00 booking.
+- **07:53** A job opens with those facts filled in, and the last change beside them: the switch on that floor was updated on Tuesday. Nobody is asked for a room number or an asset tag. With a spreadsheet, the desk copies the same facts from the room's row.
+- **08:05** Liam, the technician on site, starts his day. His list opens with one line: one room at risk before 9:00, everything else fine.
+- **08:15** Liam finds that Tuesday's update turned the room's network port off. He cannot change the switch, so he hands the job to the network team with everything he found. The job now reads "With Network team: needs the port for 3.09 turned back on."
+- **08:31** The network team turns the port on. Liam checks the room and closes the job with one sentence: what fixed it. The sentence is kept in the record, against the video bar.
+- **09:00** The call starts on time. The next time that fault appears, whoever opens the job sees what fixed it before.
+
+### The five ideas
+
+The steps from 07:52 to 08:31 are the five ideas, one step each, in order. Each idea is a habit a team can keep with no special software; the last line of each says how Keia Atlas helps.
+
+#### 1. Start from the building
+
+- **Instead of** piecing together what is in a room from memory and vendor consoles.
+- **You** keep one record of every space, the devices in it and what they connect to, and attach every job to a space or a device.
+- **You'll know it's working when** anyone can say what is in a room, and what has happened to it, without asking.
+- **In Keia Atlas:** each office is a floor plan; select a room, then a device, then its port.
+
+#### 2. Capture, don't ask
+
+- **Instead of** forms that ask people what you already know.
+- **You** fill in each new job from your records (room, device, last change) and ask people only what only they know.
+- **You'll know it's working when** a report needs no follow-up question, and closing a job takes one sentence: what fixed it.
+- **In Keia Atlas:** an alert opens a job already filled in; a QR code on the table reports a fault in one tap.
+
+#### 3. Answer first
+
+- **Instead of** long reports, and alerts that nobody acts on.
+- **You** open every report and every morning with one line: is everything all right, and if not, what needs someone first. Detail comes after.
+- **You'll know it's working when** people can act on the first line, and every alert leads to an action.
+- **In Keia Atlas:** every page opens with one line that says whether all is well; each count under it opens the list it counts.
+
+#### 4. Own it, hand it on
+
+- **Instead of** passing a job up a chain where each team starts again.
+- **You** give every job one named owner until whoever it affects can work again. If someone else must act, hand it over whole: what is known, what was tried, why it is theirs.
+- **You'll know it's working when** nobody asks "who has this?", and nobody is asked the same question twice.
+- **In Keia Atlas:** each job says who has it and why, with its whole history attached.
+
+#### 5. Learn as you go
+
+- **Instead of** courses apart from the work, and fixes that live in one person's head.
+- **You** keep each setup guide beside its device, and write down what fixed a fault where the next person will look.
+- **You'll know it's working when** a repeat fault is fixed from last time's note, and a new starter sets up a room right first time.
+- **In Keia Atlas:** the setup guide opens beside the device, and a job shows what fixed it the last two times.
+
+### Start in 30 days
+
+Four weeks, one or two habits at a time. The order is a suggestion, and no software is needed to begin.
+
+- **Week 1: record your rooms.** List each space and what is in it: every device, its model and what it connects to. Start with one floor. A spreadsheet is enough. From now on, note each change against the device it touches.
+- **Week 2: name an owner.** Give every open job one named owner and a line saying who has it now and why. When you pass a job on, pass all of it. Whoever changes something updates the list as part of the job, never as a separate chore.
+- **Week 3: stop asking.** Before you contact the person who reported a fault, fill in the room, the device and the last change from your list. Close every job with one sentence: what fixed it.
+- **Week 4: answer first.** Open the team's day with one line: is everything all right, and what needs someone first. List the alerts nobody acted on this month and ask whether each is needed. Put each setup guide beside its device.
+- **Day 30: look back.** Over the last two weeks, how many reports needed a follow-up question, and how many fixes did someone reuse? Keep what helped. If the spreadsheet gets hard to keep current, Keia Atlas can import it.
+
+### The words
+
+The method keeps the names IT teams already use, and adds a few plain words of its own.
+
+**ITIL words we keep.** ITIL is the most widely used guide to running IT services. These are its names, with their usual meaning.
+
+- **Incident:** something is broken.
+- **Request:** someone wants something that is not broken.
+- **Problem:** the cause behind incidents that keep coming back.
+- **Change:** a planned alteration to something in use.
+- **Service:** something IT provides, such as video meetings, with an owner and a target for how well it works.
+
+**Keia's own words.** Plain words for things ITIL names differently, or not at all.
+
+- **The record:** the one shared list of every space, what is in it, and every job on it. It stays current because each job updates it.
+- **Job:** any piece of work on the record: an incident, a request, a change or a task.
+- **Space:** any place where technology lives, such as a meeting room, a comms room or a home office.
+- **Setup guide:** the settings for one kind of device, in the order you apply them.
+- **With:** who holds a job now, and why, as in "With Network team: needs a port turned on".
+- **Hand to:** pass a job, with everything known about it, to a colleague, a team or a vendor. It replaces "escalate", because the job moves sideways to whoever can act, not up a ladder.
+
+---
+
+## Level 2: the detail
+
+Each idea in the same shape as Level 1, with more room: what it replaces, what you do, how you'll know it's working, and what Keia Atlas adds, then why it works and where it stops. After the ideas come where to start, how software does routine work, why IT can trust the record, and the evidence behind it all.
+
+### 2.1 Start from the building
+
+Keep one record of every place and what is in it, and attach all other work to it.
+
+**Instead of.** Knowing a room from memory, a drawing from the fit-out and a console per vendor. Facilities tools hold the floors, IT tools hold the devices, and the join between them lives in someone's head. Network teams run 4 to 10 monitoring tools, and none surveyed has reached one view (EMA, 2026).
+
+**You.** Model the places first: region, office, floor, space (any place technology lives, including a home office), then the devices in each space and what they connect to. The record calls one physical device a unit. Every other record (incident, change, project, contract, knowledge) attaches to a place or a unit. A space type is the standard a kind of space is built to; the gap between the standard and the real space is the work.
+
+**The moves.** Record (each space, the units in it and what they connect to). Attach (every job, change and document to its space or unit). Compare (each space with its space type, and list the gaps).
+
+**You'll know it's working when.** The share of spaces with a complete record rises; fewer devices turn up on the network that the record does not know; a new space has a usable record soon after handover. Measure all three.
+
+**In Keia Atlas.** Three ways to move through the record. Zoom goes from region to port and back, each step a real page. Lens switches one floor plan between Network, Support, Projects, Vendors and Knowledge. Trace draws a service from the internet circuit to the device, lit by health. Every object has the same page shape: where it is and what it connects to, what is happening now, discussion, history, then its own detail. The same health circle, with a word beside it, is used everywhere.
+
+**Why it works.** Nobody else joins the space, the device, the change, the owner and the vendor in one record; today the join lives in someone's head. Facilities tools own floors; IT tools own devices; the room's technology belongs to neither.
+
+**Limits.** Real estate and property services (leases, space planning, moves, cleaning and catering) are another profession's record; Keia exchanges space data with those systems and never owns it. Laptops and phones are out of scope.
+
+### 2.2 Capture, don't ask
+
+Fill in every record from what is already known, and ask people only what only they know.
+
+**Instead of.** Forms that ask what the alert already said. The portal is the slowest way to report a fault: 4 h 26 min lost per incident, against 1 h 24 min for a walk-in (HappySignals, 2026). Only 44% of issues are reported at all (Nexthink, 2023).
+
+**You.** Fill every record from what is known before a person sees it: the alert names the unit, the unit knows its space, the calendar knows the booking, the build sheet (every setting of one unit) knows the settings, and the change log knows what happened last. The categories are the space and the device type the record already has. Ask a person one thing at a time, and only what only they know.
+
+**The moves.** Confirm (accept what was captured, correct what was not). Capture (one sentence at the moment of knowing: "What fixed it?" or "Nothing new"). Propose (a captured fix that keeps helping becomes a proposed edit to the setup guide, approved by its owner).
+
+**You'll know it's working when.** More fields are filled by capture than typed; reports per space come close to the faults you observe; the time from a fault to a filled-in incident falls. Measure all three.
+
+**In Keia Atlas.** An incident arrives with its space, unit, likely known error, last change and a proposed priority a person may change. The room guide, the page behind the code on each meeting-room table, reports a fault in one tap. A change is written from the work, not typed after it. A project's as-built record becomes the operational record the next day.
+
+**Why it works.** The form is the slowest, least-liked way to report, and half of problems are never reported. Extraneous load (hunting, re-typing, translating) is the only kind of mental load design can remove.
+
+**Limits.** Capture needs feeds. Much works with no connector (the catalogue, space types, floor plans, standards, build sheets, the room guide); every connected figure is labelled with its source and time.
+
+### 2.3 Answer first
+
+Open every page, report and morning with the answer: is everything all right, and if not, what needs you.
+
+**Instead of.** Dashboards that stay green while people are unhappy, and alerts that need no action. Every service level can be met while each incident still costs the person 3 h 18 min (HappySignals, 2026). 67% of security alerts are ignored (Vectra, 2023).
+
+**You.** Open with one sentence that answers "is it all right?", then at most four figures that answer "how many need me?", each leading to the list it counts. Summaries never unfold in place: every figure leads to its list, and every list to its records, down to the raw log and configuration. Nothing is hidden and nothing is forced on the reader.
+
+**The moves.** Lead (one sentence: all right, or what is not). Count (at most four figures, each a number of things that need someone). Link (every figure opens its list; every list opens its records).
+
+**Urgency when it is real.** Red, urgent words and motion appear only for a P1 or major incident, a safety matter, or a live event at risk, and they leave when it is over. Everything else is a fact with a date: "Past target since 09:14", "3 to review", "12 new". A quiet page proves it is quiet: "checked 40 s ago". A feed that has not reported in its window is itself a fault.
+
+**You'll know it's working when.** People reach the record they need in a few clicks from their first page; most alerts raised lead to an action; a page is red only while something is really wrong. Measure clicks to the record, alerts acted on against alerts raised, and time spent red against incidents open.
+
+**In Keia Atlas.** Every page opens with its answer, up to four figures and one action. A figure opens its list with the filters in the address. Hover shows a record and a click opens it. Each person can open a page at the depth they use, and it is remembered. Stillness means fine: one motion, once, when a state changes, and nothing pulses to look alive. Reduced motion replaces travel with cross-fades and keeps every meaning.
+
+**Why it works.** People hold about four things at once; alerts that need no action train people to ignore the ones that do; static small multiples beat animation for reading data; cockpits, control rooms and intensive care all learnt to be quiet when normal and loud only when it matters.
+
+**Limits.** Density is a layer, not a mode: the first screen is simple, every layer below is denser, and the raw layer is never removed. Experts set their own default depth.
+
+### 2.4 Own it, hand it on
+
+Give every job one named owner, and when it has to move, move all of it.
+
+**Instead of.** Escalating through tiers, where each team starts again. Each reassignment cuts satisfaction by about 10 points and takes the time a person loses from about 2 h to about 9.5 h (HappySignals, 2025 and 2026).
+
+**You.** Every job has one named owner: the person who took it, or the service owner who approved the rule that runs it. The owner keeps it until the person is back working, or hands it on whole: the record moves with its history, evidence and context, and says who has it now and why. Vendors, integrators and managed service providers are peers in the same record, with access scoped to the job and ending when it closes. Routine work is handed to a standing rule owned by a person.
+
+**The moves.** Take (pick it up). Hand to (pass it as a peer, with why). Park (one minute: where I stopped, the next step, the open question; resuming takes one glance). Run (a standing rule does the outcome). Roll back or Undo (where the rule has one).
+
+**The default when nothing moves.** Work not taken within the service's response target goes to the service owner. A major incident names one commander. A hand-off to a vendor carries the contract's clock, visible to both sides.
+
+**Cover.** Handover for leave or a shift is a fixed short card (open, fragile, who owns it, what changed), not a chat thread. Coming back opens with what changed, what is yours and what was handled.
+
+**You'll know it's working when.** Jobs change hands less often; no job sits with nobody; every parked job has a resume note; vendors answer within their contract, read from the record. Measure all four.
+
+**In Keia Atlas.** Every job carries a With line: "With Network team: needs a switch config change." Waiting on names what it is stopped for. A vendor sees only the jobs handed to them, with the contract's clock on each. Handing on is one action, and the history, evidence and context go with it.
+
+**Why it works.** Each reassignment multiplies lost time and cuts trust; a structured handover cut medical errors by 23%; external change approval does not reduce change failures. Peers with context beat tiers without it.
+
+**Limits.** Escalation exists for reasons: contractual clocks, skills, command in a crisis. The default owner, the commander and the visible clock answer those without a tier.
+
+### 2.5 Learn as you go
+
+Put what people need to know where the work is, and keep what they learn where the next person will look.
+
+**Instead of.** Training apart from the work, and knowledge that leaves with people. 42% of role knowledge is unique to one person (Panopto). Knowledge management is the weakest service management practice: 20% say it works (Axelos, 2022).
+
+**You.** Put the knowledge where the work is. The setup guide sits beside the device being configured; the incident shows what was tried and what fixed it the last two times; each lesson ends with a thing to try. Guidance is full the first time and shortens as a person's own record shows they no longer need it. Rarely used procedures come back in full after a long gap.
+
+**The moves.** Place (the guide beside the device, the fix on the record where it was found). Capture (what you learnt goes on the record, with your name). Shorten (steps a person no longer needs fold away, and come back after a long gap).
+
+**Progress, never points.** Show team progress on real outcomes (spaces that worked first time this month, problems fixed for good), and impact on the record ("Boardroom back for the 10:00"). A personal mastery record is private and opt-in and only shortens checklists. No leaderboards, no per-person rankings, no streaks, no points for volume or speed.
+
+**You'll know it's working when.** First-timers set spaces up right first time; new starters become competent sooner; captured fixes are reused ("used on 14 installs"). Measure all three.
+
+**In Keia Atlas.** The setup guide opens beside the device. The Help switch explains any control on the screen you are on. Every lesson has a task to try in the demo. A captured fix becomes a proposal to the setup guide, approved by its owner.
+
+**Why it works.** Training transfers only where it is applied at once; step-by-step help that aids a novice hurts an expert; visible progress on meaningful work is the strongest motivator measured; points and leaderboards at work crowd it out.
+
+**Limits.** People must keep doing the diagnosis. On a P1 or P2 the person records what they think before a suggestion is shown; any rule can be run by hand to keep the skill.
+
+### 2.6 Start anywhere
+
+There are no stages: start with the idea that would help most, whether the team is one person or a thousand.
+
+The smallest useful start is a list of your spaces and what is in them; Level 1 has a 30-day path. A one-person team has no tiers to remove and lets rules do more; a global team has the same records and the same words.
+
+**In Keia Atlas.** Each module is On, Connected (an outside tool shows its data in the same page shape, with a source mark) or Off, and a team can start with any of them. The smallest useful setup is the device catalogue.
+
+**What Keia Atlas owns.** The record of what is in the building and the work on it. It connects to the systems that run each technology, and leaves alone anything that is a whole product of its own (print queues, DNS, video retention, access credentials, HVAC control, real estate and space planning, endpoint management).
+
+| Module | On its own | With the others on |
+|---|---|---|
+| Device catalogue | Models with cited facts, ports and drawings; standards; setup guides | Units in spaces with build sheets; firmware against the standard; known errors matched to the fleet |
+| Locations | Floor plans, every device a health circle, who is on site | Incidents lit in their space; the change calendar on the floor |
+| Services | A map per service; levels within or past target | Incidents, changes and vendors on the map; experience measures |
+| Support | One queue for incidents, requests, problems and changes; hand-offs; standing rules | The incident story on the space drawing; changes written from work |
+| Projects | Playbooks; a programme that is always current; deploy work that is verified, not ticked: batches by default; by room, by floor or one at a time where the team works that way | The as-built record becomes the operational record; lessons into setup guides |
+| Vendors | Contracts and end dates; cases; performance from the record | The vendor as a peer in the flow, scoped to the job |
+| Knowledge | Runbooks, lessons, guides, glossary, with owners and review dates | Fixes captured where work closes |
+
+### 2.7 How software does routine work
+
+Software does routine work only under a standing rule a person approved, and only where it can be undone.
+
+Routine work means rebooting, re-applying a setting, re-syncing or updating a record. A standing rule is what ITIL calls a standard change: the service owner approves it once, with caps (limits on how much it may do at a time). Anything that cannot be undone is a proposal a person confirms. Every automatic action shows what it read, what it did and why, with Undo or Roll back where one exists. The method works with AI switched off.
+
+| Rule | Meaning |
+|---|---|
+| A rule has a named owner | A standing rule is a standard change the service owner approved once, with its conditions and its rollback; nothing runs outside it; the owner is told on every run |
+| Reversible runs, irreversible asks | Bounded, reversible actions run within caps (never more than N devices per wave, never in a booked meeting, never in a freeze, halt on failures). Firmware, resets, deletes, bulk pushes, and anything touching security, identity, access or life safety are proposals a person confirms every time |
+| Read freely, write narrowly | Software reads on its own; writes only under its rule; never does what is prohibited, for anyone |
+| Checked by reading back | After every write the system is read back and compared; a write that does not read back as intended is "Unable to complete", never "done" |
+| Undo, Roll back, or ask | Each rule declares which it has; the screen never shows an Undo that is not real |
+| One line, one card, one log | "Done automatically under the DNS rule (owner: Nora)" on the record; "How was this done?" opens what it read, did, ruled out and did not check; the full trace is in the audit log |
+| Text is data, not instructions | Ticket text, device names and vendor notes are untrusted; software that reads them cannot send data out |
+| People keep the diagnosis | A suggestion follows the person's own call on P1 and P2; any rule can be run by hand; every action explains itself so people learn how their workplace behaves |
+| Never about people | No scoring, ranking or allocation of work by an individual's behaviour or performance |
+| Your model, your region, or none | The customer chooses the model and where it runs, including local only, or turns AI off; nothing trains on customer data; every AI call is logged with model and region; an assistant says it is AI |
+
+### 2.8 Why IT can trust the record
+
+Every change has a named person, every figure names its source, and nothing is edited quietly.
+
+| | |
+|---|---|
+| Named ownership | Every change, task, incident and rule has a person; automatic work runs under that person's rule and reports to them |
+| A record that cannot be quietly edited | Who, what, when, before, after, on every object; the audit log is also the change history and the auditor's evidence |
+| Inspectable | "How was this done?" on every automatic action; every figure names its source and time; the raw record one click down |
+| Least privilege | Connectors read-only by default; a write scope belongs to a named rule; per-platform service accounts in a vault; vendor access scoped to a job and ending with it |
+| Bounded automation | Caps per wave, rings, halt on failures, change windows, two people above a blast-radius threshold, a kill switch |
+| Restricted by default | Floor plans, camera and door positions, IP plans and the vulnerable-firmware list are restricted by schema; exports are watermarked and logged; live camera feeds are never stored |
+| Keia is a service too | In its own catalogue with an owner and a service level; when the fault is ours, the incident says so |
+| No rip and replace | Existing service desk, asset, fleet and network tools connect through one layer and stay the record for as long as the team wants |
+
+### 2.9 The problems it answers
+
+Every idea answers a problem that has been measured. This table lists each one, what it costs and where the figure comes from, so you can check it.
 
 | The problem | What it costs | Evidence |
 |---|---|---|
@@ -47,131 +272,13 @@ Workplace IT runs on a console per vendor, forms that ask what the alert already
 
 Some of these are organisational, not tooling: change boards exist for compliance and politics, tiers exist because skills differ. The method answers the parts a record and a way of working can answer, and says so.
 
-### 2.2 Start from the building
-
-**What you do.** Model the places first: region, office, floor, space (any place technology lives, including a home office), then the units in each space and what they connect to. Every other record (incident, change, project, contract, knowledge) attaches to a place or a unit. The space type is the standard a space is built to; the gap between the standard and the space is the work.
-
-**The moves.** Zoom (region to port and back, each step a real page). Lens (one floor plan; switch on Network, Support, Projects, Vendors, Knowledge). Trace (the service map from the internet circuit to the device, lit by health).
-
-**What you'll see.** One page shape for every object: where it is and what it is connected to, what is happening now, discussion, history, then the object's own detail. The same circle for health everywhere, with a word beside it.
-
-**Why it works.** Nobody else joins the space, the device, the change, the owner and the vendor in one record; the join today lives in someone's head. Facilities tools own floors; IT tools own devices; the room's technology belongs to neither.
-
-**Limits.** Real estate and property services (leases, space planning, moves, soft services) are another profession's record; Keia exchanges space data with those systems and never owns it. Laptops and phones are out of scope.
-
-**Measure.** Spaces with a complete record; devices found on the network but not in the record; time from handover to a usable operational record.
-
-### 2.3 Capture, don't ask
-
-**What you do.** Every record is filled from what the systems know before a person sees it: the alert names the unit, the unit knows its space, the calendar knows the booking, the build sheet knows the settings, the change log knows what happened last. Categories are the space and the device type the record already has. A person is asked one thing at a time, and only what only they know.
-
-**The moves.** Confirm (accept what was captured, correct what was not). Capture (one sentence at the moment of knowing: "What fixed it?" or "Nothing new"). Propose (a captured fix that keeps helping becomes a proposal to the setup guide, approved by its owner).
-
-**What you'll see.** An incident that arrives with space, unit, likely known error, last change and a proposed priority a person may change. A change written from the work, not typed after it. The as-built record from a project becoming the operational record the next day.
-
-**Why it works.** The form is the slowest, least-liked channel, and half of problems are never reported. Extraneous load (hunting, re-typing, translating) is the only kind design can remove.
-
-**Limits.** Capture needs feeds. Say what works with no connector (the catalogue, space types, floor plans, standards, build sheets, the room guide) and label every connected figure with its source and time.
-
-**Measure.** Fields filled by capture against fields typed; reports per space against faults observed; time to a filled-in incident.
-
-### 2.4 Answer first
-
-**What you do.** Every page opens with one sentence that answers "is it all right?", then at most four figures that answer "how many need me?", each opening the list it counts. Summaries never unfold in place; every number drills down to the owning list with its filters in the address. Detail opens where it came from, down to the raw record, the log and the config. Nothing is hidden and nothing is forced.
-
-**The moves.** Drill (a number opens its list, the list opens its record). Peek (hover shows, click opens). Set your depth (open a page at the layer you use; it is remembered).
-
-**Urgency when it is real.** Red, urgent words and motion appear only for a P1 or major incident, a safety matter, or a live event at risk, and they leave when it is over. Everything else is a fact with a date: "Past target since 09:14", "3 to review", "12 new". A quiet page proves it is quiet: "checked 40 s ago". A feed that has not reported in its window is itself a fault.
-
-**Motion.** Stillness means fine. One motion, once, when a state changes. Navigation keeps the object in view as the page changes around it. Nothing pulses to look alive. Reduced motion replaces travel with cross-fades and keeps every meaning.
-
-**Why it works.** People hold about four things at once; alerts that need no action train people to ignore the ones that do; static small multiples beat animation for reading data; cockpits, control rooms and intensive care all learnt to be quiet when normal and loud only when it matters.
-
-**Limits.** Density is a layer, not a mode: the first screen is simple, every layer below is denser, and the raw layer is never removed. Experts set their own default depth.
-
-**Measure.** Clicks from Home to the record; alerts that led to an action against alerts raised; pages red at any time against incidents open.
-
-### 2.5 Own it, hand it on
-
-**What you do.** Every job has one named owner, from the person who asked or the service owner who approved the rule. The owner keeps it until the person is back working, or hands it on as a whole: the record moves, with its history, evidence and context, and says who has it now and why. Vendors, integrators and managed service providers are peers in the same record with access scoped to the job and ending when it closes. Routine work is handed to a standing rule owned by a person.
-
-**The moves.** Take (pick it up). Hand to (pass it as a peer, with why). Park (one minute: where I stopped, the next step, the open question; resuming takes one glance). Run (a rule does the outcome). Roll back or Undo (where the rule has one).
-
-**The default when nothing moves.** Work not taken within the service's response target goes to the service owner. A major incident names one commander. A hand-off to a vendor carries the contract's clock, visible to both sides.
-
-**Cover.** Handover for leave or a shift is a fixed short card (open, fragile, who owns it, what changed), not a chat thread. Coming back opens with what changed, what is yours and what was handled.
-
-**Why it works.** Each reassignment multiplies lost time and cuts trust; a structured handover cut medical errors by 23%; external change approval does not reduce change failures. Peers with context beat tiers without it.
-
-**Limits.** Escalation exists for reasons: contractual clocks, skills, command in a crisis. The default owner, the commander and the visible clock answer those without a tier.
-
-**Measure.** Reassignments per job; time with nobody; jobs parked with a resume note; vendor response against the contract, read from the record.
-
-### 2.6 Learn as you go
-
-**What you do.** Put the knowledge where the work is. The setup guide opens beside the device being configured; the incident shows what was tried and what fixed it the last two times; the Help switch explains any control on the screen you are on; each lesson ends with a thing to try. Guidance is full the first time and shortens as a person's own record shows they no longer need it. Rarely used procedures come back in full after a long gap.
-
-**The moves.** Switch on help (point at anything). Try it (every lesson has a task in the demo). Capture (what you learnt goes on the record, with your name).
-
-**Progress, never points.** Show team progress on real outcomes (spaces that worked first time this month, problems fixed for good), and impact on the record ("Boardroom back for the 10:00"). A personal mastery record is private and opt-in and only shortens checklists. No leaderboards, no per-person rankings, no streaks, no points for volume or speed.
-
-**Why it works.** Training transfers only where it is applied at once; step-by-step help that aids a novice hurts an expert; visible progress on meaningful work is the strongest motivator measured; points and leaderboards at work crowd it out.
-
-**Limits.** People must keep doing the diagnosis. On a P1 or P2 the person records what they think before a suggestion is shown; any rule can be run by hand to keep the skill.
-
-**Measure.** Right-first-time setups by a first-timer; time to competence for a new starter; captured fixes reused ("used on 14 installs").
-
-### 2.7 Choose your modules
-
-There is no staged journey. A team switches modules On, Connected (an outside tool shows its data in the same page shape with a source mark) or Off, and starts anywhere. The smallest useful setup is the device catalogue. It works for one person or a thousand: a one-person team has no tiers to remove and lets rules do more; a global team has the same records and the same words.
-
-The scope rule: Keia owns the record of what is in the building and the work on it; connects to the systems that run each technology; leaves alone anything that is a whole product of its own (print queues, DNS, video retention, access credentials, HVAC control, real estate and space planning, endpoint management).
-
-| Module | On its own | With the others on |
-|---|---|---|
-| Device catalogue | Models with cited facts, ports and drawings; standards; setup guides | Units in spaces with build sheets; firmware against the standard; known errors matched to the fleet |
-| Locations | Floor plans, every device a health circle, who is on site | Incidents lit in their space; the change calendar on the floor |
-| Services | A map per service; levels within or past target | Incidents, changes and vendors on the map; experience measures |
-| Support | One queue for incidents, requests, problems and changes; hand-offs; standing rules | The incident story on the space drawing; changes written from work |
-| Projects | Playbooks; a programme that is always current; deploy batches that verify instead of tick | The as-built record becomes the operational record; lessons into setup guides |
-| Vendors | Contracts and end dates; cases; performance from the record | The vendor as a peer in the flow, scoped to the job |
-| Knowledge | Runbooks, lessons, guides, glossary, with owners and review dates | Fixes captured where work closes |
-
-### 2.8 How the work gets done
-
-| Rule | Meaning |
-|---|---|
-| A rule has a named owner | A standing rule is a standard change the service owner approved once, with its conditions and its rollback; nothing runs outside it; the owner is told on every run |
-| Reversible runs, irreversible asks | Bounded, reversible actions run within caps (never more than N devices per wave, never in a booked meeting, never in a freeze, halt on failures). Firmware, resets, deletes, bulk pushes, and anything touching security, identity, access or life safety are proposals a person confirms every time |
-| Read freely, write narrowly | Software reads on its own; writes only under its rule; never does what is prohibited, for anyone |
-| Checked by reading back | After every write the system is read back and compared; a write that does not read back as intended is "Unable to complete", never "done" |
-| Undo, Roll back, or ask | Each rule declares which it has; the screen never shows an Undo that is not real |
-| One line, one card, one log | "Done automatically under the DNS rule (owner: Nora)" on the record; "How was this done?" opens what it read, did, ruled out and did not check; the full trace is in the audit log |
-| Text is data, not instructions | Ticket text, device names and vendor notes are untrusted; software that reads them cannot send data out |
-| People keep the diagnosis | A suggestion follows the person's own call on P1 and P2; any rule can be run by hand; every action explains itself so people learn how their workplace behaves |
-| Never about people | No scoring, ranking or allocation of work by an individual's behaviour or performance |
-| Your model, your region, or none | The customer chooses the model and where it runs, including local only, or turns AI off; nothing trains on customer data; every AI call is logged with model and region; an assistant says it is AI |
-
-### 2.9 Why IT can trust it
-
-| | |
-|---|---|
-| Named ownership | Every change, task, incident and rule has a person; automatic work runs under that person's rule and reports to them |
-| A record that cannot be quietly edited | Who, what, when, before, after, on every object; the audit log is also the change history and the auditor's evidence |
-| Inspectable | "How was this done?" on every automatic action; every figure names its source and time; the raw record one click down |
-| Least privilege | Connectors read-only by default; a write scope belongs to a named rule; per-platform service accounts in a vault; vendor access scoped to a job and ending with it |
-| Bounded automation | Caps per wave, rings, halt on failures, change windows, two people above a blast-radius threshold, a kill switch |
-| Restricted by default | Floor plans, camera and door positions, IP plans and the vulnerable-firmware list are restricted by schema; exports are watermarked and logged; live camera feeds are never stored |
-| Keia is a service too | In its own catalogue with an owner and a service level; when the fault is ours, the incident says so |
-| No rip and replace | Existing service desk, asset, fleet and network tools connect through one layer and stay the record for as long as the team wants |
-
 ---
 
 ## Level 3: the reference
 
 ### 3.1 Words
 
-One vocabulary, no settings switch. ITIL, ITSM and PM terms where they are terms of art; plain verbs and statuses where ITIL is procedure-speak. When a module is connected, both states show: "Waiting on vendor · ServiceNow: Awaiting Vendor".
+Every word on screen, what it means in plain English, and the ITIL, PMI or ISO term it maps to. There is one set of words, with no setting to change them: standard terms where IT people already share them, plain verbs and statuses where the standard ones describe a procedure. When a module is connected, both show: "Waiting on vendor · ServiceNow: Awaiting Vendor".
 
 | On screen | Plain meaning | Maps to |
 |---|---|---|
@@ -204,7 +311,7 @@ One vocabulary, no settings switch. ITIL, ITSM and PM terms where they are terms
 
 ### 3.2 Standards and regulations the record supports
 
-Keia is not "compliant" with anything; a tool cannot be. It keeps the records that let its users meet their duties.
+No tool can make an organisation compliant. Keia keeps the records that help its users meet their duties.
 
 | Standard or rule | What the record holds |
 |---|---|
@@ -218,13 +325,13 @@ Keia is not "compliant" with anything; a tool cannot be. It keeps the records th
 | Accessibility (WCAG 2.2 AA, EN 301 549, ADA) | The product itself; and per space: hearing loop and last test, captions, assistive listening, step-free access |
 | CSRD, WEEE, ecodesign | Per device: power draw, schedule, purchase date, expected life, disposal route and certificate |
 
-### 3.3 Underneath
+### 3.3 What sits underneath
 
-The record follows a small canonical model (space, unit, model, service, person, organisation, work, event, agreement) that every page reads. Each connector maps one tool to that model in both directions, declares what it can read, write and subscribe to, keeps the raw payload beside the normalised one, and stamps every value with its source and time. Source of truth is set per object and per field. The Keia framework supplies the schemas, the Read, Write and Prohibited tiers, the write lifecycle (preview, execute, read back, report) and the learning loop.
+Every page reads one small data model: space, unit, model, service, person, organisation, work, event and agreement. Each connector maps one tool to that model in both directions, declares what it can read, write and subscribe to, keeps the raw payload beside the normalised one, and stamps every value with its source and time. Source of truth is set per object and per field. The Keia framework supplies the schemas, the Read, Write and Prohibited tiers, the write lifecycle (preview, execute, read back, report) and the learning loop.
 
 ### 3.4 Under consideration
 
-Not yet part of the method. Each is written up and tried before it is added.
+These ideas are not part of the method yet. Each is written up and tried before it is added.
 
 1. **Measure and improve.** Every correction, captured fix and lesson is classified and routed to the device type, playbook or rule it improves; a monthly note per service on what changed because of what was learnt.
 2. **A friction budget.** One number per service, in the spirit of an error budget, that decides when to stop new work and fix.

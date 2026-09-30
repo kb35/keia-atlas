@@ -17,6 +17,7 @@ import { SPACE_HEALTH, SITE_HEALTH } from '../../lib/home.mjs';
 import { spaces } from '../../lib/data.mjs';
 import { href, plural, PHASES, PHASE_LABEL, PROJECT_KIND, VENDOR_KIND, REGION_LABEL, projects, vendors } from '../../lib/data.mjs';
 import { PEOPLE } from '../../lib/demo.mjs';
+import { tally } from '../../lib/health.mjs';
 import { officesIn, office, homeOffices, incidentsAt, liveModelFor, REGION_SHORT, HOME_SITE, OPEN_Q, INC_WORD } from '../../lib/locations.mjs';
 
 interface Props { region: string }
@@ -50,7 +51,7 @@ const smCards = OFFICES.map((o) => {
   const sh = SITE_HEALTH[o.id], f = worst?.f ?? fl[0];
   if (!f) return null;
   return { key: o.id, site: o.id, floor: f.id, title: o.s.name.replace(/ office$/, ''), to: `/locations/${o.id}/?floor=${f.id}`,
-    figure: sh.fault.length ? `${sh.fault.length} not working` : sh.review.length ? `${sh.review.length} to review` : `${sh.n} ready`,
+    figure: tally(sh.fault.length, sh.review.length),
     sub: fl.length > 1 ? `${f.name} of ${fl.length} floors` : f.name };
 }).filter(Boolean);
 // To review: every space in the region that is not fine, fault first, with who has it.
