@@ -161,7 +161,7 @@ const cabHit = (c) => pins.has(c.a) || pins.has(c.b);
     <div class="scene-tools" role="group" aria-label="Show in the drawing">
       {hasHidden && <button type="button" class="lchip" data-layer="xray" aria-pressed="false" title="Make what hides things see-through, and outline what is behind the display, under the table or outside the door"><span class="lc-ic xr" aria-hidden="true"></span>See behind</button>}
       {hasCables && <button type="button" class="lchip" data-layer="cables" aria-pressed={home ? 'true' : 'false'} title="Every cable, coloured by signal. Choose a device, a plate or a cable to follow its own."><span class="lc-ic rn" aria-hidden="true"></span>Cables</button>}
-      <button type="button" class="lchip lc-all" data-scene-all title="Back to the whole room (Escape)"><svg class="lc-all-ic" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 5V1.5H5M9 1.5h3.5V5M12.5 9v3.5H9M5 12.5H1.5V9" /></svg>Show everything</button>
+      <button type="button" class="lchip lc-all" data-scene-all aria-label="Show everything" title="Back to the whole room (Escape)"><svg class="lc-all-ic" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 5V1.5H5M9 1.5h3.5V5M12.5 9v3.5H9M5 12.5H1.5V9" /></svg><span class="lc-all-t">Show everything</span></button>
     </div>
     <svg class="scene" viewBox={`0 0 ${R.width} ${R.height}`} role="img" aria-label={`Drawing of the space to scale, ${areaNote}, with ${items.length} devices${simple ? '' : ` and ${count(groups.length, 'outlet plate')}`}`}>
       <g class="shell">
@@ -431,6 +431,8 @@ const cabHit = (c) => pins.has(c.a) || pins.has(c.b);
   /* Show everything: only while something is chosen; it sits at the far end, away from the layers. */
   .scene-tools .lc-all { margin-left: auto; gap: 6px; }
   .lc-all-ic { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  /* A phone: the chip keeps to one line with the layers, as its mark alone (its name stays for screen readers). */
+  @media (max-width: 480px) { .scene-tools .lc-all { padding: 4px 7px; } .scene-tools .lc-all .lc-all-t { display: none; } }
   .scene-wrap:not(.sticky) .lc-all { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity var(--dur-exit) var(--ease-exit), visibility 0s linear var(--dur-exit); }
 
   .room-key { display: grid; gap: 10px; }
@@ -456,7 +458,9 @@ const cabHit = (c) => pins.has(c.a) || pins.has(c.b);
   /* Moving from one room to the next between pages (src/lib/scene-client.mjs): the drawing's frame is its own
      layer, sized from the old frame to the new one while the drawing inside morphs; neither picture fades. */
   ::view-transition-group(room-scene) { z-index: 1; animation-duration: var(--dur-morph); animation-timing-function: var(--ease-settle); }
-  ::view-transition-old(room-scene) { animation: none; opacity: 0; }
+  /* The old picture holds until the new page is in (so there is never a blank frame), then fades on the exit token
+     over the new drawing, which starts where the old one was. */
+  ::view-transition-old(room-scene) { animation: var(--dur-exit) var(--ease-exit) both rs-fade-out; }
   ::view-transition-new(room-scene) { animation: none; opacity: 1; }
 
   /* Reduced motion (M7): the same two states, reached at once. */

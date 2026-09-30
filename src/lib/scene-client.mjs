@@ -165,12 +165,28 @@ D.addEventListener('click', (e) => {
   // A row in the Key: its link still opens the device; the rest of the row chooses it in the drawing.
   const row = t.closest('.rk-row[data-sk], .rk-cab[data-cab]');
   if (row) { if (!t.closest('a, button, summary')) { const spec = specOf(row, true); if (spec) { unpreview(true); choose(spec); } } return; }
+  if (t.closest('svg.scene') && performance.now() - lastTap < 700) return;   // a tap already chose it
+  press(t);
+});
+// Press the drawing: choose what is there, or, on empty space, go back to the whole room.
+function press(t) {
   const svg = t.closest('svg.scene'); if (!svg) return;
   const root = svg.closest('[data-scene-root]'); if (!root) return;
   const spec = specOf(t, true);
   unpreview(true);
-  if (spec) choose(spec); else showAll(root);   // empty space: the whole room again
-});
+  if (spec) choose(spec); else showAll(root);
+}
+// A tap on the drawing: WebKit sends no click for a tap on plain SVG shapes, so a short, still touch is a press.
+let tap = null, lastTap = 0;
+D.addEventListener('pointerdown', (e) => { tap = e.pointerType === 'touch' ? { x: e.clientX, y: e.clientY, t: performance.now(), el: e.target } : null; }, true);
+D.addEventListener('pointerup', (e) => {
+  if (e.pointerType !== 'touch' || !tap) return;
+  const el = tap.el, ok = Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 10 && performance.now() - tap.t < 600;
+  tap = null;
+  if (!ok || !el.closest || !el.closest('svg.scene')) return;
+  lastTap = performance.now();
+  press(el);
+}, true);
 D.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' || e.key === ' ') {
     const row = e.target.closest && e.target.closest('.rk-row[data-sk], .rk-cab[data-cab]');
