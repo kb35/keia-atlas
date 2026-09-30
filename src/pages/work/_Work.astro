@@ -4,14 +4,11 @@
 // open work in one place, from everyone's point of view. Every count on it drills down (rule P10): a number,
 // a cell, a column, a total or "See all" opens the Work list with its filters in the address, and the list
 // shows the same count. The list (`list` prop) is the same items, bar and live changes, as the whole list.
-// Overview archetype (page-anatomy.md, D):
-//   band      today's date; live projects, open tasks, open incidents, people on site today
-//   bar       Region, Office, Kind, Status, then Role and Person; it filters the whole page
-//   matrix    "Who does what": roles by kinds of work, a count in each cell on a heat scale. Hover a count to
-//             peek at the work, select it to open that work in the Work list. A role's name is its "See as"
-//             switch (it stays on this page by design): it picks the role, lights its row and shows what the
-//             role owns, decides and hands on.
-//   next up   the first 8 pieces of open work, then "See all 288 in the Work list →" with the bar's filters
+// Overview archetype (page-anatomy.md, D), opening on the support answer (REVIEW-SITE fix 10):
+//   band      the queue's answer and its four figures: Ready for you, With you, Waiting on, Past target
+//   queue     the first 8 open jobs, worst first, each with who has it, then "See all 12 in the Queue →"
+//   next up   the first 8 pieces of open work, then "See all 288 in the Work list →"
+//   (Who has the open work, the role-by-kind matrix that opened this page before, is on Team: team/_OpenWork.astro.)
 //   below     Today across offices (who is on site, what is on there today) and Recent changes (the live
 //             layer's latest events, who and when, so shared work is attributed)
 // Every item comes from src/lib/work.mjs, so this page agrees with the Schedule, Home and each project, and
@@ -23,51 +20,24 @@ import Section from '../../components/Section.astro';
 import EmptyState from '../../components/EmptyState.astro';
 import LiveBar from '../../components/LiveBar.astro';
 import Icon from '../../components/Icon.astro';
+import HealthGlyph from '../../components/HealthGlyph.astro';
+import WithChip from '../../components/WithChip.astro';
 import { work, WORK_STATUS } from '../../lib/work.mjs';
+import { openWork, COLS, COL, colOf, ROWS, rolesOf, sitesOf } from '../../lib/openwork.mjs';
+import { queueRows, queueCounts } from '../../lib/queue.mjs';
+import { HISTORY } from '../../lib/home.mjs';
 import { schedule } from '../../lib/schedule.mjs';
 import { placeOn, STEPS } from '../../lib/schedulecore.mjs';
 import { projects, sites, spaces, SITE_ORDER, DEMO_TODAY, STEP_LABEL, href, fmtDate, plural } from '../../lib/data.mjs';
-import { PEOPLE, ROLES } from '../../lib/demo.mjs';
+import { PEOPLE } from '../../lib/demo.mjs';
 
 interface Props { list?: boolean }
 const { list: isList = false } = Astro.props;
 const TODAY = DEMO_TODAY;
 const P = Object.fromEntries(PEOPLE.map((p) => [p.id, p]));
 
-// ---- Open work ---------------------------------------------------------------------------------
-// Everything not done; booked things (time off, visits, plan dates) only while they are still ahead.
-const open = work.filter((it) => it.status !== 'done' && !(it.status === 'booked' && it.end && it.end < TODAY));
-
-// The columns of the matrix: the kinds of work, in three groups. A project task sits in its Deploy step
-// (Provision, Install, Configure, Commission) or, for everything else a project needs, "Other project tasks".
-const COLS = [
-  { k: 'provision', label: STEP_LABEL.provision, one: 'Provision', g: 'proj' },
-  { k: 'install', label: STEP_LABEL.install, one: 'Install', g: 'proj' },
-  { k: 'configure', label: STEP_LABEL.configure, one: 'Configure', g: 'proj' },
-  { k: 'commission', label: STEP_LABEL.commission, one: 'Commission', g: 'proj' },
-  { k: 'task', label: 'Other project tasks', one: 'Project task', g: 'proj', note: 'Surveys, designs, reviews, budgets, orders, network, records and hand over' },
-  { k: 'incident', label: 'Incidents', one: 'Incident', g: 'svc' },
-  { k: 'lab', label: 'Lab tests', one: 'Lab test', g: 'svc' },
-  { k: 'inbox', label: 'Approvals waiting', one: 'Approval', g: 'svc', note: 'Reports for a service manager to decide, and time off for a manager to approve' },
-  { k: 'refresh', label: 'Work plan due', one: 'Work plan', g: 'year', note: 'Devices due for replacement this year and next, one item per space' },
-  { k: 'visit', label: 'Site visits', one: 'Site visit', g: 'year' },
-  { k: 'plan', label: 'Planning', one: 'Planning', g: 'year', note: 'Planning reviews, budget dates and change freezes' },
-  { k: 'time-off', label: 'Time off', one: 'Time off', g: 'year', note: 'Booked time off from today' },
-];
-const GROUPS = [{ g: 'proj', label: 'Project work' }, { g: 'svc', label: 'Running the service' }, { g: 'year', label: 'The year and the people' }].map((x) => ({ ...x, n: COLS.filter((c) => c.g === x.g).length }));
-const COL = Object.fromEntries(COLS.map((c, i) => [c.k, { ...c, i }]));
-const colOf = (it) => (it.kind === 'task' ? (STEPS.includes(it.taskKind) ? it.taskKind : 'task') : it.kind);
-
-// The rows: every role, in the order work flows from leadership to vendors; then the people managers, who
-// mostly approve and assign rather than hold work; then work nobody has yet.
-const ROLE_ORDER = ['head', 'programme', 'sm-av', 'sm-infra', 'pm', 'delivery', 'network', 'innovation', 'tech', 'desk', 'vendor', 'service-vendor', 'delivery-manager', 'pm-manager', 'eng-manager', 'tech-manager'];
-const firstNames = (ps) => { const f = ps.map((p) => p.name.split(' ')[0]); return f.length > 4 ? `${f.slice(0, 3).join(', ')} and ${f.length - 3} more` : f.length > 1 ? `${f.slice(0, -1).join(', ')} and ${f.at(-1)}` : f[0] ?? ''; };
-const ROWS = [
-  ...ROLE_ORDER.map((r) => { const ps = PEOPLE.filter((p) => p.roleId === r); return { id: r, name: ROLES[r].name, sub: firstNames(ps), people: ps, role: ROLES[r] }; }),
-  { id: 'none', name: 'Not given to anyone', sub: 'Waiting for a person, or everyone’s (a change freeze)', people: [], role: null },
-];
-const rolesOf = (who) => (who.length ? [...new Set(who.map((w) => P[w]?.roleId).filter(Boolean))] : ['none']);
-const sitesOf = (it) => (it.site ? [it.site] : [...new Set(it.who.map((w) => P[w]?.office).filter((s) => sites[s]))]);
+// ---- Open work (src/lib/openwork.mjs: the same count as Team's "Who has the open work") ------------------
+const open = openWork;
 
 // ---- Words for one item ------------------------------------------------------------------------------
 const fd = (d) => fmtDate(d, { day: 'numeric', month: 'short' });
@@ -114,18 +84,7 @@ const items = open.map((it) => {
   };
 }).sort((a, b) => a.key.when.localeCompare(b.key.when) || a.key.kr.localeCompare(b.key.kr) || a.title.localeCompare(b.title));
 
-// ---- The matrix, as the page is built (the page script recounts it as filters change) -----------------------
-const count = {}, rowTot = {}, colTot = {};
-for (const it of items) {
-  colTot[it.col] = (colTot[it.col] ?? 0) + 1;
-  for (const r of it.roles) { count[`${r}|${it.col}`] = (count[`${r}|${it.col}`] ?? 0) + 1; rowTot[r] = (rowTot[r] ?? 0) + 1; }
-}
-// Heat: 1, 2 to 3, 4 to 7, 8 to 15, 16 or more.
-const level = (n) => (!n ? 0 : Math.min(5, Math.floor(Math.log2(n)) + 1));
-
 // ---- Key numbers -------------------------------------------------------------------------------------
-const liveProjects = Object.values(projects).filter((p) => p.phase !== 'closed').length;
-const openTasks = items.filter((it) => it.kind === 'task').length;
 const openIncidents = items.filter((it) => it.kind === 'incident').length;
 // Where everyone is today, worked out the way the Schedule does it, so the two pages agree.
 const everyone = PEOPLE.map((p) => ({ ...p, country: sites[p.office]?.country ?? 'IE' }));
@@ -133,33 +92,31 @@ const placeCtx = { timeOff: schedule.pto, holidays: schedule.holidays, items: wo
 const PLACE = Object.fromEntries(everyone.map((p) => [p.id, placeOn(p, TODAY, placeCtx)]));
 const onSiteAt = (sid) => everyone.filter((p) => ['office', 'visiting'].includes(PLACE[p.id].kind) && PLACE[p.id].site === sid);
 const OFFICES = SITE_ORDER.filter((s) => sites[s].kind !== 'remote');
-const onSite = OFFICES.reduce((n, s) => n + onSiteAt(s).length, 0);
 const atHome = everyone.filter((p) => PLACE[p.id].kind === 'home').length;
 const away = everyone.filter((p) => PLACE[p.id].kind === 'away').length;
 // Each figure opens the page that owns its list, filtered to what it counts (rule P10).
-const livePhases = [...new Set(Object.values(projects).filter((p) => p.phase !== 'closed').map((p) => p.phase))];
-const TASK_KINDS = 'provision,install,configure,commission,task';
+// The overview answers "is support all right?" from the queue (REVIEW-SITE fix 10); With you is counted for the
+// person this window is signed in as (the page script; Aoife, the demo's first sign-in, as built).
+const Q = queueCounts();
+const withYou0 = queueRows.filter((r) => r.o?.to === 'aoife' && ['with', 'parked', 'waiting'].includes(r.o.s)).length;
 const NUMBERS = isList ? [
   { n: items.filter((it) => it.status === 'blocked').length, label: 'Waiting on', to: '?status=blocked', tone: 'bad' },
   { n: items.filter((it) => !it.who.length).length, label: 'Not given to anyone', to: '?role=none' },
   { n: openIncidents, label: 'Incidents', to: '?kind=incident' },
   { n: items.filter((it) => it.col === 'inbox').length, label: 'Approvals waiting', to: '?kind=inbox' },
 ] : [
-  { n: liveProjects, label: 'Live projects', to: `/projects/?phase=${livePhases.join(',')}` },
-  { n: openTasks, label: 'Open tasks', to: `/work/list/?kind=${TASK_KINDS}` },
-  { n: openIncidents, label: 'Open incidents', to: '/incidents/?state=new,in-progress,on-hold' },
-  { n: onSite, label: 'On site today', to: '/work/schedule/?view=day&scope=all' },
+  { n: Q.ready, label: 'Ready for you', to: '/support/queue/?status=ready', id: 'ov-ready', tone: Q.ready ? 'warn' : undefined },
+  { n: withYou0, label: 'With you', to: '#queue', id: 'ov-with' },
+  { n: Q.waiting, label: 'Waiting on', to: '/support/queue/?status=waiting', id: 'ov-wait' },
+  { n: Q.past, label: 'Past target', to: '/support/queue/?due=past', tone: Q.past ? 'bad' : undefined },
 ];
 // The answers. The list leads with work nobody has and work waiting on something; the overview with open
 // incidents and project tasks past their due date.
 const nobody = items.filter((it) => !it.who.length).length, waitingOn = items.filter((it) => it.status === 'blocked').length;
-const pastDue = items.filter((it) => it.when.tone === 'late').length;
 const listAnswer = nobody || waitingOn
   ? [nobody && `${plural(nobody, 'item')} with nobody yet`, waitingOn && `${plural(waitingOn, 'item')} waiting on something`].filter(Boolean).join(' · ')
   : `${plural(items.length, 'open item')}, all with someone · none waiting on anything`;
-const overviewAnswer = `${plural(openIncidents, 'incident')} open · ${pastDue ? `${plural(pastDue, 'task')} past due` : 'no task past due'}`;
-// A drill-down into the Work list: the kind and role it counts (the page script adds the bar's other filters).
-const listTo = (q = {}) => { const u = new URLSearchParams(Object.entries(q).filter(([, v]) => v)); return href(`/work/list/${u.toString() ? `?${u}` : ''}`); };
+const overviewAnswer = `${Q.ready ? `${Q.ready} nobody has taken yet` : 'Every job has an owner'} · ${Q.open} open${Q.past ? ` · ${Q.past} past target` : ''}`;
 
 // ---- Today across offices ---------------------------------------------------------------------------
 const TODAY_KINDS = new Set(['provision', 'install', 'configure', 'commission', 'task', 'incident', 'lab', 'visit']);
@@ -201,94 +158,28 @@ const whoLine = (who) => (who.length === 1 ? P[who[0]]?.role ?? '' : who.length 
     : <PageBand overline="Support" title="Overview" answer={overviewAnswer} lede={`${today}: every piece of open work, who has it and where.`} sim numbers={NUMBERS} />}
 
   <div class:list={['content ov', { 'ov-is-list': isList }]} data-ov>
-    <FilterBar facets={FACETS} placeholder="Find a task, person or space" label="Find work" noun={['open item', 'open items']} scope=".content.ov" sort={SORT} />
+    <!-- The Work list filters its list; the overview is a summary, and each block opens the page that owns it (P10). -->
+    {isList && <FilterBar facets={FACETS} placeholder="Find a task, person or space" label="Find work" noun={['open item', 'open items']} scope=".content.ov" sort={SORT} />}
 
-    <!-- Who does what: roles by kinds of work. Every number opens that work in the Work list. -->
-    {!isList && <section class="card ov-mx" aria-labelledby="mx-h">
-      <header class="ov-h" data-help="overview.matrix">
-        <h2 id="mx-h">Who does what</h2>
-        <p class="faint">Open work by role and kind. Pick a role to see it as they do; hover a number to look, select it to open that work in the Work list.</p>
-      </header>
-      <div class="mx-wrap">
-        <table class="mx" data-mx>
-          <colgroup><col class="mx-c-role" />{COLS.map(() => <col />)}<col class="mx-c-tot" /></colgroup>
-          <thead>
-            <tr class="mx-gr">
-              <th class="mx-corner" rowspan="2" scope="col">
-                <span class="overline" data-help="overview.seeas">See as</span>
-                <button type="button" class="mx-all" data-help="overview.all" data-mx-all aria-pressed="true">Everyone</button>
-              </th>
-              {GROUPS.map((g) => <th colspan={g.n} scope="colgroup" class={`mx-g g-${g.g}`}><span>{g.label}</span></th>)}
-              <th rowspan="2" scope="col" class="mx-th-tot">All</th>
-            </tr>
-            <tr class="mx-ch">
-              {COLS.map((c) => (
-                <th scope="col" data-col={c.k} class={`g-${c.g}`}>
-                  <a class="mx-col" data-help="overview.kind" data-help-name={c.head ?? c.label} data-mx-col={c.k} href={listTo({ kind: c.k })} data-vt-rec="dd-work-list" title={c.note ? `${c.label}: ${c.note}. Select to open it all in the Work list.` : `${c.label}. Select to open it all in the Work list.`}><i class={`k-${c.k}`} aria-hidden="true"></i>{c.head ?? c.label}</a>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody data-dd="See as, a switch for this page">
-            {ROWS.map((r) => (
-              <>
-                <tr data-row={r.id} class:list={[{ 'mx-none': r.id === 'none' }]}>
-                  <th scope="row">
-                    <button type="button" class="mx-role" data-help={r.role ? 'overview.role' : 'overview.nobody'} data-help-name={r.name} data-mx-role={r.id} aria-pressed="false" aria-expanded={r.role ? 'false' : undefined} title={r.role ? `See Keia Atlas as a ${r.name.toLowerCase()}` : 'List work nobody has yet'}>
-                      <b>{r.name}</b><small>{r.sub}</small>
-                    </button>
-                  </th>
-                  {COLS.map((c) => {
-                    const n = count[`${r.id}|${c.k}`] ?? 0;
-                    return (
-                      <td data-col={c.k}>
-                        <a class={`mx-cell k-${c.k}`} data-help={n ? 'overview.cell' : undefined} data-peek data-mx-cell data-r={r.id} data-k={c.k} data-label={c.label} data-lv={level(n)} data-zero={n ? undefined : ''} href={n ? listTo({ role: r.id, kind: c.k }) : undefined} data-vt-rec="dd-work-list" aria-label={`${r.name}, ${c.label}: ${n}`}>
-                          <span data-n>{n || ''}</span><template data-peek-body></template>
-                        </a>
-                      </td>
-                    );
-                  })}
-                  <td class="mx-tot" data-label="All"><a class="mx-tl" data-tot={r.id} data-help="overview.total" data-help-name={`${r.name}, all kinds`} href={listTo({ role: r.id })} data-vt-rec="dd-work-list">{rowTot[r.id] ?? 0}</a></td>
-                </tr>
-                {r.role && (
-                  <tr class="mx-detail" data-detail={r.id} hidden>
-                    <td colspan={COLS.length + 2}>
-                      <div class="mx-dt">
-                        <div class="dt-people">
-                          <p class="overline">Who</p>
-                          {r.people.map((p) => (
-                            <a class="dt-p" data-help="overview.person" href={href('/')} data-see-as={p.id} title={`Open Home as ${p.name}`}>
-                              <span class="ov-av" aria-hidden="true">{p.initials}</span><span><b>{p.name}</b><small>{p.where}</small></span>
-                            </a>
-                          ))}
-                        </div>
-                        <div><p class="overline">Owns</p><ul>{r.role.owns.map((x) => <li>{x}</li>)}</ul></div>
-                        <div><p class="overline">Decides</p><ul>{r.role.decides.map((x) => <li>{x}</li>)}</ul></div>
-                        <div class="dt-hands">
-                          <p class="overline">Hands on</p><p>{r.role.hands}</p>
-                          {r.people[0] && <a class="btn primary small" href={href('/')} data-see-as={r.people[0].id}><Icon name="home" size={16} />Open their Home</a>}
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr>
-              <th scope="row">All roles</th>
-              {COLS.map((c) => <td data-col={c.k}><a class="mx-tl" data-ctot={c.k} data-help="overview.total" data-help-name={`${c.label}, all roles`} href={listTo({ kind: c.k })} data-vt-rec="dd-work-list">{colTot[c.k] ?? 0}</a></td>)}
-              <td class="mx-tot"><a class="mx-tl" data-gtot data-help="overview.total" data-help-name="All open work" href={listTo()} data-vt-rec="dd-work-list">{items.length}</a></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-      <footer class="mx-key">
-        <span class="mx-scale" data-help="overview.scale"><span>Fewer</span>{[1, 2, 3, 4, 5].map((l) => <i data-lv={l}></i>)}<span>More</span></span>
-        <span class="faint">Shared work counts once for each role on it. “All” counts each piece once.</span>
-      </footer>
-    </section>}
+    <!-- The support answer first (REVIEW-SITE fix 10): the queue, worst first, each job with who has it. The same
+         rows as the Queue page (src/lib/queue.mjs); the chips follow the live layer. -->
+    {!isList && (
+      <Section title="The queue" id="queue" help="overview.queue" aside={`${Q.open} open, worst first`} showAll={8} to="/support/queue/" place="the Queue">
+        <ol class="list q-l" data-ov-q data-items>
+          {queueRows.map((r) => (
+            <li class="row q-r" data-item={`inc:${r.v.inc.number}`} data-base={JSON.stringify(r.o)}>
+              <span class="q-g"><HealthGlyph state={r.glyph} size={16} title={r.glyph === 'fault' ? 'Fault' : 'To review'} /></span>
+              <span class="q-m">
+                <a class="name" href={href(r.v.href)} data-vt-rec={r.v.inc.number}>{r.v.inc.short_description}</a>
+                <span class="sub"><span class="mono">{r.v.inc.number}</span> · {r.v.roomTitle}, {sites[r.v.space.site].name} · <span class={`q-p q-p${r.v.inc.priority}`}>P{r.v.inc.priority}</span></span>
+                <span class="sub q-due">{r.due}</span>
+              </span>
+              <span class="end"><WithChip own={r.o} item={`inc:${r.v.inc.number}`} history={HISTORY[`inc:${r.v.inc.number}`] ?? []} /></span>
+            </li>
+          ))}
+        </ol>
+      </Section>
+    )}
 
     <!-- The overview: a short preview of what is next, then "See all N in the Work list" with the bar's filters.
          The Work list: the whole list, on its own page (so it may show all in place). -->
@@ -354,7 +245,7 @@ const whoLine = (who) => (who.length === 1 ? P[who[0]]?.role ?? '' : who.length 
     (function () {
       var root = document.querySelector('[data-ov]'); if (!root) return;
       var D = JSON.parse(root.querySelector('[data-ov-data]').textContent);
-      var list = root.querySelector('[data-ov-list]'), mx = root.querySelector('[data-mx]');
+      var list = root.querySelector('[data-ov-list]');
       var bar = root.querySelector('[data-fb]');
       var W = window;
       var M = function () { return W.rsMotion ? W.rsMotion() : { reduced: true }; };
@@ -402,89 +293,6 @@ const whoLine = (who) => (who.length === 1 ? P[who[0]]?.role ?? '' : who.length 
       }
       addLocal();
 
-      // ---- The matrix: counted from the list, with every filter except Role and Kind (those pick the cells) ----
-      var sel = function (k) { return bar && bar.rsFilter ? bar.rsFilter.get(k) : []; };
-      function passes(row, words) {
-        if (words.length) { var t = norm(row.getAttribute('data-find')); for (var i = 0; i < words.length; i++) if (t.indexOf(words[i]) < 0) return false; }
-        var keys = ['region', 'site', 'status', 'person'];
-        for (var j = 0; j < keys.length; j++) {
-          var s = sel(keys[j]); if (!s.length) continue;
-          var v = (row.getAttribute('data-f-' + keys[j]) || '').split('|');
-          if (!v.some(function (x) { return s.indexOf(x) >= 0; })) return false;
-        }
-        return true;
-      }
-      var level = function (n) { return !n ? 0 : Math.min(5, Math.floor(Math.log2(n)) + 1); };
-      var cellRows = {}, first = true;
-      function peekHtml(r, k, rows) {
-        var head = '<b>' + esc(D.rows[r]) + ': ' + esc(D.cols[k].label.toLowerCase()) + '</b><small>' + rows.length + ' open. Select to open ' + (rows.length === 1 ? 'it' : 'them') + ' in the Work list.</small>';
-        var li = rows.slice(0, 6).map(function (row) {
-          var it = D.items[row.dataset.id] || {}, who = (row.getAttribute('data-f-person') || '').split('|').filter(function (x) { return x && x !== 'none'; });
-          return '<li><span>' + esc(it.t) + '</span><small>' + esc(who.map(function (w) { return person(w).n; }).join(', ') || 'Nobody yet') + ' · ' + esc(row.querySelector('[data-when-t]').textContent) + '</small></li>';
-        }).join('');
-        return head + '<ul class="ov-peek">' + li + '</ul>' + (rows.length > 6 ? '<small>And ' + (rows.length - 6) + ' more.</small>' : '');
-      }
-      // A drill-down into the Work list: this page's filters from the address, then the role and kind it counts.
-      var listUrl = function (p) { var s = p.toString().replace(/%2C/g, ','); return D.base + 'work/list/' + (s ? '?' + s : ''); };
-      function listHref(r, k) {
-        var p = new URLSearchParams(location.search); p.delete('role'); p.delete('kind'); p.delete('sort');
-        if (r) p.set('role', r);
-        if (k) p.set('kind', k);
-        return listUrl(p);
-      }
-      function render() {
-        if (!mx) return;
-        var qi = bar && bar.querySelector('[data-fb-q]'), q = qi ? norm(qi.value).trim() : '', words = q ? q.split(/\s+/) : [];
-        var cells = {}, rowTot = {}, colTot = {}, all = 0;
-        rowsNow().forEach(function (row) {
-          if (!passes(row, words)) return;
-          var k = row.getAttribute('data-f-kind');
-          all++; colTot[k] = (colTot[k] || 0) + 1;
-          (row.getAttribute('data-f-role') || 'none').split('|').forEach(function (r) { (cells[r + '|' + k] = cells[r + '|' + k] || []).push(row); rowTot[r] = (rowTot[r] || 0) + 1; });
-        });
-        cellRows = cells;
-        var roles = sel('role'), kinds = sel('kind');
-        mx.querySelectorAll('[data-mx-cell]').forEach(function (c) {
-          var rows = cells[c.dataset.r + '|' + c.dataset.k] || [], n = rows.length, span = c.querySelector('[data-n]');
-          if (span.textContent !== String(n || '')) {
-            span.textContent = n || '';
-            if (!first && W.rsMarkChanged) W.rsMarkChanged(c);
-          }
-          c.dataset.lv = level(n);
-          if (n) { c.removeAttribute('data-zero'); c.setAttribute('href', listHref(c.dataset.r, c.dataset.k)); } else { c.setAttribute('data-zero', ''); c.removeAttribute('href'); }
-          c.setAttribute('aria-label', D.rows[c.dataset.r] + ', ' + D.cols[c.dataset.k].label + ': ' + n);
-          c.querySelector('template').innerHTML = n ? peekHtml(c.dataset.r, c.dataset.k, rows) : '';
-          var on = roles.indexOf(c.dataset.r) >= 0 && kinds.indexOf(c.dataset.k) >= 0;
-          c.classList.toggle('on', on); c.setAttribute('aria-pressed', String(on));
-        });
-        mx.querySelectorAll('[data-tot]').forEach(function (t) { t.textContent = rowTot[t.dataset.tot] || 0; t.setAttribute('href', listHref(t.dataset.tot, '')); });
-        mx.querySelectorAll('[data-ctot]').forEach(function (t) { t.textContent = colTot[t.dataset.ctot] || 0; t.setAttribute('href', listHref('', t.dataset.ctot)); });
-        var gt = mx.querySelector('[data-gtot]'); gt.textContent = all; gt.setAttribute('href', listHref('', ''));
-        mx.querySelectorAll('[data-mx-col]').forEach(function (a) { a.setAttribute('href', listHref('', a.dataset.mxCol)); });
-        // Picked role rows and kind columns light up; with one role picked, its row opens to say what it does.
-        mx.querySelectorAll('tr[data-row]').forEach(function (tr) {
-          var on = roles.indexOf(tr.dataset.row) >= 0;
-          tr.classList.toggle('on', on); tr.classList.toggle('dim', roles.length > 0 && !on);
-          var b = tr.querySelector('[data-mx-role]'); b.setAttribute('aria-pressed', String(on));
-          if (b.hasAttribute('aria-expanded')) b.setAttribute('aria-expanded', String(on && roles.length === 1));
-        });
-        mx.querySelectorAll('[data-detail]').forEach(function (tr) {
-          var show = roles.length === 1 && roles[0] === tr.dataset.detail;
-          if (tr.hidden === show) { tr.hidden = !show; if (show && !M().reduced) tr.querySelector('.mx-dt').classList.add('m-in'); }
-        });
-        mx.querySelectorAll('[data-col]').forEach(function (el) { el.classList.toggle('col-on', kinds.indexOf(el.dataset.col) >= 0); });
-        mx.querySelectorAll('[data-mx-col]').forEach(function (b) { b.classList.toggle('on', kinds.indexOf(b.dataset.mxCol) >= 0); });
-        mx.querySelector('[data-mx-all]').setAttribute('aria-pressed', String(!roles.length));
-        // Today across offices follows the Region and Office filters.
-        var rg = sel('region'), st = sel('site'), anyTd = false;
-        root.querySelectorAll('[data-td-site]').forEach(function (a) {
-          var ok = (!rg.length || rg.indexOf(a.dataset.tdRegion) >= 0) && (!st.length || st.indexOf(a.dataset.tdSite) >= 0);
-          a.hidden = !ok; anyTd = anyTd || ok;
-        });
-        var tdNone = root.querySelector('[data-td-none]'); if (tdNone) tdNone.hidden = anyTd;
-        first = false;
-      }
-
       // ---- Sort ----
       var KEYS = {
         soon: function (r) { return r.dataset.when + r.dataset.kr; },
@@ -498,28 +306,6 @@ const whoLine = (who) => (who.length === 1 ? P[who[0]]?.role ?? '' : who.length 
           .sort(function (a, b) { return a.k < b.k ? -1 : a.k > b.k ? 1 : a.i - b.i; })
           .forEach(function (x) { list.appendChild(x.r); });
       }
-
-      // ---- Picking: a role (its name), a kind (its column head) or both (a cell), through the bar ----
-      function setFacet(k, vals) { if (bar && bar.rsFilter) bar.rsFilter.set(k, vals); }
-      // Whatever opens or closes above the thing you picked, it stays under the pointer (M6).
-      function keep(el, fn) { var y0 = el.getBoundingClientRect().top; fn(); var dy = el.getBoundingClientRect().top - y0; if (Math.abs(dy) > 1) window.scrollBy(0, dy); }
-      var same = function (a, b) { return a.length === b.length && a.every(function (x) { return b.indexOf(x) >= 0; }); };
-      // A cell, a column or a total is a link into the Work list (rule P10). A role's name and "Everyone" are
-      // the See as switch: they stay on this page by design.
-      if (mx) mx.addEventListener('click', function (e) {
-        if (!bar || !bar.rsFilter) return;
-        var r = e.target.closest('[data-mx-role]'), a = e.target.closest('[data-mx-all]');
-        if (e.target.closest('a[data-mx-cell]')) setTimeout(function () { if (W.__rsPeek && W.__rsPeek.hide) W.__rsPeek.hide(true); }, 0);
-        if (r) keep(r, function () { setFacet('role', same(sel('role'), [r.dataset.mxRole]) ? [] : [r.dataset.mxRole]); });
-        else if (a) keep(a, function () { setFacet('role', []); });
-      });
-      // "Open their Home": view Keia Atlas as that person, then go Home.
-      root.addEventListener('click', function (e) {
-        var s = e.target.closest('[data-see-as]'); if (!s) return;
-        if (W.rsSetWho) W.rsSetWho(s.dataset.seeAs); else try { localStorage.setItem('rs4-who', s.dataset.seeAs); } catch (_) {}
-        if (W.rsApplyTheme) W.rsApplyTheme(); if (W.rsSyncDemo) W.rsSyncDemo();
-        document.dispatchEvent(new CustomEvent('rs:demo-change'));
-      });
 
       // ---- The live layer: changes made anywhere are replayed here, marked with who, and listed ----
       var L = null;
@@ -608,6 +394,37 @@ const whoLine = (who) => (who.length === 1 ? P[who[0]]?.role ?? '' : who.length 
       }
       if (W.rsLive) go(); else { document.addEventListener('rs:live-ready', go, { once: true }); if (rcEmpty) rcEmpty.hidden = false; }
 
+      // ---- The queue's figures follow who has each job (the live layer), and With you follows who is signed in ----
+      var q = root.querySelector('[data-ov-q]');
+      function syncQueue() {
+        if (!q) return;
+        var LL = W.rsLive && W.rsLive.live, me = W.rsWhoId ? W.rsWhoId() : 'aoife', all = me === 'everyone';
+        var n = { ready: 0, mine: 0, some: 0, waiting: 0 };
+        q.querySelectorAll('[data-item]').forEach(function (row) {
+          var base = null; try { base = JSON.parse(row.dataset.base || 'null'); } catch (_) {}
+          var o = LL ? (LL.stateOf(row.dataset.item, { own: base }).own || base) : base;
+          var st = !o || o.s === 'ready' ? 'ready' : o.s;
+          if (st === 'ready') n.ready++;
+          else if (st === 'waiting') n.waiting++;
+          if (st !== 'ready' && st !== 'done') { if (st !== 'waiting') n.some++; if (o && o.to === me) n.mine++; }
+        });
+        if (!W.rsKeyNumber) return;
+        W.rsKeyNumber('ov-ready', n.ready, { tone: n.ready ? 'warn' : '' });
+        W.rsKeyNumber('ov-wait', n.waiting);
+        // Everyone (overview) has no "you": the figure counts every job someone has.
+        W.rsKeyNumber('ov-with', all ? n.some : n.mine, { label: all ? 'With someone' : 'With you' });
+      }
+      if (q) {
+        var qGo = function () {
+          syncQueue();
+          var stopQ = W.rsLive.live.subscribe('inc:', function (e) { if (e.field === 'own') syncQueue(); });
+          cleanups.push(stopQ);
+        };
+        if (W.rsLive) qGo(); else { syncQueue(); document.addEventListener('rs:live-ready', qGo, { once: true }); }
+        document.addEventListener('rs:demo-change', syncQueue);
+        cleanups.push(function () { document.removeEventListener('rs:demo-change', syncQueue); });
+      }
+
       // ---- Local times at each office ----
       function tick() { root.querySelectorAll('[data-tz]').forEach(function (el) { try { el.textContent = new Intl.DateTimeFormat('en-IE', { hour: '2-digit', minute: '2-digit', timeZone: el.dataset.tz }).format(new Date()); } catch (_) {} }); }
       tick(); var timer = setInterval(tick, 30000);
@@ -617,91 +434,33 @@ const whoLine = (who) => (who.length === 1 ? P[who[0]]?.role ?? '' : who.length 
       // ---- Start once the bar is ready (on a first load it starts when the page has been read) ----
       function start() {
         if (!bar.rsFilter) return;
-        bar.addEventListener('fb:change', render);
         bar.addEventListener('fb:sort', function (e) { bar.rsFilter.run(true, function () { reorder(e.detail.value); }); });
         if (bar.rsFilter.sort() !== 'soon') reorder(bar.rsFilter.sort());
         bar.rsFilter.run(false);
       }
-      if (bar.rsFilter) start(); else document.addEventListener('DOMContentLoaded', start, { once: true });
+      if (bar) { if (bar.rsFilter) start(); else document.addEventListener('DOMContentLoaded', start, { once: true }); }
     })();
   </script>
 </Shell>
 
 <style>
-  /* The matrix. */
-  .ov-mx { padding: 18px 20px 14px; display: grid; gap: 12px; min-width: 0; }
-  .ov-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; }
-  .ov-h h2 { font-size: var(--h2-size); margin: 0; }
-  .ov-h p { margin: 0; font-size: var(--fs-body); }
-  /* The matrix is a table while its card is at least 1040 px wide, so no heading is ever squashed or broken
-     inside a word. Narrower, each role becomes a card listing only the kinds of work it has (container mx). */
-  .mx-wrap { min-width: 0; container: mx / inline-size; }
-  .mx { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 3px; font-family: var(--font-sans); font-variant-numeric: tabular-nums; }
-  .mx th, .mx td { white-space: normal; }
-  .mx-c-role { width: 184px; }
-  .mx-c-tot { width: 44px; }
-  .mx th { font-weight: 600; text-align: center; vertical-align: bottom; padding: 0; border: 0; background: none; letter-spacing: 0; text-transform: none; color: var(--text); font-size: var(--fs-support); }
-  .mx td { border: 0; vertical-align: middle; }
-  .mx-corner { text-align: left !important; vertical-align: bottom; padding: 0 0 4px; }
-  .mx-corner .overline { display: block; margin: 0 0 6px 2px; }
-  .mx-g { padding: 0 2px 6px; }
-  .mx-g span { display: block; padding-bottom: 5px; border-bottom: 2px solid var(--line); font: 600 var(--overline-size, 11px)/1.2 var(--font-sans); letter-spacing: var(--overline-track, .08em); text-transform: var(--overline-case, uppercase); color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .mx-th-tot { font: var(--fw-title) var(--fs-code)/1.2 var(--font-sans); color: var(--text-3); padding-bottom: 8px; }
-  .mx-col { appearance: none; text-decoration: none; display: grid; justify-items: center; gap: 5px; width: 100%; min-height: 48px; align-content: end; padding: 4px 0 6px; border: 0; border-radius: 8px; background: none; color: var(--text-2); font: 600 var(--fs-mark)/1.2 var(--font-sans); letter-spacing: -.01em; hyphens: manual; cursor: pointer; transition: background var(--dur-hover) var(--ease-settle), color var(--dur-hover) var(--ease-settle); }
-  .mx-col i { width: 18px; height: 4px; border-radius: 2px; background: var(--kc, var(--grey)); }
-  .mx-col:hover { background: var(--surface-2); color: var(--text); }
-  .mx-col.on { background: var(--accent-soft); color: var(--accent-ink); }
-  .mx-all, .mx-role { appearance: none; border: 1px solid var(--line); background: var(--surface); color: var(--text); cursor: pointer; font: 400 var(--fs-body)/1.3 var(--font-sans); text-align: left; transition: background var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle), color var(--dur-hover) var(--ease-settle); }
-  .mx-all { padding: 6px 14px; border-radius: var(--pill-radius); font: 600 var(--fs-support)/1 var(--font-sans); }
-  .mx-all[aria-pressed=true] { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
-  .mx-role { display: grid; gap: 1px; width: 100%; min-height: 36px; padding: 5px 12px; border-radius: 10px; border-color: transparent; background: none; }
-  .mx-role b { font-size: var(--fs-body); line-height: 1.25; }
-  .mx-role small { font-size: var(--fs-mark); color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .mx-role:hover { background: var(--surface-2); border-color: var(--line); }
-  .mx-role[aria-pressed=true] { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); color: var(--accent-ink); }
-  .mx-role[aria-pressed=true] small { color: var(--accent-ink); }
-  .mx tbody th { padding: 0; }
-  .mx td { padding: 0; }
-  .mx tr[data-row] { transition: opacity var(--dur-state) var(--ease-settle); }
-  .mx tr.dim { opacity: .5; }
-  .mx tr.dim:hover { opacity: 1; }
-  .mx-none .mx-role b { font-weight: 600; color: var(--text-2); }
-  .mx-cell { appearance: none; text-decoration: none; display: grid; place-items: center; width: 100%; height: 36px; border: 0; border-radius: 7px; background: color-mix(in srgb, var(--text) 3%, var(--surface)); color: var(--text); font: var(--fw-title) var(--fs-body)/1 var(--font-sans); cursor: pointer;
-    transition: background var(--dur-state) var(--ease-settle), color var(--dur-state) var(--ease-settle), box-shadow var(--dur-hover) var(--ease-settle); }
-  .mx-cell[data-zero] { cursor: default; pointer-events: none; background: none; }
-  .mx-cell[data-zero]::after { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--line-strong); opacity: .7; }
-  .mx-cell:hover, .mx-cell.peek-on { box-shadow: 0 0 0 2px var(--text); }
-  .mx-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .mx-cell.on { box-shadow: 0 0 0 2px var(--accent), 0 0 0 5px var(--accent-soft); }
-  [data-lv="1"] { background: color-mix(in srgb, var(--accent) 13%, var(--surface)); }
-  [data-lv="2"] { background: color-mix(in srgb, var(--accent) 26%, var(--surface)); }
-  [data-lv="3"] { background: color-mix(in srgb, var(--accent) 42%, var(--surface)); }
-  [data-lv="4"] { background: color-mix(in srgb, var(--accent) 64%, var(--surface)); color: var(--on-accent); }
-  [data-lv="5"] { background: var(--accent); color: var(--on-accent); }
-  .mx td.col-on .mx-cell:not([data-zero]):not(.on) { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }
-  .mx-tot { text-align: center; font: var(--fw-title) var(--fs-support)/1 var(--font-sans); color: var(--text-2); }
-  /* Totals open the Work list too: quiet until pointed at. */
-  .mx-tl { display: inline-block; min-width: 28px; padding: 4px 6px; border-radius: 6px; color: inherit; text-decoration: none; transition: background var(--dur-hover) var(--ease-settle); }
-  .mx-tl:hover { background: var(--surface-2); color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
-  .mx tfoot th { text-align: right; padding: 8px 12px 0 0; font: 600 var(--fs-code)/1.2 var(--font-sans); color: var(--text-3); }
-  .mx tfoot td { text-align: center; padding-top: 8px; font: var(--fw-title) var(--fs-support)/1 var(--font-sans); color: var(--text-2); border-top: 1px solid var(--line); }
-  /* A picked role opens under its row: who, owns, decides, hands on, and "Open their Home". */
-  .mx-detail td { padding: 2px 0 10px; }
-  .mx-dt { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr); gap: 16px 22px; padding: 14px 16px; border-radius: 12px; background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); text-align: left; }
-  .mx-dt.m-in { animation: ov-open var(--dur-enter) var(--ease-settle) both; transform-origin: top center; }
-  @keyframes ov-open { from { opacity: 0; transform: translateY(-6px) scaleY(.96); } }
-  .mx-dt .overline { margin: 0 0 6px; }
-  .mx-dt ul { margin: 0; padding-left: 16px; display: grid; gap: 4px; font-size: var(--fs-body); }
-  .mx-dt p:not(.overline) { margin: 0 0 12px; font-size: var(--fs-body); }
-  .dt-people { display: grid; gap: 4px; align-content: start; }
-  .dt-p { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 8px; align-items: center; padding: 4px 6px; margin-left: -6px; border-radius: 8px; color: inherit; text-decoration: none; transition: background var(--dur-hover) var(--ease-settle); }
-  .dt-p:hover { background: var(--surface); }
-  .dt-p b { display: block; font-size: var(--fs-body); } .dt-p small { display: block; font-size: var(--fs-code); color: var(--text-2); }
-  .dt-hands .btn { display: inline-flex; gap: 6px; align-items: center; }
-  .mx-key { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; font-size: var(--fs-code); }
-  .mx-scale { display: inline-flex; align-items: center; gap: 3px; color: var(--text-3); }
-  .mx-scale i { width: 18px; height: 12px; border-radius: 3px; }
-  .mx-scale span { margin: 0 4px; }
+  /* The queue: the same row as the Queue page. */
+  .q-l { list-style: none; margin: 0; padding: 0; }
+  .q-r { grid-template-columns: 28px minmax(0, 1fr) auto; align-items: start; }
+  .q-g { display: grid; place-items: center; padding-top: 2px; }
+  .q-m { display: grid; gap: 2px; min-width: 0; }
+  .q-m .name { color: inherit; text-decoration: none; }
+  .q-m .name:hover { text-decoration: underline; }
+  .q-p { font: 600 var(--fs-mark)/1 var(--font-mono); padding: 2px 5px; border-radius: 4px; background: var(--surface-3); color: var(--text); }
+  .q-p1 { background: var(--h-fault); color: #fff; }
+  .q-p2 { background: var(--h-fault-soft); color: var(--h-fault-ink); }
+  .q-p3 { background: var(--h-review-soft); color: var(--h-review-ink); }
+  .q-due { color: var(--text-3); }
+  .q-r .end { align-self: center; max-width: min(46vw, 360px); }
+  @media (max-width: 767px) {
+    .q-r { grid-template-columns: 28px minmax(0, 1fr); }
+    .q-r .end { grid-column: 2; justify-content: flex-start; max-width: 100%; }
+  }
 
   /* Avatars and kinds, shared by the list, Today and Recent changes. */
   .ov-av { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--surface-3); color: var(--text); font: 500 10px/1 var(--font-mono); box-shadow: 0 0 0 2px var(--surface); flex: none; }
@@ -754,28 +513,6 @@ const whoLine = (who) => (who.length === 1 ? P[who[0]]?.role ?? '' : who.length 
   [data-rc-empty] :global(.empty) { padding: 24px 18px; }
   [data-rc-empty] :global(.empty p) { font-size: var(--fs-body); }
 
-  @container mx (max-width: 1039px) {
-    .mx, .mx tbody, .mx thead, .mx thead tr { display: block; }
-    .mx colgroup, .mx thead tr.mx-ch, .mx thead th.mx-g, .mx thead th.mx-th-tot, .mx tfoot { display: none; }
-    .mx thead tr.mx-gr { display: block; }
-    .mx-corner { display: flex; align-items: center; gap: 10px; padding: 0 0 10px; }
-    .mx-corner .overline { margin: 0; }
-    .mx tbody { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 8px; }
-    .mx tbody tr[data-row] { display: flex; flex-wrap: wrap; align-content: flex-start; align-items: center; gap: 6px; padding: 8px 10px 10px; border: 1px solid var(--line); border-radius: 12px; }
-    .mx tbody tr[data-row] > th { order: 0; flex: 1 1 calc(100% - 70px); min-width: 0; text-align: left; }
-    .mx tbody tr[data-row] > .mx-tot { order: 1; flex: none; padding: 0 4px; font-size: var(--fs-code); }
-    .mx tbody tr[data-row] > .mx-tot::before { content: attr(data-label) " "; font-weight: 600; color: var(--text-3); }
-    .mx tbody tr[data-row] > td[data-col] { order: 2; }
-    .mx tbody td[data-col]:has(> .mx-cell[data-zero]) { display: none; }
-    .mx-role { padding: 4px 8px; margin-left: -8px; }
-    .mx-cell { display: inline-flex; align-items: center; gap: 8px; width: auto; height: 32px; padding: 0 10px 0 8px; font-size: var(--fs-body); }
-    .mx-cell::before { content: attr(data-label); font: 600 var(--fs-code)/1 var(--font-sans); }
-    .mx tr.mx-detail { grid-column: 1 / -1; display: block; }
-    .mx tr.mx-detail[hidden] { display: none; }
-    .mx tr.mx-detail > td { display: block; }
-    .mx-dt { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
-    .mx tr[data-row]:not(:has(td[data-col] > .mx-cell:not([data-zero]))) .mx-role small { white-space: normal; }
-  }
   @container content (max-width: 1099px) {
     .ov-row { grid-template-columns: 104px minmax(0, 1fr) 180px 110px 80px; gap: 12px; }
   }
@@ -789,14 +526,4 @@ const whoLine = (who) => (who.length === 1 ? P[who[0]]?.role ?? '' : who.length 
     .td-row { grid-template-columns: minmax(0, 1fr) auto; }
     .td-work { grid-column: 1 / 3; }
   }
-  @container content (max-width: 559px) {
-    .ov-mx { padding: 14px 14px 12px; }
-  }
-  @media (prefers-reduced-motion: reduce) { .mx-dt.m-in { animation: none; } }
-</style>
-<style is:global>
-  /* The peek card's list of work (Peek lives on <body>). */
-  .ov-peek { list-style: none; margin: 8px 0 4px; padding: 0; display: grid; gap: 6px; max-width: 340px; }
-  .ov-peek li span { display: block; font-size: var(--fs-support); font-weight: 600; line-height: 1.3; }
-  .ov-peek li small { display: block; font-size: var(--fs-code); color: var(--text-3); }
 </style>

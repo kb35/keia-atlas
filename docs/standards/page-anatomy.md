@@ -163,7 +163,7 @@ The frame (sidebar, top bar, place tabs, padding) and the shared parts already c
 ```
 
 - A block that can sit in columns of different widths (a card that is sometimes half, sometimes full) can be its own container: `container: myname / inline-size`, then `@container myname (...)`.
-- A matrix or table wider than its column: each row becomes a card listing only its non-empty cells (Who does what on the Work overview, `Raci.astro`). Never squash headings or let them break inside a word.
+- A matrix or table wider than its column: each row becomes a card listing only its non-empty cells (Who has the open work on Team, `Raci.astro`). Never squash headings or let them break inside a word.
 - A board: `repeat(4, minmax(0, 1fr))`, then 2, then 1 column, by the width of `content`.
 - A timeline or gantt: narrow the name column, then put each name above its bar (`ScheduleYear.astro`).
 - A closed pop-up takes no room (`display: none`, with `@starting-style` for its fade in); a hidden one past the window's edge widens the page.

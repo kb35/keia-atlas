@@ -15,6 +15,7 @@ import Raci from '../../components/Raci.astro';
 import TeamChip from '../../components/TeamChip.astro';
 import TeamPerson from '../../components/TeamPerson.astro';
 import TeamFlow from '../../components/TeamFlow.astro';
+import OpenWork from './_OpenWork.astro';
 import { projects, sites, SITE_ORDER, spaces, vendors, classes, configurations, racks, incidents, commsRooms, PHASE_LABEL, DEMO_TODAY } from '../../lib/data.mjs';
 import { PEOPLE, ROLES, PROJECT_ROLE, REGION_SHORT } from '../../lib/demo.mjs';
 import { workByPerson, whereIs, overlaps, addDays, WORK_KIND, WORK_STATUS } from '../../lib/work.mjs';
@@ -248,7 +249,7 @@ const mgrSub = (p) => `Manager${p.city ? ` · ${p.city}` : ''}`;
 
           <ul class="oc-leads">
             {LEADS.map((l) => (
-              <li class={`oc-team ot-${l.team}`}>
+              <li class={`oc-team ot-${l.team}`} data-oc-blk>
                 <p class="oc-th"><span>{l.name}</span><i class="num" title={`${l.team === 'delivery' ? deliveryCount : 1 + l.reports.length} people`}>{l.team === 'delivery' ? deliveryCount : 1 + l.reports.length}</i></p>
                 <TeamChip p={l.lead} sub={SHORT[l.lead.roleId]} size="node" away={awayToday(l.lead.id)} manager={l.reports.length > 0 || l.team === 'delivery'} />
                 {l.reports.length > 0 && <ul class="oc-sub">{l.reports.map((r) => <li><TeamChip p={r} sub={SHORT[r.roleId] ?? r.role} size="node" away={awayToday(r.id)} /></li>)}</ul>}
@@ -257,16 +258,16 @@ const mgrSub = (p) => `Manager${p.city ? ` · ${p.city}` : ''}`;
             ))}
           </ul>
 
-          <div class="oc-deliv">
+          <div class="oc-deliv" data-oc-blk>
             <p class="oc-cap"><b>Delivery, by region</b><small>Four leads report to {delMgr.name}, the global delivery manager.</small></p>
             <div class="od-grid">
               <p class="od-corner"><small>Team</small></p>
               {REGIONS.map(([rid, short]) => <p class="od-rh"><b>{short}</b><small>{regionCount(rid)} people</small></p>)}
               {grid.map((g) => (
                 <>
-                  <p class="od-gh"><b>{g.name}</b><small>{g.sub}</small></p>
+                  <p class="od-gh" data-oc-blk data-oc-grp={g.role}><b>{g.name}</b><small>{g.sub}</small></p>
                   {g.cells.map((c) => (
-                    <div class="od-cell" data-region-label={REGIONS.find((r) => r[0] === c.rid)[1]}>
+                    <div class="od-cell" data-oc-blk data-oc-grp={g.role} data-region-label={REGIONS.find((r) => r[0] === c.rid)[1]}>
                       {c.mgr ? <TeamChip p={c.mgr} sub={mgrSub(c.mgr)} size="lead" away={awayToday(c.mgr.id)} manager />
                         : c.cover ? <TeamChip p={c.cover} sub={`Leads from ${REGION_SHORT[c.cover.region]}`} size="lead" ghost />
                         : <p class="od-none">Nobody yet</p>}
@@ -278,10 +279,14 @@ const mgrSub = (p) => `Manager${p.city ? ` · ${p.city}` : ''}`;
             </div>
           </div>
 
-          <div class="oc-vend">
+          <div class="oc-vend" data-oc-blk>
             <p class="oc-cap"><b>Vendors, outside the line</b><small>They report to their own company and work with a project manager.</small></p>
             <ul>{vendorsList.map((v) => <li><TeamChip p={v} sub={v.vendorName} size="lead" away={awayToday(v.id)} /></li>)}</ul>
           </div>
+
+          <!-- On a phone the chart opens on your own part of it (REVIEW-SITE fix 6); everyone else is one press away,
+               and a search or filter shows whoever it finds. -->
+          <button type="button" class="btn small oc-more" data-oc-more data-help="team.chart-fold" aria-expanded="false">Show all {PEOPLE.length} people</button>
 
           <p class="oc-key" aria-label="Key">
             <span class="k-mgr">Manages people</span>
@@ -320,8 +325,10 @@ const mgrSub = (p) => `Manager${p.city ? ` · ${p.city}` : ''}`;
       </SidePanel>
     </div>
 
-    <Section title="Who does what (RACI)" help="team.raci" id="raci" aside="Hover a letter for the reason. Pick a role to see only its work.">
-      <div class="card tm-raci"><Raci rows={RACI} cols={RACI_COLS} id="team" caption="RACI for the team's work" /></div>
+    <OpenWork />
+
+    <Section title="Who does what (RACI)" help="team.raci" id="raci" aside="Hover a letter for the reason. Pick a role to see only its work." rows={8} rowsAt="phone">
+      <div class="card tm-raci"><Raci rows={RACI} cols={RACI_COLS} id="team" caption="RACI for the team's work" items /></div>
     </Section>
 
     <Section title="How the team works" help="team.flow" id="how" aside="Hover or focus a team to follow its work; select it to open its pages.">
@@ -329,7 +336,7 @@ const mgrSub = (p) => `Manager${p.city ? ` · ${p.city}` : ''}`;
     </Section>
   </div>
 
-  <script is:inline data-astro-rerun define:vars={{ FIRST: head.id, ROWS, PARENT }} slot="end">
+  <script is:inline data-astro-rerun define:vars={{ FIRST: head.id, ROWS, PARENT, PEOPLE_N: PEOPLE.length }} slot="end">
     (function () {
       var oc = document.querySelector('[data-oc]'), host = document.querySelector('[data-panel]');
       if (!oc || !host || oc.__tm) return; oc.__tm = true;
@@ -391,6 +398,7 @@ const mgrSub = (p) => `Manager${p.city ? ` · ${p.city}` : ''}`;
         }
         if (e.target.closest('[data-back]')) {
           var c = chipFor(cur); var list = document.querySelector('[data-view-list]');
+          if (c && c.offsetParent === null && oc.classList.contains('oc-fold')) setFold(false);
           var to = list && !list.hidden ? rowsById[cur] : c;
           if (to) { to.scrollIntoView({ block: 'center', behavior: M().reduced ? 'auto' : 'smooth' }); var f = to.matches('button') ? to : to.querySelector('button'); if (f) f.focus({ preventScroll: true }); }
         }
@@ -418,6 +426,7 @@ const mgrSub = (p) => `Manager${p.city ? ` · ${p.city}` : ''}`;
 
       // ---- Filters: in the chart, people who match stay bright and everyone else steps back, so the chart keeps its shape ----
       var reg = {}; oc.querySelectorAll('.tm-reg [data-fi]').forEach(function (r) { reg[r.dataset.pid] = r; });
+      var refold = function () {};   // the phone fold, set up below
       var qi = bar.querySelector('[data-fb-q]'), lastQ = qi.value.trim();
       function paint(on) {
         var hit = {};
@@ -425,6 +434,7 @@ const mgrSub = (p) => `Manager${p.city ? ` · ${p.city}` : ''}`;
         oc.classList.toggle('filtering', on);
         chips.forEach(function (c) { c.classList.toggle('hit', on && !!hit[c.dataset.pid]); });
         oc.querySelectorAll('.oc-team, .od-cell, .oc-vend').forEach(function (b) { b.classList.toggle('miss', on && !b.querySelector('.pc.hit')); });
+        refold(on);
         return Object.keys(hit);
       }
       bar.addEventListener('fb:change', function (e) {
@@ -463,6 +473,43 @@ const mgrSub = (p) => `Manager${p.city ? ` · ${p.city}` : ''}`;
       // ---- Start: the person in the address, else whoever is signed in, else the head ----
       var you = document.documentElement.dataset.who;
       chips.forEach(function (c) { c.classList.toggle('is-you', c.dataset.pid === you); });
+
+      // ---- On a phone the chart opens on your own part of it: the head, then your team, or your delivery team in
+      // your region under the delivery lead. The head, or Everyone, sees the leads and their teams. A search or a
+      // filter shows the parts with someone it found. "Show all" opens the whole chart (the CSS acts only while the
+      // chart is one column wide, @container oc). ----
+      var folded = true, moreB = oc.querySelector('[data-oc-more]'), blks = Array.prototype.slice.call(oc.querySelectorAll('[data-oc-blk]'));
+      var deliv = oc.querySelector('.oc-deliv'), dLead = oc.querySelector('.ot-delivery'), filt = false;
+      var partOf = function (c) { return c && c.closest('.od-cell, .oc-team, .oc-vend'); };
+      refold = function (filtering) {
+        if (filtering !== undefined) filt = filtering;
+        oc.classList.toggle('oc-fold', folded);
+        var show = [];
+        if (filt) chips.forEach(function (c) { if (c.classList.contains('hit')) show.push(partOf(c)); });
+        else {
+          var mine = chipFor(you), p = partOf(mine);
+          if (!p || p.closest('.oc-head') || !mine) show = Array.prototype.slice.call(oc.querySelectorAll('.oc-team'));
+          else { show.push(p); if (p === dLead) show = show.concat(blks.filter(function (b) { return deliv.contains(b); })); }
+        }
+        // A delivery cell brings its team's heading, the grid and the delivery lead above it.
+        show.slice().forEach(function (b) {
+          if (!b || !b.classList.contains('od-cell')) return;
+          show.push(deliv, dLead, oc.querySelector('.od-gh[data-oc-grp="' + b.dataset.ocGrp + '"]'));
+        });
+        blks.forEach(function (b) { b.classList.toggle('oc-in', show.indexOf(b) >= 0); });
+        var out = folded ? chips.filter(function (c) { return !c.classList.contains('pc-ghost') && !c.closest('.oc-head') && show.indexOf(partOf(c)) < 0; }).length : 1;
+        moreB.hidden = !out;
+        moreB.textContent = folded ? 'Show all ' + PEOPLE_N + ' people' : 'Show fewer';
+        moreB.setAttribute('aria-expanded', String(!folded));
+      };
+      var setFold = function (f) { folded = f; refold(); };
+      moreB.addEventListener('click', function () {
+        var y0 = moreB.getBoundingClientRect().top, closing = !folded;
+        setFold(!folded);
+        // Showing fewer: the button stays under the pointer (M6).
+        if (closing) { var dy = moreB.getBoundingClientRect().top - y0; if (Math.abs(dy) > 1) window.scrollBy(0, dy); }
+      });
+      refold(false);
       var start = new URLSearchParams(location.search).get('p'); pinned = !!arts[start]; if (!arts[start]) start = arts[you] ? you : FIRST;
       select(start, { quiet: true });
       if (bar.rsFilter) { var hits = paint(bar.rsFilter && document.querySelector('.content.tm').classList.contains('fb-on')); if (!pinned && hits.length && hits.length < Object.keys(reg).length && hits.indexOf(cur) < 0) select(hits[0], { quiet: true }); }
@@ -523,6 +570,14 @@ const mgrSub = (p) => `Manager${p.city ? ` · ${p.city}` : ''}`;
   /* Vendors sit outside the line: no connector, a dashed edge. */
   .oc-vend { margin-top: 22px; display: grid; gap: 10px; padding: 14px; border: 1.5px dashed var(--line-strong); border-radius: var(--radius-lg); transition: opacity var(--dur-state) var(--ease-settle); }
   .oc-vend ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+
+  /* The phone fold (see the script): only while the chart is one column wide. */
+  .oc-more { display: none; justify-self: start; margin-top: 14px; }
+  @container oc (max-width: 560px) {
+    .oc-more:not([hidden]) { display: inline-flex; }
+    .oc.oc-fold [data-oc-blk]:not(.oc-in) { display: none; }
+    .oc.oc-fold .oc-deliv:not(.oc-in) + .oc-vend { margin-top: 0; }
+  }
 
   /* The key, under the chart. */
   .oc-key { margin: 16px 0 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: var(--fs-code); color: var(--text-3); }

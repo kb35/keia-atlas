@@ -105,7 +105,7 @@ const PLACES = {
 const PAGES = {
   'page.generic': e('This page', 'A page in Keia Atlas. The band at the top says what it is and gives its key figures.', 'Use the bar under the band to find things, and the tabs at the top to move around the place. Turn on help to see what each part is.', 'l:help'),
   'page.home': e('Your home page', def('home-page'), 'Start with what is at the top. View as, under your name, shows another role\'s first screen.', 'l:home'),
-  'page.overview': e('Support overview', 'Every piece of open work in one place: who has it, what kind it is and when. Filters and the Who does what table narrow the list.', 'Pick a role or a kind in the table, or use the filter bar, then open any row.', 'l:projects'),
+  'page.overview': e('Support overview', 'The support answer first: the queue, worst first, with what is ready for you, with you, waiting on something and past its target. Then what is next in the Work list, today across offices and recent changes.', 'Open a job from the queue, or a figure for the list it counts.', 'l:projects'),
   'page.schedule': e('Schedule', 'Who is where and doing what. Day shows the offices, Week each person, Month the calendar, and Year the projects.', 'Choose a view in the bar, then a scope: Me, My team or Everyone. Drag work onto a person and day, or use Assign.'),
   'page.projects': e('Projects', def('project'), 'Open a project to see its phase, tasks and spaces. Deploy is where the devices go in.', 'l:projects'),
   'page.incidents': e('Incidents', def('incident'), 'Open one to see the space, the evidence and the next steps from the guide.', 'g:incident'),
@@ -293,19 +293,16 @@ const HOME = {
 
 // ---- Work overview ------------------------------------------------------------------------------------------------
 const OVERVIEW = {
-  'overview.matrix': e('Who does what', 'Open work by role and by kind, with the count in each square on a heat scale: the darker, the more.', 'Hover a number to look at the work. Select a number, a kind or a total to open that work in the Work list.'),
-  'overview.seeas': e('See as', 'The rows are roles. A role\'s name is its See as chip: it lights the row and shows what that role owns, decides and hands on.', 'Select a role\'s name to see it as they do. Select it again to let go.', 'g:view-as'),
-  'overview.all': e('Everyone', 'Every role at once.', 'Select it to clear the role and see all the work.'),
-  'overview.role': e('{name}', 'A role. Its row counts the open work it has, by kind.', 'Select it to see this page as that role: its row lights up and opens to say who holds it, what it owns and what it decides. Its total opens its work in the Work list.', 'g:raci'),
   'overview.kind': e('{name}', 'A kind of work: a task, a step in Deploy, a booked visit or another kind. The column counts it across the roles.', 'Select it to open every piece of that kind in the Work list.'),
-  'overview.cell': e('A count', 'How much open work this role has of this kind. Shared work counts once for each role on it.', 'Hover it to look at the work. Select it to open that work in the Work list, with the filters you picked here.'),
-  'overview.total': e('{name}', 'A total: the open work in this row or column, with the filters you picked here.', 'Select it to open that work in the Work list. The list shows the same number.'),
-  'overview.nobody': e('Nobody yet', 'Work that nobody has been given yet.', 'Select it to show that work here, then give it to someone in the Schedule. Its total opens it in the Work list.'),
+  'overview.cell': e('A count', 'How much open work this role has of this kind. Shared work counts once for each role on it.', 'Hover it to look at the work. Select it to open that work in the Work list.'),
+  'overview.total': e('{name}', 'A total: the open work in this row or column.', 'Select it to open that work in the Work list. The list shows the same number.'),
+  'overview.nobody': e('Nobody yet', 'Work that nobody has been given yet.', 'Select it to open that work in the Work list, then give it to someone there or in the Schedule.'),
   'overview.person': e('Open their Home', 'Someone who holds this role in the demo.', 'Select it to view Keia Atlas as them and go to their home page.', 'g:view-as'),
   'overview.scale': e('How to read the colours', 'The heat scale runs from fewer to more pieces of work.', 'Nothing to do. Numbers matter more than colour.'),
 
+  'overview.queue': e('The queue', 'Every open job, worst first: priority, then nobody on it, then past its target, then oldest. Each row says who has it.', 'Open a job, or take it or hand it on from its chip. See all opens the Queue with its filters.', 'g:task'),
   'overview.row': e('A piece of open work', 'One task, step or visit: what it is, who has it, when and its status.', 'Select it to open it. Changes made in the Schedule or on a project show here too.', 'g:task'),
-  'overview.today': e('Today across offices', 'For each office, who is on site today and what work is on there. It follows the Region and Office filters.', 'Select an office to open Day in the Schedule at that site.'),
+  'overview.today': e('Today across offices', 'For each office, who is on site today and what work is on there.', 'Select an office to open Day in the Schedule at that site.'),
   'overview.recent': e('Recent changes', 'The latest changes anyone has made to work, with who made them and when.', 'Change something in another window to watch it appear here.'),
 };
 
@@ -507,12 +504,15 @@ const UNIT = {
 // ---- Team ---------------------------------------------------------------------------------------------------------
 const TEAM_KEYS = {
   'team.chart': e('Org chart', 'Who reports to whom. Anyone who manages people has a bar on their left edge.', 'Select a person for their details, or use the arrow keys to move between people.'),
+  'team.chart-fold': e('Show all', 'On a phone the chart opens on your own part of it: the head of the team, then your team and your manager. A search or a filter shows whoever it finds.', 'Select it to open the whole chart. Select it again to fold it back.'),
   'team.chip': e('{name}', 'A person, with their role and, if they are away today, an Away mark.', 'Select them to see their week and details in the panel.'),
   'team.list': e('Everyone', 'The same people as a list you can scan.', 'Select a person for their details.'),
   'team.panel': e('Person', 'The selected person: their role, who they manage, who they work with and where they are this week.', 'Select a name in it to move to that person.'),
   'team.week': e('This week', 'Where they are each day, Monday to Friday, and the work on those days.', 'Select a line to open the work, or the schedule link for the whole week.'),
   'team.pick': e('A colleague', 'A person this one manages, reports to or works with.', 'Select them to see their details.'),
   'team.raci': e('Who does what (RACI)', def('raci'), 'Point at a letter for the reason. Pick a role to see only its work.', 'g:raci'),
+  'team.openwork': e('Who has the open work', 'Open work by role and by kind, with the count in each square on a heat scale: the darker, the more. Shared work counts once for each role on it.', 'Hover a number to look at the work. Select a number, a kind or a total to open that work in the Work list.'),
+  'team.openwork-role': e('{name}', 'A role. Its row counts the open work it has, by kind.', 'Select it to open the row: who holds the role, what it owns, what it decides and what it hands on. Its total opens its work in the Work list.', 'g:raci'),
   'team.flow': e('How the team works', 'Teams as boxes, and the work that passes between them, such as the standard, incidents and finished spaces.', 'Point at a team to follow its work. Select it to open its pages.', 'l:t-support'),
   'team.flow-team': e('{name}', 'One team, what it owns and what it does.', 'Select it to open its pages.'),
 };
