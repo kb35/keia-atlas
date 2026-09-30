@@ -67,8 +67,8 @@ export function moduleAttrs(map) {
 //   state     the default: on, connected or off
 //   source    the tool it reads from when Connected (the source mark: "from Datadog")
 //   requires  modules or capabilities that must not be Off for it to be on
-//   helper    a section another change added (src/lib/features-added.mjs, FEATURES_ADDED, lists them with the same
-//             module); registered here, so that list never needs a switch of its own
+//   helper    a section the overlooked batch added (warranty, on call, circuits and the rest); this is the only list
+//             of capabilities, so there is never a second one to keep in step
 export const CAPABILITIES = [
   // Locations
   { id: 'room-accessibility', module: 'locations', label: 'Room accessibility', what: 'Hearing loops, captions and step-free access on each space', state: 'on', source: 'the workplace system', helper: true },

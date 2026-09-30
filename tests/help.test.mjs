@@ -4,6 +4,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { needsDist } from './helpers/dist.mjs';
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -72,6 +73,32 @@ test('every page section has its own page card, and every place and tab has its 
   assert.deepEqual([...new Set(tabs)].filter((t) => !HELP[`tab:${t}`]), [], 'each tab needs tab:<id>');
 });
 
+test('every tab, place and page card has exactly one entry, and each names a tab, place or page that exists', () => {
+  // Exactly one: an object literal keeps the last of two equal keys without a word, so read the source.
+  const src = readFileSync(join(ROOT, 'src/lib/help.mjs'), 'utf8');
+  const keys = [...src.matchAll(/^\s+'((?:tab|place):[a-z-]+|page\.[a-z-]+)':\s*e\(/gm)].map((m) => m[1]);
+  const twice = keys.filter((k, i) => keys.indexOf(k) !== i);
+  assert.deepEqual(twice, [], 'each key once in src/lib/help.mjs (the second silently wins)');
+  // Each names something real: a NAV place or tab, a Shell section, or a key a template carries as it is.
+  const shell = readFileSync(join(ROOT, 'src/layouts/Shell.astro'), 'utf8');
+  const nav = shell.slice(shell.indexOf('const NAV = ['), shell.indexOf('const parent = NAV'));
+  const places = new Set([...nav.matchAll(/^  \{ id: '([a-z-]+)', label:/gm)].map((m) => m[1]));
+  const tabs = new Set([...nav.matchAll(/^\s+\{ id: '([a-z-]+)', label: '[^']+', to:/gm)].map((m) => m[1]));
+  const sections = new Set(['generic']);
+  const fronts = [];   // section={`services-${id}`}: every page.services-<id> is in use
+  for (const [, s] of text) {
+    for (const m of s.matchAll(/\bsection="([a-z-]+)"/g)) sections.add(m[1]);
+    for (const m of s.matchAll(/\bsection=\{`([a-z-]+)\$\{/g)) fronts.push(m[1]);
+    for (const m of s.matchAll(/\bdata-page-help="page\.([a-z-]+)"/g)) sections.add(m[1]);
+  }
+  const used = new Set(usedKeys().keys());
+  const isPage = (id) => sections.has(id) || fronts.some((f) => id.startsWith(f));
+  const stale = Object.keys(HELP).filter((k) => (k.startsWith('tab:') && !tabs.has(k.slice(4)))
+    || (k.startsWith('place:') && !places.has(k.slice(6)))
+    || (k.startsWith('page.') && !isPage(k.slice(5)) && !used.has(k)));
+  assert.deepEqual(stale, [], 'remove these from src/lib/help.mjs: no tab, place or page uses them now');
+});
+
 test('every "Learn more" link goes to a lesson or a glossary word that exists', () => {
   const j = helpJson();
   assert.ok(Object.keys(j).length > 150, 'the registry is built');
@@ -99,7 +126,7 @@ test('help words follow the house rules: no em dashes, no double spaces, no word
   }
 });
 
-test('built pages only use keys the registry knows (runs when dist/ exists)', { skip: !existsSync(join(ROOT, 'dist')) }, () => {
+test('built pages only use keys the registry knows (runs when dist/ exists)', { skip: needsDist() }, () => {
   const dist = walk(join(ROOT, 'dist')).filter((f) => f.endsWith('.html'));
   const bad = new Map();
   for (const f of dist) {
