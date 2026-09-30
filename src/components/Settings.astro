@@ -17,6 +17,7 @@ const LOOKS = [
 import { PEOPLE, TEAMS } from '../lib/demo.mjs';
 import { MODULES, MODULE_STATES } from '../lib/modules.mjs';
 import SettingsPersonal from './SettingsPersonal.astro';
+import PillSelect from './PillSelect.astro';
 const GROUPS = ['delivery', 'onsite', 'av-it', 'it-infra', 'service-desk', 'leadership', 'vendor'].map((tm) => ({ tm, ps: PEOPLE.filter((p) => p.team === tm) })).filter((g) => g.ps.length);
 const MODES = [
   { id: 'system', name: 'Auto' },
@@ -24,6 +25,7 @@ const MODES = [
   { id: 'dark', name: 'Dark' },
 ];
 ---
+<PillSelect />
 <dialog class="settings" id="settings" aria-labelledby="settings-title" tabindex="-1" autofocus>
   <form method="dialog">
     <header>
@@ -33,7 +35,7 @@ const MODES = [
       </button>
     </header>
     <label class="who-phone"><span class="overline">View as</span>
-      <select name="who" data-who-select>
+      <select name="who" data-who-select data-pill aria-label="View as">
         <optgroup label="Overview"><option value="everyone">Everyone (overview) · Every role at once</option></optgroup>
         {GROUPS.map((g) => <optgroup label={TEAMS[g.tm]}>{g.ps.map((p) => <option value={p.id}>{p.role} · {p.where}</option>)}</optgroup>)}
       </select>
@@ -123,7 +125,7 @@ const MODES = [
         n.textContent = v === 'connected' ? n.dataset.conn : v === 'off' ? n.dataset.off : n.dataset.on;
       });
       dlg.querySelectorAll('[data-look-note]').forEach(function (p) { p.classList.toggle('on', p.dataset.lookNote === s); });
-      var ws = dlg.querySelector('[data-who-select]'); if (ws) ws.value = window.rsWhoId ? window.rsWhoId() : get('rs4-who', 'aoife');
+      var ws = dlg.querySelector('[data-who-select]'); if (ws) { ws.value = window.rsWhoId ? window.rsWhoId() : get('rs4-who', 'aoife'); if (ws.pmRefresh) ws.pmRefresh(); }
       markLook(); markSegs();
     }
     // Open beside the button that opened it, top edge fixed, so nothing moves under the pointer as you choose.
@@ -211,6 +213,7 @@ const MODES = [
   .settings .seg-s label:focus-within span { outline: 2px solid var(--focus); }
   .settings p { margin: 0; font-size: 12.5px; }
   .settings .who-phone { display: none; gap: 6px; }
+  .settings .who-phone .pm, .settings .who-phone .pm-btn, .settings .who-phone .pm-list { width: 100%; max-width: 100%; }
   .settings .who-phone select { width: 100%; min-width: 0; font: inherit; font-size: 15px; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); }
   /* While the page cross-fades to a new look, the markers in here still slide (motion.css turns other easing off). */
   @media (prefers-reduced-motion: no-preference) {

@@ -52,14 +52,14 @@ const NUMBERS = [
 ];
 const answer = `${f.installed ? `${plural(f.installed, 'unit')} in service` : 'None installed'} · ${f.overdue ? `${f.overdue} past planned life` : 'none past planned life'} · firmware ${f.fw.label[0].toLowerCase()}${f.fw.label.slice(1)}`;
 const dims = m.dimensions_mm;
-// Security support (CRA, UK PSTI): the maker's end date and contact, with the warning within 12 months or after.
+// Security support (CRA, UK PSTI): the manufacturer's end date and contact, with the warning within 12 months or after.
 const sec = securityInfo(m);
 const legend = [...new Set(ports.map((p) => portColour(p)))];
 const LEGEND_NAME = { 'var(--c-hdmi)': 'Video', 'var(--c-hdbt)': 'HDBaseT', 'var(--c-poe)': 'PoE', 'var(--c-usb)': 'USB', 'var(--c-lan)': 'Network', 'var(--c-power)': 'Power', 'var(--c-audio)': 'Audio', 'var(--grey)': 'Other' };
 ---
 <Shell vendorOk about={{ kind: 'model', label: modelName(id), model: modelName(id) }} title={modelName(id)} section="models" crumbs={[{ label: 'Models', to: '/models/' }, { label: className(m.class), to: `/models/#${m.class}` }, { label: m.model }]}>
   <PageBand overline={m.manufacturer} title={m.model} answer={answer} lede={m.summary} numbers={NUMBERS}>
-    <a slot="overline" class="tag" href={href(`/profiles/${m.class}/${id}/`)}>{className(m.class)} profile</a>
+    <a slot="overline" class="tag" href={href(`/profiles/${m.class}/${id}/`)}>{className(m.class)} device type</a>
   </PageBand>
 
   <div class="content">
@@ -84,7 +84,7 @@ const LEGEND_NAME = { 'var(--c-hdmi)': 'Video', 'var(--c-hdbt)': 'HDBaseT', 'var
           </div>
         )}
       </section>
-      <SidePanel class="s-5" title="At a glance" meta="From the vendor's documents">
+      <SidePanel class="s-5" title="At a glance" meta="From the manufacturer's documents">
         <dl class="kv">
           <div><dt>Class</dt><dd>{className(m.class)}</dd></div>
           <div><dt>Firmware</dt><dd><span class={`fw fw-${f.fw.tone}`}>{f.fw.label}</span><small class="faint"> {f.fw.sub}</small></dd></div>
@@ -119,7 +119,7 @@ const LEGEND_NAME = { 'var(--c-hdmi)': 'Video', 'var(--c-hdbt)': 'HDBaseT', 'var
           <details class="mdp-all">
             <summary>Every port, in detail</summary>
             <div class="tablewrap" style="margin-top:12px">
-              <table>
+              <table class="stack-sm">
                 <thead><tr><th scope="col">#</th><th scope="col">Port</th><th scope="col">Connector</th><th scope="col">Carries</th><th scope="col">Direction</th><th scope="col">Where</th></tr></thead>
                 <tbody>
                   {panels.flatMap((pn) => pn.ports.map((p, k) => (
@@ -146,9 +146,9 @@ const LEGEND_NAME = { 'var(--c-hdmi)': 'Video', 'var(--c-hdbt)': 'HDBaseT', 'var
           <dl class="kv">
             <div><dt>Firmware line</dt><dd>{sec.line}</dd></div>
             <div><dt>Security updates</dt><dd>{sec.text}{sec.chip && <> <span class={`ss-chip ${sec.tone}`}>{sec.chip}</span></>}{sec.endsDemo ? <> <span class="demo-val" data-help="unit.demo-value">Demo value</span></> : sec.endsSrc && <small class="faint"> {sec.endsSrc.url ? <a href={sec.endsSrc.url}>{sec.endsSrc.title}</a> : sec.endsSrc.title}</small>}</dd></div>
-            <div><dt>Report a flaw</dt><dd>{sec.contact ? <><a href={sec.contact.url}>{sec.contact.url.replace(/^https?:[/][/]/, '').replace(/[/]$/, '')}</a>{sec.contact.demo && <> <span class="demo-val" data-help="unit.demo-value">Demo value</span></>}</> : 'The maker publishes no page we could open (see gaps)'}</dd></div>
+            <div><dt>Report a flaw</dt><dd>{sec.contact ? <><a href={sec.contact.url}>{sec.contact.url.replace(/^https?:[/][/]/, '').replace(/[/]$/, '')}</a>{sec.contact.demo && <> <span class="demo-val" data-help="unit.demo-value">Demo value</span></>}</> : 'The manufacturer publishes no page we could open (see gaps)'}</dd></div>
           </dl>
-          <p class="faint" style="margin:10px 0 0;font-size:12.5px">The maker sets these dates; Keia Atlas tracks them and does not vouch for them. A warning shows from 12 months before support ends.</p>
+          <p class="faint" style="margin:10px 0 0;font-size:12.5px">The manufacturer sets these dates; Keia Atlas tracks them and does not vouch for them. A warning shows from 12 months before support ends.</p>
         </div>
       </Section>
     )}
@@ -163,7 +163,7 @@ const LEGEND_NAME = { 'var(--c-hdmi)': 'Video', 'var(--c-hdbt)': 'HDBaseT', 'var
     )}
 
     {types.length > 0 && (
-      <Section title="Space types that use it" id="where" aside={used ? `${plural(used.units, 'unit')} in ${plural(used.spaces.size, 'space')} at ${plural(used.sites.size, 'site')}` : undefined}>
+      <Section title="Space types that use it" id="where" aside={used ? `${plural(used.units, 'unit')} in ${plural(used.spaces.size, 'space')} at ${plural(used.sites.size, 'office')}` : undefined}>
         <div class="list" data-items>
           {types.map((t) => (
             <a class="row plain" href={href(`/room-profiles/${t}/`)}>
@@ -181,7 +181,7 @@ const LEGEND_NAME = { 'var(--c-hdmi)': 'Video', 'var(--c-hdbt)': 'HDBaseT', 'var
           <div class="card side-card s-6" id="notes"><h3>Notes</h3><ul class="note-list">{m.notes.map((t) => <li>{t}</li>)}</ul></div>
         )}
         {m.gaps?.length > 0 && (
-          <div class="card side-card s-6" id="gaps"><h3>What the vendor doesn't say</h3><ul class="note-list">{m.gaps.map((g) => <li>{g}</li>)}</ul></div>
+          <div class="card side-card s-6" id="gaps"><h3>What the manufacturer doesn't say</h3><ul class="note-list">{m.gaps.map((g) => <li>{g}</li>)}</ul></div>
         )}
       </div>
     )}
@@ -194,7 +194,7 @@ const LEGEND_NAME = { 'var(--c-hdmi)': 'Video', 'var(--c-hdbt)': 'HDBaseT', 'var
             return <li>{src?.url ? <a href={src.url}>{src.title}</a> : (src?.title ?? s.source)}<br /><span class="faint" style="font-size:12.5px">{s.provides}</span></li>;
           })}
         </ul>
-        <p class="faint" style="margin:0;font-size:12.5px">Each model was read twice, independently, and the two readings reconciled against the vendor's text.</p>
+        <p class="faint" style="margin:0;font-size:12.5px">Each model was read twice, independently, and the two readings reconciled against the manufacturer's text.</p>
       </div>
     </Section>
 

@@ -62,7 +62,8 @@ const snCfg = { project: p.id, task: t.id, title: t.title, pb: pbk?.id ?? '', pb
 
   <div class="content task">
     <div class="g12 top">
-      <section class="card tk-steps s-7" aria-labelledby="h-steps">
+      <div class="s-7 tk-left">
+      <section class="card tk-steps" aria-labelledby="h-steps">
           {t.status === 'blocked' && <div class="tk-block"><Icon name="alert" size={20} /><span><b>Waiting on:</b> {t.blocked_by}</span><button type="button" class="btn small" data-open-report="urgent">Raise it as urgent</button></div>}
           {intLink && t.status !== 'done' && <a class="tk-int" href={intLink}><span><b>On the Deploy board</b><small>{D.devices.length ? `${plural(D.devices.length, 'device')}, ` : ''}each with its {STEP_LABEL[intStep]} checklist to tick, live with the rest of the team.</small></span><span class="btn small">Open in Deploy<Icon name="arrow" size={14} /></span></a>}
           <header class="tk-h"><h2 id="h-steps">What to do</h2><span class="faint" data-step-count></span></header>
@@ -89,6 +90,21 @@ const snCfg = { project: p.id, task: t.id, title: t.title, pb: pbk?.id ?? '', pb
             <div class="sn-list" data-sn-list></div>
           </div>
         </section>
+      <section class="card pad tk-more" aria-label="Where this task sits">
+          {D.rooms.length > 0 && (
+            <div class="tk-sub">
+              <h3 class="overline">{D.rooms.length === 1 ? 'The space' : 'The spaces'}</h3>
+              <ul class="rooms-mini">{D.rooms.map((r) => <li><a href={href(`/rooms/${r.id}/`)}>{r.number ? `${r.number} ` : ''}{r.name}</a><small>{r.type.profile.name}</small></li>)}</ul>
+            </div>
+          )}
+          <nav class="tk-sub tk-nav" aria-label="Other tasks on this project">
+            <h3 class="overline">On this project</h3>
+            {prev && <a href={tHref(prev)}><Icon name="back" size={14} /><span><small class="mono">{prev.id}</small> {prev.title}</span></a>}
+            {next && <a href={tHref(next)}><span><small class="mono">{next.id}</small> {next.title}</span><Icon name="arrow" size={14} /></a>}
+            <a class="all" href={href(`${home}#tasks`)}>All {p.tasks.length} tasks</a>
+          </nav>
+      </section>
+      </div>
       <SidePanel class="s-5" title="The task" meta={dueWord}>
         <div class="owner" data-tk-live={t.id} data-status={t.status} data-owner={t.owner} data-title={t.title} data-people={JSON.stringify(pickable(p))}>
           <button type="button" class="av tk-av owner-av" data-tk-owner aria-haspopup="dialog" aria-expanded="false" data-help="project.assign" aria-label={`Assigned to ${who.name}. Change`}>{who.initials}</button>
@@ -103,19 +119,6 @@ const snCfg = { project: p.id, task: t.id, title: t.title, pb: pbk?.id ?? '', pb
           <div><dt>Kind of work</dt><dd>{D.kindLabel}</dd></div>
           {t.team && <div><dt>With</dt><dd>{TEAM_LABEL[t.team] ?? t.team}</dd></div>}
         </dl>
-        {D.rooms.length > 0 && (
-          <div class="tk-sub">
-            <h3 class="overline">{D.rooms.length === 1 ? 'The space' : 'The spaces'}</h3>
-            <ul class="rooms-mini">{D.rooms.map((r) => <li><a href={href(`/rooms/${r.id}/`)}>{r.number ? `${r.number} ` : ''}{r.name}</a><small>{r.type.profile.name}</small></li>)}</ul>
-          </div>
-        )}
-        <nav class="tk-sub tk-nav" aria-label="Other tasks on this project">
-          <h3 class="overline">On this project</h3>
-          {prev && <a href={tHref(prev)}><Icon name="back" size={14} /><span><small class="mono">{prev.id}</small> {prev.title}</span></a>}
-          {next && <a href={tHref(next)}><span><small class="mono">{next.id}</small> {next.title}</span><Icon name="arrow" size={14} /></a>}
-          <a class="all" href={href(`${home}#tasks`)}>All {p.tasks.length} tasks</a>
-        </nav>
-        <LiveBar page={`task:${t.id}`} />
       </SidePanel>
       <PeoplePicker />
     </div>
@@ -185,6 +188,7 @@ const snCfg = { project: p.id, task: t.id, title: t.title, pb: pbk?.id ?? '', pb
           </div>
       </Section>
     )}
+    <LiveBar page={`task:${t.id}`} />
   </div>
 
   <script is:inline data-astro-rerun slot="end">
@@ -319,6 +323,9 @@ const snCfg = { project: p.id, task: t.id, title: t.title, pb: pbk?.id ?? '', pb
 </style>
 <style>
   .tk-sub { display: grid; gap: 4px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .tk-left { display: grid; gap: var(--gutter); align-content: start; }   /* the spaces and the other tasks continue the left column under What to do */
+  .tk-more { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px 28px; align-content: start; }
+  .tk-more .tk-sub { margin-top: 0; padding-top: 0; border-top: 0; align-content: start; }
   .tk-sub .overline { margin: 0; }
   .tk-int { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-bottom: 14px; padding: 12px 14px; border-radius: var(--radius); background: var(--accent-soft); color: inherit; text-decoration: none; }
   .tk-int:hover { color: inherit; }
@@ -334,8 +341,8 @@ const snCfg = { project: p.id, task: t.id, title: t.title, pb: pbk?.id ?? '', pb
   .steps input { position: absolute; opacity: 0; pointer-events: none; }
   .tick { width: 20px; height: 20px; border-radius: 6px; border: 2px solid var(--line-strong); display: grid; place-items: center; transition: background var(--dur-state), border-color var(--dur-state); }
   .tick svg { width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 24; stroke-dashoffset: 24; transition: stroke-dashoffset 360ms var(--ease-settle) 80ms; }
-  .steps input:checked + .tick { background: var(--green); border-color: var(--green); }
-  .steps input:checked + .tick svg { stroke-dashoffset: 0; }
+  .steps input:checked + .tick { background: transparent; border-color: var(--h-fine); }   /* a ring with a tick, never a filled disc */
+  .steps input:checked + .tick svg { stroke: var(--h-fine-ink); stroke-dashoffset: 0; }
   .steps input:focus-visible + .tick { outline: 2px solid var(--focus); outline-offset: 2px; }
   .st-text { font-size: 14.5px; line-height: 1.45; transition: color var(--dur-state), opacity var(--dur-state); }
   .steps input:checked ~ .st-text { color: var(--text-3); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--text-3) 50%, transparent); }
@@ -349,7 +356,7 @@ const snCfg = { project: p.id, task: t.id, title: t.title, pb: pbk?.id ?? '', pb
   .rec-t input { width: 100%; box-sizing: border-box; padding: 7px 9px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface-2); color: var(--text); font-size: var(--fs-support); }
   .rec-t input.bad { border-color: var(--red); background: var(--red-soft); }
   .rec-ok { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--surface-3); transition: background var(--dur-state); }
-  .rec-ok.on { background: var(--green); animation: rs-flash-ok var(--dur-flash) var(--ease-settle); }
+  .rec-ok.on { background: transparent; box-shadow: inset 0 0 0 2px var(--h-fine); animation: rs-flash-ok var(--dur-flash) var(--ease-settle); }
   .dev-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
   .dcard { display: grid; grid-template-columns: 50px minmax(0, 1fr); gap: 12px; padding: 12px 14px; }
   .dc-g { color: var(--art-line, var(--text-2)); display: grid; place-items: center; }
@@ -359,7 +366,7 @@ const snCfg = { project: p.id, task: t.id, title: t.title, pb: pbk?.id ?? '', pb
   .dcard details { font-size: var(--fs-code); margin-top: 6px; } .dcard ul { margin: 4px 0 0; padding-left: 18px; color: var(--text-2); }
   .fix { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; align-items: start; padding: 12px; border-radius: var(--radius); background: var(--green-soft); }
   .fix.none { background: var(--surface-2); }
-  .fix-ic { width: 30px; height: 30px; border-radius: 50%; background: var(--green); color: #fff; display: grid; place-items: center; }
+  .fix-ic { width: 30px; height: 30px; border-radius: 50%; background: transparent; box-shadow: inset 0 0 0 2px var(--h-fine); color: var(--h-fine-ink); display: grid; place-items: center; }
   .fix p { margin: 4px 0; font-size: var(--fs-h3); }
   .close-btns { display: flex; flex-wrap: wrap; gap: 8px; }
   .nn { display: grid; gap: 6px; margin-top: 10px; animation: rise var(--dur-enter, 440ms) var(--ease-settle); }

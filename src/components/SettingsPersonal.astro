@@ -1,6 +1,6 @@
 ---
 /* The person's own settings inside Settings (UX-V2 §5.2 and §5.3; rule P11): density, where pages open, and the demo
-   switch for coming back from leave. Stored per person in this browser: rs6-density, rs6-depth (src/lib/depth.mjs),
+   switch for coming back from leave. Stored per person in this browser: rs6-density, rs6-depth (src/lib/depth.mjs; Where pages open sets one layer for every kind of page),
    rs6-leave and rs6-welcomed. Density is applied before first paint by the Shell's boot script (html[data-density]).
    Motion: density eases rows and cards to their new size together, holding what you were looking at (rsChange,
    MOTION-V2 4.25); the reset line changes its words and nothing else (4.27). */
@@ -16,7 +16,13 @@ import '../styles/density.css';
   </fieldset>
   <fieldset data-help="settings.depth">
     <legend class="overline">Where pages open</legend>
-    <button type="button" class="set-link" data-depth-reset>Open everything at the band again</button>
+    <div class="seg-s" data-seg>
+      <label><input type="radio" name="depth" value="band" /><span>Band</span></label>
+      <label><input type="radio" name="depth" value="summary" /><span>Summary</span></label>
+      <label><input type="radio" name="depth" value="record" /><span>Record</span></label>
+      <label><input type="radio" name="depth" value="raw" /><span>Raw</span></label>
+    </div>
+    <small class="faint set-note" data-depth-note>Every page opens at the top.</small>
   </fieldset>
 </div>
 <fieldset data-help="settings.leave">
@@ -29,6 +35,7 @@ import '../styles/density.css';
     var dlg = document.querySelector('dialog#settings'); if (!dlg) return;
     var W = window, R = document.documentElement;
     var who = function () { return W.rsWhoId ? W.rsWhoId() : 'aoife'; };
+    var KINDS = ['home', 'space', 'device', 'job', 'service', 'project', 'office', 'vendor'];
     var read = function (k) { try { return JSON.parse(localStorage.getItem(k) || '{}') || {}; } catch (_) { return {}; } };
     var write = function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
     function sync() {
@@ -36,8 +43,12 @@ import '../styles/density.css';
       dlg.querySelectorAll('input[name=density]').forEach(function (i) { i.checked = i.value === d; });
       var on = false; try { on = localStorage.getItem('rs6-leave') === 'on'; } catch (_) {}
       var lv = dlg.querySelector('[data-leave]'); if (lv) lv.checked = on;
-      var dp = read('rs6-depth')[who()], b = dlg.querySelector('[data-depth-reset]');
-      if (b && !b.__busy) { b.disabled = !dp || !Object.keys(dp).length; b.textContent = b.disabled ? 'Every page opens at the band' : 'Open everything at the band again'; }
+      // One layer for every kind of page, or "Mixed" when "Open pages like this here" has set some kinds deeper than others.
+      var mine = read('rs6-depth')[who()] || {}, vals = KINDS.map(function (k) { return mine[k] || 'band'; });
+      var same = vals.every(function (v) { return v === vals[0]; });
+      dlg.querySelectorAll('input[name=depth]').forEach(function (i) { i.checked = same && i.value === vals[0]; });
+      var note = dlg.querySelector('[data-depth-note]');
+      if (note) note.textContent = !same ? 'Mixed: some pages open deeper than others.' : vals[0] === 'band' ? 'Every page opens at the top.' : 'Every page opens at its ' + vals[0] + ' layer.';
     }
     if (dlg.__rsPersonal) { sync(); return; }
     dlg.__rsPersonal = true;
@@ -48,18 +59,17 @@ import '../styles/density.css';
         var set = function () { R.setAttribute('data-density', i.value); };
         if (W.rsChange) W.rsChange(set); else set();
       }
+      if (i.name === 'depth') {
+        var all = read('rs6-depth');
+        if (i.value === 'band') delete all[who()]; else all[who()] = KINDS.reduce(function (o, k) { o[k] = i.value; return o; }, {});
+        write('rs6-depth', all);
+        if (W.rsDepthLabels) W.rsDepthLabels();
+        sync();
+      }
       if (i.name === 'leave') {
         try { if (i.checked) { localStorage.setItem('rs6-leave', 'on'); localStorage.removeItem('rs6-welcomed'); } else localStorage.removeItem('rs6-leave'); } catch (_) {}
         document.dispatchEvent(new CustomEvent('rs:leave', { detail: { on: i.checked } }));
       }
-    });
-    dlg.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-depth-reset]'); if (!b) return;
-      var all = read('rs6-depth'); delete all[who()]; write('rs6-depth', all);
-      b.__busy = true; b.textContent = 'Every page now opens at the band'; b.disabled = true;
-      if (W.rsDepthLabels) W.rsDepthLabels();
-      var linger = parseFloat(getComputedStyle(R).getPropertyValue('--dur-linger')) || 4000;
-      setTimeout(function () { b.__busy = false; sync(); }, linger);
     });
     // Settings calls its own sync when it opens; follow it.
     new MutationObserver(function () { if (dlg.open) { sync(); if (dlg.__rsPlace) dlg.__rsPlace(); } }).observe(dlg, { attributes: true, attributeFilter: ['open'] });
@@ -69,9 +79,7 @@ import '../styles/density.css';
 
 <style is:global>
   .settings .set-personal { grid-template-columns: auto 1fr; align-items: start; }
-  .settings .set-link { appearance: none; border: 0; background: none; padding: 7px 0; font: 500 13px/1.3 var(--font-sans); color: var(--accent-ink); text-align: left; cursor: pointer; border-radius: var(--radius); }
-  .settings .set-link:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 2px; }
-  .settings .set-link:disabled { color: var(--text-3); cursor: default; }
+  .settings .set-note { display: block; margin-top: 6px; font-size: 12px; }
   .settings .set-switch { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13.5px; }
   .settings .set-switch small { display: block; font-size: 12px; }
   .settings .set-switch input { position: absolute; opacity: 0; pointer-events: none; }

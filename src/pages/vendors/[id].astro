@@ -54,6 +54,9 @@ const cards = covered.map((s) => {
   const n = open.filter((j) => j.site === s).length;
   return { key: s, site: s, floor: (withJob ?? fl[0]).id, title: sites[s].name.replace(/ office$/, ''), to: `/vendors/access/?vendor=${id}&site=${s}`, figure: n ? plural(n, 'job') : 'No jobs' };
 });
+// Only the offices with a job are drawn: ten plans that all say "No jobs" carry no information (REVIEW-SITE #12).
+const busy = cards.filter((c) => open.some((j) => j.site === c.site));
+const coverWords = `${plural(covered.length, 'office')} under the contract · ${busy.length ? `${busy.length} with open jobs, lit below` : 'no open jobs'}`;
 const answer = !open.length ? `No jobs with ${V.name} · contract ${L.state === 'fine' ? 'in force' : L.words.toLowerCase()}`
   : `${plural(open.length, 'job')} with them · ${past.length ? `${past.length} past the contract clock` : 'none past the contract clock'}`;
 const NUMBERS = [
@@ -72,10 +75,20 @@ const raw = JSON.stringify({ id: V.id, name: V.name, kind: V.kind, regions: V.re
 
   <div class="content vrec">
     <div class="g12 top">
-      <section class="card pad s-7 vrec-cov" aria-labelledby="cov-h" data-help="vendors.coverage">
-        <header class="vrec-h"><h2 id="cov-h">Where they work</h2><span class="faint">{plural(covered.length, 'office')} under the contract · a job lights its space</span></header>
-        {cards.length ? <SmallMultiples cards={cards} health={health} people={FIRST} min={180} label={`The offices ${V.name} covers`} /> : <p class="faint">Not tied to named offices.</p>}
+      <div class="s-7 vrec-left">
+      <section class="card pad vrec-cov" aria-labelledby="cov-h" data-help="vendors.coverage">
+        <header class="vrec-h"><h2 id="cov-h">Where they work</h2><span class="faint">{coverWords}</span></header>
+        {busy.length ? <SmallMultiples cards={busy} health={health} people={FIRST} min={180} label={`The offices ${V.name} has jobs in`} /> : !covered.length && <p class="faint">Not tied to named offices.</p>}
       </section>
+      <section class="vrec-perf" aria-labelledby="perf-h" data-help="vendors.performance">
+        <header class="vrec-h"><h2 id="perf-h">Performance against the contract</h2><span class="faint">last 12 months · measured from the job records, no manual reporting</span></header>
+        <div class="g12">
+          {P.map((m) => (
+            <FigureTile class="s-12" id={m.id} label={m.label} value={m.words} spark={m.series} span="12 months" fmt={PERF_FMT[m.unit]} state={m.state === 'off' ? 'fine' : m.state} word="To review" source={{ from: 'Job records', at: '08:00' }} help="vendors.perf-figure" />
+          ))}
+        </div>
+      </section>
+      </div>
       <SidePanel class="s-5" title="The contract" meta={C.ref} sticky help="vendors.contract">
         <div class="vrec-side">
           <div class="vrec-clock" data-help="vendors.contract-clock">
@@ -94,14 +107,6 @@ const raw = JSON.stringify({ id: V.id, name: V.name, kind: V.kind, regions: V.re
       </SidePanel>
     </div>
 
-    <section class="vrec-perf" aria-labelledby="perf-h" data-help="vendors.performance">
-      <header class="vrec-h"><h2 id="perf-h">Performance against the contract</h2><span class="faint">last 12 months · measured from the job records, no manual reporting</span></header>
-      <div class="g12">
-        {P.map((m) => (
-          <FigureTile class={P.length === 4 ? 's-3' : 's-4'} id={m.id} label={m.label} value={m.words} spark={m.series} span="12 months" fmt={PERF_FMT[m.unit]} state={m.state === 'off' ? 'fine' : m.state} word="To review" source={{ from: 'Job records', at: '08:00' }} help="vendors.perf-figure" />
-        ))}
-      </div>
-    </section>
 
     <Section title="Jobs with them" id="jobs" aside={`${open.length} open · ${jobs.length - open.length} closed recently`} help="vendors.jobs">
       {jobs.length ? (
@@ -152,6 +157,7 @@ const raw = JSON.stringify({ id: V.id, name: V.name, kind: V.kind, regions: V.re
   .vrec-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 12px; }
   .vrec-h h2 { margin: 0; font-size: var(--fs-h3); }
   .vrec-h .faint { font-size: var(--fs-code); }
+  .vrec-left { display: grid; gap: var(--gutter); align-content: start; }   /* coverage, then the twelve-month figures, beside the contract */
   .vrec-perf { display: grid; min-width: 0; }
   .vrec-side { display: grid; gap: 8px; }
   .vrec-clock { display: grid; gap: 6px; }
