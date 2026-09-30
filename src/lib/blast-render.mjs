@@ -17,6 +17,12 @@ export function clock(now, min) {
   return t >= 1440 ? `${hm} tomorrow` : hm;
 }
 
+/** "19:00 to 21:00", "02:00 to 04:00 tomorrow": a span, saying tomorrow once. */
+export function span(now, a, b) {
+  const x = clock(now, a), y = clock(now, b);
+  return x.endsWith(' tomorrow') && y.endsWith(' tomorrow') ? `${x.replace(' tomorrow', '')} to ${y}` : `${x} to ${y}`;
+}
+
 /** The window the meetings are counted in: { from, to } in minutes after `now`. A device is off from the handle to
     the end of the 24 hours; a change is off for its own window, starting at the handle. */
 export const windowOf = (win, from) => ({ from, to: win.len ? Math.min(win.hours * 60, from + win.len) : win.hours * 60 });
@@ -42,7 +48,7 @@ export function stateOf(ex, ports, w) {
 
 /** The words for the window: "in the next 24 hours", "from 15:00 on", "during its window, 19:00 to 21:00". */
 export function whenWords(win, w, now) {
-  if (win.len) return `${w.from === win.start ? 'during its window' : 'while it is off'}, ${clock(now, w.from)} to ${clock(now, w.to)}`;
+  if (win.len) return `${w.from === win.start ? 'during its window' : 'while it is off'}, ${span(now, w.from, w.to)}`;
   return w.from === 0 ? `in the next ${win.hours} hours` : `from ${clock(now, w.from)} on`;
 }
 

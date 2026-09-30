@@ -417,6 +417,19 @@ const SUPPORT_V5 = {
   'change.facts': e('The change', 'What kind of change it is, who owns it, how it was approved, its way back and what it touches.', 'Nothing to do.'),
   'change.incidents': e('Incidents', 'The incident this change raised, or the incidents that name it.', 'Open one to see who has it.', 'g:incident'),
   'change.trace': e('The run, step by step', 'The run\'s trace from the audit log: each step, what it called and what came back.', 'Filter it, or open the full trace in the log.', 'g:unable-to-complete'),
+  'change.approval': e('Approval', 'The approval this change needs, worked out from what it would take off: one space goes ahead, one floor needs the service owner, more than a floor, a whole office, firmware or no way back needs two people.', 'Read why, and who has approved it so far.'),
+  'change.timeline': e('Timeline', 'What happened to this change, newest last: proposed, approved, run and read back.', 'Nothing to do.'),
+  'change.raw': e('Raw', 'The change as the record holds it, and the audit log\'s entries for it.', 'Open an entry for its full trace.'),
+  'changes.approval': e('Approval', 'The approval each change needs, from what it would take off. Most need none.', 'Filter by it to see the changes that need two people.'),
+  // The blast-radius explorer (BlastRadius.astro, V9).
+  'blast.section': e('If this were off', 'Which spaces, meetings, people and services would be hit if this were off, worked out from the recorded patching. Bookings are simulated.', 'Press Take it off to see it on the plan; drag the time handle to re-list the meetings.'),
+  'blast.target': e('What to take off', 'The switches, gateways and internet circuits in this comms room. Each has its own picture.', 'Pick one.'),
+  'blast.toggle': e('Take it off', 'Shows what would be cut off on the plan: a wash and a broken ring in the To review colour. It is a projection, not a fault; nothing is touched.', 'Press it again to put the plan back.'),
+  'blast.time': e('Off from', 'When it would go off. The meetings it would hit are counted from here to the end of the next 24 hours, or for a change, over its window.', 'Drag it, or use the arrow keys.'),
+  'blast.plan': e('The floors', 'Every floor of the office, drawn at one scale so sizes compare. Spaces it would cut off take the projection wash.', 'Nothing to do.'),
+  'blast.ports': e('Its ports', 'The switch face: each port is a toggle. Pressed ports are off. Up marks an uplink, dashed ports have nothing patched.', 'Press Clear, then press one port to see what that port alone serves.'),
+  'blast.meetings': e('Meetings it would hit', 'Booked meetings in the spaces it would cut off, with how many people are in each. Never names.', 'Move the time handle to see another part of the day.'),
+  'blast.spaces': e('Spaces it would cut off', 'Every space that would lose its way to the internet, with its units and bookings.', 'Open one to see it.'),
   'queue.auto': e('Done automatically today', 'What standing rules did today, each under a rule someone owns, read back and recorded.', 'Select How was this done? for what it read and did.', 'g:done-automatically'),
 };
 
@@ -493,13 +506,14 @@ const UNIT = {
   'unit.network': e('Network', 'The path from this unit to the internet: the floor switch, the core and the firewall.', 'Select a comms room to open it.', 'g:mdf'),
   // Classification, security support and privacy records (docs/rules/data.md F10 and F11).
   'classification.restricted': e('Restricted', 'Facts about Aigna\'s buildings that would help an attacker: floor plans, racks and switch ports, IP plans, the vulnerable-firmware list and default password status. Only people who need them see them, and exports are watermarked and logged.', 'Do not copy it into a ticket, a chat or a slide. Share the link instead.'),
+  'unit.blast': e('If this were off', 'What this switch or gateway would cut off: spaces, meetings in the next 24 hours and services, worked out from the recorded patching. Bookings are simulated.', 'Open it in the comms room to see it on the floor plans and narrow it port by port.'),
   'unit.security': e('Security support', 'How long the maker keeps fixing security holes in this model, its firmware line, where to report a flaw, and whether this unit\'s default password was changed.', 'When support ends within a year, plan the replacement. A unit still on the default password needs its vault password set.', 'g:firmware'),
   'unit.security-chip': e('Security support warning', 'The maker stops fixing security holes in this model within 12 months, or already has.', 'Select it for the dates, then plan the replacement.', 'g:firmware'),
   'unit.password-chip': e('Default password not changed', 'This unit still has the maker\'s default admin password, which anyone can look up.', 'Set the site\'s vault password on it, then record the change.'),
   'unit.demo-value': e('Demo value', 'The maker has not published this, so the value is made up for the demo. A real one would cite the maker\'s page.', 'Nothing to do. Do not rely on it.'),
   'unit.privacy': e('Privacy', 'The privacy record for this sensing device: what it captures, why, the legal footing, the room notice, how long anything is kept and the works-council agreement. Rooms are counted, never people.', 'Show all opens the rest of the record. Questions go to the data protection officer.'),
   'model.security': e('Security support', 'The maker\'s end date for security updates, its firmware line and where it takes reports of flaws. Dates the maker has not published are marked as demo values.', 'Plan a replacement before support ends.', 'g:firmware'),
-  'model.security-chip': e('Security support', 'Until when the maker fixes security holes in this model. A warning shows from 12 months before the end.', 'Select it for the dates and the maker\'s contact.', 'g:firmware'),
+  'model.security-chip': e('Security support', 'Until when the maker fixes security holes in this model. Warnings show at 12, 6 and 3 months before the end.', 'Select it for the dates and the maker\'s contact.', 'g:firmware'),
   'incident.priority-changed': e('Priority changed', 'The priority was proposed from impact and urgency, and a person changed it. This is the priority it replaced, and the reason they gave.', 'Nothing to do. The ticket details say who changed it and when.', 'g:incident'),
   'about.logs': e('What Keia logs about users', 'What Keia Atlas keeps about the people who use it, what it never keeps, and the privacy records for the cameras and microphones in the rooms.', 'Select it to read the page.'),
 };

@@ -1,0 +1,351 @@
+---
+/* BlastRadius: the "If this were off" section (UX-V2 §7; BUILD-PLAN V9 H1; MOTION-V2 4.29). On a switch, a gateway,
+   an internet circuit, a vendor or a change: which spaces, meetings, people and services would be hit, before
+   anyone acts.
+     1. The count first, in words: "Would affect 6 spaces, 2 meetings in the next 24 hours (14 people), 1 service".
+     2. Every floor of the office as small multiples at one scale. No colour until you press "Take it off": then the
+        spaces it would cut off take the projection wash and a broken ring in the To review colour (a projection,
+        not a fault: the key says so). Press again and they ease back.
+     3. On a switch, its ports as a switch face: each port is a toggle, so you can narrow the picture to one port.
+     4. A time handle along the next 24 hours re-lists the meetings; the plan does not move while you drag.
+     5. Meetings show a count of people, never names.
+   Everything is simulated and labelled: the bookings are made up per space, the cut-offs come from the recorded
+   patching (src/lib/blast.mjs). The page carries the data; the script only takes unions of it.
+   Props:  targets  explorers from src/lib/blast-view.mjs (one, or several to choose between: a comms room's
+                    switches, gateways and circuits)
+           open     start with the projection shown (a change's record: what it will take off)
+           window   { start, len } in minutes after the demo's now: a change's own window. Without it the handle
+                    runs from now to the end of the 24 hours
+           now      the demo's now (zoneless local time); hours the handle's reach (24)
+           id, title, lede, pick (the chooser's label), help */
+import HealthGlyph from './HealthGlyph.astro';
+import SimTag from './SimTag.astro';
+import Restricted from './Restricted.astro';
+import { base } from '../lib/data.mjs';
+import { stateOf, windowOf, lineOf, figuresHtml, meetingsHtml, spacesHtml, servicesHtml, clock } from '../lib/blast-render.mjs';
+
+interface Props { targets: any[]; open?: boolean; window?: { start: number; len: number } | null; now: string; hours?: number; id?: string; title?: string; lede?: string; pick?: string; initial?: string | null; help?: string; class?: string }
+const { targets: all, open = false, window: win0 = null, now, hours = 24, id = 'if-off', title = 'If this were off', lede, pick = 'Take off', initial = null, help = 'blast.section', class: cls } = Astro.props;
+const targets = all.filter(Boolean);
+const first = Math.max(0, targets.findIndex((t) => t.key === initial));
+const ex = targets[first];
+const win = { hours, start: win0?.start ?? 0, len: win0?.len ?? 0 };
+const w = windowOf(win, win.start);
+const st = ex ? stateOf(ex, null, w) : null;
+// The plans: every floor any target shows, once each, at one scale (the largest sets it; smaller sit centred).
+const plans = [...new Map(targets.flatMap((t) => t.plans).map((p) => [p.key, p])).values()];
+const W = Math.max(1, ...plans.map((p) => p.W)), H = Math.max(1, ...plans.map((p) => p.H));
+const pad = 1;
+const hit = new Set(st ? st.sp.map((i) => ex.spaces[i].id) : []);
+const apHit = new Set(st ? st.ap : []);
+const multi = new Set(plans.map((p) => p.site)).size > 1;
+const cols = plans.length <= 1 ? 1 : plans.length === 2 ? 2 : 3;
+const data = JSON.stringify({ targets: targets.map(({ plans: _p, ...t }) => t), win, now });
+const face = (t: any) => {
+  if (!t?.ports) return null;
+  const on = new Set(t.ports.map((p: any) => p.p)), up = new Set(t.uplinks ?? []);
+  return Array.from({ length: t.portCount }, (_, i) => i + 1).map((p) => ({ p, on: on.has(p), up: up.has(p), n: t.ports.find((x: any) => x.p === p) }));
+};
+const ports = face(ex);
+---
+{ex && (
+<section class:list={['card', 'br', cls]} id={id} data-br data-open={open ? '' : undefined} data-base={base} aria-labelledby={`${id}-h`}>
+  <script type="application/json" data-br-data set:html={data} />
+  <header class="br-head">
+    <div class="br-title">
+      <h2 id={`${id}-h`} data-help={help}>{title}</h2>
+      <SimTag kind="simulated" />
+    </div>
+    {lede && <p class="br-lede">{lede}</p>}
+  </header>
+
+  {targets.length > 1 && (
+    <div class="br-pick" role="group" aria-label={pick} data-help="blast.target">
+      <span class="br-pick-l">{pick}</span>
+      {targets.map((t, i) => (
+        <button type="button" class="br-chip" data-br-pick={i} aria-pressed={i === first ? 'true' : 'false'}>
+          <span>{t.title}</span><small>{t.spaces.length ? `${t.kindWord} · ${t.spaces.length} ${t.spaces.length === 1 ? 'space' : 'spaces'}` : `${t.kindWord} · cuts nothing`}</small>
+        </button>
+      ))}
+    </div>
+  )}
+
+  <div class="br-target">
+    <p class="br-who"><b data-br-title>{ex.title}</b> <span class="faint" data-br-sub>{ex.sub}</span></p>
+    <p class="br-line" data-br-line aria-live="polite">{lineOf(ex, st, win, w, now)}</p>
+  </div>
+
+  <div class="br-controls">
+    <button type="button" class="br-toggle" data-br-toggle aria-pressed={open ? 'true' : 'false'} data-help="blast.toggle">
+      <span class="br-sw" aria-hidden="true"><span></span></span>
+      <span data-br-toggle-w>{open ? 'Shown as off' : 'Take it off'}</span>
+    </button>
+    <label class="br-time" data-help="blast.time">
+      <span class="br-time-l">Off from</span>
+      <input type="range" min="0" max={hours * 60 - 30} step="30" value={win.start} data-br-from aria-valuetext={clock(now, win.start)} />
+      <output data-br-from-w class="mono">{clock(now, win.start)}</output>
+    </label>
+  </div>
+
+  <div class="br-body">
+    <div class="br-pics">
+      <ul class="br-plans" style={`--br-cols:${cols}`} aria-label={multi ? 'The offices, floor by floor, at one scale' : 'The office, floor by floor, at one scale'}>
+        {plans.map((p) => {
+          const ox = (W - p.W) / 2 + pad, oy = (H - p.H) / 2 + pad, VW = W + pad * 2, VH = H + pad * 2;
+          const Y = (y: number) => p.H - y;
+          return (
+            <li class="br-plan" data-help="blast.plan">
+              <div class="br-svg" style={`aspect-ratio:${VW.toFixed(2)} / ${VH.toFixed(2)}`}>
+                <svg viewBox={`0 0 ${VW.toFixed(2)} ${VH.toFixed(2)}`} aria-hidden="true" focusable="false">
+                  <g transform={`translate(${ox.toFixed(2)} ${oy.toFixed(2)})`}>
+                    <polygon class="br-out" points={p.outline.map(([x, y]: number[]) => `${x},${Y(y)}`).join(' ')} />
+                    {p.core.map((c: number[]) => <rect class="br-core" x={c[0]} y={Y(c[3])} width={c[2] - c[0]} height={c[3] - c[1]} />)}
+                    {p.rooms.map((r: any) => <rect class:list={['br-room', { 'br-bank': r.bank, 'br-comms': r.comms }]} data-br-r={r.id} data-p={hit.has(r.id) ? '' : undefined} x={r.x} y={Y(r.y + r.h)} width={r.w} height={r.h}><title>{r.label}</title></rect>)}
+                    {p.aps.map((a: any) => <circle class="br-ap" data-br-ap={a.id} data-p={apHit.has(a.id) ? '' : undefined} cx={a.x} cy={Y(a.y)} r="0.55" />)}
+                  </g>
+                </svg>
+                {p.rooms.map((r: any) => (
+                  <span class="br-g" data-br-g={r.id} data-p={hit.has(r.id) ? '' : undefined} style={`left:${(((ox + r.x + r.w / 2) / VW) * 100).toFixed(2)}%;top:${(((oy + Y(r.y + r.h / 2)) / VH) * 100).toFixed(2)}%`}>
+                    <HealthGlyph state="fault" size={12} label={`${r.label}: would be affected`} />
+                  </span>
+                ))}
+              </div>
+              <p class="br-pf"><b>{multi ? `${p.site.toUpperCase()} · ` : ''}{p.name}</b><span class="mono" data-br-pf={p.key}></span></p>
+            </li>
+          );
+        })}
+      </ul>
+      <div class="br-key">
+        <span class="br-k"><span class="br-sq br-sq-p"></span><HealthGlyph state="fault" size={12} /> Would be affected: a projection, not a fault</span>
+        <span class="br-k"><span class="br-sq"></span> Keeps working</span>
+        <Restricted view="floorPlan" />
+      </div>
+
+      <div class="br-ports" data-br-ports hidden={!ports} data-help="blast.ports">
+        <div class="br-ports-h">
+          <b>Its ports</b>
+          <span class="faint">Pressed ports are off; press one to keep it on and narrow the picture</span>
+          <span class="br-ports-b">
+            <button type="button" class="btn small ghost" data-br-all>All ports off</button>
+            <button type="button" class="btn small ghost" data-br-none>Clear</button>
+          </span>
+        </div>
+        <div class="br-face" data-br-face>
+          {(ports ?? []).map((q) => q.on
+            ? <button type="button" class="br-port" data-br-port={q.p} aria-pressed="true" title={`Port ${q.p}`}><span>{q.p}</span></button>
+            : <span class:list={['br-port', q.up ? 'br-up' : 'br-spare']} title={`Port ${q.p}: ${q.up ? 'uplink' : 'nothing patched'}`}><span>{q.up ? 'Up' : q.p}</span></span>)}
+        </div>
+        <p class="br-ports-f"><Restricted view="rack" /> <span class="faint">"Up" is an uplink: the way this switch reaches the internet.</span></p>
+      </div>
+    </div>
+
+    <aside class="br-side">
+      <div class="br-figs" data-br-figs set:html={figuresHtml(st)} />
+      <div class="br-svcs"><span class="br-sl">Services</span><span data-br-svcs set:html={servicesHtml(st, base)} /></div>
+      <div class="br-meet" data-help="blast.meetings">
+        <h3>Meetings it would hit</h3>
+        <ol class="br-ml" data-br-meet set:html={meetingsHtml(ex, st, now, base)} />
+        <p class="faint br-note">Bookings are simulated per space. Attendees are a count, never names.</p>
+      </div>
+    </aside>
+  </div>
+
+  <div class="br-spaces" data-help="blast.spaces">
+    <h3>{ex.listTitle ?? "Spaces it would cut off"} <span class="faint mono" data-br-n>{st.sp.length}</span></h3>
+    <ul class="br-sl-l" data-br-spaces set:html={spacesHtml(ex, st, base) || `<li class="br-none">None: ${ex.carried}.</li>`} />
+  </div>
+</section>
+)}
+
+<script>
+  import { stateOf, windowOf, lineOf, figuresHtml, meetingsHtml, spacesHtml, servicesHtml, clock } from '../lib/blast-render.mjs';
+  function init() {
+    document.querySelectorAll<HTMLElement>('[data-br]').forEach((root) => {
+      if ((root as any).__br) return; (root as any).__br = true;
+      const D = JSON.parse(root.querySelector('[data-br-data]')!.textContent!);
+      const base = root.dataset.base ?? '';
+      const $ = <T extends Element = HTMLElement>(s: string) => root.querySelector<T>(s)!;
+      const picks = [...root.querySelectorAll<HTMLButtonElement>('[data-br-pick]')];
+      let t = Math.max(0, picks.findIndex((b) => b.getAttribute('aria-pressed') === 'true'));
+      let ports: Set<number> | null = null;
+      let from = +$<HTMLInputElement>('[data-br-from]').value;
+      const all = { meetings: false, spaces: false };
+      const face = () => {
+        const ex = D.targets[t], box = $('[data-br-ports]');
+        box.hidden = !ex.ports;
+        if (!ex.ports) return;
+        const on = new Set(ex.ports.map((p: any) => p.p)), up = new Set(ex.uplinks ?? []);
+        $('[data-br-face]').innerHTML = Array.from({ length: ex.portCount }, (_, i) => i + 1).map((p) => on.has(p)
+          ? `<button type="button" class="br-port" data-br-port="${p}" aria-pressed="true" title="Port ${p}"><span>${p}</span></button>`
+          : `<span class="br-port ${up.has(p) ? 'br-up' : 'br-spare'}" title="Port ${p}: ${up.has(p) ? 'uplink' : 'nothing patched'}"><span>${up.has(p) ? 'Up' : p}</span></span>`).join('');
+      };
+      const render = () => {
+        const ex = D.targets[t];
+        const w = windowOf(D.win, from);
+        const st = stateOf(ex, ports, w);
+        $('[data-br-title]').textContent = ex.title;
+        $('[data-br-sub]').textContent = ex.sub;
+        $('[data-br-line]').textContent = lineOf(ex, st, D.win, w, D.now);
+        $('[data-br-figs]').innerHTML = figuresHtml(st);
+        $('[data-br-svcs]').innerHTML = servicesHtml(st, base);
+        $('[data-br-meet]').innerHTML = meetingsHtml(ex, st, D.now, base, all.meetings);
+        $('[data-br-spaces]').innerHTML = spacesHtml(ex, st, base, all.spaces) || `<li class="br-none">None: ${ex.carried}.</li>`;
+        $('[data-br-n]').textContent = String(st.sp.length);
+        const hit = new Set(st.sp.map((i: number) => ex.spaces[i].id)), ap = new Set(st.ap);
+        root.querySelectorAll<SVGElement>('[data-br-r]').forEach((r) => r.toggleAttribute('data-p', hit.has(r.dataset.brR!)));
+        root.querySelectorAll<HTMLElement>('[data-br-g]').forEach((g) => g.toggleAttribute('data-p', hit.has(g.dataset.brG!)));
+        root.querySelectorAll<SVGElement>('[data-br-ap]').forEach((a) => a.toggleAttribute('data-p', ap.has(a.dataset.brAp!)));
+        root.querySelectorAll<HTMLButtonElement>('[data-br-port]').forEach((b) => b.setAttribute('aria-pressed', !ports || ports.has(+b.dataset.brPort!) ? 'true' : 'false'));
+      };
+      const toggle = $<HTMLButtonElement>('[data-br-toggle]');
+      toggle.addEventListener('click', () => {
+        const on = toggle.getAttribute('aria-pressed') !== 'true';
+        toggle.setAttribute('aria-pressed', String(on));
+        root.toggleAttribute('data-open', on);
+        $('[data-br-toggle-w]').textContent = on ? 'Shown as off' : 'Take it off';
+      });
+      picks.forEach((b, i) => b.addEventListener('click', () => {
+        t = i; ports = null; all.meetings = all.spaces = false;
+        picks.forEach((x, j) => x.setAttribute('aria-pressed', String(j === i)));
+        face(); render();
+        try { const u = new URL(location.href); u.searchParams.set('off', D.targets[t].key); history.replaceState(history.state, '', u); } catch { /* the address stays as it was */ }
+      }));
+      const range = $<HTMLInputElement>('[data-br-from]');
+      range.addEventListener('input', () => {
+        from = +range.value;
+        const words = clock(D.now, from);
+        $('[data-br-from-w]').textContent = words; range.setAttribute('aria-valuetext', words);
+        render();
+      });
+      root.addEventListener('click', (e) => {
+        const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-br-port]');
+        if (b) {
+          const ex = D.targets[t], p = +b.dataset.brPort!;
+          if (!ports) ports = new Set(ex.ports.map((x: any) => x.p));
+          if (ports.has(p)) ports.delete(p); else ports.add(p);
+          if (ports.size === ex.ports.length) ports = null;
+          render(); return;
+        }
+        const m = (e.target as HTMLElement).closest<HTMLElement>('[data-br-more]');
+        if (m) { (all as any)[m.dataset.brMore!] = true; render(); return; }
+        if ((e.target as HTMLElement).closest('[data-br-all]')) { ports = null; render(); }
+        if ((e.target as HTMLElement).closest('[data-br-none]')) { ports = new Set(); render(); }
+      });
+      // ?off=<key> picks a target when the page opens (a unit's page links here for its switch).
+      const want = new URLSearchParams(location.search).get('off');
+      const k = want ? D.targets.findIndex((x: any) => x.key === want) : -1;
+      if (k >= 0) { if (k !== t) picks[k]?.click(); if (!root.hasAttribute('data-open')) toggle.click(); }
+    });
+  }
+  init();
+  document.addEventListener('astro:page-load', init);
+</script>
+
+<style is:global>
+  .br { padding: 20px 22px; display: grid; gap: 16px; container: br / inline-size; }
+  .br-head { display: grid; gap: 4px; }
+  .br-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .br-title h2 { margin: 0; font-size: var(--fs-h3); }
+  .br-lede { margin: 0; font-size: var(--fs-support); color: var(--text-2); max-width: 70ch; }
+  .br-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .br-pick-l { font-size: var(--fs-support); color: var(--text-2); margin-right: 4px; }
+  .br-chip { display: inline-grid; gap: 1px; text-align: left; min-height: 44px; padding: 6px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--text); font: 500 var(--fs-support)/1.25 var(--font-sans); cursor: pointer; transition: border-color var(--dur-hover) var(--ease-settle), background var(--dur-hover) var(--ease-settle); }
+  .br-chip small { font-size: 11.5px; color: var(--text-2); }
+  .br-chip:hover { border-color: var(--line-strong); }
+  .br-chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .br-chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink, var(--text)); }
+  .br-target { display: grid; gap: 4px; }
+  .br-who { margin: 0; font-size: var(--fs-support); }
+  .br-who b { font-weight: 550; font-size: var(--fs-body); }
+  .br-line { margin: 0; font-size: var(--fs-lede); line-height: 1.35; font-weight: 500; }
+  .br-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
+  .br-toggle { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 14px 6px 8px; border: 1px solid var(--line-strong); border-radius: var(--pill-radius); background: var(--surface); color: var(--text); font: 550 var(--fs-body)/1 var(--font-sans); cursor: pointer; transition: border-color var(--dur-hover) var(--ease-settle), background var(--dur-hover) var(--ease-settle); }
+  .br-toggle:hover { background: var(--surface-2); }
+  .br-toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .br-sw { position: relative; width: 36px; height: 20px; border-radius: 10px; background: var(--surface-3); border: 1px solid var(--line-strong); transition: background var(--dur-state) var(--ease-settle); }
+  .br-sw span { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--text-2); transition: transform var(--dur-state) var(--ease-settle), background var(--dur-state) var(--ease-settle); }
+  .br-toggle[aria-pressed="true"] { border-color: var(--h-review); }
+  .br-toggle[aria-pressed="true"] .br-sw { background: var(--h-review-soft); border-color: var(--h-review); }
+  .br-toggle[aria-pressed="true"] .br-sw span { transform: translateX(16px); background: var(--h-review); }
+  .br-time { display: inline-flex; align-items: center; gap: 10px; flex: 1 1 280px; min-width: 0; max-width: 520px; font-size: var(--fs-support); color: var(--text-2); }
+  .br-time input { flex: 1; min-width: 0; min-height: 44px; accent-color: var(--accent); }
+  .br-time output { min-width: 11ch; color: var(--text); font-variant-numeric: tabular-nums; }
+
+  .br-body { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
+  @container br (min-width: 880px) { .br-body { grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); } }
+  .br-pics { display: grid; gap: 12px; align-content: start; min-width: 0; }
+  .br-plans { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; grid-template-columns: repeat(var(--br-cols, 1), minmax(0, 1fr)); }
+  @container br (max-width: 620px) { .br-plans { grid-template-columns: repeat(min(var(--br-cols, 1), 2), minmax(0, 1fr)); } }
+  @container br (max-width: 420px) { .br-plans { grid-template-columns: minmax(0, 1fr); } }
+  .br-plan { display: grid; gap: 6px; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); }
+  .br-svg { position: relative; width: 100%; }
+  .br-svg svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; }
+  .br-out { fill: var(--surface-2); stroke: var(--line-strong); stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .br-core { fill: var(--surface-3); }
+  .br-room { fill: var(--surface); stroke: var(--line-strong); stroke-width: 1; vector-effect: non-scaling-stroke; transition: fill var(--dur-state) var(--ease-settle), stroke var(--dur-state) var(--ease-settle); }
+  .br-room.br-comms { fill: var(--surface-3); }
+  .br-room.br-bank { stroke-dasharray: 2 2; }
+  .br-ap { fill: var(--surface); stroke: var(--text-3); stroke-width: 1; vector-effect: non-scaling-stroke; transition: fill var(--dur-state) var(--ease-settle), stroke var(--dur-state) var(--ease-settle); }
+  .br-g { position: absolute; display: grid; place-items: center; width: 16px; height: 16px; margin: -8px 0 0 -8px; opacity: 0; transition: opacity var(--dur-state) var(--ease-settle); pointer-events: none; }
+  .br .br-g .hg { color: var(--h-review); }
+  /* The projection (MOTION-V2 4.29): opening eases every affected space to it at once, together; closing eases back. */
+  .br[data-open] .br-room[data-p] { fill: var(--projection); stroke: var(--h-review); }
+  .br[data-open] .br-ap[data-p] { fill: var(--h-review-soft); stroke: var(--h-review); }
+  .br[data-open] .br-g[data-p] { opacity: 1; }
+  .br-pf { margin: 0; display: flex; justify-content: space-between; gap: 8px; font-size: var(--fs-support); }
+  .br-pf b { font-weight: 550; }
+  .br-key { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; font-size: var(--fs-support); color: var(--text-2); }
+  .br-k { display: inline-flex; align-items: center; gap: 6px; }
+  .br-k .hg { color: var(--h-review); }
+  .br-sq { width: 16px; height: 12px; border: 1px solid var(--line-strong); background: var(--surface); border-radius: 2px; }
+  .br-sq-p { background: var(--projection); border-color: var(--h-review); }
+
+  .br-ports { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface-2); }
+  .br-ports[hidden] { display: none; }
+  .br-ports-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; font-size: var(--fs-support); }
+  .br-ports-h b { font-weight: 550; font-size: var(--fs-body); }
+  .br-ports-b { margin-left: auto; display: inline-flex; gap: 8px; }
+  .br-face { display: grid; gap: 4px; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); }
+  @container br (min-width: 760px) { .br-face { grid-template-rows: repeat(2, 36px); grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); grid-template-columns: none; } }
+  .br-port { display: grid; place-items: center; min-height: 40px; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--surface); color: var(--text-2); font: 500 11.5px/1 var(--font-mono); font-variant-numeric: tabular-nums; }
+  @container br (min-width: 760px) { .br-port { min-height: 0; } }
+  button.br-port { cursor: pointer; transition: background var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle); }
+  button.br-port:hover { border-color: var(--text-2); }
+  button.br-port:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+  button.br-port[aria-pressed="true"] { background: var(--h-review-soft); border-color: var(--h-review); color: var(--h-review-ink); }
+  .br-spare { border-style: dashed; color: var(--text-3); background: transparent; }
+  .br-up { background: var(--surface-3); color: var(--text); }
+  .br-ports-f { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-size: var(--fs-support); }
+
+  .br-side { display: grid; gap: 16px; align-content: start; min-width: 0; }
+  .br-figs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  @container br (min-width: 520px) and (max-width: 879px) { .br-figs { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .br-fig { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+  .br-fig b { font: 600 var(--fs-figure)/1.1 var(--font-sans); font-variant-numeric: tabular-nums; }
+  .br-fig span { font-size: var(--fs-support); color: var(--text-2); }
+  .br-svcs { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: var(--fs-support); }
+  .br-sl { color: var(--text-2); }
+  .br-svc { padding: 3px 10px; border: 1px solid var(--line); border-radius: var(--pill-radius); color: var(--text); text-decoration: none; }
+  .br-svc:hover { border-color: var(--line-strong); text-decoration: underline; }
+  .br-meet h3, .br-spaces h3 { margin: 0 0 8px; font-size: var(--fs-body); font-weight: 550; display: flex; gap: 8px; align-items: baseline; }
+  .br-ml { list-style: none; margin: 0; padding: 0; display: grid; }
+  .br-ml li { display: grid; grid-template-columns: 7.5ch minmax(0, 1fr); gap: 2px 10px; padding: 7px 0; border-top: 1px solid var(--line); font-size: var(--fs-support); }
+  .br-ml li:first-child { border-top: 0; }
+  .br-ml .br-p { grid-column: 2; color: var(--text-2); }
+  .br-t { color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .br-none { color: var(--text-2); font-size: var(--fs-support); list-style: none; }
+  .br-ml li.br-none, .br-ml li.br-more { display: block; }
+  .br-more { list-style: none; padding-top: 10px !important; border-top: 0 !important; }
+  .br-sl-l li.br-more { display: block; grid-column: 1 / -1; }
+  .br-note { margin: 8px 0 0; font-size: 12.5px; }
+  .br-sl-l { list-style: none; margin: 0; padding: 0; display: grid; gap: 0 20px; grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); }
+  .br-sl-l li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 8px; align-items: start; padding: 7px 0; border-top: 1px solid var(--line); }
+  .br-sl-l li.br-none { display: block; border: 0; }
+  .br-lg { padding-top: 2px; } .br-lg .hg { color: var(--h-review); }
+  .br-sn { display: grid; min-width: 0; font-size: var(--fs-support); }
+  .br-sn a, .br-sn b { font-weight: 550; color: var(--text); overflow-wrap: anywhere; }
+  .br-sn small { color: var(--text-2); font-size: 12.5px; }
+  @media (prefers-reduced-motion: reduce) {
+    .br-room, .br-ap, .br-g, .br-sw, .br-sw span, .br-chip, .br-toggle, button.br-port { transition: none; }
+  }
+</style>
