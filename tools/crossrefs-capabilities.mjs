@@ -90,5 +90,19 @@ export function crossCheckCapabilities(records) {
     if (d.priority === 1 && d.quiet_hours) report(rec, ['quiet_hours'], 'a priority 1 alert never waits for quiet hours to end');
   }
 
+  // Credentials: what uses it exists (models, offices, units, a management platform); it expires after it was issued.
+  const platforms = new Set(inFolder('house-values').flatMap((r) => (r.data.platforms ?? []).map((p) => p.id)));
+  for (const rec of inFolder('credentials')) {
+    const d = rec.data, u = d.used_by;
+    fileId(rec);
+    (u.models ?? []).forEach((m, i) => model(rec, ['used_by', 'models', i], m));
+    (u.sites ?? []).forEach((s, i) => site(rec, ['used_by', 'sites', i], s));
+    (u.units ?? []).forEach((t, i) => unit(rec, ['used_by', 'units', i], t));
+    if (u.platform && !platforms.has(u.platform)) report(rec, ['used_by', 'platform'], `management platform "${u.platform}" is not in data/house-values/`);
+    if (d.expires <= d.issued) report(rec, ['expires'], 'it expires before it was issued');
+    if (d.rotated && d.rotated < d.issued) report(rec, ['rotated'], 'it was rotated before it was issued');
+    role(rec, ['owner_role'], d.owner_role);
+  }
+
   return problems;
 }

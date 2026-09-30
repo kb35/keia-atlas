@@ -12,6 +12,7 @@ import { validate } from '../tools/validate.mjs';
 import { seatHolders, licenceRows, licenceSummary, licenceAnswer, inDays } from '../src/lib/licences.mjs';
 import { outNow, lostBookings, noticeLines, whenWords, alternativesFor } from '../src/lib/outofservice.mjs';
 import { sentence, quietWords, simulatedAlerts, alertCounts, ruleAnswer } from '../src/lib/alerts.mjs';
+import { warnLevel, credentialRows, credentialSummary, credentialAnswer } from '../src/lib/credentials.mjs';
 import { nthWeekday, planDates, rounds, checksForSpace, checksSummary, checksAnswer, checkItem, addMonths } from '../src/lib/checks.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -35,7 +36,7 @@ for (const f of readdirSync(join(ROOT, 'data/installs'))) for (const n of readdi
   for (const u of inst.older_kit ?? []) add(u, u.model);
 }
 
-const FOLDERS = ['licences', 'checks', 'out-of-service', 'alert-rules'];
+const FOLDERS = ['licences', 'checks', 'out-of-service', 'alert-rules', 'credentials'];
 let result;
 test('each capability\'s data validates: schema, secrets and cross-references', async () => {
   result = await validate(ROOT);
@@ -148,6 +149,24 @@ test('alert rules: the simulated alerts keep to office hours, silence for planne
   const ups = simulatedAlerts(rules['AR-05'], { ...ctx, targets: [{ id: 'dub-3-21', label: 'MDF', site: 'dub', space: 'dub-3-21' }] });
   assert.ok(ups.every((e) => e.status !== 'held'), 'priority 1 never waits');
   assert.match(ruleAnswer(alertCounts(a)), /^Sent (once|\d+ times) in 30 days · \d+ silenced by planned work/);
+});
+
+// ---- Certificates and secrets ---------------------------------------------------------------------------------------
+test('credentials: references only, warned at 60, 30 and 7 days, soonest first', () => {
+  const list = read('credentials');
+  for (const c of list) {
+    assert.match(c.vault, /^vault:\S/, `${c.id}: a vault name`);
+    assert.ok(!Object.keys(c).some((k) => /pass|secret|token|key$/i.test(k)), `${c.id}: no field that could hold a secret`);
+  }
+  assert.equal(warnLevel(-1), 'expired'); assert.equal(warnLevel(6), 7); assert.equal(warnLevel(25), 30); assert.equal(warnLevel(53), 60); assert.equal(warnLevel(61), null);
+  const rows = credentialRows(list, units, TODAY);
+  assert.deepEqual(rows.map((r) => r.days), [...rows.map((r) => r.days)].sort((a, b) => a - b));
+  const s = credentialSummary(rows);
+  assert.equal(s.expired, 1, 'the Juneau printer certificate has expired');
+  assert.match(credentialAnswer(s), /^1 credential expired · \d+ expires? within 30 days$/);
+  assert.ok(rows.find((r) => r.id === 'cert-printer-jnu').units.includes('AG-000482'));
+  assert.ok(rows.find((r) => r.id === 'cert-8021x-poly-emea').units.length > 10, 'used by every Poly system in its offices');
+  assert.equal(credentialAnswer({ expired: 0, in30: 0, in60: 0 }), 'Nothing expires in the next 60 days');
 });
 
 test('out of service: the space offered instead is the same kind in the same office, same floor first, never one that is out', () => {

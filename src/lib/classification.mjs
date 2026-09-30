@@ -36,6 +36,7 @@ export const RESTRICTED_VIEWS = {
   ipPlan: 'IP plan',
   exposure: 'vulnerable-firmware list',
   passwords: 'default password status',
+  credentials: 'credential references',
 };
 
 // Every `x-classification` in a schema, as [{ at: 'properties.units.items...', label }], following $defs.

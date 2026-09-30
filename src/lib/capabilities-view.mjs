@@ -7,6 +7,7 @@ import path from 'node:path';
 import { parse } from 'yaml';
 import { spaces, sites, models, classes, DEMO_TODAY, href, KIND } from './data.mjs';
 import { sentence, subjectOf, routeWords, simulatedAlerts, alertCounts } from './alerts.mjs';
+import { credentialRows, credentialSummary, expiryWords, LEVEL_WORD } from './credentials.mjs';
 import { alternativesFor } from './outofservice.mjs';
 import { PEOPLE } from './demo.mjs';
 import { licenceRows, licenceSummary, inDays } from './licences.mjs';
@@ -109,6 +110,11 @@ export const alertViews = alertRules.map((rule) => {
     people: officeIds.map((s) => ({ site: s, person: alertPerson(rule, s), n: targets.filter((t) => t.site === s).length })) };
 });
 
+// ---- Certificates and secrets ----------------------------------------------------------------------------------------
+export const credentials = credentialRows(readRecords('credentials'), fleetUnits, DEMO_TODAY);
+export const credentialTotals = credentialSummary(credentials);
+export const platformName = (id) => readRecords('house-values')[0]?.platforms?.find((p) => p.id === id)?.name ?? id;
+
 // ---- The unit page's cards (/device/caps.json, UnitCapabilities.astro) --------------------------------------------
 // Each card already worded: { feature, help, title, answer, tone?, items: [{ b, text?, w?, tone?, small?, to? }], more? }.
 // Cards come in the order UnitCapabilities.astro lists them (licences, credentials, cves, config-backups).
@@ -123,6 +129,17 @@ UNIT_CARDS.push((u) => {
     answer: soon.length ? `${soon[0].platformLabel} renews ${inDays(soon[0].days)}` : lic.some((r) => r.short) ? 'Its pool is short of seats' : `Holds a seat in ${lic.length === 1 ? 'one licence' : `${lic.length} licences`}`,
     tone: soon.length || lic.some((r) => r.short) ? 'warn' : undefined,
     items: lic.map((r) => ({ b: r.name, text: `Renews ${fmt(r.renews)}`, w: `(${inDays(r.days)})`, tone: r.soon ? 'warn' : r.lapsed ? 'bad' : undefined, small: r.short ? `${r.short} seat${r.short === 1 ? '' : 's'} short across the pool` : `${r.used} of ${r.seats} seats in use`, to: `assets/licences/#${r.id}` })),
+  };
+});
+UNIT_CARDS.push((u) => {
+  const cr = credentials.filter((r) => r.units.includes(u.tag));
+  if (!cr.length) return null;
+  const first = cr[0];
+  return {
+    feature: 'credentials', help: 'unit.credentials', title: 'Certificates and secrets',
+    answer: first.level ? `${first.kindLabel} ${expiryWords(first, fmt)}` : `${cr.length === 1 ? 'One credential' : `${cr.length} credentials`}, none expiring within 60 days`,
+    tone: first.tone ?? undefined,
+    items: cr.map((r) => ({ b: r.name, text: `${r.kindLabel} · ${r.days < 0 ? 'expired' : 'expires'} ${fmt(r.expires)}`, w: r.level ? `(${LEVEL_WORD[r.level].toLowerCase()})` : '', tone: r.tone ?? undefined, small: `In the vault as ${r.vault.slice(6)}`, to: `assets/certificates/#${r.id}` })),
   };
 });
 export function unitCaps() {

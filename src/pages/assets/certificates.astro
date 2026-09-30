@@ -1,0 +1,68 @@
+---
+// Certificates and secrets (the Certificates and secrets capability, src/lib/modules.mjs; src/lib/credentials.mjs):
+// every certificate, device service account, SNMP user and API credential, by reference only, soonest expiry first.
+// The answer first (what has expired, what expires within 30 days), then the list: what it is for, what uses it,
+// where it lives in the vault, who owns it, and its dates with the warning at 60, 30 and 7 days. The secret itself is
+// never in Atlas: a row names its vault entry. Off by default; demo data (data/credentials/).
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import HealthGlyph from '../../components/HealthGlyph.astro';
+import FeatureGate from '../../components/FeatureGate.astro';
+import FeatureSource from '../../components/FeatureSource.astro';
+import Restricted from '../../components/Restricted.astro';
+import { fmtDate, plural, modelName, sites } from '../../lib/data.mjs';
+import { ROLES } from '../../lib/demo.mjs';
+import { credentials, credentialTotals as T, platformName, unitByTag, spaceTitle } from '../../lib/capabilities-view.mjs';
+import { credentialAnswer, expiryWords, KIND_LABEL, LEVEL_WORD } from '../../lib/credentials.mjs';
+import '../../styles/capabilities.css';
+
+const STATE = { expired: 'fault', 7: 'fault', 30: 'review', 60: 'review' };
+const usedBy = (r) => (r.platform ? `${platformName(r.platform)}, for every system it manages` : r.models.length ? `${r.models.map(modelName).join(', ')}${r.sites ? ` in ${r.sites.map((s) => sites[s]?.name.replace(/ office$/, '')).join(', ')}` : ''}` : r.units.map((t) => unitByTag.get(t)).filter(Boolean).map((u) => `${u.host ?? u.tag}, ${spaceTitle(u.space)}, ${sites[u.site]?.name}`).join('; '));
+const FACETS = [
+  { key: 'kind', label: 'Kind', options: Object.entries(KIND_LABEL).filter(([k]) => credentials.some((r) => r.kind === k)).map(([value, label]) => ({ value, label })) },
+  { key: 'status', label: 'Expires', options: [{ value: 'expired', label: 'Expired' }, { value: '30', label: 'Within 30 days' }, { value: '60', label: 'Within 60 days' }, { value: 'later', label: 'Later' }] },
+  { key: 'owner', label: 'Owner', options: [...new Set(credentials.map((r) => r.owner))].map((o) => ({ value: o, label: ROLES[o]?.name ?? o })) },
+];
+const status = (r) => [r.level === 'expired' ? 'expired' : null, r.level === 7 || r.level === 30 ? '30' : null, r.level != null && r.level !== 'expired' ? '60' : null, r.level == null ? 'later' : null].filter(Boolean).join('|');
+const NUMBERS = [
+  { n: T.expired, label: 'Expired', to: '?status=expired', tone: T.expired ? 'bad' : undefined },
+  { n: T.in30, label: 'Within 30 days', to: '?status=30', tone: T.in30 ? 'warn' : undefined },
+  { n: T.total, label: 'Credentials', fact: true },
+  { n: T.units, label: 'Units using them', fact: true },
+];
+---
+<Shell title="Certificates and secrets" section="certificates" crumbs={[{ label: 'Assets', to: '/assets/' }, { label: 'Certificates and secrets' }]}>
+  <FeatureGate id="credentials">
+    <PageBand overline="Certificates and secrets" title="Certificates and secrets" answer={credentialAnswer(T)} lede="Certificates, service accounts and API credentials by reference: what uses each, who owns it and when it expires." sim heartbeat={false} numbers={NUMBERS}>
+      <FeatureSource slot="overline" id="credentials" />
+    </PageBand>
+    <div class="content crd">
+      <FilterBar facets={FACETS} placeholder="Find a credential, model or vault name" label="Find a credential" noun={['credential', 'credentials']} scope=".content.crd" />
+      <p class="crd-cls"><Restricted view="credentials" /></p>
+      <div class="card cap-t">
+        <table class="to-cards cap-tbl">
+          <thead><tr><th>Credential</th><th>Used by</th><th>Expires</th><th>Owner</th></tr></thead>
+          <tbody>
+            {credentials.map((r) => (
+              <tr id={r.id} class:list={[{ 'is-alert': r.tone === 'bad', 'is-warn': r.tone === 'warn' }]} data-fi data-help="credential.row"
+                data-find={`${r.name} ${r.kindLabel} ${r.vault} ${r.purpose} ${r.models.map(modelName).join(' ')}`} data-f-kind={r.kind} data-f-status={status(r)} data-f-owner={r.owner}>
+                <td data-label="">{r.level && <span class="cap-g"><HealthGlyph state={STATE[r.level]} size={16} word={LEVEL_WORD[r.level]} /></span>}<b>{r.name}</b><small>{r.kindLabel}{r.issuer ? ` · issued by ${r.issuer}` : ''}</small><small class="mono">{r.vault}</small></td>
+                <td data-label="Used by">{usedBy(r)}<small>{r.purpose}</small>{r.units.length > 0 && <small>{plural(r.units.length, 'unit')} in {plural(r.spaces.length, 'space')}</small>}</td>
+                <td data-label="Expires" class="num">{fmtDate(r.expires)}{r.level && <small class:list={['cap-w', r.tone && `t-${r.tone}`]}>{expiryWords(r, fmtDate)}</small>}{r.rotated && <small>Last changed {fmtDate(r.rotated)}</small>}</td>
+                <td data-label="Owner">{ROLES[r.owner]?.name ?? r.owner}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <EmptyState text="No credentials match these filters." />
+      <p class="cap-note">References only: each row names where the secret lives in the vault, never the secret, and the data check refuses a file that holds one. Warnings start 60 days before expiry, then at 30 and 7. Made up for the demo. The same credentials show on each unit that uses them.</p>
+    </div>
+  </FeatureGate>
+</Shell>
+
+<style>
+  .crd-cls { margin: 0; }
+</style>
