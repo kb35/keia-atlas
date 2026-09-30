@@ -57,6 +57,34 @@ function matchVerbs(rows, q) {
   return rows.map((r) => [score(r), r]).filter(([s]) => s >= 0).sort((a, b) => a[0] - b[0] || a[1].i - b[1].i).map(([, r]) => r);
 }
 
+// View as, by name: ">liam", ">view as liam", ">technician dublin". The rows press the View as picker's own
+// buttons (src/components/ViewAs.astro), so this is the picker's verb, not a new one. people is
+// [{ id, name, role, short, where }]. Nothing typed after ">" lists none (the page's verbs come first); "view as"
+// on its own lists everyone. Each word typed must start a word of the person's name, role or place; a first name
+// ranks first, then a surname, then the role, then the place.
+function matchPeople(people, q) {
+  const raw = String(q || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+  if (!raw) return [];
+  const lead = /^(view as|view|see as|switch to|as)\b\s*/;
+  const asked = lead.test(raw), t = raw.replace(lead, '').trim();
+  if (!t) return asked ? people.slice() : [];
+  const toks = t.split(/\s+/).filter(Boolean);
+  const words = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^a-z0-9]+/).filter(Boolean);
+  const rows = [];
+  people.forEach((p, i) => {
+    const name = words(p.name), role = words(`${p.role} ${p.short || ''}`), where = words(p.where);
+    let score = 0;
+    for (const k of toks) {
+      const s = name[0] && name[0].startsWith(k) ? 0 : name.slice(1).some((w) => w.startsWith(k)) ? 1
+        : role.some((w) => w.startsWith(k)) ? 2 : where.some((w) => w.startsWith(k)) ? 3 : -1;
+      if (s < 0) return;
+      score += s;
+    }
+    rows.push([score, i, p]);
+  });
+  return rows.sort((a, b) => a[0] - b[0] || a[1] - b[1]).map((r) => r[2]);
+}
+
 // The mode a palette query is in: '>' Do (the page's verbs), '?' Ask (plain words and the glossary), else Find.
 function paletteMode(q) {
   const s = String(q || '').replace(/^\s+/, '');
@@ -65,4 +93,4 @@ function paletteMode(q) {
   return { mode: 'find', q: s };
 }
 
-export { VERBS, verbRows, matchVerbs, paletteMode };
+export { VERBS, verbRows, matchVerbs, matchPeople, paletteMode };
