@@ -1,5 +1,6 @@
-# Runs on every push and pull request: checks all data against its schemas,
-# then runs the validator's own tests. A red X on GitHub means one of them failed.
+# Runs on every push and pull request: checks all data against its schemas, builds
+# the site, then runs the tests. The build comes first so the tests that read the
+# built pages (dist/) run too. A red X on GitHub means one of them failed.
 name: CI
 
 on:
@@ -31,8 +32,8 @@ jobs:
       - name: Validate data
         run: npm run validate
 
-      - name: Test the validator
-        run: npm test
+      - name: Build the site (fails if any page breaks)
+        run: npm run build
 
-      - name: Build the console site (fails if any page breaks)
-        run: npx astro build
+      - name: Run the tests, including those that read the built pages
+        run: npm test

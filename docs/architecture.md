@@ -498,7 +498,9 @@ In database mode the label drives everything automatically (designed): who can r
 
 **Built today:** dependencies installed from the lockfile with `npm ci`; Dependabot with a five-day cooldown on new releases; every GitHub Action pinned to a full commit hash; container base images pinned by digest; the container runs as a non-root user; secret scanning with gitleaks in CI; the OpenSSF Scorecard; private vulnerability reporting ([SECURITY.md](../SECURITY.md)); the Keia framework pinned as a submodule and never edited.
 
-**Next:** releases and container images signed with Sigstore; an SBOM (CycloneDX) attached to every release and image; SLSA build provenance, so anyone can check that an image was built from a given commit by a given workflow; signed module and connector packages; release signing only in CI, never on a laptop.
+**Written, waiting for the first tagged release:** a release workflow (`.github/workflows/release.yml`) that signs each container image with Sigstore from CI, keyless, and attaches an SBOM (CycloneDX) to the image and the release; a DCO sign-off check on pull requests.
+
+**Next:** SLSA build provenance, so anyone can check that an image was built from a given commit by a given workflow; signed module and connector packages.
 
 ### 6.7 The front door
 
@@ -611,7 +613,7 @@ Proposed targets for an enterprise deployment:
 | **AI** | None acts; Ask, where present, answers from demo data and says it is AI | Model policy per task kind, local or hosted or off; quarantine for untrusted text; evaluation sets |
 | **Audit log** | Its shape on `/support/log/`, with demo entries | Append-only, hash-chained, copied to your security log system |
 | **Connectors** | Kit v0: adapter interface, manifest schema, field ownership, secret redaction, CSV and NetBox file importers, read only (`tools/connectors/`) | Live adapters (webhooks, polling, reconcile), approved writes, isolated workers, rate budgets, Partner tier, SDK additions |
-| **Security** | Vault references enforced; classification labels; SHA-pinned actions; digest-pinned images; Dependabot with cooldown; gitleaks; Scorecard; non-root container | Label-driven access and redaction; job-scoped vendor access; signed releases, SBOM, SLSA provenance |
+| **Security** | Vault references enforced; classification labels; SHA-pinned actions; digest-pinned images; Dependabot with cooldown; gitleaks; Scorecard; non-root container | Label-driven access and redaction; job-scoped vendor access; signed releases and an SBOM (the workflow is written; the first release is to come); SLSA provenance |
 | **Search** | In the browser, over the built site | Server index filtered by permission at query time |
 | **Running it** | Static site; Dockerfile and `compose.yaml` serving it; GitHub Pages for the fictional demo | Compose file for a small team; Helm chart; OpenShift; HA Postgres; backups and restore drills; zero-downtime migrations |
 | **Observability** | None needed for a static site | OpenTelemetry throughout; run id as trace id |
