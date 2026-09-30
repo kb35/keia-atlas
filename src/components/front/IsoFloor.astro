@@ -1,0 +1,85 @@
+---
+// A floor as an architect's model, for the front door: the scene from src/lib/isofloor.mjs drawn as one SVG, every
+// space a block with a health ring over it, and (when asked) a dot per device on its top face. The same palette as
+// the hero (HeroZoom.astro), light and dark, so the floor reads as the same building wherever it appears.
+//
+// State lives on attributes so scripts and CSS agree: a space's group and its ring both carry data-state (fine,
+// review, fault, progress, planned); src/lib/isofloor-client.mjs changes them, and the CSS eases the ring's shape
+// and the room's tint over --dur-state. Device dots start hidden when `kitHidden` is set and come on with .is-on,
+// each --i steps after the one before (the kit filling in). Reduced motion: every change at once.
+import { ringParts } from '../../lib/ring.mjs';
+interface Props { scene: any; states?: Record<string, string>; state?: string; kitHidden?: boolean; numbers?: boolean; numbersLow?: boolean; class?: string; label?: string }
+const { scene: S, states = {}, state = 'fine', kitHidden = false, numbers = false, numbersLow = false, class: cls, label = 'A floor of the demo office' } = Astro.props;
+// With kit on the top face, a room's number moves down to its near edge so it clears the dots.
+const numY = (r: any) => r.top[1] + (numbersLow ? Math.max(rf + 11, 0.62 * S.k) : rf + 11);
+const STATES = ['fine', 'review', 'fault', 'progress', 'planned'];
+const rf = Math.max(4.6, 0.46 * S.k), rDev = Math.max(2.2, 0.2 * S.k);
+const uid = `ifl${Math.random().toString(36).slice(2, 7)}`;
+const stateOf = (id: string) => states[id] ?? state;
+// Devices within a batch are numbered in the order they appear, so a batch coming on staggers across the floor.
+const idx: Record<string, number> = {};
+const devI = (cls: string) => (idx[cls] = (idx[cls] ?? -1) + 1);
+---
+<svg class:list={['ifl', cls]} viewBox={`0 0 ${S.width} ${S.height}`} role="img" aria-label={label}>
+  <defs><filter id={`${uid}-sh`} x="-20%" y="-40%" width="140%" height="200%"><feGaussianBlur stdDeviation="12" /></filter></defs>
+  <polygon class="ifl-ground" points={S.ground} filter={`url(#${uid}-sh)`} />
+  {S.prims.map((p) => p.room
+    ? null
+    : <polygon class:list={['ifl-p', `ifl-${p.kind}`]} points={p.pts} />)}
+  {S.rooms.map((r) => {
+    const faces = S.prims.filter((p) => p.room?.id === r.id);
+    if (!faces.length) return null;
+    return <g class="ifl-room" data-ifl-room={r.id} data-state={stateOf(r.id)}>{faces.map((p) => <polygon class:list={['ifl-p', `ifl-${p.kind}`, `ifl-k-${p.k}`]} points={p.pts} />)}</g>;
+  })}
+  {S.devs.map((d) => <circle class:list={['ifl-dev', { 'is-on': !kitHidden }]} data-ifl-dev={d.cls} data-room={d.room} style={`--i:${devI(d.cls)}`} cx={d.at[0]} cy={d.at[1]} r={rDev} />)}
+  {S.rings.map((r) => (<>
+    {numbers && r.wide && r.room.number && <text class="ifl-no" x={r.top[0]} y={numY(r)}>{r.room.number}</text>}
+    <g class="ifl-ring" data-ifl-ring={r.id} data-state={stateOf(r.id)}>
+      {STATES.map((s) => <g class="ifl-s" data-s={s}>{ringParts(s, r.at[0], r.at[1], s === 'fault' ? rf * 1.3 : rf, s === 'fault' ? 2 : 1.6).map(({ tag, attrs }) => tag === 'circle' ? <circle {...attrs} stroke={attrs.stroke ?? 'currentColor'} /> : <path {...attrs} stroke="currentColor" />)}</g>)}
+    </g>
+  </>))}
+</svg>
+
+<style is:global>
+  .ifl {
+    --ifl-slab-top: #E4DCCF; --ifl-slab-east: #C8BEAE; --ifl-slab-north: #D6CCBC; --ifl-corr: #DBD2C3; --ifl-core: #CFC5B5;
+    --ifl-top: #FBF9F5; --ifl-east: #D3CABB; --ifl-north: #E5DED2; --ifl-edge: rgba(28, 26, 23, .16); --ifl-ground: rgba(40, 30, 15, .30);
+    --ifl-k-meeting: #EEF1F6; --ifl-k-small: #F2EEF6; --ifl-k-shared: #F8EFDF; --ifl-desk: #F6F2EA; --ifl-dev: #2A2B31;
+    display: block; width: 100%; height: auto; overflow: visible; font-family: var(--font-sans);
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ifl {
+    --ifl-slab-top: #2A2621; --ifl-slab-east: #121110; --ifl-slab-north: #1A1815; --ifl-corr: #322E28; --ifl-core: #221F1B;
+    --ifl-top: #4A453E; --ifl-east: #221F1B; --ifl-north: #2E2A25; --ifl-edge: rgba(255, 235, 210, .09); --ifl-ground: rgba(0, 0, 0, .7);
+    --ifl-k-meeting: #434850; --ifl-k-small: #48434F; --ifl-k-shared: #4F4739; --ifl-desk: #5A544B; --ifl-dev: #EAE4DA;
+  } }
+  :root[data-theme="dark"] .ifl {
+    --ifl-slab-top: #2A2621; --ifl-slab-east: #121110; --ifl-slab-north: #1A1815; --ifl-corr: #322E28; --ifl-core: #221F1B;
+    --ifl-top: #4A453E; --ifl-east: #221F1B; --ifl-north: #2E2A25; --ifl-edge: rgba(255, 235, 210, .09); --ifl-ground: rgba(0, 0, 0, .7);
+    --ifl-k-meeting: #434850; --ifl-k-small: #48434F; --ifl-k-shared: #4F4739; --ifl-desk: #5A544B; --ifl-dev: #EAE4DA;
+  }
+  .ifl-ground { fill: var(--ifl-ground); }
+  .ifl-p { stroke: var(--ifl-edge); stroke-width: .8; stroke-linejoin: round; }
+  .ifl-slab-top { fill: var(--ifl-slab-top); } .ifl-slab-east { fill: var(--ifl-slab-east); } .ifl-slab-north { fill: var(--ifl-slab-north); }
+  .ifl-corr { fill: var(--ifl-corr); stroke: none; } .ifl-core { fill: var(--ifl-core); stroke: none; }
+  .ifl-room-top { fill: var(--ifl-top); transition: fill var(--dur-state) var(--ease-settle); } .ifl-room-east { fill: var(--ifl-east); } .ifl-room-north { fill: var(--ifl-north); }
+  .ifl-room-top.ifl-k-meeting { fill: var(--ifl-k-meeting); } .ifl-room-top.ifl-k-small { fill: var(--ifl-k-small); }
+  .ifl-room-top.ifl-k-reception, .ifl-room-top.ifl-k-pantry, .ifl-room-top.ifl-k-print { fill: var(--ifl-k-shared); }
+  .ifl-room-top.ifl-k-desks { fill: var(--ifl-corr); }
+  .ifl-desk-top { fill: var(--ifl-desk); } .ifl-desk-east { fill: var(--ifl-east); } .ifl-desk-north { fill: var(--ifl-north); }
+  .ifl-room[data-state="fault"] .ifl-room-top { fill: color-mix(in srgb, var(--h-fault, var(--red)) 24%, var(--ifl-top)); }
+  .ifl-room[data-state="review"] .ifl-room-top { fill: color-mix(in srgb, var(--h-review, var(--amber)) 26%, var(--ifl-top)); }
+  .ifl-room[data-state="progress"] .ifl-room-top { fill: color-mix(in srgb, var(--h-progress, var(--blue)) 18%, var(--ifl-top)); }
+  .ifl-room[data-state="planned"] .ifl-room-top { fill: color-mix(in srgb, var(--ifl-top) 60%, var(--ifl-slab-top)); }
+  .ifl-dev { fill: var(--ifl-dev); stroke: var(--ifl-top); stroke-width: .8; transform-box: fill-box; transform-origin: center; opacity: 0; transform: scale(.4);
+    transition: opacity var(--dur-state) var(--ease-settle) calc(var(--i, 0) * 45ms), transform var(--dur-state) var(--ease-settle) calc(var(--i, 0) * 45ms); }
+  .ifl-dev.is-on { opacity: 1; transform: none; }
+  .ifl-ring { color: var(--quiet, var(--text-3)); }
+  .ifl-s { opacity: 0; transition: opacity var(--dur-state) var(--ease-settle); }
+  .ifl-s[data-s="fault"] { color: var(--h-fault, var(--red)); } .ifl-s[data-s="review"] { color: var(--h-review, var(--amber)); }
+  .ifl-s[data-s="progress"] { color: var(--h-progress, var(--blue)); } .ifl-s[data-s="planned"] { color: var(--text-3); opacity: 0; }
+  .ifl-ring[data-state="fine"] .ifl-s[data-s="fine"], .ifl-ring[data-state="fault"] .ifl-s[data-s="fault"], .ifl-ring[data-state="review"] .ifl-s[data-s="review"],
+  .ifl-ring[data-state="progress"] .ifl-s[data-s="progress"] { opacity: 1; }
+  .ifl-ring[data-state="planned"] .ifl-s[data-s="planned"] { opacity: .7; }
+  .ifl-no { font-size: 9px; font-weight: 550; fill: var(--text-3); text-anchor: middle; font-variant-numeric: tabular-nums; }
+  @media (prefers-reduced-motion: reduce) { .ifl-room-top, .ifl-dev, .ifl-s { transition: none; } }
+</style>

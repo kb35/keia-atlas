@@ -1,14 +1,20 @@
 ---
 // The front door (FRONT-DOOR-V2.md). Five seconds: seven words, one sentence, two doors, and the product itself,
-// four levels deep, with the zoom that joins them. One minute: one morning as five visual moments, one per idea.
-// Then three ways in and one honest block. Every door is open: no sign-up, no form, no "request a demo".
+// four levels deep, with the zoom that joins them. Then the two halves of the work, each one screen with the product
+// in it: Run it (the fault the hero found, fixed in five clicks) and Deliver it (a new floor set up in batches and
+// checked by the record). Then one morning as five visual moments, one per idea; three ways in; one honest strip.
+// Every door is open: no sign-up, no form, no "request a demo".
 //
 // Why /welcome/ and not the root: the console's Home is "/" and is linked from the sidebar, the mark, lessons,
 // help cards and every role's first screen. /welcome/ adds a page and changes nothing that exists.
 import Front from '../../layouts/Front.astro';
 import HeroZoom from '../../components/front/HeroZoom.astro';
-import Moments from '../../components/front/Moments.astro';
 import FixIt from '../../components/front/FixIt.astro';
+import Deliver from '../../components/front/Deliver.astro';
+import Moments from '../../components/front/Moments.astro';
+import IsoFloor from '../../components/front/IsoFloor.astro';
+import { building } from '../../lib/floors.mjs';
+import { floorScene } from '../../lib/isofloor.mjs';
 import { href } from '../../lib/data.mjs';
 import { NAME, LINE, LINKS } from '../../lib/brand.mjs';
 
@@ -16,9 +22,9 @@ import { NAME, LINE, LINKS } from '../../lib/brand.mjs';
 const HEADLINE = 'Every room, device and job. One living record.';
 const SENTENCE = 'Written as the work happens and handed on whole, from the whole estate down to one port.';
 const WAYS = [
-  { word: 'Open the demo', what: 'A fictional company, eleven offices, one September morning. Open it as Liam, the Dublin technician, and break a room.', note: 'No sign-up', to: href('/'), as: 'liam', primary: true },
-  { word: 'Run it for your team', what: 'Your estate as YAML in a private repository. Validation runs on every change; the site builds itself.', note: 'Getting started', to: LINKS.gettingStarted },
-  { word: 'Read the method', what: 'Five ideas, the words they use and what they map to in ITIL, PMI and ISO/IEC 20000. One screen, then as deep as you like.', note: 'Ten minutes', to: href('/method/') },
+  { id: 'demo', word: 'Open the demo', what: 'A fictional company, eleven offices, one September morning. Open it as Liam, the Dublin technician, and break a room.', note: 'No sign-up', to: href('/'), as: 'liam', primary: true },
+  { id: 'run', word: 'Run it for your team', what: 'Your estate as YAML in a private repository. Validation runs on every change; the site builds itself.', note: 'Getting started', to: LINKS.gettingStarted },
+  { id: 'read', word: 'Read the method', what: 'Five ideas, the words they use and what they map to in ITIL, PMI and ISO/IEC 20000. One screen, then as deep as you like.', note: 'Ten minutes', to: href('/method/') },
 ];
 const STANDS = [
   ['Real today', 'Schemas, validation, floor plans, room drawings, build sheets, the room guide.'],
@@ -29,9 +35,13 @@ const STANDS = [
 const LINKROW = [
   ['v0.1 preview', LINKS.releases], ['Apache 2.0', LINKS.licence], ['Method CC BY-SA 4.0', LINKS.ccbysa], ['Source', LINKS.source], ['Roadmap', LINKS.roadmap], ['Security', LINKS.security], ['The words', href('/method/words/')],
 ];
+// The demo door's picture: the third floor, small, with the one fault the hero found.
+const M = building('dub');
+const S = floorScene(M, '3', { width: 520, height: 260, pad: 22, rings: 'all' });
+const IDEA_WORDS = ['Start from the building', 'Capture, don’t ask', 'Answer first', 'Own it, hand it on', 'Learn as you go'];
 ---
 <Front title={`${NAME}: ${LINE}`} description={HEADLINE}>
-  <section class="fd-hero" aria-labelledby="fd-h">
+  <section class="fd-hero" aria-labelledby="fd-h" data-shot="hero">
     <div class="fd-lead">
       <h1 id="fd-h">{HEADLINE}</h1>
       <p class="fd-sentence">{SENTENCE}</p>
@@ -44,23 +54,48 @@ const LINKROW = [
     <p class="fd-honest">The demo's Dublin office, one September morning. Simulated: every company, room and fault is made up.</p>
   </section>
 
-  <div class="fd-screen fd-fix"><FixIt /></div>
+  <div class="fd-screen"><FixIt /></div>
+
+  <div class="fd-screen"><Deliver /></div>
 
   <section class="fd-screen" aria-labelledby="fd-morning">
-    <p class="fd-over">One morning · 07:52 to 08:31</p>
-    <h2 id="fd-morning">Five ideas, in the order they happen</h2>
+    <header class="fd-head">
+      <p class="fd-eyebrow">One morning · 07:52 to 08:31</p>
+      <h2 id="fd-morning">Five ideas, in the order they happen</h2>
+      <p class="fd-sub">The method behind both halves, seen once each as the morning unfolds. Each has its own page.</p>
+    </header>
     <Moments />
   </section>
 
-  <section class="fd-screen" aria-labelledby="fd-ways">
-    <p class="fd-over">Three ways in</p>
-    <h2 id="fd-ways">Open it, run it, or read it first</h2>
+  <section class="fd-screen" aria-labelledby="fd-ways" data-shot="ways">
+    <header class="fd-head">
+      <p class="fd-eyebrow">Three ways in</p>
+      <h2 id="fd-ways">Open it, run it, or read it first</h2>
+    </header>
     <ul class="fd-ways">
       {WAYS.map((w) => (
         <li>
-          <a class:list={['fd-way', { 'is-primary': w.primary }]} href={w.to} data-as={w.as}>
+          <a class:list={['fd-way', `fd-way-${w.id}`, { 'is-primary': w.primary }]} href={w.to} data-as={w.as}>
+            <span class="fd-way-pic" aria-hidden="true">
+              {w.id === 'demo' && <IsoFloor scene={S} states={{ 'dub-3-09': 'fault' }} label="" />}
+              {w.id === 'run' && (
+                <svg viewBox="0 0 320 150" class="fd-pic-run">
+                  <rect class="pr-file" x="26" y="18" width="150" height="118" rx="10" />
+                  <rect class="pr-line pr-key" x="44" y="40" width="34" height="7" rx="3.5" /><rect class="pr-line" x="84" y="40" width="58" height="7" rx="3.5" />
+                  <rect class="pr-line pr-key" x="44" y="58" width="52" height="7" rx="3.5" /><rect class="pr-line" x="102" y="58" width="38" height="7" rx="3.5" />
+                  <rect class="pr-line pr-key" x="56" y="76" width="26" height="7" rx="3.5" /><rect class="pr-line" x="88" y="76" width="66" height="7" rx="3.5" />
+                  <rect class="pr-line pr-key" x="56" y="94" width="40" height="7" rx="3.5" /><rect class="pr-line" x="102" y="94" width="34" height="7" rx="3.5" />
+                  <rect class="pr-line pr-key" x="44" y="112" width="30" height="7" rx="3.5" /><rect class="pr-line" x="80" y="112" width="52" height="7" rx="3.5" />
+                  <path class="pr-arrow" d="M190 77h48" /><path class="pr-arrow" d="M231 69l8 8-8 8" />
+                  <circle class="pr-ring" cx="272" cy="77" r="20" /><path class="pr-tick" d="M262 78l7 7 13-14" />
+                </svg>
+              )}
+              {w.id === 'read' && (
+                <ol class="fd-pic-read">{IDEA_WORDS.map((n, i) => <li style={`--i:${i}`}><i>{i + 1}</i><span>{n}</span></li>)}</ol>
+              )}
+            </span>
             <b>{w.word}</b>
-            <span>{w.what}</span>
+            <span class="fd-way-what">{w.what}</span>
             <small>{w.note} →</small>
           </a>
         </li>
@@ -68,15 +103,23 @@ const LINKROW = [
     </ul>
   </section>
 
-  <section class="fd-screen fd-stands" aria-labelledby="fd-where">
-    <p class="fd-over">Where it stands</p>
-    <h2 id="fd-where">What is real, what is simulated, what is not planned</h2>
+  <section class="fd-stands" aria-labelledby="fd-where" data-shot="stands">
+    <h2 id="fd-where" class="fd-stands-h">Where it stands</h2>
     <dl class="fd-stand">
       {STANDS.map(([k, v]) => <div><dt>{k}</dt><dd>{v}</dd></div>)}
     </dl>
     <p class="fd-links">{LINKROW.map(([w, to]) => <a href={to}>{w}</a>)}</p>
   </section>
 </Front>
+
+<style is:global>
+  /* Every section below the hero opens the same way: a short label, a heading that states the answer, one sentence. */
+  .fd-head { display: grid; gap: 10px; max-width: 980px; }
+  .fd-eyebrow { margin: 0; font-size: 13.5px; font-weight: 550; color: var(--text-3); letter-spacing: .005em; }
+  .fd-head h2 { margin: 0; font: 600 clamp(26px, 2.9vw, 38px)/1.1 var(--font-sans); letter-spacing: -.03em; text-wrap: balance; max-width: 34ch; }
+  .fd-sub { margin: 0; font-size: 16px; line-height: 1.5; color: var(--text-2); max-width: 96ch; text-wrap: pretty; }
+  @container fd (max-width: 699px) { .fd-head h2 { font-size: 26px; } .fd-sub { font-size: 15px; } }
+</style>
 
 <style>
   /* The first screen is the whole composition: headline, one line, both doors and the entire visual, at 1280 x 800,
@@ -99,47 +142,61 @@ const LINKROW = [
   .fd-hero :global(.hz) { width: 100%; }
   .fd-honest { margin: -10px 0 0; font-size: 12.5px; color: var(--text-3); text-align: center; }
 
-  .fd-screen { display: grid; gap: 12px; padding-top: 96px; }
-  .fd-fix { padding-top: 72px; }
-  .fd-over { margin: 0; font: 500 11px/1.2 var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); }
-  .fd-fix { display: block; }
-  .fd-fix :global(.fd-over) { margin: 0; font: 500 11px/1.2 var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); }
-  .fd-screen h2 { margin: 0 0 28px; font: 600 clamp(26px, 3vw, 38px)/1.12 var(--font-sans); letter-spacing: -.028em; max-width: 30ch; text-wrap: balance; }
+  .fd-screen { display: grid; gap: 28px; padding-top: 104px; }
 
-  .fd-ways { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  /* Three doors, each with its own picture. */
+  .fd-ways { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
   .fd-ways li { display: grid; min-width: 0; }
-  .fd-way { display: grid; grid-template-rows: auto 1fr auto; gap: 10px; padding: 24px 24px 20px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-md); color: var(--text); text-decoration: none; transition: border-color var(--dur-hover) var(--ease-settle), transform var(--dur-hover) var(--ease-settle); }
-  .fd-way:hover { color: var(--text); border-color: var(--text-3); transform: translateY(-2px); }
-  .fd-way b { font: 600 19px/1.2 var(--font-sans); letter-spacing: -.015em; }
-  .fd-way span { font-size: 14.5px; line-height: 1.5; color: var(--text-2); }
-  .fd-way small { font-size: 13.5px; font-weight: 550; color: var(--accent-ink); }
-  .fd-way.is-primary { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
-  .fd-way.is-primary:hover { color: var(--on-ink); }
-  .fd-way.is-primary span { color: color-mix(in srgb, var(--on-ink) 72%, transparent); }
-  .fd-way.is-primary small { color: var(--on-ink); }
+  .fd-way { display: grid; grid-template-rows: auto auto 1fr auto; gap: 8px; padding: 14px 14px 20px; border-radius: 20px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-md); color: var(--text); text-decoration: none; transition: border-color var(--dur-hover) var(--ease-settle), transform var(--dur-hover) var(--ease-settle), box-shadow var(--dur-hover) var(--ease-settle); }
+  .fd-way:hover { color: var(--text); border-color: var(--text-3); transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+  .fd-way:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .fd-way b { font: 600 20px/1.2 var(--font-sans); letter-spacing: -.02em; padding: 8px 10px 0; }
+  .fd-way-what { font-size: 14.5px; line-height: 1.5; color: var(--text-2); padding: 0 10px; }
+  .fd-way small { display: inline-flex; align-items: center; width: max-content; min-height: 36px; margin: 6px 10px 0; padding: 0 14px; border-radius: 999px; font-size: 13.5px; font-weight: 550; color: var(--text); background: var(--surface-2); border: 1px solid var(--line-strong); }
+  .fd-way.is-primary small { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+  .fd-way-pic {
+    --pic-bg: #EFE9DF; --pic-light: #FFFDF9;
+    display: grid; place-items: center; height: 180px; padding: 14px 18px; border-radius: 14px; overflow: clip; box-shadow: inset 0 0 0 1px var(--hairline);
+    background: radial-gradient(90% 80% at 24% 8%, var(--pic-light) 0%, transparent 62%), var(--pic-bg);
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .fd-way-pic { --pic-bg: #15130F; --pic-light: #2B2621; } }
+  :root[data-theme="dark"] .fd-way-pic { --pic-bg: #15130F; --pic-light: #2B2621; }
+  .fd-way-pic :global(.ifl) { width: 100%; max-height: 100%; }
+  .fd-pic-run { width: 100%; height: 100%; }
+  .pr-file { fill: var(--surface); stroke: var(--line-strong); stroke-width: 1.2; }
+  .pr-line { fill: var(--surface-3); } .pr-key { fill: var(--text-3); opacity: .55; }
+  .pr-arrow { fill: none; stroke: var(--text-3); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .pr-ring { fill: var(--surface); stroke: var(--h-fine, var(--green)); stroke-width: 2.4; }
+  .pr-tick { fill: none; stroke: var(--h-fine, var(--green)); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+  .fd-pic-read { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; width: 100%; }
+  .fd-pic-read li { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 550; color: var(--text); }
+  .fd-pic-read i { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 1.6px solid var(--text-3); font: 600 11.5px/1 var(--font-sans); font-style: normal; color: var(--text-2); flex: none; font-variant-numeric: tabular-nums; }
+  .fd-pic-read li:first-child i { border-color: var(--h-fault, var(--red)); color: var(--h-fault-ink, var(--red-ink)); }
 
-  .fd-stands { padding-bottom: 24px; }
+  /* Where it stands: one small strip, then the links. */
+  .fd-stands { display: grid; gap: 16px; padding: 96px 0 8px; }
+  .fd-stands-h { margin: 0; font-size: 13.5px; font-weight: 550; color: var(--text-3); }
   .fd-stand { margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
-  .fd-stand div { display: grid; gap: 6px; align-content: start; padding-top: 14px; border-top: 1px solid var(--line-strong); }
+  .fd-stand div { display: grid; gap: 4px; align-content: start; padding-top: 12px; border-top: 1px solid var(--line-strong); }
   .fd-stand dt { font-size: 14px; font-weight: 600; }
   .fd-stand dd { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--text-2); }
-  .fd-links { margin: 28px 0 0; display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 13.5px; }
+  .fd-links { margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 13.5px; }
   .fd-links a { display: inline-flex; align-items: center; min-height: 32px; color: var(--text-2); }
   .fd-links a:hover { color: var(--text); }
 
   @container fd (max-width: 1099px) {
-    .fd-ways { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .fd-stand { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
   @container fd (max-width: 899px) {
     .fd-ways { grid-template-columns: minmax(0, 1fr); }
+    .fd-way-pic { height: 160px; }
   }
   @container fd (max-width: 699px) {
     .fd-hero { padding-top: 24px; gap: 22px; }
     .fd-lead { gap: 12px; }
     .fd-lead h1 { font-size: 32px; }
-    .fd-screen { padding-top: 80px; }
-    .fd-screen h2 { margin-bottom: 20px; }
+    .fd-screen { padding-top: 80px; gap: 22px; }
+    .fd-stands { padding-top: 72px; }
     .fd-honest { margin-top: -12px; }
     .fd-door { flex: 1 1 100%; justify-content: center; }
   }

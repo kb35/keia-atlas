@@ -1,44 +1,46 @@
 ---
 // Fix it yourself (the front door, after the hero finds the fault): the incident the hero found, in the product's
-// own interface, and five steps the visitor takes, one click each. Take it · Check remotely · Fix (a standing rule,
-// with "How was this done?") · Verify (a test call) · Close ("What fixed it?" pre-filled). A timeline logs every
-// step as it happens (time, who, what, source), so the visitor sees that everything is recorded. It ends with the
-// plan back to all fine and the heartbeat, and the two doors. Self-contained: no backend, no state kept.
+// own interface at showcase scale, and five steps the visitor takes, one click each. Take it · Check remotely ·
+// Fix (a standing rule, with "How was this done?") · Verify (a test call) · Close ("What fixed it?" pre-filled).
+// The record beside it logs every step as it happens (time, who, what, source), the glyph and the With chip change
+// in place, and the floor's one broken ring closes. Self-contained: no backend, no state kept.
 //
-// Motion (MOTION-V2 4.15, 4.17, 4.19): each step changes exactly the things it changed, once: the With chip's words
-// slide along one line (--dur-chip), the glyph's state eases in place (--dur-state), a new timeline entry enters at
-// its centre (--dur-enter), the plan's one ring closes. Reduced motion: every change at once; the chip's words swap.
+// One stage, one screen at 1440 x 900: the incident card with the product drawing on the left, the record and the
+// floor on the right, the five clicks along the bottom. Motion (MOTION-V2 4.15, 4.17, 4.19): each step changes
+// exactly the things it changed, once: the chip's words slide (--dur-chip), the glyph's state eases in place
+// (--dur-state), a new entry grows at its centre (--dur-enter), the ring closes. Reduced motion: every change at once.
 // Skipping Verify and closing anyway is allowed and honest: the close reads "Unable to complete: not verified".
 import HealthGlyph from '../HealthGlyph.astro';
 import WithChip from '../WithChip.astro';
+import DeviceArt from '../DeviceArt.astro';
+import IsoFloor from './IsoFloor.astro';
 import { building } from '../../lib/floors.mjs';
+import { floorScene } from '../../lib/isofloor.mjs';
 import { href, DEMO_TODAY } from '../../lib/data.mjs';
 
 const M = building('dub');
-const F = M.floors.find((f) => f.id === '3');
-const rooms = Object.values(M.rooms).filter((r) => r.floor === '3' && r.rect);
-const K = 8, PAD = 8, W = 60 * K + PAD * 2, H = 24 * K + PAD * 2;
-const rc = ([x0, y0, x1, y1]) => ({ x: PAD + x0 * K, y: PAD + (24 - y1) * K, width: (x1 - x0) * K, height: (y1 - y0) * K });
-const centre = (r) => [PAD + ((r.rect[0] + r.rect[2]) / 2) * K, PAD + (24 - (r.rect[1] + r.rect[3]) / 2) * K];
+const S = floorScene(M, '3', { width: 640, height: 330, pad: 26, rings: 'all' });
+const nRooms = S.rings.length;
 const STEPS = [
-  { id: 'take', n: 1, verb: 'Take it', what: 'Ready for you. It becomes yours until it is back working.' },
-  { id: 'check', n: 2, verb: 'Check remotely', what: 'Read the unit’s status and its last change without leaving your desk.' },
-  { id: 'fix', n: 3, verb: 'Restart the video bar', what: 'Run the standing rule. It can be put back, so it runs without asking.' },
-  { id: 'verify', n: 4, verb: 'Run a test call', what: 'Prove it: a test call, the camera and the audio.' },
+  { id: 'take', n: 1, verb: 'Take it', what: 'It becomes yours until the room works.' },
+  { id: 'check', n: 2, verb: 'Check remotely', what: 'The unit’s status and last change, from your desk.' },
+  { id: 'fix', n: 3, verb: 'Restart the bar', what: 'A standing rule runs it. It can be put back.' },
+  { id: 'verify', n: 4, verb: 'Run a test call', what: 'Prove it: the call, the camera, the audio.' },
   { id: 'close', n: 5, verb: 'Close', what: 'One question, pre-filled from what you did.' },
 ];
 ---
-<section class="fx" data-fx aria-labelledby="fx-h">
-  <div class="fx-head">
-    <p class="fd-over">Fix it yourself · simulated</p>
-    <h2 id="fx-h">The fault the hero found. Fix it, in five clicks.</h2>
-    <p class="fx-lead">This is the incident as Liam sees it. Take each step yourself; the record writes itself as you go.</p>
-  </div>
+<section class="fx" data-fx data-shot="fix" aria-labelledby="fx-h" data-rooms={nRooms}>
+  <header class="fd-head">
+    <p class="fd-eyebrow">Run it</p>
+    <h2 id="fx-h">The fault the hero found. Fixed in five clicks, every one on the record.</h2>
+    <p class="fd-sub">This is the incident as Liam sees it. Take each step yourself; the record writes itself as you go. Simulated: the room, the unit and the fault are made up.</p>
+  </header>
 
-  <div class="fx-grid">
+  <div class="fx-stage">
+    <div class="fx-light" aria-hidden="true"></div>
     <article class="fx-inc" aria-labelledby="fx-t">
-      <p class="fx-over"><span>Incident · P2 · Simulated</span> <span class="fx-src">from Poly Lens · 07:52</span></p>
-      <h3 id="fx-t" class="fx-title"><HealthGlyph state="fault" size={24} title="video bar offline since 07:52" class="fx-glyph lit" /> Video bar offline · 3.09 Whooper Swan</h3>
+      <p class="fx-over"><span>Incident · P2</span><span class="fx-src">from Poly Lens, 07:52</span></p>
+      <h3 id="fx-t" class="fx-title"><HealthGlyph state="fault" size={40} title="video bar offline since 07:52" class="fx-glyph lit" /><span>Video bar offline<small>3.09 Whooper Swan · third floor</small></span></h3>
       <p class="fx-answer" data-fx-answer aria-live="polite">Offline since 07:52. Booked 09:00, 8 people.</p>
       <div class="fx-with" data-fx-with aria-live="polite">
         <WithChip own={{ s: 'ready', to: 'liam', kind: 'person', at: `${DEMO_TODAY}T07:52:00` }} history={[{ at: `${DEMO_TODAY}T07:52:00`, text: 'Offered to Liam by the record' }]} />
@@ -46,40 +48,34 @@ const STEPS = [
       <dl class="fx-facts">
         <div><dt>Unit</dt><dd>Poly Studio X72 · dub-309-vc01 <span class="fx-src">from the build sheet</span></dd></div>
         <div><dt>Last change</dt><dd>Firmware 4.6.1 · 02:10 today <span class="fx-src">from the change log</span></dd></div>
-        <div class="fx-fact-hid" data-fx-fact="check"><dt>Status</dt><dd>Reachable on the network; the codec is not responding <span class="fx-src">read at <span data-fx-now>08:11</span></span></dd></div>
+        <div class="fx-fact-hid" data-fx-fact="check"><dt>Status</dt><dd>Reachable; the codec is not responding <span class="fx-src">read at <span data-fx-now>08:11</span></span></dd></div>
         <div class="fx-fact-hid" data-fx-fact="check"><dt>Known error</dt><dd>Codec hang after firmware 4.6.x · used on 14 installs <span class="fx-src">matched from the last change</span></dd></div>
         <div class="fx-fact-hid" data-fx-fact="fix"><dt>Done automatically</dt><dd>Restarted · under the restart rule (owner: Niamh) <button type="button" class="fx-how" data-fx-how aria-expanded="false">How was this done?</button></dd></div>
-        <div class="fx-fact-hid fx-howcard" data-fx-fact="how" hidden><dt></dt><dd>The rule read the unit from the build sheet, sent a restart over its management port, waited 40 s and read the status back. It can be put back: Roll back returns the unit to how it was.</dd></div>
+        <div class="fx-fact-hid fx-howcard" data-fx-fact="how" hidden><dt></dt><dd>The rule read the unit from the build sheet, sent a restart over its management port, waited 40 s and read the status back. Roll back returns the unit to how it was.</dd></div>
         <div class="fx-fact-hid" data-fx-fact="verify"><dt>Test</dt><dd>Test call connected · camera and audio fine <span class="fx-src">read at <span data-fx-now2>08:13</span></span></dd></div>
         <div class="fx-fact-hid fx-ask" data-fx-fact="ask"><dt>What fixed it?</dt><dd><span class="fx-answer-box" data-fx-what>Restart under the restart rule; codec hang after firmware 4.6.x.</span></dd></div>
       </dl>
-      <div class="fx-do">
-        {STEPS.map((s, i) => <button type="button" class:list={['fx-step', { 'is-next': i === 0 }]} data-fx-step={s.id} disabled={i !== 0}><span class="fx-n">{s.n}</span><b>{s.verb}</b><small>{s.what}</small></button>)}
-      </div>
-      <p class="fx-done" data-fx-done hidden><b>Resolved.</b> Every step is on the record, with who did it and where the facts came from. <a href={href('/')} data-as="liam">Open the full demo</a> or <a href={href('/method/')}>read the method</a>.</p>
+      <div class="fx-art" aria-hidden="true"><DeviceArt model="poly-studio-x72" label="" /><span class="fx-art-cap">The unit: Poly Studio X72</span></div>
+      <p class="fx-done" data-fx-done hidden><b>Resolved.</b> Every step is on the record, with who did it and where each fact came from. <a href={href('/')} data-as="liam">Open the full demo</a> or <a href={href('/method/')}>read the method</a>.</p>
     </article>
 
     <aside class="fx-side">
       <section class="fx-log" aria-labelledby="fx-log-h">
-        <h4 id="fx-log-h" class="fx-over">Timeline</h4>
+        <h4 id="fx-log-h" class="fx-h4">The record</h4>
         <ol class="fx-entries" data-fx-log aria-live="polite">
           <li><time>07:52</time><span><b>Offline</b> · video bar</span><small>from Poly Lens</small></li>
           <li><time>07:52</time><span><b>Incident opened</b>, filled in: space, unit, last change, priority</span><small>by the record</small></li>
         </ol>
       </section>
-      <section class="fx-plan-box" aria-label="Third floor plan">
-        <p class="fx-over"><span data-fx-plan-cap>Third floor · 1 fault</span> <span class="fx-beat" data-fx-beat>checked just now</span></p>
-        <svg class="fx-plan" viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
-          <rect class="fp-out" x={PAD} y={PAD} width={60 * K} height={24 * K} rx="5" />
-          {F.corridors.map((c) => <rect class="fp-corr" {...rc(c.rect)} />)}
-          {F.core.map((c) => <rect class="fp-core" {...rc(c.rect)} />)}
-          {rooms.map((r) => <rect class:list={['fp-room', { 'is-hot': r.id === 'dub-3-09' }]} data-fx-room={r.id === 'dub-3-09' ? '' : undefined} {...rc(r.rect)} rx="2.5" />)}
-          {rooms.map((r) => { const [cx, cy] = centre(r); return r.id === 'dub-3-09'
-            ? <g class="fp-ring is-fault" data-fx-ring><circle class="fp-fine" cx={cx} cy={cy} r="5.5" /><g class="fp-fault"><path d={`M${cx + 5.5 * Math.sin(Math.PI / 6)} ${cy - 5.5 * Math.cos(Math.PI / 6)}A5.5 5.5 0 0 1 ${cx + 5.5 * Math.sin((5 * Math.PI) / 6)} ${cy - 5.5 * Math.cos((5 * Math.PI) / 6)}`} /><path d={`M${cx + 5.5 * Math.sin((7 * Math.PI) / 6)} ${cy - 5.5 * Math.cos((7 * Math.PI) / 6)}A5.5 5.5 0 0 1 ${cx + 5.5 * Math.sin((11 * Math.PI) / 6)} ${cy - 5.5 * Math.cos((11 * Math.PI) / 6)}`} /><circle class="fp-dot" cx={cx} cy={cy} r="1.4" /></g></g>
-            : <g class="fp-ring"><circle class="fp-fine" cx={cx} cy={cy} r="5.5" /></g>; })}
-        </svg>
+      <section class="fx-plan-box" aria-label="Third floor">
+        <p class="fx-h4"><span data-fx-plan-cap>Third floor · {nRooms} spaces · 1 fault</span> <span class="fx-beat" data-fx-beat>checked just now</span></p>
+        <IsoFloor scene={S} states={{ 'dub-3-09': 'fault' }} label="The third floor: every space a ring, 3.09 broken" />
       </section>
     </aside>
+
+    <ol class="fx-do" aria-label="Five clicks">
+      {STEPS.map((s, i) => <li><button type="button" class:list={['fx-step', { 'is-next': i === 0 }]} data-fx-step={s.id} disabled={i !== 0}><span class="fx-n">{s.n}</span><b>{s.verb}</b><small>{s.what}</small></button></li>)}
+    </ol>
   </div>
 </section>
 
@@ -88,6 +84,7 @@ const STEPS = [
   import { setGlyph } from '../../lib/health.mjs';
   import { chipOf } from '../../lib/ownership.mjs';
   import { setChip } from '../../lib/withchip.mjs';
+  import { setSpace } from '../../lib/isofloor-client.mjs';
 
   const ORDER = ['take', 'check', 'fix', 'verify', 'close'];
   const PEOPLE = { liam: { name: 'Liam', first: 'Liam', initials: 'L' }, niamh: { name: 'Niamh', first: 'Niamh', initials: 'N' } };
@@ -98,6 +95,7 @@ const STEPS = [
     const q = <T extends HTMLElement>(s: string) => root.querySelector<T>(s)!;
     const steps = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-fx-step]'));
     const log = q<HTMLOListElement>('[data-fx-log]'), answer = q('[data-fx-answer]');
+    const nRooms = root.dataset.rooms || '';
     // The With chip (WithChip.astro), drawn for Liam as the viewer: "Ready for you", then "With you", then "Done".
     const chipHost = q('[data-wc-host]'), today = chipHost.dataset.wcToday || '';
     const own = (s: string, at: string, extra: Record<string, unknown> = {}) => ({ s, to: 'liam', kind: 'person', at: `${today}T${at}:00`, ...extra });
@@ -109,7 +107,7 @@ const STEPS = [
     if (!W.RS_PEOPLE) W.RS_PEOPLE = [{ id: 'liam', name: 'Liam Doyle', initials: 'LD' }, { id: 'niamh', name: 'Niamh', initials: 'N' }];
     chipTo(own('ready', '07:52'), history);
     setTimeout(() => chipTo(own('ready', '07:52'), history), 0);
-    const glyph = q('.fx-glyph'), ring = q('[data-fx-ring]'), room = q('[data-fx-room]'), planCap = q('[data-fx-plan-cap]'), beat = q('[data-fx-beat]');
+    const glyph = q('.fx-glyph'), floor = q('svg.ifl'), planCap = q('[data-fx-plan-cap]'), beat = q('[data-fx-beat]');
     const done = q('[data-fx-done]'), how = q<HTMLButtonElement>('[data-fx-how]'), howCard = q('[data-fx-fact="how"]');
     const facts = (id: string) => Array.from(root.querySelectorAll<HTMLElement>(`[data-fx-fact="${id}"]`));
     let i = 0, mins = 0, verified = false;
@@ -135,7 +133,7 @@ const STEPS = [
       take() { mins = 0; chip(1); entry(clock(0), '<b>With Liam</b>', 'by Liam'); answer.textContent = 'With you. Offline since 07:52; booked 09:00, 8 people.'; },
       check() { mins = 1; root.querySelector('[data-fx-now]')!.textContent = clock(1); reveal('check'); entry(clock(1), '<b>Checked remotely</b>: reachable, codec not responding; known error matched', 'from the unit and the change log'); answer.textContent = 'The codec is not responding after a firmware change at 02:10. A known error matches.'; },
       fix() {
-        mins = 2; reveal('fix'); setGlyph(glyph, 'progress', { title: 'restarting, read back in 40 s' });
+        mins = 2; reveal('fix'); setGlyph(glyph, 'progress', { title: 'restarting, read back in 40 s' }); setSpace(floor, 'dub-3-09', 'progress');
         entry(clock(2), '<b>Done automatically</b> · restarted under the restart rule (owner: Niamh)', 'by the rule, for Liam');
         answer.textContent = 'Restarting. Read back in 40 s.';
         setTimeout(() => { setGlyph(glyph, 'fine', { title: 'in service again' }); answer.textContent = 'Back in service. Not yet verified.'; }, motion().reduced ? 0 : 900);
@@ -146,9 +144,9 @@ const STEPS = [
         const took = `${20 + mins} min`;
         if (!verified) { setGlyph(glyph, 'review', { title: 'closed without a test' }); chip(3); entry(clock(4), '<b>Closed without verifying</b> · Unable to complete: not verified', 'by Liam'); answer.textContent = 'Unable to complete: closed without a test. It stays To review.'; }
         else { reveal('ask'); chip(2); entry(clock(4), '<b>Resolved</b> · what fixed it: restart under the restart rule; codec hang after firmware 4.6.x', 'by Liam · kept on the known error, now used on 15'); answer.textContent = `Resolved in ${took}, before the 09:00 booking.`; }
-        // The plan: the one ring closes, the room's tint goes, the floor is all fine.
-        ring.classList.remove('is-fault'); ring.classList.toggle('is-review', !verified); room.classList.remove('is-hot'); room.classList.toggle('is-review', !verified);
-        planCap.textContent = verified ? 'Third floor · all 14 spaces fine' : 'Third floor · 1 to review';
+        // The floor: the one ring closes and the room's tint goes, or it stays To review.
+        setSpace(floor, 'dub-3-09', verified ? 'fine' : 'review');
+        planCap.textContent = verified ? `Third floor · all ${nRooms} spaces fine` : `Third floor · ${nRooms} spaces · 1 to review`;
         done.hidden = false;
         const m = motion(); if (!m.reduced) done.animate([{ opacity: 0, transform: 'scale(.97)' }, { opacity: 1, transform: 'none' }], { duration: m.enter, easing: m.ease });
       },
@@ -174,35 +172,59 @@ const STEPS = [
 </script>
 
 <style>
-  /* The whole flow on one screen at 1440 x 900: a short head, compact steps, the timeline and plan beside. */
-  .fx { display: grid; gap: 20px; }
-  .fx-head { display: grid; gap: 8px; }
-  .fx-head h2 { margin: 0; font: 600 clamp(24px, 2.6vw, 32px)/1.12 var(--font-sans); letter-spacing: -.028em; max-width: 40ch; text-wrap: balance; }
-  .fx-lead { margin: 0; font-size: 15.5px; color: var(--text-2); max-width: 60ch; }
-  .fx-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 20px; align-items: start; }
-  .fx-inc { display: grid; gap: 11px; padding: 18px 22px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-md); min-width: 0; }
-  .fx-over { margin: 0; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font: 500 10.5px/1.2 var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); }
-  .fx-src { font: 500 11px/1.4 var(--font-mono); color: var(--quiet, var(--text-3)); letter-spacing: 0; text-transform: none; }
-  .fx-title { margin: 0; display: flex; align-items: center; gap: 10px; font: 600 clamp(18px, 1.8vw, 22px)/1.2 var(--font-sans); letter-spacing: -.02em; }
-  .fx-answer { margin: 0; font-size: 14.5px; line-height: 1.4; }
+  .fx { display: grid; gap: 22px; }
+  .fx-stage {
+    --fx-bg: #EFE9DF; --fx-light: #FFFDF9; --fx-glow: rgba(226, 122, 58, .14);
+    position: relative; display: grid; grid-template-columns: minmax(0, 7fr) minmax(300px, 4fr); grid-template-rows: auto auto; gap: 18px 24px; padding: 26px 28px 24px; border-radius: 24px;
+    background: var(--fx-bg); box-shadow: inset 0 0 0 1px var(--hairline); overflow: clip; align-items: start;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .fx-stage { --fx-bg: #15130F; --fx-light: #2B2621; --fx-glow: rgba(238, 138, 78, .12); } }
+  :root[data-theme="dark"] .fx-stage { --fx-bg: #15130F; --fx-light: #2B2621; --fx-glow: rgba(238, 138, 78, .12); }
+  .fx-light { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(80% 70% at 22% 6%, var(--fx-light) 0%, transparent 62%), radial-gradient(60% 46% at 90% 100%, var(--fx-glow) 0%, transparent 70%); }
+
+  .fx-inc { position: relative; display: grid; gap: 12px; padding: 22px 24px 20px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-md); min-width: 0; align-self: stretch; align-content: start; }
+  .fx-art { position: absolute; right: 24px; top: 176px; width: 38%; max-width: 300px; display: grid; gap: 6px; justify-items: center; pointer-events: none; }
+  .fx-art :global(svg) { width: 100%; height: auto; display: block; }
+  .fx-art-cap { font-size: 12px; color: var(--text-3); }
+  .fx-over { margin: 0; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 13px; font-weight: 550; color: var(--text-3); }
+  .fx-src { font-size: 12px; font-weight: 450; color: var(--text-3); }
+  .fx-title { margin: 0; display: flex; align-items: center; gap: 14px; font: 600 clamp(20px, 2vw, 26px)/1.12 var(--font-sans); letter-spacing: -.025em; }
+  .fx-title small { display: block; margin-top: 3px; font-size: 14px; font-weight: 500; color: var(--text-2); letter-spacing: 0; }
+  .fx-answer { margin: 0; font-size: 16px; line-height: 1.4; }
   .fx-with { display: flex; }
-  .fx-facts { margin: 0; display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
-  .fx-facts div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 4px 14px; align-items: baseline; }
+  .fx-with :global(.wc) { height: 30px; font-size: 13px; }
+  .fx-facts { margin: 0; display: grid; gap: 9px; border-top: 1px solid var(--line); padding-top: 12px; width: 56%; }
+  .fx-facts div { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 2px 12px; align-items: baseline; min-width: 0; }
   .fx-facts dt { font-size: 12.5px; color: var(--text-3); }
-  .fx-facts dd { margin: 0; font-size: 14px; font-weight: 550; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+  .fx-facts dd { margin: 0; font-size: 13.5px; font-weight: 550; display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; line-height: 1.4; }
   .fx-facts .fx-fact-hid:not(.is-in), .fx-facts .fx-fact-hid[hidden] { display: none; }
   .fx-facts .fx-fact-hid.is-in { animation: fx-in var(--dur-enter) var(--ease-settle) both; }
   @keyframes fx-in { from { opacity: 0; transform: translateY(4px); } }
   .fx-how { font: 550 12.5px/1 var(--font-sans); color: var(--accent-ink); background: none; border: 0; padding: 4px 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; min-height: 28px; }
-  .fx-howcard dd { font-weight: 400; font-size: 13.5px; color: var(--text-2); padding: 10px 12px; border-radius: 8px; background: var(--surface-2); }
+  .fx-howcard dd { font-weight: 400; font-size: 13px; color: var(--text-2); padding: 10px 12px; border-radius: 8px; background: var(--surface-2); }
   .fx-ask dt { color: var(--text); font-weight: 550; }
   .fx-answer-box { padding: 6px 10px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--bg); font-weight: 500; }
-  .fx-do { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 12px; }
-  .fx-step { display: grid; grid-template-columns: 28px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 12px; row-gap: 1px; align-items: center; text-align: left; padding: 7px 12px; min-height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--text); font: inherit; cursor: pointer; transition: background var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle), opacity var(--dur-state) var(--ease-settle), transform var(--dur-press, 80ms) var(--ease-settle); }
-  .fx-step .fx-n { grid-row: 1 / span 2; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 600 12px/1 var(--font-mono); color: var(--text-2); border: 1.5px solid var(--line-strong); }
-  .fx-step b { font-size: 14.5px; font-weight: 600; }
-  .fx-step small { font-size: 12.5px; color: var(--text-2); }
-  .fx-step:disabled { cursor: default; opacity: .55; }
+  .fx-done { margin: 0; width: 56%; font-size: 14px; line-height: 1.5; padding: 12px 14px; border-radius: 10px; background: var(--h-fine-soft, var(--green-soft)); color: var(--h-fine-ink, var(--green-ink)); }
+  .fx-done a { color: inherit; font-weight: 600; }
+
+  .fx-side { display: grid; gap: 14px; min-width: 0; align-self: stretch; grid-template-rows: minmax(0, 1fr) auto; }
+  .fx-log, .fx-plan-box { display: grid; gap: 10px; padding: 16px 18px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-md); min-width: 0; align-content: start; }
+  .fx-h4 { margin: 0; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; font-weight: 550; color: var(--text-3); }
+  .fx-entries { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .fx-entries li { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 1px 10px; font-size: 13.5px; line-height: 1.4; transform-origin: center; }
+  .fx-entries time { font-size: 13px; line-height: 1.5; color: var(--text-3); font-variant-numeric: tabular-nums; grid-row: 1 / span 2; }
+  .fx-entries b { font-weight: 600; }
+  .fx-entries small { grid-column: 2; font-size: 12px; color: var(--text-3); }
+  .fx-beat { font-size: 12px; font-weight: 450; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .fx-plan-box :global(.ifl) { width: 100%; }
+
+  .fx-do { grid-column: 1 / -1; list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; counter-reset: none; }
+  .fx-do li { display: grid; min-width: 0; }
+  .fx-step { display: grid; grid-template-columns: 30px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 12px; row-gap: 2px; align-items: center; text-align: left; padding: 12px 14px; min-height: 64px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--text); font: inherit; cursor: pointer; box-shadow: var(--shadow-md); transition: background var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle), opacity var(--dur-state) var(--ease-settle), transform var(--dur-press, 80ms) var(--ease-settle); }
+  .fx-step .fx-n { grid-row: 1 / span 2; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font: 600 13px/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-2); border: 1.5px solid var(--line-strong); }
+  .fx-step b { font-size: 14.5px; font-weight: 600; letter-spacing: -.01em; }
+  .fx-step small { font-size: 12.5px; line-height: 1.35; color: var(--text-2); }
+  .fx-step:disabled { cursor: default; opacity: .6; box-shadow: none; }
   .fx-step.is-next { border-color: var(--ink); background: var(--ink); color: var(--on-ink); opacity: 1; }
   .fx-step.is-next small { color: color-mix(in srgb, var(--on-ink) 72%, transparent); }
   .fx-step.is-next .fx-n { color: var(--on-ink); border-color: color-mix(in srgb, var(--on-ink) 60%, transparent); }
@@ -210,41 +232,27 @@ const STEPS = [
   .fx-step.is-next:active { transform: scale(.985); }
   .fx-step.is-done { opacity: 1; border-color: var(--line); color: var(--text-2); }
   .fx-step.is-done .fx-n { background: var(--h-fine-soft, var(--green-soft)); border-color: var(--h-fine, var(--green)); color: var(--h-fine-ink, var(--green-ink)); }
-  .fx-step.is-done .fx-n::before { content: "\2713"; }
-  .fx-step.is-done .fx-n { font-size: 0; } .fx-step.is-done .fx-n::before { font-size: 12px; }
+  .fx-step.is-done .fx-n::before { content: "\2713"; font-size: 13px; }
+  .fx-step.is-done .fx-n { font-size: 0; }
   .fx-step:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-  .fx-done { margin: 0; font-size: 14.5px; line-height: 1.5; padding: 12px 14px; border-radius: 10px; background: var(--h-fine-soft, var(--green-soft)); color: var(--h-fine-ink, var(--green-ink)); }
-  .fx-done a { color: inherit; font-weight: 600; }
 
-  .fx-side { display: grid; gap: 16px; min-width: 0; }
-  .fx-log, .fx-plan-box { display: grid; gap: 10px; padding: 18px 20px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-md); min-width: 0; }
-  .fx-log h4 { margin: 0; }
-  .fx-entries { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-  .fx-entries li { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 1px 10px; font-size: 13.5px; line-height: 1.4; transform-origin: center; }
-  .fx-entries time { font: 500 12.5px/1.5 var(--font-mono); color: var(--text-3); font-variant-numeric: tabular-nums; grid-row: 1 / span 2; }
-  .fx-entries b { font-weight: 600; }
-  .fx-entries small { grid-column: 2; font: 500 11px/1.4 var(--font-mono); color: var(--quiet, var(--text-3)); }
-  .fx-beat { font: 500 11px/1.4 var(--font-mono); color: var(--quiet, var(--text-3)); letter-spacing: 0; text-transform: none; }
-  .fx-plan { display: block; width: 100%; height: auto; }
-  .fp-out { fill: var(--bg); stroke: var(--line-strong); stroke-width: 1.2; }
-  .fp-corr { fill: var(--surface-2); } .fp-core { fill: var(--surface-3); }
-  .fp-room { fill: var(--surface); stroke: var(--line-strong); stroke-width: 1; transition: fill var(--dur-state) var(--ease-settle); }
-  .fp-room.is-hot { fill: color-mix(in srgb, var(--h-fault, var(--red)) 14%, var(--surface)); }
-  .fp-room.is-review { fill: color-mix(in srgb, var(--h-review, var(--amber)) 16%, var(--surface)); }
-  .fp-ring { color: var(--quiet, var(--text-3)); }
-  .fp-ring .fp-fine { fill: none; stroke: currentColor; stroke-width: 1.8; transition: opacity var(--dur-state) var(--ease-settle), stroke var(--dur-state) var(--ease-settle); }
-  .fp-ring .fp-fault { color: var(--h-fault, var(--red)); opacity: 0; transition: opacity var(--dur-state) var(--ease-settle); }
-  .fp-ring .fp-fault path { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; } .fp-dot { fill: currentColor; }
-  .fp-ring.is-fault .fp-fault { opacity: 1; } .fp-ring.is-fault .fp-fine { opacity: 0; }
-  .fp-ring.is-review .fp-fine { stroke: var(--h-review, var(--amber)); stroke-dasharray: 28 6.5; }
-
+  @container fd (max-width: 1099px) {
+    .fx-stage { grid-template-columns: minmax(0, 1fr); }
+    .fx-side { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto; }
+    .fx-do { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  }
   @container fd (max-width: 899px) {
-    .fx-grid { grid-template-columns: minmax(0, 1fr); }
+    .fx-do { grid-template-columns: minmax(0, 1fr); }
+    .fx-step { min-height: 56px; }
+    .fx-side { grid-template-columns: minmax(0, 1fr); }
   }
-  @container fd (max-width: 559px) {
-    .fx-inc, .fx-log, .fx-plan-box { padding: 16px; }
-    .fx-facts div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
-    .fx-step { grid-template-columns: 24px minmax(0, 1fr); }
+  @container fd (max-width: 699px) {
+    .fx-stage { padding: 18px 16px; border-radius: 18px; gap: 16px; }
+    .fx-inc, .fx-log, .fx-plan-box { padding: 16px; border-radius: 14px; }
+    .fx-art { position: static; width: 60%; max-width: 220px; margin: 4px auto 0; }
+    .fx-facts div { grid-template-columns: minmax(0, 1fr); }
+    .fx-facts, .fx-done { width: auto; grid-template-columns: minmax(0, 1fr); }
+    .fx-step { grid-template-columns: 26px minmax(0, 1fr); }
   }
-  @media (prefers-reduced-motion: reduce) { .fp-room, .fp-ring * , .fx-step { transition: none; } .fx-fact-hid.is-in { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .fx-step { transition: none; } .fx-fact-hid.is-in { animation: none; } }
 </style>

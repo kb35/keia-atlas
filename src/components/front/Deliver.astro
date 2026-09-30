@@ -1,0 +1,267 @@
+---
+// Deliver (the front door's other half): a new floor set up in batches and checked by the record, then handed over.
+// The fourth floor of the demo's Dublin office (src/lib/floors.mjs) drawn as a model (IsoFloor.astro), every single
+// space a block with a ring; the kit arrives batch by batch (every video bar at once, then the displays, then what
+// pairs with them), the build sheet's values for one unit appear worked out from the record, Keia reads each unit
+// back and marks the one exception, and at handover the integrator's as-built record becomes the living record
+// (the With chip slides from the vendor to the Dublin team). Real: the floor, its spaces and their kit, the house
+// values the sheet is filled from. Simulated: the integrator, the day, the readings.
+//
+// Motion: one sequence, once, when the stage scrolls into view. Each beat changes exactly what it changed: dots
+// come on in turn (--dur-state, 45 ms apart), rings ease planned -> in progress -> fine, a card enters at its
+// centre (--dur-enter), rows follow in turn, the chip slides (--dur-chip). Reduced motion: the final frame at once.
+import IsoFloor from './IsoFloor.astro';
+import HealthGlyph from '../HealthGlyph.astro';
+import WithChip from '../WithChip.astro';
+import { building } from '../../lib/floors.mjs';
+import { floorScene, batchesOf } from '../../lib/isofloor.mjs';
+import { HOUSE } from '../../lib/integrate.mjs';
+import { className, spaces, sites, DEMO_TODAY } from '../../lib/data.mjs';
+
+const SITE = 'dub', FLOOR = '4', FIRST = 'dub-4-01', EXCEPTION = 'dub-4-05';
+const M = building(SITE);
+const S = floorScene(M, FLOOR, { width: 900, height: 520, pad: 44, kit: true, rings: 'rooms' });
+const all = batchesOf(S.devs);
+const MAIN = all.slice(0, 4), rest = all.slice(4);
+const restDevs = rest.flatMap((b) => b.devs);
+const plural = (w: string) => (/(s|x|ch|sh)$/i.test(w) ? `${w}es` : /[^aeiou]y$/i.test(w) ? `${w.slice(0, -1)}ies` : `${w}s`);
+const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+const BATCHES = [
+  ...MAIN.map((b, i) => ({ id: b.cls, n: i + 1, word: plural(className(b.cls)), units: b.devs.length, rooms: b.rooms })),
+  ...(restDevs.length ? [{ id: 'rest', n: MAIN.length + 1, word: 'The rest', units: restDevs.length, rooms: [...new Set(restDevs.map((d) => d.room))] }] : []),
+];
+const N = S.devs.length, ROOMS = new Set(S.devs.map((d) => d.room)).size;
+const states = Object.fromEntries(S.rings.map((r) => [r.id, 'planned']));
+
+// The build sheet's values for the first unit of the first batch, filled from the house values the way
+// src/lib/buildsheet.mjs fills them: {city} {number} {room} and the rest.
+const first = spaces[FIRST], site = sites[SITE];
+const vars = { site: site.name, city: site.city ?? site.name, code: String(site.code ?? site.id).toLowerCase(), number: first.number ?? '', digits: String(first.number ?? '').replace(/\D/g, ''), room: first.name, slug: String(first.name).toLowerCase().replace(/[^a-z0-9]+/g, '-') };
+const fill = (p: string) => String(p ?? '').replace(/\{(\w+)\}/g, (m, k) => vars[k] ?? m);
+const vlan = HOUSE.vlans.find((v: any) => v.classes.includes(MAIN[0]?.cls))?.vlan ?? '30';
+const SHEET = [
+  ['Hostname', `${vars.code}-${vars.digits}-vc01`, 'the naming standard'],
+  ['Room name', fill(HOUSE.calendar.name), 'the space record'],
+  ['Network', `VLAN ${vlan} · ${HOUSE.dns[site.region]?.[0] ?? '10.20.0.53'}`, 'the network standard'],
+  ['Time', `${HOUSE.time_servers[0]}`, 'the house values'],
+];
+const CHECKS = [
+  { id: 'port', what: 'Online on its switch port', from: 'the switch' },
+  { id: 'mgmt', what: 'In device management', from: 'Poly Lens' },
+  { id: 'read', what: 'Settings match the standard', from: 'the unit' },
+  { id: 'addr', what: 'On its reserved address', from: 'the DHCP server' },
+];
+const exc = spaces[EXCEPTION];
+const firstWord = lower(className(MAIN[0]?.cls ?? 'video-bar'));
+const CAPS = [
+  `The fourth floor as planned: ${ROOMS} spaces to equip, ${N} devices, no kit on the floor yet.`,
+  `Batch 1: every ${firstWord} on the floor at once. One configuration; each unit's values worked out from the record, not typed.`,
+  `Keia reads each unit back: on its port, in device management, against the standard. A person accepts what passed in one action.`,
+  `Three more batches. One exception: ${exc.number} ${exc.name} is not on its reserved address. Only that needs a person.`,
+  `Handover, 16:40. Every batch checked by the record; one exception, with a person. The floor is live.`,
+];
+const chipOwn = { s: 'with', to: 'brightwave', kind: 'vendor', name: 'Brightwave', at: `${DEMO_TODAY}T08:30:00`, why: 'fit-out' };
+---
+<section class="dl" data-dl data-shot="deliver" aria-labelledby="dl-h" data-n={N} data-rooms={ROOMS} data-exc={EXCEPTION}>
+  <header class="fd-head">
+    <p class="fd-eyebrow">Deliver it</p>
+    <h2 id="dl-h">A new floor, set up in batches and checked by the record.</h2>
+    <p class="fd-sub">The demo's Dublin fourth floor as an integrator fits it out: {N} devices, {ROOMS} spaces, one afternoon. Keia reads each unit back; a person fixes only the exceptions. The floor and its kit are real sample data; the integrator, the day and the readings are simulated.</p>
+  </header>
+
+  <div class="dl-stage">
+    <div class="dl-light" aria-hidden="true"></div>
+    <div class="dl-floor">
+      <IsoFloor scene={S} states={states} kitHidden numbers numbersLow label={`The fourth floor: ${ROOMS} spaces being fitted out`} />
+      <ol class="dl-batches" aria-label="Batches">
+        {BATCHES.filter((b) => b.id !== 'rest').map((b) => <li class="dl-batch" data-dl-batch={b.id} data-state="planned"><HealthGlyph state="planned" size={16} title={b.word} class="dl-bg lit" /><b>{b.word}</b><span>{b.units}</span></li>)}
+      </ol>
+    </div>
+
+    <div class="dl-cards">
+      <article class="dl-card" data-dl-card="batch" aria-label="Batch 1">
+        <p class="dl-over"><b>Batch 1 · {BATCHES[0].word}</b><span>{BATCHES[0].units} units · one configuration</span></p>
+        <dl class="dl-sheet">
+          {SHEET.map(([k, v, from], i) => <div class="dl-row" style={`--i:${i}`}><dt>{k}</dt><dd><span class="dl-v">{v}</span><span class="dl-from">from {from}</span></dd></div>)}
+        </dl>
+        <p class="dl-foot dl-row" style={`--i:${SHEET.length}`}>Shown for {first.number} {first.name}; each of the {BATCHES[0].units} gets its own.</p>
+      </article>
+
+      <article class="dl-card" data-dl-card="verify" aria-label="Checked by the record">
+        <p class="dl-over"><b>Checked by the record</b><span data-dl-checked>0 of {N} devices</span></p>
+        <ul class="dl-checks">
+          {CHECKS.map((c, i) => <li class="dl-row" style={`--i:${i}`} data-dl-check={c.id}><HealthGlyph state="progress" size={16} title={c.what} class="dl-cg lit" /><span class="dl-what">{c.what} <span class="dl-from">from {c.from}</span></span><span class="dl-n" data-dl-n={c.id}>0 of {N}</span></li>)}
+        </ul>
+        <p class="dl-exc" data-dl-exc hidden><HealthGlyph state="review" size={16} title="not on its reserved address" class="lit" /><span><b>{exc.number} {exc.name}</b> · display not on its reserved address. The one row a person opens.</span></p>
+      </article>
+
+    </div>
+
+    <article class="dl-card dl-hand-band" data-dl-card="hand" aria-label="Handover">
+      <p class="dl-over"><b>Handover</b><span data-dl-when>16:40</span></p>
+      <div class="dl-chip" data-dl-chip><WithChip own={chipOwn} history={[{ at: `${DEMO_TODAY}T08:30:00`, text: 'Fit-out with Brightwave: the as-built record' }]} /></div>
+      <p class="dl-hand">{N} devices, every port and setting: already the record the Dublin team runs from tomorrow. Nothing is typed twice.</p>
+    </article>
+  </div>
+
+  <p class="dl-cap"><span data-dl-cap aria-live="polite">{CAPS[0]}</span> <span class="dl-beat" data-dl-beat hidden>checked just now</span> <button type="button" class="dl-again" data-dl-again hidden>Play again</button></p>
+  <script type="application/json" data-dl-data set:html={JSON.stringify({ batches: BATCHES.map((b) => ({ id: b.id, rooms: b.rooms, units: b.units, word: b.word })), caps: CAPS })} />
+</section>
+
+<script>
+  import { motion, onceInView } from '../../lib/motion-read.mjs';
+  import { setGlyph } from '../../lib/health.mjs';
+  import { setSpace, showKit } from '../../lib/isofloor-client.mjs';
+  import { chipOf } from '../../lib/ownership.mjs';
+  import { setChip } from '../../lib/withchip.mjs';
+
+  function init(root: HTMLElement) {
+    if ((root as any).__dl) return; (root as any).__dl = true;
+    const q = <T extends HTMLElement>(s: string) => root.querySelector<T>(s)!;
+    const D = JSON.parse(q('[data-dl-data]').textContent || '{}');
+    const N = +root.dataset.n!, EXC = root.dataset.exc!;
+    const svg = q('svg.ifl'), cap = q('[data-dl-cap]'), beat = q('[data-dl-beat]'), again = q<HTMLButtonElement>('[data-dl-again]');
+    const cards = Object.fromEntries(Array.from(root.querySelectorAll<HTMLElement>('[data-dl-card]')).map((c) => [c.dataset.dlCard!, c]));
+    const checked = q('[data-dl-checked]'), exc = q('[data-dl-exc]');
+    const chipHost = q('[data-wc-host]'), today = chipHost.dataset.wcToday || '';
+    const W = window as any;
+    if (!W.rsWhoId) W.rsWhoId = () => 'liam';
+    if (!W.RS_PEOPLE) W.RS_PEOPLE = [{ id: 'liam', name: 'Liam Doyle', initials: 'LD' }, { id: 'niamh', name: 'Niamh', initials: 'N' }];
+    const PEOPLE = { liam: { name: 'Liam Doyle', first: 'Liam', initials: 'LD' } };
+    let timers: number[] = [], t0 = 0;
+    const later = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
+    const batchEl = (id: string) => root.querySelector<HTMLElement>(`[data-dl-batch="${id}"]`)!;
+    const setBatch = (id: string, s: string) => { const el = batchEl(id); if (!el) return; el.dataset.state = s; setGlyph(el.querySelector('.hg'), s); };
+    const counts = (n: number) => { checked.textContent = `${n} of ${N} devices`; root.querySelectorAll<HTMLElement>('[data-dl-n]').forEach((x) => { const short = x.dataset.dlN === 'addr' && n > D.batches[0].units ? 1 : 0; x.textContent = `${n - short} of ${N}`; }); };
+    const tick = () => { if (!root.isConnected || !t0) return; const s = Math.round((Date.now() - t0) / 10000) * 10; beat.textContent = s < 10 ? 'checked just now' : s < 60 ? `checked ${s} s ago` : `checked ${Math.floor(s / 60)} min ago`; setTimeout(tick, 10000); };
+    const chipTo = (rec: Record<string, unknown>) => { const el = chipHost.querySelector<HTMLElement>('[data-wc]'); if (el) setChip(el, chipOf(rec, null, { people: PEOPLE, today }), { history: [{ at: '16:40', text: 'Handed over to the Dublin AV team' }, { at: '08:30', text: 'Fit-out with Brightwave: the as-built record' }] }); };
+    const teamOwn = { s: 'with', to: 'dub-av', kind: 'team', name: 'Dublin AV team', at: `${today}T16:40:00`, why: 'as-built record' };
+
+    // The frame at the end of the sequence, all at once (reduced motion, and the reset before Play again).
+    const reset = () => {
+      timers.forEach(clearTimeout); timers = [];
+      showKit(svg, '', false);
+      root.querySelectorAll<HTMLElement>('[data-ifl-ring]').forEach((r) => setSpace(svg, r.dataset.iflRing!, 'planned'));
+      D.batches.forEach((b: any) => setBatch(b.id, 'planned'));
+      Object.values(cards).forEach((c) => c.classList.remove('is-in'));
+      root.querySelectorAll('.dl-cg').forEach((g) => setGlyph(g as HTMLElement, 'progress'));
+      exc.hidden = true; counts(0); cap.textContent = D.caps[0]; beat.hidden = true; again.hidden = true; t0 = 0;
+      chipTo({ s: 'with', to: 'brightwave', kind: 'vendor', name: 'Brightwave', at: `${today}T08:30:00`, why: 'fit-out' });
+    };
+    const finish = () => {
+      showKit(svg, '', true);
+      root.querySelectorAll<HTMLElement>('[data-ifl-ring]').forEach((r) => setSpace(svg, r.dataset.iflRing!, r.dataset.iflRing === EXC ? 'review' : 'fine'));
+      D.batches.forEach((b: any) => setBatch(b.id, 'fine'));
+      Object.values(cards).forEach((c) => c.classList.add('is-in'));
+      root.querySelectorAll('.dl-cg').forEach((g) => setGlyph(g as HTMLElement, 'fine'));
+      setGlyph(root.querySelector('[data-dl-check="addr"] .hg'), 'review');
+      exc.hidden = false; counts(N);
+      cap.textContent = D.caps[4]; t0 = Date.now(); beat.hidden = false; setTimeout(tick, 10000); again.hidden = false;
+      chipTo(teamOwn);
+    };
+
+    // The sequence: planned, then batch 1 with its sheet, then the checks, then the other batches and the one
+    // exception, then handover. Times are the tokens' (state 300, enter 440) so the tempo follows the look.
+    const run = () => {
+      const m = motion();
+      if (m.reduced) { finish(); return; }
+      const B = D.batches, n0 = B[0].units, S = m.state, E = m.enter;
+      let done = 0;
+      const rooms = (b: any, s: string) => b.rooms.forEach((id: string) => setSpace(svg, id, id === EXC && s === 'fine' && done > n0 ? 'review' : s));
+      later(500, () => { cap.textContent = D.caps[1]; cards.batch.classList.add('is-in'); showKit(svg, B[0].id); setBatch(B[0].id, 'progress'); rooms(B[0], 'progress'); });
+      later(500 + E + S * 3, () => { cap.textContent = D.caps[2]; cards.verify.classList.add('is-in'); });
+      later(500 + E * 2 + S * 3, () => {
+        root.querySelectorAll('.dl-cg').forEach((g, i) => later(i * 140, () => setGlyph(g as HTMLElement, 'fine')));
+        done = n0; counts(done); rooms(B[0], 'fine'); setBatch(B[0].id, 'fine');
+      });
+      const t3 = 500 + E * 2 + S * 3 + 900;
+      cap.textContent = D.caps[0];
+      later(t3, () => { cap.textContent = D.caps[3]; });
+      B.slice(1).forEach((b: any, k: number) => {
+        const t = t3 + k * 620;
+        later(t, () => { showKit(svg, b.id === 'rest' ? '' : b.id); setBatch(b.id, 'progress'); rooms(b, 'progress'); });
+        later(t + 520, () => { done += b.units; counts(done); rooms(b, 'fine'); setBatch(b.id, 'fine'); if (k === 0) { setSpace(svg, EXC, 'review'); exc.hidden = false; setGlyph(root.querySelector('[data-dl-check="addr"] .hg'), 'review'); } });
+      });
+      const t4 = t3 + (B.length - 1) * 620 + 800;
+      later(t4, () => { cap.textContent = D.caps[4]; cards.hand.classList.add('is-in'); t0 = Date.now(); beat.hidden = false; setTimeout(tick, 10000); });
+      later(t4 + E, () => chipTo(teamOwn));
+      later(t4 + E + m.chip + 600, () => { again.hidden = false; });
+    };
+    // Astro's own chip script redraws the chip at page load from its data; the sequence's chip state wins after that.
+    onceInView(root.querySelector('.dl-stage')!, run, 0.35);
+    again.addEventListener('click', () => { reset(); later(200, run); });
+  }
+  const boot = () => document.querySelectorAll<HTMLElement>('[data-dl]').forEach(init);
+  boot();
+  document.addEventListener('astro:page-load', boot);
+</script>
+
+<style>
+  .dl { display: grid; gap: 20px; }
+  .dl-stage {
+    --dl-bg: #EFE9DF; --dl-light: #FFFDF9; --dl-glow: rgba(226, 122, 58, .14);
+    position: relative; display: grid; grid-template-columns: minmax(0, 8fr) minmax(320px, 5fr); gap: 14px 24px; padding: 20px 22px 18px; border-radius: 24px;
+    background: var(--dl-bg); box-shadow: inset 0 0 0 1px var(--hairline); overflow: clip; align-items: start;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .dl-stage { --dl-bg: #15130F; --dl-light: #2B2621; --dl-glow: rgba(238, 138, 78, .12); } }
+  :root[data-theme="dark"] .dl-stage { --dl-bg: #15130F; --dl-light: #2B2621; --dl-glow: rgba(238, 138, 78, .12); }
+  .dl-light { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(80% 70% at 22% 6%, var(--dl-light) 0%, transparent 62%), radial-gradient(60% 46% at 90% 100%, var(--dl-glow) 0%, transparent 70%); }
+  .dl-floor { position: relative; display: grid; gap: 6px; align-self: center; min-width: 0; }
+  .dl-floor :global(.ifl) { width: 100%; }
+  .dl-batches { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .dl-batch { display: inline-flex; align-items: center; gap: 7px; min-height: 30px; padding: 0 10px 0 8px; border-radius: 999px; background: color-mix(in srgb, var(--surface) 70%, transparent); border: 1px solid var(--hairline); font-size: 12.5px; color: var(--text-2); transition: background var(--dur-state) var(--ease-settle), color var(--dur-state) var(--ease-settle); }
+  .dl-batch b { font-weight: 550; color: var(--text); }
+  .dl-batch span { font-variant-numeric: tabular-nums; }
+  .dl-batch[data-state="progress"] { background: var(--surface); }
+  .dl-batch[data-state="fine"] { background: var(--surface); }
+
+  .dl-cards { position: relative; display: grid; gap: 10px; align-content: start; min-width: 0; }
+  .dl-card { display: grid; gap: 8px; padding: 13px 16px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-md); min-width: 0;
+    opacity: 0; transform: translateY(10px) scale(.985); transition: opacity var(--dur-enter) var(--ease-settle), transform var(--dur-enter) var(--ease-settle); }
+  .dl-card.is-in { opacity: 1; transform: none; }
+  .dl-over { margin: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--text-2); }
+  .dl-over b { font-size: 14.5px; font-weight: 600; color: var(--text); letter-spacing: -.01em; }
+  .dl-over span { font-variant-numeric: tabular-nums; }
+  .dl-row { opacity: 0; transform: translateY(4px); transition: opacity var(--dur-state) var(--ease-settle) calc(var(--dur-enter) * .5 + var(--i, 0) * 110ms), transform var(--dur-state) var(--ease-settle) calc(var(--dur-enter) * .5 + var(--i, 0) * 110ms); }
+  .dl-card.is-in .dl-row { opacity: 1; transform: none; }
+  .dl-sheet { margin: 0; display: grid; gap: 6px; }
+  .dl-sheet div { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 2px 10px; align-items: baseline; }
+  .dl-sheet dt { font-size: 12.5px; color: var(--text-3); }
+  .dl-sheet dd { margin: 0; display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; min-width: 0; }
+  .dl-v { font-size: 13.5px; font-weight: 550; overflow-wrap: anywhere; }
+  .dl-from { font-size: 12px; color: var(--text-3); }
+  .dl-foot { margin: 0; font-size: 12.5px; color: var(--text-2); }
+  .dl-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+  .dl-checks li { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: 1px 10px; align-items: center; font-size: 13.5px; }
+  .dl-what .dl-from { white-space: nowrap; margin-left: 2px; }
+  .dl-what { font-weight: 550; }
+  .dl-n { font-variant-numeric: tabular-nums; color: var(--text-2); font-size: 13px; }
+  .dl-exc { margin: 0; display: flex; gap: 10px; align-items: start; padding: 9px 11px; border-radius: 10px; background: var(--h-review-soft, var(--amber-soft)); color: var(--h-review-ink, var(--amber-ink)); font-size: 13px; line-height: 1.4; animation: dl-in var(--dur-enter) var(--ease-settle) both; }
+  .dl-exc b { font-weight: 600; }
+  .dl-exc :global(.hg) { flex: none; margin-top: 2px; }
+  @keyframes dl-in { from { opacity: 0; transform: scale(.97); } }
+  .dl-hand-band { grid-column: 1 / -1; grid-template-columns: auto max-content minmax(0, 1fr); align-items: center; gap: 8px 22px; padding: 12px 18px; }
+  .dl-hand-band .dl-over { gap: 8px; }
+  .dl-chip { display: flex; }
+  /* The chip measures its new width when it slides; nothing here may cap it, or the words would be cut. */
+  .dl-chip :global(.wc-host), .dl-chip :global(.wc) { max-width: none; }
+  .dl-chip :global(.wc) { height: 32px; font-size: 13.5px; padding-right: 13px; }
+  .dl-hand { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--text-2); }
+  .dl-cap { margin: -4px 0 0; display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; font-size: 14.5px; line-height: 1.45; color: var(--text-2); }
+  .dl-beat { font-size: 12.5px; color: var(--text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .dl-again { font: 550 13px/1 var(--font-sans); color: var(--accent-ink); background: none; border: 0; padding: 6px 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+
+  @container fd (max-width: 1099px) {
+    .dl-stage { grid-template-columns: minmax(0, 1fr); }
+  }
+  @container fd (max-width: 899px) {
+    .dl-hand-band { grid-template-columns: minmax(0, 1fr); }
+  }
+  @container fd (max-width: 699px) {
+    .dl-stage { padding: 18px 16px; border-radius: 18px; gap: 18px; }
+    .dl-card { padding: 14px; }
+    .dl-sheet div { grid-template-columns: minmax(0, 1fr); }
+    .dl-what .dl-from { white-space: normal; }
+  }
+  @media (prefers-reduced-motion: reduce) { .dl-card, .dl-row, .dl-batch { transition: none; } .dl-exc { animation: none; } .dl-card, .dl-row { opacity: 1; transform: none; } }
+</style>
