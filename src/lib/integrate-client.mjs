@@ -7,7 +7,7 @@
 // that gains or loses items morphs (rsMorphPanels) inside a held box (rsHold), a change made by Keia Atlas,
 // the agent or another window is marked in place with who (rsMarkChanged), and a unit's detail grows
 // from its row. With reduced motion on, states just change.
-import { integrateModel, cellHtml, metersHtml, batchFootHtml, roomFootHtml, roomChipsHtml, needsHtml, readyHtml, unitDetailHtml, sharedHtml, setupHtml, testsHtml, describe, glyph, esc, PSEUDO, sheetCheck } from './integrate-view.mjs';
+import { integrateModel, cellHtml, metersHtml, batchFootHtml, roomFootHtml, roomChipsHtml, needsHtml, readyHtml, unitDetailHtml, sharedHtml, setupHtml, testsHtml, describe, glyph, esc, PSEUDO, sheetCheck, boardHtml, groupActsHtml, groupMetersHtml, oneHtml, oneActsHtml, nextInQueue, setBarHtml, setFormHtml, DELIVER_WORD, roomTestWord } from './integrate-view.mjs';
 
 const W = window;
 const motion = () => (W.rsMotion ? W.rsMotion() : { reduced: true, state: 300, morph: 520, enter: 440, exit: 240, ease: 'ease' });
@@ -50,24 +50,204 @@ function start() {
     const vName = (W.RS_PEOPLE || []).find((p) => p.id === id);
     root.querySelectorAll('[data-vendor-name]').forEach((el) => { el.textContent = vName ? `${vName.name}${vName.where ? `, ${vName.where}` : ''}` : 'a vendor'; });
     if (page === 'overview') {
-      const bar = document.querySelector('[data-fb]');
-      root.querySelectorAll('[data-rcard]').forEach((c) => {
-        const mine = plan.units.some((u) => u.room === c.dataset.rcard && u.vendor);
-        c.hidden = mode === 'vendor' && !(root.dataset.vendorHere === 'yes' && mine);
-      });
-      // The bar may still be starting: switch to Rooms as soon as it can.
-      // A drill-down that asks for the rooms (?view=rooms, from "Rooms signed off") opens them too.
-      let tries = 0;
-      const wantRooms = mode === 'vendor' || (!setMode.done && new URLSearchParams(location.search).get('view') === 'rooms');
-      setMode.done = true;
-      const toRooms = () => {
-        if (!wantRooms || !bar) return;
-        if (bar.rsFilter?.setView) { bar.rsFilter.setView('rooms'); bar.rsFilter.refresh?.(); } else if (tries++ < 30) requestAnimationFrame(toRooms);
-      };
-      toRooms();
-      if (mode !== 'vendor') bar?.rsFilter?.refresh?.();
+      // A vendor works space by space: their installs sit in each space's card, whatever the team's way.
+      const want = mode === 'vendor' ? 'room' : (setMode.by ?? by);
+      if (mode === 'vendor' && by !== 'room') { setMode.by = by; by = 'room'; drawBoard(false); }
+      else if (mode !== 'vendor' && setMode.by && want !== by) { by = want; setMode.by = null; drawBoard(false); }
+      vendorCards();
+      paintCtl();
       document.querySelectorAll('.band [data-help="integrate.next"]').forEach((a) => { a.hidden = mode === 'vendor'; });
     }
+  }
+
+  // ---- Deliver by (the overview): the same units, grouped the way the team works ----
+  // The team's way is the project's delivery.by; a person's own pick, their sets and where they are in the
+  // one-at-a-time queue are kept in this browser (rs8-deliver-*). Every way reads and writes the same unit-level
+  // events, so switching never loses progress.
+  const WAYS = ['type', 'room', 'floor', 'one', 'set'];
+  const boardBox = root.querySelector('[data-board-box]');
+  const board = root.querySelector('[data-board]');
+  const setSlot = root.querySelector('[data-setslot]');
+  const ctl = root.querySelector('[data-deliver-ctl]');
+  const fbar = document.querySelector('[data-fb]');
+  const still = () => motion().reduced || Boolean(W.km && W.km.reduced()) || /^(off|reduced)$/.test(document.documentElement.dataset.motion || '');
+  const K = (k) => `rs8-deliver-${k}:${plan.project}`;
+  const keep = {
+    get(k, d) { try { const v = localStorage.getItem(K(k)); return v == null ? d : JSON.parse(v); } catch (_) { return d; } },
+    set(k, v) { try { if (v == null) localStorage.removeItem(K(k)); else localStorage.setItem(K(k), JSON.stringify(v)); } catch (_) { /* private window: this visit only */ } },
+  };
+  const team = WAYS.includes(plan.delivery?.by) ? plan.delivery.by : 'type';
+  // The address is read before the filter bar rewrites it (index.astro keeps it in window.__rsDeliverQ).
+  const q0 = new URLSearchParams(W.__rsDeliverQ ?? location.search);
+  let by = WAYS.includes(q0.get('by')) ? q0.get('by') : q0.get('view') === 'rooms' ? 'room' : keep.get('by', null);
+  if (!WAYS.includes(by)) by = team;
+  let sets = keep.get('sets', []);
+  if (!Array.isArray(sets)) sets = [];
+  sets = sets.filter((s) => s && s.id && s.name && Array.isArray(s.units));
+  let setId = keep.get('set', null);
+  let draft = null, at = keep.get('at', null), sortV = 'order';
+  const activeSet = () => sets.find((s) => s.id === setId) ?? null;
+  const suggestName = () => `Set ${sets.length + 1}`;
+  if (by === 'set' && !sets.length) draft = { id: null, name: suggestName(), units: [] };
+
+  function paintCtl() {
+    if (!ctl) return;
+    ctl.querySelectorAll('[data-by]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.by === by)));
+    // One marker slides to the chosen way (M12); on a phone the five words sit in one line, short.
+    const seg = ctl.querySelector('.dv-seg');
+    if (seg && W.rsMarkerWatch) W.rsMarkerWatch(seg, '[aria-pressed=true]');
+    // The band's one action follows the way you work: the next batch, the next space, or the next unit.
+    const act = document.querySelector('.band [data-help="integrate.next"]');
+    if (act && mode !== 'vendor') {
+      const nb = plan.batches.find((b) => M.batchSum(b.id).status !== 'done');
+      const nr = plan.rooms.find((r) => r.units.length && !M.roomSum(r.id).signed);
+      const nu = nextInQueue(M, null);
+      const t = by === 'one' && nu ? [M.U.get(nu).sheet, 'Open the next unit'] : (by === 'room' || by === 'floor') && nr ? [`${plan.base}room/${nr.id}/`, 'Open the next space'] : nb ? [`${plan.base}${nb.id}/`, 'Open the next batch'] : null;
+      if (t) { act.setAttribute('href', t[0]); if (act.textContent !== t[1]) act.textContent = t[1]; }
+    }
+    const line = ctl.querySelector('[data-deliver-team]');
+    if (line) {
+      const tw = DELIVER_WORD[team].toLowerCase();
+      line.innerHTML = by === team
+        ? `<b>The team's way</b>${plan.delivery?.note ? ` · ${esc(plan.delivery.note)}` : ` · by ${esc(tw)}${plan.delivery?.recorded ? '' : ', the default'}`}`
+        : `<b>Your way, in this browser</b> · the team delivers by ${esc(tw)}. <button type="button" class="dv-link" data-act="deliver-team" data-help="integrate.deliver-team">Back to the team's way</button>`;
+    }
+  }
+  function vendorCards() {
+    if (page !== 'overview') return;
+    root.querySelectorAll('[data-rcard]').forEach((c) => {
+      const mine = plan.units.some((u) => u.room === c.dataset.rcard && u.vendor);
+      c.hidden = mode === 'vendor' && !(root.dataset.vendorHere === 'yes' && mine);
+    });
+  }
+  function drawSetSlot(hold = true) {
+    if (!setSlot) return;
+    const html = by === 'set' && mode !== 'vendor' ? setBarHtml(M, sets, setId) + (draft ? setFormHtml(M, draft) : '') : '';
+    const openHand = setSlot.querySelector('.dv-sf-hand')?.open;
+    const go = () => { setSlot.innerHTML = html; setSlot.hidden = !html; if (openHand) { const d = setSlot.querySelector('.dv-sf-hand'); if (d) d.open = true; } };
+    if (hold && W.rsHold && !still()) W.rsHold(setSlot, go); else go();
+  }
+  // Draw the board for `by`. With `animate`, each unit row travels to its new group (km.regroup).
+  function drawBoard(animate) {
+    if (!board) return;
+    const html = boardHtml(M, by, { set: activeSet(), sort: sortV, at });
+    const go = () => {
+      board.innerHTML = html;
+      board.querySelectorAll('[data-slot]').forEach((el) => { el.__h = null; });
+      drawSetSlot(false);
+      vendorCards();
+      markCurrent();
+      if (fbar?.rsFilter) fbar.rsFilter.refresh(); else document.dispatchEvent(new CustomEvent('rs:find-refresh'));
+    };
+    if (animate && W.km?.regroup && !still()) W.km.regroup(boardBox || board, go); else go();
+  }
+  function setBy(v) {
+    if (!WAYS.includes(v) || v === by) return;
+    by = v;
+    keep.set('by', v === team ? null : v);
+    if (by === 'set' && !sets.length && !draft) draft = { id: null, name: suggestName(), units: [] };
+    paintCtl();
+    drawBoard(true);
+    paint();
+  }
+  // One at a time: the unit in hand, and Next.
+  const currentOne = () => board?.querySelector('[data-slot="one"]')?.dataset.u || null;
+  function markCurrent() {
+    const cur = by === 'one' ? currentOne() : null;
+    board?.querySelectorAll('[data-urow]').forEach((row) => { const on = row.dataset.urow === cur; row.classList.toggle('is-current', on); if (on) row.setAttribute('aria-current', 'step'); else row.removeAttribute('aria-current'); });
+  }
+  function oneGo(uid, dir = 1) {
+    if (!uid || by !== 'one' || !board) return;
+    const slot = board.querySelector('[data-slot="one"]'), acts = board.querySelector('[data-oacts]'), card = slot?.closest('.dv-cur');
+    if (!slot || uid === slot.dataset.u) return;
+    at = uid; keep.set('at', at);
+    reasonFor = null;
+    const swap = () => { slot.dataset.u = uid; slot.innerHTML = oneHtml(M, uid); if (acts) { acts.__h = null; acts.innerHTML = oneActsHtml(M, uid); } markCurrent(); };
+    if (card && W.km?.slide && !still()) W.km.slide(card, swap, { dir }); else swap();
+    const top = card?.getBoundingClientRect().top ?? 0, lim = W.rsTopLimit ? W.rsTopLimit() : 0;
+    if (card && top < lim) card.scrollIntoView({ block: 'start', behavior: still() ? 'auto' : 'smooth' });
+  }
+  function oneStep(dir) {
+    const cur = currentOne();
+    const q = plan.queue ?? plan.units.map((u) => u.id);
+    const next = dir > 0 ? nextInQueue(M, cur) ?? q[(q.indexOf(cur) + 1) % q.length] : q[(q.indexOf(cur) - 1 + q.length) % q.length];
+    if (next && next !== cur) oneGo(next, dir);
+  }
+  // Custom sets.
+  const saveSets = () => { keep.set('sets', sets); keep.set('set', setId); };
+  function pickSet(id) { if (id === setId && !draft) return; setId = id; draft = null; saveSets(); drawBoard(true); paint(); }
+  function editSet(d) { draft = d; drawSetSlot(true); if (d) later(0, () => setSlot?.querySelector('input[name="name"]')?.focus({ preventScroll: true })); }
+  function syncDraft() {
+    if (!draft || !setSlot) return;
+    const has = new Set(draft.units);
+    setSlot.querySelectorAll('input[name="u"]').forEach((cb) => { cb.checked = has.has(cb.value); });
+    setSlot.querySelectorAll('[data-act="set-add"]').forEach((b) => { const ids = b.dataset.ids.split(' ').filter(Boolean); b.setAttribute('aria-pressed', String(ids.length > 0 && ids.every((i) => has.has(i)))); });
+    const n = setSlot.querySelector('[data-set-n]'); if (n) n.textContent = String(has.size);
+  }
+  function toggleDraft(ids) {
+    if (!draft) return;
+    const has = new Set(draft.units), all = ids.every((i) => has.has(i));
+    ids.forEach((i) => (all ? has.delete(i) : has.add(i)));
+    draft.units = plan.units.map((u) => u.id).filter((id) => has.has(id));
+    syncDraft();
+  }
+  function saveSet(form) {
+    if (!draft) return;
+    const name = String(new FormData(form).get('name') || '').trim().slice(0, 60);
+    const units = draft.units.filter((id) => M.U.has(id));
+    const say = form.querySelector('.dv-sf-n');
+    if (!name || !units.length) { if (say) say.innerHTML = `<b class="num" data-set-n>${units.length}</b> units chosen · ${!name ? 'Name the set first' : 'Choose at least one unit'}`; return; }
+    if (draft.id && sets.some((s) => s.id === draft.id)) sets = sets.map((s) => (s.id === draft.id ? { ...s, name, units } : s));
+    else { const id = `set-${Date.now().toString(36)}`; sets = [...sets, { id, name, units, made: nowIso() }]; draft.id = id; }
+    setId = draft.id; draft = null;
+    saveSets(); drawBoard(true); paint();
+  }
+  function deleteSet(id) {
+    sets = sets.filter((s) => s.id !== id);
+    if (setId === id) setId = sets[0]?.id ?? null;
+    draft = sets.length ? null : { id: null, name: suggestName(), units: [] };
+    saveSets(); drawBoard(true); paint();
+  }
+  // Live changes: every row, count, answer and action changes in place; nothing re-sorts (M10).
+  function paintBoard() {
+    if (!board) return;
+    let refilter = false;
+    board.querySelectorAll('[data-urow]').forEach((row) => {
+      const uid = row.dataset.urow, u = M.U.get(uid); if (!u) return;
+      const xs = M.unitSteps(uid), w = M.worstOf(xs), st = M.unitStatus(uid);
+      if (row.dataset.st !== st) { row.dataset.st = st; row.dataset.fStatus = st; refilter = true; }
+      const g = row.querySelector('.dv-ub > .ig'); if (g && w) g.dataset.st = w.st;
+      const word = row.querySelector('[data-uword]'), txt = M.unitWord(uid);
+      if (word && word.textContent !== txt) word.textContent = txt;
+      row.querySelectorAll('[data-dot]').forEach((d) => { const x = xs[u.steps.indexOf(d.dataset.dot)]; if (x && d.dataset.st !== x.st) { d.dataset.st = x.st; const gl = d.querySelector('.ig'); if (gl) gl.dataset.st = x.st; d.title = `${M.LABEL[d.dataset.dot]}: ${x.label}`; } });
+    });
+    board.querySelectorAll('.dv-g[data-g]').forEach((sec) => {
+      const g = groupFor(sec.dataset.g); if (!g) return;
+      const sum = M.groupSum(g);
+      sec.dataset.st = sum.status;
+      const c = sec.querySelector('[data-gcount]'); if (c) c.textContent = `${sum.checked}/${sum.total}`;
+      const a = sec.querySelector('[data-gans]'), ans = M.groupAnswer(g, sum, { bare: true }); if (a && a.textContent !== ans) a.textContent = ans;
+      const m = sec.querySelector('[data-gmeters]');
+      if (m) {
+        const tmp = document.createElement('div'); tmp.innerHTML = groupMetersHtml(M, g);
+        const olds = m.querySelectorAll('.im'), news = tmp.querySelectorAll('.im');
+        if (olds.length !== news.length) m.innerHTML = tmp.innerHTML;
+        else news.forEach((n, i) => {
+          const o = olds[i], os = o.querySelectorAll('.im-segs i, .im-bar i'), ns = n.querySelectorAll('.im-segs i, .im-bar i');
+          if (os.length !== ns.length) { o.replaceWith(n); return; }
+          ns.forEach((x, j) => { os[j].dataset.st = x.dataset.st; if (x.style.width) os[j].style.width = x.style.width; });
+          const ob = o.querySelector('.im-h b'), nb = n.querySelector('.im-h b'); if (ob && nb) ob.textContent = nb.textContent;
+        });
+      }
+      const f = sec.querySelector('[data-gacts]'); if (f) swapHtml(f, groupActsHtml(M, g));
+    });
+    board.querySelectorAll('[data-rword]').forEach((el) => { const t = roomTestWord(M, el.dataset.rword); if (el.textContent !== t) el.textContent = t; });
+    const cur = currentOne();
+    if (cur) {
+      const oa = board.querySelector('[data-oans]'), t = M.unitAnswer(cur); if (oa && oa.textContent !== t) oa.textContent = t;
+      const acts = board.querySelector('[data-oacts]'); if (acts) swapHtml(acts, oneActsHtml(M, cur));
+    }
+    if (refilter) fbar?.rsFilter?.refresh(board);
   }
 
   // ---- Painting ----
@@ -180,19 +360,19 @@ function start() {
   function paintFilterItems() {
     const bar = document.querySelector('[data-fb]');
     let moved = false;
-    root.querySelectorAll('[data-bcard]').forEach((c) => {
+    root.querySelectorAll('[data-bcard][data-fi]').forEach((c) => {
       const st = M.batchSum(c.dataset.bcard).status;
       if (c.dataset.fStatus !== st) { c.dataset.fStatus = st; moved = true; bar?.rsFilter?.refresh?.(c); }
       c.dataset.st = st;
     });
-    root.querySelectorAll('[data-rcard]').forEach((c) => {
+    root.querySelectorAll('[data-rcard][data-fi]').forEach((c) => {
       const st = M.roomSum(c.dataset.rcard).status;
       if (c.dataset.fStatus !== st) { c.dataset.fStatus = st; moved = true; bar?.rsFilter?.refresh?.(c); }
       c.dataset.st = st;
     });
     return moved;
   }
-  let view = 'batches';
+  // The Checked list follows the way the work is grouped (type, room, floor, one, set).
   function paint(ev, meta) {
     M.fresh();
     const mark = ev ? markWho(ev, meta) : null;
@@ -203,7 +383,7 @@ function start() {
     root.querySelectorAll('[data-slot="bfoot"]').forEach((el) => swapHtml(el, batchFootHtml(M, el.dataset.b)));
     root.querySelectorAll('[data-slot="rfoot"]').forEach((el) => swapHtml(el, roomFootHtml(M, el.dataset.r)));
     root.querySelectorAll('[data-slot="needs"]').forEach((el) => swapList(el, needsHtml(M, { room: el.dataset.room || null, batch: el.dataset.batch || null })));
-    root.querySelectorAll('[data-slot="ready"]').forEach((el) => swapList(el, readyHtml(M, { by: el.dataset.by === 'follow' ? (view === 'rooms' ? 'room' : 'batch') : el.dataset.by, only: el.dataset.only || null })));
+    root.querySelectorAll('[data-slot="ready"]').forEach((el) => swapList(el, readyHtml(M, { by: el.dataset.by === 'follow' ? by : el.dataset.by, only: el.dataset.only || null, set: activeSet() })));
     root.querySelectorAll('[data-slot="shared"]').forEach((el) => { if (swapHtml(el, sharedHtml(M, el.dataset.b)) && mark && ev && /:batch$/.test(ev.item) && W.rsMarkChanged) W.rsMarkChanged(el, mark); });
     root.querySelectorAll('[data-slot="setup"]').forEach((el) => swapHtml(el, setupHtml(M, el.dataset.b), true));
     root.querySelectorAll('[data-slot="tests"]').forEach((el) => { if (swapHtml(el, testsHtml(M, el.dataset.r)) && mark && ev && /:room$/.test(ev.item) && W.rsMarkChanged) W.rsMarkChanged(el, mark); });
@@ -212,6 +392,7 @@ function start() {
     root.querySelectorAll('[data-slot="vinstall"]').forEach((el) => swapHtml(el, vinstallHtml(el.dataset.r)));
     root.querySelectorAll('tr[data-u]').forEach((tr) => { const xs = M.unitSteps(tr.dataset.u); tr.dataset.st = xs.some((x) => x.st === 'issue') ? 'issue' : xs.every((x) => x.st === 'done') ? 'done' : xs.some((x) => x.st === 'verified') ? 'verified' : 'todo'; });
     root.querySelectorAll('[data-sck]').forEach((el) => paintSheetCheck(el, mark));
+    paintBoard();
     figures();
     if (paintFilterItems()) document.dispatchEvent(new CustomEvent('rs:find-refresh'));
   }
@@ -277,40 +458,53 @@ function start() {
   const setU = (uid, field, v, note, as) => rec(M.item.unit(uid), field, M.us(uid)[field], v, note, as);
   const nowIso = () => new Date().toISOString();
 
-  function accept(scope, id, keys, note) {
-    const it = scope === 'batch' ? M.item.batch(id) : scope === 'room' ? M.item.room(id) : M.item.project();
-    const cur = (scope === 'batch' ? M.bs(id) : scope === 'room' ? M.rs(id) : io.get(it, { accepted: {} })).accepted ?? {};
-    const add = Object.fromEntries(keys.map((k) => [k, { who: who(), at: nowIso() }]));
-    rec(it, 'accepted', cur, { ...cur, ...add }, note);
+  // ---- Groups: the ones on the page, and any other by its key ("room:jnu-2-02", "set:set-1", "unit:<id>") ----
+  function groupFor(gid) {
+    const i = gid.indexOf(':'), scope = gid.slice(0, i), id = gid.slice(i + 1);
+    if (scope === 'unit') return M.U.has(id) ? { scope, id, title: M.unitLabel(M.U.get(id)), units: [id] } : null;
+    if (scope === 'project') return { scope, id: 'all', title: 'the whole project', units: plan.units.map((u) => u.id) };
+    const way = { batch: 'type', room: 'room', zone: 'floor', queue: 'one', set: 'set', rest: 'set' }[scope];
+    return way ? M.groupsBy(way, { set: activeSet() }).find((g) => g.scope === scope && String(g.id) === id) ?? null : null;
   }
-  const EV = { provision: 'in the asset register, DNS and device management', install: 'online on the right switch ports', configure: 'settings read back and match the standard' };
-  function evidence(keys) {
-    const steps = [...new Set(keys.map((k) => k.split('|')[1]))];
-    const unitsN = new Set(keys.map((k) => k.split('|')[0])).size;
-    const checksN = keys.reduce((n, k) => { const [u, s] = k.split('|'); return n + (M.stepOf(u, s).cs?.length ?? 0); }, 0);
-    return `${unitsN} ${unitsN === 1 ? 'unit' : 'units'}, ${keys.length} ${keys.length === 1 ? 'step' : 'steps'}: ${['provision', 'install', 'configure'].filter((s) => steps.includes(s)).map((s) => EV[s]).join('; ')}. ${checksN} checks passed.`;
+  // Accept: one event on the group's item, every unit and step with who, when, what passed and where.
+  function accept(g, keys, note) {
+    if (!g || !keys.length || !L) return;
+    const e = M.acceptEvent(g, keys, { who: who(), at: nowIso(), note });
+    rec(e.item, e.field, e.before, e.after, e.note);
   }
+  const verifiedKeys = (ids) => ids.flatMap((id) => M.U.get(id).steps.filter((s) => M.stepOf(id, s).st === 'verified').map((s) => `${id}|${s}`));
   function acceptGroup(scope, id) {
-    let groups = scope === 'project' ? M.readyGroups('batch') : M.readyGroups(scope).filter((g) => g.id === id);
-    const keys = groups.flatMap((g) => g.keys);
-    if (!keys.length) return;
-    accept(scope, id, keys, `Accepted ${evidence(keys)}`);
+    if (scope === 'project') { accept(groupFor('project:all'), M.readyGroups('batch').flatMap((g) => g.keys)); return; }
+    const g = groupFor(`${scope}:${id}`);
+    if (g) accept(g, verifiedKeys(g.units));
   }
   function acceptUnits(bid, only) {
-    const keys = M.B.get(bid).units.filter((id) => !only || only.has(id)).flatMap((id) => M.U.get(id).steps.filter((s) => M.stepOf(id, s).st === 'verified').map((s) => `${id}|${s}`));
+    const keys = verifiedKeys(M.B.get(bid).units.filter((id) => !only || only.has(id)));
     if (!keys.length) return 0;
-    accept('batch', bid, keys, `Accepted ${evidence(keys)}`);
+    accept(groupFor(`batch:${bid}`), keys);
     return keys.length;
+  }
+  // Apply: a batch in one event; any other group, each unit that still needs its setup guide.
+  function applyGroup(g, how) {
+    const evs = M.applyEvents(g, { how });
+    evs.forEach((e) => rec(e.item, e.field, e.before, e.after, e.note));
+    const bids = new Set(g.units.map((id) => M.U.get(id).batch));
+    bids.forEach((bid) => readBack(bid));
+  }
+  function confirmGroup(g) {
+    const keys = M.toConfirm(g).map((id) => `${id}|configure`);
+    if (keys.length) accept(g, keys, `Confirmed by hand in ${g.title}, ${keys.length} ${keys.length === 1 ? 'unit' : 'units'}: set as the setup guide says. Keia Atlas cannot read these back.`);
   }
 
   // ---- The simulated systems: what Keia Atlas and the agent do after a person acts ----
   const reachable = (u) => (u.networked ? Boolean(M.us(u.id).online) : true) && M.hostOnline(u);
   function readBack(bid, delay = 900) {
     if (stage() < 2) return;
-    const b = M.B.get(bid); if (!b?.readable || !M.bs(bid).applied) return;
+    const b = M.B.get(bid); if (!b?.readable) return;
     let i = 0, drifted = false;
     for (const id of b.units) {
       const u = M.U.get(id); if (!u.steps.includes('configure')) continue;
+      if (!(M.bs(bid).applied || M.us(id).applied)) continue;
       const s = M.us(id); if (s.read && !s.drift) continue;
       if (!reachable(u)) continue;
       const n = i++;
@@ -403,7 +597,7 @@ function start() {
     if (cell && root.contains(cell) && cell.tagName === 'BUTTON') {
       const [uid, step] = cell.dataset.cell.split('|');
       const x = M.stepOf(uid, step);
-      if (x.st === 'verified') { const n = M.U.get(uid); accept('batch', n.batch, [`${uid}|${step}`], `Accepted ${evidence([`${uid}|${step}`])}`); return; }
+      if (x.st === 'verified') { accept(groupFor(`batch:${M.U.get(uid).batch}`), [`${uid}|${step}`]); return; }
       if (['todo', 'doing', 'blocked'].includes(x.st) && !(M.seeOn() && (x.cs ?? []).every((c) => c.ok !== null)) && !x.why && page === 'batch') { tick(uid, step, true); return; }
       if (page === 'batch') openDetail(uid, false); else location.href = `${plan.base}${M.U.get(uid).batch}/#u=${encodeURIComponent(uid)}`;
       return;
@@ -416,9 +610,24 @@ function start() {
     if (act === 'confirm') {
       const b = M.B.get(id);
       const keys = b.units.filter((u) => M.U.get(u).steps.includes('configure') && !['done', 'verified'].includes(M.stepOf(u, 'configure').st)).map((u) => `${u}|configure`);
-      if (keys.length) accept('batch', id, keys, `Confirmed by hand on ${keys.length} ${keys.length === 1 ? 'unit' : 'units'}: set as ${b.cfg?.name ?? 'the configuration'} says. Keia Atlas cannot read these back.`);
+      if (keys.length) accept(groupFor(`batch:${id}`), keys, `Confirmed by hand on ${keys.length} ${keys.length === 1 ? 'unit' : 'units'}: set as ${b.cfg?.name ?? 'the configuration'} says. Keia Atlas cannot read these back.`);
       return;
     }
+    // Deliver by, and what each group can do.
+    if (act === 'g-accept') { const g = groupFor(a.dataset.g); if (g) accept(g, verifiedKeys(g.units)); return; }
+    if (act === 'g-apply') { const g = groupFor(a.dataset.g); if (g) applyGroup(g, a.dataset.via); return; }
+    if (act === 'g-confirm') { const g = groupFor(a.dataset.g); if (g) confirmGroup(g); return; }
+    if (act === 'deliver') { setBy(a.dataset.by); return; }
+    if (act === 'deliver-team') { setBy(team); return; }
+    if (act === 'one-next') { oneStep(1); return; }
+    if (act === 'one-prev') { oneStep(-1); return; }
+    if (act === 'one-pick') { ev.preventDefault(); oneGo(uid, 1); return; }
+    if (act === 'set-pick') { pickSet(a.dataset.set); return; }
+    if (act === 'set-new') { editSet({ id: null, name: suggestName(), units: [] }); return; }
+    if (act === 'set-edit') { const s = activeSet(); if (s) editSet({ ...s, units: [...s.units] }); return; }
+    if (act === 'set-cancel') { editSet(null); return; }
+    if (act === 'set-delete') { deleteSet(a.dataset.set); return; }
+    if (act === 'set-add') { toggleDraft(a.dataset.ids.split(' ').filter(Boolean)); return; }
     if (act === 'apply') {
       const b = M.B.get(id), via = a.dataset.via;
       rec(M.item.batch(id), 'applied', false, true, via === 'agent' ? 'Applied the run the setup guide agent prepared' : via === 'push' ? `Applied through ${b.via} to all ${b.units.length}` : `Applied by hand in ${b.via}`);
@@ -473,6 +682,7 @@ function start() {
     if (!f || !root.contains(f)) return;
     ev.preventDefault();
     const kind = f.dataset.actForm, fd = new FormData(f);
+    if (kind === 'set') { saveSet(f); return; }
     if (kind === 'host') { const v = String(fd.get('host') || '').trim().toLowerCase().replace(/\s+/g, '-'); if (v) setU(f.dataset.u, 'host', v, 'Gave it a hostname'); return; }
     if (kind === 'reason') { saveReason(String(fd.get('r') || '').trim()); return; }
     if (kind === 'fail') { const note = String(fd.get('note') || '').trim(); if (note) testSet(f.dataset.id, f.dataset.t, { r: 'fail', note }); return; }
@@ -506,7 +716,11 @@ function start() {
     else if (tr) { if (cb.checked) selected.add(tr.dataset.u); else selected.delete(tr.dataset.u); tr.classList.toggle('picked', cb.checked); }
     paint();
   }
-  const onChange = (ev) => { const cb = ev.target.closest && ev.target.closest('[data-pick]'); if (cb && root.contains(cb)) pick(cb); };
+  const onChange = (ev) => {
+    const u = ev.target.closest && ev.target.closest('.dv-setform input[name="u"]');
+    if (u && draft) { const has = new Set(draft.units); if (u.checked) has.add(u.value); else has.delete(u.value); draft.units = plan.units.map((x) => x.id).filter((id) => has.has(id)); syncDraft(); return; }
+    const cb = ev.target.closest && ev.target.closest('[data-pick]'); if (cb && root.contains(cb)) pick(cb);
+  };
   root.addEventListener('click', onClick);
   root.addEventListener('submit', onSubmit);
   root.addEventListener('keydown', onKey);
@@ -514,10 +728,11 @@ function start() {
 
   // ---- The filter bar: views and sort ----
   const bar = document.querySelector('[data-fb]');
-  const onView = (e) => { view = e.detail?.value ?? view; paint(); };
   const RANK = { needs: 0, accept: 1, test: 1, doing: 2, todo: 3, done: 4 };
   const onSort = (e) => {
     const v = e.detail?.value ?? 'order';
+    // The Deploy overview's board: the groups re-order and every unit travels with its group.
+    if (board) { sortV = v; drawBoard(true); return; }
     const re = () => root.querySelectorAll('[data-sortable]').forEach((grid) => {
       const items = [...grid.children];
       items.sort((x, y) => (v === 'needs' ? (RANK[x.dataset.st] ?? 5) - (RANK[y.dataset.st] ?? 5) : 0) || (v === 'name' ? String(x.dataset.name).localeCompare(String(y.dataset.name)) : (+x.dataset.order) - (+y.dataset.order)));
@@ -525,7 +740,7 @@ function start() {
     });
     if (bar?.rsFilter) bar.rsFilter.run(true, re); else re();
   };
-  if (bar) { bar.addEventListener('fb:view', onView); bar.addEventListener('fb:sort', onSort); view = bar.querySelector('.fb-view[aria-pressed="true"]')?.dataset.fbView ?? view; }
+  if (bar) { bar.addEventListener('fb:sort', onSort); sortV = bar.rsFilter?.sort?.() ?? sortV; }
 
   // ---- The live layer ----
   let stop = null;
@@ -534,6 +749,9 @@ function start() {
     L.register(PFX, { base: (it) => M.baseOf(it), describe: (e) => describe(M, e) });
     if (stop) stop();
     stop = L.live.subscribe(PFX, (e, meta) => { paint(e, meta); });
+    // The board is drawn once the events are in, so its rows open in the right order (exceptions first) for
+    // the way this person works; from here on they change in place.
+    if (board) { M.fresh(); if (bar?.rsFilter?.sort) sortV = bar.rsFilter.sort(); drawBoard(false); paintCtl(); }
     paint();
     settled = true;
     // A link to one unit (#u=<id>) opens its detail.
@@ -549,7 +767,7 @@ function start() {
     if (stop) stop(); stop = null;
     timers.forEach(clearTimeout); timers.clear();
     document.removeEventListener('rs:demo-change', onDemo);
-    bar?.removeEventListener('fb:view', onView); bar?.removeEventListener('fb:sort', onSort);
+    bar?.removeEventListener('fb:sort', onSort);
   }, { once: true });
 }
 

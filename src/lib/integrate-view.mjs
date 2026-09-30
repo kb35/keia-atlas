@@ -29,7 +29,8 @@ export function integrateModel(plan, io) {
   const seeOn = () => stage() >= 2;
 
   // ---- Items and what they were built as ----
-  const item = { unit: (id) => `int:${P}:${id}:unit`, batch: (id) => `int:${P}:${id}:batch`, room: (id) => `int:${P}:${id}:room`, project: () => `int:${P}:all:project` };
+  const item = { unit: (id) => `int:${P}:${id}:unit`, batch: (id) => `int:${P}:${id}:batch`, room: (id) => `int:${P}:${id}:room`, zone: (id) => `int:${P}:${id}:zone`, project: () => `int:${P}:all:project` };
+  const Z = new Map((plan.zones ?? []).map((z) => [z.id, z]));
   const setupOf = (u) => (B.get(u.batch)?.setup ?? []);
   function baseUnit(u) {
     const o = { online: u.base.online, read: u.base.read, drift: u.base.drift, fwOk: u.base.fwOk, dnsOk: u.base.dnsOk, host: u.host, installed: u.base.installed };
@@ -40,7 +41,7 @@ export function integrateModel(plan, io) {
   const baseBatch = (b) => ({ applied: b.units.every((id) => U.get(id).base.read) && b.units.some((id) => U.get(id).steps.includes('configure')), handed: false, prepared: false, accepted: {} });
   const baseRoom = (r) => ({ tests: r.base.tests ?? {}, signed: r.base.signed ? { w: r.base.signed } : false, accepted: {} });
   const baseOf = (it) => {
-    const m = /^int:[^:]+:(.+):(unit|batch|room|project)$/.exec(it); if (!m) return {};
+    const m = /^int:[^:]+:(.+):(unit|batch|room|zone|project)$/.exec(it); if (!m) return {};
     if (m[2] === 'unit') return U.has(m[1]) ? baseUnit(U.get(m[1])) : {};
     if (m[2] === 'batch') return B.has(m[1]) ? baseBatch(B.get(m[1])) : {};
     if (m[2] === 'room') return R.has(m[1]) ? baseRoom(R.get(m[1])) : {};
@@ -51,13 +52,16 @@ export function integrateModel(plan, io) {
   const bs = (id) => S(item.batch(id));
   const rs = (id) => S(item.room(id));
 
-  // Everything accepted, from the built plan and from every accept event (batch, room, project).
+  // Everything accepted, from the built plan and from every accept event (batch, room, floor or side, one unit,
+  // the project and custom sets), whichever way the work was grouped when it was accepted.
   function acceptedAll() {
     const out = new Map();
     for (const u of plan.units) for (const [step, who] of Object.entries(u.base.accepted ?? {})) out.set(`${u.id}|${step}`, { who, at: null });
     const add = (st) => { for (const [k, v] of Object.entries(st.accepted ?? {})) out.set(k, v); };
     plan.batches.forEach((b) => add(bs(b.id)));
     plan.rooms.forEach((r) => add(rs(r.id)));
+    Z.forEach((z) => add(S(item.zone(z.id))));
+    plan.units.forEach((u) => add(us(u.id)));
     add(S(item.project()));
     return out;
   }
@@ -130,7 +134,7 @@ export function integrateModel(plan, io) {
     if (step === 'configure') {
       const bst = bs(u.batch);
       const su = setupOf(u), n = su.filter((x2) => s[`su-${x2.id}`] || bst[`su-${x2.id}`]).length;
-      if (bst.applied && seeable) return { st: 'doing', label: 'Under way', sub: !hostOnline(u) ? 'Waits for its video bar' : u.networked && !s.online ? 'Applies when it is online' : 'Reading back', cs };
+      if ((bst.applied || s.applied) && seeable) return { st: 'doing', label: 'Under way', sub: !hostOnline(u) ? 'Waits for its video bar' : u.networked && !s.online ? 'Applies when it is online' : 'Reading back', cs };
       if (n > 0) return { st: 'doing', label: 'Under way', sub: `${n} of ${su.length} setup steps`, cs };
     }
     return { st: 'todo', label: 'To do', sub: '', cs };
@@ -182,9 +186,14 @@ export function integrateModel(plan, io) {
   }
   // What Keia Atlas saw pass and nobody has accepted yet, by batch or by room.
   const EVIDENCE = { provision: 'in the asset register, DNS and device management', install: 'online on the right switch ports', configure: 'settings read back and match' };
-  function readyGroups(by) {
+  // `by` is a way of delivering (type, room, floor, one, set) or, as before, 'batch'.
+  function readyGroups(by, opts = {}) {
     const groups = [];
-    const list = by === 'room' ? plan.rooms.map((r) => ({ id: r.id, title: r.name, units: r.units, noun: null })) : plan.batches.map((b) => ({ id: b.id, title: b.title, units: b.units, noun: b.noun, cfg: b.cfg }));
+    const way = by === 'batch' ? 'type' : by;
+    const list = way === 'one'
+      ? (plan.queue ?? plan.units.map((u) => u.id)).map((id) => { const u = U.get(id); return { scope: 'unit', id, title: unitLabel(u), units: [id], noun: null }; })
+      : groupsBy(way, opts).map((g) => ({ ...g, noun: g.scope === 'batch' ? B.get(g.id).noun : null, cfg: g.scope === 'batch' ? B.get(g.id).cfg : null }));
+    const scopeWord = (g) => (g.scope === 'batch' ? 'batch' : g.scope);
     for (const g of list) {
       const keys = [], stepsSeen = new Set(); let checksN = 0; const unitsIn = new Set();
       let blockedN = 0;
@@ -197,13 +206,161 @@ export function integrateModel(plan, io) {
       const ev = USTEPS.filter((s) => stepsSeen.has(s)).map((s) => (s === 'configure' && g.cfg ? `settings match the setup guide (${g.cfg.name}, ${g.cfg.version})` : EVIDENCE[s]));
       const n = unitsIn.size;
       const all = n === g.units.length && !blockedN && g.units.every((id) => U.get(id).steps.every((st) => ['verified', 'done'].includes(stepOf(id, st).st)));
-      const what = by === 'room' ? `in ${g.title}` : (g.noun ?? 'units');
-      const head = all
-        ? (by === 'room' ? `Every unit in ${g.title} passes` : n === 1 ? `The ${g.title.replace(/^1 /, '')} passes` : `All ${n} ${what} pass`)
-        : `${plural(keys.length, 'step')} passed on ${n} of ${g.units.length} ${by === 'room' ? `units ${what}` : what}`;
-      groups.push({ scope: by, id: g.id, title: g.title, head, ev: ev.join(', '), keys, n, checksN, left: blockedN, all });
+      const inWords = g.scope !== 'batch';
+      const what = inWords ? `in ${g.title}` : (g.noun ?? 'units');
+      const head = g.scope === 'unit' ? `${g.title}: ${plural(keys.length, 'step')} passed`
+        : all
+          ? (inWords ? `Every unit in ${g.title} passes` : n === 1 ? `The ${g.title.replace(/^1 /, '')} passes` : `All ${n} ${what} pass`)
+          : `${plural(keys.length, 'step')} passed on ${n} of ${g.units.length} ${inWords ? `units ${what}` : what}`;
+      groups.push({ scope: scopeWord(g), id: g.id, title: g.title, head, ev: ev.join(', '), keys, n, checksN, left: blockedN, all });
     }
     return groups;
+  }
+
+  // ---- Deliver by: the same units, grouped the way a team works ----
+  // type: batches that share a setup guide; room: each space's units, then its room test; floor: spaces by
+  // floor, or by side of the floor; one: a single queue in walking order; set: a set a person picked.
+  const lc = (s) => (/^[A-Z][a-z]/.test(String(s)) ? String(s).charAt(0).toLowerCase() + String(s).slice(1) : String(s));
+  const unitLabel = (u) => `${u.roomName} ${lc(u.short)}`;
+  function groupsBy(by, { set = null } = {}) {
+    if (by === 'room') return plan.rooms.filter((r) => r.units.length).map((r, i) => ({ scope: 'room', id: r.id, n: i + 1, title: r.name, sub: [r.profile, r.kept.length ? `${plural(r.kept.length, 'device')} kept as they are` : ''].filter(Boolean).join(' · '), units: r.units, rooms: [r.id] }));
+    if (by === 'floor') {
+      const zones = plan.zones?.length ? plan.zones : [{ id: 'all', title: 'Every space', rooms: plan.rooms.filter((r) => r.units.length).map((r) => r.id), units: plan.units.map((u) => u.id) }];
+      return zones.map((z, i) => ({ scope: 'zone', id: z.id, n: i + 1, title: z.title, sub: `${plural(z.rooms.length, 'space')}, ${plural(z.units.length, 'unit')}`, units: z.units, rooms: z.rooms }));
+    }
+    if (by === 'one') {
+      const q = plan.queue ?? plan.units.map((u) => u.id);
+      return [{ scope: 'queue', id: 'all', title: 'The queue', sub: 'Space by space, in the order an engineer works', units: q, rooms: [...new Set(q.map((id) => U.get(id).room))] }];
+    }
+    if (by === 'set') {
+      const inSet = set ? set.units.filter((id) => U.has(id)) : [];
+      const rest = plan.units.map((u) => u.id).filter((id) => !inSet.includes(id));
+      const out = [];
+      if (set) out.push({ scope: 'set', id: set.id, title: set.name, sub: 'Your set, saved in this browser', units: inSet, rooms: [...new Set(inSet.map((id) => U.get(id).room))] });
+      if (rest.length) out.push({ scope: 'rest', id: 'rest', title: set ? 'Not in this set' : 'Every unit', sub: set ? 'The rest of the project' : 'Pick units for a set above', units: rest, rooms: [...new Set(rest.map((id) => U.get(id).room))] });
+      return out;
+    }
+    return plan.batches.map((b) => ({ scope: 'batch', id: b.id, n: b.n, title: b.title, sub: b.touched ? 'Re-check: they pair with the new units' : b.cfg ? `${b.cfg.name} ${b.cfg.version}` : 'Nothing to set: provision and install', units: b.units, rooms: b.rooms }));
+  }
+  const settled = (x) => x.st === 'done' || x.st === 'verified';
+  // Where a group stands, counted from its units' own steps (so every grouping counts the same way).
+  function groupSum(g) {
+    const per = g.units.map((id) => ({ id, xs: unitSteps(id) }));
+    const checked = per.filter((p) => p.xs.every(settled)).length;
+    const accepted = per.filter((p) => p.xs.every((x) => x.st === 'done')).length;
+    const issueUnits = per.filter((p) => p.xs.some((x) => x.st === 'issue')).map((p) => p.id);
+    const readyKeys = per.flatMap((p) => U.get(p.id).steps.filter((s, i) => p.xs[i].st === 'verified').map((s) => `${p.id}|${s}`));
+    const moving = per.some((p) => p.xs.some((x) => x.st !== 'todo' && x.st !== 'na'));
+    const rooms = (g.scope === 'room' || g.scope === 'zone') ? (g.rooms ?? []).map((rid) => roomSum(rid)) : [];
+    const signed = rooms.filter((r) => r.signed).length, failed = rooms.filter((r) => r.failed.length && !r.signed);
+    const status = issueUnits.length || failed.length ? 'needs' : readyKeys.length ? 'accept'
+      : rooms.length ? (signed === rooms.length ? 'done' : checked === per.length ? 'test' : moving ? 'doing' : 'todo')
+        : accepted === per.length ? 'done' : moving ? 'doing' : 'todo';
+    return { total: per.length, checked, accepted, issueUnits, readyKeys, rooms, signed, failed, status, moving };
+  }
+  // A unit's worst step: what a person would want to know about it first.
+  const worstOf = (xs) => xs.find((x) => x.st === 'issue') ?? xs.find((x) => x.st === 'blocked') ?? xs.find((x) => !settled(x)) ?? xs.find((x) => x.st === 'verified') ?? xs[0];
+  // Where a unit stands, in two or three words: the same words in every way of delivering.
+  function unitWord(uid) {
+    const u = U.get(uid), xs = unitSteps(uid);
+    const issue = xs.find((x) => x.st === 'issue');
+    if (issue) return `Ready for you: ${lc(issue.sub || 'look')}`;
+    const wait = xs.find((x) => x.st === 'blocked');
+    if (wait) return `Waiting on: ${lc(wait.sub)}`;
+    const ready = xs.filter((x) => x.st === 'verified').length;
+    if (ready) return `${plural(ready, 'step')} to accept`;
+    if (xs.every((x) => x.st === 'done')) return 'Accepted';
+    const i = xs.findIndex((x) => !settled(x));
+    return i < 0 ? 'Set up' : `${LABEL[u.steps[i]]}: ${lc(xs[i].label)}`;
+  }
+  const unitStatus = (uid) => { const xs = unitSteps(uid); return xs.some((x) => x.st === 'issue') ? 'needs' : xs.some((x) => x.st === 'verified') ? 'accept' : xs.every((x) => x.st === 'done') ? 'done' : xs.some((x) => x.st !== 'todo' && x.st !== 'na') ? 'doing' : 'todo'; };
+  // One exception in words, short enough for the answer sentence.
+  // mode: 'room' names the unit by its kind ("the display"), 'self' says "it", anything else names it in full.
+  function issuePhrase(n, mode) {
+    const inRoom = mode === 'room' || mode === 'self';
+    const u = n.u ? U.get(n.u) : null;
+    const who = mode === 'self' ? 'it' : u ? (inRoom ? `the ${lc(u.short)}` : unitLabel(u)) : '';
+    const its = mode === 'self' ? 'its' : `${who}'s`;
+    if (n.kind === 'host') return `${who} has no hostname yet`;
+    if (n.kind === 'dns') return `${its} DNS still points at the old unit`;
+    if (n.kind === 'fw') return `${who} runs older firmware than the standard`;
+    if (n.kind === 'offline') return `${who} is offline`;
+    if (n.kind === 'drift') { const what = String(us(n.u).drift ?? '').split(':')[0].toLowerCase(); return `${its} ${what || 'settings'} ${what && !/s$/.test(what) ? 'differs' : 'differ'} from the setup guide`; }
+    if (n.kind === 'test') return inRoom ? `the room test failed: ${lc(n.t.replace(/^Room test failed: /, ''))}` : `${R.get(n.room)?.name ?? 'a space'}'s room test failed`;
+    if (n.kind === 'blocked') return `waiting on ${lc(n.t.replace(/^Waiting on: /, ''))}`;
+    return lc(n.t);
+  }
+  // The answer sentence first: "4.05 Heron: 5 of 7 checked; the display's DNS still points at the old unit".
+  // `bare` leaves the group's name off, for a card whose title already says it.
+  function groupAnswer(g, sum = groupSum(g), { bare = false } = {}) {
+    const inRoom = g.scope === 'room';
+    const ids = new Set(g.units), roomsIn = new Set(g.rooms ?? []);
+    const list = needs().filter((n) => (n.u ? ids.has(n.u) : (n.kind === 'test' && (g.scope === 'room' || g.scope === 'zone') && roomsIn.has(n.room)) || (n.kind === 'blocked' && n.room && roomsIn.has(n.room))));
+    const loud = list.filter((n) => !n.quiet);
+    const head = `${bare ? '' : `${g.title}: `}${sum.checked} of ${plural(sum.total, 'unit')} checked`;
+    if (loud.length) return `${head}; ${issuePhrase(loud[0], inRoom ? 'room' : 'any')}${loud.length > 1 ? `, and ${loud.length - 1} more for you` : ''}`;
+    if (sum.readyKeys.length) return `${head}; ${plural(sum.readyKeys.length, 'step')} passed, ready to accept`;
+    if (sum.rooms.length) {
+      if (sum.signed === sum.rooms.length) return `${head}; ${sum.rooms.length === 1 ? 'signed off' : `all ${sum.rooms.length} spaces signed off`}`;
+      if (sum.checked === sum.total) return `${head}; ${sum.rooms.length === 1 ? 'ready for the room test' : `${sum.signed} of ${sum.rooms.length} spaces signed off`}`;
+    }
+    if (sum.accepted === sum.total && sum.total) return `${head}; all accepted`;
+    const waits = list.filter((n) => n.quiet);
+    if (waits.length) return `${head}; ${issuePhrase(waits[0], inRoom ? 'room' : 'any')}`;
+    if (!sum.moving) return `${head}; not started`;
+    return sum.checked === sum.total ? `${head}; nothing waiting on you` : `${head}; ${sum.total - sum.checked} still to set up`;
+  }
+  // One unit's answer, for One at a time.
+  function unitAnswer(uid) {
+    const u = U.get(uid), xs = unitSteps(uid);
+    const n = needs().find((x) => x.u === uid && !x.quiet);
+    const ok = xs.filter(settled).length;
+    const head = `${unitLabel(u)}: ${ok} of ${plural(xs.length, 'step')} checked`;
+    if (n) return `${head}; ${issuePhrase(n, 'self')}`;
+    const ready = xs.filter((x) => x.st === 'verified').length;
+    if (ready) return `${head}; ${plural(ready, 'step')} passed, ready to accept`;
+    if (xs.every((x) => x.st === 'done')) return `${head}; all accepted`;
+    const w = worstOf(xs), step = lc(LABEL[u.steps[xs.indexOf(w)]] ?? '');
+    if (w.st === 'blocked') return `${head}; ${step} is waiting on ${lc(w.sub)}`;
+    return `${head}; next: ${step}${w.sub ? ` (${lc(w.sub)})` : ''}`;
+  }
+
+  // What passed for one unit and step, in words, kept with its accept.
+  function evidenceOf(uid, step) {
+    const x = stepOf(uid, step);
+    const ok = (x.cs ?? []).filter((c) => c.ok);
+    if (!ok.length) return 'Confirmed by hand: Keia Atlas cannot see this one';
+    return ok.map((c) => `${c.t}: ${c.found || c.exp}`).join('; ');
+  }
+  function acceptSummary(keys) {
+    const steps = [...new Set(keys.map((k) => k.split('|')[1]))];
+    const unitsN = new Set(keys.map((k) => k.split('|')[0])).size;
+    const checksN = keys.reduce((n, k) => { const [u, s] = k.split('|'); return n + ((stepOf(u, s).cs ?? []).filter((c) => c.ok).length); }, 0);
+    return `${plural(unitsN, 'unit')}, ${plural(keys.length, 'step')}: ${USTEPS.filter((s) => steps.includes(s)).map((s) => EVIDENCE[s]).join('; ')}. ${plural(checksN, 'check')} passed.`;
+  }
+  // The item an accept in this group is written to. A custom set lives in one browser, so its accepts go on the
+  // project, naming the set; every other grouping has an item every window knows.
+  function itemOfGroup(g) {
+    if (g.scope === 'batch') return item.batch(g.id);
+    if (g.scope === 'room') return item.room(g.id);
+    if (g.scope === 'zone') return item.zone(g.id);
+    if (g.scope === 'unit') return item.unit(g.id);
+    return item.project();
+  }
+  // The one event that accepts `keys` in group g: each unit and step with who, when, what passed and where.
+  function acceptEvent(g, keys, { who, at, note } = {}) {
+    const it = itemOfGroup(g);
+    const cur = S(it).accepted ?? {};
+    const add = Object.fromEntries(keys.map((k) => { const [uid, step] = k.split('|'); return [k, { who, at, ev: evidenceOf(uid, step), in: `${g.scope}:${g.id}`, inTitle: g.title }]; }));
+    return { item: it, field: 'accepted', before: cur, after: { ...cur, ...add }, note: note ?? `Accepted in ${g.title}: ${acceptSummary(keys)}` };
+  }
+  // Units in a group still waiting for their setup guide: ones Keia Atlas can read back, and ones a person confirms.
+  function toApply(g) { return g.units.filter((id) => { const u = U.get(id); return u.steps.includes('configure') && u.readable && !(bs(u.batch).applied || us(id).applied || us(id).read) && !settled(stepOf(id, 'configure')); }); }
+  function toConfirm(g) { return g.units.filter((id) => { const u = U.get(id); return u.steps.includes('configure') && !u.readable && !settled(stepOf(id, 'configure')); }); }
+  // The events that send a group its setup guides: a batch is one event, anything else one per unit.
+  function applyEvents(g, { how = 'push' } = {}) {
+    if (g.scope === 'batch') { const b = B.get(g.id); return [{ item: item.batch(g.id), field: 'applied', before: false, after: true, note: how === 'push' ? `Applied through ${b.via} to all ${b.units.length}` : `Applied by hand in ${b.via}` }]; }
+    return toApply(g).map((id) => { const b = B.get(U.get(id).batch); return { item: item.unit(id), field: 'applied', before: false, after: true, note: `${how === 'push' ? 'Applied' : 'Applied by hand'}: ${b?.cfg ? `${b.cfg.name} ${b.cfg.version}` : 'the setup guide'} through ${b?.via ?? 'device management'}, with ${g.title}` }; });
   }
 
   // ---- Band figures ----
@@ -216,7 +373,7 @@ export function integrateModel(plan, io) {
   }
 
   const agents = () => io.agents?.() ?? stage() >= 6;
-  return { agents, plan, P, U, B, R, LABEL, DONE_W, item, baseOf, us, bs, rs, acc, fresh, checks, issueOf, issuesOf, stepOf, unitSteps, unitSetUp, batchSum, roomSum, needs, readyGroups, figures, nameOf, setupOf, hostOnline, stage, seeOn };
+  return { agents, plan, P, U, B, R, LABEL, DONE_W, item, baseOf, us, bs, rs, acc, fresh, checks, issueOf, issuesOf, stepOf, unitSteps, unitSetUp, batchSum, roomSum, needs, readyGroups, figures, nameOf, setupOf, hostOnline, stage, seeOn, Z, groupsBy, groupSum, groupAnswer, unitAnswer, unitStatus, unitWord, worstOf, unitLabel, evidenceOf, acceptSummary, acceptEvent, itemOfGroup, toApply, toConfirm, applyEvents, issuePhrase };
 }
 
 // ---- Markup, shared by the build and the browser ----
@@ -283,8 +440,8 @@ export function needsHtml(M, { room = null, batch = null, limit = 0 } = {}) {
   }).join('')}</ul>${limit && list.length > limit ? `<p class="nd-more faint">and ${list.length - limit} more below</p>` : ''}`;
 }
 // The "Checked by Keia Atlas" list: what passed and waits for a person to accept, one action each.
-export function readyHtml(M, { by = 'batch', only = null } = {}) {
-  let groups = M.readyGroups(by);
+export function readyHtml(M, { by = 'batch', only = null, set = null } = {}) {
+  let groups = M.readyGroups(by, { set });
   if (only) groups = groups.filter((g) => g.id === only);
   if (!groups.length) {
     return `<p class="rd-none">${M.seeOn() ? 'Nothing waiting. When units pass their checks, they gather here for you to accept in one go.' : 'Once real feeds replace the simulation, Keia Atlas checks the systems and gathers what passed here. Until then, mark each step done by hand.'}</p>`;
@@ -417,9 +574,180 @@ export function testsHtml(M, rid) {
   return `<ul class="rt-list">${rows}</ul>${foot}`;
 }
 
+// ---- Deliver by: the board ----
+// Every way of delivering draws the same unit rows (keyed data-vk="u:<id>"), so switching moves each row to its
+// new group (km.regroup) instead of swapping the page. The rows keep their order while live changes arrive
+// (M10); the order (exceptions first) is set when the board is drawn.
+export const DELIVER_BY = [
+  { by: 'type', label: 'Device type', short: 'Type', what: 'Batches of units that share a setup guide, set up together' },
+  { by: 'room', label: 'Room', short: 'Room', what: 'Each space\'s units set up and checked together, then its room test' },
+  { by: 'floor', label: 'Floor or zone', short: 'Floor', what: 'Spaces grouped by floor, or by side of the floor, for a fit-out' },
+  { by: 'one', label: 'One at a time', short: 'One', what: 'A single queue: the next unit, its build sheet and checks, then Next' },
+  { by: 'set', label: 'Custom set', short: 'Set', what: 'Units you pick and name, worked as one batch' },
+];
+export const DELIVER_WORD = Object.fromEntries(DELIVER_BY.map((d) => [d.by, d.label]));
+const ST_RANK = { needs: 0, accept: 1, doing: 2, todo: 3, done: 4 };
+const DOT_WORD = { todo: 'To do', doing: 'Under way', verified: 'Checked', done: 'Accepted', issue: 'Ready for you', blocked: 'Waiting on', na: 'Not needed' };
+
+// One unit's row. How it is named depends on the group: by space in a batch, by kind in a space, both elsewhere.
+export function unitRowHtml(M, uid, g, { one = false } = {}) {
+  const u = M.U.get(uid), xs = M.unitSteps(uid), w = M.worstOf(xs), st = M.unitStatus(uid);
+  const inRoom = g.scope === 'room' || g.scope === 'zone';
+  const name = g.scope === 'batch' ? u.roomName : inRoom ? u.short : M.unitLabel(u);
+  const sub = [g.scope === 'batch' ? u.short : u.modelName?.replace(/\s*\([^)]*\)\s*$/, ''), u.host].filter(Boolean).join(' · ');
+  const word = M.unitWord(uid);
+  const dots = u.steps.map((s, i) => `<span class="dv-dot" data-dot="${s}" data-st="${xs[i].st}" title="${esc(`${M.LABEL[s]}: ${DOT_WORD[xs[i].st] ?? xs[i].label}`)}">${glyph(xs[i].st)}</span>`).join('');
+  const to = `${M.plan.base}${u.batch}/#u=${encodeURIComponent(uid)}`;
+  return `<li class="dv-u" data-vk="u:${esc(uid)}" data-urow="${esc(uid)}" data-st="${st}" data-fi data-find="${esc([u.name, u.roomName, u.short, u.host, u.modelName, u.clsName].filter(Boolean).join(' '))}" data-f-site="${esc(u.site)}" data-f-kind="${esc(u.cls)}" data-f-status="${st}" data-f-room="${esc(u.room)}" data-help="integrate.unit-row">` +
+    `<a class="dv-ub" href="${esc(to)}"${one ? ` data-act="one-pick" data-u="${esc(uid)}"` : ''}>${glyph(w?.st ?? 'todo')}<span class="dv-un"><b>${esc(name)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</span></a>` +
+    `<span class="dv-uw" data-uword>${esc(word)}</span><span class="dv-dots" aria-hidden="true">${dots}</span></li>`;
+}
+// A group's progress per step: one segment per unit (a single bar past 24 units), and the room tests.
+export function groupMetersHtml(M, g) {
+  const steps = USTEPS.filter((s) => g.units.some((id) => M.U.get(id).steps.includes(s)));
+  const meter = (label, key, sts) => {
+    const n = sts.filter((s) => s === 'done' || s === 'verified').length, t = sts.filter((s) => s !== 'na').length;
+    const body = sts.length > 24
+      ? (() => { const pc = (k) => (100 * sts.filter((s) => s === k).length) / Math.max(1, t); return `<span class="im-bar"><i data-st="done" style="width:${pc('done').toFixed(1)}%"></i><i data-st="verified" style="width:${pc('verified').toFixed(1)}%"></i><i data-st="issue" style="width:${pc('issue').toFixed(1)}%"></i><i data-st="doing" style="width:${pc('doing').toFixed(1)}%"></i></span>`; })()
+      : `<span class="im-segs">${sts.map((s) => `<i data-st="${s}"></i>`).join('')}</span>`;
+    return `<div class="im" data-meter="${key}"><span class="im-h"><span>${esc(label)}</span><b class="num">${n}/${t}</b></span>${body}</div>`;
+  };
+  const out = steps.map((s) => meter(M.LABEL[s], s, g.units.map((id) => M.stepOf(id, s).st)));
+  if (g.scope === 'room' || g.scope === 'zone') {
+    const sts = (g.rooms ?? []).map((rid) => { const r = M.roomSum(rid); return r.signed ? 'done' : r.failed.length ? 'issue' : r.passed ? 'doing' : r.ready ? 'verified' : 'todo'; });
+    out.push(meter(g.scope === 'room' ? 'Room test' : 'Room tests', 'commission', sts).replace(/<b class="num">\d+\/\d+<\/b>/, `<b class="num">${sts.filter((s) => s === 'done').length}/${sts.length}</b>`));
+  }
+  return out.join('');
+}
+// What a person can do with the group in view: apply its setup guides, confirm what cannot be read back, accept
+// what passed, and open the page that goes deeper.
+export function groupActsHtml(M, g) {
+  const sum = M.groupSum(g), acts = [];
+  const gid = `${g.scope}:${g.id}`;
+  const apply = M.toApply(g), confirm = M.toConfirm(g);
+  if (apply.length && M.seeOn()) {
+    const cfgs = new Set(apply.map((id) => M.B.get(M.U.get(id).batch)?.cfg?.id).filter(Boolean)).size;
+    const push = M.stage() >= 4;
+    acts.push(`<button type="button" class="btn small" data-help="integrate.group-apply" data-act="g-apply" data-g="${esc(gid)}" data-via="${push ? 'push' : 'hand'}">${push ? `Apply ${cfgs > 1 ? `${cfgs} setup guides` : 'the setup guide'} to ${apply.length}` : `I have applied it (${apply.length})`}</button>`);
+  }
+  if (confirm.length) acts.push(`<button type="button" class="btn small" data-help="integrate.confirm-all" data-act="g-confirm" data-g="${esc(gid)}">Confirm ${confirm.length} set by hand</button>`);
+  if (sum.readyKeys.length) {
+    const units = new Set(sum.readyKeys.map((k) => k.split('|')[0])).size;
+    const all = sum.checked === sum.total && !sum.issueUnits.length;
+    acts.push(`<button type="button" class="btn small primary" data-help="integrate.accept" data-act="g-accept" data-g="${esc(gid)}">${all && units > 1 ? `Accept all ${units}` : `Accept ${plural(sum.readyKeys.length, 'step')} that passed`}</button>`);
+  }
+  if (g.scope === 'room' && !M.roomSum(g.id).signed && (M.roomSum(g.id).ready || M.roomSum(g.id).failed.length)) acts.push(`<a class="btn small" data-help="integrate.roomtest" href="${esc(`${M.plan.base}room/${g.id}/`)}">Open the room test</a>`);
+  return acts.join('');
+}
+// A space inside a floor group: its name, where its room test stands, then its units.
+export function roomTestWord(M, rid) {
+  const s = M.roomSum(rid);
+  return s.signed ? 'Signed off' : s.failed.length ? `Room test: ${plural(s.failed.length, 'failure')}` : s.ready ? 'Ready for the room test' : s.total === 1 ? 'Room test once its unit is set up' : `Room test once all ${s.total} are set up`;
+}
+const sortUnits = (M, ids) => [...ids].map((id, i) => ({ id, i, r: ST_RANK[M.unitStatus(id)] })).sort((a, b) => a.r - b.r || a.i - b.i).map((x) => x.id);
+export function groupHtml(M, g) {
+  const sum = M.groupSum(g);
+  const gid = `${g.scope}:${g.id}`;
+  // A batch and a space have pages of their own: the title opens it, and flies into its page (M5).
+  const to = g.scope === 'batch' ? `${M.plan.base}${g.id}/` : g.scope === 'room' ? `${M.plan.base}room/${g.id}/` : null;
+  let body;
+  if (g.scope === 'zone') {
+    body = (g.rooms ?? []).map((rid) => {
+      const r = M.R.get(rid);
+      return `<div class="dv-room" data-dvroom="${esc(rid)}"><p class="dv-rh"><a href="${esc(`${M.plan.base}room/${rid}/`)}">${esc(r.name)}</a><span data-rword="${esc(rid)}">${esc(roomTestWord(M, rid))}</span></p><ul class="dv-list">${sortUnits(M, r.units).map((id) => unitRowHtml(M, id, g)).join('')}</ul></div>`;
+    }).join('');
+  } else if (g.scope === 'queue') {
+    body = `<ol class="dv-list dv-queue">${g.units.map((id) => unitRowHtml(M, id, g, { one: true })).join('')}</ol>`;
+  } else {
+    body = `<ul class="dv-list">${sortUnits(M, g.units).map((id) => unitRowHtml(M, id, g)).join('')}</ul>`;
+  }
+  const test = g.scope === 'room' ? `<p class="dv-rtest" data-rword="${esc(g.id)}">${esc(roomTestWord(M, g.id))}</p>` : '';
+  const vi = g.scope === 'room' ? `<div class="iv-vi" data-vendor-only data-slot="vinstall" data-r="${esc(g.id)}"></div>` : '';
+  return `<section class="card dv-g" data-g="${esc(gid)}" data-st="${sum.status}" data-fb-group${g.scope === 'room' ? ` data-rcard="${esc(g.id)}"` : ''} data-help="integrate.group" aria-label="${esc(g.title)}">` +
+    `<header class="dv-gh" data-km-chrome>${g.n ? `<span class="iv-n num" aria-hidden="true">${g.n}</span>` : ''}<span class="dv-gt">${to ? `<a class="dv-gl" href="${esc(to)}"${g.scope === 'batch' ? ` data-vt-rec="int-${esc(g.id)}"` : g.scope === 'room' ? ` data-vt-rec="int-r-${esc(g.id)}"` : ''}><b>${esc(g.title)}</b></a>` : `<b>${esc(g.title)}</b>`}${g.sub ? `<small>${esc(g.sub)}</small>` : ''}</span><b class="dv-gc num" data-gcount>${sum.checked}/${sum.total}</b></header>` +
+    `<p class="dv-ans" data-gans data-engineer-only data-km-chrome>${esc(M.groupAnswer(g, sum, { bare: true }))}</p>` +
+    `<div class="dv-meters" data-gmeters data-engineer-only data-km-chrome>${groupMetersHtml(M, g)}</div>` +
+    `<div data-engineer-only>${body}</div>${test}${vi}` +
+    `<footer class="dv-acts" data-gacts data-engineer-only data-km-chrome>${groupActsHtml(M, g)}</footer></section>`;
+}
+// One at a time: the unit in hand, with its build sheet's essentials, its checks and Next.
+export function oneHtml(M, uid) {
+  const q = M.plan.queue ?? M.plan.units.map((u) => u.id);
+  if (!uid) return `<p class="dv-none">${glyph('done')}<span>Every unit is set up and accepted. The room tests are on each space's page.</span></p>`;
+  const u = M.U.get(uid), s = M.us(uid), i = q.indexOf(uid);
+  const b = M.B.get(u.batch);
+  const facts = [
+    ['Model', u.modelName], ['Hostname', s.host ?? 'None yet'], ['Address', u.networked ? u.ip : null], ['Switch port', u.port],
+    ['Setup guide', b?.cfg ? `${b.cfg.name} ${b.cfg.version}` : 'Nothing to set'], ['Pairs with', u.pairs], ['Where', u.where],
+  ].filter(([, v]) => v);
+  return `<article class="dv-one" data-one="${esc(uid)}">` +
+    `<p class="dv-one-k"><span>Unit ${i + 1} of ${q.length} · ${esc(u.roomName)}</span><button type="button" class="btn small ghost" data-act="one-next" data-help="integrate.one-next">Next unit</button></p>` +
+    `<h3 class="dv-one-t">${esc(u.short)}<small>${esc(u.roomName)}</small></h3>` +
+    `<p class="dv-ans" data-oans>${esc(M.unitAnswer(uid))}</p>` +
+    `<dl class="dv-kvs" data-help="integrate.sheet-unit">${facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd${/Hostname|Address|Switch/.test(k) ? ' class="mono"' : ''}>${esc(v)}</dd></div>`).join('')}</dl>` +
+
+    `<div class="dv-one-d" data-slot="udetail" data-u="${esc(uid)}">${unitDetailHtml(M, uid)}</div>` +
+    `</article>`;
+}
+export function oneActsHtml(M, uid) {
+  if (!uid) return '';
+  const g = { scope: 'unit', id: uid, title: M.unitLabel(M.U.get(uid)), units: [uid] };
+  const acts = [];
+  const apply = M.toApply(g), ready = M.U.get(uid).steps.filter((s) => M.stepOf(uid, s).st === 'verified');
+  if (apply.length && M.seeOn()) acts.push(`<button type="button" class="btn" data-help="integrate.group-apply" data-act="g-apply" data-g="unit:${esc(uid)}" data-via="${M.stage() >= 4 ? 'push' : 'hand'}">${M.stage() >= 4 ? 'Apply its setup guide' : 'I have applied it'}</button>`);
+  if (ready.length) acts.push(`<button type="button" class="btn primary" data-help="integrate.accept" data-act="g-accept" data-g="unit:${esc(uid)}">Accept ${plural(ready.length, 'step')} that passed</button>`);
+  acts.push(`<button type="button" class="btn${ready.length ? '' : ' primary'} dv-next" data-help="integrate.one-next" data-act="one-next">Next unit</button>`);
+  return acts.join('');
+}
+
+// The unit One at a time opens on: the one asked for, else the first in the queue not yet set up and accepted.
+export function nextInQueue(M, after = null) {
+  const q = M.plan.queue ?? M.plan.units.map((u) => u.id);
+  const open = (id) => !M.unitSteps(id).every((x) => x.st === 'done');
+  const i = after ? q.indexOf(after) : -1;
+  return q.slice(i + 1).find(open) ?? q.slice(0, Math.max(0, i + 1)).find(open) ?? null;
+}
+const GROUP_RANK = { needs: 0, accept: 1, test: 2, doing: 3, todo: 4, done: 5 };
+export function boardGroups(M, by, { set = null, sort = 'order' } = {}) {
+  const gs = M.groupsBy(by, { set });
+  if (sort === 'needs') return gs.map((g, i) => ({ g, i, r: GROUP_RANK[M.groupSum(g).status] ?? 9 })).sort((a, b) => a.r - b.r || a.i - b.i).map((x) => x.g);
+  if (sort === 'name') return [...gs].sort((a, b) => a.title.localeCompare(b.title));
+  return gs;
+}
+// The whole board for one way of delivering.
+export function boardHtml(M, by, { set = null, sort = 'order', at = null } = {}) {
+  if (by === 'one') {
+    const cur = at && M.U.has(at) ? at : nextInQueue(M);
+    const q = M.groupsBy('one')[0];
+    return `<div class="dv-board dv-oneboard" data-by="one"><section class="card dv-cur" aria-label="The unit in hand" data-help="integrate.one" data-km-chrome><div data-slot="one" data-u="${esc(cur ?? '')}">${oneHtml(M, cur)}</div><footer class="dv-one-acts" data-oacts>${oneActsHtml(M, cur)}</footer></section>${groupHtml(M, q)}</div>`;
+  }
+  const gs = boardGroups(M, by, { set, sort });
+  return `<div class="dv-board" data-by="${esc(by)}"><div class="dv-groups">${gs.map((g) => groupHtml(M, g)).join('')}</div></div>`;
+}
+// The custom set picker, and the form that makes or changes one. Sets are kept in this browser only.
+export function setBarHtml(M, sets, active) {
+  const chips = sets.map((s) => `<button type="button" class="dv-chip" data-act="set-pick" data-set="${esc(s.id)}" aria-pressed="${s.id === active}">${esc(s.name)}<small class="num">${s.units.filter((id) => M.U.has(id)).length}</small></button>`).join('');
+  return `<div class="dv-setbar" role="group" aria-label="Your sets" data-help="integrate.set">${chips}<button type="button" class="btn small ghost" data-act="set-new" data-help="integrate.set-new">New set</button>${active ? `<button type="button" class="btn small ghost" data-act="set-edit">Change this set</button>` : ''}<span class="dv-setnote faint">Sets are yours, kept in this browser. What you accept in one is recorded for everyone.</span></div>`;
+}
+export function setFormHtml(M, draft) {
+  const has = new Set(draft.units);
+  const kinds = [...new Set(M.plan.units.map((u) => u.cls))].map((c) => ({ k: `kind:${c}`, label: M.plan.units.find((u) => u.cls === c).clsName, ids: M.plan.units.filter((u) => u.cls === c).map((u) => u.id) }));
+  const rooms = M.plan.rooms.filter((r) => r.units.length).map((r) => ({ k: `room:${r.id}`, label: r.name, ids: r.units }));
+  const status = [['needs', 'Ready for you'], ['accept', 'Checked, to accept'], ['todo', 'Not started']].map(([v, label]) => ({ k: `status:${v}`, label, ids: M.plan.units.filter((u) => M.unitStatus(u.id) === v).map((u) => u.id) })).filter((x) => x.ids.length);
+  const chip = (x) => `<button type="button" class="dv-chip" data-act="set-add" data-ids="${esc(x.ids.join(' '))}" aria-pressed="${x.ids.every((id) => has.has(id))}">${esc(x.label)}<small class="num">${x.ids.length}</small></button>`;
+  const byRoom = M.plan.rooms.filter((r) => r.units.length).map((r) => `<fieldset class="dv-setroom"><legend>${esc(r.name)}</legend>${r.units.map((id) => { const u = M.U.get(id); return `<label class="dv-pick"><input type="checkbox" name="u" value="${esc(id)}"${has.has(id) ? ' checked' : ''} /><span>${esc(u.short)}${u.host ? `<small class="mono">${esc(u.host)}</small>` : ''}</span></label>`; }).join('')}</fieldset>`).join('');
+  return `<form class="card dv-setform" data-act-form="set" data-help="integrate.set-new">` +
+    `<div class="dv-sf-top"><label class="dv-sf-name"><span>Name the set</span><input name="name" value="${esc(draft.name)}" required maxlength="60" autocomplete="off" /></label><p class="dv-sf-n"><b class="num" data-set-n>${has.size}</b> units chosen</p></div>` +
+    `<div class="dv-sf-by"><p class="dv-sf-h">Add or take out by kind of device</p><div class="dv-chips">${kinds.map(chip).join('')}</div></div>` +
+    `<div class="dv-sf-by"><p class="dv-sf-h">By space</p><div class="dv-chips">${rooms.map(chip).join('')}</div></div>` +
+    (status.length ? `<div class="dv-sf-by"><p class="dv-sf-h">By where they stand</p><div class="dv-chips">${status.map(chip).join('')}</div></div>` : '') +
+    `<details class="dv-sf-hand"><summary>Pick units by hand</summary><div class="dv-setrooms">${byRoom}</div></details>` +
+    `<div class="dv-sf-acts"><button class="btn primary">Save the set</button><button type="button" class="btn ghost" data-act="set-cancel">Cancel</button>${draft.id ? `<button type="button" class="btn ghost dv-sf-del" data-act="set-delete" data-set="${esc(draft.id)}">Delete this set</button>` : ''}</div></form>`;
+}
+
 // Words for the History drawer (and anything else that lists changes).
 export function describe(M, e) {
-  const m = /^int:[^:]+:(.+):(unit|batch|room|project)$/.exec(e.item) ?? [];
+  const m = /^int:[^:]+:(.+):(unit|batch|room|zone|project)$/.exec(e.item) ?? [];
   const kind = m[2], id = m[1];
   const f = e.field, on = e.after;
   const u = kind === 'unit' ? M.U.get(id) : null;

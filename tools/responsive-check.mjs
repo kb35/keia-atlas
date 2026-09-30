@@ -45,6 +45,8 @@ const PAGES = [
   ['projects', '/projects/'],
   ['project', '/projects/prj-09/'],
   ['project-integrate', '/projects/prj-09/integrate/'],
+  ['deliver-type', '/projects/prj-14/integrate/?by=type'], ['deliver-room', '/projects/prj-14/integrate/?by=room'], ['deliver-floor', '/projects/prj-14/integrate/?by=floor'],
+  ['deliver-one', '/projects/prj-14/integrate/?by=one'], ['deliver-set', '/projects/prj-14/integrate/?by=set'],
   ['task', '/projects/prj-09/tasks/t-0901/'],
   ['incidents', '/incidents/'],
   ['incident', '/incidents/inc0041121/'],

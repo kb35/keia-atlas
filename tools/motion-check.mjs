@@ -94,6 +94,13 @@ const FLOWS = [
     await page.locator('input[name="mod-vendors"][value="on"]').evaluate((i) => i.closest('label').click()); await settle(page);
     await key(page, 'Escape'); await settle(page, 400);
   }],
+  ['deliver', '/projects/prj-14/integrate/', async (page) => {
+    // Deliver by: each way regroups the same units (km.regroup); One at a time's Next slides the next in (km.slide).
+    for (const by of ['type', 'room', 'one', 'set', 'floor']) {
+      await page.click(`[data-deliver-ctl] [data-by="${by}"]`); await settle(page);
+      if (by === 'one') { await page.click('[data-act="one-next"]'); await settle(page); }
+    }
+  }],
   ['port', '/rooms/dub-3-09/', async (page) => {
     await page.locator('main a[href*="device/?tag="]:visible').first().click();
     await page.waitForURL(/device\/\?tag=/, { waitUntil: 'commit' }); await page.waitForSelector('a.dv-port', { timeout: 8000 }); await settle(page);

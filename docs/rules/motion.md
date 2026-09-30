@@ -201,6 +201,8 @@ Each interaction on a page is one of these rows (MOTION-V2 section 4), with its 
 | 43 | Method, How it fits: point at or focus an idea on a mapping | The idea's chip and its row ease to the accent wash and the other rows quieten (`--dur-state`); nothing moves, and the rows never animate in (M16) | Changes at once |
 | 44 | Method pages: arriving from another method page | The navigation's marker slides from the page you came from to this one once the navigation is in view (`rsZoom`, the zero-bounce spring) | The marker is simply at this page |
 | 45 | Method pages: "Try it in the demo" | The zoom-in page move (row 6), growing from the link: the method page scales to `--zoom-scale` and fades as the demo arrives | Cross-fade |
+| 46 | Deploy, "Deliver by": switching the way the work is grouped (device type, room, floor or zone, one at a time, a set), or the order of the groups | The marker slides to the chosen way; each unit row travels from its old group to its new one (FLIP, `--dur-morph` on the zero-bounce spring, `km.regroup`), rows that were not on screen fade in where they land, the new groups' headings, answers and actions fade in around them, and the box eases to its new height. Live changes afterwards change rows in place and never re-sort (M10) | The new grouping at once |
+| 47 | Deploy, One at a time: Next, or picking a unit in the queue | The unit in hand slides out the way you came from and fades while the next slides in from the side you stepped towards, on one line (`km.slide`, `--dur-enter` on the spring); the box eases to the new height; the queue's current row moves its mark | The next unit at once |
 
 A list that appears with the page (a card grid, a list of rows) makes one quiet stagger, once: the first 12 items rise into place `--stagger` apart, the rest together; filtering, sorting and live changes never replay it.
 
@@ -268,6 +270,8 @@ The twelve micro-motions of the Keia motion library live in `src/styles/motion-l
 | 10 | `km-toast` | `window.rsToast()` (Report, the Schedule) is `km.toast()` in a host at the foot of the window |
 | 11 | `km-empty` | `EmptyState.astro`: a thin planned ring that comes on once each time the empty state appears |
 | 12 | `km-skeleton` | `window.rsFill(box, fill)`: the wash only after `--skeleton-skip`, gone when the content arrives |
+
+Two helpers in the library carry the persist and step moves for any page that regroups or steps through things: `km.regroup(box, swap)` (M2 persist: FLIP by `data-vk`, with `[data-km-chrome]` fading in) and `km.slide(el, swap, { dir })` (M12, a step). Both land at once under reduced motion, which `km.reduced()` reads from the system setting, `html[data-reduced]` and `html[data-motion="off" | "reduced"]`.
 
 - **Why:** one library, one set of tokens, one spring: the site moves as one thing.
 - **Do:** reach for a `km-` motion before writing a new one.
