@@ -20,9 +20,9 @@
 //
 // Everything here is pure except loadRaw(), which reads the files; the checks (tools/crossrefs-floors.mjs) and the
 // generator (tools/migrations/2026-09-30-dublin-floors.mjs) use the same functions, so they always agree.
-import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
+import { readdirSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { parse } from 'yaml';
+import { loadYaml } from './demo-clock.mjs';
 import { buildRoom, outletPlates, parseEnd, devKey } from './room3d.mjs';
 
 export const FICTION = 'Fictional floor plan: space sizes from the space types; layout, trays and cable lengths made up for the demo.';
@@ -277,7 +277,7 @@ export function routeRun({ floor, G, rackAt, item, outlet, geo, level = 0 }) {
 function readFolder(root, folder) {
   const out = {}; const dir = path.join(root, 'data', folder);
   if (!existsSync(dir)) return out;
-  const walk = (d) => { for (const n of readdirSync(d).sort()) { const f = path.join(d, n); if (statSync(f).isDirectory()) walk(f); else if (n.endsWith('.yaml')) out[n.slice(0, -5)] = parse(readFileSync(f, 'utf8')); } };
+  const walk = (d) => { for (const n of readdirSync(d).sort()) { const f = path.join(d, n); if (statSync(f).isDirectory()) walk(f); else if (n.endsWith('.yaml')) out[n.slice(0, -5)] = loadYaml(f); } };
   walk(dir); return out;
 }
 export function loadRaw(root = process.cwd()) {

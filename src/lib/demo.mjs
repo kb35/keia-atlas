@@ -1,6 +1,7 @@
 // The demo layer: who you can sign in as, what each role is responsible for, and the six adoption
 // stages. People are made up. Stage 1 is real; stages 2 to 6 run on
 // simulated systems and say so on the page.
+import { demoShift } from './demo-clock.mjs';
 
 // Roles are Aigna's own, not any real company's job titles. Each says what the role owns,
 // what it decides, and what it hands to someone else.
@@ -224,16 +225,16 @@ export const PROJECT_ROLE = {
 // What was already waiting in the service managers' inboxes when the demo starts. Reports sent from
 // any page's Report button join these (saved in the browser under rs4-inbox). Made up.
 export const INBOX_SEED = [
-  { id: 'RPT-097', kind: 'urgent', to: 'sofia', by: 'sam', at: '2026-09-28T09:40', status: 'new',
+  { id: 'RPT-097', kind: 'urgent', to: 'sofia', by: 'sam', at: demoShift('2026-09-28T09:40'), status: 'new',
     about: { kind: 'device', label: 'Heron video bar, Juneau office', to: '/rooms/jnu-2-02/' },
     fields: { happened: 'The new Studio X52 arrived on VideoOS 4.7.0, which is still in the Lab. The setup guide is written for 4.6.2, so I stopped before provisioning. Do we downgrade to 4.6.2 or go ahead on 4.7.0?', blocks: "Yes, I can't continue" } },
-  { id: 'RPT-096', kind: 'firmware', to: 'sofia', by: 'sam', at: '2026-09-28T09:32', status: 'new',
+  { id: 'RPT-096', kind: 'firmware', to: 'sofia', by: 'sam', at: demoShift('2026-09-28T09:32'), status: 'new',
     about: { kind: 'model', label: 'Poly Studio X52', to: '/profiles/video-bar/poly-studio-x52/' },
     fields: { model: 'Poly Studio X52', version: '4.7.0-466077', how: 'Arrived from the factory with it', works: 'Something is different or broken', notes: 'Six of the eight units for PRJ-14 shipped on 4.7.0, which is still in the Lab (LAB-07). Standard is 4.6.2.' } },
-  { id: 'RPT-095', kind: 'urgent', to: 'declan', by: 'liam', at: '2026-09-27T16:10', status: 'new',
+  { id: 'RPT-095', kind: 'urgent', to: 'declan', by: 'liam', at: demoShift('2026-09-27T16:10'), status: 'new',
     about: { kind: 'comms', label: 'Dublin office IDF, floor 4', to: '/rooms/dub-4-21/' },
     fields: { happened: 'Access switch 2 in the floor 4 IDF shows a failed power supply. Spaces on floor 4 still have power over Ethernet from the second supply.', blocks: 'No, but it needs fixing' } },
-  { id: 'RPT-094', kind: 'change', to: 'sofia', by: 'liam', at: '2026-09-26T12:20', status: 'new',
+  { id: 'RPT-094', kind: 'change', to: 'sofia', by: 'liam', at: demoShift('2026-09-26T12:20'), status: 'new',
     about: { kind: 'config', label: 'TC10 paired to its room system', to: '/profiles/touch-controller/#configuration' },
     fields: { what: 'Pairing step', now: 'Find the TC10 by its MAC address and select Pair', should: 'Wait for the TC10 to finish its own update first (about 10 minutes out of the box), then pair', why: 'Pairing during the TC10 update failed three times in Curlew. After the update it paired first time.' } },
 ];

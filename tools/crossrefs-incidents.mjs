@@ -17,7 +17,8 @@
 
 import path from 'node:path';
 
-// The last moment a history entry may have: the end of the demo's today (DEMO_TODAY in src/lib/data.mjs).
+// The last moment a history entry may have: the end of the demo's anchor day (demo_anchor in data/house-values; the
+// validator reads the files as written, before the rolling demo clock moves them).
 export const LAST_MOMENT = '2026-09-28T23:59';
 export const STATE_LABEL = { new: 'New', 'in-progress': 'In progress', 'on-hold': 'On hold', resolved: 'Resolved' };
 

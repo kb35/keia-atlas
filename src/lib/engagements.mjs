@@ -11,6 +11,7 @@
 // made up for the demo, as lightweight data (sites, open jobs, service levels). Everything here is SIMULATED and fixed
 // at the demo's now, 28 Sept 12:00. Pure: nothing is loaded, so the rules can be tested (tests/engagements.test.mjs).
 import { JOBS, NOW, contractClock, daysBetween, dateWords, whenWords } from './vendors.mjs';
+import { demoShift } from './demo-clock.mjs';
 
 export { NOW };
 
@@ -74,20 +75,20 @@ export const siteName = (client, id) => CLIENT_SITES[client]?.find((s) => s.id =
 
 const FICTIONAL_JOBS = [
   { id: 'FW-INC-2207', client: 'fenwater', vendor: 'northlight', kind: 'incident', title: 'Boardroom display flickers', site: 'fw-bos', where: 'Boardroom, level 6',
-    handedAt: '2026-09-28T08:30', sla: { what: 'P2, room degraded: on site', kind: 'response', hours: 4 }, state: 'with', native: { from: 'Fenwater service desk', ref: 'FWH-2207', status: 'Assigned' } },
+    handedAt: demoShift('2026-09-28T08:30'), sla: { what: 'P2, room degraded: on site', kind: 'response', hours: 4 }, state: 'with', native: { from: 'Fenwater service desk', ref: 'FWH-2207', status: 'Assigned' } },
   { id: 'FW-INC-2201', client: 'fenwater', vendor: 'northlight', kind: 'incident', title: 'Lecture theatre microphones drop out', site: 'fw-cam', where: 'Lecture theatre',
-    handedAt: '2026-09-24T10:00', sla: { what: 'P3 fixed', kind: 'fix', workdays: 2 }, state: 'with', native: { from: 'Fenwater service desk', ref: 'FWH-2201', status: 'Parts ordered' } },
+    handedAt: demoShift('2026-09-24T10:00'), sla: { what: 'P3 fixed', kind: 'fix', workdays: 2 }, state: 'with', native: { from: 'Fenwater service desk', ref: 'FWH-2201', status: 'Parts ordered' } },
   { id: 'FW-REQ-0880', client: 'fenwater', vendor: 'northlight', kind: 'request', title: 'Add a camera to telehealth room 2', site: 'fw-qcy', where: 'Telehealth room 2',
-    handedAt: '2026-09-22T09:00', sla: { what: 'Request done', kind: 'fix', workdays: 10 }, state: 'with', native: { from: 'Fenwater service desk', ref: 'FWH-R880', status: 'Scheduled' } },
+    handedAt: demoShift('2026-09-22T09:00'), sla: { what: 'Request done', kind: 'fix', workdays: 10 }, state: 'with', native: { from: 'Fenwater service desk', ref: 'FWH-R880', status: 'Scheduled' } },
   { id: 'FW-INC-2190', client: 'fenwater', vendor: 'northlight', kind: 'incident', title: 'Ward huddle room will not join calls', site: 'fw-bos', where: 'Ward 4 huddle room',
-    handedAt: '2026-09-21T08:00', sla: { what: 'P2, room degraded: on site', kind: 'response', hours: 4 }, state: 'done', closedAt: '2026-09-21T10:40', native: { from: 'Fenwater service desk', ref: 'FWH-2190', status: 'Closed' } },
+    handedAt: demoShift('2026-09-21T08:00'), sla: { what: 'P2, room degraded: on site', kind: 'response', hours: 4 }, state: 'done', closedAt: demoShift('2026-09-21T10:40'), native: { from: 'Fenwater service desk', ref: 'FWH-2190', status: 'Closed' } },
   // Handed to another provider: Northlight must never see it (Fenwater's own record, another engagement).
   { id: 'FW-INC-2205', client: 'fenwater', vendor: 'other', kind: 'incident', title: 'Nurse call panel fault', site: 'fw-bos', where: 'Ward 2',
-    handedAt: '2026-09-27T14:00', sla: { what: 'P1', kind: 'response', hours: 1 }, state: 'with', native: { from: 'Fenwater service desk', ref: 'FWH-2205', status: 'Assigned' } },
+    handedAt: demoShift('2026-09-27T14:00'), sla: { what: 'P1', kind: 'response', hours: 1 }, state: 'with', native: { from: 'Fenwater service desk', ref: 'FWH-2205', status: 'Assigned' } },
   { id: 'QM-1142', client: 'quillmark', vendor: 'northlight', kind: 'incident', title: 'Podcast studio mixer hums', site: 'qm-sea', where: 'Podcast studio',
-    handedAt: '2026-09-25T14:00', sla: { what: 'Fault fixed', kind: 'fix', workdays: 2 }, state: 'with', native: { from: 'Quillmark IT', ref: 'Q-1142', status: 'Booked' } },
+    handedAt: demoShift('2026-09-25T14:00'), sla: { what: 'Fault fixed', kind: 'fix', workdays: 2 }, state: 'with', native: { from: 'Quillmark IT', ref: 'Q-1142', status: 'Booked' } },
   { id: 'QM-1139', client: 'quillmark', vendor: 'northlight', kind: 'incident', title: 'Boardroom touch panel frozen', site: 'qm-den', where: 'Boardroom',
-    handedAt: '2026-09-14T09:00', sla: { what: 'Fault fixed', kind: 'fix', workdays: 2 }, state: 'done', closedAt: '2026-09-15T11:00', native: { from: 'Quillmark IT', ref: 'Q-1139', status: 'Closed' } },
+    handedAt: demoShift('2026-09-14T09:00'), sla: { what: 'Fault fixed', kind: 'fix', workdays: 2 }, state: 'done', closedAt: demoShift('2026-09-15T11:00'), native: { from: 'Quillmark IT', ref: 'Q-1139', status: 'Closed' } },
 ];
 
 // ---- Engagements ---------------------------------------------------------------------------------------------------
@@ -95,11 +96,11 @@ const FICTIONAL_JOBS = [
 // agreement.sla is the service levels; for Aigna's engagements the contract in data/vendors/<id>.yaml is the master
 // and the page joins it (agreement.contract names it).
 export const ENGAGEMENTS = [
-  { id: 'aigna-northlight', client: 'aigna', provider: 'northlight', role: 'integrator', start: '2025-04-01', end: '2027-03-31', signed: '2025-03-14',
+  { id: 'aigna-northlight', client: 'aigna', provider: 'northlight', role: 'integrator', start: demoShift('2025-04-01'), end: demoShift('2027-03-31'), signed: demoShift('2025-03-14'),
     scope: { sites: ['nyc', 'chi', 'tor', 'jnu'], projects: ['PRJ-14'], kinds: ['site', 'job', 'visit', 'as-built', 'handover', 'design'] },
     agreement: { contract: 'northlight' },
     contacts: { client: 'marcus', provider: 'sam' } },
-  { id: 'fenwater-northlight', client: 'fenwater', provider: 'northlight', role: 'managed', start: '2025-01-01', end: '2026-12-31', signed: '2024-12-02',
+  { id: 'fenwater-northlight', client: 'fenwater', provider: 'northlight', role: 'managed', start: demoShift('2025-01-01'), end: demoShift('2026-12-31'), signed: demoShift('2024-12-02'),
     scope: { sites: ['fw-bos', 'fw-cam', 'fw-qcy'], projects: [], kinds: ['site', 'job', 'visit', 'handover'] },
     agreement: { ref: 'FWH-AV-2025-01', sla: [
       { what: 'P1, room down: on site', target: '1 hour' },
@@ -108,20 +109,20 @@ export const ENGAGEMENTS = [
       { what: 'Rooms checked each weekday', target: 'Before 08:00' },
     ] },
     contacts: { provider: 'sam' } },
-  { id: 'quillmark-northlight', client: 'quillmark', provider: 'northlight', role: 'maintenance', start: '2026-07-01', end: '2027-06-30', signed: '2026-06-12',
+  { id: 'quillmark-northlight', client: 'quillmark', provider: 'northlight', role: 'maintenance', start: demoShift('2026-07-01'), end: demoShift('2027-06-30'), signed: demoShift('2026-06-12'),
     scope: { sites: ['qm-den', 'qm-sea'], projects: [], kinds: ['site', 'job', 'visit'] },
     agreement: { ref: 'QM-MAINT-26', sla: [
       { what: 'Fault fixed', target: '2 working days' },
       { what: 'Preventive maintenance', target: 'Each quarter' },
     ] },
     contacts: { provider: 'sam' } },
-  { id: 'aigna-brightwave', client: 'aigna', provider: 'brightwave', role: 'integrator', start: '2024-11-01', end: '2026-10-31', signed: '2024-10-15',
+  { id: 'aigna-brightwave', client: 'aigna', provider: 'brightwave', role: 'integrator', start: demoShift('2024-11-01'), end: demoShift('2026-10-31'), signed: demoShift('2024-10-15'),
     scope: { sites: ['dub', 'lon', 'cph', 'sin', 'mel', 'tyo'], projects: ['PRJ-15'], kinds: ['site', 'job', 'visit', 'as-built', 'handover', 'design'] },
     agreement: { contract: 'brightwave' }, contacts: { client: 'anna', provider: 'lena' } },
-  { id: 'aigna-keystone', client: 'aigna', provider: 'keystone', role: 'maintenance', start: '2026-01-01', end: '2028-12-31', signed: '2025-12-02',
+  { id: 'aigna-keystone', client: 'aigna', provider: 'keystone', role: 'maintenance', start: demoShift('2026-01-01'), end: demoShift('2028-12-31'), signed: demoShift('2025-12-02'),
     scope: { sites: ['dub', 'lon', 'cph', 'nyc', 'chi', 'tor', 'jnu', 'sin', 'tyo', 'mel'], projects: [], kinds: ['site', 'job', 'visit'] },
     agreement: { contract: 'keystone' }, contacts: { client: 'sofia', provider: 'dev' } },
-  { id: 'aigna-hp-poly', client: 'aigna', provider: 'hp-poly', role: 'manufacturer', start: '2023-04-01', end: '2027-03-31', signed: '2023-03-20',
+  { id: 'aigna-hp-poly', client: 'aigna', provider: 'hp-poly', role: 'manufacturer', start: demoShift('2023-04-01'), end: demoShift('2027-03-31'), signed: demoShift('2023-03-20'),
     scope: { sites: [], projects: [], kinds: ['job'] },
     agreement: { contract: 'hp-poly' }, contacts: { client: 'sofia' } },
 ];
@@ -146,23 +147,23 @@ const jobRecord = (j) => ({ id: j.id, kind: 'job', owner: j.client, client: j.cl
 
 export const PROVIDER_RECORDS = [
   // Crews on site today (the provider's own: never shared). Teams, never people.
-  { id: 'crew-nl-1', kind: 'crew', owner: 'northlight', provider: 'northlight', client: 'aigna', site: 'jnu', at: '2026-09-28T07:30', what: 'Install crew 1 · 2 installers', doing: 'Reframing the camera in 2.02 (SNAG-14-02)' },
-  { id: 'crew-nl-res', kind: 'crew', owner: 'northlight', provider: 'northlight', client: 'fenwater', site: 'fw-bos', at: '2026-09-28T07:00', what: 'Resident team · 2 technicians', doing: 'Rooms checked at 07:52; now on the boardroom display (FW-INC-2207)' },
+  { id: 'crew-nl-1', kind: 'crew', owner: 'northlight', provider: 'northlight', client: 'aigna', site: 'jnu', at: demoShift('2026-09-28T07:30'), what: 'Install crew 1 · 2 installers', doing: 'Reframing the camera in 2.02 (SNAG-14-02)' },
+  { id: 'crew-nl-res', kind: 'crew', owner: 'northlight', provider: 'northlight', client: 'fenwater', site: 'fw-bos', at: demoShift('2026-09-28T07:00'), what: 'Resident team · 2 technicians', doing: 'Rooms checked at 07:52; now on the boardroom display (FW-INC-2207)' },
   // Visits this week, with their readiness (shared: both marks).
-  { id: 'visit-nl-chi', kind: 'visit', owner: 'northlight', provider: 'northlight', client: 'aigna', site: 'chi', at: '2026-09-29T10:00', what: 'Site survey before the 12.09 refit (SURV-0412)', ready: true, readiness: 'Ready: access booked with reception, survey kit packed', shared: true },
-  { id: 'visit-nl-cam', kind: 'visit', owner: 'northlight', provider: 'northlight', client: 'fenwater', site: 'fw-cam', at: '2026-09-30T09:00', what: 'Swap the lecture theatre microphones (FW-INC-2201)', ready: false, readiness: 'Waiting on: parts, due Tuesday', shared: true },
-  { id: 'visit-nl-den', kind: 'visit', owner: 'northlight', provider: 'northlight', client: 'quillmark', site: 'qm-den', at: '2026-10-01T09:30', what: 'Quarterly preventive maintenance', ready: true, readiness: 'Ready: access confirmed by Quillmark IT', shared: true },
+  { id: 'visit-nl-chi', kind: 'visit', owner: 'northlight', provider: 'northlight', client: 'aigna', site: 'chi', at: demoShift('2026-09-29T10:00'), what: 'Site survey before the 12.09 refit (SURV-0412)', ready: true, readiness: 'Ready: access booked with reception, survey kit packed', shared: true },
+  { id: 'visit-nl-cam', kind: 'visit', owner: 'northlight', provider: 'northlight', client: 'fenwater', site: 'fw-cam', at: demoShift('2026-09-30T09:00'), what: 'Swap the lecture theatre microphones (FW-INC-2201)', ready: false, readiness: 'Waiting on: parts, due Tuesday', shared: true },
+  { id: 'visit-nl-den', kind: 'visit', owner: 'northlight', provider: 'northlight', client: 'quillmark', site: 'qm-den', at: demoShift('2026-10-01T09:30'), what: 'Quarterly preventive maintenance', ready: true, readiness: 'Ready: access confirmed by Quillmark IT', shared: true },
   // Sent to the client (shared) and kept to itself (never shared).
-  { id: 'asbuilt-nl-205', kind: 'as-built', owner: 'northlight', provider: 'northlight', client: 'aigna', site: 'jnu', project: 'PRJ-14', at: '2026-09-11T15:20', what: 'As-built for 2.05, with the cable cover fitted', shared: true },
-  { id: 'note-nl-jnu', kind: 'note', owner: 'northlight', provider: 'northlight', client: 'aigna', site: 'jnu', at: '2026-09-25T17:00', what: 'Crew note: bring the long HDMI run for 2.03' },
-  { id: 'cost-nl-prj14', kind: 'cost', owner: 'northlight', provider: 'northlight', client: 'aigna', project: 'PRJ-14', at: '2026-09-01T09:00', what: 'Juneau fit-out: labour and margin' },
-  { id: 'note-nl-fw', kind: 'note', owner: 'northlight', provider: 'northlight', client: 'fenwater', site: 'fw-cam', at: '2026-09-26T16:00', what: 'Crew note: the theatre ceiling needs the tall ladder' },
+  { id: 'asbuilt-nl-205', kind: 'as-built', owner: 'northlight', provider: 'northlight', client: 'aigna', site: 'jnu', project: 'PRJ-14', at: demoShift('2026-09-11T15:20'), what: 'As-built for 2.05, with the cable cover fitted', shared: true },
+  { id: 'note-nl-jnu', kind: 'note', owner: 'northlight', provider: 'northlight', client: 'aigna', site: 'jnu', at: demoShift('2026-09-25T17:00'), what: 'Crew note: bring the long HDMI run for 2.03' },
+  { id: 'cost-nl-prj14', kind: 'cost', owner: 'northlight', provider: 'northlight', client: 'aigna', project: 'PRJ-14', at: demoShift('2026-09-01T09:00'), what: 'Juneau fit-out: labour and margin' },
+  { id: 'note-nl-fw', kind: 'note', owner: 'northlight', provider: 'northlight', client: 'fenwater', site: 'fw-cam', at: demoShift('2026-09-26T16:00'), what: 'Crew note: the theatre ceiling needs the tall ladder' },
 ];
 
 // A client's own records that never flow (the scope filter must keep them home).
 const CLIENT_ONLY = [
-  { id: 'plan-aigna-jnu-2', kind: 'floor-plan', owner: 'aigna', client: 'aigna', site: 'jnu', at: '2026-04-24T09:00', what: 'Juneau office, second floor plan' },
-  { id: 'plan-fw-bos-6', kind: 'floor-plan', owner: 'fenwater', client: 'fenwater', site: 'fw-bos', at: '2025-02-01T09:00', what: 'Boston campus, level 6 plan' },
+  { id: 'plan-aigna-jnu-2', kind: 'floor-plan', owner: 'aigna', client: 'aigna', site: 'jnu', at: demoShift('2026-04-24T09:00'), what: 'Juneau office, second floor plan' },
+  { id: 'plan-fw-bos-6', kind: 'floor-plan', owner: 'fenwater', client: 'fenwater', site: 'fw-bos', at: demoShift('2025-02-01T09:00'), what: 'Boston campus, level 6 plan' },
 ];
 
 /** Every record in the demo federation. */
@@ -213,7 +214,7 @@ export function engagementView(id, side = 'provider', records = federation(), li
 }
 
 // ---- A provider's portfolio -----------------------------------------------------------------------------------------
-const WEEK = { from: '2026-09-28', to: '2026-10-04' };
+const WEEK = { from: demoShift('2026-09-28'), to: demoShift('2026-10-04') };
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 /** One client card: the engagement, its open jobs (with the clock), crews today, visits this week, the renewal. */
@@ -247,38 +248,38 @@ export function portfolio(provider, now = NOW, records = federation(), list = EN
 // Each entry is written in both organisations' audit logs (signed by the sender, received by the other side).
 export const ACTIVITY = {
   'aigna-northlight': [
-    { at: '2026-09-28T08:10', by: 'northlight', what: 'Marked Tuesday\'s Chicago survey ready: access booked, kit packed', kind: 'sent' },
-    { at: '2026-09-25T16:00', by: 'aigna', what: 'TASK-14-2-03 now waiting on switch ports: the clock paused for both sides', kind: 'shared' },
-    { at: '2026-09-21T09:00', by: 'aigna', what: 'Handed TASK-14-2-03 to Northlight AV: record serials and MACs, 2.03', kind: 'shared' },
-    { at: '2026-09-18T10:00', by: 'aigna', what: 'Handed SURV-0412 to Northlight AV: survey before the 12.09 refit', kind: 'shared' },
-    { at: '2026-09-16T15:00', by: 'aigna', what: 'Handed SNAG-14-02 to Northlight AV: reframe the camera in 2.02', kind: 'shared' },
-    { at: '2026-09-11T15:20', by: 'northlight', what: 'Sent the as-built for 2.05; it landed in Aigna\'s record as a reviewed change, accepted by Marcus', kind: 'sent' },
-    { at: '2025-03-14T11:00', by: 'aigna', what: 'Engagement signed by both sides, with the data processing agreement', kind: 'signed' },
+    { at: demoShift('2026-09-28T08:10'), by: 'northlight', what: 'Marked Tuesday\'s Chicago survey ready: access booked, kit packed', kind: 'sent' },
+    { at: demoShift('2026-09-25T16:00'), by: 'aigna', what: 'TASK-14-2-03 now waiting on switch ports: the clock paused for both sides', kind: 'shared' },
+    { at: demoShift('2026-09-21T09:00'), by: 'aigna', what: 'Handed TASK-14-2-03 to Northlight AV: record serials and MACs, 2.03', kind: 'shared' },
+    { at: demoShift('2026-09-18T10:00'), by: 'aigna', what: 'Handed SURV-0412 to Northlight AV: survey before the 12.09 refit', kind: 'shared' },
+    { at: demoShift('2026-09-16T15:00'), by: 'aigna', what: 'Handed SNAG-14-02 to Northlight AV: reframe the camera in 2.02', kind: 'shared' },
+    { at: demoShift('2026-09-11T15:20'), by: 'northlight', what: 'Sent the as-built for 2.05; it landed in Aigna\'s record as a reviewed change, accepted by Marcus', kind: 'sent' },
+    { at: demoShift('2025-03-14T11:00'), by: 'aigna', what: 'Engagement signed by both sides, with the data processing agreement', kind: 'signed' },
   ],
   'fenwater-northlight': [
-    { at: '2026-09-28T08:30', by: 'fenwater', what: 'Handed FW-INC-2207 to Northlight AV: boardroom display flickers', kind: 'shared' },
-    { at: '2026-09-28T07:52', by: 'northlight', what: 'Rooms checked on all three sites before 08:00', kind: 'sent' },
-    { at: '2026-09-24T10:00', by: 'fenwater', what: 'Handed FW-INC-2201 to Northlight AV: lecture theatre microphones', kind: 'shared' },
-    { at: '2024-12-02T10:00', by: 'fenwater', what: 'Engagement signed by both sides', kind: 'signed' },
+    { at: demoShift('2026-09-28T08:30'), by: 'fenwater', what: 'Handed FW-INC-2207 to Northlight AV: boardroom display flickers', kind: 'shared' },
+    { at: demoShift('2026-09-28T07:52'), by: 'northlight', what: 'Rooms checked on all three sites before 08:00', kind: 'sent' },
+    { at: demoShift('2026-09-24T10:00'), by: 'fenwater', what: 'Handed FW-INC-2201 to Northlight AV: lecture theatre microphones', kind: 'shared' },
+    { at: demoShift('2024-12-02T10:00'), by: 'fenwater', what: 'Engagement signed by both sides', kind: 'signed' },
   ],
   'quillmark-northlight': [
-    { at: '2026-09-25T14:00', by: 'quillmark', what: 'Handed QM-1142 to Northlight AV: podcast studio mixer hums', kind: 'shared' },
-    { at: '2026-09-15T11:00', by: 'northlight', what: 'Closed QM-1139 with the fix and a photo of the panel', kind: 'sent' },
-    { at: '2026-06-12T10:00', by: 'quillmark', what: 'Engagement signed by both sides', kind: 'signed' },
+    { at: demoShift('2026-09-25T14:00'), by: 'quillmark', what: 'Handed QM-1142 to Northlight AV: podcast studio mixer hums', kind: 'shared' },
+    { at: demoShift('2026-09-15T11:00'), by: 'northlight', what: 'Closed QM-1139 with the fix and a photo of the panel', kind: 'sent' },
+    { at: demoShift('2026-06-12T10:00'), by: 'quillmark', what: 'Engagement signed by both sides', kind: 'signed' },
   ],
   'aigna-brightwave': [
-    { at: '2026-09-25T11:00', by: 'aigna', what: 'SURV-0415 now waiting on floor access after 18:00: the clock paused for both sides', kind: 'shared' },
-    { at: '2026-09-24T14:00', by: 'aigna', what: 'Handed DSGN-15-01 to Brightwave Integration: design review, the divisible town hall', kind: 'shared' },
-    { at: '2024-10-15T10:00', by: 'aigna', what: 'Engagement signed by both sides, with the data processing agreement', kind: 'signed' },
+    { at: demoShift('2026-09-25T11:00'), by: 'aigna', what: 'SURV-0415 now waiting on floor access after 18:00: the clock paused for both sides', kind: 'shared' },
+    { at: demoShift('2026-09-24T14:00'), by: 'aigna', what: 'Handed DSGN-15-01 to Brightwave Integration: design review, the divisible town hall', kind: 'shared' },
+    { at: demoShift('2024-10-15T10:00'), by: 'aigna', what: 'Engagement signed by both sides, with the data processing agreement', kind: 'signed' },
   ],
   'aigna-keystone': [
-    { at: '2026-09-28T09:40', by: 'aigna', what: 'Handed INC0041215 to Keystone Service: codec stuck after a power cut', kind: 'shared' },
-    { at: '2026-09-28T08:40', by: 'keystone', what: 'Booked an engineer for tomorrow morning on INC0041214', kind: 'sent' },
-    { at: '2025-12-02T10:00', by: 'aigna', what: 'Engagement signed by both sides, with the data processing agreement', kind: 'signed' },
+    { at: demoShift('2026-09-28T09:40'), by: 'aigna', what: 'Handed INC0041215 to Keystone Service: codec stuck after a power cut', kind: 'shared' },
+    { at: demoShift('2026-09-28T08:40'), by: 'keystone', what: 'Booked an engineer for tomorrow morning on INC0041214', kind: 'sent' },
+    { at: demoShift('2025-12-02T10:00'), by: 'aigna', what: 'Engagement signed by both sides, with the data processing agreement', kind: 'signed' },
   ],
   'aigna-hp-poly': [
-    { at: '2026-02-11T10:00', by: 'aigna', what: 'Security assessment renewed', kind: 'signed' },
-    { at: '2023-03-20T10:00', by: 'aigna', what: 'Engagement signed by both sides', kind: 'signed' },
+    { at: demoShift('2026-02-11T10:00'), by: 'aigna', what: 'Security assessment renewed', kind: 'signed' },
+    { at: demoShift('2023-03-20T10:00'), by: 'aigna', what: 'Engagement signed by both sides', kind: 'signed' },
   ],
 };
 /** The log in words, newest first: "today, 08:10 · Northlight AV · Marked ...", with how each side holds it. */

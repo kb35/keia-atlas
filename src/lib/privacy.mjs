@@ -1,16 +1,16 @@
 // Privacy records for sensing devices (schemas/ext/privacy-record.schema.yaml). Rule: count, never identify.
 // No Astro or browser dependency, so the validator (tools/crossrefs-privacy.mjs) uses it too.
 
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { parse } from 'yaml';
+import { loadYaml } from './demo-clock.mjs';
 
 // The records in data/privacy/, by id (the file name). Build time only.
 let cache = null;
 export function loadPrivacy(root = process.cwd()) {
   if (cache) return cache;
   const dir = path.join(root, 'data', 'privacy');
-  cache = existsSync(dir) ? Object.fromEntries(readdirSync(dir).filter((f) => f.endsWith('.yaml')).sort().map((f) => [f.slice(0, -5), parse(readFileSync(path.join(dir, f), 'utf8'))])) : {};
+  cache = existsSync(dir) ? Object.fromEntries(readdirSync(dir).filter((f) => f.endsWith('.yaml')).sort().map((f) => [f.slice(0, -5), loadYaml(path.join(dir, f))])) : {};
   return cache;
 }
 

@@ -1,13 +1,13 @@
 // The standards library: the house standards in data/standards/ (every file but cables.yaml) and the cable colour
 // and label standard (cables.yaml), shaped for the list at /standards/ and the pages at /standards/<id>/.
 // Loaded at build time; the validator and tests/standards.test.mjs have already checked every link.
-import { readFileSync, readdirSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import path from 'node:path';
-import { parse } from 'yaml';
+import { loadYaml } from '../../lib/demo-clock.mjs';
 import { sources, models, classes, configurations, spaceTypes, modelName, className } from '../../lib/data.mjs';
 
 const DIR = path.join(process.cwd(), 'data', 'standards');
-const files = Object.fromEntries(readdirSync(DIR).filter((n) => n.endsWith('.yaml')).sort().map((n) => [n.slice(0, -5), parse(readFileSync(path.join(DIR, n), 'utf8'))]));
+const files = Object.fromEntries(readdirSync(DIR).filter((n) => n.endsWith('.yaml')).sort().map((n) => [n.slice(0, -5), loadYaml(path.join(DIR, n))]));
 
 export const AREAS = [
   { id: 'cabling', label: 'Cabling and labelling' },
