@@ -56,12 +56,12 @@ test('the schemas refuse a record with no source mark, an unknown status or a li
   assert.ok(validateRecord({ ...t, source: { ...t.source, url: 'https://servicedesk.example.com/x?access_token=abc' } }).length);
   assert.ok(validateRecord({ ...t, source: { ...t.source, url: 'https://admin:pw@servicedesk.example.com/x' } }).length);
   assert.match(validateRecord({ ...t, assignee: 'A Person' }).join('\n'), /unknown field "assignee"/);
-  assert.deepEqual(validateRecord({ kind: 'thing' }), ['kind must be one of space, unit, ticket, event']);
+  assert.deepEqual(validateRecord({ kind: 'thing' }), ['kind must be one of space, contact, unit, network, port, address, connection, circuit, group, ticket, event']);
 });
 
 // ---- The adapter interface ----
 
-test('both reference adapters have valid manifests: read only, every field owned, no hosts, no credentials', () => {
+test('every adapter has a valid manifest: read only, every field owned, no hosts, no credentials', () => {
   for (const a of Object.values(ADAPTERS)) {
     assert.deepEqual(checkManifest(a.manifest), [], a.manifest.id);
     for (const [kind, o] of Object.entries(a.manifest.objects)) {
@@ -101,9 +101,12 @@ test('an adapter may fill only the fields its manifest declares', async () => {
 });
 
 test('the planned MCP tools are small, typed and read only', () => {
-  assert.deepEqual(plannedMcpTools(ADAPTERS.netbox.manifest).map((t) => `${t.name}:${t.tier}`), [
-    'netbox.space.list:read', 'netbox.space.get:read', 'netbox.unit.list:read', 'netbox.unit.get:read',
+  assert.deepEqual(plannedMcpTools(ADAPTERS.csv.manifest).map((t) => `${t.name}:${t.tier}`), [
+    'csv.space.list:read', 'csv.space.get:read', 'csv.unit.list:read', 'csv.unit.get:read',
   ]);
+  const netbox = plannedMcpTools(ADAPTERS.netbox.manifest);
+  assert.ok(netbox.every((t) => t.tier === 'read' && /^netbox\.[a-z]+\.(list|get)$/.test(t.name)));
+  assert.deepEqual([...new Set(netbox.map((t) => t.name.split('.')[1]))], ['space', 'unit', 'network', 'port', 'address', 'connection', 'group']);
 });
 
 test('helpers: ids are slugs, and secret-looking fields are emptied unless they are vault references', () => {
@@ -314,7 +317,7 @@ test('netbox: one saved list response works, a short page is flagged, and a devi
   writeFileSync(file, JSON.stringify(only));
   const plan = await run('netbox', file, tmp());
   assert.equal(plan.changes.length, 3, 'kinds are read from each object\'s url');
-  assert.match(plan.warnings.join('\n'), /holds 3 of 120\. NetBox pages its lists: export with \?limit=0/);
+  assert.match(plan.warnings.join('\n'), /holds 3 of 120\. NetBox pages its lists \(1,000 at most by default, even with \?limit=0\): follow "next" and save every page/);
   assert.match(plan.problems.join('\n'), /unit netbox-device-42: space "netbox-rack-7" is not in this file or in data\/connected/);
 });
 

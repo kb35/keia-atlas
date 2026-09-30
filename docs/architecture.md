@@ -79,7 +79,7 @@ Read it top to bottom. People use the web app, which talks only to the API serve
 
 | Part | What it does | Today |
 |---|---|---|
-| **Canonical model** | The record shapes every page reads: space, unit, model, service, person, organisation, work (incident, request, problem, change, task), event, agreement. JSON Schema, written in YAML | **Built** in part: `schemas/` checks every data folder; `schemas/connectors/` holds unit, space, ticket and event ([model.md](connectors/model.md)). Person, organisation and agreement are designed |
+| **Canonical model** | The record shapes every page reads: space, unit, model, service, person, organisation, work (incident, request, problem, change, task), event, agreement. JSON Schema, written in YAML | **Built** in part: `schemas/` checks every data folder; `schemas/connectors/` holds the connector model v1: space, unit, port, connection, network, address, group, circuit, contact, ticket and event ([model.md](connectors/model.md)). Person, organisation and agreement are designed |
 | **Storage interface** | One way to read, write, watch and see the history of any record, whichever store holds it ([section 2](#2-two-kinds-of-data-one-model)) | Designed. Today pages read YAML at build time (`src/lib/data.mjs`) |
 | **Git store** | Knowledge as YAML, reviewed like code | **Built**: repo mode |
 | **Postgres store** | Operations: transactional, live, multi-user | Designed |
@@ -87,7 +87,7 @@ Read it top to bottom. People use the web app, which talks only to the API serve
 | **Web app** | The pages. The same page shapes in both modes | **Built** as a static site (Astro). In database mode the same pages fill their live parts from the API |
 | **Event bus** | Every change as one event in one envelope (CloudEvents 1.0); written in the same transaction as the change (the outbox pattern), so none is lost | Designed. Today the live layer (`src/lib/live.mjs`) passes events between windows on one computer, through the same two functions a server will provide |
 | **Rule worker** | Runs standing rules: conditions, caps, rings, read back, Undo or Roll back ([section 4](#4-agents-and-automation)) | Rules as data and the run model are **built** (`data/standing-rules/`, `src/lib/rules.mjs`, tested in `tests/rules.test.mjs`); runs are simulated |
-| **Connector workers** | One per connected system: sync in, approved actions out ([section 5](#5-connectors-in-production)) | The adapter kit v0 is **built** (`tools/connectors/`): file imports, read only |
+| **Connector workers** | One per connected system: sync in, approved actions out ([section 5](#5-connectors-in-production)) | The adapter kit is **built** (`tools/connectors/`): five file importers, read only, and a spec per system ready to connect |
 | **Keia gateway (MCP)** | The one path for any action on another system, by a rule or by AI | Designed. `npm run connect -- netbox --manifest` already prints the tools an adapter will publish |
 | **Auth** | Single sign-on (OIDC or SAML), passkeys, SCIM for joiners and leavers, break-glass accounts | Designed. v0.1 has no sign-in of its own |
 | **Vault** | Holds every secret; hands out short-lived credentials. Yours: OpenBao, HashiCorp Vault or a cloud secret manager | Vault references are **built** and enforced: `npm run validate` refuses a literal secret (`tools/secrets.mjs`) |
@@ -361,7 +361,7 @@ Every run has a run id, which is also its trace id in the observability data. Th
 
 ## 5. Connectors in production
 
-[docs/connectors/](connectors/README.md) describes the connector kit as it is today (**built**): the canonical model, the adapter interface (`defineAdapter({ manifest, open, list, get, map })`), the manifest schema, field ownership, vault references, the `connect` command and two reference adapters (a spreadsheet and a NetBox export). It reads files and is read only. This section is what production adds.
+[docs/connectors/](connectors/README.md) describes the connector kit as it is today (**built**): the canonical model, the adapter interface (`defineAdapter({ manifest, open, list, get, map })`), the manifest schema, field ownership and its defaults, planned against seen (drift events), vault references, the `connect` command and five file importers (a spreadsheet, NetBox, Infoblox, Alertmanager and Snipe-IT), with a written spec for each system it expects to connect. It reads files and is read only. This section is what production adds.
 
 ### 5.1 Adapters and capability manifests
 
@@ -599,7 +599,7 @@ Proposed targets for an enterprise deployment:
 
 | Area | Built today | Next (designed here) |
 |---|---|---|
-| **Canonical model** | Schemas for every data folder (`schemas/`); connected unit, space, ticket and event (`schemas/connectors/`); stability labels | Person, organisation, agreement; work as one shape across incidents, requests, problems, changes and tasks |
+| **Canonical model** | Schemas for every data folder (`schemas/`); the connector model v1 (`schemas/connectors/`: eleven kinds, the seen block); stability labels | Person, organisation, agreement; work as one shape across incidents, requests, problems, changes and tasks |
 | **Knowledge in Git** | Repo mode: YAML in `data/`, checked by `npm run validate` and cross-reference checks; kept migrations (`tools/migrations/`) | Proposals from the web app becoming pull requests or commits; CODEOWNERS from record owners |
 | **Operations in Postgres** | Incidents and projects as YAML; changes to work as events in one browser (`src/lib/live.mjs`) | Postgres behind the storage interface; live updates between everyone |
 | **Storage interface** | The registry of folders, schemas and labels (`schemas/registry.yaml`) | `store: knowledge` or `store: operations` per kind; one interface for pages, rules and connectors |
@@ -612,7 +612,7 @@ Proposed targets for an enterprise deployment:
 | **Keia gateway (MCP)** | Planned tools printed from each manifest (`npm run connect -- <id> --manifest`) | The gateway: per-tool authorisation, caps, audit, no token passthrough |
 | **AI** | None acts; Ask, where present, answers from demo data and says it is AI | Model policy per task kind, local or hosted or off; quarantine for untrusted text; evaluation sets |
 | **Audit log** | Its shape on `/support/log/`, with demo entries | Append-only, hash-chained, copied to your security log system |
-| **Connectors** | Kit v0: adapter interface, manifest schema, field ownership, secret redaction, CSV and NetBox file importers, read only (`tools/connectors/`) | Live adapters (webhooks, polling, reconcile), approved writes, isolated workers, rate budgets, Partner tier, SDK additions |
+| **Connectors** | Kit: adapter interface, manifest schema, field ownership, planned against seen, secret and privacy redaction; file importers for CSV, NetBox, Infoblox, Alertmanager and Snipe-IT; specs for eleven systems; read only (`tools/connectors/`, `docs/connectors/`) | Live adapters (webhooks, polling, reconcile), approved writes, isolated workers, rate budgets, Partner tier, SDK additions |
 | **Security** | Vault references enforced; classification labels; SHA-pinned actions; digest-pinned images; Dependabot with cooldown; gitleaks; Scorecard; non-root container | Label-driven access and redaction; job-scoped vendor access; signed releases and an SBOM (the workflow is written; the first release is to come); SLSA provenance |
 | **Search** | In the browser, over the built site | Server index filtered by permission at query time |
 | **Running it** | Static site; Dockerfile and `compose.yaml` serving it; GitHub Pages for the fictional demo | Compose file for a small team; Helm chart; OpenShift; HA Postgres; backups and restore drills; zero-downtime migrations |

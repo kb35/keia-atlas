@@ -32,15 +32,14 @@ import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 import { parse } from 'yaml';
 import { looksLikeSecretKey, isVaultReference } from '../secrets.mjs';
+import { KINDS, KIND_FOLDER, KEIA_FIELDS } from './kinds.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SCHEMA_DIR = path.join(REPO_ROOT, 'schemas', 'connectors');
 const ID_BASE = 'https://kb35.github.io/keia-atlas/schemas/connectors/';
 
-// Spaces first, so the places exist before the units placed in them.
-export const KINDS = ['space', 'unit', 'ticket', 'event'];
-// Where each kind is kept under data/connected/<system>/.
-export const KIND_FOLDER = { unit: 'units', space: 'spaces', ticket: 'tickets', event: 'events' };
+// The kinds of record (canonical model v1) and where each is kept: see kinds.mjs.
+export { KINDS, KIND_FOLDER };
 export const TIERS = ['community', 'certified'];
 export const OWNERS = ['source', 'keia'];
 // v0 is read only. Write actions arrive with standing rules and a person's approval (docs/connectors/README.md).
@@ -84,8 +83,13 @@ export function checkManifest(manifest) {
   const check = schemas().getSchema(ID_BASE + 'manifest');
   const out = check(manifest) ? [] : check.errors.filter((e) => e.keyword !== 'if').map(describe);
   for (const [kind, o] of Object.entries(manifest?.objects ?? {})) {
-    for (const f of Object.keys(o?.fields ?? {})) {
+    for (const [f, owner] of Object.entries(o?.fields ?? {})) {
       if (RUNNER_FIELDS.includes(f)) out.push(`objects.${kind}.fields.${f}: set by the runner, not by an adapter`);
+      else if (KEIA_FIELDS.includes(f) && owner !== 'keia') out.push(`objects.${kind}.fields.${f}: Keia owns its links and notes, so this must be "keia"`);
+    }
+    for (const f of o?.observes ?? []) {
+      if (!(f in (o?.fields ?? {}))) out.push(`objects.${kind}.observes: "${f}" is not one of the fields it fills`);
+      else if (KEIA_FIELDS.includes(f)) out.push(`objects.${kind}.observes: "${f}" is Keia's own, not something a system sees`);
     }
   }
   return out;
@@ -139,6 +143,51 @@ export function redact(native) {
   };
   return { raw: walk(native, ''), redacted };
 }
+
+// A MAC address in Keia's form: lower case, colon separated. Accepts 00-00-5E-00-53-2A, 0000.5e00.532a and
+// 00005e00532a. Anything else gives undefined, so a bad value never reaches the record (it stays in raw).
+export function normMac(v) {
+  if (typeof v !== 'string') return undefined;
+  const hex = v.trim().toLowerCase().replace(/[^0-9a-f]/g, '');
+  if (hex.length !== 12 || !/^[0-9a-f:.\s-]+$/i.test(v.trim())) return undefined;
+  return hex.match(/../g).join(':');
+}
+
+// IP addresses: the address without its prefix length, and whether it sits inside a prefix. IPv4 and IPv6.
+export const ipHost = (ip) => String(ip ?? '').split('/')[0].trim().toLowerCase();
+function ipBits(ip) {
+  const h = ipHost(ip);
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) {
+    const parts = h.split('.').map(Number);
+    if (parts.some((p) => p > 255)) return undefined;
+    return { v: 4, n: parts.reduce((a, p) => (a << 8n) | BigInt(p), 0n), width: 32 };
+  }
+  if (!h.includes(':')) return undefined;
+  const [left, right = ''] = h.split('::');
+  const l = left ? left.split(':') : [];
+  const r = right ? right.split(':') : [];
+  if (!h.includes('::') && l.length !== 8) return undefined;
+  const groups = [...l, ...Array(8 - l.length - r.length).fill('0'), ...r];
+  if (groups.length !== 8 || groups.some((g) => !/^[0-9a-f]{1,4}$/.test(g))) return undefined;
+  return { v: 6, n: groups.reduce((a, g) => (a << 16n) | BigInt(parseInt(g, 16)), 0n), width: 128 };
+}
+export function inPrefix(ip, prefix) {
+  const a = ipBits(ip);
+  const p = ipBits(prefix);
+  const len = Number(String(prefix).split('/')[1]);
+  if (!a || !p || a.v !== p.v || !Number.isInteger(len) || len < 0 || len > p.width) return false;
+  const shift = BigInt(p.width - len);
+  return a.n >> shift === p.n >> shift;
+}
+// The most specific of several prefixes an address sits in: [{ prefix, ...anything }] -> that item, or undefined.
+export function containingPrefix(ip, items) {
+  return items
+    .filter((x) => inPrefix(ip, x.prefix))
+    .sort((a, b) => Number(String(b.prefix).split('/')[1]) - Number(String(a.prefix).split('/')[1]))[0];
+}
+
+// A text value, trimmed, or undefined when empty.
+export const text = (v) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : typeof v === 'number' ? String(v) : undefined);
 
 // Map a system's own status word to Keia's, through a table of lower-case words. Unknown words give undefined,
 // so the record keeps only status_native and the page shows the system's word (connect rule 5: both states).
