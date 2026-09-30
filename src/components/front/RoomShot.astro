@@ -1,0 +1,63 @@
+---
+// A room as a product shot: the same to-scale cut-away drawing Atlas draws for a space (src/lib/room3d.mjs, rendered
+// by RoomScene.astro), with only the room and its kit. No tools, cables, markers or rulers: those belong to the
+// record, and this picture is the front door's. The caller renders the model (buildRoom, render) so it can also read
+// where a device sits (R.marks); this draws it. Materials use the same tones as RoomScene, light and dark.
+interface Props { R: any; label: string; class?: string; x?: number; y?: number; width?: number; height?: number }
+const { R, label, class: cls, x, y, width, height } = Astro.props;
+const nested = x !== undefined;
+---
+<svg class:list={['rshot', cls]} viewBox={`0 0 ${R.width} ${R.height}`} role="img" aria-label={label} {...(nested ? { x, y, width, height } : {})}>
+  {R.shapes.map((s) => s.pts ? <polygon points={s.pts} class={`sh ${s.cls}`} /> : <path d={s.d} class={`sh ${s.cls}`} />)}
+  {R.drawn.map((d) => {
+    const s = d.s;
+    if (s.ghost || s.outside) return null;
+    const c = [`m-${s.mat}`, s.hid && 'hid', s.ceiling && 'ceil'].filter(Boolean).join(' ');
+    return (
+      <g class={c} data-sk={s.sk}>
+        {d.fs.map((f) => <polygon points={f.pts} class={f.top ? 'ft' : 'fs'} style={f.top ? undefined : `--k:${f.k}%`} />)}
+        {d.dec.map((dc) => <polygon points={dc.pts} class={`dc d-${dc.mat}${dc.port ? ' pt' : ''}`} />)}
+      </g>
+    );
+  })}
+</svg>
+
+<style is:global>
+  .rshot {
+    display: block; overflow: visible;
+    --sc-wall: #ECE6DA; --sc-wall-2: #E2DACB; --sc-cut: #9C9384; --sc-floor: #D8D0C0; --sc-slab: #B9AF9C; --sc-line: rgba(28,26,23,.28); --sc-edge: rgba(28,26,23,.30);
+    --sc-dev: #2A2B31; --sc-bezel: #17181C; --sc-table: #C9A77A; --sc-wood: #B8976D; --sc-chair: #5C6474; --sc-chair-2: #464C59; --sc-base: #3A3E47;
+    --sc-sofa: #7F8C8A; --sc-counter: #DAD3C6; --sc-stone: #EFEBE3; --sc-door: #C8B596; --sc-board: #FBFBF8; --sc-leaf: #5E8C5A; --sc-pot: #B7704A;
+    --sc-app: #C9CDD2; --sc-printer: #E6E6E2; --sc-ceil: #F4F2EE; --sc-screen: #14161C; --sc-lit: #2C4A7E;
+    --sc-plate: #FCFBF8; --sc-plate-edge: rgba(28,26,23,.55); --sc-lid: #A7A298; --sc-well: #5B5750; --sc-hole: #24252A;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .rshot { --sc-wall: #34312B; --sc-wall-2: #2C2A25; --sc-cut: #57524A; --sc-floor: #3E3A33; --sc-slab: #24221E; --sc-line: rgba(255,255,255,.22); --sc-edge: rgba(0,0,0,.45); --sc-dev: #0F1013; --sc-bezel: #08090B; --sc-table: #8C744F; --sc-wood: #7A6446; --sc-chair: #6B7384; --sc-chair-2: #555C6A; --sc-base: #2A2D34; --sc-sofa: #5C6866; --sc-counter: #5A554D; --sc-stone: #6E685E; --sc-door: #6B5E48; --sc-board: #D8D6CF; --sc-leaf: #4A7447; --sc-pot: #8E5638; --sc-app: #7C8085; --sc-printer: #A9A9A4; --sc-ceil: #CFCBC2; --sc-plate: #E9E6DF; --sc-plate-edge: rgba(0,0,0,.6); --sc-lid: #77736B; --sc-well: #2A2825; } }
+  :root[data-theme="dark"] .rshot { --sc-wall: #34312B; --sc-wall-2: #2C2A25; --sc-cut: #57524A; --sc-floor: #3E3A33; --sc-slab: #24221E; --sc-line: rgba(255,255,255,.22); --sc-edge: rgba(0,0,0,.45); --sc-dev: #0F1013; --sc-bezel: #08090B; --sc-table: #8C744F; --sc-wood: #7A6446; --sc-chair: #6B7384; --sc-chair-2: #555C6A; --sc-base: #2A2D34; --sc-sofa: #5C6866; --sc-counter: #5A554D; --sc-stone: #6E685E; --sc-door: #6B5E48; --sc-board: #D8D6CF; --sc-leaf: #4A7447; --sc-pot: #8E5638; --sc-app: #7C8085; --sc-printer: #A9A9A4; --sc-ceil: #CFCBC2; --sc-plate: #E9E6DF; --sc-plate-edge: rgba(0,0,0,.6); --sc-lid: #77736B; --sc-well: #2A2825; }
+
+  .rshot .ft { fill: var(--m); stroke: var(--sc-edge); stroke-width: .7; stroke-linejoin: round; }
+  .rshot .fs { fill: color-mix(in srgb, var(--m) var(--k, 80%), #000); stroke: var(--sc-edge); stroke-width: .7; stroke-linejoin: round; }
+  .rshot .sh.floor { fill: var(--sc-floor); }
+  .rshot .sh.slab { fill: var(--sc-slab); } .rshot .sh.slab.r { fill: color-mix(in srgb, var(--sc-slab) 82%, #000); }
+  .rshot .sh.wall.back { fill: var(--sc-wall); } .rshot .sh.wall.left { fill: var(--sc-wall-2); }
+  .rshot .sh.wall-cut { fill: var(--sc-cut); } .rshot .sh.wall-cut.side { fill: color-mix(in srgb, var(--sc-cut) 85%, #000); }
+  .rshot .sh.skirt { stroke: var(--sc-line); stroke-width: 2; fill: none; }
+  .rshot .sh.swing { fill: none; stroke: var(--sc-line); stroke-width: 1.2; stroke-dasharray: 4 3; }
+  .rshot .m-table { --m: var(--sc-table); } .rshot .m-leg { --m: var(--sc-base); } .rshot .m-wood { --m: var(--sc-wood); }
+  .rshot .m-chair { --m: var(--sc-chair); } .rshot .m-chair-back { --m: var(--sc-chair-2); } .rshot .m-chair-base { --m: var(--sc-base); }
+  .rshot .m-sofa { --m: var(--sc-sofa); } .rshot .m-sofa-back { --m: color-mix(in srgb, var(--sc-sofa) 85%, #000); }
+  .rshot .m-counter { --m: var(--sc-counter); } .rshot .m-stone { --m: var(--sc-stone); } .rshot .m-appliance { --m: var(--sc-app); }
+  .rshot .m-door { --m: var(--sc-door); } .rshot .m-board { --m: var(--sc-board); } .rshot .m-leaf { --m: var(--sc-leaf); } .rshot .m-pot { --m: var(--sc-pot); }
+  .rshot .m-lamp { --m: #E9E4D6; } .rshot .m-screen-panel { --m: color-mix(in srgb, var(--sc-sofa) 70%, var(--sc-wall)); }
+  .rshot .m-dev, .rshot .m-router, .rshot .m-laptop { --m: var(--sc-dev); } .rshot .m-bezel { --m: var(--sc-bezel); }
+  .rshot .m-printer { --m: var(--sc-printer); } .rshot .m-printer-top { --m: color-mix(in srgb, var(--sc-printer) 88%, #000); }
+  .rshot .m-ceil-dev { --m: var(--sc-ceil); } .rshot .m-led-wall { --m: #101114; }
+  .rshot .m-plate { --m: var(--sc-plate); } .rshot .m-floorbox { --m: var(--sc-lid); } .rshot .m-deskmod { --m: #B9BCC2; }
+  .rshot .m-plate .ft, .rshot .m-plate .fs { stroke: var(--sc-plate-edge); stroke-width: .6; }
+  .rshot .dc.d-sock { fill: color-mix(in srgb, var(--sc-plate) 90%, #000); }
+  .rshot .dc.d-hole { fill: var(--sc-hole); } .rshot .dc.d-pin { fill: #9A968E; }
+  .rshot .dc.d-fb-well { fill: var(--sc-well); } .rshot .dc.d-plate-flat { fill: var(--sc-plate); stroke: var(--sc-plate-edge); stroke-width: .4; }
+  .rshot .d-screen { fill: var(--sc-screen); } .rshot .d-screen-lit { fill: var(--sc-lit); } .rshot .d-glare { fill: #5A8CFF; opacity: .16; }
+  .rshot .d-lens { fill: #0B0B0E; stroke: #6A7080; stroke-width: 1; } .rshot .d-grille { fill: #5A5D66; } .rshot .d-handle { fill: var(--sc-dev); }
+  .rshot .dc.d-jack { fill: #2A2B31; } .rshot .dc.d-jack-spare { fill: color-mix(in srgb, var(--sc-plate) 80%, #000); }
+  .rshot .hid { opacity: .0; }
+</style>
