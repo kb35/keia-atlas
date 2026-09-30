@@ -52,5 +52,19 @@ The old families (`--green`, `--amber`, `--red`, `--blue`, `--violet`, `--grey`)
 - **Do:** pair each glyph with its word, and use the ink token for any text.
 - **Don't:** use the accent for health, a fill token for text, or red for decoration.
 
+### T5. Icons follow the text
+
+Anything that sits in a line of text scales with Text size; anything that belongs to a drawing keeps the drawing's scale.
+
+Settings › Accessibility › Text size multiplies every font size by `--rs-text` (1, 1.15 or 1.3). Beside text, icons grow by the same amount through `--rs-icon`: health glyphs, button and chip icons, chevrons on links, the sidebar and palette icons, avatars and the With chip's avatar, the pause button, a device's small picture in a row, and the grid column an icon sits in. Hit targets grow with them and are never under 24 px.
+
+On a floor plan, a floor thumbnail, the 3D office, the front door's hero or a room drawing, markers belong to the picture and keep its scale: the drawing sets `--rs-icon: 1` on itself, or draws its markers inside its own picture.
+
+How it works (`tools/postcss-a11y.mjs`, `src/styles/a11y.css`): the build scales any px size of 48 or less on an svg or img, and on a small fixed box that holds letters (an avatar, a step number, a chip of a set height). An svg sized only by its `width` and `height` attributes is scaled by rules in `a11y.css`. A health glyph's size is `calc(<px> * var(--rs-icon, 1))`, and its stroke is drawn in its 16-unit box, so it thickens with the glyph as a letter's stems do.
+
+- **Why:** a status mark that stays small beside large text looks wrong and is harder to see ([WCAG 2.2, resize text](https://www.w3.org/WAI/WCAG22/Understanding/resize-text.html)).
+- **Do:** size icons in px (or em) in CSS or with `width` and `height`; add `/* text-size: icon */` to any other box that must grow with text (an icon button, a frame round an icon, a status dot); add `/* text-size: drawing */` to a rule for a mark that belongs to a picture.
+- **Don't:** size an icon, an avatar or a label column in px in an inline `style`, or set a fixed height on a box of text without letting it grow; write the size in CSS instead, or multiply it by `var(--rs-text, 1)`.
+
 ## No accent bars on rounded boxes
 A coloured stripe down one edge of a box with rounded corners curves around the corners and looks off. Don't use `border-left` or an `inset` left shadow as an accent on anything rounded. Show state with a thin tinted outline (`box-shadow: inset 0 0 0 1px color-mix(in srgb, <colour> 55%, transparent)`), a soft tinted background, or a small dot or icon. Straight table rows may keep a straight edge.
