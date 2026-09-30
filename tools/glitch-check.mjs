@@ -22,7 +22,7 @@
      npm run build && npx astro preview --port 4499 &
      npm run glitch -- [--base http://127.0.0.1:4499/keia-atlas] [--only home,portfolio] [--quick]
                        [--widths 375,768,1440] [--text 1,1.15,1.3] [--looks studio-light,enterprise-dark]
-                       [--out <dir>] [--workers 6] [--max 40]
+                       [--out <dir>] [--workers 6] [--max 40] [--dist dist]
    --quick checks 375 and 1440, text 1 and 1.3, Studio only. The report goes to ../notes/audit/ next to the
    repository (never committed): glitches.json and GLITCHES.md. Needs Playwright with WebKit, found the way
    tools/responsive-check.mjs finds it. Exits 0 (it reports; it does not gate).
@@ -50,7 +50,7 @@ const LOOKS = opt('looks', QUICK ? 'studio-light' : 'studio-light,enterprise-dar
 const ONLY = opt('only', '').split(',').filter(Boolean);
 const WORKERS = Number(opt('workers', '6'));
 const MAX_PER_GLOB = Number(opt('max', '40'));
-const DIST = join(ROOT, 'dist');
+const DIST = resolve(opt('dist', join(ROOT, 'dist')));
 
 const TEXT_NAME = { 1: 'default', 1.15: 'larger', 1.3: 'largest' };
 const LOOK = { 'studio-light': ['studio', 'light'], 'studio-dark': ['studio', 'dark'], 'enterprise-light': ['enterprise', 'light'], 'enterprise-dark': ['enterprise', 'dark'] };
@@ -114,7 +114,7 @@ function measure() {
   const W = document.documentElement.clientWidth;
   const cache = new Map();
   const cs = (el) => { let c = cache.get(el); if (!c) { c = getComputedStyle(el); cache.set(el, c); } return c; };
-  const SKIP = '[data-glitch-ok], [data-rc-ok], [hidden], .sr-only, .visually-hidden, [aria-hidden="true"], astro-dev-toolbar, template, noscript, canvas, dialog:not([open]), [inert]';
+  const SKIP = '[data-glitch-ok], [data-rc-ok], [hidden], .sr-only, .sr, .visually-hidden, [aria-hidden="true"], astro-dev-toolbar, template, noscript, canvas, dialog:not([open]), [inert]';
   const hiddenUp = (el) => { for (let p = el; p; p = p.parentElement) { const c = cs(p); if (c.display === 'none' || +c.opacity === 0 || c.contentVisibility === 'hidden') return true; } return false; };
   const shown = (el) => {
     if (!el || el.closest(SKIP)) return false;
@@ -224,8 +224,8 @@ function measure() {
     const allow = par.closest('[data-overlap]');
     const limit = allow ? Number(allow.getAttribute('data-overlap')) || 0.3 : 0.2;
     const pc = cs(par);
-    if (pc.display === 'contents' || !shown(par)) continue;
-    const vis = kids.filter((k) => !positioned(k) && cs(k).display !== 'contents' && !/^(SCRIPT|STYLE|TEMPLATE)$/.test(k.tagName) && shown(k));
+    if (pc.display === 'contents' || par.closest('svg') || !shown(par)) continue; // a drawing's shapes overlap on purpose
+    const vis = kids.filter((k) => !positioned(k) && !/^(contents|inline)$/.test(cs(k).display) && !/^(SCRIPT|STYLE|TEMPLATE)$/.test(k.tagName) && shown(k));
     const rects = vis.map((k) => k.getBoundingClientRect());
     for (let i = 0; i < vis.length; i++) for (let j = i + 1; j < vis.length; j++) {
       const a = rects[i], b = rects[j];
@@ -426,9 +426,13 @@ async function main() {
   // ---------- Rank ----------
   const groups = new Map();
   const intentional = (s) => INTENTIONAL.find(([p]) => s.startsWith(p));
+  const counted = new Set(); // one count per page and view, however many states it was seen in
   for (const f of findings) {
     if (intentional(f.sig)) continue;
     const key = `${f.type}|${f.sig}${f.by ? ' in ' + f.by : ''}${f.with ? ' x ' + f.with : ''}`;
+    const k2 = `${key}|${f.page}|${f.view}`;
+    if (counted.has(k2)) { groups.get(key)?.states.add(f.state); continue; }
+    counted.add(k2);
     const g = groups.get(key) || { type: f.type, sig: f.sig, by: f.by, with: f.with, severity: SEVERITY[f.type] || 1, count: 0, pages: new Set(), views: new Set(), states: new Set(), sample: f.text, px: 0 };
     g.count++; g.pages.add(f.page); g.views.add(f.view); g.states.add(f.state);
     g.px = Math.max(g.px, Math.abs(f.px || 0), f.frac || 0);
