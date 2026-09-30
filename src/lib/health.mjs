@@ -32,7 +32,7 @@ const LEGACY = {
 /** One of the seven states for any state word the site already uses ('ok', 'warn', 'bad', 'off', 'good'...). */
 export const stateOf = (s) => (STATES.includes(s) ? s : LEGACY[String(s ?? '').toLowerCase()] ?? 'off');
 
-// The km-ring (notes/logo/LIBRARY.md, motion 3): every state is the same circle with a dash pattern set by the
+// The km-ring (the motion library, motion 3): every state is the same circle with a dash pattern set by the
 // state (src/styles/motion-library.css), plus the fault's dot and the off slash, so a state change eases in place
 // instead of swapping shapes. data-s names the state in the markup; the pattern comes from .hg[data-state].
 const RING = (s) => `<circle class="hg-s hg-ring" data-s="${s}" pathLength="1" cx="8" cy="8" r="6"/><circle class="hg-dot" cx="8" cy="8" r="1.5"/><line class="hg-s hg-thin hg-slash" pathLength="1" x1="2.804" y1="5" x2="13.196" y2="11"/>`;

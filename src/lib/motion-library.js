@@ -1,6 +1,6 @@
-/* Keia motion library: the scripted half, the site's single source for these motions (notes/logo/LIBRARY.md).
+/* Keia motion library: the scripted half, the site's single source for these motions.
    Pairs with src/styles/motion-library.css. Loaded once on every page by Motion.astro; sets window.km.
-   Ported from notes/logo/motion-library.js: durations and curves are read from the tokens (so each look keeps its
+   Durations and curves are read from the tokens (so each look keeps its
    own tempo), and the spring is V2's (src/lib/spring.mjs), one curve for the whole site.
    Every function checks km.reduced() and applies the end state at once when it is on (MOTION-V2 section 7). */
 import { springEasing } from './spring.mjs';

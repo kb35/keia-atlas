@@ -7,7 +7,7 @@
 // Rules this file keeps:
 //   - Every figure names its source and the time it was read. Money comes from the finance connector (SIMULATED).
 //   - The model's inputs say what they are: Sourced (a published figure, with its link and strength from
-//     notes/distill/VALUE-SCAN.md), or Assumption (Aigna's own number, to be replaced with real figures). The model's
+//     the value research), or Assumption (Aigna's own number, to be replaced with real figures). The model's
 //     results are estimates, never findings.
 //   - Nothing names or ranks a person. An owner is a separate field, never written into a line with a number
 //     (tests/no-rankings.test.mjs checks it).

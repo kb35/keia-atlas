@@ -245,7 +245,7 @@ A list that appears with the page (a card grid, a list of rows) makes one quiet 
 
 ### M17. The motion library is the one source
 
-The twelve micro-motions of the Keia motion library (`notes/logo/LIBRARY.md`) live in `src/styles/motion-library.css` and `src/lib/motion-library.js` (`window.km`), loaded on every page by `src/components/Motion.astro`. Their durations and curves are the tokens in `motion.css`, so each look keeps its tempo; their spring is V2's (`src/lib/spring.mjs`, `--ease-spring`); `--km-t` is 0 under reduced motion, so every one of them lands on its end state.
+The twelve micro-motions of the Keia motion library live in `src/styles/motion-library.css` and `src/lib/motion-library.js` (`window.km`), loaded on every page by `src/components/Motion.astro`. Their durations and curves are the tokens in `motion.css`, so each look keeps its tempo; their spring is V2's (`src/lib/spring.mjs`, `--ease-spring`); `--km-t` is 0 under reduced motion, so every one of them lands on its end state.
 
 | # | Motion | In the site |
 |---|---|---|
