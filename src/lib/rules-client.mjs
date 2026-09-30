@@ -59,7 +59,7 @@ export function cardHtml(runId, trigger) {
 }
 W.rsHowBody = (runId, trigger) => cardHtml(runId, trigger);
 
-/** A run's one line for a record ("Done automatically under the DNS rule (owner: Niamh)"). */
+/** A run's one line for a record ("Done automatically under the DNS rule (owner: Nora)"). */
 export const lineOf = (rule, run) => runLine(rule, run, people());
 
 let seq = 0;

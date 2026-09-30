@@ -273,10 +273,10 @@ export const MATCH_RULE = { name: 'Match tickets to spaces', owner: 'priya' };
 
 // ---- Who has each piece of work, before any live change ----------------------------------------------------
 // Parked jobs in the demo (UX-V2 §4.4): Liam stopped part way through labelling the IDF 3 panel for the cutover;
-// Aoife stopped part way through commissioning Heron in Juneau.
+// Anna stopped part way through commissioning Heron in Juneau.
 export const PARKED_SEED = {
   'task:T-1605': { by: 'liam', at: `${DEMO_TODAY}T10:14`, park: { where: 'Labelled ports 1 to 8 on the IDF 3 panel', next: 'Label 9 to 12, then check each against the build sheet', question: 'Is port 11 the booking panel? Its label is missing' } },
-  'task:T-1404': { by: 'aoife', at: '2026-09-25T16:40', park: { where: 'Framing fixed; half of the verification run', next: 'Run the far-end checks from another office', question: 'Does the Juneau desk want the old unit kept as a spare?' } },
+  'task:T-1404': { by: 'anna', at: '2026-09-25T16:40', park: { where: 'Framing fixed; half of the verification run', next: 'Run the far-end checks from another office', question: 'Does the Juneau desk want the old unit kept as a spare?' } },
 };
 function baseOwn(it) {
   const to = it.who[0] ?? null;
@@ -428,7 +428,7 @@ function reviewFor(p) {
 export const REVIEW = Object.fromEntries(PEOPLE.map((p) => [p.id, reviewFor(p)]));
 
 // ---- Welcome back, and the hand over for cover (UX-V2 §4.3) ------------------------------------------------------
-// Who covers whom while they are away: the first colleague in the same role (Marcus covers Aoife).
+// Who covers whom while they are away: the first colleague in the same role (Marcus covers Anna).
 export const coverOf = (p) => PEOPLE.find((x) => x.id !== p.id && x.roleId === p.roleId && !x.vendor)?.id ?? null;
 const scopeSites = (p) => (p.roleId === 'tech' ? [p.office] : p.region ? SITE_ORDER.filter((s) => sites[s].region === p.region) : SITE_ORDER);
 function welcomeFor(p) {

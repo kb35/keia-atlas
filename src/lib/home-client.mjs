@@ -40,7 +40,7 @@ function ownOf(id) {
   if (L) { const st = L.live.stateOf(id, { own: base, status: H.items[id]?.status }); o = st.own ?? o; if (st.status === 'done' && H.items[id]?.status !== 'done') o = { ...(o ?? {}), s: 'done' }; }
   return o;
 }
-const who = () => (W.rsWhoId ? W.rsWhoId() : 'aoife');
+const who = () => (W.rsWhoId ? W.rsWhoId() : 'anna');
 const actor = () => (W.rsActorId ? W.rsActorId() : who());
 const people = () => Object.fromEntries(Object.values(H.people).map((p) => [p.id, { name: p.name, first: p.first, initials: p.initials }]));
 const personOf = (id) => H.people[id] || { id, name: id, first: id, role: '', roleId: 'delivery', initials: '?' };
@@ -245,7 +245,7 @@ function details(viewer, items) {
     const u = n.unit;
     return `<a class="next dev" href="${esc(n.href)}" data-help="home.device-card"><span class="next-b"><span class="next-k">${esc(n.project)} ${esc(n.projectName)} · ${esc(n.siteName)}</span><b>${esc(u ? u.name : n.batch)}</b><small>${esc(u && u.model ? `${u.model} · ` : '')}${esc(n.batch)}: ${n.done} of ${n.total} set up${n.issues ? ` · ${n.issues} ready for you` : n.ready ? ` · ${n.ready} checked, to accept` : ''}</small><span class="next-go">Open the batch →</span></span></a>`;
   };
-  root.querySelector('[data-device]').innerHTML = dev(H.next[all ? 'aoife' : viewer]);
+  root.querySelector('[data-device]').innerHTML = dev(H.next[all ? 'anna' : viewer]);
   root.querySelector('[data-device-vendor]').innerHTML = dev(H.next[all ? 'sam' : viewer]);
   const prov = items.filter((i) => i.kind === 'task' && i.taskKind === 'provision' && (all || i.who.includes(viewer)) && i.status !== 'done');
   root.querySelector('[data-provision]').innerHTML = prov.length ? prov.map((i) => `<a class="mini-row" href="${esc(i.href)}">${glyph(i.status === 'blocked' ? 'review' : i.status === 'doing' ? 'progress' : 'planned', { size: 12 })}<span>${esc(i.title)}<small>${esc(STATUS[i.status])} · ${esc(subOf(i))}</small></span><span class="mr-arrow" aria-hidden="true">→</span></a>`).join('') : none('Nothing waiting to be provisioned.');

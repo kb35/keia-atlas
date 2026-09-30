@@ -53,7 +53,7 @@ export const GLOSSARY = [
   { id: 'module', term: 'Module', def: 'A part of Keia Atlas a team switches on or off. On means built in, Connected means an outside tool feeds it (each figure shows its source and time), and Off means not used. A team starts anywhere.' },
   { id: 'standing-rule', term: 'Standing rule', def: 'A routine job that a named owner approved once, with its conditions and its way back, so software may run it. Nothing runs outside it, and the owner is told on every run.' },
   { id: 'ready-for-you', term: 'Ready for you', def: 'Prepared and waiting for you.' },
-  { id: 'with', term: 'With', def: 'Who holds the work now, and why, such as "With Aoife", "With Network team" or "With Poly (vendor)".' },
+  { id: 'with', term: 'With', def: 'Who holds the work now, and why, such as "With Anna", "With Network team" or "With Poly (vendor)".' },
   { id: 'to-review', term: 'To review', def: 'A person should look. Nothing is broken yet.' },
   { id: 'waiting-on', term: 'Waiting on', def: 'Stopped until something outside the record moves. It says what for, such as "Waiting on: the vendor".' },
   { id: 'unable-to-complete', term: 'Unable to complete', def: 'It did not happen. It says why, and where it stopped.' },

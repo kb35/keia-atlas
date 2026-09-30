@@ -250,7 +250,7 @@ The registry is a table per organisation of the modules installed, their version
 
 ## 4. Agents and automation
 
-**The words.** A **standing rule** is a standard change a service owner approved once, with its conditions, caps and way back. An **agent** is the software that runs it. Most automation has no AI in it at all: conditions, caps, thresholds and schedules are plain code that gives the same answer twice. AI is used where language or judgement is the work (summaries, drafts, grouping alerts, suggesting causes), and it proposes; it never acts on its own authority. Agents have no names, faces or place in Team. The record says it quietly: "Done automatically under the DNS rule (owner: Niamh)".
+**The words.** A **standing rule** is a standard change a service owner approved once, with its conditions, caps and way back. An **agent** is the software that runs it. Most automation has no AI in it at all: conditions, caps, thresholds and schedules are plain code that gives the same answer twice. AI is used where language or judgement is the work (summaries, drafts, grouping alerts, suggesting causes), and it proposes; it never acts on its own authority. Agents have no names, faces or place in Team. The record says it quietly: "Done automatically under the DNS rule (owner: Nora)".
 
 ### 4.1 One run, end to end
 

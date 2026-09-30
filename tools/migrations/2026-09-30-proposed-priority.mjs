@@ -42,7 +42,7 @@ const OVERRIDES = {
       'priority_override:',
       '  priority: 4',
       '  reason: The room still books correctly from the calendar; only the panel by the door is out of date.',
-      '  by: aoife',
+      '  by: anna',
       '  at: "2026-09-25T14:40"',
     ],
   },

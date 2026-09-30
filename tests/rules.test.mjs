@@ -19,7 +19,7 @@ import { listHtml, dayLabel } from '../src/lib/timeline.mjs';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const DIR = join(ROOT, 'data', 'standing-rules');
 const RULES = Object.fromEntries(readdirSync(DIR).filter((f) => f.endsWith('.yaml')).map((f) => { const r = parse(readFileSync(join(DIR, f), 'utf8')); return [r.id, r]; }));
-const people = { niamh: { name: 'Niamh Walsh' }, declan: { name: 'Declan Moore' }, sofia: { name: 'Sofia Reyes' }, liam: { name: 'Liam Doyle' }, priya: { name: 'Priya Nair' } };
+const people = { nora: { name: 'Nora Walsh' }, declan: { name: 'Declan Moore' }, sofia: { name: 'Sofia Reyes' }, liam: { name: 'Liam Doyle' }, priya: { name: 'Priya Nair' } };
 const dns = RULES['dns-from-build-sheet'], poe = RULES['poe-cycle'], cal = RULES['calendar-resync'], fw = RULES['firmware-to-standard'];
 
 test('every rule declares one way back, and a rule that asks never runs alone', () => {
@@ -71,9 +71,9 @@ test('only the declared verb, never a fake Undo; Run again only for the rule\'s 
   assert.equal(wayBack(poe, done), null, 'nothing to put back');
   assert.equal(wayBack(fw, done), null, 'asks every time');
   assert.equal(wayBack(dns, { ...done, reversed: true }), null, 'already put back');
-  assert.equal(mayRunAgain(dns, 'niamh'), true);
+  assert.equal(mayRunAgain(dns, 'nora'), true);
   assert.equal(mayRunAgain(dns, 'liam', 'liam'), true);
-  assert.equal(mayRunAgain(dns, 'liam', 'niamh'), false);
+  assert.equal(mayRunAgain(dns, 'liam', 'nora'), false);
   assert.equal(mayRunAgain(dns, null), false);
 });
 
@@ -98,15 +98,15 @@ test('the default owner clock: P1 and P2 count every minute, P3 and P4 count wor
 
 test('the card keeps its fixed order, says what it did not check, and labels AI', () => {
   const unable = dns.runs.find((r) => r.result === 'unable');
-  const c = howCard(dns, unable, { people, today: '2026-09-28', viewer: 'niamh' });
+  const c = howCard(dns, unable, { people, today: '2026-09-28', viewer: 'nora' });
   assert.deepEqual(c.rows.map((r) => r.k), ['What happened', 'What it read', 'What it did', 'What it ruled out', 'What it did not check', 'Evidence']);
   assert.match(c.rows[0].v, /^Unable to complete at the write step/);
   assert.ok(c.rows[4].v.length > 0);
   assert.deepEqual(c.actions.map((a) => a.verb), ['Run again'], 'unable: no Roll back to offer, Run again for the owner');
-  assert.match(c.meta, /^DNS rule · owner Niamh Walsh · ran 02:00 · 1.4 s$/);
-  const other = howCard(dns, unable, { people, viewer: 'liam', jobOwner: 'niamh' });
+  assert.match(c.meta, /^DNS rule · owner Nora Walsh · ran 02:00 · 1.4 s$/);
+  const other = howCard(dns, unable, { people, viewer: 'liam', jobOwner: 'nora' });
   assert.deepEqual(other.actions, []);
-  assert.match(other.againFor, /Niamh, the rule's owner/);
+  assert.match(other.againFor, /Nora, the rule's owner/);
   const ai = dns.runs.find((r) => r.ai);
   const card = howCard(dns, ai, { people });
   assert.match(card.ai, /^Drafted by AI \(/);
@@ -115,7 +115,7 @@ test('the card keeps its fixed order, says what it did not check, and labels AI'
   assert.ok(html.includes('href="/support/log/#run-RUN-5118"'), 'the trace is one link away');
   assert.ok(!/%/.test(html), 'no percentage on the card');
   assert.ok(howTrigger(card).startsWith('<button type="button" class="how-link"'));
-  assert.equal(runLine(dns, unable, people), 'Unable to complete, rolled back · DNS rule (owner: Niamh)');
+  assert.equal(runLine(dns, unable, people), 'Unable to complete, rolled back · DNS rule (owner: Nora)');
   assert.equal(rolledBack(dns, unable), true);
   assert.equal(verbFor(poe, 'GE1/0/12'), 'Cycle PoE on GE1/0/12');
 });
@@ -140,7 +140,7 @@ test('the job record\'s words: the answer, the impact line and the hand-off coun
   assert.equal(answerFor({ own: { s: 'ready', to: 'liam' }, booking }, people), 'Offered to Liam, not taken yet · booked 09:00, 8 people');
   assert.equal(answerFor({ own: { s: 'with', to: 'liam', kind: 'person' }, booking }, people), 'With Liam · booked 09:00, 8 people');
   assert.equal(answerFor({ own: { s: 'with', to: 'liam' }, run: { result: 'done', at: '2026-09-28T07:58', rule: { name: 'PoE rule' } } }, people), 'Back at 07:58 under the PoE rule · close it with what fixed it');
-  assert.equal(answerFor({ own: { s: 'ready', to: 'niamh' }, run: { result: 'unable', back: true, rule: { name: 'DNS rule' } } }, people), 'Unable to complete, rolled back · offered to Niamh, not taken yet');
+  assert.equal(answerFor({ own: { s: 'ready', to: 'nora' }, run: { result: 'unable', back: true, rule: { name: 'DNS rule' } } }, people), 'Unable to complete, rolled back · offered to Nora, not taken yet');
   assert.equal(impactLine({ spaceNumber: '3.09', booking, resolvedAt: '2026-09-28T07:59' }), '3.09 back for the 09:00 (8 people)');
   assert.equal(handoffs([{ to: 'liam' }, { to: 'liam' }, { to: 'marco' }, { to: 'liam' }]), 2);
   for (const s of [answerFor({ own: null }, people), answerFor({ own: { s: 'waiting', wait: 'parts' } }, people)]) assert.ok(s.split(/\s+/).length <= 25);

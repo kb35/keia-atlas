@@ -48,8 +48,8 @@ test('incidents, Lab tests, plan events, inbox reports, time off, visits and the
   const inc = fromIncident({ number: 'INC1', short_description: 'Gateway restarts', opened: '2026-09-24T16:30', state: 'on-hold', priority: 3, subject: { room: 'rem-bray-01' },
     history: [{ at: '2026-09-24T16:30', state: 'new' }, { at: '2026-09-25T09:10', state: 'in-progress', by: 'priya' }], keia_atlas: { assigned: 'priya' } }, { roomSite, today: '2026-09-28' });
   assert.deepEqual([inc.id, inc.status, inc.who[0], inc.site, inc.start, inc.end, inc.hours], ['inc:INC1', 'blocked', 'priya', 'rem', '2026-09-24', '2026-09-28', 2]);
-  const lab = fromLab({ id: 'LAB-07', title: 'x', owner: 'niamh', with: ['aoife'], status: 'testing', start: '2026-09-21', checks: [{}, {}, {}] }, { siteOf: () => 'dub' });
-  assert.deepEqual([lab.who, lab.site, lab.end, lab.hours, lab.status, lab.href], [['niamh', 'aoife'], 'dub', '2026-10-11', 6, 'doing', '/lab/#lab-07']);
+  const lab = fromLab({ id: 'LAB-07', title: 'x', owner: 'nora', with: ['anna'], status: 'testing', start: '2026-09-21', checks: [{}, {}, {}] }, { siteOf: () => 'dub' });
+  assert.deepEqual([lab.who, lab.site, lab.end, lab.hours, lab.status, lab.href], [['nora', 'anna'], 'dub', '2026-10-11', 6, 'doing', '/lab/#lab-07']);
   const freeze = fromPlanEvent({ id: 'fy' }, { kind: 'freeze', date: '2026-12-14', end: '2027-01-08', title: 'Freeze' }, 3, { today: '2026-09-28' });
   assert.deepEqual([freeze.id, freeze.who, freeze.end, freeze.status], ['plan:fy:3', [], '2027-01-08', 'booked']);
   const inbox = fromInbox({ id: 'RPT-1', kind: 'urgent', to: 'sofia', by: 'sam', at: '2026-09-28T09:40', status: 'new', about: { label: 'Heron', to: '/rooms/nyc-20-05/' } }, { roomSite });
@@ -61,15 +61,15 @@ test('incidents, Lab tests, plan events, inbox reports, time off, visits and the
 });
 
 const items = [
-  { id: 'a', kind: 'task', who: ['aoife'], site: 'dub', start: '2026-09-28', end: '2026-09-30', hours: 6 },
-  { id: 'b', kind: 'task', who: ['aoife', 'liam'], site: 'nyc', start: '2026-10-02', end: '2026-10-05', hours: 12 },
+  { id: 'a', kind: 'task', who: ['anna'], site: 'dub', start: '2026-09-28', end: '2026-09-30', hours: 6 },
+  { id: 'b', kind: 'task', who: ['anna', 'liam'], site: 'nyc', start: '2026-10-02', end: '2026-10-05', hours: 12 },
   { id: 'c', kind: 'plan', who: [], site: null, start: '2026-10-01', end: '2026-10-01', hours: 0 },
   { id: 'd', kind: 'incident', who: ['liam'], site: 'dub', start: null, end: null, hours: 2 },
 ];
 
 test('byPerson lists an item under everyone on it; bySite and byKind group by one value', () => {
   const p = byPerson(items);
-  assert.deepEqual(p.get('aoife').map((x) => x.id), ['a', 'b']);
+  assert.deepEqual(p.get('anna').map((x) => x.id), ['a', 'b']);
   assert.deepEqual(p.get('liam').map((x) => x.id), ['b', 'd']);
   assert.deepEqual([...bySite(items).keys()], ['dub', 'nyc']);
   assert.deepEqual(byKind(items).get('task').map((x) => x.id), ['a', 'b']);
@@ -90,11 +90,11 @@ test('hours are spread over working days only', () => {
 });
 
 test('whereOn: away on time off, in the office on office days, otherwise at home or remote', () => {
-  const aoife = { id: 'aoife', base: 'rem-maynooth-01', office: 'dub', office_days: ['tue', 'thu'], home: true };
+  const anna = { id: 'anna', base: 'rem-maynooth-01', office: 'dub', office_days: ['tue', 'thu'], home: true };
   const olivia = { id: 'olivia', base: 'dub', office: 'dub', office_days: ['mon', 'tue', 'wed', 'thu'], home: false };
   assert.equal(weekday('2026-09-29'), 'tue');
-  assert.deepEqual(whereOn(aoife, '2026-09-29'), { kind: 'office', place: 'dub' });
-  assert.deepEqual(whereOn(aoife, '2026-09-30'), { kind: 'home', place: 'rem-maynooth-01' });
+  assert.deepEqual(whereOn(anna, '2026-09-29'), { kind: 'office', place: 'dub' });
+  assert.deepEqual(whereOn(anna, '2026-09-30'), { kind: 'home', place: 'rem-maynooth-01' });
   assert.deepEqual(whereOn(olivia, '2026-10-02'), { kind: 'remote', place: null });
-  assert.deepEqual(whereOn(aoife, '2026-10-06', [{ who: 'aoife', from: '2026-10-05', to: '2026-10-09' }]), { kind: 'away', place: null });
+  assert.deepEqual(whereOn(anna, '2026-10-06', [{ who: 'anna', from: '2026-10-05', to: '2026-10-09' }]), { kind: 'away', place: null });
 });

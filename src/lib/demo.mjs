@@ -124,13 +124,13 @@ export const REGION_SHORT = { amer: 'Americas', emea: 'EMEA', apac: 'APAC' };
 // Who reports to whom (people managers, not project work). Vendors are outside the line: they work
 // with a project manager but report to their own company. Made up.
 const REPORTS_TO = {
-  aoife: 'fionn', marcus: 'fionn', mei: 'fionn', camila: 'fionn',
+  anna: 'finn', marcus: 'finn', mei: 'finn', camila: 'finn',
   liam: 'yusuf', tom: 'yusuf', arjun: 'yusuf', kenji: 'yusuf', ruby: 'yusuf',
   carlos: 'denise', elena: 'denise', grace: 'denise', nathan: 'denise',
   ruth: 'ingrid', david: 'ingrid', hana: 'ingrid', katya: 'ingrid',
-  fionn: 'olivia', ingrid: 'olivia', yusuf: 'olivia', denise: 'olivia',
+  finn: 'olivia', ingrid: 'olivia', yusuf: 'olivia', denise: 'olivia',
   olivia: 'claire', tomas: 'claire', sofia: 'claire', declan: 'claire', priya: 'claire',
-  niamh: 'sofia', marco: 'declan', farah: 'declan',
+  nora: 'sofia', marco: 'declan', farah: 'declan',
 };
 
 // Where each person works (decision 0025), for the Schedule's Day and Week views. `base` is where they
@@ -139,11 +139,11 @@ const REPORTS_TO = {
 // are based at the site they are working on. Made up.
 const WD = ['mon', 'tue', 'wed', 'thu', 'fri'];
 const BASES = {
-  aoife: { base: 'rem-maynooth-01', office: 'dub', office_days: ['tue', 'thu'] },
+  anna: { base: 'rem-maynooth-01', office: 'dub', office_days: ['tue', 'thu'] },
   marcus: { base: 'ram-hoboken-01', office: 'nyc', office_days: ['mon', 'wed', 'thu'] },
   mei: { base: 'rap-tampines-01', office: 'sin', office_days: ['tue', 'wed', 'thu'] },
   olivia: { base: 'dub', office_days: ['mon', 'tue', 'wed', 'thu'] },
-  fionn: { base: 'dub', office_days: ['mon', 'tue', 'wed', 'thu'] },
+  finn: { base: 'dub', office_days: ['mon', 'tue', 'wed', 'thu'] },
   ingrid: { base: 'cph', office_days: ['mon', 'tue', 'wed', 'thu'] },
   yusuf: { base: 'lon', office_days: WD },
   denise: { base: 'chi', office_days: WD },
@@ -156,7 +156,7 @@ const BASES = {
   marco: { base: 'rem-watford-01', office: 'lon', office_days: ['mon', 'wed'] },
   sofia: { base: 'dub', office_days: ['mon', 'tue', 'wed', 'thu'] },
   declan: { base: 'dub', office_days: ['mon', 'tue', 'wed', 'thu'] },
-  niamh: { base: 'dub', office_days: WD },
+  nora: { base: 'dub', office_days: WD },
   tomas: { base: 'rem-naas-01', office: 'dub', office_days: ['tue', 'wed', 'thu'] },
   claire: { base: 'dub', office_days: ['mon', 'tue', 'wed', 'thu'] },
   elena: { base: 'nyc', office_days: WD }, nathan: { base: 'tor', office_days: WD },
@@ -169,12 +169,12 @@ const BASES = {
 export const isHomeOffice = (base) => /^r(em|am|ap)-/.test(base ?? '');
 
 export const PEOPLE = [
-  { id: 'aoife', name: 'Aoife Byrne', roleId: 'delivery', region: 'emea', scope: 'Europe, Middle East and Africa', initials: 'AB' },
+  { id: 'anna', name: 'Anna Byrne', roleId: 'delivery', region: 'emea', scope: 'Europe, Middle East and Africa', initials: 'AB' },
   { id: 'marcus', name: 'Marcus Lee', roleId: 'delivery', region: 'amer', scope: 'Americas', initials: 'ML' },
   { id: 'mei', name: 'Mei Tan', roleId: 'delivery', region: 'apac', scope: 'Asia Pacific', initials: 'MT' },
   { id: 'camila', name: 'Camila Ortiz', roleId: 'delivery', region: 'amer', scope: 'Americas', initials: 'CO' },
   { id: 'olivia', name: 'Olivia Grant', roleId: 'delivery-manager', scope: 'The whole delivery team: engineers, project managers and technicians, all regions', initials: 'OG', city: 'Dublin', citySite: 'dub' },
-  { id: 'fionn', name: 'Fionn Gallagher', roleId: 'eng-manager', region: 'emea', scope: 'Delivery engineers in all regions', initials: 'FG', city: 'Dublin', citySite: 'dub', covers: ['emea', 'amer', 'apac'] },
+  { id: 'finn', name: 'Finn Gallagher', roleId: 'eng-manager', region: 'emea', scope: 'Delivery engineers in all regions', initials: 'FG', city: 'Dublin', citySite: 'dub', covers: ['emea', 'amer', 'apac'] },
   { id: 'ingrid', name: 'Ingrid Larsen', roleId: 'pm-manager', region: 'emea', scope: 'Project managers in all regions', initials: 'IL', city: 'Copenhagen', citySite: 'cph', covers: ['emea', 'amer', 'apac'] },
   { id: 'yusuf', name: 'Yusuf Demir', roleId: 'tech-manager', region: 'emea', scope: 'On-site technicians in EMEA and Asia Pacific', initials: 'YD', city: 'London', citySite: 'lon', covers: ['emea', 'apac'] },
   { id: 'denise', name: 'Denise Carter', roleId: 'tech-manager', region: 'amer', scope: 'On-site technicians in the Americas', initials: 'DC', city: 'Chicago', citySite: 'chi', covers: ['amer'] },
@@ -196,7 +196,7 @@ export const PEOPLE = [
   { id: 'farah', name: 'Farah Idris', roleId: 'network', region: 'apac', scope: 'Asia Pacific', initials: 'FI' },
   { id: 'sofia', name: 'Sofia Reyes', roleId: 'sm-av', scope: 'Owns device types and setup guides', initials: 'SR' },
   { id: 'declan', name: 'Declan Moore', roleId: 'sm-infra', scope: 'Network, comms rooms (MDF and IDF)', initials: 'DM' },
-  { id: 'niamh', name: 'Niamh Walsh', roleId: 'innovation', scope: 'The Lab: new devices and firmware', initials: 'NW' },
+  { id: 'nora', name: 'Nora Walsh', roleId: 'innovation', scope: 'The Lab: new devices and firmware', initials: 'NW' },
   { id: 'tomas', name: 'Tomás Varga', roleId: 'programme', scope: 'Fit-outs, refreshes and the year plan', initials: 'TV' },
   { id: 'claire', name: 'Claire Dunne', roleId: 'head', scope: 'All regions', initials: 'CD' },
   { id: 'sam', name: 'Sam Okafor', roleId: 'vendor', scope: 'Northlight AV · Juneau office fit-out', initials: 'SO', vendor: 'northlight', vendorName: 'Northlight AV', projects: ['PRJ-14'] },

@@ -13,13 +13,13 @@ const people = [
   { id: 'lead', roleId: 'tech-manager', team: 'onsite', region: 'emea', reportsTo: 'boss', office: 'lon', base: 'lon', office_days: ['mon', 'tue', 'wed', 'thu', 'fri'], country: 'GB' },
   { id: 'liam', name: 'Liam Doyle', roleId: 'tech', team: 'onsite', region: 'emea', reportsTo: 'lead', office: 'dub', base: 'dub', office_days: ['mon', 'tue', 'wed', 'thu', 'fri'], country: 'IE' },
   { id: 'tom', name: 'Tom Ashby', roleId: 'tech', team: 'onsite', region: 'emea', reportsTo: 'lead', office: 'lon', base: 'lon', office_days: ['mon', 'tue', 'wed', 'thu', 'fri'], country: 'GB' },
-  { id: 'aoife', name: 'Aoife Byrne', roleId: 'delivery', team: 'delivery', region: 'emea', reportsTo: 'boss', office: 'dub', base: 'rem-maynooth-01', home: true, office_days: ['tue', 'thu'], country: 'IE' },
+  { id: 'anna', name: 'Anna Byrne', roleId: 'delivery', team: 'delivery', region: 'emea', reportsTo: 'boss', office: 'dub', base: 'rem-maynooth-01', home: true, office_days: ['tue', 'thu'], country: 'IE' },
   { id: 'ruth', roleId: 'pm', team: 'delivery', region: 'emea', reportsTo: 'boss', office: 'dub', base: 'rem-bray-01', home: true, office_days: ['wed'], country: 'IE' },
   { id: 'sam', roleId: 'vendor', team: 'vendor', vendor: true, reportsTo: null, office: 'jnu', base: 'jnu', office_days: ['mon'], country: 'US' },
 ];
-const projects = [{ id: 'PRJ-12', owner: 'ruth', phase: 'integrate', people: ['ruth', 'aoife', 'liam'] }];
+const projects = [{ id: 'PRJ-12', owner: 'ruth', phase: 'integrate', people: ['ruth', 'anna', 'liam'] }];
 const sites = { dub: { region: 'emea' }, lon: { region: 'emea' }, nyc: { region: 'amer' }, rem: { region: 'emea' } };
-const timeOff = [{ id: 's0', who: 'aoife', from: '2026-10-05', to: '2026-10-09', status: 'approved' }];
+const timeOff = [{ id: 's0', who: 'anna', from: '2026-10-05', to: '2026-10-09', status: 'approved' }];
 const holidays = [{ country: 'IE', date: '2026-10-26', name: 'October Bank Holiday' }];
 const P = (id) => people.find((p) => p.id === id);
 
@@ -42,40 +42,40 @@ test('where someone is: time off, holidays, visits and on-site work, office days
   const items = [
     { id: 'visit:0', kind: 'visit', who: ['tom'], site: 'cph', room: null, start: '2026-10-06', end: '2026-10-06' },
     { id: 'task:T-1', kind: 'task', taskKind: 'install', where: 'onsite', who: ['liam'], site: 'rem', room: 'rem-drogheda-02', start: '2026-10-06', end: '2026-10-06' },
-    { id: 'task:T-2', kind: 'task', taskKind: 'design', where: 'remote', who: ['aoife'], site: 'nyc', start: '2026-09-28', end: '2026-09-28' },
+    { id: 'task:T-2', kind: 'task', taskKind: 'design', where: 'remote', who: ['anna'], site: 'nyc', start: '2026-09-28', end: '2026-09-28' },
   ];
   const ctx = { timeOff, holidays, items };
-  assert.equal(placeOn(P('aoife'), '2026-10-06', ctx).why, 'time-off');
+  assert.equal(placeOn(P('anna'), '2026-10-06', ctx).why, 'time-off');
   assert.equal(placeOn(P('liam'), '2026-10-26', ctx).why, 'holiday');
   assert.equal(placeOn(P('tom'), '2026-10-26', ctx).kind, 'office', 'a holiday in Ireland is not one in London');
   assert.deepEqual([placeOn(P('tom'), '2026-10-06', ctx).kind, placeOn(P('tom'), '2026-10-06', ctx).site], ['visiting', 'cph']);
   assert.deepEqual([placeOn(P('liam'), '2026-10-06', ctx).place, placeOn(P('liam'), '2026-10-06', ctx).site], ['rem-drogheda-02', 'rem']);
-  assert.deepEqual([placeOn(P('aoife'), '2026-09-28', ctx).kind, placeOn(P('aoife'), '2026-09-28', ctx).site], ['home', 'rem'], 'remote work does not move her');
-  assert.deepEqual([placeOn(P('aoife'), '2026-09-29', ctx).kind, placeOn(P('aoife'), '2026-09-29', ctx).place], ['office', 'dub']);
-  assert.equal(placeOn(P('aoife'), '2026-10-03', ctx).why, 'weekend');
-  assert.equal(placeOn(P('aoife'), '2026-10-06', { ...ctx, timeOff: [{ ...timeOff[0], status: 'pending' }] }).kind, 'office', 'a pending request is not time off yet');
+  assert.deepEqual([placeOn(P('anna'), '2026-09-28', ctx).kind, placeOn(P('anna'), '2026-09-28', ctx).site], ['home', 'rem'], 'remote work does not move her');
+  assert.deepEqual([placeOn(P('anna'), '2026-09-29', ctx).kind, placeOn(P('anna'), '2026-09-29', ctx).place], ['office', 'dub']);
+  assert.equal(placeOn(P('anna'), '2026-10-03', ctx).why, 'weekend');
+  assert.equal(placeOn(P('anna'), '2026-10-06', { ...ctx, timeOff: [{ ...timeOff[0], status: 'pending' }] }).kind, 'office', 'a pending request is not time off yet');
 });
 
 test('load: hours spread over their days, project time not in tasks, none of it on days off', () => {
   const items = [
-    { id: 'a', kind: 'task', who: ['aoife'], start: '2026-09-28', end: '2026-09-30', hours: 12 },
-    { id: 'b', kind: 'refresh', who: ['aoife'], start: '2026-09-28', end: '2026-12-31', hours: 50 },
-    { id: 'c', kind: 'time-off', who: ['aoife'], start: '2026-09-28', end: '2026-09-28', hours: 0 },
+    { id: 'a', kind: 'task', who: ['anna'], start: '2026-09-28', end: '2026-09-30', hours: 12 },
+    { id: 'b', kind: 'refresh', who: ['anna'], start: '2026-09-28', end: '2026-12-31', hours: 50 },
+    { id: 'c', kind: 'time-off', who: ['anna'], start: '2026-09-28', end: '2026-09-28', hours: 0 },
   ];
-  const reserved = [{ who: 'aoife', from: '2026-09-28', to: '2026-10-30', perDay: 1 }];
-  assert.equal(dayLoad('aoife', '2026-09-28', items), 4, 'an unbooked work-plan item takes no day');
-  assert.equal(dayLoad('aoife', '2026-09-28', items, reserved), 5);
-  const wk = weekLoad(P('aoife'), '2026-09-28', { items, reserved, timeOff, holidays });
+  const reserved = [{ who: 'anna', from: '2026-09-28', to: '2026-10-30', perDay: 1 }];
+  assert.equal(dayLoad('anna', '2026-09-28', items), 4, 'an unbooked work-plan item takes no day');
+  assert.equal(dayLoad('anna', '2026-09-28', items, reserved), 5);
+  const wk = weekLoad(P('anna'), '2026-09-28', { items, reserved, timeOff, holidays });
   assert.deepEqual(wk, { hours: 17, cap: 30 });
-  const off = weekLoad(P('aoife'), '2026-10-05', { items, reserved, timeOff, holidays });
+  const off = weekLoad(P('anna'), '2026-10-05', { items, reserved, timeOff, holidays });
   assert.deepEqual(off, { hours: 0, cap: 0 }, 'a week off books no project time');
   assert.deepEqual([loadBand(0, 30), loadBand(10, 30), loadBand(20, 30), loadBand(30, 30), loadBand(40, 30), loadBand(2, 0)], [0, 1, 2, 3, 4, 4]);
 });
 
 test('Me, My team and Everyone', () => {
-  assert.deepEqual(reportsOf('boss', people).sort(), ['aoife', 'lead', 'liam', 'ruth', 'tom']);
+  assert.deepEqual(reportsOf('boss', people).sort(), ['anna', 'lead', 'liam', 'ruth', 'tom']);
   assert.deepEqual(teamOf('lead', people).sort(), ['lead', 'liam', 'tom']);
-  assert.deepEqual(teamOf('ruth', people, projects).sort(), ['aoife', 'liam', 'ruth'], 'a project manager\'s team is their project team');
+  assert.deepEqual(teamOf('ruth', people, projects).sort(), ['anna', 'liam', 'ruth'], 'a project manager\'s team is their project team');
   assert.deepEqual(teamOf('liam', people).sort(), ['lead', 'liam', 'tom'], 'otherwise: their manager and the people beside them');
   assert.deepEqual(teamOf('sam', people), ['sam']);
   assert.equal(scopePeople('all', 'liam', people).size, people.length);
@@ -100,26 +100,26 @@ test('who may assign what, to whom', () => {
   assert.equal(assignRights('liam', people), null);
   assert.equal(assignRights('sam', people), null);
   assert.ok(canAssign('lead', task, 'tom', ctx));
-  assert.ok(!canAssign('lead', task, 'aoife', ctx), 'not someone else\'s report');
-  assert.ok(canAssign('ruth', task, 'aoife', ctx));
+  assert.ok(!canAssign('lead', task, 'anna', ctx), 'not someone else\'s report');
+  assert.ok(canAssign('ruth', task, 'anna', ctx));
   assert.ok(!canAssign('ruth', task, 'tom', ctx), 'not outside the project team');
-  assert.ok(!canAssign('ruth', { ...task, project: 'PRJ-99' }, 'aoife', ctx), 'not another project');
+  assert.ok(!canAssign('ruth', { ...task, project: 'PRJ-99' }, 'anna', ctx), 'not another project');
   assert.ok(!canAssign('liam', task, 'liam', ctx));
   assert.ok(!canAssign('boss', { ...task, status: 'done' }, 'tom', ctx), 'done work stays done');
   assert.ok(!canAssign('boss', { ...task, kind: 'time-off' }, 'tom', ctx));
   assert.ok(canHandOut('lead', task, ctx));
-  assert.ok(!canHandOut('lead', { ...task, who: ['aoife'] }, ctx));
+  assert.ok(!canHandOut('lead', { ...task, who: ['anna'] }, ctx));
   assert.ok(canHandOut('lead', { ...task, who: [], site: 'lon' }, ctx), 'unowned work in their region');
   assert.ok(!canHandOut('lead', { ...task, who: [], site: 'nyc' }, ctx));
 });
 
 test('Unscheduled: needs cover, nobody on it, work plan to book', () => {
   const items = [
-    { id: 'task:T-9', kind: 'task', status: 'todo', who: ['aoife'], project: 'PRJ-12', site: 'dub', start: '2026-10-06', end: '2026-10-06', hours: 3 },
-    { id: 'task:T-8', kind: 'task', status: 'todo', who: ['aoife'], project: 'PRJ-12', site: 'dub', start: '2026-10-13', end: '2026-10-13', hours: 3 },
+    { id: 'task:T-9', kind: 'task', status: 'todo', who: ['anna'], project: 'PRJ-12', site: 'dub', start: '2026-10-06', end: '2026-10-06', hours: 3 },
+    { id: 'task:T-8', kind: 'task', status: 'todo', who: ['anna'], project: 'PRJ-12', site: 'dub', start: '2026-10-13', end: '2026-10-13', hours: 3 },
     { id: 'refresh:dub-1:2026', kind: 'refresh', status: 'todo', who: ['liam'], site: 'dub', start: '2026-09-28', end: '2026-12-31', hours: 5 },
     { id: 'refresh:lon-1:2026', kind: 'refresh', status: 'todo', who: [], site: 'lon', start: '2026-09-28', end: '2026-12-31', hours: 5 },
-    { id: 'task:T-7', kind: 'task', status: 'done', who: ['aoife'], project: 'PRJ-12', site: 'dub', start: '2026-10-06', end: '2026-10-06' },
+    { id: 'task:T-7', kind: 'task', status: 'done', who: ['anna'], project: 'PRJ-12', site: 'dub', start: '2026-10-06', end: '2026-10-06' },
   ];
   const ctx = { items, people, projects, sites, today: '2026-09-28', horizon: '2026-12-31', timeOff, holidays };
   assert.deepEqual(unscheduled('boss', ctx).map((u) => [u.item.id, u.why]), [['task:T-9', 'cover'], ['refresh:lon-1:2026', 'nobody'], ['refresh:dub-1:2026', 'book']]);
@@ -131,8 +131,8 @@ test('Unscheduled: needs cover, nobody on it, work plan to book', () => {
 });
 
 test('an item after the live layer\'s events: owner first, start moved by whole working days', () => {
-  const it = { id: 'task:T-1', kind: 'task', who: ['aoife', 'liam'], start: '2026-10-01', end: '2026-10-05', hours: 12 };
-  assert.deepEqual(baseOf(it), { owner: 'aoife', start: '2026-10-01' });
+  const it = { id: 'task:T-1', kind: 'task', who: ['anna', 'liam'], start: '2026-10-01', end: '2026-10-05', hours: 12 };
+  assert.deepEqual(baseOf(it), { owner: 'anna', start: '2026-10-01' });
   assert.equal(applyState(it, baseOf(it)), it, 'no change, same item');
   const moved = applyState(it, { owner: 'tom', start: '2026-10-08' });
   assert.deepEqual([moved.who, moved.start, moved.end, moved.moved], [['tom', 'liam'], '2026-10-08', '2026-10-12', true]);

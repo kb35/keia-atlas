@@ -146,7 +146,7 @@ The scope rule: Keia owns the record of what is in the building and the work on 
 | Read freely, write narrowly | Software reads on its own; writes only under its rule; never does what is prohibited, for anyone |
 | Checked by reading back | After every write the system is read back and compared; a write that does not read back as intended is "Unable to complete", never "done" |
 | Undo, Roll back, or ask | Each rule declares which it has; the screen never shows an Undo that is not real |
-| One line, one card, one log | "Done automatically under the DNS rule (owner: Niamh)" on the record; "How was this done?" opens what it read, did, ruled out and did not check; the full trace is in the audit log |
+| One line, one card, one log | "Done automatically under the DNS rule (owner: Nora)" on the record; "How was this done?" opens what it read, did, ruled out and did not check; the full trace is in the audit log |
 | Text is data, not instructions | Ticket text, device names and vendor notes are untrusted; software that reads them cannot send data out |
 | People keep the diagnosis | A suggestion follows the person's own call on P1 and P2; any rule can be run by hand; every action explains itself so people learn how their workplace behaves |
 | Never about people | No scoring, ranking or allocation of work by an individual's behaviour or performance |
@@ -192,7 +192,7 @@ One vocabulary, no settings switch. ITIL, ITSM and PM terms where they are terms
 | Module: On, Connected, Off; Connector; Source mark | Built in, fed by an outside tool, or not used; the adapter; "from ServiceNow, 09:14" on a figure | |
 | **Verbs:** Take, Hand to, Park, Run, Run again, Undo, Roll back, Accept all, Prepare, Propose, Approve, Capture, Export | Pick it up; pass it as a peer; leave a resume note; do the outcome; retry; put it back; restore the declared previous state; verify a batch at once; get a draft ready; suggest an edit; say yes; record a fix; take the data with you | Replace assign, escalate, execute, submit |
 | **Ready for you** | Prepared and waiting for you | Replaces needs you, action required, assigned |
-| **With you / With Aoife / With Network team / With Poly (vendor)** | Who holds the work now, and why | Replaces assigned, escalated, tier |
+| **With you / With Anna / With Network team / With Poly (vendor)** | Who holds the work now, and why | Replaces assigned, escalated, tier |
 | **To review** | A person should look; nothing is broken yet | Replaces warning, needs attention, needs a look |
 | **Waiting on** + who or what | Stopped until something outside the record moves | ITIL on hold; replaces blocked, pending |
 | **In progress, Resolved, Closed, Done** | Being worked; fixed and checked; finished with lessons kept; the outcome happened | ITIL states |

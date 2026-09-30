@@ -1,5 +1,5 @@
 // People are never ranked (UX-V2 §4.7 step 5, UI-V2 §10 "No person's name appears beside a count, rate or rank").
-// Leadership's Home names an owner ("Owner: Aoife") but never counts, rates or ranks a person ("Tom: 12 closed this
+// Leadership's Home names an owner ("Owner: Anna") but never counts, rates or ranks a person ("Tom: 12 closed this
 // week"). Checked three ways: the leadership model (src/lib/costs.mjs), the experience figures behind it, and, when the
 // site has been built, the text of Claire's sections on Home.
 import { test } from 'node:test';
@@ -27,7 +27,7 @@ function strings(v, path = '', out = []) {
 
 const OWNERS = Object.fromEntries(PEOPLE.map((p) => [p.id, p.name.split(' ')[0]]));
 const VENDORS = [
-  { id: 'brightwave', name: 'Brightwave Integration', owner: 'aoife', contract: { end: '2026-10-31' } },
+  { id: 'brightwave', name: 'Brightwave Integration', owner: 'anna', contract: { end: '2026-10-31' } },
   { id: 'keystone', name: 'Keystone Service', owner: 'sofia', contract: { end: '2028-12-31' } },
 ];
 const L = leadership({ vendors: VENDORS, experience: experience('av', [{ id: 'dub', weight: 40 }, { id: 'nyc', weight: 60 }]), behind: 34, owners: OWNERS });

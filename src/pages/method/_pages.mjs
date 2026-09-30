@@ -6,10 +6,10 @@ import { IDEAS, SECTIONS } from '../../lib/method.mjs';
 // Who a "Try it" opens the demo as. Names are the demo's made-up people (src/lib/demo.mjs).
 export const PEOPLE = {
   liam: 'Liam, the Dublin technician',
-  aoife: 'Aoife, a delivery engineer',
+  anna: 'Anna, a delivery engineer',
   declan: 'Declan, who owns the network and comms rooms',
   priya: 'Priya, on the service desk',
-  niamh: 'Niamh, who runs the lab',
+  nora: 'Nora, who runs the lab',
   claire: 'Claire, head of the service',
 };
 
@@ -28,10 +28,10 @@ const TRY = {
   },
   'own-it-hand-it-on': {
     to: '/incidents/inc0041172/', as: 'liam', label: 'Open the Whooper Swan booking panel incident',
-    steps: ['Open the booking panel incident: it says who holds it and what it is waiting on.', 'Read its history: every hand-off keeps the evidence with it.', 'Switch View as to Aoife: the same record, the same history.'],
+    steps: ['Open the booking panel incident: it says who holds it and what it is waiting on.', 'Read its history: every hand-off keeps the evidence with it.', 'Switch View as to Anna: the same record, the same history.'],
   },
   'learn-as-you-go': {
-    to: '/configurations/poly-x-google-meet/', as: 'aoife', label: 'Open the video bar setup guide',
+    to: '/configurations/poly-x-google-meet/', as: 'anna', label: 'Open the video bar setup guide',
     steps: ['Open the setup guide for the video bar: the settings in order, beside the device.', 'Press ? to switch Help on, then point at three things on the page.'],
   },
   problems: {
@@ -43,7 +43,7 @@ const TRY = {
     steps: ['Open Home as Liam: his first screen is built from the places his work uses.', 'Open Settings (the gear): it switches modules on, connected or off. Next: each module On, Connected or Off.'],
   },
   'how-the-work-gets-done': {
-    to: '/changes/', as: 'niamh', label: 'Open Proposals',
+    to: '/changes/', as: 'nora', label: 'Open Proposals',
     steps: ['Open Proposals: every edit to a standard, who proposed it and who approved it.', 'In v0.1 automatic work is simulated. Next: standing rules with "How was this done?" on every run.'],
   },
   trust: {

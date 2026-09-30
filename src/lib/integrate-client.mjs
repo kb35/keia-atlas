@@ -35,14 +35,14 @@ function start() {
     get people() { return people(); },
   };
   let M = integrateModel(plan, io);
-  const who = () => (L ? L.who() : W.rsActorId ? W.rsActorId() : 'aoife');
+  const who = () => (L ? L.who() : W.rsActorId ? W.rsActorId() : 'anna');
   const myName = () => M.nameOf(who());
 
   // ---- Who is looking: a vendor sees only their installs ----
   const vendorIds = W.RS_VENDORS || [];
   let mode = 'engineer';
   function setMode() {
-    const id = W.rsWhoId ? W.rsWhoId() : 'aoife';
+    const id = W.rsWhoId ? W.rsWhoId() : 'anna';
     const isVendor = vendorIds.includes(id);
     mode = isVendor ? 'vendor' : 'engineer';
     root.dataset.mode = mode;

@@ -35,8 +35,8 @@ test('accepting a batch takes only what passed; the exception stays out', () => 
   assert.ok(g.keys.includes('a|configure'));
   assert.ok(!g.keys.includes('b|configure'), 'the drifted unit is never swept up');
   assert.equal(g.left, 1);
-  const accepted = Object.fromEntries(g.keys.map((k) => [k, { who: 'aoife', at: '2026-09-29T10:00:00Z' }]));
-  const M = model([{ id: 'e1', at: '2026-09-29T10:00:00Z', who: 'aoife', item: 'int:PRJ-1:c:batch', field: 'accepted', before: {}, after: accepted }]);
+  const accepted = Object.fromEntries(g.keys.map((k) => [k, { who: 'anna', at: '2026-09-29T10:00:00Z' }]));
+  const M = model([{ id: 'e1', at: '2026-09-29T10:00:00Z', who: 'anna', item: 'int:PRJ-1:c:batch', field: 'accepted', before: {}, after: accepted }]);
   assert.equal(M.stepOf('a', 'configure').st, 'done');
   assert.equal(M.stepOf('b', 'configure').st, 'issue');
 });
@@ -44,7 +44,7 @@ test('accepting a batch takes only what passed; the exception stays out', () => 
 test('fixing the drift makes it Checked again, and an untick with a reason wins over what was seen', () => {
   const fixed = model([{ id: 'e1', at: '2026-09-29T10:00:00Z', who: 'keia_atlas', item: 'int:PRJ-1:b:unit', field: 'drift', before: 'x', after: null }]);
   assert.equal(fixed.stepOf('b', 'configure').st, 'verified');
-  const unticked = model([{ id: 'e2', at: '2026-09-29T10:00:00Z', who: 'aoife', item: 'int:PRJ-1:a:unit', field: 'x-install', before: null, after: { v: false, w: 'aoife', n: 'Needs a second look' } }]);
+  const unticked = model([{ id: 'e2', at: '2026-09-29T10:00:00Z', who: 'anna', item: 'int:PRJ-1:a:unit', field: 'x-install', before: null, after: { v: false, w: 'anna', n: 'Needs a second look' } }]);
   const x = unticked.stepOf('a', 'install');
   assert.equal(x.st, 'todo');
   assert.equal(x.why, 'Needs a second look');

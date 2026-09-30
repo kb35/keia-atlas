@@ -20,7 +20,7 @@ export const HOLIDAYS = [
 
 // Time off already booked (demo). People are the made-up team.
 export const PTO_SEED = [
-  ['aoife', '2026-10-05', '2026-10-09', 'Autumn break'], ['aoife', '2026-12-21', '2027-01-01', 'Christmas'],
+  ['anna', '2026-10-05', '2026-10-09', 'Autumn break'], ['anna', '2026-12-21', '2027-01-01', 'Christmas'],
   ['liam', '2026-10-19', '2026-10-23', ''], ['liam', '2026-12-23', '2026-12-31', ''],
   ['tom', '2026-10-12', '2026-10-16', ''], ['tom', '2026-12-28', '2027-01-01', ''],
   ['carlos', '2026-11-25', '2026-11-27', 'Thanksgiving week'], ['grace', '2026-10-26', '2026-10-30', ''],
@@ -29,14 +29,14 @@ export const PTO_SEED = [
   ['mei', '2026-10-13', '2026-10-15', ''], ['olivia', '2026-11-02', '2026-11-06', ''],
   ['priya', '2026-10-27', '2026-10-30', ''], ['ruth', '2026-09-28', '2026-10-02', ''], ['ruth', '2026-12-24', '2027-01-04', ''],
   ['david', '2026-11-27', '2026-11-27', ''], ['hana', '2026-10-19', '2026-10-21', ''], ['marco', '2026-11-09', '2026-11-13', ''],
-  ['sofia', '2026-12-18', '2027-01-04', 'Christmas'], ['declan', '2026-10-08', '2026-10-09', ''], ['niamh', '2026-11-19', '2026-11-20', ''],
+  ['sofia', '2026-12-18', '2027-01-04', 'Christmas'], ['declan', '2026-10-08', '2026-10-09', ''], ['nora', '2026-11-19', '2026-11-20', ''],
   ['tomas', '2026-10-19', '2026-10-23', 'Half term'], ['claire', '2026-12-22', '2027-01-04', ''],
 ];
 
 export const SITE_VISITS = [
   { date: '2026-10-06', title: 'Site visit: Tom Ashby to the Copenhagen office', site: 'cph', who: ['tom'] },
-  { date: '2026-10-14', end: '2026-10-15', title: 'Site visit: Aoife Byrne to the London office', site: 'lon', who: ['aoife'] },
-  { date: '2026-11-03', title: 'Vendor walk-through, town hall', site: 'dub', who: ['lena', 'aoife'] },
+  { date: '2026-10-14', end: '2026-10-15', title: 'Site visit: Anna Byrne to the London office', site: 'lon', who: ['anna'] },
+  { date: '2026-11-03', title: 'Vendor walk-through, town hall', site: 'dub', who: ['lena', 'anna'] },
   { date: '2026-11-10', end: '2026-11-11', title: 'Site visit: Hana Mori to the Tokyo office', site: 'tyo', who: ['hana'] },
   { date: '2026-11-17', title: 'Site visit: Marcus Lee to the Toronto office', site: 'tor', who: ['marcus'] },
   { date: '2026-12-01', title: 'Comms room audit, Singapore office', site: 'sin', who: ['arjun'] },

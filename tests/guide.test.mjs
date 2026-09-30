@@ -78,7 +78,7 @@ test('a report makes an incident in the shape of the incident data, from the roo
   assert.equal(inc.source, 'room-guide');
   assert.equal(inc.demo, true);
   assert.equal(inc.caller, 'Someone in the room');
-  const req = makeRequest({ room, kind: 'home', what: '', name: 'Aoife', ms });
+  const req = makeRequest({ room, kind: 'home', what: '', name: 'Anna', ms });
   assert.match(req.number, /^REQ[0-9]{7}$/);
   assert.equal(req.title, 'Home office kit');
   const events = [

@@ -9,7 +9,7 @@
 //   checking ──(a condition fails)──► not-run                 nothing was touched; the words say which condition
 //      │
 //      ▼
-//    read ─► write ─► (wait) ─► readback ─► done              "Done automatically under the DNS rule (owner: Niamh)"
+//    read ─► write ─► (wait) ─► readback ─► done              "Done automatically under the DNS rule (owner: Nora)"
 //               │                  │
 //               └──(refused)───────┴──(does not match)──► unable ─► rolled-back   (the rule declared Roll back or
 //                                                            │                     Undo: it restores what it changed)
@@ -46,7 +46,7 @@ const fullName = (people, id) => people?.[id]?.name ?? id ?? '';
 
 /** The verb a rule shows on a record: "Cycle PoE on GE1/0/12". */
 export const verbFor = (rule, target) => String(rule.verb).replace('{target}', target ?? 'this');
-/** The line on a record for a run: "Done automatically under the DNS rule (owner: Niamh)". */
+/** The line on a record for a run: "Done automatically under the DNS rule (owner: Nora)". */
 export function runLine(rule, run, people) {
   const owner = `${rule.name} (owner: ${first(people, rule.owner)})`;
   if (run.result === 'done') return `Done automatically under the ${owner}`;

@@ -25,15 +25,15 @@ test('versions start with the base and add one per event', () => {
 });
 
 test('undo writes a reversing event, keeps the original, and undoing the undo is a redo', () => {
-  const u = reversing(events, events[1], { id: 'u1', at: '2026-09-29T11:00:00Z', who: 'aoife', base: { status: 'doing' } });
-  assert.deepEqual({ ...u }, { id: 'u1', at: '2026-09-29T11:00:00Z', who: 'aoife', item: 'task:T-1204', field: 'status', before: 'done', after: 'doing', note: 'Undo', undoes: 'e1' });
+  const u = reversing(events, events[1], { id: 'u1', at: '2026-09-29T11:00:00Z', who: 'anna', base: { status: 'doing' } });
+  assert.deepEqual({ ...u }, { id: 'u1', at: '2026-09-29T11:00:00Z', who: 'anna', item: 'task:T-1204', field: 'status', before: 'done', after: 'doing', note: 'Undo', undoes: 'e1' });
   const after = [...events, u];
   assert.equal(after.length, 4);
   assert.equal(replay(after, 'task:T-1204', { status: 'doing' }).status, 'doing');
   const h = historyOf(after, 'task:T-1204');
   assert.deepEqual(h.map((e) => e.id), ['u1', 'e2', 'e1']);
   assert.equal(h.find((e) => e.id === 'e1').undoneBy, 'u1');
-  const redo = reversing(after, u, { id: 'r1', at: '2026-09-29T11:05:00Z', who: 'aoife', base: { status: 'doing' } });
+  const redo = reversing(after, u, { id: 'r1', at: '2026-09-29T11:05:00Z', who: 'anna', base: { status: 'doing' } });
   assert.equal(redo.note, 'Redo');
   assert.equal(replay([...after, redo], 'task:T-1204', { status: 'doing' }).status, 'done');
 });
@@ -74,7 +74,7 @@ test('a change in one window reaches the other, with who and when, and both agre
   assert.equal(b.stateOf('task:T-1204', { status: 'doing' }).status, 'done');
   assert.equal(b.historyOf('task:T-1204')[0].at, '2026-09-29T10:00:00.000Z');
   // Window B undoes it; window A sees the reversing event and the original stays in the history.
-  const u = b.undo(b.historyOf('task:T-1204')[0].id, { who: 'aoife', base: { status: 'doing' } });
+  const u = b.undo(b.historyOf('task:T-1204')[0].id, { who: 'anna', base: { status: 'doing' } });
   assert.equal(a.stateOf('task:T-1204', { status: 'doing' }).status, 'doing');
   assert.deepEqual(a.historyOf('task:T-1204').map((e) => e.id), [u.id, 'A-1']);
   assert.equal(a.versions('task:T-1204', { status: 'doing' }).length, 3);
@@ -90,11 +90,11 @@ test('presence: each window sees the others on the same page until they leave or
   const { open, clock } = computer();
   const a = open('A'), b = open('B');
   const leaveA = a.here('project:PRJ-12', 'ruth');
-  b.here('project:PRJ-12', 'aoife');
-  b.here('project:PRJ-14', 'aoife');
-  assert.deepEqual(a.whoIsHere('project:PRJ-12').map((h) => h.who), ['aoife']);
+  b.here('project:PRJ-12', 'anna');
+  b.here('project:PRJ-14', 'anna');
+  assert.deepEqual(a.whoIsHere('project:PRJ-12').map((h) => h.who), ['anna']);
   assert.deepEqual(b.whoIsHere('project:PRJ-12').map((h) => h.who), ['ruth']);
-  assert.deepEqual(a.whoIsHere('project:PRJ-14').map((h) => h.who), ['aoife']);
+  assert.deepEqual(a.whoIsHere('project:PRJ-14').map((h) => h.who), ['anna']);
   leaveA();
   assert.deepEqual(b.whoIsHere('project:PRJ-12'), []);
   clock.tick(12000);
