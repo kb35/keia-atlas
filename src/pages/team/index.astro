@@ -505,7 +505,10 @@ const mgrSub = (p) => `Manager${p.city ? ` · ${p.city}` : ''}`;
       var setFold = function (f) { folded = f; refold(); };
       moreB.addEventListener('click', function () {
         var y0 = moreB.getBoundingClientRect().top, closing = !folded;
-        setFold(!folded);
+        // The chart's box holds and eases to its new height; the parts that open grow in from their centres (M12).
+        var was = blks.map(function (b) { return b.getClientRects().length > 0; });
+        if (window.rsHold) window.rsHold(oc, function () { setFold(!folded); }); else setFold(!folded);
+        if (!closing && window.rsEnterEls) window.rsEnterEls(blks.filter(function (b, i) { return !was[i] && b.getClientRects().length; }).map(function (b) { return [b, b.getBoundingClientRect()]; }));
         // Showing fewer: the button stays under the pointer (M6).
         if (closing) { var dy = moreB.getBoundingClientRect().top - y0; if (Math.abs(dy) > 1) window.scrollBy(0, dy); }
       });

@@ -49,7 +49,7 @@ const cssMs = (name, d) => {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim(), n = parseFloat(v);
   return Number.isNaN(n) ? d : /ms$/.test(v) ? n : /s$/.test(v) ? n * 1000 : n;
 };
-const reduced = () => (typeof window !== 'undefined' && window.rsMotion ? window.rsMotion().reduced : typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
+const reduced = () => (typeof window !== 'undefined' && window.rsMotion ? window.rsMotion().reduced : typeof matchMedia === 'function' && (window.rsReducedNow ? window.rsReducedNow() : matchMedia('(prefers-reduced-motion: reduce)').matches));
 
 /** Change a chip to a new chip model. Slides unless reduced motion; retargets a slide already running. */
 export function setChip(el, c, { history, aria } = {}) {

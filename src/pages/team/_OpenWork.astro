@@ -113,11 +113,15 @@ const aside = `${C.all.toLocaleString('en-IE')} open pieces of work${nobody ? ` 
     t.addEventListener('click', function (e) {
       var b = e.target.closest('[data-ow-role]'); if (!b) return;
       var id = b.dataset.owRole, open = b.getAttribute('aria-expanded') !== 'true', y0 = b.getBoundingClientRect().top;
-      t.querySelectorAll('[data-ow-role]').forEach(function (x) { x.setAttribute('aria-expanded', String(open && x === b)); x.closest('tr').classList.toggle('on', open && x === b); });
-      t.querySelectorAll('[data-ow-detail]').forEach(function (tr) {
-        var show = open && tr.dataset.owDetail === id;
-        if (tr.hidden === show) { tr.hidden = !show; if (show && !M().reduced) tr.querySelector('.mx-dt').classList.add('m-in'); }
-      });
+      // The table's box holds and eases to its new height while the row opens (M6, rsHold).
+      var swap = function () {
+        t.querySelectorAll('[data-ow-role]').forEach(function (x) { x.setAttribute('aria-expanded', String(open && x === b)); x.closest('tr').classList.toggle('on', open && x === b); });
+        t.querySelectorAll('[data-ow-detail]').forEach(function (tr) {
+          var show = open && tr.dataset.owDetail === id;
+          if (tr.hidden === show) { tr.hidden = !show; if (show && !M().reduced) tr.querySelector('.mx-dt').classList.add('m-in'); }
+        });
+      };
+      if (window.rsHold) window.rsHold(t, swap); else swap();
       // What opens or closes above the role stays out from under the pointer (M6).
       var dy = b.getBoundingClientRect().top - y0; if (Math.abs(dy) > 1) window.scrollBy(0, dy);
     });
