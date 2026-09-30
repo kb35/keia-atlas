@@ -1,0 +1,17 @@
+---
+// The engagement, on Aigna's side (docs/service-providers.md): what this provider can see and do, the agreement, what
+// is shared and who owns it, the activity log both sides hold, and Revoke (simulated). The same engagement lives in the
+// provider's own Keia too (/portfolio/<engagement>/engagement/). Simulated (src/lib/engagements.mjs).
+import Shell from '../../../layouts/Shell.astro';
+import EngagementView from '../../../components/EngagementView.astro';
+import { ENGAGEMENTS, orgName } from '../../../lib/engagements.mjs';
+
+export function getStaticPaths() {
+  return ENGAGEMENTS.filter((e) => e.client === 'aigna').map((e) => ({ params: { id: e.provider }, props: { e } }));
+}
+const { e } = Astro.props;
+const name = orgName(e.provider);
+---
+<Shell title={`Engagement with ${name}`} section="engagement" crumbs={[{ label: 'Vendors', to: '/vendors/' }, { label: name, to: `/vendors/${e.provider}/` }, { label: 'Engagement' }]} about={{ kind: 'vendor', label: `Engagement with ${name}`, to: `/vendors/${e.provider}/engagement/` }}>
+  <EngagementView e={e} side="client" />
+</Shell>

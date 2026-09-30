@@ -27,6 +27,7 @@ import OpenHere from '../components/OpenHere.astro';
 import SmallMultiples from '../components/SmallMultiples.astro';
 import LeadershipHome from '../components/LeadershipHome.astro';
 import PartnerHome from '../components/PartnerHome.astro';
+import PortfolioHome from '../components/PortfolioHome.astro';
 import '../styles/withchip.css';
 import '../styles/handover.css';
 import '../styles/home.css';
@@ -45,6 +46,7 @@ import { experience, serviceLevels } from '../lib/experience.mjs';
 import { SERVICE_ORDER } from '../lib/services.mjs';
 import { leadership } from '../lib/costs.mjs';
 import { partnerBand } from '../lib/vendors.mjs';
+import { portfolio } from '../lib/engagements.mjs';
 import { sparkSvg } from '../lib/spark.mjs';
 import { tally } from '../lib/health.mjs';
 
@@ -66,6 +68,9 @@ H.cockpit.lead = {
 };
 // Partners (V7): the jobs handed to each partner's company, with the contract clock (src/lib/vendors.mjs; simulated).
 H.cockpit.partner = Object.fromEntries(PEOPLE.filter((p) => p.vendor).map((p) => { const B = partnerBand(p.id); return [p.id, { withYou: B.withYou, waiting: B.waiting, past: B.past, spaces: B.spaces, answer: B.answer }]; }));
+// Providers with more than one client (docs/service-providers.md): the portfolio leads their Home (simulated).
+H.cockpit.portfolio = Object.fromEntries(PEOPLE.filter((p) => p.vendor).map((p) => [p.id, portfolio(p.vendor)]).filter(([, P]) => P.cards.length > 1)
+  .map(([id, P]) => [id, { clients: P.cards.length, jobs: P.jobs, past: P.past, crews: P.crews.length, answer: P.answer }]));
 // Welcome back is shown for Anna (the demo switch in Settings); keep the blob to the people who need it.
 H.cockpit.welcome = { anna: H.cockpit.welcome.anna };
 const json = JSON.stringify(H).replace(/</g, '\\u003c');
@@ -231,6 +236,7 @@ const pmCss = pms.map((pm) => `:root[data-who="${pm.id}"] [data-pm]:not([data-pm
 
       <!-- Leadership: what it costs, and what is to review (V7). Partners: the jobs with their company (V7). -->
       <LeadershipHome part="summary" L={LEAD} />
+      <PortfolioHome />
       <PartnerHome />
 
       <!-- Vendors: only their installation. -->

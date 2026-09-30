@@ -1,0 +1,26 @@
+---
+/* PortfolioHome: a provider's Home when it serves more than one client (docs/service-providers.md). Every client as a
+   card with its answer sentence, then crews on site today, visits this week and renewals. Each client's records stay
+   separate: a card opens that one engagement's view, and nothing on it comes from another client. One block per
+   provider person; the page shows only the viewer's (View as). Simulated (src/lib/engagements.mjs). */
+import Portfolio from './Portfolio.astro';
+import { href } from '../lib/data.mjs';
+import { PEOPLE } from '../lib/demo.mjs';
+import { portfolio, orgName } from '../lib/engagements.mjs';
+const blocks = PEOPLE.filter((p) => p.vendor).map((p) => ({ p, P: portfolio(p.vendor) })).filter((b) => b.P.cards.length > 1);
+const css = blocks.map(({ p }) => `:root[data-who="${p.id}"] [data-pf-home="${p.id}"]{display:grid}`).join('');
+---
+<section class="ck card pf-home" data-sec="portfolio" id="portfolio" aria-labelledby="h-portfolio" hidden data-feature="engagements">
+  <header class="ck-h"><h2 id="h-portfolio" data-help="home.portfolio">Your clients</h2><span class="ck-n faint">each through its own engagement · nothing crosses between them</span><a class="aside" href={href('/portfolio/')}>All clients <span aria-hidden="true">→</span></a></header>
+  {blocks.map(({ p, P }) => (
+    <div class="pf-for pf-hb" data-pf-home={p.id}>
+      <Portfolio P={P} todayId="pf-today" />
+      <p class="pf-none">{orgName(p.vendor)}'s own Keia: its crews, notes and costs stay here. Each client sees only what its engagement shares.</p>
+    </div>
+  ))}
+</section>
+<style is:global set:html={css}></style>
+<style is:global>
+  .pf-hb { gap: 14px; }
+  .pf-home .pf-today { margin-top: 0; }
+</style>

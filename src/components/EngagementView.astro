@@ -1,0 +1,159 @@
+---
+/* EngagementView: one engagement, from one side (docs/service-providers.md). The same record lives in both
+   organisations' Keia; each side's page shows the scope, the role, the agreement and its service levels, what is
+   shared and who owns it, and the activity log, which both sides hold. The client's side can Revoke (simulated:
+   nothing is saved); the provider's side can offer its own standards as a template.
+     band   the two organisations, the answer ("In force · 4 sites and 1 project shared · 3 jobs open"), four figures
+     top    the scope (7 cols) beside the agreement (5 cols)
+     below  what is shared and who owns it; the activity log; the action for this side; how the two Keias connect
+   Props: e (an engagement from src/lib/engagements.mjs), side ('client' or 'provider'). Simulated. */
+import PageBand from './PageBand.astro';
+import SidePanel from './SidePanel.astro';
+import Section from './Section.astro';
+import HealthGlyph from './HealthGlyph.astro';
+import { href, vendors, projects } from '../lib/data.mjs';
+import { person } from '../lib/demo.mjs';
+import { ORGS, ROLE_WORDS, RECORD_KINDS, orgName, siteName, engagementView, clientCard, activityOf, engagementAnswer, NOW } from '../lib/engagements.mjs';
+import { dateWords, daysBetween, papersOf } from '../lib/vendors.mjs';
+import '../styles/engagements.css';
+interface Props { e: any; side: 'client' | 'provider' }
+const { e, side } = Astro.props;
+const C = ORGS[e.client], Pr = ORGS[e.provider];
+const contract = e.agreement.contract ? vendors[e.agreement.contract]?.contract : null;
+const ref = contract?.ref ?? e.agreement.ref;
+const sla = contract?.sla ?? e.agreement.sla ?? [];
+const card = clientCard(e);
+const shared = engagementView(e.id, 'client');
+const count = (k: string) => shared.filter((r: any) => r.kind === k).length;
+const left = daysBetween(NOW, e.end);
+const papers = e.client === 'aigna' ? papersOf(e.provider) : [];
+const log = activityOf(e.id);
+const prjName = (id: string) => Object.values(projects as any).find((p: any) => p.id === id)?.name ?? id;
+const me = side === 'client' ? C : Pr, them = side === 'client' ? Pr : C;
+const contact = (k: 'client' | 'provider') => (e.contacts?.[k] ? person(e.contacts[k]).name : null);
+const NUMBERS = [
+  { n: e.scope.sites.length, label: e.scope.sites.length === 1 ? 'Site in scope' : 'Sites in scope', to: '#scope' },
+  { n: card.jobs.length, label: 'Jobs open', to: '#shared' },
+  { n: card.past, label: 'Past target', to: '#shared', tone: card.past ? 'bad' : undefined },
+  { n: left < 0 ? 'Ended' : left, label: left < 0 ? 'Engagement' : 'Days left', fact: true, tone: left <= 120 ? 'warn' : undefined },
+];
+const ownWords = (o: string) => (o === 'client' ? C.name : o === 'provider' ? Pr.name : 'Both marks');
+const statusOf = (k: string) => (!RECORD_KINDS[k].flows ? { s: 'off', w: 'Never shared' } : e.scope.kinds.includes(k) ? { s: 'fine', w: count(k) ? `Shared · ${count(k)} now` : 'Shared' } : { s: 'off', w: 'Not in this engagement' });
+const KINDS = Object.keys(RECORD_KINDS).sort((a, b) => Number(RECORD_KINDS[b].flows && e.scope.kinds.includes(b)) - Number(RECORD_KINDS[a].flows && e.scope.kinds.includes(a)));
+const modeLine = (o: any, other: any) => (o.mode === 'repo'
+  ? `${o.name} runs Keia in repo mode: what it shares leaves as a signed export, and what ${other.name} sends back arrives as a pull request a person reviews.`
+  : `${o.name} runs Keia in database mode: it shares and receives over the API and events, each one signed.`);
+---
+<PageBand overline={`Engagement · ${ROLE_WORDS[e.role]}`} title={`${C.name} and ${Pr.name}`} answer={engagementAnswer(e)} sim numbers={NUMBERS} rec={`eg-${e.id}-${side}`}>
+  <span slot="overline" class="mono eg-ref">{ref}</span>
+  {C.fictional && <span slot="overline" class="pf-fict">Made-up client</span>}
+</PageBand>
+
+<div class="content eg" data-feature="engagements" data-eg={e.id} data-side={side}>
+  <div class="g12 top">
+    <section class="s-7 card pad eg-scope" id="scope" aria-labelledby="eg-scope-h" data-help="engagement.scope">
+      <h2 id="eg-scope-h" class="eg-h">The scope</h2>
+      <div>
+        <h3>Sites</h3>
+        {e.scope.sites.length ? <ul class="eg-chips">{e.scope.sites.map((s: string) => <li>{siteName(e.client, s)}</li>)}</ul> : <p>No sites: this engagement covers the manufacturer's products wherever they are, through support cases.</p>}
+      </div>
+      {e.scope.projects.length > 0 && <div><h3>Projects</h3><ul class="eg-chips">{e.scope.projects.map((p: string) => <li>{p} · {prjName(p)}</li>)}</ul></div>}
+      <div>
+        <h3>What flows</h3>
+        <ul class="eg-chips">{e.scope.kinds.map((k: string) => <li>{RECORD_KINDS[k].words}</li>)}</ul>
+      </div>
+      <p>{Pr.name} sees a record of {C.name}'s only when it sits inside this scope, and work only when it was handed to {Pr.name}. {side === 'client' ? 'Change the scope and the next record follows the new one.' : `${C.name} sets the scope; ask your contact to change it.`}</p>
+    </section>
+    <SidePanel class="s-5" title="The agreement" meta={ref} help="engagement.agreement">
+      <div class="eg-side">
+        <p><b>{ROLE_WORDS[e.role]}</b> · {dateWords(e.start)} to {dateWords(e.end)}</p>
+        <p class="faint">Signed by both sides on {dateWords(e.signed)}{left >= 0 ? ` · ${left} days left` : ''}</p>
+        {sla.length > 0 && <><h3 class="eg-sub">Service levels</h3><ul class="eg-sla">{sla.map((s: any) => <li><span>{s.what}</span><b>{s.target}</b></li>)}</ul></>}
+        {papers.length > 0 && <><h3 class="eg-sub">Before data flows</h3><ul class="pf-list">{papers.map((x: any) => <li><HealthGlyph state={x.state} size={16} quiet={x.state === 'fine'} /><span><b>{x.what}</b><small>{x.words}</small></span></li>)}</ul></>}
+        <h3 class="eg-sub">Contacts</h3>
+        <p>{C.name}: {contact('client') ?? 'the service desk'} · {Pr.name}: {contact('provider') ?? 'the support desk'}</p>
+      </div>
+    </SidePanel>
+  </div>
+
+  <Section title="What is shared, and who owns it" id="shared" aside={`${shared.length} records cross this engagement now`} help="engagement.shared">
+    <div class="card pad eg-tw">
+      <table class="eg-table">
+        <thead><tr><th scope="col">Records</th><th scope="col">Owned by</th><th scope="col">Over this engagement</th></tr></thead>
+        <tbody>
+          {KINDS.map((k) => { const st = statusOf(k); return (
+            <tr class:list={{ 'eg-no': st.s === 'off' }}>
+              <td><b>{RECORD_KINDS[k].words}</b><small>{RECORD_KINDS[k].how}</small></td>
+              <td><span class="eg-own">{ownWords(RECORD_KINDS[k].owner)}</span></td>
+              <td><HealthGlyph state={st.s} size={16} word={st.w} quiet /></td>
+            </tr>
+          ); })}
+        </tbody>
+      </table>
+    </div>
+    <p class="eg-note">Shared records carry both marks. Field by field, the owner's value wins, as the connector model sets out: {C.name} owns the job's state and priority; {Pr.name} owns its own status and reference, and both are shown. An as-built {Pr.name} sends lands in {C.name}'s record as a reviewed change, captured, not asked for.</p>
+  </Section>
+
+  <Section title="Activity" id="activity" aside="signed, and held in both audit logs" help="engagement.activity">
+    <div class="card pad eg-logw">
+      <ol class="eg-log">
+        {log.map((x: any) => (
+          <li><time datetime={x.at}>{x.when}</time><span><b>{x.byName}</b> · {x.what}<small>{x.held}</small></span></li>
+        ))}
+      </ol>
+    </div>
+  </Section>
+
+  <div class="g12">
+    {side === 'client' ? (
+      <section class="s-6 card pad eg-act" data-help="engagement.revoke" data-revoke>
+        <h2 class="eg-h">Revoke</h2>
+        <p>Stops the flow at once: {Pr.name} receives nothing new and can send nothing back. Each side keeps its copy of what was shared before, and the revoke is written in both audit logs.</p>
+        <div class="eg-row" data-rv-idle><button type="button" class="btn danger" data-rv-ask>Revoke this engagement</button><span class="faint">Simulated: nothing is saved</span></div>
+        <div class="eg-row" data-rv-confirm hidden><span>Revoke {Pr.name}'s engagement now?</span><button type="button" class="btn danger" data-rv-go>Revoke</button><button type="button" class="btn ghost" data-rv-no>Keep it</button></div>
+        <p class="eg-state revoked" data-rv-done hidden aria-live="polite">Revoked just now (simulated). Nothing flows; each side keeps its copy.</p>
+      </section>
+    ) : (
+      <section class="s-6 card pad eg-act" data-help="engagement.standards">
+        <h2 class="eg-h">Standards</h2>
+        <p>{C.name}'s standards apply to everything you do for {C.name}. You can offer {Pr.name}'s own as a template: {C.name} decides whether to adopt any of it.</p>
+        <div class="eg-row"><button type="button" class="btn" data-offer={C.name}>Offer your standards as a template</button><span class="faint">Simulated</span></div>
+      </section>
+    )}
+    <section class="s-6 card pad eg-act" data-help="engagement.connect">
+      <h2 class="eg-h">How the two Keias connect</h2>
+      <p>{modeLine(me, them)}</p>
+      <p>{modeLine(them, me)}</p>
+      <p class="faint">No shared database: each side keeps its own Keia and its own copy.</p>
+    </section>
+  </div>
+</div>
+
+<script is:inline data-astro-rerun>
+  (function () {
+    var box = document.querySelector('[data-revoke]');
+    if (box && !box.__rv) {
+      box.__rv = true;
+      var q = function (s) { return box.querySelector(s); };
+      q('[data-rv-ask]').addEventListener('click', function () { q('[data-rv-idle]').hidden = true; q('[data-rv-confirm]').hidden = false; q('[data-rv-go]').focus(); });
+      q('[data-rv-no]').addEventListener('click', function () { q('[data-rv-confirm]').hidden = true; q('[data-rv-idle]').hidden = false; q('[data-rv-ask]').focus(); });
+      q('[data-rv-go]').addEventListener('click', function () {
+        q('[data-rv-confirm]').hidden = true; q('[data-rv-done]').hidden = false;
+        var a = document.querySelector('[data-pb-answer]'); var was = a ? a.textContent : '';
+        if (a) a.textContent = 'Revoked · nothing flows · each side keeps its copy';
+        var undo = function () { q('[data-rv-done]').hidden = true; q('[data-rv-idle]').hidden = false; if (a) a.textContent = was; };
+        if (window.rsToast) window.rsToast('Engagement revoked (simulated)', { action: 'Undo', onAction: undo });
+      });
+    }
+    document.querySelectorAll('[data-offer]').forEach(function (b) {
+      if (b.__of) return; b.__of = true;
+      b.addEventListener('click', function () { if (window.rsToast) window.rsToast('Offered to ' + b.dataset.offer + ' as a template (simulated)'); b.disabled = true; b.textContent = 'Offered as a template'; });
+    });
+  })();
+</script>
+
+<style>
+  .eg { display: grid; gap: var(--gutter); }
+  .eg-h { margin: 0 0 4px; font-size: var(--fs-h3); }
+  .eg-ref { font-size: var(--fs-mark); color: var(--text-3); }
+</style>

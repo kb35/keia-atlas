@@ -130,6 +130,8 @@ export const LAYOUT = {
   pm: { summary: ['ready', 'projects', 'work'], record: ['quiet', 'tasks', 'gates', 'blocked'] },
   lead: { summary: ['estate', 'costs', 'lreview'], record: ['pilot', 'model', 'projects', 'quiet', 'stuck', 'regions', 'across'] },
   vendor: { summary: ['partner', 'install'], record: ['tasks', 'vnext'] },
+  // A provider with more than one client (docs/service-providers.md): the portfolio first, then the jobs with this client.
+  provider: { summary: ['portfolio', 'partner'], record: ['install', 'tasks', 'vnext'] },
   manager: { summary: ['ready', 'team', 'work'], record: ['quiet', 'tasks'] },
   everyone: { summary: ['estate', 'work', 'projects'], record: ['quiet', 'stuck', 'regions', 'across'] },
 };
@@ -163,7 +165,8 @@ const jobOrder = (ownOf) => (a, b) => {
 export function cockpit(H, ownOf, who) {
   const C = H.cockpit, today = H.today, all = who === 'everyone';
   const p = all ? null : H.people[who];
-  const kind = all ? 'everyone' : ROLE_KIND[p?.roleId] ?? 'field';
+  const base = all ? 'everyone' : ROLE_KIND[p?.roleId] ?? 'field';
+  const kind = base === 'vendor' && C.portfolio?.[who] ? 'provider' : base;
   const items = Object.values(H.items).filter((it) => JOB_KINDS.has(it.kind));
   const own = (it) => ownOf(it.id);
   const sort = jobOrder(ownOf);
@@ -220,6 +223,13 @@ export function cockpit(H, ownOf, who) {
       figures = [F('spaces', `${estate.n - estate.fault} of ${estate.n}`, 'Spaces working', '/rooms/'), F('inc', incs.length, 'Open incidents', `/incidents/?state=${H.openInc}`), F('past', past, 'Past target', `/incidents/?state=${H.openInc}`, { tone: past ? 'bad' : '' }), F('off', X.off ?? 0, 'Projects off plan', '#review')];
       answer = `${estate.fault ? `${plural(estate.fault, 'space')} with a fault across ${C.offices.length} offices` : `All ${C.offices.length} offices running`} · ${past ? `${past} past target` : 'every job within target'}`;
       break;
+    case 'provider': {
+      // A provider's portfolio: every client, each through its own engagement (src/lib/engagements.mjs; simulated).
+      const P = C.portfolio[who];
+      figures = [F('clients', P.clients, 'Clients', '#portfolio'), F('jobs', P.jobs, 'Jobs open', '#portfolio'), F('late', P.past, 'Past target', '#portfolio', { tone: P.past ? 'bad' : '' }), F('crews', P.crews, 'Crews on site today', '#pf-today')];
+      answer = P.answer;
+      break;
+    }
     case 'vendor': {
       // A partner (UI-V2 §3.6): the jobs handed to their company and the one contract clock (src/lib/vendors.mjs).
       const P = C.partner?.[who];

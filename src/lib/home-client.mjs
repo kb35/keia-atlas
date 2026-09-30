@@ -129,6 +129,7 @@ function actionFor(model, me, all) {
     case 'pm': return me.roleId === 'programme' ? ['Open the year plan', '/work/schedule/?view=year'] : ['Open your projects', `/projects/?owner=${me.id}`];
     case 'lead': return ['Open Locations', '/locations/'];
     case 'vendor': return ['Open your installation', '/vendor/'];
+    case 'provider': return ['Open your clients', '/portfolio/'];
     default: return ['Team schedule', '/work/schedule/?view=day&scope=team'];
   }
 }

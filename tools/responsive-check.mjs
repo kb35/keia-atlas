@@ -4,7 +4,7 @@
 
    Usage:
      node tools/responsive-check.mjs [--base http://127.0.0.1:4321/keia-atlas] [--only work,projects]
-                                     [--widths 375,768,1024] [--shots dir] [--dark] [--all]
+                                     [--widths 375,768,1024] [--shots dir] [--dark] [--all] [--who sam]
    Start a dev server first (npx astro dev --port <n>) or serve the built site (npm run preview:files),
    and pass its address with --base.
 
@@ -19,7 +19,8 @@
      overlap    two parts of the page's chrome sit on top of each other: band items, filter bar items, tabs,
                 key numbers, buttons, headings.
      spill      a label is wider than its box (a squashed table heading, a tab, a button, a pill).
-   Items the page marks data-rc-ok are skipped. */
+   Items the page marks data-rc-ok are skipped. --who opens every page as that person (View as), for the pages
+   only some people see, such as a provider's own clients (--who sam --only portfolio,portfolio-client). */
 import { existsSync, readdirSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
@@ -32,6 +33,7 @@ const WIDTHS = opt('widths', '375,768,1024,1280,1440,1920').split(',').map(Numbe
 const ONLY = opt('only', '');
 const SHOTS = opt('shots', '');
 const DARK = flag('dark');
+const WHO = opt('who', '');
 
 // The pages to check: every archetype, and the pages most often used at small sizes.
 const PAGES = [
@@ -80,6 +82,9 @@ const PAGES = [
   ['model', '/models/poly-studio-x52/', 'other'], ['room', '/rooms/chi-12-01/', 'other'],
   ['team', '/team/', 'other'],
   ['vendors', '/vendors/', 'other'], ['vendor-record', '/vendors/keystone/', 'other'], ['vendors-access', '/vendors/access/', 'other'], ['vendor-job', '/vendor/jobs/inc0041214/', 'other'],
+  // Organisations and engagements (docs/service-providers.md): the client's side, and the provider's own (--who sam).
+  ['vendor-engagement', '/vendors/northlight/engagement/', 'other'],
+  ['portfolio', '/portfolio/', 'other'], ['portfolio-client', '/portfolio/aigna-northlight/', 'other'], ['portfolio-client-fw', '/portfolio/fenwater-northlight/', 'other'], ['portfolio-engagement', '/portfolio/aigna-northlight/engagement/', 'other'],
   ['usage', '/usage/', 'other'],
   ['learn', '/learn/', 'other'],
   // The front door and the method pages
@@ -196,6 +201,7 @@ let fails = 0;
 const rows = [];
 for (const w of WIDTHS) {
   const ctx = await browser.newContext({ viewport: { width: w, height: w < 600 ? 812 : 900 }, colorScheme: DARK ? 'dark' : 'light', reducedMotion: 'reduce' });
+  if (WHO) await ctx.addInitScript((w) => { try { sessionStorage.setItem('rs5-who', w); sessionStorage.setItem('rs5-me', w); } catch (_) {} }, WHO);
   const page = await ctx.newPage();
   for (const [id, path] of list) {
     try {

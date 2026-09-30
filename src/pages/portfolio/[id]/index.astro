@@ -1,0 +1,145 @@
+---
+// One client, seen by the provider through one engagement (docs/service-providers.md). Only that engagement's scope:
+// the client's sites and the jobs handed to this provider there, the service levels, the crews and visits for this
+// client, and the provider's own notes (which never leave its Keia). Nothing from any other client.
+//   band   the client (the portfolio card flies into the title), the answer, four figures
+//   top    the jobs open, worst first, each with its clock (7 cols), beside the engagement (5 cols)
+//   below  the sites in scope; this week; what stays with each side; a design to propose (pre-sales)
+// Only the provider's people see it. Simulated (src/lib/engagements.mjs).
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import SidePanel from '../../../components/SidePanel.astro';
+import Section from '../../../components/Section.astro';
+import HealthGlyph from '../../../components/HealthGlyph.astro';
+import { href, vendors } from '../../../lib/data.mjs';
+import { PEOPLE } from '../../../lib/demo.mjs';
+import { ENGAGEMENTS, ORGS, ROLE_WORDS, RECORD_KINDS, clientCard, engagementView, siteName, orgName, NOW } from '../../../lib/engagements.mjs';
+import { dateWords, atWords } from '../../../lib/vendors.mjs';
+import '../../../styles/engagements.css';
+
+export function getStaticPaths() {
+  const withPeople = new Set(PEOPLE.filter((p) => p.vendor).map((p) => p.vendor));
+  return ENGAGEMENTS.filter((e) => withPeople.has(e.provider)).map((e) => ({ params: { id: e.id }, props: { e } }));
+}
+const { e } = Astro.props;
+const C = ORGS[e.client], Pr = ORGS[e.provider];
+const card = clientCard(e);
+const mine = engagementView(e.id, 'provider');
+const own = mine.filter((r: any) => r.owner === e.provider && !RECORD_KINDS[r.kind].flows);
+const done = mine.filter((r: any) => r.kind === 'job' && r.job.state === 'done');
+const sla = (e.agreement.contract ? vendors[e.agreement.contract]?.contract?.sla : e.agreement.sla) ?? [];
+const openAt = (s: string) => card.jobs.filter((j: any) => j.site === s).length;
+const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const dayWords = (t: string) => (t.slice(0, 10) === NOW.slice(0, 10) ? `Today, ${t.slice(11, 16)}` : `${DAY[new Date(`${t.slice(0, 10)}T00:00Z`).getUTCDay()]} ${Number(t.slice(8, 10))}, ${t.slice(11, 16)}`);
+const stateOf = (j: any) => (j.clock.past && !j.clock.paused ? 'fault' : j.state === 'waiting' ? 'review' : 'progress');
+const answer = `${card.answer.slice(card.name.length + 2)} · ${card.renewal.words.replace(/^R/, 'r')}`.replace(/^./, (c) => c.toUpperCase());
+const NUMBERS = [
+  { n: card.jobs.length, label: 'Jobs open', to: '#jobs' },
+  { n: card.past, label: 'Past target', to: '#jobs', tone: card.past ? 'bad' : undefined },
+  { n: e.scope.sites.length, label: e.scope.sites.length === 1 ? 'Site in scope' : 'Sites in scope', to: '#sites' },
+  { n: card.visits.length, label: card.visits.length === 1 ? 'Visit this week' : 'Visits this week', to: '#week' },
+];
+const css = PEOPLE.filter((p) => p.vendor === e.provider).map((p) => `:root[data-who="${p.id}"] .pf-for{display:revert}:root[data-who="${p.id}"] .pf-gate-wrap{display:none}`).join('');
+---
+<Shell vendorOk title={C.name} section="portfolio-client" crumbs={[{ label: 'Your clients', to: '/portfolio/' }, { label: C.name }]}>
+  <div class="pf-for">
+    <PageBand overline={`Client · ${ROLE_WORDS[e.role]}`} title={C.name} answer={answer} lede={C.what} sim numbers={NUMBERS} rec={`pf-${e.id}`}>
+      {C.fictional && <span slot="overline" class="pf-fict">Made-up client</span>}
+    </PageBand>
+
+    <div class="content pfc" data-feature="engagements">
+      <div class="g12 top">
+        <section class="s-7 card pad" id="jobs" aria-labelledby="pfc-jobs-h" data-help="portfolio.jobs">
+          <h2 id="pfc-jobs-h" class="pfc-h">Jobs open</h2>
+          {card.jobs.length ? (
+            <ol class="pfc-jobs">
+              {card.jobs.map((j: any) => (
+                <li class="pfc-j">
+                  <HealthGlyph state={stateOf(j)} size={16} title={j.clock.past && !j.clock.paused ? 'Past target' : j.state === 'waiting' ? `Waiting on ${C.name}` : 'With you'} />
+                  <span>
+                    <b><span class="mono">{j.id}</span>{j.title}</b>
+                    <small>{siteName(e.client, j.site)}{j.where ? `, ${j.where}` : ''} · handed over {atWords(j.handedAt)}</small>
+                    <span class:list={['clk', { past: j.clock.past && !j.clock.paused }]}>{j.clock.text} · {j.sla.what}</span>
+                    <small>{j.state === 'waiting' ? `Waiting on: ${j.wait}` : `With ${Pr.name}`} · {j.native.from}: {j.native.status}</small>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          ) : <p class="pf-none">Nothing open for {C.name}.</p>}
+          {done.length > 0 && <p class="eg-note">{done.length} closed recently, within the engagement's records.</p>}
+        </section>
+        <SidePanel class="s-5" title="The engagement" meta={ROLE_WORDS[e.role]} help="portfolio.engagement">
+          <div class="eg-side">
+            <p>{dateWords(e.start)} to {dateWords(e.end)} · {card.renewal.words}</p>
+            {sla.length > 0 && <><h3 class="eg-sub">Service levels</h3><ul class="eg-sla">{sla.map((s: any) => <li><span>{s.what}</span><b>{s.target}</b></li>)}</ul></>}
+            <h3 class="eg-sub">What flows</h3>
+            <ul class="eg-chips">{e.scope.kinds.map((k: string) => <li>{RECORD_KINDS[k].words}</li>)}</ul>
+            <p>{C.name} sets the scope and owns its places and records. Your crews, notes and costs stay in your own Keia.</p>
+            <a class="btn small" href={href(`/portfolio/${e.id}/engagement/`)} data-vt-rec={`eg-${e.id}-provider`}>Open the engagement</a>
+          </div>
+        </SidePanel>
+      </div>
+
+      <Section title="Sites in scope" id="sites" aside={`${e.scope.sites.length} of ${C.name}'s sites`} help="portfolio.sites">
+        <ul class="pfc-sites">{e.scope.sites.map((s: string) => <li><span>{siteName(e.client, s)}</span><small>{openAt(s) ? `${openAt(s)} open` : 'Nothing open'}</small></li>)}</ul>
+      </Section>
+
+      <div class="g12" id="week">
+        <section class="s-6 pf-mini" data-help="portfolio.crews" aria-label="Crews today">
+          <h3>Crews on site today</h3>
+          {card.crews.length ? <ul class="pf-list">{card.crews.map((x: any) => <li><HealthGlyph state="progress" size={16} title="On site" /><span><b>{x.what}</b><small>{siteName(e.client, x.site)} · {x.doing}</small></span></li>)}</ul> : <p class="pf-none">No crew on site today.</p>}
+        </section>
+        <section class="s-6 pf-mini" data-help="portfolio.visits" aria-label="Visits this week">
+          <h3>Visits this week</h3>
+          {card.visits.length ? <ul class="pf-list">{card.visits.map((v: any) => <li><HealthGlyph state={v.ready ? 'fine' : 'review'} size={16} title={v.ready ? 'Ready' : 'Not ready yet'} /><span><b>{dayWords(v.at)} · {siteName(e.client, v.site)}</b><small>{v.what}</small><small>{v.readiness} · shared with {C.name}</small></span></li>)}</ul> : <p class="pf-none">No visits booked this week.</p>}
+        </section>
+      </div>
+
+      <div class="g12 eg-seew">
+        <section class="s-6 pf-mini" data-help="portfolio.own">
+          <h3>Stays with {Pr.name}</h3>
+          <ul class="pf-list">{own.map((r: any) => <li><HealthGlyph state="off" size={16} title="Never shared" /><span><b>{r.what}</b><small>{RECORD_KINDS[r.kind].words} · only {Pr.name} sees this</small></span></li>)}</ul>
+          {!own.length && <p class="pf-none">Nothing of your own recorded for {C.name}.</p>}
+        </section>
+        <section class="s-6 pf-mini eg-no-see" data-help="portfolio.theirs">
+          <h3>Stays with {C.name}</h3>
+          <ul class="pf-list">
+            <li><HealthGlyph state="off" size={16} /><span><b>Floor plans, IP addresses and switch ports</b><small>Restricted: never shared</small></span></li>
+            <li><HealthGlyph state="off" size={16} /><span><b>Sites outside the scope</b><small>{C.name} decides the scope</small></span></li>
+            <li><HealthGlyph state="off" size={16} /><span><b>Work handed to anyone else</b><small>Even at a site in scope</small></span></li>
+          </ul>
+        </section>
+      </div>
+
+      {e.scope.kinds.includes('design') && (
+        <section class="card pad eg-act" data-help="portfolio.propose">
+          <h2 class="pfc-h">Propose a design</h2>
+          <p>Draft it in your own Keia: the space types, a bill of materials from the device library and the drawings. Then propose it to {C.name} as a project. {C.name}'s standards apply; {C.name} decides.</p>
+          <div class="eg-row"><button type="button" class="btn" data-propose={C.name}>Start a proposal</button><span class="faint">Simulated</span></div>
+        </section>
+      )}
+    </div>
+  </div>
+
+  <div class="pf-gate-wrap content">
+    <div class="card pad pf-gate">
+      <p class="overline">A provider's own Keia</p>
+      <h1 class="pf-gh">This is {Pr.name}'s view of a client</h1>
+      <p>Only {Pr.name}'s people see their own Keia, and each client only through its engagement. {e.client === 'aigna' ? 'Aigna holds the same engagement under Vendors.' : `${C.name} is a made-up client of ${Pr.name}; Aigna never sees it.`}</p>
+      {e.client === 'aigna' && <a class="btn" href={href(`/vendors/${e.provider}/engagement/`)}>See Aigna's side</a>}
+    </div>
+  </div>
+
+  <script is:inline data-astro-rerun>
+    document.querySelectorAll('[data-propose]').forEach(function (b) {
+      if (b.__pp) return; b.__pp = true;
+      b.addEventListener('click', function () { if (window.rsToast) window.rsToast('A draft proposal for ' + b.dataset.propose + ' would open here (simulated)'); });
+    });
+  </script>
+</Shell>
+<style is:global set:html={css}></style>
+<style is:global>
+  .pfc { display: grid; gap: var(--gutter); }
+  .pfc-h { margin: 0 0 12px; font-size: var(--fs-h3); }
+  .pf-gh { margin: 0; font-size: var(--fs-h2, 24px); }
+</style>

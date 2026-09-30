@@ -1,0 +1,32 @@
+---
+// The engagement, on the provider's side (docs/service-providers.md): the same record the client holds, seen from the
+// provider's own Keia. Only the provider's people see it; anyone else gets a line saying whose Keia this is.
+// Simulated (src/lib/engagements.mjs).
+import Shell from '../../../layouts/Shell.astro';
+import EngagementView from '../../../components/EngagementView.astro';
+import { href } from '../../../lib/data.mjs';
+import { PEOPLE } from '../../../lib/demo.mjs';
+import { ENGAGEMENTS, orgName } from '../../../lib/engagements.mjs';
+import '../../../styles/engagements.css';
+
+export function getStaticPaths() {
+  const withPeople = new Set(PEOPLE.filter((p) => p.vendor).map((p) => p.vendor));
+  return ENGAGEMENTS.filter((e) => withPeople.has(e.provider)).map((e) => ({ params: { id: e.id }, props: { e } }));
+}
+const { e } = Astro.props;
+const client = orgName(e.client), provider = orgName(e.provider);
+const css = PEOPLE.filter((p) => p.vendor === e.provider).map((p) => `:root[data-who="${p.id}"] .pf-for{display:revert}:root[data-who="${p.id}"] .pf-gate-wrap{display:none}`).join('');
+---
+<Shell vendorOk title={`${client}: the engagement`} section="portfolio-engagement" crumbs={[{ label: 'Your clients', to: '/portfolio/' }, { label: client, to: `/portfolio/${e.id}/` }, { label: 'Engagement' }]}>
+  <div class="pf-for"><EngagementView e={e} side="provider" /></div>
+  <div class="pf-gate-wrap content">
+    <div class="card pad pf-gate">
+      <p class="overline">A provider's own Keia</p>
+      <h1 class="pf-gh">This is {provider}'s side of the engagement</h1>
+      <p>Only {provider}'s people see their own Keia. {e.client === 'aigna' ? 'Aigna holds the same engagement under Vendors.' : `${client} is a made-up client of ${provider}; Aigna never sees it.`}</p>
+      {e.client === 'aigna' && <a class="btn" href={href(`/vendors/${e.provider}/engagement/`)}>See Aigna's side</a>}
+    </div>
+  </div>
+</Shell>
+<style is:global set:html={css}></style>
+<style is:global>.pf-gh { margin: 0; font-size: var(--fs-h2, 24px); }</style>

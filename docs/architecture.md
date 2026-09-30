@@ -572,6 +572,8 @@ A tenant is one client organisation. An integrator or managed service provider r
 - **Partner staff** get access per client, scoped to the job, never one login across clients.
 - **The cross-client view** reads from each tenant through a grant the client can see and revoke.
 
+How a provider and its clients connect, each with its own Keia, is designed in [service-providers.md](service-providers.md): organisations, engagements, who owns what, and federation.
+
 ### 7.8 Service levels for the platform itself
 
 Keia Atlas is a service in its own catalogue (Services › Keia Atlas), with an owner, service levels, its connectors as parts of its service map, and its own incidents. When a fault is Atlas's, the incident says so.

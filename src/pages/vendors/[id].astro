@@ -22,6 +22,8 @@ import { explorerForVendor, BLAST_NOW } from '../../lib/blast-view.mjs';
 import { vendors, sites, spaces, SITE_ORDER, VENDOR_KIND, modelName, href, plural } from '../../lib/data.mjs';
 import { building } from '../../lib/floors.mjs';
 import { PEOPLE, person } from '../../lib/demo.mjs';
+import { between, ROLE_WORDS, RECORD_KINDS, siteName, engagementView } from '../../lib/engagements.mjs';
+import '../../styles/engagements.css';
 import { JOBS, NOW, contractClock, accessOf, accessRegister, performance, contractLeft, papersOf, whenWords, atWords, dateWords, daysBetween } from '../../lib/vendors.mjs';
 
 export function getStaticPaths() {
@@ -67,6 +69,10 @@ const NUMBERS = [
   { n: L.left < 0 ? 'Ended' : L.left, label: L.left < 0 ? 'Contract' : 'Days left on the contract', fact: true, tone: L.state === 'review' ? 'warn' : L.state === 'fault' ? 'bad' : undefined },
   { n: R.open, label: 'Access open now', to: `/vendors/access/?vendor=${id}&status=open` },
 ];
+// The engagement (docs/service-providers.md): what this provider can see under it, and what stays with Aigna.
+const EG = between('aigna', id);
+const egShared = EG ? engagementView(EG.id, 'client') : [];
+const egWhere = EG ? [EG.scope.sites.length ? `${plural(EG.scope.sites.length, 'office')}` : null, EG.scope.projects.length ? plural(EG.scope.projects.length, 'project') : null].filter(Boolean).join(' and ') || 'no offices' : '';
 // If they stopped (V9): the spaces that depend on them, on the plan, with the meetings in them.
 const blast = explorerForVendor(id);
 const PERF_FMT = { '%': '%', n: '', x: 'x', d: 'd' };
@@ -111,6 +117,31 @@ const raw = JSON.stringify({ id: V.id, name: V.name, kind: V.kind, regions: V.re
       </SidePanel>
     </div>
 
+
+    {EG && (
+      <Section title="The engagement" id="engagement" aside={`${ROLE_WORDS[EG.role]} · ${egWhere} · ${egShared.length} records shared now`} help="vendors.engagement">
+        <div class="card pad eg-seew" data-feature="engagements">
+          <div class="eg-see">
+            <div>
+              <h3>{V.name} can see</h3>
+              <ul>
+                {EG.scope.sites.length > 0 && <li>{EG.scope.sites.map((s) => siteName('aigna', s).replace(/ office$/, '')).join(', ')}{EG.scope.projects.length ? ` and ${EG.scope.projects.join(', ')}` : ''}</li>}
+                {EG.scope.kinds.map((k) => <li>{RECORD_KINDS[k].words}{k === 'job' ? ', only when handed to them' : ''}</li>)}
+              </ul>
+            </div>
+            <div class="eg-no-see">
+              <h3>Stays with Aigna</h3>
+              <ul>
+                <li>Floor plans, IP addresses and switch ports</li>
+                <li>Offices outside the scope, and work handed to anyone else</li>
+                <li>Costs, people and the year plan</li>
+              </ul>
+            </div>
+          </div>
+          <p class="vrec-note"><a href={href(`/vendors/${id}/engagement/`)} data-vt-rec={`eg-${EG.id}-client`}>Open the engagement</a>: the scope, the agreement, who owns each record, the log both sides keep, and Revoke.</p>
+        </div>
+      </Section>
+    )}
 
     {blast && <BlastRadius targets={[blast]} now={BLAST_NOW} title="If they stopped" lede={`${blast.why.charAt(0).toUpperCase()}${blast.why.slice(1)}. Every floor with a space that depends on them, at one scale.`} />}
 
