@@ -148,7 +148,7 @@ The scope rule: Keia owns the record of what is in the building and the work on 
 | Undo, Roll back, or ask | Each rule declares which it has; the screen never shows an Undo that is not real |
 | One line, one card, one log | "Done automatically under the DNS rule (owner: Niamh)" on the record; "How was this done?" opens what it read, did, ruled out and did not check; the full trace is in the audit log |
 | Text is data, not instructions | Ticket text, device names and vendor notes are untrusted; software that reads them cannot send data out |
-| People keep the diagnosis | A suggestion follows the person's own call on P1 and P2; any rule can be run by hand; every action explains itself so people learn how the estate behaves |
+| People keep the diagnosis | A suggestion follows the person's own call on P1 and P2; any rule can be run by hand; every action explains itself so people learn how their workplace behaves |
 | Never about people | No scoring, ranking or allocation of work by an individual's behaviour or performance |
 | Your model, your region, or none | The customer chooses the model and where it runs, including local only, or turns AI off; nothing trains on customer data; every AI call is logged with model and region; an assistant says it is AI |
 

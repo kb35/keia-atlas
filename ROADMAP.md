@@ -14,7 +14,7 @@ Real estate and property services (IWMS, CAFM, leases, space planning, moves) ar
 
 ## v0.1: preview (today)
 
-A working demo of one fictional company's estate, with simulated live data. Repo mode is real: every page is built from YAML files checked by schemas, and the site runs anywhere static files can be served. Database mode, sign-in and live connectors are on the roadmap below.
+A working demo of one fictional company's offices and home offices, with simulated live data. Repo mode is real: every page is built from YAML files checked by schemas, and the site runs anywhere static files can be served. Database mode, sign-in and live connectors are on the roadmap below.
 
 What is in it:
 
@@ -33,7 +33,7 @@ What is real today: schemas, validation, floor plans, drawings, build sheets, th
 - The new sidebar: Home, Locations, Services, Assets, Support, Projects, Vendors, Team, Knowledge; modules that are On, Connected or Off; the sidebar shows only what is on.
 - **The office page with the floor plan:** 2D by default, 3D optional; every device a circle coloured by health with hover detail; filters by floor, space type, device type, health and service; who is on site; experience centres marked.
 - **The front door and the method pages:** a landing page with two doors, "Try it" and "Read the method"; the method explained visually (the problems, the shifts as before and after, the five ideas with live examples, the vocabulary, a fair comparison with ITIL, ITSM tools and PMI / PRINCE2, start with one module).
-- **Aigna through time:** the demo company at three sizes from its own history (one office and one IT generalist; four offices and a small team; the global estate), so the same site shows the method for one person and for a thousand, and shows which modules each size has on.
+- **Aigna through time:** the demo company at three sizes from its own history (one office and one IT generalist; four offices and a small team; offices around the world), so the same site shows the method for one person and for a thousand, and shows which modules each size has on.
 - Setting up: import from spreadsheets, discovery through connectors, trace a floor plan from a PDF or image; the first importers from ITSM tools and integrator handover documents.
 
 ## Then, in order
@@ -51,10 +51,10 @@ Connector names for each item are in [Connectors by module](#connectors-by-modul
 7. **Zoom, maps and timelines:** one continuous zoom from region to port; service maps; the incident story; the programme timeline; the change calendar on the floor plan.
 8. **Connector kit:** the open connector specification, a template connector with tests, and contributor documentation, so anyone can add a source (fleet tools, network controllers, booking systems, monitoring, identity, service management). AV control and monitoring platforms supply status and health. A reboot runs under a standing rule; firmware updates and configuration pushes are proposals a person confirms.
 9. **Accessibility and languages:** WCAG 2.2 AA throughout; interface strings in one file per language; formats by location.
-10. **Database mode:** a database behind a small server, with sign-in, real role-based access, live collaboration, an API, full export and live connectors one at a time; YAML stays as import, export and seed data. Real automation: agents under standing rules with their own service accounts, least privilege and a full audit trail; you choose the AI model and where it runs, including local models on your own servers, or turn AI off. What enterprises need before they adopt: single sign-on (SAML and OIDC), audit logs, EU data residency as a standard option, backups and restore, high availability, a published threat model (what an attacker learns from an estate model, and how the platform limits it), and SOC 2 and ISO/IEC 27001 as targets, not claims.
+10. **Database mode:** a database behind a small server, with sign-in, real role-based access, live collaboration, an API, full export and live connectors one at a time; YAML stays as import, export and seed data. Real automation: agents under standing rules with their own service accounts, least privilege and a full audit trail; you choose the AI model and where it runs, including local models on your own servers, or turn AI off. What enterprises need before they adopt: single sign-on (SAML and OIDC), audit logs, EU data residency as a standard option, backups and restore, high availability, a published threat model (what an attacker learns from a model of your offices, and how the platform limits it), and SOC 2 and ISO/IEC 27001 as targets, not claims.
 11. **Migration in:** importers from service-management tools, spreadsheets and integrator handover documents, so switching is realistic.
 
-## Beyond meeting rooms: the whole workplace estate
+## Beyond meeting rooms: the whole workplace
 
 Workplace technology is more than meeting rooms. The scope rule above applies to all of it. In order:
 
@@ -99,7 +99,7 @@ The people who use the spaces are an audience in their own right: the room guide
 
 ## Leadership
 
-A leadership view (the estate, services within target, experience measures, the programme and spend on one screen) and a method page, "The case for leadership", with a cost model whose assumptions are shown as figures the reader can change: tool licence costs against open source, time saved (consoles, reports, audit preparation, status meetings), room downtime avoided, fewer site visits, vendor spend and performance made visible.
+A leadership view (every office, services within target, experience measures, the programme and spend on one screen) and a method page, "The case for leadership", with a cost model whose assumptions are shown as figures the reader can change: tool licence costs against open source, time saved (consoles, reports, audit preparation, status meetings), room downtime avoided, fewer site visits, vendor spend and performance made visible.
 
 How we will know it works:
 
@@ -114,7 +114,7 @@ How we will know it works:
 
 ## Also on our mind
 
-- An open data standard for describing workplace technology (spaces, devices, wiring, standards), building on Keia's schemas, so estates, catalogues and tools can exchange data.
+- An open data standard for describing workplace technology (spaces, devices, wiring, standards), building on Keia's schemas, so organisations, catalogues and tools can exchange data.
 - A community device catalogue maintained in the open.
 - Privacy for sensors, cameras and microphones in spaces (GDPR): what is recorded, for how long, and the notices in the room.
 
