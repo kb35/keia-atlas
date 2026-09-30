@@ -132,7 +132,9 @@ const edgeLit = (e) => lit.has(e.U.id) && lit.has(e.D.id);
   .w-node.pin .w-box { stroke: var(--red); stroke-width: 3; fill: color-mix(in srgb, var(--red) 7%, var(--surface)); }
   .w-svg.focus .w-edge:not(.lit), .w-svg.focus .w-node:not(.lit) { opacity: .2; }
   .w-svg.focus .w-edge.lit .w-line { stroke-width: 3.6; }
-  .w-edge.lit .w-flow, .wiring.playing .w-flow { opacity: 1; animation: w-run 1.1s linear infinite; animation-delay: calc(var(--k) * -90ms); }
+  /* A lit path is drawn still; signals move along it only while "Show signals moving" is on (MOTION-V2 4.30). */
+  .w-edge.lit .w-flow { opacity: 1; }
+  .wiring.playing .w-flow { opacity: 1; animation: w-run var(--dur-flow) linear infinite; animation-delay: calc(var(--k) * var(--stagger) * -4); }
   @keyframes w-run { to { stroke-dashoffset: -34; } }
   .w-play { margin-left: 4px; }
   @media (prefers-reduced-motion: reduce) { .w-flow { animation: none !important; stroke-dasharray: none; } .w-node, .w-edge, .w-line { transition: none; } }
@@ -187,7 +189,12 @@ const edgeLit = (e) => lit.has(e.U.id) && lit.has(e.D.id);
     document.addEventListener('focusout', function (ev) { var h = hit(ev.target); if (h) lite(h.svg, null, null); });
     document.addEventListener('click', function (ev) {
       var b = ev.target.closest && ev.target.closest('[data-w-play]'); if (!b) return;
-      var on = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', String(on)); b.closest('.wiring').classList.toggle('playing', on);
+      var on = b.getAttribute('aria-pressed') !== 'true', w = b.closest('.wiring');
+      // MOTION-V2 4.30: signals move only while the switch is on, and it turns itself off after 30 s.
+      var set = function (v) { b.setAttribute('aria-pressed', String(v)); w.classList.toggle('playing', v); };
+      set(on); clearTimeout(w.__wPlay);
+      if (on) w.__wPlay = setTimeout(function () { set(false); }, 30000);
     });
+    document.addEventListener('astro:before-swap', function () { document.querySelectorAll('.wiring.playing [data-w-play]').forEach(function (b) { b.click(); }); });
   })();
 </script>
