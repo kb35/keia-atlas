@@ -1,0 +1,410 @@
+# Space type: Briefing auditorium
+# Keia Atlas house standard, not from a published guideline (see docs/decisions/0009-house-standard.md). No public
+# guidance covers an executive briefing centre's rooms, so every size, count and choice here is a house choice.
+# Keia part (profile to verification_model): which classes of device belong here.
+# Keia Atlas part: build options, the models each option names, and the outlets.
+
+schema: composite-profile
+
+profile:
+  name: Briefing auditorium
+  space_type: briefing-auditorium
+  version: "1.0"
+  last_updated: "2026-09-30"
+  owner: Keia Atlas maintainers
+  capacity: "40-60 people"
+  purpose: >-
+    The briefing centre's auditorium: keynotes and customer briefings to a seated audience, with
+    remote attendees on video. The codec, amplifier and switches sit in the AV rack in the
+    control room behind it.
+
+sources:
+  - file: docs/decisions/0009-house-standard.md
+    provides: 'Keia Atlas house standard: why this space type and its kit'
+  - file: data/device-classes/display.yaml
+    provides: Healthy state for the display class
+  - file: data/device-classes/codec.yaml
+    provides: Healthy state for the video codec class
+  - file: data/device-classes/camera.yaml
+    provides: Healthy state for the camera class
+  - file: data/device-classes/touch-controller.yaml
+    provides: Healthy state for the touch controller class
+  - file: data/device-classes/microphone.yaml
+    provides: Healthy state for the microphone class
+  - file: data/device-classes/amplifier.yaml
+    provides: Healthy state for the amplifier class
+  - file: data/device-classes/loudspeaker.yaml
+    provides: Healthy state for the loudspeaker class
+  - file: data/device-classes/av-extender.yaml
+    provides: Healthy state for the AV extender class
+  - file: data/device-classes/network-switch.yaml
+    provides: Healthy state for the in-room network switch class
+  - file: data/device-classes/scheduler-panel.yaml
+    provides: Healthy state for the scheduler panel class
+
+equipment_categories:
+  - category: display
+    description: Two main displays at the front; a direct-view LED wall instead where the room allows
+    object_profile: data/device-classes/display.yaml
+    quantity: "2"
+  - category: video_conferencing_codec
+    description: Meeting computer for remote attendees, in the control room's AV rack
+    object_profile: data/device-classes/codec.yaml
+    quantity: "1"
+  - category: camera
+    description: A wide camera on the audience and a PTZ camera on the presenter
+    object_profile: data/device-classes/camera.yaml
+    quantity: "2"
+  - category: meeting_control
+    description: Touchscreen on the presenter's table
+    object_profile: data/device-classes/touch-controller.yaml
+    quantity: "1"
+  - category: microphones
+    description: A microphone on the presenter's table and ceiling microphones over the audience for questions
+    object_profile: data/device-classes/microphone.yaml
+    quantity: "5"
+  - category: audio_amplification
+    description: Amplifier and audio processing for the ceiling speakers
+    object_profile: data/device-classes/amplifier.yaml
+    quantity: "1"
+  - category: loudspeakers
+    description: Ceiling speakers over the seats
+    object_profile: data/device-classes/loudspeaker.yaml
+    quantity: "8"
+  - category: signal_extension
+    description: HDBaseT transmitters and receivers for the displays and the presenter's laptop
+    object_profile: data/device-classes/av-extender.yaml
+    quantity: "6"
+  - category: network
+    description: In-room network switch for the AV devices, in the control room's AV rack
+    object_profile: data/device-classes/network-switch.yaml
+    quantity: "1"
+  - category: scheduling_panel
+    description: Booking panel at the door
+    object_profile: data/device-classes/scheduler-panel.yaml
+    quantity: "1"
+
+verification_model:
+  platforms_to_check:
+    - platform: keia_atlas
+      check: every required device in the chosen option is recorded in the space and wired
+        as the option says
+    - platform: inventory
+      check: every device has an active record in this space
+    - platform: dhcp_dns
+      check: every networked device has an address reservation and DNS records
+    - platform: device_management
+      check: meeting devices are online, paired and on standard firmware
+    - platform: room_booking
+      check: the room resource exists with the right capacity and is linked to its devices
+
+keia_atlas:
+  standard: house
+  category: connect
+  bookable: true
+  capacity:
+    min: 40
+    max: 60
+  area:
+    sq_ft:
+      min: 1076
+      max: 1399
+    m2:
+      min: 100
+      max: 130
+  geometry:
+    # The room shell for a floor-level 3D model; basis says where each value comes from.
+    width_m: 6.4
+    depth_m: 18
+    ceiling_m: 2.6
+    display_wall: back
+    door: { wall: left, from_m: 16.6, to_m: 17.6 }
+    data_entry: { via: ceiling, wall: left, at: above the door }
+    containment: [display-track, wall-riser, ceiling-drop, ceiling-basket, table-tray, table-leg, floor-cover, floor-box, floor-duct, floor-void, in-wall]
+    basis:
+      size: chosen
+      ceiling: house-default
+      door: house-default
+      data_entry: house-default
+      containment: house-default
+    notes:
+      - 6.4 × 18 m (115.2 m²), the depth of a facade row; the displays are on a short wall and the door at the back (house choice).
+  options:
+    - id: dual-display
+      name: Dual display, codec in the control room
+      standard: house
+      since: "2026-06-15"
+      summary: "Two 85 in displays fed over HDBaseT from a Poly G62 codec in the control room's AV rack, a wide camera on the audience and a PTZ camera on the presenter, a table microphone for the presenter and four ceiling microphones for questions, eight ceiling speakers on an amplifier, and the presenter's laptop over HDBaseT. Lighting scenes come from the building's lighting control; recording and streaming take the codec's feed in the control room."
+      equipment:
+        - key: display
+          class: display
+          model: samsung-qm85c
+          quantity: 2
+          requirement: required
+          location: display-wall
+          sizes_in: [85]
+          notes: 85 in is the largest display in the library; for the back rows a direct-view LED wall suits better
+        - key: display-led
+          class: display
+          quantity: 1
+          requirement: optional
+          location: display-wall
+          sizes_in: [136, 146]
+          notes: All-in-one direct-view LED wall instead of the two displays; no model chosen yet
+        - key: codec
+          class: codec
+          model: poly-g62
+          quantity: 1
+          requirement: required
+          location: data-closet
+          notes: In the AV rack in the control room behind the auditorium
+        - key: audience-camera
+          class: camera
+          model: poly-e70
+          role: Wide camera over the audience, for questions
+          quantity: 1
+          requirement: required
+          location: display-wall
+        - key: presenter-camera
+          class: camera
+          model: poly-e60
+          role: PTZ camera on the back wall, following the presenter
+          quantity: 1
+          requirement: required
+          location: tbd
+        - key: touch-controller
+          class: touch-controller
+          model: poly-tc10
+          quantity: 1
+          requirement: required
+          location: table-top
+          notes: On the presenter's table; a second is in the control room
+        - key: presenter-microphone
+          class: microphone
+          model: poly-tabletop-microphone
+          quantity: 1
+          requirement: required
+          location: table-top
+        - key: ceiling-microphone
+          class: microphone
+          model: poly-ip-ceiling-microphone
+          quantity: 4
+          requirement: required
+          location: ceiling
+          notes: Over the seats, for questions from the audience
+        - key: amplifier
+          class: amplifier
+          model: kramer-pa-240z
+          quantity: 1
+          requirement: required
+          location: data-closet
+          notes: Amplifier with audio processing, in the control room's AV rack
+        - key: loudspeaker
+          class: loudspeaker
+          model: kramer-galil-6
+          quantity: 8
+          requirement: required
+          location: ceiling
+        - key: network-switch
+          class: network-switch
+          model: netgear-m4250-gsm4210pd
+          quantity: 1
+          requirement: required
+          location: data-closet
+          notes: In the control room's AV rack
+        - key: display-tx
+          class: av-extender
+          model: kramer-tp-583txr
+          role: HDBaseT transmitter for each display, in the AV rack
+          quantity: 2
+          requirement: required
+          location: data-closet
+        - key: display-rx
+          class: av-extender
+          model: kramer-tp-583rxr
+          role: HDBaseT receiver at each display
+          quantity: 2
+          requirement: required
+          location: behind-display
+        - key: hdbaset-tx
+          class: av-extender
+          model: kramer-ext3-c-xr-t
+          role: "HDBaseT transmitter: the presenter's laptop connection"
+          quantity: 1
+          requirement: required
+          location: below-table
+        - key: hdbaset-rx
+          class: av-extender
+          model: kramer-ext3-poe-xr-r
+          role: HDBaseT receiver for the presenter's laptop
+          quantity: 1
+          requirement: required
+          location: behind-display
+        - key: scheduler-panel
+          class: scheduler-panel
+          model: logitech-tap-scheduler
+          quantity: 1
+          requirement: required
+          location: room-entrance
+      infrastructure:
+        - service: power
+          provided_by: it
+          quantity: 6
+          location: behind-display
+          serves: [display 1, HDBaseT receiver 1, laptop HDBaseT receiver, display 2, HDBaseT receiver 2, spare]
+        - service: power
+          provided_by: it
+          quantity: 2
+          location: below-table
+          serves: [HDBaseT transmitter, spare]
+        - service: power
+          provided_by: facilities
+          quantity: 2
+          location: floor-box
+          notes: For the presenter. A house recommendation; facilities decide.
+        - service: power
+          provided_by: it
+          quantity: 1
+          location: tbd
+          serves: [presenter camera]
+        - service: data
+          provided_by: it
+          quantity: 6
+          location: behind-display
+          serves: [display 1, audience camera, in-room switch uplink, display 2, spare, spare]
+        - service: data
+          provided_by: it
+          quantity: 3
+          location: below-table
+          serves: [touch controller, presenter microphone, spare]
+        - service: direct-run
+          provided_by: it
+          quantity: 2
+          location: below-table
+          serves: [HDBaseT link to the display wall, spare]
+          notes: Cable runs straight from the presenter's floor box to the display wall.
+        - service: data
+          provided_by: it
+          quantity: 2
+          location: tbd
+          serves: [presenter camera, spare]
+          notes: On the back wall, under the presenter camera
+        - service: data
+          provided_by: it
+          quantity: 1
+          location: room-entrance
+          serves: [scheduler panel]
+      wiring:
+        - from: codec.hdmi-out-1
+          to: display-tx#1.hdmi-in-1
+          cable: hdmi
+        - from: display-tx#1.hdbaset-1
+          to: display-rx#1.hdbaset-1
+          cable: cat6a
+          notes: Structured cable from the control room to the display
+        - from: display-rx#1.hdmi-out-1
+          to: display#1.hdmi-in-1
+          cable: hdmi
+        - from: codec.hdmi-out-2
+          to: display-tx#2.hdmi-in-1
+          cable: hdmi
+        - from: display-tx#2.hdbaset-1
+          to: display-rx#2.hdbaset-1
+          cable: cat6a
+          notes: Structured cable from the control room to the display
+        - from: display-rx#2.hdmi-out-1
+          to: display#2.hdmi-in-1
+          cable: hdmi
+        - from: display#1.lan-1
+          to: outlet:data/behind-display#1
+          cable: cat6
+        - from: audience-camera.lan-1
+          to: outlet:data/behind-display#2
+          cable: cat6
+        - from: display#2.lan-1
+          to: outlet:data/behind-display#4
+          cable: cat6
+        - from: codec.lan-1
+          to: network-switch.lan-1
+          cable: cat6
+          notes: The switch powers the codec (PoE+)
+        - from: codec.lan-2
+          to: network-switch.lan-2
+          cable: cat6
+          notes: Link-local network for Poly IP peripherals
+        - from: ceiling-microphone#1.lan-1
+          to: network-switch.lan-3
+          cable: cat6
+        - from: ceiling-microphone#2.lan-1
+          to: network-switch.lan-4
+          cable: cat6
+        - from: ceiling-microphone#3.lan-1
+          to: network-switch.lan-5
+          cable: cat6
+        - from: ceiling-microphone#4.lan-1
+          to: network-switch.lan-6
+          cable: cat6
+        - from: amplifier.lan-1
+          to: network-switch.lan-7
+          cable: cat6
+        - from: network-switch.lan-9
+          to: outlet:data/behind-display#3
+          cable: cat6
+          notes: Uplink
+        - from: presenter-camera.lan-1
+          to: outlet:data/tbd#1
+          cable: cat6
+        - from: touch-controller.lan-1
+          to: outlet:data/below-table#1
+          cable: cat6
+        - from: presenter-microphone.lan-1
+          to: outlet:data/below-table#2
+          cable: cat6
+        - from: hdbaset-tx.hdbaset-1
+          to: hdbaset-rx.hdbaset-1
+          cable: cat6a
+          notes: In direct cable run 1, floor box to display wall
+        - from: hdbaset-tx.usb-c-1
+          to: laptop
+          cable: usb-c
+          notes: The cable the presenter plugs their laptop into
+        - from: hdbaset-rx.hdmi-out-1
+          to: codec.hdmi-in-1
+          cable: hdmi
+        - from: codec.audio-out-1
+          to: amplifier.audio-in-1
+          cable: audio
+        - from: amplifier.speaker-out-1
+          to: loudspeaker#1.speaker-in-1
+          cable: speaker
+          notes: The eight speakers are chained from the amplifier in two zones, front and back
+        - from: scheduler-panel.lan-1
+          to: outlet:data/room-entrance#1
+          cable: cat6
+        - from: display#1.power-in
+          to: outlet:power/behind-display#1
+          cable: power
+        - from: display-rx#1.power-in
+          to: outlet:power/behind-display#2
+          cable: power
+        - from: hdbaset-rx.power-in
+          to: outlet:power/behind-display#3
+          cable: power
+        - from: display#2.power-in
+          to: outlet:power/behind-display#4
+          cable: power
+        - from: display-rx#2.power-in
+          to: outlet:power/behind-display#5
+          cable: power
+        - from: hdbaset-tx.power-in
+          to: outlet:power/below-table#1
+          cable: power
+        - from: presenter-camera.power-in
+          to: outlet:power/tbd#1
+          cable: power
+  notes:
+    - 'Keia Atlas house standard: no public guidance covers an executive briefing centre, so the size, seats and kit are house choices.'
+    - 'The data closet here is the control room behind the auditorium (space type av-control-room): the codec, amplifier, AV switch and display transmitters are in its AV rack, and it is where an operator runs an event.'
+    - 'Lighting control: scenes for house lights, presenting and video come from the building''s lighting control, on a keypad by the door and in the control room. No device class covers lighting control, so it is not listed as kit (a gap to fill).'
+    - 'Recording and streaming: the codec''s feed is recorded or streamed from the control room. No device class covers a recorder or streaming encoder, so none is listed (a gap to fill).'
+    - 'Sensing kit (codec, cameras, microphones) needs a privacy record for its site before it is installed.'

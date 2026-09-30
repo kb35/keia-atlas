@@ -370,6 +370,64 @@ const LAYOUTS = {
     b.anchors.wallPlate = { x: 4.95, y: 0.02, z: 0.45 };
     return { W, D, area: 30, chairs: 4, notes: ['Space size varies by office; 6 × 5 m shown', 'Desk for one or two, lounge seating, signage 65 in shown'] };
   },
+  // The executive briefing centre (house space types, no public guidance): long rooms, the display on a short wall.
+  'executive-boardroom'(b) {
+    const W = 6.4, D = 10.0; // 64 m2; 17 seats
+    const chairs = meetingTable(b, W, D, { tx0: 2.45, ty0: 1.9, tw: 1.5, td: 6.4, perSide: 8, endChairs: 1 });
+    credenza(b, W - 0.5, 2.0, W - 0.04, 5.0, 0.74, 'Credenza');
+    door(b, 'left', D - 1.1, D - 0.2);
+    b.anchors.wall = { cx: W / 2, lens: 1.22 };
+    return { W, D, area: 64, chairs, notes: ['Table 6.4 × 1.5 m for 16, a chair at the far end (house choice)'] };
+  },
+  'briefing-auditorium'(b) {
+    const W = 6.4, D = 18.0; // 115.2 m2; 54 seats in nine rows of six, a centre aisle
+    table(b, 2.2, 1.4, 4.2, 2.1, 0.74, { modesty: true });
+    b.anchors.table = { x0: 2.2, y0: 1.4, x1: 4.2, y1: 2.1, z: 0.74 };
+    let chairs = 0;
+    for (let r = 0; r < 9; r++) for (const x of [0.8, 1.5, 2.2, 4.2, 4.9, 5.6]) { chair(b, x, 4.0 + r * 1.25, -Math.PI / 2); chairs += 1; }
+    door(b, 'left', D - 1.4, D - 0.4);
+    b.anchors.wall = { cx: W / 2, lens: 1.22 };
+    return { W, D, area: 115.2, chairs, notes: ['Presenter table at the front, nine rows of six seats with a centre aisle, standing room at the back (house choice)'] };
+  },
+  'demo-zone'(b) {
+    const W = 6.4, D = 12.0; // 76.8 m2; standing, with stools at the benches
+    table(b, 1.7, 2.4, 4.7, 3.3, 0.95, { pedestal: true });
+    b.anchors.table = { x0: 1.7, y0: 2.4, x1: 4.7, y1: 3.3, z: 0.95 };
+    for (const x of [2.2, 3.2, 4.2]) stool(b, x, 3.75, 0.72);
+    for (const y of [6.0, 8.8]) { table(b, 1.0, y, 2.6, y + 0.8, 0.95, { pedestal: true }); table(b, 3.8, y, 5.4, y + 0.8, 0.95, { pedestal: true }); }
+    plant(b, W - 0.4, D - 0.4, 1.4);
+    door(b, 'left', D - 1.1, D - 0.2);
+    b.anchors.wall = { cx: W / 2, lens: 1.22 };
+    return { W, D, area: 76.8, chairs: 3, notes: ['A demo bench at the displays and four demo pods, bar height (house choice)'] };
+  },
+  'welcome-lounge'(b) {
+    const W = 6.4, D = 12.0; // 76.8 m2
+    // Lounge seating in two groups by the windows (the right wall), a coffee point on the left wall, the welcome
+    // screens on the back wall; a wide door in the middle of the left wall.
+    for (const y of [2.8, 7.4]) {
+      b.box(W - 0.9, y, 0.05, W - 0.1, y + 2.0, 0.42, 'sofa', { label: 'Lounge sofa' }); b.box(W - 0.28, y, 0.42, W - 0.1, y + 2.0, 0.82, 'sofa-back');
+      b.box(W - 2.2, y + 0.5, 0, W - 1.4, y + 1.5, 0.4, 'wood', { label: 'Coffee table' });
+      chair(b, W - 2.85, y + 0.6, 0, { lounge: true }); chair(b, W - 2.85, y + 1.4, 0, { lounge: true });
+    }
+    b.box(0.05, 8.2, 0, 0.65, 11.2, 0.92, 'counter', { label: 'Coffee point' });
+    plant(b, W - 0.45, D - 0.45, 1.5); plant(b, 0.45, D - 0.45, 1.3);
+    door(b, 'left', 4.2, 6.0);
+    b.anchors.wall = { cx: 3.0, signage: true, zc: 1.6 };
+    b.anchors.wallPlate = { x: 5.4, y: 0.02, z: 0.45 };
+    return { W, D, area: 76.8, chairs: 8, notes: ['Two lounge groups for eight, a coffee point, the welcome screens on the back wall (house choice)'] };
+  },
+  'av-control-room'(b) {
+    const W = 6.4, D = 5.0; // 32 m2
+    // The operator's desk facing the monitoring display; the AV rack and the charging cabinet on the right wall.
+    table(b, 1.7, 1.2, 4.7, 2.0, 0.74, { modesty: true });
+    chair(b, 2.6, 2.45, -Math.PI / 2); chair(b, 3.8, 2.45, -Math.PI / 2);
+    b.box(W - 0.8, 3.2, 0, W - 0.05, 4.6, 2.0, 'counter', { label: 'AV rack: the auditorium codec, amplifier and switches' });
+    b.box(W - 0.6, 0.6, 0, W - 0.05, 2.6, 1.1, 'wood', { label: 'Charging cabinet for the demo kit' });
+    door(b, 'left', D - 1.1, D - 0.2);
+    b.anchors.desk = { x0: 1.7, y0: 1.2, x1: 4.7, y1: 2.0, z: 0.74 };
+    b.anchors.wall = { cx: W / 2, lens: 1.1 };
+    return { W, D, area: 32, chairs: 2, notes: ['Operator desk for two facing the monitoring display, the AV rack and a charging cabinet (house choice)'] };
+  },
   'remote-home'(b) {
     const W = 3.0, D = 2.6;
     table(b, 0.6, 0.05, 2.0, 0.75, 0.74, { modesty: true });
