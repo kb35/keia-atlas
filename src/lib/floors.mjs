@@ -411,7 +411,7 @@ function backbonePath(r, floors, racks, rackPlace) {
 // A graph of everything that carries the signal: room wiring (device to outlet), runs (outlet to panel port), patch
 // cords (panel port to switch, switch to switch), the riser fibre, the providers' boxes, the lead-in and the internet.
 // Passive panels are followed port by port; active gear (switches, firewalls) passes the signal on from any port.
-function signalGraph(M) {
+export function signalGraph(M) {
   const adj = new Map();
   // Each direction remembers the port it arrives at, so a hop can say "port 47".
   const add = (a, b, e) => { for (const [x, y, k] of [[a, b, 1], [b, a, 0]]) { if (!adj.has(x)) adj.set(x, []); adj.get(x).push({ to: y, ...e, toPort: e.ports?.[k] ?? null }); } };
@@ -458,7 +458,7 @@ function shortest(adj, start, goal) {
   return out;
 }
 // Room wiring, device to outlet, over network cables only.
-function wiringToOutlet(room, posKey) {
+export function wiringToOutlet(room, posKey) {
   const opt = room.optionData; if (!opt) return null;
   const fitted = new Set(room.fitted);
   const unit = posKey.includes('/') ? posKey.split('/')[0] : null;
