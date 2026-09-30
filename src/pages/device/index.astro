@@ -14,13 +14,13 @@ import DeviceGlyph from '../../components/DeviceGlyph.astro';
 import Icon from '../../components/Icon.astro';
 import PageBand from '../../components/PageBand.astro';
 import SimTag from '../../components/SimTag.astro';
-import { models, spaces, STAGES, STAGE_LABEL, TASK_STATUS, INC_STATE } from '../../lib/data.mjs';
+import { models, spaces, STAGES, STAGE_LABEL, TASK_STATUS, INC_STATE, DEMO_TODAY } from '../../lib/data.mjs';
 import { artParts, artSource } from '../../lib/art.mjs';
 import '../../styles/viz.css';
 import '../../styles/classification.css';
 const used = [...new Set(Object.values(spaces).flatMap((s) => [...s.positions, ...s.olderKit].map((p) => p.model).filter(Boolean)))];
 const clsUsed = [...new Set(Object.values(spaces).flatMap((s) => [...s.positions, ...s.olderKit].map((p) => p.cls)))];
-const words = { stages: STAGES.map((s) => [s, STAGE_LABEL[s]]), task: TASK_STATUS, inc: INC_STATE };
+const words = { stages: STAGES.map((s) => [s, STAGE_LABEL[s]]), task: TASK_STATUS, inc: INC_STATE, today: DEMO_TODAY };
 const mm = (id) => models[id]?.dimensions_mm;
 const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d.depth].filter(Boolean).map((n) => (+n).toLocaleString('en-IE', { maximumFractionDigits: 1 })).join(' × ') + ' mm' : ''; };
 ---
@@ -133,6 +133,37 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
         else if (animate) P.push(name, 6, location.pathname + location.search);
         else { var z = window.rsZoom; window.rsZoom = function () { return null; }; P.push(name, 6, location.pathname + location.search); window.rsZoom = z; }
       }
+      // The space a unit sits in, drawn to scale (src/pages/device/scene/[room].astro), with the unit lit the way the
+      // incident page lights it (UI-V2 §2; REVIEW-SITE fix 8). The outline for its kind stays until the drawing is
+      // ready, and stays for good when the space has no drawing or does not draw this unit.
+      var scenes = {};
+      function loadScene(u, r, m, slot, bad) {
+        var key = u.pos.key.replace(/^[a-z]+-\d+\//, ''), url = L('device/scene/' + u.room + '/');
+        var sig = function (x) { return x.getAttribute('data-vite-dev-id') || x.getAttribute('href') || x.textContent.slice(0, 160); };
+        (scenes[url] = scenes[url] || fetch(url).then(function (x) { if (!x.ok) throw new Error('no scene'); return x.text(); }))
+          .then(function (html) {
+            if (!document.body.contains(slot)) return;
+            var doc = new DOMParser().parseFromString(html, 'text/html'), src = doc.querySelector('[data-scene-root]'), e = CSS.escape(key);
+            if (!src || !src.querySelector('[data-sk="' + e + '"]')) return;
+            // The drawing's styles and its pointing script, once per visit.
+            var have = Array.prototype.map.call(document.querySelectorAll('style, link[rel="stylesheet"]'), sig);
+            doc.querySelectorAll('style, link[rel="stylesheet"]').forEach(function (st) { if (have.indexOf(sig(st)) < 0) document.head.appendChild(document.importNode(st, true)); });
+            if (!window.__rsSceneHook) doc.querySelectorAll('script').forEach(function (sc) {
+              if (sc.textContent.indexOf('__rsSceneHook') < 0) return;
+              var n = document.createElement('script'); n.textContent = sc.textContent; document.body.appendChild(n);
+            });
+            var sc = document.importNode(src, true);
+            sc.classList.add('focus'); if (bad) sc.classList.add('tone-bad');
+            sc.dataset.pin = key;
+            sc.querySelectorAll('[data-sk="' + e + '"]').forEach(function (h) { h.classList.add('hit', 'pin'); if (h.classList.contains('hid')) sc.classList.add('focus-hid'); });
+            sc.querySelectorAll('.cab[data-a="' + e + '"], .cab[data-b="' + e + '"], .pt[data-dev="' + e + '"]').forEach(function (c) { c.classList.add('hit'); });
+            var cap = document.createElement('p');
+            cap.className = 'dv-cap';
+            cap.textContent = roomLabel(r) + ' to scale, this ' + u.pos.role.toLowerCase() + ' lit. No drawing of ' + (m ? 'the ' + m.name : 'its model') + ' yet.';
+            slot.classList.remove('generic'); slot.classList.add('dv-scene');
+            slot.replaceChildren(sc, cap);
+          }).catch(function () {});
+      }
       function show(u) {
         var r = D.rooms[u.room], s = D.sites[r.site], m = u.pos.model ? D.models[u.pos.model] : null;
         var nm = u.name ? u.name.charAt(0).toUpperCase() + u.name.slice(1) : (u.host || u.pos.role);
@@ -158,21 +189,14 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
         var ans = lede.closest('p'); if (ans) ans.title = answer + '\n' + u.pos.role + (m ? ', ' + m.name : '') + ', in ' + roomLabel(r) + ' at ' + s.name + (s.city ? ', ' + s.city : '') + '.';
         root.querySelector('.dv-search').hidden = true;
         root.querySelector('[data-dv-results]').hidden = true;
-        // Key numbers in the band: how many need attention, each a link to the card that holds them.
         var openTasks = r.tasks.filter(function (t) { return t.status !== 'done'; }).length, advN = m ? m.advisories.length : 0;
-        var kn = function (n, label, to, tone) { return '<li class="kn-i' + (tone ? ' t-' + tone : '') + '" data-help="number:' + label + '" data-help-name="' + label + '"><a href="' + to + '"><b class="num">' + n + '</b><span>' + label + '</span></a></li>'; };
-        root.querySelector('[data-dv-kn]').innerHTML = '<ul class="kn" aria-label="Key numbers">' +
-          kn(openInc.length, 'Open incidents', '#history', openInc.length ? 'bad' : '') +
-          kn(openTasks, 'Open tasks in space', '#history', '') +
-          kn(advN, 'Advisories', '#advisories', advN ? 'warn' : '') +
-          kn(u.conn.length, 'Connections', '#connections', '') + '</ul>';
         var at = STAGES.findIndex(function (x) { return x[0] === u.stage; });
         var tpl = artTpl(u), traced = tpl && tpl.dataset.traced, dimsTxt = tpl ? tpl.dataset.dims : '';
         var body = '';
 
         // Row 1: the drawing, big, with its lifecycle underneath; the facts beside it.
         body += '<section class="card dv-card s-5 c-art' + (openInc.length ? ' rs-radiate' : '') + '" data-help="unit.picture" aria-label="Drawing and lifecycle">' +
-          '<div class="stage dv-stage' + (traced ? '' : ' generic') + '">' + art(u) +
+          '<div class="stage dv-stage' + (traced ? '' : ' generic') + '"' + (traced ? '' : ' data-dv-scene') + '>' + art(u) +
           '<p class="dv-cap">' + (traced ? 'Front, to scale' + (dimsTxt ? ', ' + esc(dimsTxt) : '') + '. Traced from ' + esc(tpl.dataset.src) + '.' : 'No traced drawing for ' + (m ? esc(m.name) : 'this unit') + ' yet: the outline for its kind.') + '</p></div>' +
           '<ol class="dv-life" aria-label="Lifecycle">' + STAGES.map(function (x, i) { return '<li class="' + (i < at ? 'done' : i === at ? 'now ' + x[0] : '') + '"' + (i === at ? ' aria-current="step"' : '') + '><i></i><span>' + x[1] + '</span></li>'; }).join('') + '</ol>' +
           '</section>';
@@ -193,6 +217,8 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
             (u.net ? row('IP address', '<span class="mono">' + u.net.ip + '</span> ' + R(D.restricted.ipPlan)) + row('MAC', '<span class="mono">' + u.net.mac + '</span>') : '') +
             row('Installed', u.installed ? fmt(u.installed) : (u.stage === 'manage' || u.stage === 'retire' ? 'Not recorded' : 'Not yet')) +
             (u.retired ? row('Taken out', fmt(u.retired)) : '') +
+            // No setup guide: one line here instead of an empty card (REVIEW-SITE fix 8).
+            (m && m.config ? '' : row('Setup guide', '<span class="dv-none" data-help="unit.config">None: nothing to set on the unit itself</span>')) +
           '</dl></div></div></section>';
 
         // Advisories for this model change what you do next: one line each, open for the action.
@@ -238,7 +264,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
         }
 
         // Row 2: Health, Configuration, and the unit's history.
-        body += '<section class="card dv-card s-4 c-health" data-help="unit.health">' + head('Health', '<button type="button" class="btn small" data-help="unit.check" data-dv-check>Check again</button>') + '<ul class="dv-checks">' +
+        var healthCard = '<section class="card dv-card s-4 c-health" data-help="unit.health">' + head('Health', '<button type="button" class="btn small" data-help="unit.check" data-dv-check>Check again</button>') + '<ul class="dv-checks">' +
           u.platforms.map(function (p) { var bad = p === 'device_management' && u.stage === 'deploy'; return '<li><span class="dv-c" data-c' + (bad ? ' data-bad' : '') + '>' + '<span class="sp"></span>' + tick + '<svg class="x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg></span><b>' + (PLAT[p] || p) + '</b><span class="faint">' + ({ keia_atlas: 'Recorded where the space type expects it', inventory: 'Active record in this space', dhcp_dns: u.net ? 'Reservation ' + u.net.ip + ' and DNS ' + u.host : 'Not networked', device_management: bad ? 'Not enrolled yet: finish provisioning' : m && m.fw ? 'Online, firmware ' + m.fw.version + ' (standard)' : 'Online', room_booking: 'Calendar resource linked', monitoring: 'Reporting, no critical alerts' }[p] || '') + '</span></li>'; }).join('') +
           '</ul><p class="faint dv-foot">These checks are simulated. With real feeds they read the real systems.</p></section>';
 
@@ -253,7 +279,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
         } else {
           cfg += '<p class="dv-sub">Nothing to set on this unit itself. It works as it comes, or it is set up through the device it connects to.</p>';
         }
-        body += '<section class="card dv-card s-4 c-config" data-help="unit.config">' + head('Setup guide', m && m.config ? '<a class="btn small" href="' + L('configurations/' + m.config.id + '/') + '">Every setting</a>' : '') + cfg + '</section>';
+        var cfgCard = m && m.config ? '<section class="card dv-card s-4 c-config" data-help="unit.config">' + head('Setup guide', '<a class="btn small" href="' + L('configurations/' + m.config.id + '/') + '">Every setting</a>') + cfg + '</section>' : '';
 
         // History: incidents, tasks in this room, Lab tests of this model, and the unit's own dates. Newest first.
         var H = [];
@@ -268,8 +294,23 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
           return '<li class="hx hx-' + h.k + (h.open ? ' open' : '') + '"' + (i >= FIRST - 1 ? ' data-more hidden' : '') + '><time>' + when(h) + '</time><i aria-hidden="true"></i><div>' +
             (h.href ? '<a href="' + h.href + '"><span class="mono">' + esc(h.id) + '</span> ' + esc(h.t) + '</a>' : '<b>' + esc(h.t) + '</b>') + '<small>' + h.sub + '</small></div></li>';
         }).join('');
-        body += '<section class="card dv-card s-4 c-history" data-help="unit.history" id="history">' + head('Work and incidents', '<span class="faint dv-aside">Newest first</span>') +
+        var histCard = '<section class="card dv-card s-4 c-history" data-help="unit.history" id="history">' + head('Work and incidents', '<span class="faint dv-aside">Newest first</span>') +
           (H.length ? '<ol class="dv-hx">' + hx + '</ol>' + (H.length >= FIRST ? '<button type="button" class="btn small dv-all" data-help="section.showall" data-show-all>Show all ' + H.length + '</button>' : '') : '<p class="faint">No work or incidents on this unit yet.</p>') + '</section>';
+
+        // Key numbers in the band (REVIEW-SITE fix 8): figures that say something about this unit. Open work first,
+        // then advisories when there are any, how long it has been in its state, when its security support ends and
+        // its last change; each a link to the card that holds it. A zero that says nothing gives way to the next.
+        var mon = function (d) { var dt = new Date(d); return dt.toLocaleDateString('en-IE', { month: 'short', year: 'numeric' }); };
+        var kn = function (n, label, to, tone, title) { return '<li class="kn-i' + (tone ? ' t-' + tone : '') + '" data-help="number:' + label + '" data-help-name="' + label + '"' + (title ? ' title="' + esc(title) + '"' : '') + '><a href="' + to + '"><b class="num">' + n + '</b><span>' + label + '</span></a></li>'; };
+        var since = u.stage === 'retire' ? u.retired : u.stage === 'manage' ? u.installed : u.arrived || u.installed;
+        var figs = [kn(openInc.length + openTasks, 'Open work', '#history', openInc.length ? 'bad' : '', openInc.length + ' open incident' + (openInc.length === 1 ? '' : 's') + ' on this unit, ' + openTasks + ' open task' + (openTasks === 1 ? '' : 's') + ' in ' + roomLabel(r))];
+        if (advN) figs.push(kn(advN, 'Advisories', '#advisories', 'warn'));
+        if (since) figs.push(kn(mon(since), status + ' since', '#history', '', fmt(since)));
+        if (sec && sec.ends) figs.push(kn(sec.ends.replace(/^\d+ /, '').replace(/^([A-Z][a-z]{2})[a-z]+/, '$1'), sec.state === 'ended' ? 'Support ended' : 'Support until', '#security', sec.tone === 'bad' ? 'bad' : sec.tone === 'warn' ? 'warn' : '', sec.text));
+        var last = H.filter(function (h) { return h.d && h.d.slice(0, 10) <= W.today; })[0];   // a due date ahead is not a change
+        if (last && (!since || mon(last.d) !== mon(since))) figs.push(kn(mon(last.d), 'Last change', '#history', '', fmt(last.d) + ': ' + last.t));
+        if (figs.length < 4 && u.conn.length) figs.push(kn(u.conn.length, u.conn.length === 1 ? 'Connection' : 'Connections', '#connections', ''));
+        root.querySelector('[data-dv-kn]').innerHTML = '<ul class="kn" aria-label="Key numbers">' + figs.slice(0, 4).join('') + '</ul>';
 
         // Row 3: usage and how it is wired. However many cards there are, they fill the row.
         var r3 = [];
@@ -292,9 +333,17 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
             (r.path.mdf && (!r.path.idf || r.path.mdf.id !== r.path.idf.id) ? '<li><a href="' + L('rooms/' + r.path.mdf.id + '/') + '">' + esc(r.path.mdf.name) + '</a><small>Core and firewall</small></li>' : '') +
             '<li><b>Internet</b><small>Meeting services and device management</small></li></ol></section>');
         }
+        // Row 2: Health, the setup guide and the history. With no setup guide, Usage or Connections moves up into
+        // its place, so the second row is all information (REVIEW-SITE fix 8).
+        var up = cfgCard ? cfgCard : r3.length ? r3.shift().replace('SPAN', 's-4') : '';
+        if (!up) { healthCard = healthCard.replace(' s-4 ', ' s-6 '); histCard = histCard.replace(' s-4 ', ' s-6 '); }
+        body += healthCard + (cfgCard ? up + histCard : histCard + up);
         var span3 = r3.length === 1 ? 's-12' : r3.length === 2 ? 's-6' : 's-4';
         r3.forEach(function (h) { body += h.replace('SPAN', span3); });
         var el = root.querySelector('[data-dv-body]'); el.innerHTML = body; el.hidden = false;
+        // No traced drawing: the space drawn to scale with this unit lit, in place of the outline for its kind.
+        var slot = el.querySelector('[data-dv-scene]');
+        if (slot && !u.spare) loadScene(u, r, m, slot, openInc.length > 0);
         // Frame the drawing on the unit itself, so it fills the stage. The caption gives its real size. Small
         // units are enlarged at most about twice, so a touch panel never looks as big as a video bar.
         var svg = el.querySelector('.dv-stage > svg.model-art');
@@ -399,6 +448,9 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
   .dv-stage > .model-art, .dv-stage > svg { position: absolute; inset: 4px 8px 26px; width: calc(100% - 16px); height: calc(100% - 30px); view-transition-name: art-hero; }
   .dv-stage.generic > .model-art, .dv-stage.generic > svg { inset: 24px 30% 40px; width: 40%; height: calc(100% - 64px); aspect-ratio: auto; }
   .dv-stage.generic .model-art.generic svg { width: 100%; height: 100%; }
+  /* No traced drawing: the space to scale, the unit lit (loadScene). Its own caption gives way to the unit's. */
+  .dv-stage.dv-scene { display: grid; align-content: center; padding: 2px 2px 30px; }
+  .dv-scene .scene-cap { display: none; }
   .dv-cap { position: absolute; left: 10px; right: 10px; bottom: 6px; margin: 0; font-size: var(--fs-mark); line-height: 1.3; color: var(--text-3); }
   .dv-life { list-style: none; margin: 0 0 4px; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
   .dv-life li { position: relative; display: grid; justify-items: center; gap: 5px; text-align: center; font-size: clamp(10px, .78vw, 11px); line-height: 1.2; color: var(--text-3); }
