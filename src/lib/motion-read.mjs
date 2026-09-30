@@ -10,7 +10,7 @@ const ms = (cs, name, d) => {
 export function motion() {
   const cs = getComputedStyle(document.documentElement);
   return {
-    reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
+    reduced: (window.rsReducedNow ? window.rsReducedNow() : matchMedia('(prefers-reduced-motion: reduce)').matches),
     ease: cs.getPropertyValue('--ease-settle').trim() || 'cubic-bezier(.22, 1, .36, 1)',
     exitEase: cs.getPropertyValue('--ease-exit').trim() || 'cubic-bezier(.4, 0, 1, 1)',
     hover: ms(cs, '--dur-hover', 140), pop: ms(cs, '--dur-pop', 200), exit: ms(cs, '--dur-exit', 240),
