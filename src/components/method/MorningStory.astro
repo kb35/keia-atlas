@@ -1,0 +1,65 @@
+---
+// The method's one story: a meeting room fails before a 9:00 call, told twice. "Before" is prose on a quiet card.
+// "After" is a small sequence of timed steps, each with a drawing: the first five are the five ideas in order (their
+// IdeaArt), the sixth is the room working at 9:00. The ideas are not named here; the cards below name them, and each
+// card links back to its step (#st-0752 and so on). Every word is the method's (docs/keia-method.md, Level 1).
+//
+// Motion (docs/rules/motion.md; the motion library's moves on the tokens): when the sequence comes into view,
+// MethodPage's script plays it once. Each step steps in (km-step-in) a --dur-state after the one before, and its
+// drawing plays its point at the same moment. Reduced motion: never played, so the end frame is all there is.
+import IdeaArt from './IdeaArt.astro';
+import { LEVEL1, md } from '../../lib/method.mjs';
+const { story, ideas } = LEVEL1;
+const art = (i: number) => ideas[i]?.slug ?? 'on-time';
+// The drawings carry the story's own words: Liam's list counts one room; the job goes from Liam to the network team.
+const LABEL: Record<string, { figure?: string; was?: string; now?: string }> = {
+  'answer-first': { figure: '1' },
+  'own-it-hand-it-on': { was: 'With Liam', now: 'With Network' },
+};
+---
+<div class="st" data-help="method.story">
+  {story.before && (
+    <section class="card pad st-before" aria-labelledby="st-before-h">
+      <h3 id="st-before-h">{story.before.label}</h3>
+      <p set:html={md(story.before.text)} />
+    </section>
+  )}
+  <section class="card pad st-after" aria-labelledby="st-after-h">
+    <h3 id="st-after-h">{story.after?.label ?? 'After'}</h3>
+    {story.after && <p class="st-lead" set:html={md(story.after.text)} />}
+    <ol class="st-steps" data-story>
+      {story.steps.map((s, i) => (
+        <li class:list={['st-step', { 'st-end': i >= ideas.length }]} id={`st-${s.time.replace(':', '')}`} style={`--i: ${i}`}>
+          <IdeaArt idea={art(i)} class="st-art" label={LABEL[art(i)]} />
+          <time>{s.time}</time>
+          <p set:html={md(s.text)} />
+        </li>
+      ))}
+    </ol>
+  </section>
+</div>
+
+<style>
+  .st { display: grid; gap: var(--gutter); container: st / inline-size; }
+  .st h3 { margin: 0; font: 600 15px/1.3 var(--font-sans); }
+  .st-before { display: grid; gap: 8px; background: var(--surface-2); }
+  .st-before p { margin: 0; font-size: 14.5px; line-height: 1.6; max-width: 90ch; color: var(--text-2); }
+  .st-after { display: grid; gap: 12px; }
+  .st-lead { margin: 0; font-size: 14px; line-height: 1.55; max-width: 90ch; color: var(--text-2); }
+  .st-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; counter-reset: none; }
+  .st-step { display: grid; grid-template-rows: auto auto 1fr; gap: 6px; align-content: start; padding: 10px 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); scroll-margin-top: 96px; }
+  .st-step:target { border-color: var(--accent); }
+  .st-end { border-color: color-mix(in srgb, var(--h-fine, var(--green)) 45%, var(--line)); }
+  .st-step time { font: 600 13px/1.2 var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text); }
+  .st-step p { margin: 0; font-size: 13px; line-height: 1.5; }
+  .st-step :global(.st-art) { max-height: 72px; }
+  @container st (max-width: 1060px) { .st-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @container st (max-width: 620px) {
+    .st-steps { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .st-step { grid-template-columns: 88px minmax(0, 1fr); grid-template-rows: auto 1fr; column-gap: 12px; }
+    .st-step :global(.st-art) { grid-row: 1 / span 2; align-self: start; max-height: 56px; }
+  }
+  /* Played once (.km-play on the list, added by MethodPage when it comes into view). The markup is the end frame. */
+  .st-steps.km-play .st-step { animation: km-step-in var(--km-enter) var(--ease-settle) both; animation-delay: calc(var(--i) * var(--dur-state) * var(--km-t)); }
+  .st-steps .st-step { --ia-n: var(--i); }
+</style>
