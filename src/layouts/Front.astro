@@ -5,6 +5,7 @@
 // Light and dark follow the system, or the choice made in the console on this browser.
 import { ClientRouter } from 'astro:transitions';
 import '../styles/looks/studio.css';
+import '../styles/looks/contrast.css';   /* High contrast (Settings): its colours over Studio's shapes */
 import '../styles/base.css';
 import '../styles/motion.css';
 import '../styles/motion-library.css';
@@ -27,8 +28,10 @@ const { title, description = LINE } = Astro.props;
   <script is:inline data-astro-rerun set:html={A11Y_BOOT}></script>
   <script is:inline data-astro-rerun>
     (function () {
-      var r = document.documentElement, t = 'system';
-      try { t = localStorage.getItem('rs4-theme') || t; } catch (_) {}
+      var r = document.documentElement, t = 'system', skin = '';
+      try { t = localStorage.getItem('rs4-theme') || t; skin = localStorage.getItem('rs4-skin') || ''; } catch (_) {}
+      // The High contrast look chosen in the console (or Settings › Accessibility) carries its colours here too.
+      if (skin === 'contrast') r.setAttribute('data-contrast', 'high'); else r.removeAttribute('data-contrast');
       if (t === 'light' || t === 'dark') r.setAttribute('data-theme', t); else r.removeAttribute('data-theme');
       r.setAttribute('data-look', 'studio');
     })();
@@ -114,6 +117,8 @@ const { title, description = LINE } = Astro.props;
     --h-planned: #CC79A7; --h-planned-ink: #D8CCF0; --h-planned-soft: #231E30;
     --h-off: #7D766C; --h-off-ink: #CFC8BD; --h-off-soft: #22201D;
   }
+  /* A control reached with Tab is never hidden under the sticky bar or the lifecycle strip (WCAG 2.4.11). */
+  html:has(.fd-body) { scroll-padding-top: 128px; }
   .fd-body { min-height: 100svh; display: grid; grid-template-rows: auto 1fr auto; background: var(--bg); color: var(--text); font: 400 14px/1.5 var(--font-sans); }
   .fd-top {
     position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 16px;

@@ -142,7 +142,9 @@ const STEPS = [
         reveal('fix'); setGlyph(glyph, 'progress', { title: 'restarting, read back in 40 s' }); setSpace(floor, 'dub-3-09', 'progress');
         entry(clock(2), '<b>Done automatically</b> · restarted under the restart rule (owner: Nora)', 'by the rule, for Liam', quick);
         answer.textContent = 'Restarting. Read back in 40 s.';
-        later(quick || motion().reduced ? 0 : 900, () => { setGlyph(glyph, 'fine', { title: 'in service again' }); answer.textContent = 'Back in service. Not yet verified.'; });
+        const back = () => { setGlyph(glyph, 'fine', { title: 'in service again' }); answer.textContent = 'Back in service. Not yet verified.'; };
+        // Skipping ahead (or with motion off), the read-back lands now, so a later step's words are never overwritten.
+        if (quick || motion().reduced) back(); else later(900, back);
       },
       verify(quick) { root.querySelector('[data-fx-now2]')!.textContent = clock(3); reveal('verify'); entry(clock(3), '<b>Test call connected</b> · camera and audio fine', 'from the test', quick); answer.textContent = 'Verified: test call connected, camera and audio fine.'; },
       close(quick) {
@@ -198,7 +200,8 @@ const STEPS = [
     const tick = () => { if (!root.isConnected) return; const s = Math.round((Date.now() - t0) / 10000) * 10; beat.textContent = s < 10 ? 'checked just now' : s < 60 ? `checked ${s} s ago` : `checked ${Math.floor(s / 60)} min ago`; setTimeout(tick, 10000); };
     setTimeout(tick, 10000);
     paint();
-    if (motion().reduced) { for (let s = 0; s < ORDER.length; s++) doStep(s, true); return; }
+    // Reduced motion: the finished frame, drawn after the chip's first paint above so the record's last state wins.
+    if (motion().reduced) { setTimeout(() => { for (let s = 0; s < ORDER.length; s++) doStep(s, true); }, 0); return; }
     lp = loop(q('.fx-stage'), { play, reset, hold: 3200, clock: clk, finish: () => { clearTimers(); for (let s = i; s < ORDER.length; s++) doStep(s, true); } });
   }
   const boot = () => document.querySelectorAll<HTMLElement>('[data-fx]').forEach(init);
