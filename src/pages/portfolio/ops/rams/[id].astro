@@ -1,0 +1,152 @@
+---
+// One RAMS as a document (src/lib/provider-ops.mjs, generateRams): the disclaimer first, then who generated and who
+// approved it, the work and what the record says about the site, the 5 × 5 matrix before and after controls (the cells
+// with hazards fill once, km-draw-in, row 49), every hazard with who might be harmed, its controls, its risk and its
+// sources, the method, PPE, emergency arrangements, the crew's competence, and the sign-offs. Prints as a clean
+// document. A demo template, not professional safety advice.
+import Shell from '../../../../layouts/Shell.astro';
+import PageBand from '../../../../components/PageBand.astro';
+import HealthGlyph from '../../../../components/HealthGlyph.astro';
+import Gate from '../_Gate.astro';
+import Base from '../_Base.astro';
+import { href } from '../../../../lib/data.mjs';
+import { opsBase } from '../../../../lib/provider-ops-load.mjs';
+import { opsView, ramsAnswer, riskBand, dayWords, dateWords, LIKELIHOOD, SEVERITY, TASK_WORDS, CERTS } from '../../../../lib/provider-ops.mjs';
+import { ramsSignHtml, ramsStatusWord } from '../../../../lib/provider-ops-view.mjs';
+import '../../../../styles/engagements.css';
+import '../../../../styles/provider-ops.css';
+
+export function getStaticPaths() {
+  const V = opsView(opsBase());
+  return Object.values(V.rams).map((d) => ({ params: { id: d.job.id.toLowerCase() }, props: { id: d.job.id } }));
+}
+const { id } = Astro.props;
+const V = opsView(opsBase());
+const d = V.rams[id];
+const days = d.days.length > 1 ? `${dayWords(d.days[0])} to ${dayWords(d.days[d.days.length - 1])}` : dayWords(d.days[0]);
+const visit = V.visits.find((r) => r.visit.jobs.includes(id));
+const facts = d.job.facts ?? {};
+const record = [
+  facts.ceilingSource, facts.traySource, facts.accessSource, facts.comms?.source, facts.riser?.source,
+  facts.fitOutSource, facts.occupiedSource, facts.electrical?.source, facts.ceilingNote,
+].filter(Boolean);
+const rows = [5, 4, 3, 2, 1];
+const matrix = (when) => rows.map((l) => [1, 2, 3, 4, 5].map((s) => ({ l, s, n: d.matrix[when][l - 1][s - 1], band: riskBand(l, s).id })));
+---
+<Shell vendorOk title={`RAMS: ${d.title}`} section="ops-rams-doc" crumbs={[{ label: 'Operations', to: '/portfolio/ops/' }, { label: 'RAMS', to: '/portfolio/ops/rams/' }, { label: d.job.id }]}>
+  <div class="pf-for">
+    <PageBand overline={`RAMS · ${d.job.id}`} title={d.title} answer={ramsAnswer(d)} lede="A risk assessment and method statement, generated from the record and reviewed by a person." sim heartbeat={false}>
+      <div slot="action" class="rm-print"><button type="button" class="btn small" data-po-print>Print</button></div>
+    </PageBand>
+    <div class="content po-page" data-po-root data-po-page="rams-doc" data-job={id} data-feature="provider-rams">
+      <article class="rm-doc" aria-labelledby="pb-title">
+        <header class="rm-head">
+          <h1 class="rm-print-only">RAMS {d.job.id}: {d.title}</h1>
+          <p class="rm-disclaimer"><b>Demo template.</b> {d.disclaimer}</p>
+          <p class="po-foot" data-rm-status>{ramsStatusWord(d)}</p>
+          <dl class="rm-facts">
+            <div><dt>Client</dt><dd>{d.clientName}</dd></div>
+            <div><dt>Site</dt><dd>{d.siteName}{d.where ? `, ${d.where}` : ''}</dd></div>
+            <div><dt>When</dt><dd>{days}</dd></div>
+            <div><dt>Crew</dt><dd>{d.crew.map((c) => c.name).join(', ') || 'Not booked yet'}</dd></div>
+            <div><dt>For</dt><dd>{d.job.ref}{visit && <> · <a href={href('/portfolio/ops/visits/')}>{visit.ready ? 'visit ready' : 'visit at risk'}</a></>}</dd></div>
+            <div><dt>Generated</dt><dd>{dateWords(d.generated)}, {d.generated.slice(11, 16)}</dd></div>
+          </dl>
+        </header>
+
+        <div class="rm-top">
+          <section class="rm-sec" aria-labelledby="rm-work" data-help="ops.rams-work">
+            <h2 id="rm-work">The work, and what the record says</h2>
+            <ul class="rm-tasks">{d.tasks.map((t) => <li>{TASK_WORDS[t.id] ?? t.id} <small>· {t.why.join(', ')}</small></li>)}</ul>
+            {record.length > 0 ? <ul class="rm-list">{record.map((r) => <li>{r}</li>)}</ul> : <p>The record holds nothing about this site beyond its name; every hazard below comes from the work itself.</p>}
+          </section>
+          <section class="rm-sec rm-matrix" aria-labelledby="rm-mx" data-help="ops.matrix">
+            <h2 id="rm-mx">Risk after controls</h2>
+            <div class="rm-mx" role="img" aria-label={`5 by 5 risk matrix after controls: ${d.hazards.map((h) => `${h.id} likelihood ${h.after.l}, severity ${h.after.s}`).join('; ')}`}>
+              {matrix('after').map((row) => (
+                <>
+                  <span class="ax">{row[0].l}</span>
+                  {row.map((c) => (
+                    <span class="rm-cell" data-band={c.band} data-n={c.n || undefined} data-chart-bar={c.n ? '' : undefined} title={`${LIKELIHOOD[c.l - 1]} × ${SEVERITY[c.s - 1]}: ${c.n} ${c.n === 1 ? 'hazard' : 'hazards'}`}>
+                      <i style="height:100%"></i><span>{c.n || ''}</span>
+                    </span>
+                  ))}
+                </>
+              ))}
+              <span></span>{[1, 2, 3, 4, 5].map((s) => <span class="ax">{s}</span>)}
+            </div>
+            <p class="rm-axis"><span>Likelihood up, 1 rare to 5 almost certain</span><span>Severity across, 1 to 5</span></p>
+            <p class="rm-key"><span><i class="k-low"></i>Low, 1 to 4</span><span><i class="k-medium"></i>Medium, 5 to 12</span><span><i class="k-high"></i>High, 15 and above</span></p>
+            <p class="po-src">Before controls: {d.hazards.filter((h) => h.before.id === 'high').length} high, {d.hazards.filter((h) => h.before.id === 'medium').length} medium, {d.hazards.filter((h) => h.before.id === 'low').length} low.</p>
+          </section>
+        </div>
+
+        <section class="rm-sec" aria-labelledby="rm-hz" data-help="ops.hazards">
+          <h2 id="rm-hz">Hazards and controls</h2>
+          <ol class="rm-hz">
+            {d.hazards.map((h) => (
+              <li class="rm-h">
+                <div>
+                  <h3><span class="mono">{h.id}</span>{h.title}</h3>
+                  <p>{h.what}</p>
+                  <dl>
+                    <div><dt>Who might be harmed</dt><dd>{h.harmed.join('; ')}</dd></div>
+                    <div><dt>Controls</dt><dd><ul>{h.controls.map((c) => <li>{c}</li>)}</ul></dd></div>
+                  </dl>
+                  <p class="rm-src"><b>Source:</b> {h.sources.join('. ')}</p>
+                </div>
+                <div class="rm-risk">
+                  <span>Before <b data-band={h.before.id}>{h.before.label} · {h.before.l} × {h.before.s}</b></span>
+                  <span>After <b data-band={h.after.id}>{h.after.label} · {h.after.l} × {h.after.s}</b></span>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        <section class="rm-sec" aria-labelledby="rm-method" data-help="ops.method">
+          <h2 id="rm-method">Method statement</h2>
+          <ol class="rm-steps">{d.steps.map((s) => <li><b>{s.t}.</b> {s.detail}{s.hazards.length > 0 && <small> ({s.hazards.join(', ')})</small>}</li>)}</ol>
+        </section>
+
+        <div class="rm-top">
+          <section class="rm-sec" aria-labelledby="rm-ppe">
+            <h2 id="rm-ppe">Personal protective equipment</h2>
+            <ul class="rm-list">{d.ppe.map((p) => <li>{p}</li>)}</ul>
+          </section>
+          <section class="rm-sec" aria-labelledby="rm-em">
+            <h2 id="rm-em">Emergency arrangements</h2>
+            <ul class="rm-list">{d.emergency.map((p) => <li>{p}</li>)}</ul>
+          </section>
+        </div>
+
+        <section class="rm-sec" aria-labelledby="rm-comp" data-help="ops.competence">
+          <h2 id="rm-comp">Competence: the crew's certifications</h2>
+          {d.competence.length ? (
+            <ul class="rm-comp">
+              {d.competence.map((n) => (
+                <li>
+                  <HealthGlyph state={n.problems.length ? 'fault' : 'fine'} size={16} title={n.problems.length ? 'Not covered' : 'Covered'} />
+                  <span><b>{n.label}{n.each ? ', everyone on the visit' : ', at least one person'}</b><small>{n.why}. {n.problems.length ? n.problems.map((p) => p.words).join('; ') : `In date on ${dayWords(d.days[d.days.length - 1])}`}.</small></span>
+                </li>
+              ))}
+            </ul>
+          ) : <p>The work needs no certification beyond the site's own induction.</p>}
+          <p>Certifications from Northlight's crew record ({d.crew.map((c) => c.name).join(', ')}), checked on the last day of the work. {Object.values(CERTS).length} kinds are tracked, from CTS to site safety cards.</p>
+        </section>
+
+        <section class="rm-sec" aria-labelledby="rm-sign" data-help="ops.signoff">
+          <h2 id="rm-sign">Review and sign-off</h2>
+          <div data-po-slot="sign" set:html={ramsSignHtml(d)} />
+          {d.notes.length > 0 && <ul class="rm-list">{d.notes.map((n) => <li>Reviewer's note: {n}</li>)}</ul>}
+          <table class="rm-brief to-cards">
+            <thead><tr><th>Briefed to</th><th>Role</th><th>Signature</th><th>Date</th></tr></thead>
+            <tbody>{d.crew.map((c) => <tr><td data-label="">{c.name}</td><td data-label="Role">{c.role}</td><td data-label="Signature"><span class="line"></span></td><td data-label="Date"><span class="line"></span></td></tr>)}</tbody>
+          </table>
+        </section>
+      </article>
+    </div>
+  </div>
+  <Gate />
+  <Base />
+</Shell>

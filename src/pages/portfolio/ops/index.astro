@@ -1,0 +1,52 @@
+---
+// Stock (a provider's operations, src/lib/provider-ops.mjs): Northlight AV's warehouse and two vans. It answers first,
+// "2 shortfalls for next week's jobs", then shows what is short and the draft order that covers it, where the stock is,
+// and every item by model or part with on hand, reserved, available against its reorder point, and its serials.
+// Only Northlight's own people see it. Simulated (data/providers/northlight/ops/stock.yaml).
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import Section from '../../../components/Section.astro';
+import FilterBar from '../../../components/FilterBar.astro';
+import EmptyState from '../../../components/EmptyState.astro';
+import Gate from './_Gate.astro';
+import Base from './_Base.astro';
+import { href } from '../../../lib/data.mjs';
+import { opsBase } from '../../../lib/provider-ops-load.mjs';
+import { opsView, dateWords } from '../../../lib/provider-ops.mjs';
+import { shortHtml, placesHtml, itemsHtml } from '../../../lib/provider-ops-view.mjs';
+import '../../../styles/engagements.css';
+import '../../../styles/provider-ops.css';
+
+const V = opsView(opsBase());
+const reserved = V.rows.reduce((n, r) => n + r.reserved, 0);
+const low = V.rows.filter((r) => r.low).length;
+const NUMBERS = [
+  { n: V.short.length, label: V.short.length === 1 ? 'Shortfall next week' : 'Shortfalls next week', to: '#short', tone: V.short.length ? 'bad' : undefined, id: 'po-short' },
+  { n: low, label: 'Below reorder point', to: '?status=review', tone: low ? 'warn' : undefined, id: 'po-low' },
+  { n: reserved, label: 'Reserved for jobs', to: '/portfolio/ops/orders/', id: 'po-reserved' },
+  { n: V.rows.length, label: 'Items', to: '#items', id: 'po-items' },
+];
+const FACETS = [{ key: 'status', label: 'Status', options: [{ value: 'fault', label: 'Short next week' }, { value: 'review', label: 'Below reorder point' }, { value: 'fine', label: 'In stock' }] }];
+---
+<Shell vendorOk title="Stock" section="ops-stock" crumbs={[{ label: 'Operations', to: '/portfolio/ops/' }, { label: 'Stock' }]}>
+  <div class="pf-for">
+    <PageBand overline="Operations · Northlight AV" title="Stock" answer={V.answer} lede="Northlight's warehouse and vans: every item by model, what is reserved for which job, and what is short." sim numbers={NUMBERS} />
+    <div class="content po-page" data-po-root data-po-page="stock" data-base={href('')}>
+      <Section title="Short for next week" id="short" help="ops.short" data-feature="provider-stock" aside="Each is covered by a draft order">
+        <div data-po-slot="short" set:html={shortHtml(V)} />
+        <p class="po-foot"><a href={href('/portfolio/ops/orders/')}>Reserve stock and send the draft orders</a></p>
+      </Section>
+      <Section title="Where it is" id="places" help="ops.places" data-feature="provider-stock">
+        <div data-po-slot="places" set:html={placesHtml(V)} />
+      </Section>
+      <Section title="Every item" id="items" help="ops.items" data-feature="provider-stock" aside={`Counted ${dateWords(V.S.counted)}`}>
+        <FilterBar facets={FACETS} placeholder="Find a model, part or serial" label="Find an item" noun={['item', 'items']} scope=".po-page" />
+        <div data-po-slot="items" set:html={itemsHtml(V)} />
+        <EmptyState text="No items match these filters." />
+      </Section>
+      <p class="po-foot">Kit is listed by model from the shared device library, so a serial here is the same unit on the client's record once it is installed. Costs and invoices stay in Northlight's accounting system, which connects. What you reserve, send or receive on these pages is kept in this browser. <button type="button" data-po-reset>Start again from the record</button></p>
+    </div>
+  </div>
+  <Gate />
+  <Base />
+</Shell>

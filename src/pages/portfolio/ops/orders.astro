@@ -1,0 +1,52 @@
+---
+// Reservations and purchase orders (src/lib/provider-ops.mjs). Next week's jobs first: each job's bill of materials
+// against stock, with Reserve (the chips travel from Available to Reserved). Then the draft orders Keia worked out from
+// the shortfalls (Send), what is on order (Receive: the serials go into stock and onto the job), and what came in.
+// Only Northlight's own people see it. Simulated (data/providers/northlight/ops/).
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import Section from '../../../components/Section.astro';
+import Gate from './_Gate.astro';
+import Base from './_Base.astro';
+import { href } from '../../../lib/data.mjs';
+import { opsBase } from '../../../lib/provider-ops-load.mjs';
+import { opsView, WEEKS } from '../../../lib/provider-ops.mjs';
+import { jobsHtml, ordersHtml, ordersAnswer } from '../../../lib/provider-ops-view.mjs';
+import '../../../styles/engagements.css';
+import '../../../styles/provider-ops.css';
+
+const V = opsView(opsBase());
+const NUMBERS = [
+  { n: V.short.length, label: V.short.length === 1 ? 'Line short' : 'Lines short', to: '#next', tone: V.short.length ? 'bad' : undefined, id: 'po-short' },
+  { n: V.drafts.length, label: V.drafts.length === 1 ? 'Draft order' : 'Draft orders', to: '#drafts', id: 'po-drafts' },
+  { n: V.open.length, label: 'On order', to: '#open', id: 'po-open' },
+  { n: V.received.length, label: 'Received', to: '#received', id: 'po-received' },
+];
+---
+<Shell vendorOk title="Purchase orders" section="ops-orders" crumbs={[{ label: 'Operations', to: '/portfolio/ops/' }, { label: 'Purchase orders' }]}>
+  <div class="pf-for">
+    <PageBand overline="Operations · Northlight AV" title="Purchase orders" answer={ordersAnswer(V)} lede="Each job's bill of materials reserves stock; what stock cannot give becomes a draft order to a distributor." sim numbers={NUMBERS} />
+    <div class="content po-page" data-po-root data-po-page="orders" data-base={href('')}>
+      <Section title="Next week's jobs" id="next" help="ops.jobs" data-feature="provider-stock" aside="Jobs take stock in the order they start">
+        <div data-po-slot="jobs-next" set:html={jobsHtml(V, WEEKS.next)} />
+      </Section>
+      <div class="po-orders-wrap" data-po-orders>
+        <Section title="Draft orders" id="drafts" help="ops.drafts" data-feature="provider-stock" aside="Worked out from the shortfalls; a person sends them">
+          <div data-po-slot="drafts" set:html={ordersHtml(V, V.drafts, 'No draft orders: nothing is short.')} />
+        </Section>
+        <Section title="On order" id="open" help="ops.open" data-feature="provider-stock">
+          <div data-po-slot="open" set:html={ordersHtml(V, V.open, 'Nothing on order.')} />
+        </Section>
+        <Section title="Received" id="received" help="ops.received" data-feature="provider-stock">
+          <div data-po-slot="received" set:html={ordersHtml(V, V.received, 'Nothing received yet.')} />
+        </Section>
+      </div>
+      <Section title="This week's jobs" id="this" help="ops.jobs" data-feature="provider-stock">
+        <div data-po-slot="jobs-this" set:html={jobsHtml(V, WEEKS.this)} />
+      </Section>
+      <p class="po-foot">An order goes to the distributor from here; its invoice, the costs and the margin stay in Northlight's accounting system, which connects. The Juneau job's bill of materials is read from Aigna's build sheet for now; an accepted quote will feed it once the sales side is in. What you reserve, send or receive here is kept in this browser. <button type="button" data-po-reset>Start again from the record</button></p>
+    </div>
+  </div>
+  <Gate />
+  <Base />
+</Shell>

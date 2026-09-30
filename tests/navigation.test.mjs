@@ -17,7 +17,7 @@ const nav = shell.slice(shell.indexOf('const NAV = ['), shell.indexOf('const par
 const places = [...nav.matchAll(/^  \{ id: '([a-z-]+)', label: '([^']+)'/gm)].map((m) => ({ id: m[1], label: m[2] }));
 
 test('the sidebar: Home, the modules in their fixed order, then Learn and Method below the rule', () => {
-  const staff = places.map((p) => p.id).filter((id) => !['vendor', 'vschedule', 'portfolio'].includes(id));
+  const staff = places.map((p) => p.id).filter((id) => !['vendor', 'vschedule', 'portfolio', 'ops'].includes(id));
   assert.deepEqual(staff, ['home', 'locations', 'services', 'assets', 'support', 'projects', 'vendors', 'team', 'knowledge', 'learn', 'method']);
   assert.deepEqual(MODULES.map((m) => m.id), ['locations', 'services', 'assets', 'support', 'projects', 'vendors', 'team', 'knowledge']);
   for (const m of MODULES) assert.equal(places.find((p) => p.id === m.id)?.label, m.label, `${m.id} is a place with the same name`);

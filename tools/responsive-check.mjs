@@ -85,6 +85,8 @@ const PAGES = [
   // Organisations and engagements (docs/service-providers.md): the client's side, and the provider's own (--who sam).
   ['vendor-engagement', '/vendors/northlight/engagement/', 'other'],
   ['portfolio', '/portfolio/', 'other'], ['portfolio-client', '/portfolio/aigna-northlight/', 'other'], ['portfolio-client-fw', '/portfolio/fenwater-northlight/', 'other'], ['portfolio-engagement', '/portfolio/aigna-northlight/engagement/', 'other'],
+  // A provider's operations (src/lib/provider-ops.mjs), as Sam Okafor (--who sam).
+  ['ops-stock', '/portfolio/ops/', 'other'], ['ops-orders', '/portfolio/ops/orders/', 'other'], ['ops-crews', '/portfolio/ops/crews/', 'other'], ['ops-visits', '/portfolio/ops/visits/', 'other'], ['ops-rams', '/portfolio/ops/rams/', 'other'], ['ops-rams-doc', '/portfolio/ops/rams/nl-2318/', 'other'], ['ops-handover', '/portfolio/ops/handover/', 'other'], ['ops-handover-doc', '/portfolio/ops/handover/ho-nl-2240/', 'other'],
   ['usage', '/usage/', 'other'],
   ['learn', '/learn/', 'other'],
   // The capabilities (src/lib/modules.mjs): their own pages, and the space and unit pages that carry their cards

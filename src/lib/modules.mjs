@@ -92,6 +92,10 @@ export const CAPABILITIES = [
   { id: 'maintenance', module: 'projects', label: 'Room checks', what: 'Recurring checks and planned maintenance, scheduled with a checklist', state: 'on', source: 'the maintenance planner', requires: ['locations'] },
   // Vendors
   { id: 'engagements', module: 'vendors', label: 'Service providers', what: 'Engagements with service providers: scope, service levels and reviews', state: 'on', source: 'the supplier portal' },
+  // A provider's own operations (src/lib/provider-ops.mjs, /portfolio/ops/): what an integrator runs its work with.
+  { id: 'provider-stock', module: 'vendors', label: 'Provider stock and orders', what: 'A provider\'s stock, reservations per job and purchase orders to distributors', state: 'on', source: 'the provider\'s stock system' },
+  { id: 'provider-crews', module: 'vendors', label: 'Provider crews', what: 'A provider\'s crews, certifications and each visit\'s readiness', state: 'on', source: 'the provider\'s scheduling tool' },
+  { id: 'provider-rams', module: 'vendors', label: 'Provider RAMS', what: 'Risk assessments and method statements from the record, approved by a person', state: 'on', source: 'the provider\'s safety system' },
   // Team
   { id: 'oncall', module: 'team', label: 'On-call', what: 'Who is on call now, by region and service', state: 'on', source: 'the paging tool', requires: ['support'], helper: true },
 ];
