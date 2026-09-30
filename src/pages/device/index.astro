@@ -104,11 +104,34 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
       function R(what) { return '<span class="cls-tag" data-help="classification.restricted"><b>Restricted:</b> ' + esc(what) + '</span>'; }
       function demoVal() { return ' <span class="demo-val" data-help="unit.demo-value">Demo value</span>'; }
       function head(title, aside) { return '<header class="dv-ch"><h2>' + title + '</h2>' + (aside || '') + '</header>'; }
-      // The path you can climb: Units > site > room > this unit. Each step is a link but the last.
+      // The path is the zoom (src/lib/zoom.mjs): Locations / region / office / floor / space / this unit, and a
+      // port as a last step while one is chosen (#port-lan-1). Each step is a link but the last.
+      var REGION = { emea: 'EMEA', amer: 'Americas', apac: 'Asia Pacific' };
       function crumbs(u, r, s, nm) {
         var nav = document.querySelector('.mast .crumbs'); if (!nav) return;
-        var steps = [['Units', L('devices/')], [s.name, L('devices/') + '?site=' + r.site], [roomLabel(r), L('rooms/' + u.room + '/')], [nm]];
-        nav.innerHTML = steps.map(function (c, i) { return (i ? '<span class="sep" aria-hidden="true">/</span>' : '') + (c[1] ? '<a href="' + c[1] + '">' + esc(c[0]) + '</a>' : '<span aria-current="page">' + esc(c[0]) + '</span>'); }).join('');
+        var steps = [['Locations', L('locations/'), 0]];
+        if (s.region) steps.push([REGION[s.region] || s.region, L('locations/' + s.region + '/'), 1]);
+        if (s.office) {
+          steps.push([s.name, L('locations/' + r.site + '/'), 2]);
+          if (r.floor != null) steps.push([(s.floors && s.floors[String(r.floor)]) || 'Floor ' + r.floor, L('locations/' + r.site + '/') + '?floor=' + r.floor, 3]);
+        } else if (s.region) steps.push(['Home offices', L('locations/' + s.region + '/home-offices/'), 2]);
+        steps.push([roomLabel(r), L('rooms/' + u.room + '/'), 4], [nm, null, 5]);
+        nav.setAttribute('data-zoom', ''); nav.setAttribute('data-help', 'shell.zoom');
+        nav.innerHTML = steps.map(function (c, i) { return (i ? '<span class="sep" aria-hidden="true">/</span>' : '') + (c[1] ? '<a href="' + c[1] + '" data-zl="' + c[2] + '">' + esc(c[0]) + '</a>' : '<span aria-current="page" data-zl="' + c[2] + '">' + esc(c[0]) + '</span>'); }).join('');
+      }
+      // A port is a state of this page (the zoom's last level): its row is marked and the path gains its name.
+      var portSlug = function (p) { return 'port-' + String(p).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); };
+      function showPort(animate) {
+        var id = location.hash.slice(1), row = id && /^port-/.test(id) ? root.querySelector('tr[data-port="' + id.replace(/[^a-z0-9-]/g, '') + '"]') : null;
+        root.querySelectorAll('tr[data-port].is-port').forEach(function (tr) { if (tr !== row) { tr.classList.remove('is-port'); tr.removeAttribute('aria-current'); } });
+        var P = window.rsPath;
+        if (!row) { if (P && P.has()) P.pop(); return; }
+        row.classList.add('is-port'); row.setAttribute('aria-current', 'location');
+        var name = row.dataset.portName;
+        if (!P) return;
+        if (P.has()) P.rename(name);
+        else if (animate) P.push(name, 6, location.pathname + location.search);
+        else { var z = window.rsZoom; window.rsZoom = function () { return null; }; P.push(name, 6, location.pathname + location.search); window.rsZoom = z; }
       }
       function show(u) {
         var r = D.rooms[u.room], s = D.sites[r.site], m = u.pos.model ? D.models[u.pos.model] : null;
@@ -260,7 +283,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
         }
         if (u.conn.length) {
           r3.push('<section class="card dv-card SPAN c-conn" data-help="unit.connections" id="connections">' + head('Connections', '<span class="faint dv-aside">' + u.conn.length + ' cable' + (u.conn.length > 1 ? 's' : '') + '</span>') + '<table class="dv-t"><thead><tr><th>Port</th><th>Goes to</th><th>Cable</th></tr></thead><tbody>' +
-            u.conn.map(function (c) { return '<tr><td class="mono">' + esc(c.port) + '</td><td>' + esc(c.to) + '</td><td>' + esc(c.cable) + '</td></tr>'; }).join('') + '</tbody></table></section>');
+            u.conn.map(function (c) { var pid = portSlug(c.port); return '<tr data-port="' + pid + '" data-port-name="' + esc(c.port) + '"><td class="mono"><a class="dv-port" href="#' + pid + '" data-help="unit.port">' + esc(c.port) + '</a></td><td>' + esc(c.to) + '</td><td>' + esc(c.cable) + '</td></tr>'; }).join('') + '</tbody></table></section>');
         }
         if (u.net || r.path.idf || r.path.mdf) {
           r3.push('<section class="card dv-card SPAN c-net" data-help="unit.network">' + head('Network') + '<ol class="dv-path">' +
@@ -301,6 +324,32 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
           });
         };
         el.querySelector('[data-dv-check]').addEventListener('click', run); run();
+        // The port level of the zoom: a port link (#port-lan-1) marks its row and adds it to the path; [ takes it away.
+        showPort(false);
+        if (!window.__rsPortHook) {
+          window.__rsPortHook = true;
+          var mine = function () { return document.querySelector('[data-dv]'); };
+          window.addEventListener('hashchange', function () { if (mine() && window.__rsShowPort) window.__rsShowPort(true); });
+          document.addEventListener('rs:zoom-out', function () {
+            var d = mine(); if (!d) return;
+            d.querySelectorAll('tr[data-port].is-port').forEach(function (tr) { tr.classList.remove('is-port'); tr.removeAttribute('aria-current'); });
+            try { history.replaceState(history.state, '', location.pathname + location.search); } catch (_) {}
+          });
+          document.addEventListener('rs:zoom-in', function (e) {
+            if (!mine() || !window.__rsShowPort) return;
+            var h = new URL(e.detail.to, location.href).hash;
+            try { history.replaceState(history.state, '', location.pathname + location.search + h); } catch (_) {}
+            window.__rsShowPort(true);
+          });
+          // A port link on this page changes only the hash: the router moves there without a hashchange.
+          document.addEventListener('click', function (e) {
+            var a = e.target.closest && e.target.closest('a.dv-port'); if (!a || !mine()) return;
+            e.preventDefault();
+            try { history.replaceState(history.state, '', a.getAttribute('href')); } catch (_) {}
+            window.__rsShowPort(true);
+          });
+        }
+        window.__rsShowPort = showPort;
       }
     })();
   </script>

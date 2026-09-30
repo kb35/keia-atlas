@@ -15,39 +15,33 @@ import '../styles/looks/drawing.css';
 import '../styles/looks/contrast.css';
 import '../styles/base.css';
 import '../styles/motion.css';
+import '../styles/nav.css';
 
-import { PEOPLE, STAGES_DEMO, TEAMS } from '../lib/demo.mjs';
+import { PEOPLE, TEAMS } from '../lib/demo.mjs';
 import { LINE } from '../lib/brand.mjs';
+import { MODULES, MODULE_DEFAULTS } from '../lib/modules.mjs';
+import { zoomTrail } from '../lib/zoom.mjs';
+import { springEasing } from '../lib/spring.mjs';
 
-// minStage: the adoption stage a page belongs to (stages 1 to 6, see src/lib/demo.mjs). Below it, the page shows
-// what arrives at that stage instead of its content. Gated here, at page level, never in components.
-const { title, crumbs = [], section = '', minStage = 1, vendorOk = false, about } = Astro.props;
+// minStage is retired (v2: no stages, modules instead). Pages may still pass it; it is ignored. A page's module
+// is the place it belongs to in NAV: while that module is Off, the page says so and offers to switch it on.
+const { title, crumbs = [], section = '', vendorOk = false, about } = Astro.props;
 const VENDOR_IDS = PEOPLE.filter((p) => p.vendor).map((p) => p.id);
-// Six places (decision 0022). Each is one sidebar entry; the pages inside it show as tabs at the
-// top of the page, so the sidebar stays short and the same everywhere.
+// The sidebar (UX-V2 §2.1): Home, then one entry per module in a fixed order, then Learn below a rule. Each is one
+// place; the pages inside it show as tabs at the top of the page, so the sidebar stays short and the same
+// everywhere. A module that is Off is absent (Settings › Modules); one that is Connected shows its source on hover.
 const NAV = [
   { id: 'home', label: 'Home', to: '/', icon: 'home', mobile: true, vendorOk: true, tabs: [] },
   { id: 'vendor', label: 'Your installation', short: 'Install', to: '/vendor/', icon: 'kit', vendorOnly: true, vendorOk: true, mobile: true, tabs: [] },
   { id: 'vschedule', label: 'Your schedule', short: 'Schedule', to: '/work/schedule/', icon: 'schedule', vendorOnly: true, vendorOk: true, tabs: [] },
-  { id: 'work', label: 'Work', to: '/work/', icon: 'project', mobile: true, tabs: [
-    { id: 'overview', label: 'Overview', to: '/work/' },
-    { id: 'schedule', label: 'Schedule', to: '/work/schedule/' },
-    { id: 'projects', label: 'Projects', to: '/projects/', stage: 3 },
-    { id: 'incidents', label: 'Incidents', to: '/incidents/', stage: 2 },
-    { id: 'known-issues', label: 'Known errors', to: '/known-issues/', stage: 2 },
-    { id: 'playbooks', label: 'Playbooks', to: '/playbooks/', stage: 3 },
-    { id: 'planning', label: 'Planning', to: '/work/planning/', stage: 3, lead: true },
-    { id: 'refresh', label: 'Work plan', to: '/refresh/' },
-    { id: 'lab', label: 'Lab', to: '/lab/', stage: 3 },
-  ], also: ['changes'] },
-  // Locations: offices, regions and home offices, with the rooms inside them. Rooms keep their
+  // Locations: offices, regions and home offices, with the spaces inside them. Spaces keep their
   // address (/rooms/) but live here. Region, office and home-office pages light the place, not a tab.
   { id: 'locations', label: 'Locations', to: '/locations/', icon: 'sites', mobile: true, tabs: [
     { id: 'locations-overview', label: 'Overview', to: '/locations/' },
     { id: 'offices', label: 'Offices', to: '/locations/offices/' },
     { id: 'rooms', label: 'Spaces', to: '/rooms/' },
     { id: 'types', label: 'Space types', to: '/room-profiles/' },
-    { id: 'usage', label: 'Usage', to: '/usage/', stage: 2, lead: true },
+    { id: 'usage', label: 'Usage', to: '/usage/', lead: true },
   ], also: ['sites', 'office', 'region', 'home-offices'] },
   // Services: the health, fleet, standard and owners of each service.
   { id: 'services', label: 'Services', to: '/services/', icon: 'pulse', tabs: [
@@ -56,43 +50,71 @@ const NAV = [
     { id: 'services-network', label: 'Network', to: '/services/network/' },
     { id: 'services-infrastructure', label: 'Infrastructure', to: '/services/infrastructure/' },
   ], also: ['service'] },
-  { id: 'devices', label: 'Devices', to: '/devices/overview/', vendorTo: '/profiles/', icon: 'devices', mobile: true, vendorOk: true, tabs: [
-    { id: 'devices-overview', label: 'Overview', to: '/devices/overview/' },
+  // Assets (it was Devices; /devices/overview/ moved to /assets/): the units and everything that describes them.
+  { id: 'assets', label: 'Assets', to: '/assets/', vendorTo: '/profiles/', icon: 'devices', mobile: true, vendorOk: true, tabs: [
+    { id: 'devices-overview', label: 'Overview', to: '/assets/' },
     { id: 'profiles', label: 'Device types', to: '/profiles/', vendorOk: true },
     { id: 'devices', label: 'Units', to: '/devices/' },
     { id: 'models', label: 'Models', to: '/models/', vendorOk: true },
     { id: 'configurations', label: 'Setup guides', to: '/configurations/', vendorOk: true },
     { id: 'standards', label: 'Standards', to: '/standards/', vendorOk: true },
-    { id: 'equipment-usage', label: 'Usage', to: '/usage/equipment/', stage: 2, lead: true },
+    { id: 'equipment-usage', label: 'Usage', to: '/usage/equipment/', lead: true },
     { id: 'spares', label: 'IT stores', to: '/spares/' },
     { id: 'cables', label: 'Cables', to: '/cables/' },
   ] },
-  { id: 'team', label: 'Team', to: '/team/', icon: 'team', tabs: [
-    { id: 'team', label: 'People', to: '/team/', stage: 3 },
-    { id: 'vendors', label: 'Vendors', to: '/vendors/', stage: 3 },
+  // Support and Projects are what Work was (/work/ moved to /support/): the day's jobs, and the dated work.
+  { id: 'support', label: 'Support', to: '/support/', icon: 'inbox', mobile: true, tabs: [
+    { id: 'overview', label: 'Overview', to: '/support/' },
+    { id: 'incidents', label: 'Incidents', to: '/incidents/' },
+  ] },
+  { id: 'projects', label: 'Projects', to: '/projects/', icon: 'project', tabs: [
+    { id: 'projects', label: 'Projects', to: '/projects/' },
+    { id: 'schedule', label: 'Schedule', to: '/work/schedule/' },
+    { id: 'planning', label: 'Planning', to: '/work/planning/', lead: true },
+    { id: 'refresh', label: 'Work plan', to: '/refresh/' },
+    { id: 'lab', label: 'Lab', to: '/lab/' },
+  ] },
+  { id: 'vendors', label: 'Vendors', to: '/vendors/', icon: 'kit', tabs: [] },
+  { id: 'team', label: 'Team', to: '/team/', icon: 'team', tabs: [] },
+  { id: 'knowledge', label: 'Knowledge', to: '/known-issues/', icon: 'playbook', tabs: [
+    { id: 'known-issues', label: 'Known errors', to: '/known-issues/' },
+    { id: 'playbooks', label: 'Playbooks', to: '/playbooks/' },
+    { id: 'changes', label: 'Proposals', to: '/changes/' },
   ] },
   { id: 'learn', label: 'Learn', to: '/learn/', icon: 'book', vendorOk: true, tabs: [] },
+  // The Keia Method (/method/): what Atlas is built on, below the rule beside Learn.
+  { id: 'method', label: 'Method', to: '/method/', icon: 'decisions', vendorOk: true, tabs: [] },
 ];
 const parent = NAV.find((n) => n.id === section || n.tabs.some((t) => t.id === section) || (n.also ?? []).includes(section));
 const tabs = parent && parent.tabs.length > 1 ? parent.tabs : [];
-// Each role sees its own places first (under "Yours"), then everything else. Nothing is hidden.
-const ROLE_NAV = {
-  delivery: ['work', 'locations', 'devices'], 'sm-av': ['services', 'devices', 'work'], 'sm-infra': ['services', 'locations', 'devices', 'work'],
-  pm: ['work', 'locations', 'team'], 'delivery-manager': ['team', 'work'], programme: ['work', 'team'],
-  head: ['work', 'services', 'team'], tech: ['locations', 'devices', 'work'], desk: ['work', 'locations'], innovation: ['work', 'devices'],
-  network: ['locations', 'services', 'work', 'devices'],
-  'eng-manager': ['team', 'work'], 'pm-manager': ['work', 'team'], 'tech-manager': ['team', 'locations', 'work'],
-  everyone: ['work', 'locations', 'services', 'devices', 'team'],
-};
+const MOD = Object.fromEntries(MODULES.map((m) => [m.id, m]));
+const pageModule = parent && MOD[parent.id] ? MOD[parent.id] : null;
+// Old place addresses, and the place each became. Links to them still work (Moved pages); the client router
+// goes straight to the new address, so an old link never shows the Moved page on the way.
+const MOVED = { '/work/': '/support/', '/devices/overview/': '/assets/' };
+const MOVED_HREF = Object.fromEntries(Object.entries(MOVED).map(([a, b]) => [href(a), href(b)]));
 // Usage and Scenarios (lead: true) are for everyone, but come first, marked, for the roles that decide
 // where money and space go: both service managers, the head of the service and the programme manager.
 const LEAD_ROLES = ['sm-av', 'sm-infra', 'head', 'programme'];
 const leadCss = LEAD_ROLES.map((r) => `:root[data-role="${r}"] .sec-tabs [data-lead]{order:-1}:root[data-role="${r}"] .sec-tabs [data-lead]::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-right:7px;vertical-align:2px}`).join('');
-// "Everyone (overview)" is not a role, so it is matched by who (data-who); it comes last, so its order wins.
-const roleSel = (r) => (r === 'everyone' ? ':root[data-who="everyone"]' : `:root[data-role="${r}"]`);
-const roleCss = Object.entries(ROLE_NAV).map(([r, ids]) =>
-  ids.map((id, i) => `${roleSel(r)} .nav [data-nav="${id}"]{order:${i + 1}}`).join('') +
-  `${roleSel(r)} .nav .nav-div{display:block}`).join('');
+// Modules Off leave the sidebar (and their pages show the gate); Connected ones show their source on hover.
+const moduleCss = MODULES.map((m) => `:root[data-off~="${m.id}"] .nav [data-nav="${m.id}"]{display:none!important}`
+  + `:root[data-off~="${m.id}"] main[data-module="${m.id}"] .page-body{display:none!important}`
+  + `:root[data-off~="${m.id}"] main[data-module="${m.id}"] .module-gate{display:grid!important}`
+  + `:root[data-conn~="${m.id}"] .nav [data-nav="${m.id}"] .nav-src{display:block}`).join('');
+// The path in the top bar. A page on the zoom (region, office, space) gets the zoom trail from its address, so
+// it reads the same whichever page linked there (src/lib/zoom.mjs). On other pages a step that names a retired
+// place (Work, Devices), or a place the page has moved out of (Vendors was under Team), names its place now.
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+const here = Astro.url.pathname.startsWith(basePath) ? Astro.url.pathname.slice(basePath.length) || '/' : Astro.url.pathname;
+const zoom = zoomTrail(here);
+const PLACE_WORDS = new Set(['Work', 'Devices', ...NAV.map((n) => n.label)]);
+const trail = zoom ?? crumbs.map((c, i) => (i === 0 && c.to && parent && c.label !== parent.label && PLACE_WORDS.has(c.label) ? { label: parent.label, to: parent.to } : c))
+  .filter((c, i, all) => !(i === 0 && all.length > 1 && all[1].label === c.label));   // never "Vendors / Vendors"
+// The spring the zoom rides on (MOTION-V2 --spring-settle: 360 ms, no bounce), as a CSS easing.
+const EASE_SPRING = springEasing({ duration: 360, bounce: 0 });
+// A record page (not a list) is remembered as a recent object for the palette (⌘K, before you type).
+const recent = about && about.kind && about.kind !== 'page' ? JSON.stringify({ k: about.kind, t: about.label, u: here }) : undefined;
 const WHO_ROLE = Object.fromEntries(PEOPLE.map((p) => [p.id, p.roleId]));
 // "Everyone (overview)" in View as is a demo viewer, not a person: Home shows every role's panels at once
 // (matched by data-who="everyone"); anywhere else it reads as the default role.
@@ -104,13 +126,6 @@ const PEOPLE_LITE = [...PEOPLE.map((p) => ({ id: p.id, name: p.name, roleId: p.r
 const who0 = PEOPLE[0];
 // The object this page is about, for the Report drawer ("Propose an edit about ...").
 const aboutThis = about ?? { kind: 'page', label: title ?? 'this page' };
-// Styles that hide anything above the chosen stage (data-stage on <html>, set from Settings).
-const below = (min) => Array.from({ length: min - 1 }, (_, i) => i + 1);
-const gateCss = [2, 3, 4, 5, 6].flatMap((min) => below(min).flatMap((st) => [
-  `:root[data-stage="${st}"] [data-min-stage="${min}"]`, `:root[data-stage="${st}"] [data-min-stage-group="${min}"]`,
-  `:root[data-stage="${st}"] main[data-page-stage="${min}"] .page-body`])).join(',');
-const gateShow = [2, 3, 4, 5, 6].flatMap((min) => below(min).map((st) => `:root[data-stage="${st}"] main[data-page-stage="${min}"] .stage-gate`)).join(',');
-const stageInfo = STAGES_DEMO.find((x) => x.n === minStage);
 const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
 ---
 <!doctype html>
@@ -120,7 +135,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>{pageTitle}</title>
   <meta name="description" content={`Keia Atlas: ${LINE} A demo of a made-up company, built on public device data.`} />
-  <script is:inline data-astro-rerun define:vars={{ VENDOR_IDS, WHO_ROLE, PEOPLE_LITE }}>window.RS_VENDORS = VENDOR_IDS; window.RS_WHO_ROLE = WHO_ROLE; window.RS_PEOPLE = PEOPLE_LITE;</script>
+  <script is:inline data-astro-rerun define:vars={{ VENDOR_IDS, WHO_ROLE, PEOPLE_LITE, MODULE_DEFAULTS, MOVED_HREF }}>window.RS_VENDORS = VENDOR_IDS; window.RS_WHO_ROLE = WHO_ROLE; window.RS_PEOPLE = PEOPLE_LITE; window.RS_MODULES = MODULE_DEFAULTS; window.RS_MOVED = MOVED_HREF;</script>
   <script is:inline data-astro-rerun>
     /* Small shared helpers for pages that keep demo records in this browser: read and write a JSON list
        (falling back to memory when storage is blocked), and who the viewer is right now. */
@@ -190,10 +205,18 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         else if (r.hasAttribute('data-rs-theme')) { r.removeAttribute('data-theme'); r.removeAttribute('data-rs-theme'); }
         r.setAttribute('data-skin', s);
         r.setAttribute('data-mode', t === 'light' || t === 'dark' ? t : 'system');
-        // Demo controls from Settings: which stage is switched on, and whether agents are shown.
-        var st = '6', ag = 'on';
-        try { st = localStorage.getItem('rs4-stage') || st; ag = localStorage.getItem('rs4-agents') || ag; } catch (_) {}
-        r.setAttribute('data-stage', st); r.setAttribute('data-agents', ag);
+        // Demo controls from Settings: each module On, Connected or Off (src/lib/modules.mjs), and whether agents
+        // are shown. Modules become two word lists on <html>: data-off and data-conn.
+        var ag = 'on', mods = window.RS_MODULES || {}, saved = null;
+        try { ag = localStorage.getItem('rs4-agents') || ag; saved = JSON.parse(localStorage.getItem('rs6-modules') || 'null'); localStorage.removeItem('rs4-stage'); } catch (_) {}
+        var off = [], conn = [];
+        saved = saved || window.__rsModMem || null;
+        Object.keys(mods).forEach(function (id) {
+          var v = saved && /^(on|connected|off)$/.test(saved[id]) ? saved[id] : mods[id];
+          if (v === 'off') off.push(id); else if (v === 'connected') conn.push(id);
+        });
+        r.setAttribute('data-off', off.join(' ')); r.setAttribute('data-conn', conn.join(' '));
+        r.setAttribute('data-agents', ag);
         // Help mode (the ? switch): kept per window (session storage), and put back after every page swap.
         var hp = 'off'; try { hp = sessionStorage.getItem('rs5-help') === 'on' ? 'on' : 'off'; } catch (_) {}
         r.setAttribute('data-help', hp);
@@ -270,6 +293,11 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
             e.newDocument = new DOMParser().parseFromString(await res.text(), 'text/html');
             absolutise(e.newDocument, e.to);
           };
+        });
+        // A link to a place's old address (Work, Devices) goes straight to its new one, never via the Moved page.
+        document.addEventListener('astro:before-preparation', function (e) {
+          var to = (window.RS_MOVED || {})[e.to.pathname];
+          if (to) { var u = new URL(e.to.href); u.pathname = to; e.to = u; }
         });
         // Remember where each navigation is going (with its #tab), for pages that open on a tab.
         document.addEventListener('astro:before-preparation', function (e) { window.__rsNavTo = e.to; });
@@ -348,39 +376,42 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
       <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect class="tile" x="1.5" y="1.5" width="28" height="28" rx="7" stroke-width="2" /><path class="tick" d="M8.5 16l4.5 4.5 10-10" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
       <span><b>Keia Atlas</b></span>
     </a>
-    <nav class="crumbs" aria-label="Breadcrumb" data-help="shell.path">
-      {crumbs.map((c, i) => (
+    <nav class="crumbs" aria-label="Breadcrumb" data-help={zoom ? 'shell.zoom' : 'shell.path'} data-zoom={zoom ? '' : undefined}>
+      {trail.map((c, i) => (
         <>
           {i > 0 && <span class="sep" aria-hidden="true">/</span>}
-          {c.to ? <a href={href(c.to)}>{c.label}</a> : <span aria-current="page">{c.label}</span>}
+          {c.to ? <a href={href(c.to)} data-zl={c.level}>{c.label}</a> : <span aria-current="page" data-zl={c.level}>{c.label}</span>}
         </>
       ))}
     </nav>
     <span class="spacer"></span>
     <button class="search-btn" type="button" data-help="shell.search" data-open-search aria-label="Search everything (/ or Ctrl K)" title="Search everything"><Icon name="search" size={16} /><span>Search</span><kbd data-search-kbd>Ctrl K</kbd></button>
-    <button class="help-btn" type="button" data-help-toggle data-help="shell.help" data-help-src={href('/help/index.json')} aria-pressed="false" aria-label="Help: explain what things are (?)" title="Help: explain what things are (press ? to switch on or off)"><span class="hb-q" aria-hidden="true">?</span></button>
-    <button class="report-btn" type="button" data-help="shell.report" data-open-report title="Propose an edit, log new firmware or raise an urgent issue about this page"><Icon name="plus" size={16} /><span>Report</span></button>
+    <button class="help-btn" type="button" data-help-toggle data-help="shell.help" data-verb="show-help" data-verb-name="Help" data-help-src={href('/help/index.json')} aria-pressed="false" aria-label="Help: explain what things are (?)" title="Help: explain what things are (press ? to switch on or off)"><span class="hb-q" aria-hidden="true">?</span></button>
+    <button class="report-btn" type="button" data-help="shell.report" data-open-report data-verb="report" title="Propose an edit, log new firmware or raise an urgent issue about this page"><Icon name="plus" size={16} /><span>Report</span></button>
     <button class="icon-btn mobile-gear" type="button" data-help="shell.mode" data-toggle-mode aria-label="Colour mode: Auto" title="Colour mode: Auto"><span class="m-system"><Icon name="auto" /></span><span class="m-light"><Icon name="sun" /></span><span class="m-dark"><Icon name="moon" /></span></button>
-    <button class="icon-btn mobile-gear" type="button" data-help="shell.settings" data-open-settings aria-label="Settings"><Icon name="gear" /></button>
+    <button class="icon-btn mobile-gear" type="button" data-help="shell.settings" data-open-settings data-verb="settings" data-verb-name="Settings" aria-label="Settings"><Icon name="gear" /></button>
   </header>
   <div class="shell">
     <aside class="side" aria-label="Primary">
       <nav class="nav" aria-label="Sections">
         {NAV.map((n) => {
           const on = parent?.id === n.id;
-          const stage = n.tabs.length && n.tabs.every((t) => t.stage) ? Math.min(...n.tabs.map((t) => t.stage)) : undefined;
+          const src = MOD[n.id]?.source;
           return (
-            <a href={href(n.to)} data-help={`place:${n.id}`} data-vendor-to={n.vendorTo ? href(n.vendorTo) : undefined} aria-current={on ? 'page' : undefined} class={n.mobile ? 'on-mobile' : undefined} data-min-stage={stage} data-nav={n.id} data-vendor-ok={n.vendorOk ? '' : undefined} data-vendor-only={n.vendorOnly ? '' : undefined}>
-              {on && <span class="nav-on" aria-hidden="true"></span>}<Icon name={n.icon} /><span class="long">{n.label}</span><span class="short">{n.short ?? n.label}</span>
-            </a>
+            <>
+              {n.id === 'learn' && <p class="nav-div" aria-hidden="true"></p>}
+              <a href={href(n.to)} data-help={`place:${n.id}`} data-vendor-to={n.vendorTo ? href(n.vendorTo) : undefined} aria-current={on ? 'page' : undefined} class={n.mobile ? 'on-mobile' : undefined} data-nav={n.id} data-vendor-ok={n.vendorOk ? '' : undefined} data-vendor-only={n.vendorOnly ? '' : undefined}>
+                {on && <span class="nav-on" aria-hidden="true"></span>}<Icon name={n.icon} /><span class="long">{n.label}</span><span class="short">{n.short ?? n.label}</span>
+                {src && <span class="nav-src">from {src}</span>}
+              </a>
+            </>
           );
         })}
-        <p class="nav-div" aria-hidden="true"></p>
         <button class="nav-more" type="button" aria-expanded="false" data-nav-more data-help="shell.more"><Icon name="menu" /><span class="short">More</span></button>
       </nav>
       <div class="foot">
         <div class="account">
-          <button class="acct-btn" type="button" data-help="shell.account" aria-haspopup="menu" aria-expanded="false" data-acct-menu>
+          <button class="acct-btn" type="button" data-help="shell.account" aria-haspopup="menu" aria-expanded="false" data-acct-menu data-verb="view-as" data-verb-name="View as">
             <span class="avatar" aria-hidden="true" data-who-initials>AB</span>
             <span class="acct-who"><b data-who-role>AV and IT delivery engineer</b><small data-who-where>EMEA</small></span>
           </button>
@@ -388,7 +419,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
             <button class="icon-btn" type="button" data-help="shell.mode" data-toggle-mode aria-label="Colour mode: Auto. Select to change" title="Colour mode: Auto">
               <span class="m-system"><Icon name="auto" /></span><span class="m-light"><Icon name="sun" /></span><span class="m-dark"><Icon name="moon" /></span>
             </button>
-            <button class="icon-btn" type="button" data-help="shell.settings" data-open-settings aria-label="Settings" title="Settings"><Icon name="gear" /></button>
+            <button class="icon-btn" type="button" data-help="shell.settings" data-open-settings data-verb="settings" data-verb-name="Settings" aria-label="Settings" title="Settings"><Icon name="gear" /></button>
           </span>
           <div class="acct-menu" data-help="shell.viewas" role="menu" aria-label="View as someone else" hidden>
             <div class="am-top">
@@ -420,6 +451,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
             </div>
             <div class="am-links">
               <button type="button" role="menuitem" data-open-settings><Icon name="gear" size={16} />Settings</button>
+              <a role="menuitem" href={href('/welcome/')}><Icon name="globe" size={16} />Welcome page</a>
               <a role="menuitem" href={href('/about/')}><Icon name="about" size={16} />About</a>
               <a role="menuitem" href={href('/about/#decisions')}><Icon name="decisions" size={16} />Decisions</a>
             </div>
@@ -427,7 +459,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         </div>
       </div>
     </aside>
-    <main id="main" data-page-help={`page.${section || 'generic'}`} data-page-stage={minStage > 1 ? minStage : undefined} data-vendor-ok={vendorOk ? '' : undefined}>
+    <main id="main" data-page-help={`page.${section || 'generic'}`} data-module={pageModule?.id} data-recent={recent} data-vendor-ok={vendorOk ? '' : undefined}>
       <!-- View as: a thin ribbon under the top bar while this window is someone else, on every page (C14). -->
       <div class="viewas" data-viewas data-help="shell.ribbon" hidden role="status">
         <span class="va-eye" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg></span>
@@ -440,12 +472,12 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         <p class="lede">Vendors see their own installation and the device reference they need to build it: profiles, setup guides and models. Everything else stays with Aigna.</p>
         <a class="btn primary" href={href('/vendor/')}>Go to your installation</a>
       </section>
-      {minStage > 1 && (
-        <section class="stage-gate">
-          <p class="kind">{stageInfo?.name}</p>
-          <h1>{stageInfo?.name} is switched off</h1>
-          <p class="lede">{stageInfo?.adds}. The demo is set to switch on less than this.</p>
-          <button class="btn primary" type="button" data-help="shell.stage-gate" data-set-stage={minStage}>Switch on {stageInfo?.name}</button>
+      {pageModule && (
+        <section class="stage-gate module-gate">
+          <p class="kind">Module</p>
+          <h1>{pageModule.label} is switched off</h1>
+          <p class="lede">{pageModule.what}. This demo has the {pageModule.label} module switched off in Settings.</p>
+          <button class="btn primary" type="button" data-help="shell.module-gate" data-set-module={pageModule.id}>Switch on {pageModule.label}</button>
         </section>
       )}
       {tabs.length > 0 && (
@@ -502,6 +534,10 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
   <HelpMode />
   <SearchOverlay />
   <slot name="end" />
+  <script>
+    // The zoom: levels, keys, the floor state, rsPath, rsZoom and rsGo (UX-V2 §2.2). Loaded once per visit.
+    import '../lib/zoom-client.mjs';
+  </script>
   <script is:inline data-astro-rerun>
     /* Tables marked "to-cards" become cards on narrow screens (base.css): each cell carries its column's name. */
     (function () {
@@ -528,7 +564,6 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         document.querySelectorAll('[data-who-role]').forEach(function (el) { el.textContent = who.role; });
         document.querySelectorAll('[data-who-where]').forEach(function (el) { el.textContent = who.where; });
         document.querySelectorAll('[data-who-initials]').forEach(function (el) { el.textContent = who.initials; });
-        document.querySelectorAll('[data-stage-n]').forEach(function (el) { el.textContent = get('rs4-stage', '6'); });
         // The View as ribbon: shown while this window is anyone but the person it opened as.
         var rib = document.querySelector('[data-viewas]');
         if (rib) {
@@ -568,9 +603,9 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         more.setAttribute('aria-expanded', String(open));
       });
       document.querySelectorAll('.nav a').forEach(function (a) { a.addEventListener('click', function () { document.documentElement.classList.remove('nav-sheet'); }); });
-      /* "Switch on" on a gated page. */
-      document.querySelectorAll('[data-set-stage]').forEach(function (b) {
-        b.addEventListener('click', function () { window.rsSetStage(b.dataset.setStage); });
+      /* "Switch on" on the page of a module that is Off. */
+      document.querySelectorAll('[data-set-module]').forEach(function (b) {
+        b.addEventListener('click', function () { window.rsSetModule(b.dataset.setModule, 'on'); });
       });
       /* Account menu: about the project, decision records and settings live here. */
       var btn = document.querySelector('[data-acct-menu]'), menu = document.querySelector('.acct-menu');
@@ -651,6 +686,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         morph: ms('--dur-morph', 520), enter: ms('--dur-enter', 440), exit: ms('--dur-exit', 240), page: ms('--dur-page', 420),
         state: ms('--dur-state', 300), hover: ms('--dur-hover', 140), pop: ms('--dur-pop', 200), flash: ms('--dur-flash', 800),
         delay: ms('--delay-enter', 120), stagger: ms('--stagger', 24),
+        zoom: ms('--dur-zoom', 360), spring: cs.getPropertyValue('--ease-spring').trim() || 'cubic-bezier(.22,1,.36,1)',
       };
     };
     /* The box keeps its height through the swap (so the scroll cannot jump), then eases down to its new
@@ -985,9 +1021,20 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
       var synced = function (what) { return function () { if (W.rsSyncDemo) W.rsSyncDemo(); D.dispatchEvent(new CustomEvent('rs:demo-change', { detail: { what: what } })); }; };
       // Every page that draws itself for the viewer (Home) listens for rs:demo-change and redraws in place,
       // inside this one change: the sidebar slides into its new order, what leaves shrinks, what arrives grows.
-      W.rsSetStage = function (n) {
-        try { localStorage.setItem('rs4-stage', String(n)); } catch (_) {}
-        W.rsChange(applyDemo, synced('stage'));
+      /* Settings › Modules: one module On, Connected or Off (src/lib/modules.mjs). What leaves the sidebar shrinks,
+         what arrives grows, the rest slides (rsChange); a page whose module goes Off cross-fades to its gate. */
+      W.rsModules = function () {
+        var m = Object.assign({}, W.RS_MODULES || {}), saved = null;
+        try { saved = JSON.parse(localStorage.getItem('rs6-modules') || 'null'); } catch (_) {}
+        saved = saved || W.__rsModMem;
+        if (saved) Object.keys(m).forEach(function (id) { if (/^(on|connected|off)$/.test(saved[id])) m[id] = saved[id]; });
+        return m;
+      };
+      W.rsSetModule = function (id, state) {
+        var m = W.rsModules(); if (!(id in m) || m[id] === state) return;
+        m[id] = state; W.__rsModMem = m;   // kept in memory too, for a browser that blocks storage
+        try { localStorage.setItem('rs6-modules', JSON.stringify(m)); } catch (_) {}
+        W.rsChange(applyDemo, synced('modules'));
       };
       W.rsSetAgents = function (v) {
         try { localStorage.setItem('rs4-agents', v); } catch (_) {}
@@ -1031,7 +1078,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
   </script>
 </body>
 </html>
-<style is:global set:html={`${gateCss} { display: none !important; } ${gateShow} { display: grid !important; } ${roleCss}${leadCss}`}></style>
+<style is:global set:html={`:root{--ease-spring:${EASE_SPRING}} ${moduleCss}${leadCss}`}></style>
 <style is:global>
   .m-light, .m-dark { display: none; }
   :root[data-mode="light"] .m-system, :root[data-mode="dark"] .m-system { display: none; }

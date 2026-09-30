@@ -221,15 +221,6 @@ export const PROJECT_ROLE = {
   network: 'Network engineer', lab: 'Lab testing', technician: 'Technician', 'service-owner': 'Service owner (sign-off)', vendor: 'Vendor installer',
 };
 
-export const STAGES_DEMO = [
-  { n: 1, name: 'Knowledge', adds: 'Standards, spaces and devices; the knowledge loop', real: true },
-  { n: 2, name: 'Live', adds: 'Health and incidents from asset register, device management, monitoring and ServiceNow', real: false },
-  { n: 3, name: 'Process', adds: 'Projects, playbooks, the year plan and the Lab', real: false },
-  { n: 4, name: 'Act', adds: 'Changes to systems from an approved task, read back', real: false },
-  { n: 5, name: 'Assist', adds: 'Questions answered from knowledge and live evidence', real: false },
-  { n: 6, name: 'Agents', adds: 'Background agents that propose work as tasks', real: false },
-];
-
 // What was already waiting in the service managers' inboxes when the demo starts. Reports sent from
 // any page's Report button join these (saved in the browser under rs4-inbox). Made up.
 export const INBOX_SEED = [
