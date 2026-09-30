@@ -44,9 +44,9 @@
 //                                      ratio: a fixed pixel ratio (tools/hero-stills.mjs) }
 import {
   WebGLRenderer, Scene, PerspectiveCamera, OrthographicCamera, Group, Mesh, BoxGeometry, ExtrudeGeometry, Shape,
-  RingGeometry, CircleGeometry, CylinderGeometry, PlaneGeometry, MeshLambertMaterial, MeshBasicMaterial,
+  RingGeometry, CircleGeometry, CylinderGeometry, PlaneGeometry, ShapeGeometry, MeshLambertMaterial, MeshBasicMaterial,
   ShadowMaterial, HemisphereLight, DirectionalLight, AmbientLight, Color, Vector2, Vector3, Spherical, Raycaster, CanvasTexture, SRGBColorSpace,
-  Quaternion, PCFShadowMap,
+  Quaternion, PCFShadowMap, ShaderChunk,
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -63,9 +63,15 @@ const FURN = ['--in-wood', '--in-oak', '--in-chair', '--in-chair-2', '--in-sofa'
 const LIT = 6;                                   // the screens: unlit, so they glow a little
 const WALL_H = 2.4, LIFT = 4.5;                  // a full wall (the story room's display wall); the fourth floor's rise
 const MODEL_H = 1.1, CORE_H = 1.5, SLAB = 0.32;  // the model's partitions, its core blocks, its slab
-const T_WALL = 0.1, T_GLASS = 0.04, CAP = 0.012;
+const T_WALL = 0.1, T_GLASS = 0.04;
 const AZ = 24, EL = 38;                          // one camera angle for every level: only distance and target change
 const world = (x, y, z) => new Vector3(x, z, -y);
+
+// three.js turns its soft-shadow samples by a noise tied to the screen pixel (gl_FragCoord), made to be averaged away
+// by temporal anti-aliasing, which this scene does not use: the grain stays still on the screen while the shadows
+// move under it, so every penumbra crawled during a camera move. One fixed turn instead: a soft edge that belongs
+// to the room, not to the screen. (Only this scene uses three.js on the site.)
+ShaderChunk.shadowmap_pars_fragment = ShaderChunk.shadowmap_pars_fragment.replaceAll('interleavedGradientNoise( gl_FragCoord.xy )', '0.7');
 const rad = (deg) => (deg * Math.PI) / 180;
 
 // Read the tokens as colours (any CSS colour syntax) by painting one pixel each; the alpha is kept for the shadow.
@@ -90,6 +96,10 @@ const prism = (pts, z0, z1) => {
 };
 const rectPts = (x0, y0, x1, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
 const boxG = (x0, y0, z0, x1, y1, z1) => prism(rectPts(Math.min(x0, x1), Math.min(y0, y1), Math.max(x0, x1), Math.max(y0, y1)), z0, z1);
+// A flat finish laid on a surface (a room's floor, a corridor, a wall's cap): no thickness, so no sliver of a side
+// face to sparkle along its edge at a distance; drawn with a polygon offset (see mk) so it always wins its plane.
+const flat = (pts, z) => { const g = new ShapeGeometry(new Shape(pts.map(([x, y]) => new Vector2(x, y)))).toNonIndexed(); g.deleteAttribute('uv'); g.translate(0, 0, z); return g; };
+const flatRect = (x0, y0, x1, y1, z) => flat(rectPts(Math.min(x0, x1), Math.min(y0, y1), Math.max(x0, x1), Math.max(y0, y1)), z);
 
 // ---- Walls from the plan: each walled room's edges, split wherever another rectangle starts or ends, and each
 // piece typed by what is on its other side: another walled room (one shared party wall), the core, the outside, or
@@ -198,6 +208,7 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
     m.opacity = e.base;
     m.transparent = !!(o.fade || kind === 'shadow' || o.transparent);
     if (o.depthWrite === false) m.depthWrite = false;
+    if (o.decal) { m.polygonOffset = true; m.polygonOffsetFactor = -1; m.polygonOffsetUnits = -4; }
     if (e.emissive) { m.emissive = T.c['--in-lamp'].clone(); m.emissiveIntensity = T.n['--in-lamp-i'] * e.emissive; }
     e.m = m; mats.push(e); m.userData.e = e; return m;
   };
@@ -274,19 +285,19 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
 
     // Slab, corridors, core.
     bake(g, [prism(f.outline, L - SLAB, L)], M('--in-slab'), lit);
-    bake(g, f.corr.map((r) => boxG(r[0], r[1], L, r[2], r[3], L + 0.012)), M('--in-corr'), { receive: isStory });
-    const coreMat = M('--in-core'), capMat = M('--in-cap');
+    const corrMat = M('--in-corr', { decal: true });
+    bake(g, [...f.corr, ...f.core.filter((c) => c.flat).map((c) => c.r)].map((r) => flatRect(r[0], r[1], r[2], r[3], L)), corrMat, { receive: isStory });
+    const coreMat = M('--in-core'), capMat = M('--in-cap', { decal: true });
     const solid = f.core.filter((c) => !c.flat);
     bake(g, solid.map((c) => boxG(c.r[0], c.r[1], L, c.r[2], c.r[3], L + CORE_H)), coreMat, lit);
-    bake(g, f.core.filter((c) => c.flat).map((c) => boxG(c.r[0], c.r[1], L, c.r[2], c.r[3], L + 0.014)), M('--in-corr'), { receive: isStory });
 
     // The spaces' floors (the story room's on its own, for its tint), an invisible volume to point at, a ring above.
-    const floorMat = M('--in-room-floor');
+    const floorMat = M('--in-room-floor', { decal: true });
     const plates = [];
     for (const r of rooms) {
       const fault = r.id === D.story.room, [x0, y0, x1, y1] = r.r;
-      const mat = fault ? M('--in-room-floor') : floorMat;
-      const plate = boxG(x0, y0, L, x1, y1, L + 0.02);
+      const mat = fault ? M('--in-room-floor', { decal: true }) : floorMat;
+      const plate = flatRect(x0, y0, x1, y1, L);
       if (fault) bake(g, [plate], mat, { receive: isStory }); else plates.push(plate);
       const walled = r.w !== 'none';
       const vol = volume(g, [x0, y0, L], [x1, y1, L + (walled ? MODEL_H : 0.6)], pick); vol.userData.room = r; roomMeshes.push(vol);
@@ -300,11 +311,12 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
     // its display wall rises to full height in the feature colour; the side partitions stay as they are.
     const W = { paint: [], cap: [], glass: [] }, SF = [], SW = [], SWcap = [];
     const box = (s, t, z0, z1) => (s.ax === 'x' ? boxG(s.a, s.c - t / 2, z0, s.b, s.c + t / 2, z1) : boxG(s.c - t / 2, s.a, z0, s.c + t / 2, s.b, z1));
+    const capOf = (s, z) => (s.ax === 'x' ? flatRect(s.a, s.c - T_WALL / 2, s.b, s.c + T_WALL / 2, z) : flatRect(s.c - T_WALL / 2, s.a, s.c + T_WALL / 2, s.b, z));
     for (const s of wallPlan(f, rooms)) {
       const mine = isStory && s.rooms.includes(D.story.room);
       if (s.kind === 'glass') (mine ? SF : W.glass).push(box(s, T_GLASS, mine ? 0 : L, (mine ? 0 : L) + MODEL_H));
-      else if (mine && s.feature) { SW.push(box(s, T_WALL, 0, WALL_H)); SWcap.push(box(s, T_WALL, WALL_H, WALL_H + CAP)); }
-      else { W.paint.push(box(s, T_WALL, L, L + MODEL_H)); W.cap.push(box(s, T_WALL, L + MODEL_H, L + MODEL_H + CAP)); }
+      else if (mine && s.feature) { SW.push(box(s, T_WALL, 0, WALL_H)); SWcap.push(capOf(s, WALL_H)); }
+      else { W.paint.push(box(s, T_WALL, L, L + MODEL_H)); W.cap.push(capOf(s, L + MODEL_H)); }
     }
     const paintMat = M('--in-wall'), glassMat = M('--in-glass');
     bake(g, W.paint, paintMat, lit); bake(g, W.cap, capMat, lit); bake(g, W.glass, glassMat, lit);
