@@ -93,7 +93,10 @@ const OWNERS = Object.fromEntries(PEOPLE.filter((p) => ['sm-av', 'sm-infra'].inc
         window.rsOpenReport(b.dataset.openReport || '', { model: b.dataset.reportModel, what: b.dataset.reportWhat, now: b.dataset.reportNow });
       });
     }
-    dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
+    // It leaves the way it came in, back to the side (the library's closeDialog), from the backdrop and Escape alike.
+    var shut = function () { if (window.km) window.km.closeDialog(dlg, { to: 'translateX(40px)' }); else dlg.close(); };
+    dlg.addEventListener('cancel', function (e) { if (window.km) { e.preventDefault(); shut(); } });
+    dlg.addEventListener('click', function (e) { if (e.target === dlg) shut(); });
     form.addEventListener('submit', function (e) {
       var sub = e.submitter; if (!sub || sub.value !== 'send') return;
       var fd = new FormData(form), fields = {};
