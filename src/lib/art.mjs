@@ -3,6 +3,7 @@
 // same order, so switching models morphs one drawing into the next. Sizes are to scale within a type.
 // Carried over unchanged from the prototype's src/36-art.js; only the wrapper below is new.
 import { ART as ART_AV, ART_SRC as SRC_AV } from './art/batch-av.mjs';
+import { ART as ART_INFRA, ART_SRC as SRC_INFRA } from './art/batch-infra.mjs';
 const ART_SRC = {
   x30: 'Poly Studio X30 data sheet (front photo)', x32: 'Poly Studio X32 data sheet (front photo)', x52: 'Poly Studio X52 data sheet (front photo)',
   x70: 'Poly Studio X70 data sheet (front photo)', x72: 'Poly Studio X72 data sheet (front photo)', polyx: 'Drawn as the X52 (family shape)', meetup2: 'Logitech MeetUp 2 product gallery (front)',
@@ -108,6 +109,7 @@ const SRC_NOTE = { 'logitech-tap-scheduler': 'Drawn with the TC10 shape in sched
 // batches: each batch file under src/lib/art/ exports ART (model id -> { id, type, parts() }) and ART_SRC (drawing id -> source).
 const BATCH = {}, BATCH_SRC = {};
 Object.assign(BATCH, ART_AV); Object.assign(BATCH_SRC, SRC_AV);
+Object.assign(BATCH, ART_INFRA); Object.assign(BATCH_SRC, SRC_INFRA);
 export function artParts(model) {
   if (BATCH[model]) return BATCH[model].parts();
   const m = MAP[model]; if (!m) return null;
