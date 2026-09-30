@@ -15,34 +15,60 @@
 // stay big enough to read and tap (as room plans do on cards, rooms.md R6); the words stay upright.
 import { building } from '../lib/floors.mjs';
 import { doorOf } from '../lib/office3d.mjs';
-import { shape } from '../lib/health.mjs';
+import { shape, WORD } from '../lib/health.mjs';
+import { planOf, KIND_OF, PAD, placeIn, hitBox, glyphShare, isComms } from '../lib/floorplan.mjs';
+import { href as siteHref } from '../lib/data.mjs';
+import { recHere } from '../lib/vt.mjs';
 import Restricted from '../components/Restricted.astro';
+import HealthGlyph from './HealthGlyph.astro';
 
-
-interface Props { site: string; floor: string; cables?: boolean; highlight?: string | null; interactive?: boolean }
-const { site, floor, cables = false, highlight = null, interactive = false } = Astro.props;
+// detail  'plan' (default): the office plan, everything below. 'thumb': the same floor at thumbnail size for
+//         SmallMultiples: the outline and core drawn softly, every space in its true shape tinted by its state, a
+//         glyph only on a space that is not fine (sized to its space, so none overlap), a peek naming the space on
+//         hover or focus; a space opens its page and the floor opens the office plan, both with the zoom.
+// Thumb only: frame (frameOf() of the set, so every card shares one scale), health ({ <space>: { h, why, who } }),
+//         people (id to first name), to (the floor's page), zoom (the link zooms into the office plan), title.
+// vtHere  the plan's picture is the one a thumbnail of this floor grows into (the office page sets it).
+interface Props { site: string; floor: string; cables?: boolean; highlight?: string | null; interactive?: boolean; detail?: 'plan' | 'thumb';
+  frame?: { VW: number; VH: number }; health?: Record<string, { h: string; why?: string; who?: string | null }>; people?: Record<string, string>; to?: string; zoom?: boolean; title?: string; vtHere?: boolean }
+const { site, floor, cables = false, highlight = null, interactive = false, detail = 'plan', frame, health = {}, people = {}, to, zoom = false, title, vtHere = false } = Astro.props;
 const M = building(site);
-const F = M?.floors.find((f) => f.id === floor) ?? null;
-const rooms = F ? Object.values(M.rooms).filter((r) => r.floor === floor && r.rect) : [];
-const xs = F ? F.outline.map((p) => p[0]) : [0], ys = F ? F.outline.map((p) => p[1]) : [0];
-const W = Math.max(...xs), H = Math.max(...ys);
-const pad = 1.5;
-// Plan y runs north (up); SVG y runs down.
+const P = planOf(M, floor);
+const F = P?.F ?? null;
+const rooms = P?.rooms ?? [];
+const W = P?.W ?? 0, H = P?.H ?? 0;
+const pad = PAD;
 const Y = (y) => H - y;
-const rectAttrs = ([x0, y0, x1, y1]) => ({ x: x0, y: Y(y1), width: x1 - x0, height: y1 - y0 });
-const pts = (P) => P.map(([x, y]) => `${x},${Y(y)}`).join(' ');
+const rectAttrs = (r) => P.box(r);
+const pts = (Q) => P.pts(Q);
 const runs = cables && M ? M.runs.filter((r) => r.floor === floor && r.path) : [];
 const racks = M ? M.racks.filter((r) => r.floor === floor && r.at) : [];
 const aps = M ? M.aps.filter((a) => a.floor === floor) : [];
-const label = (r) => r.number ?? r.name;
-const roomName = (r) => `${r.number ? `${r.number} ` : ''}${r.name}`;
+const label = (r) => P.label(r);
+const roomName = (r) => P.name(r);
 const apModel = (a) => (a.model === 'unifi-u7-pro-max' ? 'U7 Pro Max' : 'U7 Pro');
 const pick = (key, name) => (interactive ? { 'data-sel': key, tabindex: 0, role: 'button', 'aria-label': name, 'aria-pressed': 'false' } : {});
+const thumb = detail === 'thumb';
+// The thumbnail: where this floor's own picture box sits in the set's shared frame.
+const fr = frame ?? (P ? { VW: P.VW, VH: P.VH } : { VW: 1, VH: 1 });
+const place = P ? placeIn(P, fr) : null;
+const tState = (r) => health[r.id]?.h ?? null;
+const whoOf = (r) => { const w = health[r.id]?.who; return w ? people[w] ?? w : ''; };
+const tLabel = (r) => { const st = health[r.id]; const s = st?.h ?? 'fine', who = whoOf(r); return `${roomName(r)}: ${WORD[s] ?? s}${st?.why ? `, ${st.why}` : ''}${who ? `, with ${who}` : ''}`; };
+// The thumbnail's drawing: the plan's first layers only. The slab draws on once (km-draw, pathLength 1); the core,
+// the desks and the spaces fade in after it; a space that is not fine takes its state's soft wash and stroke.
+const n2 = (v) => +v.toFixed(2);
+const rA = (q) => { const b = P.box(q); return `x="${n2(b.x)}" y="${n2(b.y)}" width="${n2(b.width)}" height="${n2(b.height)}"`; };
+const thumbSvg = thumb && P ? [
+  `<polygon class="fm-t-slab" pathLength="1" points="${P.pts(F.outline)}"/>`,
+  '<g class="fm-t-fill">',
+  ...F.core.filter((c) => !c.circulation && c.kind !== 'lift-lobby').map((c) => `<rect class="fm-t-core" ${rA(c.rect)}/>`),
+  ...rooms.filter((r) => !P.single(r)).flatMap((r) => r.desks.filter((d) => d.at).map((d) => `<rect class="fm-t-desk" x="${n2(d.at[0] - 0.72)}" y="${n2(Y(d.at[1]) - 0.35)}" width="1.44" height="0.7"/>`)),
+  ...rooms.filter((r) => P.single(r)).map((r) => `<rect class="fm-t-room${isComms(r) ? ' fm-t-comms' : ''}" data-fm-t-room="${r.id}"${tState(r) ? ` data-h="${tState(r)}"` : ''} ${rA(r.rect)}/>`),
+  '</g>',
+].join('') : '';
 const coreLabel = { stair: 'Stairs', lift: 'Lifts', riser: 'Riser', toilets: 'WC' };
-// What each space is, for its fill and the key (rooms.md R10): one look per kind, the same in the 3D views.
-const KIND_OF = (t) => (t === 'mdf' || t === 'idf' ? 'comms' : t === 'workstation-assigned' ? 'assigned' : t?.startsWith('workstation') ? 'flex'
-  : t === 'reception-concierge' ? 'reception' : ['pantry', 'pantry-expanded', 'cafeteria'].includes(t) ? 'pantry' : ['copy-print-room', 'it-store'].includes(t) ? 'print'
-  : t === 'focus-room' || t === 'office' || t?.startsWith('huddle-room') ? 'small' : 'meeting');
+// What each space is, for its fill and the key (rooms.md R10): KIND_OF in src/lib/floorplan.mjs, shared by every view.
 const KEY_WORD = { meeting: 'Meeting rooms', small: 'Focus, huddle and offices', reception: 'Reception', pantry: 'Pantry and café', print: 'Print and storage', flex: 'Flex desks', assigned: 'Assigned desks', comms: 'Comms room',
   stair: 'Stairs', lift: 'Lifts', toilets: 'Toilets', riser: 'Riser', store: 'Stores and ducts', 'town-hall': 'Town hall', breakout: 'Breakout', corridor: 'Corridors' };
 const coreKind = (k) => (k === 'shaft' || k === 'plant' ? 'store' : k);
@@ -68,9 +94,36 @@ const cars = (c) => {
 // not fit is left out rather than cut.
 const GLYPH = shape('fine');
 ---
-{F && (
+{F && thumb && place && (
+  <div class="fm-thumb" data-fm-thumb={`${site}-${floor}`} style={`aspect-ratio:${fr.VW.toFixed(2)} / ${fr.VH.toFixed(2)}`}>
+    <div class="fm-t-floor" style={`left:${place.left}%;top:${place.top}%;width:${place.width}%;height:${place.height}%`}>
+      {/* The floor: its picture box is the plan's (the same viewBox), so on the office page it grows into the plan. */}
+      {to ? (
+        <a class="fm-t-open" href={siteHref(to)} data-vt-rec={`plan-${site}-${floor}`} data-zoom-in={zoom ? '' : undefined} aria-label={`${title ?? `${M.siteName}, ${F.name}`}: open the plan`}>
+          <svg viewBox={P.viewBox} aria-hidden="true" focusable="false" set:html={thumbSvg} />
+        </a>
+      ) : (
+        <div class="fm-t-open"><svg viewBox={P.viewBox} aria-hidden="true" focusable="false" set:html={thumbSvg} /></div>
+      )}
+      {/* Each space, as a link over its shape: a peek names it and its state; a press opens it with the zoom. */}
+      <div class="fm-t-hits">
+        {rooms.filter((r) => P.single(r)).map((r) => {
+          const b = hitBox(P, r.rect), st = tState(r);
+          return (
+            <a class="fm-t-hit" href={siteHref(`/rooms/${r.id}/`)} data-vt-rec={r.id} data-zoom-in="" data-peek data-help="sm.space" data-fm-space={r.id} data-h={st ?? undefined}
+              data-name={roomName(r)} data-why={health[r.id]?.why ?? ''} data-who={whoOf(r)} tabindex={st ? 0 : -1} aria-label={tLabel(r)}
+              style={`left:${b.left}%;top:${b.top}%;width:${b.width}%;height:${b.height}%;--fm-g:${glyphShare(P, r)}`}>
+              {st && <HealthGlyph state={st} size={12} />}
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  </div>
+)}
+{F && !thumb && (
   <figure class:list={['floormap', { 'fm-pick': interactive }]} data-fm={floor} data-fm-w={W} data-fm-h={H} data-fm-pad={pad}>
-    <svg viewBox={`${-pad} ${-pad} ${W + pad * 2} ${H + pad * 2}`} role="group" aria-label={`${M.siteName}, ${F.name}: floor plan`} data-fm-svg>
+    <svg viewBox={P.viewBox} role="group" aria-label={`${M.siteName}, ${F.name}: floor plan`} data-fm-svg {...(vtHere ? recHere(`plan-${site}-${floor}`) : {})}>
       <g data-fm-plan>
         <polygon class="fm-outline" points={pts(F.outline)} />
         <defs>
@@ -145,6 +198,7 @@ const GLYPH = shape('fine');
 )}
 
 <script>
+  import { glyph, setGlyph, WORD } from '../lib/health.mjs';
   // Turn the plan a quarter turn when its box is narrow; keep the words upright.
   function turn(fig: HTMLElement) {
     const W = +fig.dataset.fmW!, H = +fig.dataset.fmH!, pad = +fig.dataset.fmPad!;
@@ -177,6 +231,54 @@ const GLYPH = shape('fine');
   document.addEventListener('astro:page-load', init);
   // The zoom (src/lib/zoom-client.mjs) turns the plans itself on the way in, before the page's picture is taken.
   (window as any).rsFloorMapsInit = init;
+
+  // ---- The thumbnail (detail="thumb") ----
+  const W = window as any, D = document;
+  const esc = (s: string) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as any)[c]);
+  // Reduced motion, or the page's own motion switch: every change lands at once.
+  const still = () => { const r = D.documentElement; return r.dataset.reduced === 'true' || /^(off|reduced)$/.test(r.dataset.motion ?? '') || (r.dataset.reduced !== 'false' && matchMedia('(prefers-reduced-motion: reduce)').matches); };
+  // The peek for a space, made when it is first pointed at or focused (hundreds of spaces, one small card each time).
+  function peekOf(el: HTMLElement) {
+    if (el.querySelector('template')) return;
+    const s = el.dataset.h || (el.closest('[data-stale]') ? 'stale' : 'fine'), why = el.dataset.why, who = el.dataset.who;
+    const t = D.createElement('template'); t.setAttribute('data-peek-body', '');
+    t.innerHTML = `<b class="peek-h">${esc(el.dataset.name ?? '')}</b><small>${glyph(s, { size: 12 })} ${esc((WORD as any)[s] ?? s)}${why ? ` · ${esc(why)}` : s === 'fine' ? ' · nothing open' : ''}${who ? ` · With ${esc(who)}` : ''}</small>`;
+    el.appendChild(t);
+  }
+  const prime = (e: Event) => { const el = (e.target as HTMLElement).closest?.('[data-fm-space]') as HTMLElement | null; if (el) peekOf(el); };
+  // A space's state changes in place: the tint and the glyph ease together (--dur-state); nothing else moves.
+  // rsFloorThumbs.set('dub-3-09', 'fault', 'Video bar offline'), and 'fine' (or null) to clear it.
+  function set(id: string, state: string | null, why = '') {
+    const s = state && state !== 'fine' ? state : null;
+    D.querySelectorAll<SVGRectElement>(`[data-fm-t-room="${CSS.escape(id)}"]`).forEach((r) => { if (s) r.dataset.h = s; else delete r.dataset.h; });
+    D.querySelectorAll<HTMLElement>(`.fm-t-hit[data-fm-space="${CSS.escape(id)}"]`).forEach((a) => {
+      a.querySelector('template')?.remove();
+      a.dataset.why = why; if (s) a.dataset.h = s; else delete a.dataset.h;
+      a.tabIndex = s ? 0 : -1;
+      a.setAttribute('aria-label', `${a.dataset.name}: ${(WORD as any)[s ?? 'fine']}${why ? `, ${why}` : ''}`);
+      let g = a.querySelector<HTMLElement>('.hg');
+      if (s && g) { setGlyph(g, s); return; }
+      if (s) { a.insertAdjacentHTML('beforeend', glyph(s, { size: 12 })); g = a.querySelector('.hg'); if (g && !still()) { g.classList.add('km-on'); W.km?.play?.(g); } return; }
+      if (!g) return;
+      if (still() || !g.animate) { g.remove(); return; }
+      const an = g.animate([{ opacity: 1 }, { opacity: 0 }], { duration: W.km?.t?.exit ?? 240, easing: W.km?.t?.exitCurve ?? 'ease-in' });
+      an.onfinish = () => g!.remove();
+    });
+  }
+  // When the feed stops reporting, nothing can be called fine: the fine spaces' outlines turn dashed, and back.
+  const feed = (stale: boolean) => D.querySelectorAll<HTMLElement>('[data-fm-thumb]').forEach((t) => { t.toggleAttribute('data-stale', stale); t.querySelectorAll('.fm-t-hit template').forEach((x) => x.remove()); });
+  // The draw-in plays once per thumbnail: once it has run, a re-shown card (View as, a filter) is simply there.
+  const drawn = (e: AnimationEvent) => { const t = (e.target as Element).closest?.('[data-fm-thumb]'); if (t && e.animationName === 'fm-t-in') t.setAttribute('data-drawn', ''); };
+  if (!W.__rsThumbHook) {
+    W.__rsThumbHook = true;
+    D.addEventListener('pointerover', prime, true);
+    D.addEventListener('focusin', prime, true);
+    D.addEventListener('animationend', drawn, true);
+    D.addEventListener('rs:feed', (e: any) => feed(!!e.detail?.stale));
+    D.addEventListener('rs:space-state', (e: any) => set(e.detail?.id, e.detail?.h, e.detail?.why));
+    W.rsFloorThumbs = { set };
+  }
+  D.addEventListener('astro:page-load', () => { if (D.documentElement.hasAttribute('data-stale')) feed(true); });
 </script>
 
 <style>
@@ -309,4 +411,54 @@ const GLYPH = shape('fine');
   .fm-ap.is-lit circle:not(.fm-hit) { stroke: var(--accent); stroke-width: 0.25; }
   .fm-turned .fm-room text:not(.fm-lt) { font-size: 0.9px; }
   @media (prefers-reduced-motion: reduce) { .fm-g, .fm-lt, .fm-room rect { transition: none; } }
+</style>
+
+<style is:global>
+  /* The thumbnail (detail="thumb"): the plan's first layers, calm. The floor is a soft slab with a hairline edge,
+     the core a shade deeper, each space a clean cut-out; only a space that is not fine takes a colour (its state's
+     soft wash and stroke) and a glyph, sized to its space. Global, because the drawing is one string (set:html). */
+  .fm-thumb {
+    --fm-t-slab: color-mix(in srgb, var(--text) 6%, var(--surface)); --fm-t-edge: color-mix(in srgb, var(--text) 26%, var(--surface));
+    --fm-t-core: color-mix(in srgb, var(--text) 13%, var(--surface)); --fm-t-room: color-mix(in srgb, var(--text) 1.5%, var(--surface));
+    --fm-t-line: color-mix(in srgb, var(--text) 20%, var(--surface)); --fm-t-desk: color-mix(in srgb, var(--text) 15%, var(--surface));
+    --fm-t-comms: color-mix(in srgb, var(--text) 9%, var(--surface));
+    position: relative; width: 100%;
+  }
+  :root[data-theme="dark"] .fm-thumb { --fm-t-slab: color-mix(in srgb, var(--text) 5%, var(--surface)); --fm-t-room: color-mix(in srgb, var(--text) 11%, var(--surface)); --fm-t-line: color-mix(in srgb, var(--text) 24%, var(--surface)); --fm-t-core: color-mix(in srgb, var(--text) 1.5%, var(--surface)); --fm-t-desk: color-mix(in srgb, var(--text) 16%, var(--surface)); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .fm-thumb { --fm-t-slab: color-mix(in srgb, var(--text) 5%, var(--surface)); --fm-t-room: color-mix(in srgb, var(--text) 11%, var(--surface)); --fm-t-line: color-mix(in srgb, var(--text) 24%, var(--surface)); --fm-t-core: color-mix(in srgb, var(--text) 1.5%, var(--surface)); --fm-t-desk: color-mix(in srgb, var(--text) 16%, var(--surface)); } }
+  .fm-t-floor { position: absolute; container-type: inline-size; }
+  .fm-t-open { position: absolute; inset: 0; display: block; border-radius: 3px; }
+  .fm-t-open svg { display: block; width: 100%; height: 100%; overflow: visible; }
+  a.fm-t-open:focus-visible { outline: 2px solid var(--focus, var(--accent)); outline-offset: 2px; }
+  .fm-t-slab { fill: var(--fm-t-slab); stroke: var(--fm-t-edge); stroke-width: .14; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 0; }
+  .fm-t-core { fill: var(--fm-t-core); stroke: var(--fm-t-slab); stroke-width: .12; }
+  .fm-t-desk { fill: var(--fm-t-desk); }
+  .fm-t-room { fill: var(--fm-t-room); stroke: var(--fm-t-line); stroke-width: .09;
+    transition: fill var(--dur-state) var(--ease-settle), stroke var(--dur-state) var(--ease-settle), stroke-width var(--dur-state) var(--ease-settle); }
+  .fm-t-room.fm-t-comms { fill: var(--fm-t-comms); }
+  .fm-t-room[data-h="review"] { fill: var(--h-review-soft); stroke: var(--h-review); stroke-width: .16; }
+  .fm-t-room[data-h="fault"], .fm-t-room[data-h="stale"] { fill: var(--h-fault-soft); stroke: var(--h-fault); stroke-width: .22; }
+  .fm-t-room[data-h="stale"] { stroke-dasharray: .35 .25; }
+  .fm-t-room[data-h="progress"] { fill: var(--h-progress-soft); stroke: var(--h-progress); stroke-width: .14; }
+  /* The feed is not reporting: nothing can be called fine, so the fine spaces' edges turn dashed, in place. */
+  .fm-thumb[data-stale] .fm-t-room:not([data-h]) { stroke: var(--h-fault); stroke-dasharray: .35 .25; }
+  /* The spaces themselves: links over their shapes, for the peek, the keyboard and the zoom's picture box. */
+  .fm-t-hits { position: absolute; inset: 0; pointer-events: none; }
+  .fm-t-hit { position: absolute; display: grid; place-items: center; pointer-events: auto; border-radius: 2px; cursor: pointer; -webkit-tap-highlight-color: transparent;
+    transition: box-shadow var(--dur-hover) var(--ease-settle), background-color var(--dur-hover) var(--ease-settle); }
+  .fm-t-hit:hover, .fm-t-hit.peek-on { box-shadow: inset 0 0 0 1.5px var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  .fm-t-hit:focus { outline: none; }
+  .fm-t-hit:focus-visible { box-shadow: inset 0 0 0 2px var(--focus, var(--accent)); }
+  .fm-t-hit.peek-pinned { outline: none; }
+  .fm-t-hit .hg { pointer-events: none; }
+  /* A glyph is never bigger than 12 px nor than about two thirds of its space's shorter side, so two never meet. */
+  .fm-t-hit .hg svg { width: min(12px, calc(var(--fm-g) * 68cqw)); height: min(12px, calc(var(--fm-g) * 68cqw)); }
+  /* Draws in once (the motion library's km-draw for the slab's edge, then the spaces fade up), and never again. */
+  @keyframes fm-t-slab { from { stroke-dashoffset: 1; fill-opacity: 0; } 50% { fill-opacity: .6; } }
+  @keyframes fm-t-in { from { opacity: 0; } }
+  .fm-thumb:not([data-drawn]) .fm-t-slab { animation: fm-t-slab var(--km-enter, var(--dur-enter)) var(--ease-settle) both; }
+  .fm-thumb:not([data-drawn]) .fm-t-fill, .fm-thumb:not([data-drawn]) .fm-t-hits { animation: fm-t-in var(--km-state, var(--dur-state)) var(--ease-settle) both; animation-delay: calc(var(--dur-pop) * var(--km-t, 1)); }
+  @media (prefers-reduced-motion: reduce) { :root:not([data-reduced="false"]) .fm-thumb * { animation: none !important; transition: none !important; } }
+  :root[data-reduced="true"] .fm-thumb *, :root[data-motion="off"] .fm-thumb *, :root[data-motion="reduced"] .fm-thumb * { animation: none !important; transition: none !important; }
+  @media (pointer: coarse) { .fm-t-hit:hover { box-shadow: none; background: none; } }
 </style>
