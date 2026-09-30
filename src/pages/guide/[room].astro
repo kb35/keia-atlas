@@ -1,10 +1,12 @@
 ---
-// The room guide: what the QR code on a room's table opens. Phone first, one page, plain words.
-// Order: what we already know is wrong (if anything), the room and whether it is working, the two-tap report
-// (GuideReport: tap 1 opens the symptoms in place, tap 2 sends; the status then reads back here), the room
-// drawing, how to start a meeting, share a screen and use the touch panel, then access in this room (hearing
-// loop, captions, step-free) and the privacy notice for its cameras and microphones. All from the room's own
-// data (src/lib/guide.mjs, src/pages/guide/_room.mjs).
+// The room guide: what the QR code on a room's table opens. Phone first, one page, plain words, answer first.
+// Order: the status (what we already know is wrong, if anything, and whether the space is working), the room's
+// name with its office, floor and seats, then the two big actions: Start a meeting (the call app tabs and the
+// steps) beside Something not working (GuideReport: tap 1 opens the symptoms in place, tap 2 sends; the status
+// then reads back here), with Request something and Share your screen as the quieter actions under it. Then the
+// touch panel and the other how-to cards, access in this room (hearing loop, captions, step-free), the privacy
+// notice for its cameras and microphones, and last a small "About this room" with the drawing. All from the
+// room's own data (src/lib/guide.mjs, src/pages/guide/_room.mjs).
 import Guide from '../../layouts/Guide.astro';
 import RoomScene from '../../components/RoomScene.astro';
 import DeviceArt from '../../components/DeviceArt.astro';
@@ -33,44 +35,29 @@ const ANSWER = known.length ? 'Everything else in this space is working' : 'Ever
 ---
 <Guide title={title} office={office} home={G}>
   <div class="g-room" data-guide-room data-room={room}>
-    {known.length > 0 && (
-      <section class="g-known" aria-labelledby="g-known-h" data-help="guide.known">
-        <HealthGlyph state={known[0].inc.state === 'new' ? 'review' : 'progress'} size={24} title="We know" />
-        <div>
-          <h2 id="g-known-h">We know</h2>
-          <ul>
-            {known.map((v) => <li><b>{v.inc.short_description}.</b> {knownText(v)}</li>)}
-          </ul>
-        </div>
-      </section>
-    )}
+    <div class="g-status">
+      {known.length > 0 && (
+        <section class="g-known" aria-labelledby="g-known-h" data-help="guide.known">
+          <HealthGlyph state={known[0].inc.state === 'new' ? 'review' : 'progress'} size={24} title="We know" />
+          <div>
+            <h2 id="g-known-h">We know</h2>
+            <ul>
+              {known.map((v) => <li><b>{v.inc.short_description}.</b> {knownText(v)}</li>)}
+            </ul>
+          </div>
+        </section>
+      )}
+      <p class="g-answer" data-help="guide.answer" data-guide-answer><HealthGlyph state="fine" size={16} title={ANSWER} /><span data-answer-text>{ANSWER}</span></p>
+    </div>
 
-    <section class="g-hero" aria-label="The room">
-      <div class="g-id">
-        <p class="g-over">{x.type.profile.name}</p>
-        <h1 transition:name="g-room-title">{title}</h1>
-        <p class="g-sub">{sub}</p>
-        <p class="g-answer" data-help="guide.answer" data-guide-answer><HealthGlyph state="fine" size={16} title={ANSWER} /><span data-answer-text>{ANSWER}</span></p>
-      </div>
-      <div class="g-actions">
-        <GuideReport room={R.forClient} symptoms={R.symptoms} reportHref={href(`${G}report/`)} requestHref={href(`${G}request/`)} />
-      </div>
-      <div class="g-pic" transition:name="g-room-pic">
-        <RoomScene option={x.option} type={x.space_type} fitted={x.fitted} space={x} uid={`g-${room}`} highlight={pins} tone="bad" label={`Drawing of ${title}`} />
-      </div>
-    </section>
+    <div class="g-id">
+      <h1 transition:name="g-room-title">{title}</h1>
+      <p class="g-sub">{sub}</p>
+    </div>
 
-    <nav class="g-jump" aria-label="On this page">
-      <a href="#start">Start a meeting</a>
-      {g.share && <a href="#share">Share your screen</a>}
-      {g.panelLines && <a href="#panel">The touch panel</a>}
-      {accessRows.length > 0 && <a href="#access">Access</a>}
-      <a href="#privacy">Privacy</a>
-    </nav>
-
-    <div class="g-howto">
-      <section class="g-card g-start" id="start" aria-labelledby="h-start">
-        <header><h2 id="h-start">Start a meeting</h2><p>{g.joinLede}</p></header>
+    <div class="g-prime">
+      <section class="g-card g-start" id="start" aria-labelledby="h-start" data-help="guide.start">
+        <header><h2 id="h-start">Start a meeting</h2><p class="g-lede">{g.joinLede}</p></header>
         <div class="g-plat" role="radiogroup" aria-label="Your meeting app">
           {PLATFORMS.map((p, i) => (
             <label><input type="radio" name="g-plat" value={p.id} checked={i === 0} data-plat /><span>{p.label}</span></label>
@@ -84,8 +71,29 @@ const ANSWER = known.length ? 'Everything else in this space is working' : 'Ever
         </div>
       </section>
 
+      <div class="g-actions">
+        <GuideReport room={R.forClient} symptoms={R.symptoms} reportHref={href(`${G}report/`)} requestHref={href(`${G}request/`)}>
+          {g.share && (
+            <a slot="secondary" class="gr-2nd" href="#share" data-help="guide.share">
+              <span class="gr-act-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2" /><path d="M9 21h6M12 17v4" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg></span>
+              <span><b>Share your screen</b><small>{g.share.cable} cable {g.share.where}{g.share.wireless ? ', or wireless' : ''}</small></span>
+            </a>
+          )}
+        </GuideReport>
+      </div>
+
+      {g.panelLines && (
+        <section class="g-card g-panel" id="panel" aria-labelledby="h-panel">
+          <header><h2 id="h-panel">The touch panel</h2><p>On the table, closest to the screen.</p></header>
+          <div class="g-how">
+            <div class="g-art" aria-hidden="true"><DeviceArt model={g.panel.model} cls="touch-controller" small /></div>
+            <ol class="g-steps">{g.panelLines.map((l) => <li>{l}</li>)}</ol>
+          </div>
+        </section>
+      )}
+
       {g.share && (
-        <section class="g-card" id="share" aria-labelledby="h-share">
+        <section class="g-card g-share" id="share" aria-labelledby="h-share">
           <header><h2 id="h-share">Share your screen</h2><p>{g.share.cable} cable {g.share.where}{g.share.wireless ? ', or without a cable' : ''}.</p></header>
           <div class="g-how">
             <div class="g-art" aria-hidden="true">
@@ -101,17 +109,17 @@ const ANSWER = known.length ? 'Everything else in this space is working' : 'Ever
           {g.share.wireless && <p class="g-tip">{g.share.wireless}</p>}
         </section>
       )}
+    </div>
 
-      {g.panelLines && (
-        <section class="g-card" id="panel" aria-labelledby="h-panel">
-          <header><h2 id="h-panel">The touch panel</h2><p>On the table, closest to the screen.</p></header>
-          <div class="g-how">
-            <div class="g-art" aria-hidden="true"><DeviceArt model={g.panel.model} cls="touch-controller" small /></div>
-            <ol class="g-steps">{g.panelLines.map((l) => <li>{l}</li>)}</ol>
-          </div>
-        </section>
-      )}
+    <nav class="g-jump" aria-label="On this page">
+      {g.share && <a href="#share">Share your screen</a>}
+      {g.panelLines && <a href="#panel">The touch panel</a>}
+      {accessRows.length > 0 && <a href="#access">Access</a>}
+      <a href="#privacy">Privacy</a>
+      <a href="#about">About this room</a>
+    </nav>
 
+    <div class="g-howto">
       {(g.door || g.board) && (
         <section class="g-card g-extra" aria-label="Also in this room">
           {g.door && <p><b>Booking panel by the door.</b> {g.door.replace(/^The panel by the door /, 'It ')}</p>}
@@ -152,6 +160,21 @@ const ANSWER = known.length ? 'Everything else in this space is working' : 'Ever
       </section>
     </div>
 
+    <section class="g-card g-about" id="about" aria-labelledby="h-about" data-help="guide.about">
+      <header><h2 id="h-about">About this room</h2></header>
+      <div class="g-about-b">
+        <div class="g-pic" transition:name="g-room-pic">
+          <RoomScene option={x.option} type={x.space_type} fitted={x.fitted} space={x} uid={`g-${room}`} highlight={pins} tone="bad" label={`Drawing of ${title}`} />
+        </div>
+        <dl class="g-facts">
+          <dt>Kind of space</dt><dd>{x.type.profile.name}</dd>
+          <dt>Office</dt><dd>{office}</dd>
+          {floor && <><dt>Floor</dt><dd>{floor}</dd></>}
+          {seats && <><dt>Seats</dt><dd>{seats}</dd></>}
+        </dl>
+      </div>
+    </section>
+
     <section class="g-end" aria-label="Still stuck?">
       <p>Still stuck? The {office} team can help.</p>
       <a class="btn primary" href={href(`${G}report/`)}>Report a problem</a>
@@ -172,30 +195,34 @@ const ANSWER = known.length ? 'Everything else in this space is working' : 'Ever
 
 <style>
   /* Sizes come from the guide's own scale (--g-fs-*, src/layouts/Guide.astro): larger than the console's, for a phone held at arm's length. */
-  .g-room { display: grid; gap: 16px; }
-  /* What we already know: first, calm, specific. The glyph says the state; the tint is the one soft colour. */
-  .g-known { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 12px; align-items: start; padding: 14px 16px; border-radius: var(--radius-lg); background: var(--h-progress-soft); color: var(--text); }
-  .g-known h2 { font: var(--fw-title) var(--g-fs-body)/24px var(--font-sans); margin: 0 0 4px; }
-  .g-known ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: var(--g-fs-support); line-height: 1.45; }
+  .g-room { display: grid; gap: 14px; }
 
-  .g-hero { display: grid; gap: 14px; }
-  .g-answer { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; font-size: var(--g-fs-support); color: var(--text); }
-  .g-over { margin: 0; font: 500 var(--fs-overline)/1.2 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
-  .g-id h1 { font-size: var(--g-fs-title); line-height: 1.1; margin: 4px 0 4px; letter-spacing: -.01em; }
+  /* The status: first, calm, specific. What we already know (if anything), then the one-line answer. */
+  .g-status { display: grid; gap: 8px; justify-items: start; }
+  .g-known { justify-self: stretch; display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 12px; align-items: start; padding: 12px 16px; border-radius: var(--radius-lg); background: var(--h-progress-soft); color: var(--text); }
+  .g-known h2 { font: var(--fw-title) var(--g-fs-body)/24px var(--font-sans); margin: 0 0 2px; }
+  .g-known ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: var(--g-fs-support); line-height: 1.4; }
+  .g-answer { display: flex; align-items: center; gap: 8px; margin: 0; padding: 7px 14px 7px 10px; border-radius: 999px; background: var(--surface-2); font-size: var(--g-fs-support); font-weight: 600; line-height: 1.3; color: var(--text); }
+
+  /* The room's name, with the office, floor and seats on one line. */
+  .g-id h1 { font-size: var(--g-fs-title); line-height: 1.1; margin: 0 0 2px; letter-spacing: -.01em; }
   .g-sub { margin: 0; color: var(--text-2); font-size: var(--g-fs-support); }
-  .g-pic { border-radius: var(--radius-lg); background: var(--surface); border: var(--border-card); padding: 8px; overflow: hidden; }
-  /* The drawing without its technical layers: no numbers, rulers, plates, cables or hidden kit. */
-  .g-pic :global(.scene-tools), .g-pic :global(.scene-cap), .g-pic :global(.marks), .g-pic :global(.ruler), .g-pic :global(.dim),
-  .g-pic :global(.cable-layer), .g-pic :global(.ghosts), .g-pic :global(.scene .pl), .g-pic :global(.scene .hid) { display: none; }
-  .g-pic :global(.scene) { display: block; width: 100%; height: auto; max-height: 34svh; }
-  .g-actions { display: grid; scroll-margin-top: 72px; }
+
+  /* The first screen's cards: Start a meeting, then Something not working with the quieter actions under it,
+     then the touch panel and the screen-share steps. A report in progress (the symptom list, or its status)
+     comes first and takes the width. */
+  .g-prime { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "start" "act" "panel" "share"; align-items: start; }
+  .g-prime:has([data-view="list"]), .g-prime:has([data-view="sent"]) { grid-template-areas: "act" "start" "panel" "share"; }
+  .g-start { grid-area: start; }
+  .g-actions { grid-area: act; display: grid; scroll-margin-top: 72px; }
+  .g-panel { grid-area: panel; } .g-share { grid-area: share; }
 
   .g-jump { display: flex; flex-wrap: wrap; gap: 8px; }
   .g-jump a { font-size: var(--g-fs-support); font-weight: 600; padding: 10px 14px; min-height: 44px; display: inline-flex; align-items: center; border-radius: 999px; background: var(--surface-2); color: var(--text); text-decoration: none; }
   .g-jump a:hover { background: var(--surface-3); color: var(--text); }
 
   .g-howto, .g-more { display: grid; gap: 16px; }
-  .g-card { scroll-margin-top: 72px; display: grid; gap: 14px; padding: 18px 16px; border-radius: var(--radius-lg); background: var(--surface); border: var(--border-card); }
+  .g-card { scroll-margin-top: 72px; display: grid; align-content: start; gap: 14px; padding: 18px 16px; border-radius: var(--radius-lg); background: var(--surface); border: var(--border-card); }
   .g-card header h2 { font-size: var(--g-fs-h); }
   .g-card header p { margin: 4px 0 0; color: var(--text-2); font-size: var(--g-fs-support); line-height: 1.45; }
   .g-how { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: center; }
@@ -205,6 +232,14 @@ const ANSWER = known.length ? 'Everything else in this space is working' : 'Ever
   .g-steps li { counter-increment: s; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; align-items: start; font-size: var(--g-fs-body); line-height: 1.45; }
   .g-steps li::before { content: counter(s); width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--on-ink); font: var(--fw-title) var(--fs-code)/1 var(--font-mono); margin-top: -1px; }
   .g-tip { margin: 0; padding: 10px 12px; border-radius: var(--radius); background: var(--surface-2); color: var(--text); font-size: var(--g-fs-support); }
+
+  /* Start a meeting is the answer for most people, so on a phone it is compact: no picture, tight steps,
+     so it and the report button share the first screen. */
+  .g-start { gap: 10px; padding: 14px 16px; }
+  .g-start .g-art { display: none; }
+  .g-start .g-steps { gap: 8px; }
+  .g-start .g-steps li { font-size: var(--g-fs-support); line-height: 1.35; }
+  .g-start header p { margin-top: 2px; line-height: 1.35; }
 
   /* The meeting app switch: word pills; the matching steps show, and arrive with a short rise. */
   .g-plat { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px; border-radius: 999px; background: var(--surface-2); justify-self: start; }
@@ -242,24 +277,48 @@ const ANSWER = known.length ? 'Everything else in this space is working' : 'Ever
   .g-never ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: var(--g-fs-support); line-height: 1.4; color: var(--text-2); }
   .g-fine { margin: 0; font-size: var(--fs-support); line-height: 1.45; color: var(--text-3); }
 
+  /* About this room: the drawing, small and near the end. Full width but short on a phone, a thumbnail beside the facts on a wide screen. */
+  .g-about-b { display: grid; gap: 14px; align-items: center; }
+  .g-pic { border-radius: var(--radius); background: var(--surface-2); padding: 8px; overflow: hidden; }
+  /* The drawing without its technical layers: no numbers, rulers, plates, cables or hidden kit. */
+  .g-pic :global(.scene-tools), .g-pic :global(.scene-cap), .g-pic :global(.marks), .g-pic :global(.ruler), .g-pic :global(.dim),
+  .g-pic :global(.cable-layer), .g-pic :global(.ghosts), .g-pic :global(.scene .pl), .g-pic :global(.scene .hid) { display: none; }
+  .g-pic :global(.scene) { display: block; width: 100%; height: auto; max-height: 190px; }
+  .g-facts { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; font-size: var(--g-fs-support); }
+  .g-facts dt { color: var(--text-2); } .g-facts dd { margin: 0; font-weight: 600; }
+
   .g-end { display: grid; justify-items: center; gap: 12px; text-align: center; padding: 20px 0 4px; }
   .g-end p { margin: 0; color: var(--text-2); font-size: var(--g-fs-support); }
   .g-end .btn { min-height: 48px; padding-inline: 28px; font-size: var(--g-fs-body); }
   .g-staff { font-size: var(--fs-support); color: var(--text-3); }
 
-  /* Wider: the room beside its two actions, the how-to cards side by side, picture beside the steps. */
   @media (min-width: 600px) {
     .g-how { grid-template-columns: 200px minmax(0, 1fr); gap: 20px; }
     .g-card { padding: 22px 24px; }
+    .g-start { gap: 14px; padding: 18px 20px; }
+    .g-start .g-art { display: grid; }
+    .g-start .g-steps li { font-size: var(--g-fs-body); line-height: 1.45; }
+    .g-about-b { grid-template-columns: 240px minmax(0, 1fr); gap: 24px; }
+    .g-pic :global(.scene) { max-height: none; }
   }
+  /* Wide: Start a meeting and Something not working side by side, so the first screen holds the answer, the
+     two actions and the steps; the how-to cards and the rest follow in two columns. */
   @media (min-width: 900px) {
-    .g-hero { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); grid-template-areas: "id id" "pic act"; column-gap: 20px; align-items: start; }
-    .g-id { grid-area: id; } .g-pic { grid-area: pic; } .g-actions { grid-area: act; }
-    /* Once a report is sent, its status takes the full width and the drawing follows it. */
-    .g-hero:has([data-view="sent"]) { grid-template-areas: "id id" "act act" "pic pic"; }
+    .g-room { gap: 16px; }
+    .g-prime { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); column-gap: 20px; align-items: stretch;
+      grid-template-areas: "start act" "start panel" "share panel"; }
+    .g-prime:not(:has(.g-share)) { grid-template-areas: "start act" "start panel"; }
+    .g-prime:not(:has(.g-panel)) { grid-template-areas: "start act" "share act"; }
+    .g-prime:not(:has(.g-share)):not(:has(.g-panel)) { grid-template-areas: "start act"; }
+    .g-prime:has([data-view="list"]), .g-prime:has([data-view="sent"]) { grid-template-columns: minmax(0, 1fr); grid-template-areas: "act" "start" "panel" "share"; }
+    .g-actions { align-self: start; }
+    .g-start .g-how, .g-share .g-how { grid-template-columns: 170px minmax(0, 1fr); gap: 16px; align-items: start; }
+    /* The touch panel's basics sit in the narrow column: a small picture over the steps. */
+    .g-panel .g-how { grid-template-columns: minmax(0, 1fr); align-items: start; }
+    .g-panel .g-art { min-height: 0; padding: 8px; }
+    .g-panel .g-art :global(svg) { height: 96px; width: auto; max-width: 100%; }
+    .g-panel .g-steps li, .g-share .g-steps li { font-size: var(--g-fs-support); line-height: 1.4; }
     .g-howto, .g-more { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
-    .g-start, .g-extra { grid-column: 1 / -1; }
-    .g-howto .g-how { grid-template-columns: minmax(0, 1fr); }
-    .g-start .g-how { grid-template-columns: 240px minmax(0, 1fr); }
+    .g-extra { grid-column: 1 / -1; }
   }
 </style>

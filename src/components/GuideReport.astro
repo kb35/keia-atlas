@@ -43,11 +43,13 @@ const data = { room, symptoms: symptoms.map((s) => ({ id: s.id, label: s.label }
       <span><b>Something not working</b><small>Tell us in two taps</small></span>
       <span class="gr-go" aria-hidden="true">→</span>
     </a>
-    <a class="gr-act" href={requestHref} data-help="guide.request">
-      <span class="gr-act-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" /></svg></span>
-      <span><b>Request something</b><small>Help, a change, or home office kit</small></span>
-      <span class="gr-go" aria-hidden="true">→</span>
-    </a>
+    <div class="gr-sec">
+      <a class="gr-2nd" href={requestHref} data-help="guide.request">
+        <span class="gr-act-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" /></svg></span>
+        <span><b>Request something</b><small>Help, a change, or home office kit</small></span>
+      </a>
+      <slot name="secondary" />
+    </div>
   </div>
 
   <div class="gr-view gr-list" data-gr-view="list" hidden={!open}>
@@ -147,6 +149,17 @@ const data = { room, symptoms: symptoms.map((s) => ({ id: s.id, label: s.label }
   .gr-bad:hover { color: var(--on-ink); border-color: var(--ink); background: color-mix(in srgb, var(--ink) 90%, var(--accent)); }
   .gr-bad small { color: color-mix(in srgb, var(--on-ink) 75%, transparent); }
   .gr-bad .gr-act-ic { background: var(--accent); color: var(--on-accent); }
+  /* Secondary actions (Request something, and whatever the page slots in): quieter, half width each.
+     Slotted links belong to the page, so their rules are global here. */
+  .gr-sec { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10px; }
+  .gr-sec :global(.gr-2nd) { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 10px; align-items: center; min-height: 60px; padding: 10px 12px; border-radius: var(--radius-lg); background: var(--surface); border: var(--border-card); color: var(--text); text-decoration: none; -webkit-tap-highlight-color: transparent; transition: background-color var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle), transform var(--dur-press) var(--ease-settle); }
+  .gr-sec :global(.gr-2nd:hover) { color: var(--text); border-color: var(--line-strong); }
+  .gr-sec :global(.gr-2nd:active) { transform: scale(var(--press-scale, .98)); }
+  .gr-sec :global(.gr-2nd:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .gr-sec :global(.gr-2nd .gr-act-ic) { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); color: var(--text-2); }
+  .gr-sec :global(.gr-2nd .gr-act-ic svg) { width: 20px; height: 20px; }
+  .gr-sec :global(.gr-2nd b) { display: block; font: var(--fw-name) var(--g-fs-body)/1.25 var(--font-sans); }
+  .gr-sec :global(.gr-2nd small) { display: none; margin-top: 2px; font-size: var(--g-fs-support); line-height: 1.35; color: var(--text-2); }
   .gr-go { font-size: var(--g-fs-lead); color: var(--text-3); }
   .gr-bad .gr-go { color: var(--on-ink); }
 
@@ -232,12 +245,14 @@ const data = { room, symptoms: symptoms.map((s) => ({ id: s.id, label: s.label }
   .gr-after .btn { min-height: 48px; }
 
   @media (min-width: 600px) {
+    .gr-sec :global(.gr-2nd small) { display: block; }
     .gr-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 0; }
     .gr-steps li { grid-template-columns: 24px minmax(0, 1fr); padding: 0; }
     .gr-steps li:not(:last-child)::after { left: 30px; right: -6px; top: 11px; bottom: auto; width: auto; height: 2px; display: none; }
   }
   /* Wide, once sent: the status and its steps on the left, what was sent on the right (the page gives it the full width). */
   @media (min-width: 900px) {
+    .gr-syms { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .gr-sent { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 20px; align-items: start; }
     .gr-sent > * { grid-column: 1; }
     .gr-sent > .gr-fields { grid-column: 2; grid-row: 1 / span 6; }
