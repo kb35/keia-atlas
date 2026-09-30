@@ -4,6 +4,10 @@
 # Keia's schema lists "platform_name" and "symptom" as fields, but its own
 # example uses them as the map keys (platforms.inventory, discrimination.device_unreachable).
 # This copy follows the example; the drift test knows about that mapping.
+#
+# One deliberate difference: a platform's `required_fields` is called `helpful_fields` here, because a
+# record that lacks a serial or an expected firmware is still a useful record. The old name is still
+# accepted and means the same thing. The drift test knows about this too.
 
 $schema: https://json-schema.org/draft/2020-12/schema
 $id: https://kb35.github.io/keia-atlas/schemas/keia/object-profile
@@ -50,9 +54,23 @@ properties:
     additionalProperties:
       type: object
       additionalProperties: false
-      required: [required_fields, healthy_indicators]
+      required: [healthy_indicators]
+      anyOf:
+        - { properties: { helpful_fields: true }, required: [helpful_fields] }
+        - { properties: { required_fields: true }, required: [required_fields] }
       properties:
+        helpful_fields:
+          description: >
+            The fields this platform holds that make a device of this class easier to run (serial, expected
+            firmware). Helpful, not required: a record that lacks one still passes, and the page says
+            "not known yet" instead of failing. Keia Atlas's one change to Keia's object profile.
+          type: array
+          minItems: 1
+          items: { type: string }
         required_fields:
+          description: >
+            Keia's original name for helpful_fields, still accepted so older profiles pass. Read exactly like
+            helpful_fields: nothing is blocked when a record lacks one. Write helpful_fields in new profiles.
           type: array
           minItems: 1
           items: { type: string }

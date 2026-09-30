@@ -123,7 +123,7 @@ export function provisioningOf(cfg) {
     const pk = Object.keys(PLATFORM_SYSTEM).find((k) => PLATFORM_SYSTEM[k] === sy.id) ?? (sy.id === 'darksign' ? 'device_management' : null);
     const p = pk ? plat[pk] : null;
     const applies = used.has(sy.id);
-    return { ...sy, applies, file: FILE[sy.id], fields: (p?.required_fields ?? used.get(sy.id)?.fields.map((f) => f.k) ?? []).map(nice), healthy: p?.healthy_indicators ?? [] };
+    return { ...sy, applies, file: FILE[sy.id], fields: (p?.helpful_fields ?? p?.required_fields ?? used.get(sy.id)?.fields.map((f) => f.k) ?? []).map(nice), healthy: p?.healthy_indicators ?? [] };
   }).filter((s) => s.applies || (s.id !== 'darksign' || signage));
   const prefix = C?.profile.naming_prefixes?.[0] ?? null;
   const example = fs.device?.host ?? null;

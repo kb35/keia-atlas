@@ -87,8 +87,11 @@ test('object-profile copy matches Keia', async () => {
     ...(versionOf(copy) === keia.version ? [] : [`version: Keia ${keia.version}, copy ${versionOf(copy)}`]),
     ...compare('top level', keiaFields(s), ourFields(copy), { ignore: ['schema'] }),
     ...compare('profile', keiaFields(s.profile), ourFields(p.profile)),
+    // The one deliberate difference: Keia's required_fields is helpful_fields in the copy, and the old name
+    // is still accepted but no longer required (see the copy's header).
     ...compare('platform', keiaFields(s.platforms.items.platform_entry),
-      ourFields(p.platforms.additionalProperties), { keyed: ['platform_name'] }),
+      ourFields(p.platforms.additionalProperties),
+      { keyed: ['platform_name'], ignore: ['required_fields'], extras: ['helpful_fields'] }),
     ...compare('consistency check', keiaFields(s.consistency.items.consistency_check), ourFields(p.consistency.items)),
     ...compare('discrimination entry', keiaFields(s.discrimination.items.discrimination_entry),
       ourFields(p.discrimination.additionalProperties), { keyed: ['symptom'] }),

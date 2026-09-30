@@ -11,7 +11,7 @@ import { classes, models, sites, spaces, playbooks, configurations, firmwareLine
 import { ROLES, PEOPLE, PROJECT_ROLE } from '../../lib/demo.mjs';
 
 const DATA = {
-  classes: Object.fromEntries(Object.entries(classes).map(([id, c]) => [id, { name: c.profile.name, role: c.profile.object_role, version: c.profile.version, prefixes: c.profile.naming_prefixes ?? [], platforms: Object.fromEntries(Object.entries(c.platforms ?? {}).filter(([, p]) => p && typeof p === 'object').map(([k, p]) => [k, { fields: p.required_fields ?? [], healthy: p.healthy_indicators ?? [] }])), symptoms: Object.entries(c.discrimination ?? {}).map(([k, d]) => ({ key: k, causes: d.likely_causes, first: d.first_check })) }])),
+  classes: Object.fromEntries(Object.entries(classes).map(([id, c]) => [id, { name: c.profile.name, role: c.profile.object_role, version: c.profile.version, prefixes: c.profile.naming_prefixes ?? [], platforms: Object.fromEntries(Object.entries(c.platforms ?? {}).filter(([, p]) => p && typeof p === 'object').map(([k, p]) => [k, { fields: p.helpful_fields ?? p.required_fields ?? [], healthy: p.healthy_indicators ?? [] }])), symptoms: Object.entries(c.discrimination ?? {}).map(([k, d]) => ({ key: k, causes: d.likely_causes, first: d.first_check })) }])),
   models: Object.fromEntries(Object.entries(models).map(([id, m]) => [id, { name: modelName(id), cls: m.class }])),
   roles: Object.fromEntries(Object.entries(ROLES).map(([id, r]) => [id, r.name])),
   people: PEOPLE.map((p) => ({ id: p.id, name: p.name, roleId: p.roleId, role: p.role })),
@@ -213,7 +213,7 @@ DATA.intro = Object.fromEntries(TABS.map((t) => [t.id, t.intro]));
           var fill = function () {
             var c = D.classes[val('cls')];
             form.querySelector('[data-prof]').innerHTML = field('What it does', '<textarea name="role" rows="2">' + esc(c.role) + '</textarea>') +
-              Object.keys(c.platforms).map(function (k) { var p = c.platforms[k]; return '<fieldset class="ef-set"><legend>' + esc({ keia_atlas: 'Keia Atlas', inventory: 'Asset register', dhcp_dns: 'Addresses and DNS', device_management: 'Device management', room_booking: 'Room booking', monitoring: 'Monitoring' }[k] || k) + '</legend>' + field('Healthy when', '<textarea name="h-' + k + '" rows="' + (p.healthy.length + 1) + '">' + esc(p.healthy.join('\n')) + '</textarea>') + field('Fields it must hold', '<input name="f-' + k + '" value="' + esc(p.fields.join(', ')) + '" />') + '</fieldset>'; }).join('') +
+              Object.keys(c.platforms).map(function (k) { var p = c.platforms[k]; return '<fieldset class="ef-set"><legend>' + esc({ keia_atlas: 'Keia Atlas', inventory: 'Asset register', dhcp_dns: 'Addresses and DNS', device_management: 'Device management', room_booking: 'Room booking', monitoring: 'Monitoring' }[k] || k) + '</legend>' + field('Healthy when', '<textarea name="h-' + k + '" rows="' + (p.healthy.length + 1) + '">' + esc(p.healthy.join('\n')) + '</textarea>') + field('Helpful fields', '<input name="f-' + k + '" value="' + esc(p.fields.join(', ')) + '" />') + '</fieldset>'; }).join('') +
               field('Troubleshooting: add a symptom', '<input name="sym" placeholder="Picture freezes when a laptop is shared" />', 'Likely causes, one per line, below') + '<textarea name="sym-causes" rows="2" placeholder="HDMI cable too long for 4K&#10;Laptop output set to a mode the bar can\'t take"></textarea>';
           };
           form.querySelector('[name=cls]').addEventListener('change', function () { fill(); update(); }); fill();
@@ -226,7 +226,7 @@ DATA.intro = Object.fromEntries(TABS.map((t) => [t.id, t.intro]));
             before.filter(function (x) { return after.indexOf(x) < 0; }).forEach(function (x) { diff.push('  ' + k + '.healthy_indicators', '-   ' + x); changed++; });
             after.filter(function (x) { return before.indexOf(x) < 0; }).forEach(function (x) { diff.push('  ' + k + '.healthy_indicators', '+   ' + x); changed++; });
             var bf = c.platforms[k].fields.join(', '), af = val('f-' + k);
-            if (bf !== af) { diff.push('  ' + k + '.required_fields', '-   ' + bf, '+   ' + af); changed++; }
+            if (bf !== af) { diff.push('  ' + k + '.helpful_fields', '-   ' + bf, '+   ' + af); changed++; }
           });
           if (val('sym')) { diff.push('  discrimination:', '+   ' + slug(val('sym')).replace(/-/g, '_') + ':', '+     likely_causes: [' + lines('sym-causes').join('; ') + ']'); changed++; }
           out.path = 'data/device-classes/' + id + '.yaml'; out.kind = 'changes, version ' + c.version + ' to ' + c.version.replace(/(\d+)$/, function (n) { return +n + 1; });

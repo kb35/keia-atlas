@@ -124,14 +124,16 @@ export function crossCheck(records, root) {
     rec.data.sources.forEach((s, i) => {
       if (!fileExists(s.file)) report(rec, ['sources', i, 'file'], `source file "${s.file}" does not exist`);
     });
-    // A consistency check can only compare fields its platforms actually record.
+    // A consistency check can only compare fields its platforms actually record. The fields are helpful, not
+    // required: a record that lacks one still passes, and the check says "not known yet" for it. The old name,
+    // required_fields, is read the same way.
     rec.data.consistency.forEach((c, i) => {
       c.compare.forEach((ref, j) => {
         const [platform, field] = ref.split('.');
         const p = rec.data.platforms[platform];
         if (!p) report(rec, ['consistency', i, 'compare', j], `"${ref}": platform "${platform}" is not defined`);
-        else if (!p.required_fields.includes(field)) {
-          report(rec, ['consistency', i, 'compare', j], `"${ref}": "${field}" is not in ${platform}'s required_fields`);
+        else if (!(p.helpful_fields ?? p.required_fields ?? []).includes(field)) {
+          report(rec, ['consistency', i, 'compare', j], `"${ref}": "${field}" is not in ${platform}'s helpful_fields`);
         }
       });
     });

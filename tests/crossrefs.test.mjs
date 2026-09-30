@@ -145,3 +145,19 @@ test('a task that starts after it is due', async () => {
   const errors = await withEdit('data/projects/prj-20.yaml', 'start: "2026-10-06", due: "2026-10-06"', 'start: "2026-10-09", due: "2026-10-06"');
   assert.deepEqual(errors, ['data/projects/prj-20.yaml: T-2003 starts 2026-10-09, after it is due (2026-10-06)']);
 });
+
+// Device classes list helpful fields, not required ones (see schemas/keia/object-profile.schema.yaml).
+test('a device class still written with Keia\'s required_fields passes', async () => {
+  const errors = await withEdit('data/device-classes/video-bar.yaml', 'keia_atlas:\n    helpful_fields:', 'keia_atlas:\n    required_fields:');
+  assert.deepEqual(errors, []);
+});
+
+test('a consistency check on a field its platform does not list', async () => {
+  const errors = await withEdit('data/device-classes/video-bar.yaml', '      - keia_atlas.serial\n', '      - keia_atlas.colour\n');
+  assert.deepEqual(errors, ['data/device-classes/video-bar.yaml: "keia_atlas.colour": "colour" is not in keia_atlas\'s helpful_fields']);
+});
+
+test('a platform with no fields listed at all', async () => {
+  const errors = await withEdit('data/device-classes/video-bar.yaml', '  monitoring:\n    helpful_fields:\n      - monitor_name\n', '  monitoring:\n');
+  assert.ok(errors.some((e) => e.startsWith('data/device-classes/video-bar.yaml:')), errors.join('\n'));
+});
