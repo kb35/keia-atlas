@@ -56,6 +56,9 @@ const key = (page, k) => page.keyboard.press(k);
 // What a person does. Each flow starts from a fresh page load.
 const FLOWS = [
   ['zoom', '/locations/dub/?floor=3', async (page) => {
+    // First press chooses the space (the lenses' selection, V6); a second press zooms in.
+    await page.click('[data-sel="room:dub-3-09"]'); await settle(page);
+    await key(page, 'l'); await settle(page);   // a lens switch
     await page.click('[data-sel="room:dub-3-09"]');
     await page.waitForURL(/rooms\/dub-3-09/, { waitUntil: 'commit' }); await settle(page);
     await key(page, '['); await page.waitForURL(/locations\/dub\//, { waitUntil: 'commit' }); await settle(page);
@@ -63,6 +66,13 @@ const FLOWS = [
     await key(page, '['); await settle(page);
     await key(page, '['); await settle(page);   // floor state off: the path loses a step
     await key(page, '['); await page.waitForURL(/locations\/emea\//, { waitUntil: 'commit' }); await settle(page);
+  }],
+  ['replay', '/locations/dub/?floor=3', async (page) => {
+    await page.click('[data-rpl-toggle]'); await settle(page);
+    await page.click('[data-rpl-win="inc0041210"]'); await settle(page);
+    await page.click('[data-rpl-f="1"]'); await settle(page);
+    await page.click('[data-rpl-play]'); await settle(page, 1500);
+    await page.click('[data-rpl-now]'); await settle(page);
   }],
   ['palette', '/', async (page) => {
     await key(page, '/'); await settle(page, 300);

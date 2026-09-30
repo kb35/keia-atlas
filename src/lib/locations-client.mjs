@@ -58,9 +58,21 @@ export function startLocations(root) {
     if (!first && last[id] !== v && W.rsMarkChanged) W.rsMarkChanged(document.querySelector(`.kn-i[data-kn="${id}"]`));
     last[id] = v;
   }
+  // What is wrong with a room now, in words, for the plan's Health lens and its selected-space panel.
+  function whyWords(s) {
+    const w = s.why; if (!w) return '';
+    const u = w.unit != null ? model.units[w.unit] : null;
+    if (u && w.down) return `${u.n ?? 'A unit'} offline`;
+    if (u && w.al >= 0) return `${u.n ?? 'A unit'}: ${u.alerts?.[w.al] ?? 'alerting'}`;
+    const inc = w.inc >= 0 ? model.incs?.[w.inc] : null;
+    return inc ? `${inc.no}: ${inc.title}` : '';
+  }
   function rooms(t) {
     if (!model) return;
+    // While Replay shows a past moment (src/lib/replay-client.mjs), the plan and the answer keep that moment.
+    if (root.dataset.replay) return;
     const snap = snapshot(model, t);
+    root.__rooms = new Map(model.rooms.map((r, i) => [r.id, { st: snap.rooms[i].st, why: whyWords(snap.rooms[i]) }]));
     const byId = new Map(model.rooms.map((r, i) => [r.id, i]));
     root.querySelectorAll('[data-loc-room], [data-sel^="room:"]').forEach((el) => {
       const i = byId.get(el.dataset.locRoom ?? el.dataset.sel.slice(5)); if (i == null) return;
@@ -75,6 +87,7 @@ export function startLocations(root) {
     snap.rooms.forEach((s) => { if (s.st === 'use') use++; if (s.st === 'problem') prob++; });
     number('loc-use', String(use));
     number('loc-problem', String(prob), prob ? 'bad' : '');
+    root.dispatchEvent(new CustomEvent('loc:tick'));
     if (root.hasAttribute('data-loc-answer') && W.rsAnswer) W.rsAnswer(prob ? `${prob} ${prob === 1 ? 'space' : 'spaces'} not working now` : `All ${snap.rooms.length} spaces working`);
     if (!root.querySelector('[data-fi][data-loc-tz]')) {
       const offices = model.sites.map((s, i) => ({ s, i })).filter((x) => !x.s.remote && x.s.tz && model.rooms.some((r) => r.site === x.i));
@@ -91,24 +104,8 @@ export function startLocations(root) {
   const tick = (t) => { clocks(t); rooms(t); first = false; };
   tick(tickOf(Date.now()));
 
-  // The floor map's rooms open the room, and its racks their comms room (the map draws them as buttons).
-  // Access points have no page of their own here, so they are not offered as buttons.
-  const racks = JSON.parse(root.querySelector('[data-loc-racks]')?.dataset.locRacks ?? '{}');
-  root.querySelectorAll('[data-sel^="ap:"]').forEach((el) => { el.removeAttribute('tabindex'); el.removeAttribute('role'); el.removeAttribute('aria-pressed'); });
-  root.querySelectorAll('[data-sel^="room:"], [data-sel^="rack:"]').forEach((el) => el.removeAttribute('aria-pressed'));
-  const open = (e) => {
-    const g = e.target.closest?.('[data-sel^="room:"], [data-sel^="rack:"]');
-    if (!g || !root.contains(g)) return;
-    if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
-    const [kind, id] = [g.dataset.sel.slice(0, 4), g.dataset.sel.replace(/^[a-z]+:/, '')];
-    const room = kind === 'rack' ? racks[id] : id;
-    if (!room) return;
-    e.preventDefault();
-    // A zoom: the room's shape on the plan becomes the space's drawing (src/lib/zoom-client.mjs).
-    if (window.rsGo) window.rsGo(`${B}rooms/${room}/`, g); else location.href = `${B}rooms/${room}/`;
-  };
-  root.addEventListener('click', open);
-  root.addEventListener('keydown', open);
+  // On the office, the floor map's spaces are chosen and opened by the lens script (src/lib/lens-client.mjs).
+  root.__locTick = () => tick(tickOf(Date.now()));
   const stop = every(tick);
-  return () => { stop(); root.removeEventListener('click', open); root.removeEventListener('keydown', open); };
+  return () => { stop(); };
 }

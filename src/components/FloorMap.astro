@@ -60,9 +60,13 @@ const cars = (c) => {
   const n = c.count ?? 1, [x0, y0, x1, y1] = c.rect, alongX = x1 - x0 >= y1 - y0;
   return Array.from({ length: n }, (_, i) => (alongX ? [x0 + ((x1 - x0) / n) * i, y0, x0 + ((x1 - x0) / n) * (i + 1), y1] : [x0, y0 + ((y1 - y0) / n) * i, x1, y0 + ((y1 - y0) / n) * (i + 1)]));
 };
-// Each room's health glyph (UI-V2 §6), drawn at the room's centre under its number once the page gives the room a
-// live state (data-st): Fine (in --quiet: the plan colours nothing that is fine) or Fault. CSS shows the one that applies.
-const GLYPHS = `<g class="fm-g-fine">${shape('fine')}</g><g class="fm-g-fault">${shape('fault')}</g>`;
+// Each room's health glyph (UI-V2 §6): one ring (the km-ring, src/lib/health.mjs) at the room's centre under its number,
+// shown once the page gives the room a live state (data-st: Fine, or Fault when not working). On a page with lenses
+// (the office, LensStrip.astro) the figure carries data-lens and the page's script sets each room's data-h and the
+// ring's data-s, so a lens switch eases every ring to its new state in place (MOTION-V2 4.9). Under the ring, a lens
+// label (.fm-lt) the script fills: "2 jobs", "PRJ-16", "Keystone". data-w is the room's width, so a label that does
+// not fit is left out rather than cut.
+const GLYPH = shape('fine');
 ---
 {F && (
   <figure class:list={['floormap', { 'fm-pick': interactive }]} data-fm={floor} data-fm-w={W} data-fm-h={H} data-fm-pad={pad}>
@@ -98,7 +102,8 @@ const GLYPHS = `<g class="fm-g-fine">${shape('fine')}</g><g class="fm-g-fault">$
               {door && <line class="fm-door" x1={door[0][0]} y1={Y(door[0][1])} x2={door[1][0]} y2={Y(door[1][1])} />}
               {r.geo.entry && r.count === 1 && <circle class="fm-entry" cx={r.geo.entry[0]} cy={Y(r.geo.entry[1])} r="0.18" />}
               <text x={(r.rect[0] + r.rect[2]) / 2} y={Y((r.rect[1] + r.rect[3]) / 2)}>{label(r)}</text>
-              {r.count <= 1 && <g class="fm-g" transform={`translate(${(r.rect[0] + r.rect[2]) / 2 - 0.4} ${Y((r.rect[1] + r.rect[3]) / 2) + 0.5}) scale(0.05)`} aria-hidden="true" set:html={GLYPHS} />}
+              {r.count <= 1 && <g class="fm-g" transform={`translate(${(r.rect[0] + r.rect[2]) / 2 - 0.4} ${Y((r.rect[1] + r.rect[3]) / 2) + 0.5}) scale(0.05)`} data-cx={(r.rect[0] + r.rect[2]) / 2} data-cy={Y((r.rect[1] + r.rect[3]) / 2)} aria-hidden="true" set:html={GLYPH} />}
+              {r.count <= 1 && r.rect[3] - r.rect[1] >= 3 && <text class="fm-lt" x={(r.rect[0] + r.rect[2]) / 2} y={Y((r.rect[1] + r.rect[3]) / 2) + 1.85} data-w={(r.rect[2] - r.rect[0]).toFixed(1)} aria-hidden="true"></text>}
             </g>
           );
         })}
@@ -150,6 +155,11 @@ const GLYPHS = `<g class="fm-g-fine">${shape('fine')}</g><g class="fm-g-fault">$
     fig.classList.toggle('fm-turned', on);
     svg.setAttribute('viewBox', on ? `${-pad} ${-pad} ${H + pad * 2} ${W + pad * 2}` : `${-pad} ${-pad} ${W + pad * 2} ${H + pad * 2}`);
     if (on) g.setAttribute('transform', `matrix(0 1 -1 0 ${H} 0)`); else g.removeAttribute('transform');
+    // The ring sits under the number on screen either way: on a turned plan, "under" is along the plan's x.
+    g.querySelectorAll<SVGGElement>('.fm-g[data-cx]').forEach((r) => {
+      const cx = +r.dataset.cx!, cy = +r.dataset.cy!;
+      r.setAttribute('transform', on ? `translate(${cx + 0.75} ${cy - 0.4}) scale(0.05)` : `translate(${cx - 0.4} ${cy + 0.5}) scale(0.05)`);
+    });
     g.querySelectorAll('text').forEach((t) => {
       if (!on) { t.removeAttribute('transform'); return; }
       const x = +(t.getAttribute('x') ?? 0), y = +(t.getAttribute('y') ?? 0);
@@ -242,13 +252,43 @@ const GLYPHS = `<g class="fm-g-fine">${shape('fine')}</g><g class="fm-g-fault">$
   .fm-room[data-st=free] > rect:not(.fm-desk) { fill: var(--fm-fill, var(--bg)); }
   .fm-room[data-st=closed] > rect:not(.fm-desk) { fill: var(--surface-2); }
   .fm-room[data-st=problem] > rect { fill: var(--h-fault-soft); stroke: var(--h-fault); stroke-width: 0.22; }
-  .fm-g { display: none; pointer-events: none; }
+  .fm-g { display: none; pointer-events: none; color: var(--h-fine); transition: color var(--dur-state) var(--ease-settle); }
   .fm-g :global(.hg-s) { fill: none; stroke: currentColor; stroke-width: 2.4; }
+  .fm-g :global(.hg-thin), .fm-g :global(.hg-ring[data-s=planned]), .fm-g :global(.hg-ring[data-s=off]) { stroke-width: 1.2; }
   .fm-g :global(.hg-dot) { fill: currentColor; }
   .fm-room[data-st=use] .fm-g, .fm-room[data-st=free] .fm-g, .fm-room[data-st=problem] .fm-g { display: inline; }
-  .fm-g :global(.fm-g-fine) { color: var(--h-fine); } .fm-g :global(.fm-g-fault) { display: none; color: var(--h-fault); }
-  .fm-room[data-st=problem] .fm-g :global(.fm-g-fine) { display: none; } .fm-room[data-st=problem] .fm-g :global(.fm-g-fault) { display: inline; }
+  /* Without lenses (the 3D office's plan), the ring breaks by CSS for a room that is not working. */
+  .floormap:not([data-lens]) .fm-room[data-st=problem] .fm-g { color: var(--h-fault); }
+  .floormap:not([data-lens]) .fm-room[data-st=problem] .fm-g :global(.hg-ring) { stroke-dasharray: .3333 .1667 .3333 .1667; }
+  .floormap:not([data-lens]) .fm-room[data-st=problem] .fm-g :global(.hg-dot) { transform: scale(1); }
   .fm-room[data-st=problem] text { fill: var(--h-fault-ink); }
+  .fm-lt { font-size: 0.56px; fill: var(--text-2, var(--ink)); text-anchor: middle; dominant-baseline: middle; pointer-events: none; transition: opacity var(--dur-state) var(--ease-settle); }
+  .fm-lt.fm-lt-out { opacity: 0; transition-duration: var(--dur-exit); transition-timing-function: var(--ease-exit); }
+
+  /* Lenses (UX-V2 §2.5): the page sets data-lens on the figure and data-h on each room. A space takes its state's soft
+     wash only when it is not fine; under a lens other than Health the kinds' tints step back, so the lens reads first. */
+  .floormap[data-lens] .fm-room[data-h] .fm-g { display: inline; }
+  .floormap[data-lens] .fm-room[data-h=none] .fm-g { display: none; }
+  .floormap[data-lens]:not([data-lens=health]) .fm-room:not(.fm-bank) > rect:first-of-type { fill: var(--surface, var(--bg)); stroke: var(--ink); stroke-width: 0.08; }
+  .floormap[data-lens] .fm-room[data-h=fault] .fm-g, .floormap[data-lens] .fm-room[data-h=stale] .fm-g { color: var(--h-fault); }
+  .floormap[data-lens] .fm-room[data-h=review] .fm-g { color: var(--h-review); }
+  .floormap[data-lens] .fm-room[data-h=progress] .fm-g { color: var(--h-progress); }
+  .floormap[data-lens] .fm-room[data-h=planned] .fm-g { color: var(--h-planned); }
+  .floormap[data-lens] .fm-room[data-h=off] .fm-g { color: var(--h-off); }
+  .floormap[data-lens] .fm-room[data-h=fault]:not(.fm-bank) > rect:first-of-type { fill: var(--h-fault-soft); stroke: var(--h-fault); stroke-width: 0.22; }
+  .floormap[data-lens] .fm-room[data-h=review]:not(.fm-bank) > rect:first-of-type { fill: var(--h-review-soft); stroke: var(--h-review); stroke-width: 0.16; }
+  .floormap[data-lens] .fm-room[data-h=progress]:not(.fm-bank) > rect:first-of-type { fill: var(--h-progress-soft); stroke: color-mix(in srgb, var(--h-progress) 55%, var(--line-strong)); stroke-width: 0.1; }
+  .floormap[data-lens] .fm-room[data-h=planned]:not(.fm-bank) > rect:first-of-type { fill: var(--h-planned-soft); stroke: var(--h-planned); stroke-width: 0.12; }
+  .floormap[data-lens] .fm-room[data-h=stale]:not(.fm-bank) > rect:first-of-type { stroke: var(--h-fault); stroke-width: 0.14; stroke-dasharray: 0.35 0.25; }
+  .floormap[data-lens]:not([data-lens=health]) .fm-room[data-st=problem] text { fill: var(--ink); }
+  .floormap[data-lens]:not([data-lens=health]) .fm-room[data-st=problem] .fm-lt { fill: var(--text-2, var(--ink)); }
+  .floormap[data-lens] .fm-room[data-h=fault] text, .floormap[data-lens] .fm-room[data-h=fault] .fm-lt { fill: var(--h-fault-ink); }
+  /* A turned plan (a narrow box) has no room for a second line: the ring and the chosen-space box say it. */
+  .fm-turned .fm-lt { display: none; }
+  /* Under a lens other than Health the kinds' tints step back, so their key does too. */
+  .floormap[data-lens]:not([data-lens=health]) .fm-key { display: none; }
+  /* Replay: a Then mark on the plan while it shows a past moment. */
+  .floormap[data-then] svg[data-fm-svg] { outline: 1.5px dashed var(--h-review); outline-offset: 4px; border-radius: 4px; }
   .fm-ap[data-st=warn] circle:not(.fm-hit) { stroke: var(--h-review); fill: var(--h-review-soft); }
   .fm-ap[data-st=bad] circle:not(.fm-hit) { stroke: var(--h-fault); fill: var(--h-fault-soft); stroke-width: 0.25; }
   .fm-rack[data-st=bad] rect:not(.fm-hit) { fill: var(--h-fault); } .fm-rack[data-st=warn] rect:not(.fm-hit) { fill: var(--h-review); }
@@ -267,5 +307,6 @@ const GLYPHS = `<g class="fm-g-fine">${shape('fine')}</g><g class="fm-g-fault">$
   .fm-room.is-sel > rect, .fm-rack.is-sel rect:not(.fm-hit) { stroke: var(--accent); stroke-width: 0.32; }
   .fm-rack.is-lit rect:not(.fm-hit) { fill: var(--accent); }
   .fm-ap.is-lit circle:not(.fm-hit) { stroke: var(--accent); stroke-width: 0.25; }
-  .fm-turned .fm-room text { font-size: 0.9px; }
+  .fm-turned .fm-room text:not(.fm-lt) { font-size: 0.9px; }
+  @media (prefers-reduced-motion: reduce) { .fm-g, .fm-lt, .fm-room rect { transition: none; } }
 </style>

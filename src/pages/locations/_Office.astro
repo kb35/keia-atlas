@@ -17,7 +17,10 @@ import FloorMap from '../../components/FloorMap.astro';
 import RoomPlanSprite from '../../components/RoomPlanSprite.astro';
 import GuideLive from '../../components/GuideLive.astro';
 import HealthGlyph from '../../components/HealthGlyph.astro';
-import HealthKey from '../../components/HealthKey.astro';
+import LensStrip from '../../components/LensStrip.astro';
+import LensKey from '../../components/LensKey.astro';
+import Replay from '../../components/Replay.astro';
+import { officeLenses, replayJobs } from '../../lib/lens-data.mjs';
 import { href, countryName, plural, fmtDate, KIND, PHASES, PHASE_LABEL, PROJECT_KIND, VENDOR_KIND, DEMO_TODAY } from '../../lib/data.mjs';
 import { WORK_KIND } from '../../lib/work.mjs';
 import { office, liveModelFor, REGION_SHORT, ROLE_WORD, LIGHT_WORD, OPEN_Q, roomTitle, INC_WORD } from '../../lib/locations.mjs';
@@ -80,6 +83,9 @@ const json = JSON.stringify({ ...liveModelFor([o.id]), base: href('/') }).replac
 // The answer (UI-V2 §3.2): spaces not working first. Written from the open incidents here; the live feed then keeps it
 // current (locations-client.mjs, from the same simulation as the plan).
 const incSpaces = new Set(o.inc.map((v) => v.space.id)).size;
+// Lenses and Replay (UX-V2 §2.5 and §8): each space's reading under every lens, and each floor's open jobs over time.
+const LENS_JSON = M ? JSON.stringify(officeLenses(o.id)).replace(/</g, '\\u003c') : '';
+const JOBS = M ? replayJobs(o.id) : {};
 const ANSWER = incSpaces ? `${plural(incSpaces, 'space')} not working now` : `All spaces working · no open incidents`;
 ---
 <Shell title={s.name} section="office" crumbs={[{ label: 'Locations', to: '/locations/' }, { label: REGION_SHORT[s.region], to: `/locations/${s.region}/` }, { label: s.name }]} about={{ kind: 'office', label: s.name, to: `/locations/${o.id}/` }}>
@@ -98,6 +104,11 @@ const ANSWER = incSpaces ? `${plural(incSpaces, 'space')} not working now` : `Al
     <RoomPlanSprite />
     <div class="g12 top">
       <section class="card s-7 stick ofc-map" aria-label="Floors" {...recHere(`loc-${o.id}`)} data-help="loc.floor">
+        {M && (
+          <LensStrip>
+            <button slot="end" type="button" class="btn small ghost ofc-rpl" data-rpl-toggle aria-expanded="false" data-help="replay">Replay</button>
+          </LensStrip>
+        )}
         {M ? (
           <DetailTabs tabs={floorTabs} label="Floors" param="floor">
             {M.floors.map((f) => (
@@ -117,11 +128,14 @@ const ANSWER = incSpaces ? `${plural(incSpaces, 'space')} not working now` : `Al
             ))}
           </div>
         )}
-        <p class="ofc-key" aria-label="Key"><span><i data-st="use"></i>In use</span><span><i data-st="free"></i>Free</span><span><i data-st="problem"></i>Problem</span><span><i data-st="closed"></i>Closed</span></p>
-        <HealthKey only={['fine', 'fault', 'stale']} />
+        {M && <div class="sel sel-card" data-sel-box hidden aria-live="polite" data-help="loc.selected"></div>}
+        {M && <LensKey />}
+        {M && <Replay jobs={JOBS} title={s.name} tz={s.time_zone} />}
+        {!M && <p class="ofc-key" aria-label="Key"><span><i data-st="use"></i>In use</span><span><i data-st="free"></i>Free</span><span><i data-st="problem"></i>Problem</span><span><i data-st="closed"></i>Closed</span></p>}
       </section>
 
       <SidePanel class="s-5" title="Today" meta={today} id="today" help="loc.today">
+        {M && <div class="sel sel-side" data-sel-box hidden aria-live="polite" data-help="loc.selected"></div>}
         <div class="td">
           <ul class="td-lights" data-help="loc.lights">
             {o.lights.map((l) => (
@@ -284,15 +298,18 @@ const ANSWER = incSpaces ? `${plural(incSpaces, 'space')} not working now` : `Al
       </dl>
     </Section>
     <script type="application/json" data-loc-model set:html={json}></script>
+    {M && <script type="application/json" data-lens-data set:html={LENS_JSON}></script>}
   </div>
 
   <script>
     import { startLocations } from '../../lib/locations-client.mjs';
+    import { startLenses } from '../../lib/lens-client.mjs';
+    import { startReplay } from '../../lib/replay-client.mjs';
     function init() {
       const root = document.querySelector('[data-loc="office"]') as any;
       if (!root || root.__loc) return;
-      const stop = startLocations(root);
-      document.addEventListener('astro:before-swap', stop, { once: true });
+      const stops = [startLocations(root), startLenses(root), startReplay(root)];
+      document.addEventListener('astro:before-swap', () => stops.forEach((f) => f()), { once: true });
     }
     init();
     document.addEventListener('astro:page-load', init);
@@ -315,6 +332,23 @@ const ANSWER = incSpaces ? `${plural(incSpaces, 'space')} not working now` : `Al
   .ofc-chip[data-st=use] { background: var(--surface-3); }
   .ofc-chip[data-st=free] { background: var(--bg); }
   .ofc-chip[data-st=problem] { background: var(--h-fault-soft); box-shadow: inset 0 0 0 1.5px var(--h-fault); }
+  .sel { display: grid; gap: 8px; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
+  .sel[hidden] { display: none; }
+  .ofc-rpl[aria-expanded="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+  .sel-side { margin-bottom: 16px; }
+  @container content (min-width: 840px) { .sel-card { display: none !important; } }
+  @container content (max-width: 839px) { .sel-side { display: none !important; } }
+  .sel :global(.sel-h) { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+  .sel :global(.sel-h b) { font-size: var(--fs-body); font-weight: var(--fw-name); }
+  .sel :global(.sel-h .faint) { font-size: var(--fs-code); }
+  .sel :global(.sel-x) { margin-left: auto; appearance: none; border: 0; background: transparent; color: var(--text-2); font: 500 var(--fs-code)/1 var(--font-sans); padding: 6px 8px; min-height: 32px; border-radius: 6px; cursor: pointer; }
+  .sel :global(.sel-x:hover) { background: var(--surface-3); color: var(--text); }
+  .sel :global(.sel-now) { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: var(--fs-support); }
+  .sel :global(.sel-more) { list-style: none; margin: 0; padding: 8px 0 0; border-top: 1px solid var(--line); display: grid; gap: 6px; }
+  .sel :global(.sel-more li) { display: grid; grid-template-columns: 84px auto minmax(0, 1fr); gap: 8px; align-items: baseline; font-size: var(--fs-code); color: var(--text-2); }
+  .sel :global(.sel-more b) { color: var(--text); font-weight: var(--fw-name); }
+  .sel :global(.sel-l) { color: var(--text-3, var(--text-2)); }
+  .sel :global(.sel-open) { justify-self: start; font-size: var(--fs-support); font-weight: 600; }
   .ofc-key { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; font-size: var(--fs-code); color: var(--text-2); }
   .ofc-key span { display: inline-flex; align-items: center; gap: 6px; }
   .ofc-key i { width: 12px; height: 12px; border-radius: 3px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-strong); }
@@ -334,6 +368,7 @@ const ANSWER = incSpaces ? `${plural(incSpaces, 'space')} not working now` : `Al
   .td-people { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
   .td-people a { display: flex; gap: 8px; align-items: center; color: var(--ink); text-decoration: none; padding: 4px 6px; border-radius: 8px; min-width: 0; }
   .td-people a > span:last-child { display: grid; min-width: 0; }
+  .td-people :global(.avatar) { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-3); color: var(--text-2); font: 600 11px/1 var(--font-sans); }
   .td-people b { font-size: var(--fs-support); font-weight: var(--fw-name); }
   .td-people small { color: var(--text-2); font-size: var(--fs-mark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .td-none { margin: 0; font-size: var(--fs-support); }

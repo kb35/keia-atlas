@@ -1,0 +1,75 @@
+---
+/* Replay (UX-V2 §8, MOTION-V2 4.28): a floor, or a job on it, over time, inside the picture card under the plan.
+   Still first: a strip of small frames, one per moment, each the same tiny plan at the same scale with the spaces as
+   they were (small multiples beat animation for reading). Press a frame and the plan above shows that moment with a
+   Then mark; the band's sentence turns past tense and the heartbeat reads "Replay · 07:52, 28 Sept" in the To review
+   style. Play steps one frame per --replay-step, and only when pressed; Space pauses, ← and → step, Now returns to
+   live. Export saves the strip, each frame's words and the job's events as one page. ?rw= and ?at= carry it.
+   Windows: "Today, by the hour" (from the simulation, src/lib/livesim.mjs) and one per open job on the floor (its
+   own events, src/lib/replay.mjs). The page's script is src/lib/replay-client.mjs.
+   Props:  jobs   { [floor id]: [window] } from replayJobs() in src/lib/lens-data.mjs
+           title  the office's name, for the export
+           tz     the office's time zone: a day's hours are its local hours */
+interface Props { jobs: Record<string, any[]>; title: string; tz: string }
+const { jobs, title, tz } = Astro.props;
+const json = JSON.stringify(jobs).replace(/</g, '\\u003c');
+---
+<section class="rpl" data-replay data-rpl-title={title} data-rpl-tz={tz} hidden aria-labelledby="rpl-h" data-help="replay">
+  <header class="rpl-h">
+    <h3 id="rpl-h">Replay</h3>
+    <span class="rpl-then" data-rpl-then aria-live="polite">Now</span>
+    <div class="rpl-wins" role="group" aria-label="What to replay" data-rpl-wins></div>
+  </header>
+  <ol class="rpl-strip" data-rpl-strip aria-label="Frames, oldest first"></ol>
+  <p class="rpl-cap" data-rpl-cap></p>
+  <div class="rpl-ctl">
+    <button type="button" class="btn small ghost" data-rpl-step="-1" aria-label="Step back">← Step</button>
+    <button type="button" class="btn small ghost" data-rpl-play aria-pressed="false">Play</button>
+    <button type="button" class="btn small ghost" data-rpl-step="1" aria-label="Step on">Step →</button>
+    <button type="button" class="btn small ghost" data-rpl-now>Now</button>
+    <button type="button" class="btn small ghost rpl-exp" data-rpl-export data-help="replay.export">Export</button>
+  </div>
+  <p class="rpl-note">Simulated. Frames are drawn still; Play steps them one by one. Space pauses, ← and → step, Now goes back to live.</p>
+  <script type="application/json" data-rpl-jobs set:html={json}></script>
+</section>
+
+<style is:global>
+  .rpl { display: grid; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .rpl[hidden] { display: none; }
+  .rpl-h { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .rpl-h h3 { margin: 0; font-size: var(--fs-body); }
+  .rpl-then { font: 500 var(--fs-code)/1.4 var(--font-mono); color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .rpl-then.is-then { color: var(--h-review-ink); padding: 2px 8px; border-radius: 999px; background: var(--h-review-soft); }
+  .rpl-wins { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+  .rpl-win { appearance: none; border: 0; cursor: pointer; font: var(--fw-name, 550) var(--fs-code)/1.2 var(--font-sans); color: var(--text-2); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); padding: 7px 11px; min-height: 32px; border-radius: 999px; transition: background-color var(--dur-hover) var(--ease-settle), color var(--dur-hover) var(--ease-settle); }
+  .rpl-win:hover { color: var(--text); }
+  .rpl-win[aria-pressed="true"] { background: var(--ink); color: var(--surface); box-shadow: none; }
+  .rpl-strip { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
+  .rpl-f { display: grid; gap: 4px; width: 100%; padding: 6px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--text); text-align: left; cursor: pointer; font: inherit; transition: border-color var(--dur-hover) var(--ease-settle), background-color var(--dur-hover) var(--ease-settle); }
+  .rpl-f:hover { border-color: var(--line-strong); background: var(--surface-2); }
+  .rpl-f[aria-current="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .rpl-f:focus-visible { outline: 2px solid var(--focus, var(--accent)); outline-offset: 1px; }
+  .rpl-f svg { display: block; width: 100%; height: auto; }
+  .rpl-f b { font: 500 var(--fs-code)/1.2 var(--font-mono); font-variant-numeric: tabular-nums; }
+  .rpl-f small { font-size: var(--fs-mark); color: var(--text-2); line-height: 1.3; }
+  .rp-o { fill: var(--surface-2); stroke: var(--line-strong); stroke-width: 0.12; }
+  .rp-r { fill: var(--surface); stroke: var(--line-strong); stroke-width: 0.08; transition: fill var(--dur-state) var(--ease-settle); }
+  .rp-r.rp-closed { fill: var(--surface-3); } .rp-r.rp-use { fill: var(--surface-2); }
+  .rp-r.rp-fault { fill: var(--h-fault-soft); stroke: var(--h-fault); stroke-width: 0.22; }
+  .rp-r.rp-review { fill: var(--h-review-soft); stroke: var(--h-review); stroke-width: 0.16; }
+  .rp-r.rp-progress { fill: var(--h-progress-soft); stroke: var(--h-progress); }
+  .rp-g { fill: none; stroke-width: 0.4; }
+  .rp-g.rp-fault { stroke: var(--h-fault); } .rp-g.rp-review { stroke: var(--h-review); } .rp-g.rp-progress { stroke: var(--h-progress); }
+  .rpl-cap { margin: 0; font-size: var(--fs-support); color: var(--text); min-height: 1.4em; }
+  .rpl-cap small { color: var(--text-2); }
+  .rpl-ctl { display: flex; flex-wrap: wrap; gap: 6px; }
+  .rpl-ctl .rpl-exp { margin-left: auto; }
+  .rpl-ctl button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+  .rpl-note { margin: 0; font-size: var(--fs-code); color: var(--text-3, var(--text-2)); }
+  /* While replaying: the heartbeat gives way to "Replay · 07:52, 28 Sept" in the To review style. */
+  :root[data-replay] [data-hb] { display: none; }
+  .rpl-hb { display: none; font: 500 var(--fs-code)/1.4 var(--font-mono); color: var(--h-review-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  :root[data-replay] .rpl-hb { display: inline; }
+  @media (pointer: coarse) { .rpl-win { min-height: 44px; } .rpl-ctl .btn { min-height: 44px; } }
+  @media (prefers-reduced-motion: reduce) { .rpl-f, .rp-r, .rpl-win { transition: none; } }
+</style>
