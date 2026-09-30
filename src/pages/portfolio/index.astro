@@ -1,0 +1,68 @@
+---
+// Your clients (docs/service-providers.md): a provider's portfolio in its own Keia. One card per client, worst first,
+// each opening that engagement's view; then crews on site today, visits this week and renewals across them all. Only
+// the provider's own people see it; anyone else (Aigna staff, another provider) gets a line saying whose Keia this is.
+// One block per provider with people in the demo; the page shows the viewer's. Simulated (src/lib/engagements.mjs).
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import KeyNumbers from '../../components/KeyNumbers.astro';
+import Portfolio from '../../components/Portfolio.astro';
+import { href } from '../../lib/data.mjs';
+import { PEOPLE } from '../../lib/demo.mjs';
+import { portfolio, ORGS } from '../../lib/engagements.mjs';
+import '../../styles/engagements.css';
+
+const providers = [...new Set(PEOPLE.filter((p) => p.vendor).map((p) => p.vendor))];
+const VIEW = providers.map((id) => {
+  const P = portfolio(id);
+  const people = PEOPLE.filter((p) => p.vendor === id).map((p) => p.id);
+  return {
+    id, P, people,
+    numbers: [
+      { n: P.cards.length, label: P.cards.length === 1 ? 'Client' : 'Clients', to: `#clients-${id}` },
+      { n: P.jobs, label: 'Jobs open', to: `#clients-${id}` },
+      { n: P.past, label: 'Past target', to: `#clients-${id}`, tone: P.past ? 'bad' : undefined },
+      { n: P.crews.length, label: 'Crews on site today', to: `#today-${id}` },
+    ],
+  };
+});
+// The answer follows the viewer (a provider's own sentence); the built page carries the gate's words.
+const ANSWERS = Object.fromEntries(VIEW.flatMap((v) => v.people.map((w) => [w, v.P.answer])));
+const css = VIEW.map((v) => v.people.map((w) => `:root[data-who="${w}"] [data-pf="${v.id}"]{display:revert}:root[data-who="${w}"] .pf-gate-wrap{display:none}`).join('')).join('');
+---
+<Shell vendorOk title="Your clients" section="portfolio" crumbs={[{ label: 'Your clients' }]}>
+  <PageBand overline="Portfolio" title="Your clients" answer="A provider's own Keia: each client through its own engagement" sim>
+    <Fragment slot="numbers">{VIEW.map((v) => <div class="pf-for" data-pf={v.id}><KeyNumbers items={v.numbers} /></div>)}</Fragment>
+  </PageBand>
+
+  <div class="content pf-page">
+    {VIEW.map((v) => (
+      <div class="pf-for" data-pf={v.id}>
+        <section id={`clients-${v.id}`} aria-label="Clients">
+          <Portfolio P={v.P} limit={3} todayId={`today-${v.id}`} />
+        </section>
+        <p class="eg-note">{ORGS[v.id].name} runs its own Keia in {ORGS[v.id].mode} mode. Its crews, work notes and costs stay here; each client sees only what its engagement shares, and nothing crosses from one client to another.</p>
+      </div>
+    ))}
+    <div class="pf-gate-wrap">
+      <div class="card pad pf-gate">
+        <p class="overline">A provider's own Keia</p>
+        <h2>This page belongs to a provider</h2>
+        <p>A provider such as Northlight AV keeps its clients, crews and costs in its own Keia. Aigna sees only what each engagement shares, under Vendors. To see a provider's portfolio, pick one of its people in View as (Sam Okafor, Northlight AV).</p>
+        <a class="btn" href={href('/vendors/northlight/engagement/')}>See Aigna's engagement with Northlight AV</a>
+      </div>
+    </div>
+  </div>
+  <script is:inline data-astro-rerun define:vars={{ ANSWERS }} slot="end">
+    (function () {
+      var set = function () { var a = ANSWERS[window.rsWhoId ? window.rsWhoId() : '']; var el = document.querySelector('[data-pb-answer]'); if (!el) return; if (!el.dataset.gate) el.dataset.gate = el.textContent; var t = a || el.dataset.gate; if (el.textContent !== t) { if (window.rsAnswer) window.rsAnswer(t); else el.textContent = t; } };
+      set();
+      if (!window.__pfAns) { window.__pfAns = true; document.addEventListener('rs:demo-change', function () { if (document.querySelector('.pf-page')) set(); }); }
+    })();
+  </script>
+</Shell>
+<style is:global set:html={css}></style>
+<style is:global>
+  .pf-page { display: grid; gap: var(--gutter); }
+  .pf-gate h2 { margin: 0; font-size: var(--fs-h3); }
+</style>

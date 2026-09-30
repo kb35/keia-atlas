@@ -1,0 +1,66 @@
+---
+/* Portfolio: a provider's clients as cards, worst first, each with its answer sentence and the client's name as the
+   link into that engagement's view (the card flies into the client page's title: data-vt-rec, M5), then today and
+   this week across every client: crews on site, visits with their readiness, renewals (docs/service-providers.md).
+   The cards settle once as the page arrives (the list stagger, data-stagger); reduced motion shows them in place.
+   Used by Home (PortfolioHome) and /portfolio/. Props: P, a portfolio() from src/lib/engagements.mjs; `limit` jobs
+   per card. Simulated, fixed at the demo's now, 28 Sept 12:00. */
+import HealthGlyph from './HealthGlyph.astro';
+import { href } from '../lib/data.mjs';
+import { siteName, NOW } from '../lib/engagements.mjs';
+import { whenWords, dateWords } from '../lib/vendors.mjs';
+import '../styles/engagements.css';
+interface Props { P: any; limit?: number; todayId?: string }
+const { P, limit = 2, todayId } = Astro.props;
+const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const dayWords = (t: string) => (t.slice(0, 10) === NOW.slice(0, 10) ? `Today, ${t.slice(11, 16)}` : `${DAY[new Date(`${t.slice(0, 10)}T00:00Z`).getUTCDay()]} ${Number(t.slice(8, 10))}, ${t.slice(11, 16)}`);
+const nextVisit = (c: any) => (c.visits[0] ? dayWords(c.visits[0].at) : 'None this week');
+---
+<ul class="pf-cards" data-stagger data-help="portfolio.clients">
+  {P.cards.map((c: any) => (
+    <li class:list={['pf-card', { 'pf-past': c.past }]} data-help="portfolio.client" data-feature="engagements">
+      <p class="pf-top"><span>{c.role}</span>{c.fictional && <span class="pf-fict" title="A made-up client for the demo">Made-up client</span>}</p>
+      <p class="pf-ans">
+        <HealthGlyph state={c.past ? 'fault' : c.jobs.length ? 'progress' : 'fine'} size={16} quiet />
+        <span><a href={href(`/portfolio/${c.id}/`)} data-vt-rec={`pf-${c.id}`}>{c.name}</a>{c.answer.slice(c.name.length)}</span>
+      </p>
+      {c.jobs.length > 0 && (
+        <ul class="pf-jobs">
+          {c.jobs.slice(0, limit).map((j: any) => (
+            <li><span><span class="mono">{j.id}</span>{j.title}</span><small class:list={{ past: j.clock.past && !j.clock.paused }}>{j.clock.text}</small></li>
+          ))}
+        </ul>
+      )}
+      <dl class="pf-facts">
+        <div><dt>In scope</dt><dd>{c.sites} {c.sites === 1 ? 'site' : 'sites'}</dd></div>
+        <div><dt>Next visit</dt><dd>{nextVisit(c)}</dd></div>
+        <div><dt>Renews</dt><dd>{dateWords(c.renewal.end)}</dd></div>
+      </dl>
+    </li>
+  ))}
+</ul>
+
+<div class="g12 pf-today" id={todayId}>
+  <section class="s-4 pf-mini" data-help="portfolio.crews" aria-label="Crews on site today">
+    <h3>Crews on site today</h3>
+    {P.crews.length ? (
+      <ul class="pf-list">{P.crews.map((x: any) => (
+        <li><HealthGlyph state="progress" size={16} title="On site" /><span><b>{x.what}</b><small>{x.clientName}, {siteName(x.client, x.site)} · {x.doing}</small></span></li>
+      ))}</ul>
+    ) : <p class="pf-none">No crew on site today.</p>}
+  </section>
+  <section class="s-4 pf-mini" data-help="portfolio.visits" aria-label="Visits this week">
+    <h3>Visits this week</h3>
+    {P.visits.length ? (
+      <ul class="pf-list">{P.visits.map((v: any) => (
+        <li><HealthGlyph state={v.ready ? 'fine' : 'review'} size={16} title={v.ready ? 'Ready' : 'Not ready yet'} /><span><b>{dayWords(v.at)} · {v.clientName}</b><small>{siteName(v.client, v.site)} · {v.what}</small><small>{v.readiness}</small></span></li>
+      ))}</ul>
+    ) : <p class="pf-none">No visits booked this week.</p>}
+  </section>
+  <section class="s-4 pf-mini" data-help="portfolio.renewals" aria-label="Renewals">
+    <h3>Renewals</h3>
+    <ul class="pf-list">{P.renewals.map((r: any) => (
+      <li><HealthGlyph state={r.state} size={16} quiet={r.state === 'fine'} title={r.state === 'review' ? 'Within 120 days' : 'In force'} /><span><b>{r.clientName}</b><small>{r.words}</small></span></li>
+    ))}</ul>
+  </section>
+</div>
