@@ -94,6 +94,17 @@ const FLOWS = [
     await page.locator('input[name="mod-vendors"][value="on"]').evaluate((i) => i.closest('label').click()); await settle(page);
     await key(page, 'Escape'); await settle(page, 400);
   }],
+  // A capability off and on again (src/lib/modules.mjs): what it marks collapses and grows back through rsChange.
+  ['capability', '/rooms/dub-3-09/', async (page) => {
+    const gear = page.locator('[data-open-settings]:visible').first();
+    await gear.click(); await settle(page, 400);
+    for (const [id, v] of [['licences', 'off'], ['licences', 'on'], ['maintenance', 'off'], ['maintenance', 'on']]) {
+      await page.locator(`input[name="cap-${id}"][value="${v}"]`).evaluate((i) => i.closest('label').click()); await settle(page);
+    }
+    await page.locator('input[name="mod-assets"][value="off"]').evaluate((i) => i.closest('label').click()); await settle(page);
+    await page.locator('input[name="mod-assets"][value="on"]').evaluate((i) => i.closest('label').click()); await settle(page);
+    await key(page, 'Escape'); await settle(page, 400);
+  }],
   ['port', '/rooms/dub-3-09/', async (page) => {
     await page.locator('main a[href*="device/?tag="]:visible').first().click();
     await page.waitForURL(/device\/\?tag=/, { waitUntil: 'commit' }); await page.waitForSelector('a.dv-port', { timeout: 8000 }); await settle(page);

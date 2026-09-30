@@ -199,7 +199,7 @@ export const USING = [
     one: 'Nothing has to be climbed in order. A team sets each [[module]] to On, Connected (an outside tool shows its data here) or Off, and starts anywhere. An [[agent]] does routine work only under a [[standing-rule|standing rule]] that a named person approved once. Anything that cannot be put back is a proposal a person confirms.',
     why: {
       field: 'Every automatic action shows what it read and what it did, with the rule and its owner. Where the rule has an Undo, it is there.',
-      build: 'Start with the device catalogue, which works alone. Add modules as they help. A Connected module keeps your existing tool as the record, with its source and time on each figure.',
+      build: 'Start with the device catalogue, which works alone. Add modules as they help, and switch on a module\'s bigger pieces (licences, room checks, alert rules) when you need them: switched off, they leave no trace. A Connected module keeps your existing tool as the record, with its source and time on each figure.',
       own: 'A rule is yours. You approve it once, with its conditions and its way back, and you are told on every run.',
       lead: 'A one-person team has no tiers to remove and lets rules do more. A global team has the same records and the same words.',
     },

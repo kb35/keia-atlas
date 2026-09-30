@@ -1,5 +1,6 @@
 ---
-// Settings: look, light or dark, agents, and Modules (each On, Connected or Off: src/lib/modules.mjs), all on one
+// Settings: look, light or dark, agents, and Modules (each On, Connected or Off, with its capabilities nested under
+// it: src/lib/modules.mjs and SettingsModules.astro), all on one
 // short screen. Who you're viewing as is one row at the top that opens View as (src/components/ViewAs.astro).
 // Choices are saved in this browser (localStorage keys rs4-skin, rs4-theme, rs4-agents and rs6-modules) and
 // applied by the boot script in the page head before first paint.
@@ -14,7 +15,7 @@ const LOOKS = [
   { id: 'drawing', name: 'Drawing set', note: 'Ink on drafting paper.', sw: ['#111111', '#F3F3EE', '#0B2A4C', '#B8860B'] },
   { id: 'classic', name: 'Playful', note: 'Ink outlines, bold colour.', sw: ['#15161B', '#F3F0E8', '#FFCB2E', '#1E5BFF'] },
 ];
-import { MODULES, MODULE_STATES } from '../lib/modules.mjs';
+import SettingsModules from './SettingsModules.astro';
 import SettingsPersonal from './SettingsPersonal.astro';
 import PillSelect from './PillSelect.astro';
 const MODES = [
@@ -68,19 +69,7 @@ const MODES = [
         </div>
       </fieldset>
     </div>
-    <fieldset data-help="shell.modules">
-      <legend class="overline">Modules</legend>
-      <ul class="mods">
-        {MODULES.map((m) => (
-          <li class="mod">
-            <span class="mod-n"><b id={`mod-${m.id}`}>{m.label}</b><small data-mod-note={m.id} data-on={m.what} data-conn={`Connected: from ${m.source}`} data-off="Off: not in the sidebar">{m.what}</small></span>
-            <span class="seg-s" data-seg role="radiogroup" aria-labelledby={`mod-${m.id}`}>
-              {MODULE_STATES.map((st) => (<label><input type="radio" name={`mod-${m.id}`} value={st.id} data-mod={m.id} /><span>{st.label}</span></label>))}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </fieldset>
+    <SettingsModules />
     <SettingsPersonal />
     <p class="faint">Saved in this browser only. On a computer, your name at the bottom left opens View as too.</p>
   </form>
@@ -109,18 +98,12 @@ const MODES = [
         if (window.rsMarker) window.rsMarker(g, function () { var i = g.querySelector('input:checked'); return i && i.closest('label'); });
       });
     }
-    // Each module's line says what it is when On, where it comes from when Connected, and that it is gone when Off.
+    // (Modules and their capabilities keep their own rows in step: SettingsModules.astro.)
     function sync() {
       var s = get('rs4-skin', 'studio'), t = get('rs4-theme', 'system'), ag = get('rs4-agents', 'on');
-      var mods = window.rsModules ? window.rsModules() : {};
       dlg.querySelectorAll('input[name=skin]').forEach(function (i) { i.checked = i.value === s; });
       dlg.querySelectorAll('input[name=mode]').forEach(function (i) { i.checked = i.value === t; });
       dlg.querySelectorAll('input[name=agents]').forEach(function (i) { i.checked = i.value === ag; });
-      dlg.querySelectorAll('input[data-mod]').forEach(function (i) { i.checked = i.value === (mods[i.dataset.mod] || 'on'); });
-      dlg.querySelectorAll('[data-mod-note]').forEach(function (n) {
-        var v = mods[n.dataset.modNote] || 'on';
-        n.textContent = v === 'connected' ? n.dataset.conn : v === 'off' ? n.dataset.off : n.dataset.on;
-      });
       dlg.querySelectorAll('[data-look-note]').forEach(function (p) { p.classList.toggle('on', p.dataset.lookNote === s); });
       markLook(); markSegs();
     }
@@ -155,7 +138,6 @@ const MODES = [
       var i = e.target, v = i.value;
       if (i.name === 'skin') { put('rs4-skin', v); window.rsTheme(function () { window.rsApplyTheme(); }, v); }
       if (i.name === 'mode') { put('rs4-theme', v); window.rsTheme(function () { window.rsApplyTheme(); if (window.rsSyncMode) window.rsSyncMode(); }); }
-      if (i.dataset.mod) window.rsSetModule(i.dataset.mod, v);
       if (i.name === 'agents') window.rsSetAgents(v);
       sync();
     });

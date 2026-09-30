@@ -1,0 +1,91 @@
+---
+/* Settings › Modules (src/lib/modules.mjs): each module On, Connected or Off, with its capabilities nested under it,
+   each On, Connected or Off too (Keith's rule, 30 Sept 2026: the bigger items are switched on when they are needed,
+   so nothing ever looks missing). One line per capability, no box of its own and nothing that scrolls inside.
+   A module that is Off folds its capabilities away (they are off with it); a capability whose `requires` is off
+   stays in its row, switched off, and says what it waits for.
+   Saved in this browser: rs6-modules and rs6-features. Applied by the boot script in the page head (Shell.astro).
+   Motion (M12, row 26): the choice marker slides; the page behind changes through rsChange (what a capability marks
+   collapses or grows in place, the rest slides) and so does this list when a module folds its capabilities.
+   Reduced motion: every change is at once. */
+import { MODULES, MODULE_STATES, CAPABILITIES } from '../lib/modules.mjs';
+const capsOf = (id) => CAPABILITIES.filter((c) => c.module === id);
+const LABEL = Object.fromEntries(MODULES.map((m) => [m.id, m.label]));
+const capWords = Object.fromEntries(CAPABILITIES.map((c) => [c.id, c.label]));
+// A module Off folds its capabilities away (keyed on <html>, so it is right before first paint and rsChange can move it).
+const foldCss = MODULES.map((m) => `:root[data-off~="${m.id}"] .settings [data-caps-of="${m.id}"]{display:none}`).join('');
+---
+<fieldset data-help="shell.modules" class="set-mods">
+  <legend class="overline">Modules</legend>
+  <ul class="mods">
+    {MODULES.map((m) => {
+      const caps = capsOf(m.id);
+      const off = caps.length ? `Off: not in the sidebar, nor its ${caps.length === 1 ? 'capability' : `${caps.length} capabilities`}` : 'Off: not in the sidebar';
+      return (
+        <li class="mod" data-mod-row={m.id}>
+          <span class="mod-n"><b id={`mod-${m.id}`}>{m.label}</b><small data-mod-note={m.id} data-on={m.what} data-conn={`Connected: from ${m.source}`} data-off={off}>{m.what}</small></span>
+          <span class="seg-s" data-seg role="radiogroup" aria-labelledby={`mod-${m.id}`}>
+            {MODULE_STATES.map((st) => (<label><input type="radio" name={`mod-${m.id}`} value={st.id} data-mod={m.id} /><span>{st.label}</span></label>))}
+          </span>
+          {caps.length > 0 && (
+            <ul class="caps" data-caps-of={m.id} aria-label={`${m.label} capabilities`}>
+              {caps.map((c) => (
+                <li class="cap" data-cap-row={c.id} data-help="shell.capability" data-help-name={c.label}>
+                  <span class="cap-n" title={`${c.label}: ${c.what}`}><b id={`cap-${c.id}`}>{c.label}</b><small data-cap-note={c.id} data-on={c.what} data-conn={`from ${c.source}`} data-off="off, nothing of it shows">{c.what}</small></span>
+                  <span class="seg-s seg-cap" data-seg role="radiogroup" aria-labelledby={`cap-${c.id}`}>
+                    {MODULE_STATES.map((st) => (<label><input type="radio" name={`cap-${c.id}`} value={st.id} data-cap={c.id} /><span>{st.label}</span></label>))}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </li>
+      );
+    })}
+  </ul>
+</fieldset>
+
+<script is:inline data-astro-rerun define:vars={{ LABEL, capWords, REQ: Object.fromEntries(CAPABILITIES.map((c) => [c.id, [c.module, ...(c.requires ?? [])]])) }}>
+  (function () {
+    var dlg = document.querySelector('dialog#settings'); if (!dlg) return;
+    var W = window;
+    var name = function (id) { return LABEL[id] || capWords[id] || id; };
+    // Each row says what it is when On, where it comes from when Connected, and that it is gone when Off. A capability
+    // held off by its module or by what it requires keeps its row, switched off, and says what it waits for.
+    function sync() {
+      var mods = W.rsModules ? W.rsModules() : {}, feats = W.rsFeatures ? W.rsFeatures() : {}, chosen = W.rsFeatureChoice ? W.rsFeatureChoice() : {};
+      dlg.querySelectorAll('input[data-mod]').forEach(function (i) { i.checked = i.value === (mods[i.dataset.mod] || 'on'); });
+      dlg.querySelectorAll('[data-mod-note]').forEach(function (n) {
+        var v = mods[n.dataset.modNote] || 'on';
+        n.textContent = v === 'connected' ? n.dataset.conn : v === 'off' ? n.dataset.off : n.dataset.on;
+      });
+      dlg.querySelectorAll('[data-cap-row]').forEach(function (row) {
+        var id = row.dataset.capRow, v = feats[id] || 'off', by = null;
+        // Held off: the first of its module and what it requires that is off, while it was not switched off itself.
+        if (v === 'off' && chosen[id] !== 'off') (REQ[id] || []).some(function (r) { var s = r in feats ? feats[r] : mods[r]; if (s === 'off') { by = r; return true; } return false; });
+        row.classList.toggle('is-held', !!by);
+        row.querySelectorAll('input[data-cap]').forEach(function (i) { i.checked = i.value === v; i.disabled = !!by; });
+        var n = row.querySelector('[data-cap-note]');
+        n.classList.toggle('is-note', !!by || v === 'connected');   // a phone shows the line only when it says more than the name
+        n.textContent = by ? 'off while ' + name(by) + ' is off' : v === 'connected' ? n.dataset.conn : v === 'off' ? n.dataset.off : n.dataset.on;
+      });
+      dlg.querySelectorAll('.set-mods [data-seg]').forEach(function (g) {
+        if (W.rsMarker) W.rsMarker(g, function () { var i = g.querySelector('input:checked'); return i && i.closest('label'); });
+      });
+    }
+    if (dlg.__rsModules) { sync(); return; }
+    dlg.__rsModules = true;
+    dlg.addEventListener('change', function (e) {
+      var i = e.target;
+      if (i.dataset.mod) W.rsSetModule(i.dataset.mod, i.value);
+      if (i.dataset.cap) W.rsSetFeature(i.dataset.cap, i.value);
+      if (i.dataset.mod || i.dataset.cap) sync();
+    });
+    // Settings syncs itself as it opens; follow it, and follow a change made anywhere else (a page's own Switch on).
+    new MutationObserver(function () { if (dlg.open) sync(); }).observe(dlg, { attributes: true, attributeFilter: ['open'] });
+    document.addEventListener('rs:demo-change', function () { var d = document.querySelector('dialog#settings'); if (d && d.open && d === dlg) sync(); });
+    sync();
+  })();
+</script>
+
+<style is:global set:html={foldCss}></style>

@@ -22,7 +22,7 @@ import '../styles/craft.css';
 
 import { PEOPLE } from '../lib/demo.mjs';
 import { LINE } from '../lib/brand.mjs';
-import { MODULES, MODULE_DEFAULTS } from '../lib/modules.mjs';
+import { MODULES, MODULE_DEFAULTS, CAPABILITIES, resolveFeatures, featureCss } from '../lib/modules.mjs';
 import { zoomTrail } from '../lib/zoom.mjs';
 import { springEasing } from '../lib/spring.mjs';
 
@@ -113,6 +113,11 @@ const moduleCss = MODULES.map((m) => `:root[data-off~="${m.id}"] .nav [data-nav=
   + `:root[data-off~="${m.id}"] main[data-module="${m.id}"] .page-body{display:none!important}`
   + `:root[data-off~="${m.id}"] main[data-module="${m.id}"] .module-gate{display:grid!important}`
   + `:root[data-conn~="${m.id}"] .nav [data-nav="${m.id}"] .nav-src{display:block}`).join('');
+// Capabilities (src/lib/modules.mjs): what they mark leaves the page while they are off; source marks show while
+// they are Connected. The head gets the registry (id, module, default, requires) and the one resolver, as text.
+const featCss = featureCss();
+const RS_CAPS = CAPABILITIES.map((c) => ({ id: c.id, module: c.module, state: c.state, requires: c.requires ?? [] }));
+const RESOLVE = `window.rsResolveFeatures=${resolveFeatures.toString()};`;
 // The path in the top bar. A page on the zoom (region, office, space) gets the zoom trail from its address, so
 // it reads the same whichever page linked there (src/lib/zoom.mjs). On other pages a step that names a retired
 // place (Work, Devices), or a place the page has moved out of (Vendors was under Team), names its place now.
@@ -146,7 +151,8 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>{pageTitle}</title>
   <meta name="description" content={`Keia Atlas: ${LINE} A demo of a made-up company, built on public device data.`} />
-  <script is:inline data-astro-rerun define:vars={{ VENDOR_IDS, WHO_ROLE, PEOPLE_LITE, MODULE_DEFAULTS, MOVED_HREF }}>window.RS_VENDORS = VENDOR_IDS; window.RS_WHO_ROLE = WHO_ROLE; window.RS_PEOPLE = PEOPLE_LITE; window.RS_MODULES = MODULE_DEFAULTS; window.RS_MOVED = MOVED_HREF;</script>
+  <script is:inline data-astro-rerun define:vars={{ VENDOR_IDS, WHO_ROLE, PEOPLE_LITE, MODULE_DEFAULTS, MOVED_HREF, RS_CAPS }}>window.RS_VENDORS = VENDOR_IDS; window.RS_WHO_ROLE = WHO_ROLE; window.RS_PEOPLE = PEOPLE_LITE; window.RS_MODULES = MODULE_DEFAULTS; window.RS_MOVED = MOVED_HREF; window.RS_CAPS = RS_CAPS;</script>
+  <script is:inline data-astro-rerun set:html={RESOLVE}></script>
   <script is:inline data-astro-rerun>
     /* Small shared helpers for pages that keep demo records in this browser: read and write a JSON list
        (falling back to memory when storage is blocked), and who the viewer is right now. */
@@ -220,13 +226,20 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         // are shown. Modules become two word lists on <html>: data-off and data-conn.
         var ag = 'on', mods = window.RS_MODULES || {}, saved = null;
         try { ag = localStorage.getItem('rs4-agents') || ag; saved = JSON.parse(localStorage.getItem('rs6-modules') || 'null'); localStorage.removeItem('rs4-stage'); } catch (_) {}
-        var off = [], conn = [];
+        var off = [], conn = [], full = {};
         saved = saved || window.__rsModMem || null;
         Object.keys(mods).forEach(function (id) {
           var v = saved && /^(on|connected|off)$/.test(saved[id]) ? saved[id] : mods[id];
+          full[id] = v;
           if (v === 'off') off.push(id); else if (v === 'connected') conn.push(id);
         });
         r.setAttribute('data-off', off.join(' ')); r.setAttribute('data-conn', conn.join(' '));
+        // Capabilities (src/lib/modules.mjs): off with their module or what they require. Two more word lists.
+        var fsaved = null; try { fsaved = JSON.parse(localStorage.getItem('rs6-features') || 'null'); } catch (_) {}
+        var feats = window.rsResolveFeatures ? window.rsResolveFeatures(window.RS_CAPS || [], full, fsaved || window.__rsFeatMem || null) : {};
+        var foff = [], fconn = [];
+        Object.keys(feats).forEach(function (id) { if (feats[id] === 'off') foff.push(id); else if (feats[id] === 'connected') fconn.push(id); });
+        r.setAttribute('data-feat-off', foff.join(' ')); r.setAttribute('data-feat-conn', fconn.join(' '));
         r.setAttribute('data-agents', ag);
         // Help mode (the ? switch): kept per window (session storage), and put back after every page swap.
         var hp = 'off'; try { hp = sessionStorage.getItem('rs5-help') === 'on' ? 'on' : 'off'; } catch (_) {}
@@ -461,7 +474,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         <nav class="sec-tabs" aria-label={parent.label} data-help="shell.tabs" data-sec-tabs>
           <div class="sec-list" data-sec-list>
             {tabs.map((t) => (
-              <a href={href(t.to)} data-help={`tab:${t.id}`} aria-current={t.id === section ? 'page' : undefined} data-min-stage={t.stage} data-vendor-ok={t.vendorOk ? '' : undefined} data-lead={t.lead ? '' : undefined}>
+              <a href={href(t.to)} data-help={`tab:${t.id}`} aria-current={t.id === section ? 'page' : undefined} data-min-stage={t.stage} data-vendor-ok={t.vendorOk ? '' : undefined} data-lead={t.lead ? '' : undefined} data-feature={t.feature}>
                 {t.label}{t.id === section && <span class="sec-on" aria-hidden="true"></span>}
               </a>
             ))}
@@ -499,6 +512,8 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
             fit();
             if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
             if (window.ResizeObserver) new ResizeObserver(function () { requestAnimationFrame(fit); }).observe(nav);
+            // A capability switched on or off adds or takes away a tab (data-feature): fit them again.
+            document.addEventListener('rs:demo-change', function () { if (nav.isConnected) requestAnimationFrame(fit); });
           })();
         </script>
       )}
@@ -966,7 +981,44 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         var m = W.rsModules(); if (!(id in m) || m[id] === state) return;
         m[id] = state; W.__rsModMem = m;   // kept in memory too, for a browser that blocks storage
         try { localStorage.setItem('rs6-modules', JSON.stringify(m)); } catch (_) {}
-        W.rsChange(applyDemo, synced('modules'));
+        W.rsChange(applyDemo, synced('modules'), { roots: ['.side', 'main', 'dialog#settings[open] .mods'] });
+      };
+      /* Settings › Modules, capabilities: each On, Connected or Off; off with its module or what it requires. What a
+         capability marks (data-feature) collapses or grows in place, the rest slides (rsChange). Pages ask
+         rsFeature(id) ('on', 'connected' or 'off') or rsFeatureOn(id) before they write an answer or a count, and
+         redraw on rs:demo-change (detail.what 'features' or 'modules'). */
+      W.rsFeatureChoice = function () {
+        var saved = null; try { saved = JSON.parse(localStorage.getItem('rs6-features') || 'null'); } catch (_) {}
+        return saved || W.__rsFeatMem || {};
+      };
+      W.rsFeatures = function () { return W.rsResolveFeatures ? W.rsResolveFeatures(W.RS_CAPS || [], W.rsModules(), W.rsFeatureChoice()) : {}; };
+      W.rsFeature = function (id) { return W.rsFeatures()[id] || 'off'; };
+      W.rsFeatureOn = function (id) { return W.rsFeature(id) !== 'off'; };
+      W.rsSetFeature = function (id, state) {
+        var c = Object.assign({}, W.rsFeatureChoice()), was = W.rsFeatures();
+        if (!(id in was)) return;
+        c[id] = state; W.__rsFeatMem = c;
+        try { localStorage.setItem('rs6-features', JSON.stringify(c)); } catch (_) {}
+        W.rsChange(applyDemo, synced('features'), { roots: ['.side', 'main', 'dialog#settings[open] .mods'] });
+      };
+      /* Switch a capability on from a page (its gate, or an action that needs it), with whatever it needs: its module
+         and what it requires, in one change. */
+      W.rsEnableFeature = function (id) {
+        var caps = W.RS_CAPS || [], m = W.rsModules(), fc = Object.assign({}, W.rsFeatureChoice()), seen = {};
+        var cap = function (x) { return caps.filter(function (c) { return c.id === x; })[0]; };
+        var need = function (x) {
+          if (seen[x]) return; seen[x] = true;
+          var c = cap(x);
+          if (!c) { if (m[x] === 'off') m[x] = 'on'; return; }
+          if ((fc[x] || c.state) === 'off') fc[x] = 'on';
+          if (m[c.module] === 'off') m[c.module] = 'on';
+          (c.requires || []).forEach(need);
+        };
+        if (!cap(id)) return;
+        need(id);
+        W.__rsModMem = m; W.__rsFeatMem = fc;
+        try { localStorage.setItem('rs6-modules', JSON.stringify(m)); localStorage.setItem('rs6-features', JSON.stringify(fc)); } catch (_) {}
+        W.rsChange(applyDemo, synced('features'), { roots: ['.side', 'main', 'dialog#settings[open] .mods'] });
       };
       W.rsSetAgents = function (v) {
         try { localStorage.setItem('rs4-agents', v); } catch (_) {}
@@ -1010,7 +1062,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
   </script>
 </body>
 </html>
-<style is:global set:html={`:root{--ease-spring:${EASE_SPRING}} ${moduleCss}${leadCss}`}></style>
+<style is:global set:html={`:root{--ease-spring:${EASE_SPRING}} ${moduleCss}${leadCss}${featCss}`}></style>
 <style is:global>
   .m-light, .m-dark { display: none; }
   :root[data-mode="light"] .m-system, :root[data-mode="dark"] .m-system { display: none; }

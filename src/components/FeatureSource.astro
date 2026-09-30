@@ -1,0 +1,19 @@
+---
+/* FeatureSource: the source mark of a capability that is Connected ("from Datadog"), shown only while it is Connected
+   (src/lib/modules.mjs, featureCss: [data-feat-src]). The same mark a Connected module shows in the sidebar; a record
+   that names its own source (a system, a reference, a time) uses SourceMark instead.
+   Props:  id    the capability
+           from  the tool, when it is more particular than the capability's registered source ("Datadog") */
+import { capability } from '../lib/modules.mjs';
+interface Props { id: string; from?: string }
+const { id, from } = Astro.props;
+const cap = capability(id);
+if (!cap) throw new Error(`FeatureSource: no capability "${id}" in src/lib/modules.mjs`);
+const name = from ?? cap.source;
+---
+<span class="srcm fsrc" data-feat-src={id} data-help="source" title={`${cap.label} is connected: its records come from ${name}`}>from {name}</span>
+
+<style is:global>
+  /* SourceMark's look (UI-V2 §8.4), for pages that show no other source mark. */
+  .fsrc { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border: 1px solid var(--hairline, var(--line)); border-radius: 4px; font: 500 var(--fs-mark)/1 var(--font-mono); color: var(--quiet); white-space: nowrap; vertical-align: 1px; }
+</style>

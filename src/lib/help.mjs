@@ -48,7 +48,9 @@ const SHELL = {
   'shell.more': e('More places', 'On a phone, the rest of the places in the sidebar are behind this button.', 'Select it to open them.'),
   'shell.tabs': e('The pages in this place', 'The tabs across the top are the pages inside this place. The one with the bar under it is where you are.', 'Select a tab to open that page.'),
   'shell.module-gate': e('Switch it on', 'This page belongs to a module the demo has switched off, so it is not in the sidebar.', 'Select it to switch the module on for this demo.', 'l:modules'),
-  'shell.modules': e('Modules', 'Each place in the sidebar after Home is a module. On means it is built in; Connected means its records come from a tool the team already uses; Off takes it out of the sidebar.', 'Pick On, Connected or Off for each module. The sidebar changes at once.', 'l:modules'),
+  'shell.modules': e('Modules', 'Each place in the sidebar after Home is a module, with its capabilities under it. On means it is built in; Connected means its records come from a tool the team already uses; Off takes it out of the sidebar, and its capabilities with it.', 'Pick On, Connected or Off for each module. The sidebar changes at once.', 'l:modules'),
+  'shell.feature-gate': e('Switch it on', 'This page belongs to a capability the demo has switched off, so nothing of it shows anywhere else either.', 'Select it to switch the capability on, with the module it belongs to.', 'l:modules'),
+  'shell.capability': e('{name}', 'A capability of this module: a bigger piece a team switches on when it needs it, such as licences or room checks. Off takes every trace of it away, so nothing looks missing; Connected shows where its records come from.', 'Pick On, Connected or Off. The page behind changes in place. A capability that needs another module says so and waits for it.', 'l:modules'),
 };
 
 // The places (one per module, UX-V2 §2.1) and their tabs. "place" and "tab" are the general entries; the specific ones follow.

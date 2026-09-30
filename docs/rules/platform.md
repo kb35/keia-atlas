@@ -98,3 +98,11 @@ Routine work runs only under a standing rule a named owner approved once (`data/
 - **Do:** declare the way back in the rule's data; show the verb from the rule, never from the page; word results as "Done automatically" or "Unable to complete" with the rule and its owner; keep "What it did not check" filled.
 - **Don't:** show an Undo that is not real, run anything irreversible without a person's confirmation, show a confidence percentage, or open the suggestion before the person's call on a P1 or P2.
 
+### P13. Capabilities are switched on when they are needed
+
+The bigger items a team adds when it needs them (licences, room checks, out of service, alert rules, certificates, security flaws, config backups, meeting quality and the rest) are capabilities of a module, each On, Connected or Off in Settings › Modules, nested under its module (`src/lib/modules.mjs`, `SettingsModules.astro`). A capability is off while its module is Off or anything it `requires` is off. The registry in `modules.mjs` is the one list of ids. The page head writes `data-feat-off` and `data-feat-conn` on `<html>` before first paint (`rs6-features`), and `featureCss()` takes away every element marked `data-feature="<id>"` while it is off; a `Section` (or a box marked `data-feat-wrap`) whose content is all gated by one capability goes with it, heading and all. A Connected capability shows its source mark (`FeatureSource`, "from Datadog").
+
+- **Why:** Keith's rule (30 Sept 2026): switched off, a capability leaves no trace, so nothing ever looks missing; switched on, it is there in full.
+- **Do:** mark the section, card, figure (`KeyNumbers` `feature`), tab (NAV `feature`) or answer fragment with `data-feature`; check `featureOn(id)` when the site is built and `window.rsFeatureOn(id)` in a script before writing an answer or a count; redraw on `rs:demo-change` (`detail.what` is `features` or `modules`); give a page that belongs to one capability a gate that says it is switched off, with its own Switch on.
+- **Don't:** leave a heading, an empty card, a zero or a sentence behind for something switched off, or register a capability anywhere but `modules.mjs`.
+

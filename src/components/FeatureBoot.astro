@@ -1,0 +1,30 @@
+---
+/* FeatureBoot: modules and capabilities for a page outside the Shell (the room guide). The same registry, resolver and
+   rules as the Shell's head (src/lib/modules.mjs): before first paint it writes data-off, data-conn, data-feat-off and
+   data-feat-conn on <html> from this browser's choice (rs6-modules, rs6-features), so what a switched-off capability
+   marks never shows, and window.rsFeatureOn(id) answers for the page's scripts. Put it in the <head>. */
+import { MODULE_DEFAULTS, CAPABILITIES, resolveFeatures, featureCss } from '../lib/modules.mjs';
+const RS_CAPS = CAPABILITIES.map((c) => ({ id: c.id, module: c.module, state: c.state, requires: c.requires ?? [] }));
+const RESOLVE = `window.rsResolveFeatures=${resolveFeatures.toString()};`;
+---
+<script is:inline data-astro-rerun define:vars={{ MODULE_DEFAULTS, RS_CAPS }}>window.RS_MODULES = MODULE_DEFAULTS; window.RS_CAPS = RS_CAPS;</script>
+<script is:inline data-astro-rerun set:html={RESOLVE}></script>
+<script is:inline data-astro-rerun>
+  (function () {
+    var W = window, r = document.documentElement;
+    var read = function (k) { try { return JSON.parse(localStorage.getItem(k) || 'null') || {}; } catch (_) { return {}; } };
+    W.rsModules = W.rsModules || function () {
+      var m = Object.assign({}, W.RS_MODULES || {}), s = read('rs6-modules');
+      Object.keys(m).forEach(function (id) { if (/^(on|connected|off)$/.test(s[id])) m[id] = s[id]; });
+      return m;
+    };
+    W.rsFeatures = W.rsFeatures || function () { return W.rsResolveFeatures(W.RS_CAPS || [], W.rsModules(), read('rs6-features')); };
+    W.rsFeature = W.rsFeature || function (id) { return W.rsFeatures()[id] || 'off'; };
+    W.rsFeatureOn = W.rsFeatureOn || function (id) { return W.rsFeature(id) !== 'off'; };
+    var list = function (map, st) { return Object.keys(map).filter(function (k) { return map[k] === st; }).join(' '); };
+    var mods = W.rsModules(), feats = W.rsFeatures();
+    r.setAttribute('data-off', list(mods, 'off')); r.setAttribute('data-conn', list(mods, 'connected'));
+    r.setAttribute('data-feat-off', list(feats, 'off')); r.setAttribute('data-feat-conn', list(feats, 'connected'));
+  })();
+</script>
+<style is:global set:html={featureCss()}></style>

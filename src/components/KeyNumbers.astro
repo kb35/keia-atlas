@@ -16,10 +16,12 @@
    to clear). The id may also be the item's place, 0 for the first. Nothing moves; the figure just changes.
    Sparklines (UI-V2 §8.2): `spark` (a series, oldest first) draws a 64 by 16 line beside the number, `sparkState`
    (review, fault) marks its last point, `sparkWords` is its tooltip. A script passes { spark: '<svg...>' } (from
-   sparkSvg in src/lib/spark.mjs) to redraw it, or { spark: '' } to take it away. */
+   sparkSvg in src/lib/spark.mjs) to redraw it, or { spark: '' } to take it away.
+   `feature` (a capability id, src/lib/modules.mjs) takes the figure away while that capability is off, so a count
+   never mentions something that is switched off. */
 import { href } from '../lib/data.mjs';
 import { sparkSvg } from '../lib/spark.mjs';
-interface Item { n: string | number; label: string; to?: string; fact?: boolean; tone?: 'bad' | 'warn' | 'good'; id?: string; spark?: number[]; sparkState?: string; sparkWords?: string }
+interface Item { n: string | number; label: string; to?: string; fact?: boolean; tone?: 'bad' | 'warn' | 'good'; id?: string; spark?: number[]; sparkState?: string; sparkWords?: string; feature?: string }
 interface Props { items: Item[] }
 const { items = [] } = Astro.props;
 if (items.length > 4) console.warn(`KeyNumbers: ${items.length} items given, showing the first 4 (rule L9).`);
@@ -32,7 +34,7 @@ const fmt = (n) => (typeof n === 'number' ? n.toLocaleString('en-IE') : n);
 {shown.length > 0 && (
   <ul class="kn" aria-label="Key numbers">
     {shown.map((it) => (
-      <li class:list={['kn-i', it.tone && `t-${it.tone}`]} data-kn={it.id} data-kn-plain={!it.to && it.fact ? 'fact' : undefined} data-help={`number:${it.label}`} data-help-name={it.label}>
+      <li class:list={['kn-i', it.tone && `t-${it.tone}`]} data-kn={it.id} data-feature={it.feature} data-kn-plain={!it.to && it.fact ? 'fact' : undefined} data-help={`number:${it.label}`} data-help-name={it.label}>
         {it.to ? (
           <a href={link(it.to)}><span class="kn-v"><b class="num" data-vt-rec={it.to.startsWith('/') ? ddId(it.to) : undefined}>{fmt(it.n)}</b><i class="kn-spk" data-kn-spk set:html={it.spark ? sparkSvg(it.spark, { state: it.sparkState, label: it.sparkWords }) : ''} /></span><span>{it.label}</span></a>
         ) : (

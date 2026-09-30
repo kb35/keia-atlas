@@ -43,3 +43,125 @@ export function moduleAttrs(map) {
   const ids = (st) => MODULES.filter((m) => full[m.id] === st).map((m) => m.id).join(' ');
   return { off: ids('off'), conn: ids('connected') };
 }
+
+// ---- Capabilities (Keith's rule, 30 Sept 2026: the bigger items are "turned on and turned off if they're needed,
+// so that it never looks like there's anything missing") ------------------------------------------------------------
+// Each module holds capabilities: the bigger items a team adds when it needs them (licences, room checks, alert
+// rules, certificates). Each is On, Connected (its records come from a named tool) or Off, like a module, and is
+// off whenever its module is Off or anything it `requires` (a module or another capability) is off.
+//
+// This list is the single source of truth for capability ids. An element marked data-feature="<id>" is taken out
+// of view while that capability is off. The boot script in the page head writes two word lists on <html> before
+// first paint,
+//   data-feat-off="credentials maintenance"   capabilities that are off (chosen, or by their module or requires)
+//   data-feat-conn="alerts config-backups"      capabilities connected to another tool
+// and featureCss() hides what they mark. A Section (.sec) or a [data-feat-wrap] box whose content (apart from its
+// heading) is all gated by one capability goes with it, so no heading is left behind. Pages check a capability with
+// featureOn() when the site is built and window.rsFeatureOn(id) in the browser, so answers and counts never mention
+// one that is off. The choice is kept in this browser (localStorage rs6-features).
+//
+//   id        the word used in data-feature, in rs6-features and in the two lists on <html>
+//   label     its name in Settings
+//   what      one line: what it adds
+//   module    the module it belongs to (its parent in Settings)
+//   state     the default: on, connected or off
+//   source    the tool it reads from when Connected (the source mark: "from Datadog")
+//   requires  modules or capabilities that must not be Off for it to be on
+//   helper    a section another change adds (src/lib/features-added.mjs lists them); registered here, so that list
+//             never needs a switch of its own
+export const CAPABILITIES = [
+  // Locations
+  { id: 'room-accessibility', module: 'locations', label: 'Room accessibility', what: 'Hearing loops, captions and step-free access on each space', state: 'on', source: 'the workplace system', helper: true },
+  { id: 'circuits', module: 'locations', label: 'Internet circuits', what: 'Circuit ids, bandwidth, support lines and contract ends per office', state: 'on', source: 'the carrier portals', helper: true },
+  { id: 'comms-environment', module: 'locations', label: 'Comms room power and climate', what: 'UPS runtime, load, temperature and cooling in each comms room', state: 'on', source: 'the power monitoring', helper: true },
+  { id: 'change-windows', module: 'locations', label: 'Change windows', what: 'Each office\'s hours and the window when changes may run', state: 'on', source: 'the change calendar', helper: true },
+  { id: 'meeting-quality', module: 'locations', label: 'Meeting quality', what: 'A call-quality score per space, its trend and the worst rooms', state: 'connected', source: 'the meeting platform' },
+  // Assets
+  { id: 'licences', module: 'assets', label: 'Licences', what: 'Room and platform licences, seats, renewals and cost', state: 'on', source: 'the licence portals' },
+  { id: 'warranty', module: 'assets', label: 'Warranty and cover', what: 'Warranty, support cover and purchase per unit', state: 'on', source: 'the asset register', helper: true },
+  { id: 'cves', module: 'assets', label: 'Security flaws', what: 'Published security flaws per firmware line, and the units exposed', state: 'on', source: 'the vendor advisories' },
+  { id: 'credentials', module: 'assets', label: 'Certificates and secrets', what: 'Certificates, service accounts and secrets by reference, with expiry', state: 'off', source: 'the vault' },
+  { id: 'config-backups', module: 'assets', label: 'Config backups', what: 'The last config backup of each network device, and its drift', state: 'connected', source: 'Oxidized' },
+  { id: 'cable-tests', module: 'assets', label: 'Cable test results', what: 'Certification results for every cable run and outlet', state: 'on', source: 'the cable tester', helper: true },
+  { id: 'certified-platforms', module: 'assets', label: 'Certified platforms', what: 'Which meeting platforms each space\'s kit is certified for', state: 'on', source: 'the manufacturers', helper: true },
+  // Support
+  { id: 'out-of-service', module: 'support', label: 'Out of service', what: 'Take a space out of service and tell the people booked into it', state: 'on', source: 'the booking system', requires: ['locations'] },
+  { id: 'alerts', module: 'support', label: 'Alert rules', what: 'What counts as an alert, who gets it, quiet hours and silences', state: 'connected', source: 'monitoring', requires: ['services'] },
+  { id: 'repeat-faults', module: 'support', label: 'Repeat faults', what: 'Spaces and models that keep failing, and the trend', state: 'on', source: 'ServiceNow', helper: true },
+  // Projects
+  { id: 'maintenance', module: 'projects', label: 'Room checks', what: 'Recurring checks and planned maintenance, scheduled with a checklist', state: 'on', source: 'the maintenance planner', requires: ['locations'] },
+  // Team
+  { id: 'oncall', module: 'team', label: 'On-call', what: 'Who is on call now, by region and service', state: 'on', source: 'the paging tool', requires: ['support'], helper: true },
+];
+
+export const CAPABILITY_IDS = CAPABILITIES.map((c) => c.id);
+export const CAPABILITY_DEFAULTS = Object.fromEntries(CAPABILITIES.map((c) => [c.id, c.state]));
+export const capability = (id) => CAPABILITIES.find((c) => c.id === id) ?? null;
+
+/* Every capability's state, from the modules' states (a full map, as readModules gives) and a saved choice (any
+   shape, possibly stale). A capability is off when its module is Off, when anything it requires is off, or when it
+   was switched off; otherwise it is what was chosen, or its default. Plain JavaScript with no outside names, so the
+   page head can carry it as text (resolveFeatures.toString()). */
+export function resolveFeatures(caps, mods, saved) {
+  var ok = /^(on|connected|off)$/, byId = {}, out = {}, i;
+  for (i = 0; i < caps.length; i++) byId[caps[i].id] = caps[i];
+  function eff(id, seen) {
+    if (Object.prototype.hasOwnProperty.call(out, id)) return out[id];
+    var c = byId[id];
+    if (!c) return mods && mods[id] ? mods[id] : 'on';   // a module (or a name nobody registered)
+    if (seen[id]) return 'off';                           // a loop in `requires` switches the loop off
+    seen[id] = true;
+    var v = saved && ok.test(saved[id]) ? saved[id] : c.state || 'on';
+    if (mods && mods[c.module] === 'off') v = 'off';
+    var req = c.requires || [];
+    for (var j = 0; j < req.length; j++) if (eff(req[j], seen) === 'off') v = 'off';
+    out[id] = v;
+    return v;
+  }
+  for (i = 0; i < caps.length; i++) eff(caps[i].id, {});
+  return out;
+}
+
+/** The capabilities' states for a modules choice and a capabilities choice (both as saved; stale is fine). */
+export const readFeatures = (mods, saved) => resolveFeatures(CAPABILITIES, readModules(mods), saved);
+
+/** Why a capability is off although it was not switched off itself: its module, or the first thing it requires
+    that is off. Null when nothing above it is off. */
+export function offBecause(id, mods, feats) {
+  const c = capability(id);
+  if (!c) return null;
+  if (mods[c.module] === 'off') return c.module;
+  for (const r of c.requires ?? []) if ((feats[r] ?? mods[r]) === 'off') return r;
+  return null;
+}
+
+/** The two word lists the page head writes on <html>: data-feat-off and data-feat-conn. */
+export function featureAttrs(feats) {
+  const ids = (st) => CAPABILITIES.filter((c) => feats[c.id] === st).map((c) => c.id).join(' ');
+  return { off: ids('off'), conn: ids('connected') };
+}
+
+/** When the site is built: is this capability on (On or Connected) by default? Text written once at build time uses
+    it, and is marked data-feature as well, so the browser takes it away when the person switches the capability off. */
+export function featureOn(id, feats = readFeatures(null, null)) {
+  if (!(id in feats)) throw new Error(`featureOn: no capability "${id}" in src/lib/modules.mjs`);
+  return feats[id] !== 'off';
+}
+
+/* The rules that take gated things out of view, keyed only on the two lists on <html>: a change of state is one
+   change of attribute, which rsChange measures before and after (what leaves shrinks, what arrives grows).
+     [data-feature~=id]       belongs to a capability; with several ids it needs all of them
+     .sec, [data-feat-wrap]   a section or box whose content (apart from its heading) is all gated by one capability
+                              goes with it, so no heading is left orphaned
+     [data-feat-src~=id]      a source mark ("from Datadog"), shown only while the capability is Connected
+     [data-feat-offshow~=id]  shown only while the capability is off (a page's own "switched off" line) */
+export function featureCss(ids = CAPABILITY_IDS) {
+  const skip = '.section-head,script,style,template,[hidden],.sec-all,.sec-to';
+  return ids.map((id) => {
+    const off = `:root[data-feat-off~="${id}"]`;
+    return `${off} [data-feature~="${id}"]{display:none!important}`
+      + `${off} :is(.sec,[data-feat-wrap]):has(> [data-feature~="${id}"]):not(:has(> :not(${skip},[data-feature~="${id}"]))){display:none!important}`
+      + `:root:not([data-feat-conn~="${id}"]) [data-feat-src~="${id}"]{display:none!important}`
+      + `:root:not([data-feat-off~="${id}"]) [data-feat-offshow~="${id}"]{display:none!important}`;
+  }).join('');
+}
