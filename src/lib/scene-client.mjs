@@ -9,7 +9,7 @@
    and pen only, so a tap never leaves a hover behind); a choice (a click or tap, kept until "Show everything", a
    click on empty space or Escape); the page's own highlight (data-pin: the incident's device, in the fault colour).
 
-   The morph (row 55): the same thing in two drawings carries the same data-mk. Walls, floor, rulers and leaders
+   The morph (row 60): the same thing in two drawings carries the same data-mk. Walls, floor, rulers and leaders
    tween their geometry to the new room's; furniture, devices and plates slide and resize from where they were
    (FLIP on their SVG transform); markers slide; what only the old room had fades out where it was, what only the
    new one has fades in; the dimension figures tick to their new values. Inside a page (build-option tabs) the
