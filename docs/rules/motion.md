@@ -164,8 +164,8 @@ Each interaction on a page is one of these rows (MOTION-V2 section 4), with its 
 | 6 | Zoom in one level | Transform over `--dur-zoom` on `--spring-settle`: the clicked shape grows into the destination picture; the parent scales to 1.06 and fades beneath it | Cross-fade |
 | 7 | Zoom out one level | The reverse | Reverse cross-fade |
 | 8 | Change floor on a plan | The plans cross-fade in `--dur-state`; the floor marker slides | Swap at once |
-| 9 | Lens switch | The marker slides in `--dur-morph`; every glyph eases to its new state together | At once |
-| 10 | Select a space on the plan | A 2 px accent outline eases in over `--dur-state`; the side panel's content cross-fades in place (`rsPanelSwap`); the plan never pans | Outline and content at once |
+| 9 | Lens switch | The strip's marker slides in `--dur-morph`; every ring eases to its new state together (`--dur-state`, the km-ring's dash transition, not staggered); the spaces' washes ease; the labels under the rings cross-fade (out on `--dur-exit`, in on `--dur-state`); the plan never moves (`src/lib/lens-client.mjs`) | Marker, rings and labels change at once |
+| 10 | Select a space on the plan | A 2 px accent outline eases in over `--dur-state`; the side panel's content cross-fades in place (`rsPanelSwap`), or, when the panel sits below the plan, the box under the plan fills inside a held card (`rsHold`); the plan never pans. A second press on the chosen space zooms in (row 6); Escape clears, then zooms out (row 7) | Outline and content at once |
 | 11 | Page to page on the same level | `main` leaves upward and the next rises in over `--dur-page`; frame, band and filter bar stay | Cross-fade |
 | 12 | Loading | Slots drawn at final size with a still `--surface-2` wash for at most `--skeleton-max`, then content cross-fades in over `--dur-state`; skipped when ready within `--skeleton-skip`; glyphs then come on in turn; the heartbeat last. Never a spinner for the page | Skeleton to content at once |
 | 13 | The heartbeat ticking | The words change every 10 s, no motion | Same |
@@ -183,7 +183,7 @@ Each interaction on a page is one of these rows (MOTION-V2 section 4), with its 
 | 25 | Density | Rows and cards ease to their new size together; the scroll holds on the element under the pointer | At once |
 | 26 | A module On, Connected or Off; View as | `rsChange` | At once |
 | 27 | "Open pages like this here" | The line's words change, then fade back after `--dur-linger` | Same |
-| 28 | Replay | A frame's glyphs ease in `--dur-state`; Play steps one frame per `--replay-step` | Frames change at once |
+| 28 | Replay | Frames are made when a window is chosen and drawn still. Pressing a frame: the plan's rings and washes ease to that moment in `--dur-state`, the band's sentence changes to the past tense in place, the Then mark and "Replay · 07:52, 28 Sept" appear; Play (only when pressed) steps one frame per `--replay-step`; Space pauses, arrow keys step; Now eases back to live in `--dur-state` (`src/lib/replay-client.mjs`) | Frames change at once; Play steps without easing |
 | 29 | Blast-radius explorer | Affected glyphs ease to the projection state together | At once |
 | 30 | Signal flow on a drawing | Dashes travel only while "Show signals moving" is on; it turns itself off after 30 s or when the page changes | The path is lit, still |
 | 31 | Live change by someone else | As M10 | Highlight and mark, no slide |
