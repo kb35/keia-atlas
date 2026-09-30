@@ -19,7 +19,7 @@ export const km = {
   reduced() {
     if (root.dataset.reduced === 'true') return true;
     if (root.dataset.reduced === 'false') return false;
-    return matchMedia('(prefers-reduced-motion: reduce)').matches;
+    return (window.rsReduced ? window.rsReduced() : matchMedia('(prefers-reduced-motion: reduce)').matches);
   },
   t: {
     get pop() { return tokenMs('--dur-pop', 200); },

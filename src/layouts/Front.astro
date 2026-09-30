@@ -8,6 +8,8 @@ import '../styles/looks/studio.css';
 import '../styles/base.css';
 import '../styles/motion.css';
 import '../styles/motion-library.css';
+import '../styles/a11y.css';
+import { A11Y_BOOT } from '../lib/a11y.mjs';
 import { href } from '../lib/data.mjs';
 import { NAME, LINE, LINKS } from '../lib/brand.mjs';
 
@@ -22,6 +24,7 @@ const { title, description = LINE } = Astro.props;
   <title>{title}</title>
   <meta name="description" content={description} />
   <link rel="icon" href={href('/favicon.svg')} type="image/svg+xml" />
+  <script is:inline data-astro-rerun set:html={A11Y_BOOT}></script>
   <script is:inline data-astro-rerun>
     (function () {
       var r = document.documentElement, t = 'system';
@@ -33,7 +36,7 @@ const { title, description = LINE } = Astro.props;
   <ClientRouter />
 </head>
 <body class="fd-body">
-  <a class="sr-only fd-skip" href="#main">Skip to content</a>
+  <a class="skip-link" href="#main">Skip to content</a>
   <header class="fd-top">
     <a class="fd-brand" href={href('/welcome/')} aria-label={`${NAME}: the front door`}>
       <!-- The Keia mark: the tile, and one stroke that starts as the health ring and leaves as the tick. -->
@@ -51,7 +54,8 @@ const { title, description = LINE } = Astro.props;
   </main>
   <footer class="fd-foot">
     <p>Keia Atlas code: <a href={LINKS.licence}>Apache 2.0</a>. The Keia Method text: <a href={LINKS.ccbysa}>CC BY-SA 4.0</a>. Every company, person, room and incident in the demo is made up.</p>
-    <p>Copyright Red Hat, Inc. Created by Keith Brady. <a href={LINKS.discussions}>Talk to us</a></p>
+    <p>Copyright Red Hat, Inc. Created by Keith Brady. <a href={LINKS.discussions}>Talk to us</a> · <a href={href('/about/accessibility/')}>Accessibility</a></p>
+    <p class="fd-still-row"><button type="button" class="fd-still" data-still-toggle>Pause animations</button></p>
   </footer>
   <script>
     // "See it in use" and the other demo doors open Atlas as a named person (View as), set just before the page
@@ -64,6 +68,20 @@ const { title, description = LINE } = Astro.props;
       try { localStorage.setItem('rs4-who', id); } catch (_) {}
     }
     if (!(window as any).__fdViewAs) { (window as any).__fdViewAs = true; document.addEventListener('click', viewAs, true); }
+
+    // Pause animations (WCAG 2.2.2): every moving picture on the page stops where it is, and the choice is kept, as
+    // Settings › Accessibility › Keep things still (src/lib/front-loop.mjs listens for rs:a11y and follows).
+    function stillButton() {
+      const b = document.querySelector<HTMLButtonElement>('[data-still-toggle]');
+      if (!b || (b as any).__rs) return; (b as any).__rs = true;
+      const W = window as any;
+      const show = () => { b.textContent = W.rsA11y?.().still ? 'Play animations' : 'Pause animations'; };
+      b.addEventListener('click', () => { W.rsSetA11y?.({ still: !W.rsA11y?.().still }); show(); });
+      document.addEventListener('rs:a11y', show);
+      show();
+    }
+    stillButton();
+    document.addEventListener('astro:page-load', stillButton);
   </script>
 </body>
 </html>
@@ -97,7 +115,6 @@ const { title, description = LINE } = Astro.props;
     --h-off: #7D766C; --h-off-ink: #CFC8BD; --h-off-soft: #22201D;
   }
   .fd-body { min-height: 100svh; display: grid; grid-template-rows: auto 1fr auto; background: var(--bg); color: var(--text); font: 400 14px/1.5 var(--font-sans); }
-  .fd-skip:focus { position: fixed; left: 16px; top: 8px; width: auto; height: auto; clip: auto; padding: 8px 12px; background: var(--surface); z-index: 40; }
   .fd-top {
     position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 16px;
     padding: max(10px, env(safe-area-inset-top)) var(--pad-x) 10px; background: color-mix(in srgb, var(--bg) 88%, transparent);
@@ -116,5 +133,10 @@ const { title, description = LINE } = Astro.props;
   .fd-main { width: 100%; max-width: 1240px; margin: 0 auto; padding: 0 var(--pad-x) 48px; container: fd / inline-size; min-width: 0; }
   .fd-foot { border-top: 1px solid var(--line); padding: 24px var(--pad-x) 32px; display: grid; gap: 6px; }
   .fd-foot p { margin: 0 auto; width: 100%; max-width: calc(1240px - 2 * var(--pad-x)); font-size: 13px; color: var(--text-2); }
+  .fd-still-row { display: flex; }
+  .fd-still { font: 500 13px/1 var(--font-sans); min-height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line-strong); background: transparent; color: var(--text-2); cursor: pointer; transition: color var(--dur-hover) var(--ease-settle), background-color var(--dur-hover) var(--ease-settle); }
+  .fd-still:hover { color: var(--text); background: var(--surface-2); }
+  /* Nothing moves on its own under reduced motion, so there is nothing to pause. */
+  @media (prefers-reduced-motion: reduce) { .fd-still-row { display: none; } }
   @media (max-width: 479px) { .fd-nav a { padding: 0 8px; } .fd-brand b { font-size: 15px; } }
 </style>

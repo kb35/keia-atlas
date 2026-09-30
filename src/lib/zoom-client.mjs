@@ -18,7 +18,7 @@ const W = window, D = document;
 const BASE = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
 const inSite = (u) => { const p = u.pathname; return p.startsWith(BASE) ? p.slice(BASE.length) || '/' : p; };
 const levelOf = (u) => zoomLevel(inSite(u), u.search, u.hash);
-const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const reduced = () => (window.rsReduced ? window.rsReduced() : matchMedia('(prefers-reduced-motion: reduce)').matches);
 const M = () => (W.rsMotion ? W.rsMotion() : { reduced: true, zoom: 360, exit: 240, ease: 'ease' });
 const esc = (s) => (W.CSS && CSS.escape ? CSS.escape(s) : s);
 const recName = (id) => 'rec-' + String(id).replace(/[^a-zA-Z0-9_-]/g, '-');

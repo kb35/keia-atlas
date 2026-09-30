@@ -173,7 +173,7 @@ export function initService(root) {
     const f = bar?.querySelector('[data-fb-facet="site"]'); const opt = f?.querySelector(`[data-fopt][data-v="${CSS.escape(row.dataset.k)}"]`);
     if (!opt) return;
     e.preventDefault(); opt.click();
-    if (row.dataset.on !== 'true') document.getElementById('units')?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    if (row.dataset.on !== 'true') document.getElementById('units')?.scrollIntoView({ behavior: (window.rsReduced ? window.rsReduced() : matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'auto' : 'smooth', block: 'start' });
   }));
 
   // ---- The band and the light ----
