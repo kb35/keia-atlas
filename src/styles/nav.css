@@ -1,0 +1,65 @@
+/* Navigation v2 (BUILD-PLAN round V2): the sidebar's modules, the zoom and the path, the in-page zoom states.
+   Motion tokens added by MOTION-V2 §2 for these moves live here beside the moves; the rest stay in motion.css.
+   --ease-spring is written by Shell.astro from src/lib/spring.mjs (360 ms, no bounce) as a CSS linear() curve. */
+:root {
+  --dur-zoom: 360ms;                        /* one zoom level, in or out (MOTION-V2 4.6, 4.7) */
+  --ease-exit: cubic-bezier(.4, 0, 1, 1);   /* leaving things accelerate away */
+  --zoom-scale: 1.06;                       /* the parent picture grows this much as you zoom into a child */
+}
+
+/* ---------- Sidebar: modules (UX-V2 §2.1) ----------
+   Fixed order, Learn below the rule. A Connected module shows its source mark on hover or focus. */
+.nav > a[data-nav="learn"] { order: 30; }
+.nav .nav-div { display: block; order: 25; }
+/* The sidebar scrolls on a short window, so the mark sits inside the entry, at its end, in room kept for it. */
+.nav-src { display: none; }
+.nav a .nav-src { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 11px/1.2 var(--font-sans); color: var(--text-3); opacity: 0; transition: opacity var(--dur-hover) var(--ease-settle); }
+.nav a:hover .nav-src, .nav a:focus-visible .nav-src { opacity: 1; }
+@media (max-width: 1023px) { .nav a .nav-src { display: none !important; } }
+@media (prefers-reduced-motion: reduce) { .nav a .nav-src { transition: none; } }
+
+/* ---------- The path is the zoom (UX-V2 §2.2) ---------- */
+.crumbs [data-zl] { display: inline-block; }
+/* A state step (a floor, a port) the page adds or takes away: it slides along the path (rsPath). */
+.crumbs .zp-step { white-space: nowrap; }
+
+/* The stand-in for a shape on a drawing (a room on the floor plan) while it becomes the next page's picture:
+   a drawing's inner shapes cannot be captured by View Transitions, so a plain box at the same place is. */
+.rs-zoom-proxy { position: absolute; z-index: 50; pointer-events: none; box-sizing: border-box; border: 2px solid var(--accent); border-radius: 3px; background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+
+/* ---------- Zooming between pages: one container transform per level (MOTION-V2 4.6, 4.7) ----------
+   In: the clicked shape (a named record, src/lib/vt.mjs) grows into the next page's picture on the spring; the
+   parent page scales up to --zoom-scale and fades beneath it; the path's new step slides in from the right.
+   Out: the reverse. The Shell's zoom script (src/lib/zoom-client.mjs) sets data-nav-dir and names the shapes. */
+@keyframes rs-zoom-parent-out { to { opacity: 0; transform: scale(var(--zoom-scale)); } }
+@keyframes rs-zoom-parent-in { from { opacity: 0; transform: scale(var(--zoom-scale)); } }
+@keyframes rs-crumb-in { from { opacity: 0; transform: translateX(16px); } }
+@keyframes rs-crumb-out { to { opacity: 0; transform: translateX(16px); } }
+:root[data-nav-dir^="zoom"]::view-transition-group(*) { animation-duration: var(--dur-zoom); animation-timing-function: var(--ease-spring, var(--ease-settle)); }
+:root[data-nav-dir="zoom-in"]::view-transition-old(page) { animation: var(--dur-zoom) var(--ease-spring, var(--ease-settle)) both rs-zoom-parent-out; transform-origin: var(--zx, 50%) var(--zy, 30%); }
+:root[data-nav-dir="zoom-in"]::view-transition-new(page) { animation: var(--dur-zoom) var(--ease-settle) both rs-fade-in; }
+:root[data-nav-dir="zoom-out"]::view-transition-old(page) { animation: var(--dur-exit) var(--ease-exit) both rs-fade-out; }
+:root[data-nav-dir="zoom-out"]::view-transition-new(page) { animation: var(--dur-zoom) var(--ease-spring, var(--ease-settle)) both rs-zoom-parent-in; transform-origin: var(--zx, 50%) var(--zy, 30%); }
+::view-transition-group(crumb-step) { z-index: 4; }
+::view-transition-new(crumb-step):only-child { animation: var(--dur-zoom) var(--ease-spring, var(--ease-settle)) both rs-crumb-in; }
+::view-transition-old(crumb-step):only-child { animation: var(--dur-exit) var(--ease-exit) both rs-crumb-out; }
+
+/* Reduced motion (MOTION-V2 §7): nothing travels or scales; the next picture cross-fades over the old one and
+   the path's step is simply there. (motion.css turns every other page move off.) */
+@media (prefers-reduced-motion: reduce) {
+  :root[data-nav-dir^="zoom"]::view-transition-old(page) { animation: var(--dur-exit) linear both rs-fade-out !important; }
+  :root[data-nav-dir^="zoom"]::view-transition-new(page) { animation: var(--dur-exit) linear both rs-fade-in !important; }
+}
+
+/* ---------- Settings › Modules ---------- */
+.settings .mods { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.settings .mod { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; padding: 5px 0; border-top: var(--border-rule); }
+.settings .mod:first-child { border-top: 0; }
+.settings .mod-n { min-width: 0; }
+.settings .mod-n b { display: block; font-size: 13.5px; font-weight: 600; }
+.settings .mod-n small { display: block; font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings .mod .seg-s span { padding: 5px 10px; font-size: 12.5px; }
+@media (max-width: 420px) {
+  .settings .mod { grid-template-columns: minmax(0, 1fr); }
+  .settings .mod .seg-s { justify-self: start; }
+}

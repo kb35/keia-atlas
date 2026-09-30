@@ -53,7 +53,7 @@ const coreLabel = { stair: 'Stairs', lift: 'Lifts', riser: 'Riser', toilets: 'WC
         {rooms.map((r) => {
           const door = doorOf(r);
           return (
-            <g class:list={['fm-room', { 'fm-bank': r.count > 1, 'fm-comms': ['mdf', 'idf'].includes(r.space_type), 'fm-on': r.id === highlight }]} {...pick(`room:${r.id}`, roomName(r))}>
+            <g class:list={['fm-room', { 'fm-bank': r.count > 1, 'fm-comms': ['mdf', 'idf'].includes(r.space_type), 'fm-on': r.id === highlight }]} {...pick(`room:${r.id}`, roomName(r))} data-vt-rec={interactive ? r.id : undefined}>
               <rect {...rectAttrs(r.rect)}><title>{`${roomName(r)}${r.variations.length ? `: ${r.variations.map((v) => v.text).join('; ')}` : ''}`}</title></rect>
               {r.geo.odd.filter((o) => o.rect).map((o) => <rect class="fm-odd" {...rectAttrs(o.rect)} />)}
               {r.desks.map((d) => <circle class="fm-desk" cx={d.at[0]} cy={Y(d.at[1])} r="0.28" />)}
@@ -116,6 +116,8 @@ const coreLabel = { stair: 'Stairs', lift: 'Lifts', riser: 'Riser', toilets: 'WC
   }
   init();
   document.addEventListener('astro:page-load', init);
+  // The zoom (src/lib/zoom-client.mjs) turns the plans itself on the way in, before the page's picture is taken.
+  (window as any).rsFloorMapsInit = init;
 </script>
 
 <style>
