@@ -78,12 +78,12 @@ function calendarRows() {
 }
 
 // ---- Targets -------------------------------------------------------------------------------------------------------------
-function targetRows(id, roll, extra) {
+function targetRows(id, roll, extra, units = []) {
   const svc = CATALOGUE[id];
   return svc.targets.map((t) => {
     let v = null, how = 'Simulated';
     if (t.from === 'units') { v = roll.sites.length ? Math.min(...roll.sites.map((s) => s.share)) : 100; how = 'From the units, the lowest office'; }
-    else if (t.from === 'licences') { const pools = licences.filter((l) => l.kind === 'meeting-room'); v = pools.length ? (pools.filter((l) => !l.short).length / pools.length) * 100 : 100; how = 'From the licence pools'; }
+    else if (t.from === 'licences') { const held = new Set(licences.filter((l) => l.kind === 'meeting-room').flatMap((l) => l.units)); v = units.length ? (units.filter((u) => held.has(u.tag)).length / units.length) * 100 : 100; how = 'From the licence pools that cover each model (a pool short of seats shows in Licences)'; }
     else if (t.from === 'calendar') { v = extra.calendar ? (extra.calendar.linked / Math.max(1, extra.calendar.bookable)) * 100 : 100; how = 'Simulated from the room booking system'; }
     else if (t.from === 'privacy') { v = 100; how = 'From the privacy records (the validator checks every sensing unit is covered)'; }
     else if (t.from === 'events' || t.from === 'reports') { v = extra.events?.[t.id] ?? null; how = 'From the events\' records'; }
@@ -109,7 +109,7 @@ export function catalogueModel(id, extraIn = {}) {
   if (id === 'building') extra.privacy = privacyFor(['video-bar', 'camera', 'codec', 'desk-video-device', 'microphone'], SITE_ORDER);
   if (id === 'booking') extra.calendar = calendarRows();
   if (id === 'signage' || id === 'collaboration') extra.platformsHouse = (HOUSE.platforms ?? []).map((p) => p.name);
-  const targets = targetRows(id, roll, extra);
+  const targets = targetRows(id, roll, extra, units);
   const within = targets.every((t) => t.kept);
   const std = svc.standard.id ? STANDARDS[svc.standard.id] : null;
   const standard = std

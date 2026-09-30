@@ -33,7 +33,7 @@ export const CATALOGUE = {
     classes: ['video-bar', 'codec', 'desk-video-device'], word: ['room system', 'room systems'],
     standard: { id: 'meeting-av' },
     systems: ['Google Admin console', 'Poly Lens', 'Webex Control Hub', 'The licence portals'],
-    targets: [T('available', 'Room systems signed in to their platform, in every office', 98, '%', { from: 'units' }), T('first', 'Calls that joined first time', 97, '%', { centre: 98.4, spread: 0.8 }), T('seats', 'Licence pools within their seats', 100, '%', { from: 'licences' })],
+    targets: [T('available', 'Room systems signed in to their platform, in every office', 98, '%', { from: 'units' }), T('first', 'Calls that joined first time', 97, '%', { centre: 98.4, spread: 0.8 }), T('licensed', 'Room systems on a licensed platform', 95, '%', { from: 'licences' })],
     map: { before: { label: 'AV', to: '/services/av/', sub: 'The room kit' }, groups: [{ label: 'Video bars and codecs', classes: ['video-bar', 'codec'] }, { label: 'Desk video', classes: ['desk-video-device'] }], after: { label: 'Google Meet, Teams, Zoom and Webex', sub: 'One way to join from every room' } },
   },
   wifi: {
