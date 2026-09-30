@@ -1,0 +1,34 @@
+---
+/* HandoverCard: one fixed card for three moments (UI-V2 §8.10; UX-V2 §4.3 and §4.4). The format never changes, so a
+   person reads it without learning it again. Builders in src/lib/handover.mjs (pages that draw in the browser use the
+   same ones); look in src/styles/handover.css.
+   Props:  variant  'park'     three lines: Where I stopped, Next step, Open question (read-only, or `edit`)
+                    'cover'    Hand over for cover: Open, Fragile, Who owns what, What changed recently
+                    'welcome'  Welcome back: Yours now, Handled while you were away, Changed on your projects, Refreshers
+           card     the park card's lines ({ where, next, question })
+           edit     the park card as a form (Park and Cancel)
+           data     the four places' lines ({ open: { lines, free }, ... }); leave it out to fill in the browser
+           overline, title, meta   the card's head (cover and welcome)
+   Slots:  action   one button in the head ("Start the day")
+   Motion: the card grows from the control that opened it (MOTION-V2 4.20) and the four places come in together, a
+   stagger apart; reduced motion shows it at once. */
+import '../styles/handover.css';
+import { parkRead, parkEdit, slotsHtml } from '../lib/handover.mjs';
+interface Props { variant: 'park' | 'cover' | 'welcome'; card?: Record<string, string>; edit?: boolean; data?: Record<string, unknown>; overline?: string; title?: string; meta?: string; id?: string }
+const { variant, card = {}, edit = false, data, overline = '', title = '', meta = '', id } = Astro.props;
+---
+{variant === 'park' ? (
+  <Fragment set:html={edit ? parkEdit(card, { id: id ?? 'park' }) : parkRead(card)} />
+) : (
+  <article class="ho card" data-ho={variant} id={id} aria-labelledby={id ? `${id}-h` : undefined} data-help={{ cover: 'handover.cover', welcome: 'handover.welcome' }[variant]}>
+    <header class="ho-h">
+      <div class="ho-hd">
+        {overline && <p class="overline" data-ho-over>{overline}</p>}
+        <h2 id={id ? `${id}-h` : undefined} data-ho-title>{title}</h2>
+        {meta && <p class="ho-meta" data-ho-meta>{meta}</p>}
+      </div>
+      {Astro.slots.has('action') && <div class="ho-go"><slot name="action" /></div>}
+    </header>
+    <div class="ho-grid" data-ho-body set:html={data ? slotsHtml(variant, data) : ''} />
+  </article>
+)}

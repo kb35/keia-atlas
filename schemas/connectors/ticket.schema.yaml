@@ -1,0 +1,35 @@
+# Connected ticket: an incident or a request as a service-management tool holds it, in Keia's shape.
+# The tool stays the owner of status and priority; Keia shows its plain status beside the tool's own.
+# Files live in data/connected/<system>/tickets/<id>.yaml. See docs/connectors/model.md.
+#
+# No people in v0: callers and assignees come later from the identity provider, matched on its ids.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/connectors/ticket
+title: Connected ticket
+type: object
+additionalProperties: false
+required: [kind, id, type, title, status_native, opened_at, source]
+properties:
+  kind: { const: ticket }
+  id: { $ref: "common#/$defs/id" }
+  type: { enum: [incident, request] }
+  number: { type: string, minLength: 1, description: The number people quote (INC0041121). }
+  title: { type: string, minLength: 1 }
+  status:
+    description: "Keia's plain status: New, In progress, On hold, Resolved, Closed. Left out when the tool's own state does not map cleanly."
+    enum: [new, in-progress, on-hold, resolved, closed]
+  status_native: { type: string, minLength: 1, description: The state in the tool's own words (Awaiting Vendor). }
+  priority: { enum: [1, 2, 3, 4], description: "1 critical, 2 high, 3 moderate, 4 low." }
+  priority_native: { type: string, minLength: 1 }
+  group: { type: string, minLength: 1, description: "The team it is assigned to. A team, never a person." }
+  opened_at: { $ref: "common#/$defs/when" }
+  updated_at: { $ref: "common#/$defs/when" }
+  resolved_at: { $ref: "common#/$defs/when" }
+  space: { $ref: "common#/$defs/id", description: The connected space it is about. }
+  unit: { $ref: "common#/$defs/id", description: The connected unit it is about. }
+  notes: { $ref: "common#/$defs/notes" }
+  source: { $ref: "common#/$defs/source" }
+  field_sources: { $ref: "common#/$defs/field_sources" }
+  raw: { $ref: "common#/$defs/raw" }
+  raw_redacted: { $ref: "common#/$defs/raw_redacted" }
