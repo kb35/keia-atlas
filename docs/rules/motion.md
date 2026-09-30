@@ -4,7 +4,7 @@ Motion explains a change. Tokens and shared moves are in `src/styles/motion.css`
 
 ### M1. Durations and curves are tokens
 
-Moves use `--dur-morph` (520 ms), enters `--dur-enter` (440), exits `--dur-exit` (240), pages `--dur-page` (420), colour and status `--dur-state` (300), hovers `--dur-hover` (140), menus and peek cards `--dur-pop` (200), growing from `--pop-scale` (.94); a look or light and dark cross-fades the page in `--dur-theme` (360); list items start `--stagger` (24) apart; a live change stays marked for `--dur-linger` (4000). Loops have their own: `--dur-blink`, `--dur-pulse`, `--dur-flow`. The curve is `--ease-settle`. Scripts read the same values from `window.rsMotion()`.
+Moves use `--dur-morph` (520 ms), enters `--dur-enter` (440), exits `--dur-exit` (240), pages `--dur-page` (420), colour and status `--dur-state` (300), hovers `--dur-hover` (140), menus and peek cards `--dur-pop` (200), growing from `--pop-scale` (.94); a look or light and dark cross-fades the page in `--dur-theme` (360); list items start `--stagger` (24) apart; a live change stays marked for `--dur-linger` (4000). Loops have their own: `--dur-blink` (rack link lights) and `--dur-flow` (signal flow you start). `--dur-pulse` is retired: nothing on a working page loops. The curve is `--ease-settle`. Scripts read the same values from `window.rsMotion()`.
 
 - **Why:** one rhythm reads as one system, and one edit retunes it.
 - **Do:** `transition: background var(--dur-state) var(--ease-settle)`.
@@ -20,7 +20,7 @@ A thing on both views moves and resizes into its new place. A new thing grows fr
 
 ### M3. Nothing overshoots
 
-Everything decelerates into place on one curve. No springs, no bounce. Exceptions: a status light flashes once when it gets its result (M8), spinners and signal flow run at an even speed, and a fault pulse breathes.
+Everything decelerates into place on one curve. No springs, no bounce. Exceptions: a health glyph comes on once when it gets its result (M8), and spinners and signal flow run at an even speed. Nothing pulses: stillness means fine, and a fault is told by its shape and word.
 
 - **Why:** bounce is noise in a tool used all day.
 - **Do:** one curve for moves, enters and exits.
@@ -52,19 +52,19 @@ Switching a tab, filter, view or step never moves the page under the pointer. Wr
 
 ### M7. Reduced motion turns it off
 
-With reduced motion on, nothing moves, and states still change at once. CSS is covered by `base.css` and `motion.css`; scripts must check `window.rsMotion().reduced` themselves. A fault pulse becomes a still ring.
+With reduced motion on, nothing moves, and states still change at once. CSS is covered by `base.css` and `motion.css`; scripts must check `window.rsMotion().reduced` themselves. Glyphs are drawn at once, and the heartbeat's words still change.
 
 - **Why:** [WCAG 2.2, 2.3.3](https://www.w3.org/WAI/WCAG22/Understanding/animation-from-interactions.html): motion makes some people ill.
-- **Do:** guard every `el.animate()` and `startViewTransition()`.
+- **Do:** guard every `el.animate()` and `startViewTransition()`. `node tools/motion-check.mjs --base <dev server>` walks the zoom, the palette, Settings › Modules and a port with reduced motion on and fails on any scripted animation.
 - **Don't:** assume the CSS rule stops script animation. It doesn't.
 
 ### M8. Lights come on in turn
 
-Status lights (`.hl[data-state]`: ok, warn, bad, off) arrive grey, then flash once to their colour, one after another, as they scroll into view. A fault keeps a slow pulse.
+Health glyphs (`HealthGlyph.astro`, `.hg`; UI-V2 §6) arrive quiet, then come on once to their state, one after another (`--stagger` apart), as they scroll into view. The heartbeat ("checked 40 s ago") shows last. A later change of state eases in place over `--dur-state`. Nothing pulses, a fault included: the fault pulse and the radiating glow are retired.
 
-- **Why:** it shows something was checked, not just asserted.
-- **Do:** use `.hl`, with a word beside it.
-- **Don't:** invent another status dot.
+- **Why:** it shows something was checked, not just asserted; and a still page reads as fine.
+- **Do:** use `HealthGlyph` (or `glyph()` from `src/lib/health.mjs` in a script, `.hg-m` in an inline script), with a word beside it.
+- **Don't:** invent another status dot, or loop anything on a working page.
 
 ### M9. When not to animate
 
@@ -101,7 +101,9 @@ Every control that changes what is on screen (a filter, a view or scope switch, 
 | A segmented switch ("Me, My team, Everyone", "Day, Week, Month, Year", Settings) | One marker slides to the chosen word (`--dur-morph`) | `rsMarkerWatch(group, '[aria-pressed=true]')` |
 | Filtering a list | Items that stay slide, new ones grow from their centre, leaving ones shrink to theirs where they were, the pills in the bar slide aside, the count eases in; the list box eases to its new height | `FilterBar` (`rsEnterEls`, `rsExitEls`, `rsHold`) |
 | Switching a view, scope, step or person | The old view fades out where it was (`--dur-exit`) while the new one fades in (`--dur-enter`, from the side you stepped towards for a step); its box eases to the new height; if you had scrolled into the view, the new one starts at its top, just under the bar | `rsSwapBegin(old)` then `.end(new)`, or `rsSwap(box, redraw, { dir })` |
-| A demo setting adds, removes or re-orders things (stage, agents, View as) | What leaves shrinks to its centre, what arrives grows from its centre, the rest (sidebar entries, place tabs, cards) slides; what you were looking at stays still on screen. A change that swaps the whole page (a page from a module that is switched off, the vendor gate) cross-fades the page instead | `rsSetStage(n)`, `rsSetAgents(v)`, `rsPickWho(id)` (all `rsChange`) |
+| A demo setting adds, removes or re-orders things (a module On, Connected or Off, agents, View as) | What leaves shrinks to its centre, what arrives grows from its centre, the rest (sidebar entries, place tabs, cards) slides; what you were looking at stays still on screen. A change that swaps the whole page (a page from a module that is switched off, the vendor gate) cross-fades the page instead | `rsSetStage(n)`, `rsSetAgents(v)`, `rsPickWho(id)` (all `rsChange`) |
+| Zooming one level along the map (region, office, floor, space, device, port), by a click, the path or `[` and `]` | The clicked shape becomes the next page's picture on the zero-bounce spring (`--dur-zoom`, `--ease-spring` from `src/lib/spring.mjs`); the page behind scales to `--zoom-scale` and fades; the path's new step slides in from the right, and a lost one slides out. A shape on a drawing (a room on the plan) is stood in for by a plain box (`.rs-zoom-proxy`). Two levels at once is the ordinary page move. A second move starts from where the first is (`rsZoom`). Reduced motion: the pages cross-fade; the step is simply there | `src/lib/zoom-client.mjs`, `nav.css` |
+| The palette (⌘K): Find, `>` Do, `?` Ask | Rows are drawn from memory on the keystroke's next frame and never animate while you type; `>` lists the page's own buttons (`data-verb`) and Enter presses the button | `SearchOverlay.astro`, `src/lib/verbs.mjs` |
 | A look, or light and dark | One calm cross-fade of the whole page (`--dur-theme`, View Transitions), after the look's fonts have loaded; nothing else moves or eases on its own meanwhile; what you were looking at stays still | `rsTheme(update, skin)` |
 
 - **The filter bar's shape depends on its width only.** It is laid out with everything at its widest (Clear all, Sort, the longest count, a choice named in every pill) and again only when its width changes, so no pick and no view switch re-lays it. A pill naming long choices shortens them with an ellipsis. A choice that does not apply to a view is switched off in place, never removed (Sort outside Week on the Schedule).

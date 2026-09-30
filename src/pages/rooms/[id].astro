@@ -116,11 +116,23 @@ const NUMBERS = store ? [
   x.type.keia_atlas.capacity ? { n: x.type.keia_atlas.capacity.max, label: 'Seats', fact: true } : null,
   { n: openCount, label: openCount === 1 ? 'Open incident' : 'Open incidents', to: '#incidents', tone: openCount ? 'bad' : undefined },
 ].filter(Boolean);
+// The answer (UI-V2 §3.3): the open incident first, with who has it; otherwise whether the space is as it should be.
+const lead = roomInc.find((v) => v.open);
+const firstName = (pid) => PEOPLE.find((p) => p.id === pid)?.name.split(' ')[0];
+const leadWith = lead ? firstName(lead.inc.keia_atlas?.assigned) : null;
+const ANSWER = lead
+  ? `${lead.inc.short_description}${leadWith ? ` · With ${leadWith}` : ''}${openCount > 1 ? ` · ${openCount - 1} more open` : ''}`
+  : store ? (store.lowRules.length ? `${plural(store.lowRules.length, 'model')} below minimum · no open incidents` : 'Every model at or above its minimum · no open incidents')
+  : isComms ? `${std?.text ?? 'Not checked against the standard'} · no open incidents`
+  : missing.length ? `${plural(missing.length, 'required device')} missing against its space type`
+  : replacing.length ? 'Kit being replaced · no open incidents'
+  : x.stages.deploy ? `Being installed · ${plural(x.stages.deploy, 'unit')} still going in`
+  : unitCount ? `All ${plural(unitCount, 'unit')} in service · no open incidents` : 'No tracked devices · no open incidents';
 const kiTitles = JSON.stringify(Object.fromEntries(knownIssues.map((i) => [i.id, i.title])));
 const deskWord =kind === 'kits' ? 'kit' : 'desk';
 ---
 <Shell about={{ kind: kind === 'comms' ? 'comms' : 'room', label: `${title}, ${site.name}`, to: `/rooms/${x.id}/` }} title={title} section="rooms" crumbs={[{ label: 'Spaces', to: '/rooms/' }, { label: site.name, to: `/rooms/?site=${x.site}` }, { label: title }]}>
-  <PageBand overline={KIND_ONE[kind] ?? 'Space'} title={title} numbers={NUMBERS}>
+  <PageBand overline={KIND_ONE[kind] ?? 'Space'} title={title} answer={ANSWER} heartbeat numbers={NUMBERS}>
     <Fragment slot="overline">
       <a class="code" data-help="room.site" href={href(`/rooms/?site=${x.site}`)} style="text-decoration:none" title={`Every space at ${site.name}`}>{site.code}</a>
       <span>{site.name}{floor ? ` · ${floor.name}` : ''}</span>

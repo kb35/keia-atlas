@@ -7,7 +7,7 @@ import PageBand from '../../components/PageBand.astro';
 import FilterBar from '../../components/FilterBar.astro';
 import Section from '../../components/Section.astro';
 import EmptyState from '../../components/EmptyState.astro';
-import { href } from '../../lib/data.mjs';
+import { href, plural } from '../../lib/data.mjs';
 const SEED = [
   { id: 'CHG-040', title: 'AV refresh playbook: add a step to label both ends of every patch cable', kind: 'playbook', path: 'data/playbooks/av-refresh.yaml', change: 'adds a step to Install, version 1.3 to 1.4', by: 'Liam Doyle', byRole: 'On-site technician', approver: 'Tomás Varga, Programme manager with Sofia Reyes, Service manager, AV', date: '2026-09-28', status: 'review', project: 'PRJ-12',
     text: '  - phase: install\n    steps:\n+     - { title: "Label both ends of every patch cable", role: tech, note: "Skylark" }\n', note: 'Suggested from PRJ-12 New York office video bar refresh, about 21.05 Skylark. It is already on that project as a one-off.' },
@@ -32,6 +32,7 @@ const FACETS = [
 ];
 const SORT = { options: [{ value: 'newest', label: 'Newest first' }, { value: 'review', label: 'Waiting for review first' }, { value: 'kind', label: 'By kind' }] };
 const count = (st) => SEED.filter((c) => c.status === st).length;
+const answer = `${count('review') ? `${plural(count('review'), 'proposal')} to review` : 'Nothing to review'} · ${count('changes') ? `${count('changes')} sent back for changes` : 'none sent back for changes'}`;
 const NUMBERS = [
   { n: count('review'), label: 'Waiting for review', to: '?status=review' },
   { n: count('changes'), label: 'Edits asked for', to: '?status=changes', tone: count('changes') ? 'warn' : undefined },
@@ -40,7 +41,7 @@ const NUMBERS = [
 ];
 ---
 <Shell title="Proposals" section="changes" crumbs={[{ label: 'Proposals' }]}>
-  <PageBand overline="Register" title="Proposals" lede="Every proposal to change what Keia Atlas knows, who approves it, and the file it writes." sim numbers={NUMBERS}>
+  <PageBand overline="Register" title="Proposals" answer={answer} lede="Every proposal to change what Keia Atlas knows, who approves it, and the file it writes." sim numbers={NUMBERS}>
     <a slot="action" class="btn primary" href={href('/edit/')}><Icon name="plus" size={16} />Propose an edit</a>
   </PageBand>
   <div class="content changes">

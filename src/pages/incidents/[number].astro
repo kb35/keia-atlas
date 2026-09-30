@@ -13,6 +13,7 @@ import Wiring from '../../components/Wiring.astro';
 import PageBand from '../../components/PageBand.astro';
 import SidePanel from '../../components/SidePanel.astro';
 import DetailTabs from '../../components/DetailTabs.astro';
+import HealthGlyph from '../../components/HealthGlyph.astro';
 import { recHere } from '../../lib/vt.mjs';
 import {
   incidents, classes, projects, labTests, INC_STATE, STAGE_LABEL, LOC_LABEL, className, modelName, findTask,
@@ -86,6 +87,14 @@ const NUMBERS = [
   { n: inc.keia_atlas.evidence.length, label: inc.keia_atlas.evidence.length === 1 ? 'Finding' : 'Findings', to: '#evidence' },
   { n: relatedCount, label: 'Related', to: '#related' },
 ].filter(Boolean).slice(0, 4);
+// The answer (UI-V2 §3.5): where the job stands and who has it. The ticket's own system is the source mark.
+const first = assigned ? assigned.name.split(' ')[0] : null;
+const ANSWER = inc.state === 'resolved' ? `Resolved: ${(RES_LABEL[v.resolution?.code] ?? 'closed').toLowerCase()} · took ${spoken(v.age)}`
+  : inc.state === 'on-hold' ? `On hold · waiting on ${(HOLD_LABEL[v.hold?.hold] ?? 'something').replace(/^Waiting for /, '').toLowerCase()}${first ? ` · With ${first}` : ''}`
+  : inc.state === 'new' ? `New, not taken yet · open for ${spoken(v.age)}`
+  : `In progress${first ? ` · With ${first}` : ''} · open for ${spoken(v.age)}`;
+const fromTicket = [...inc.history].reverse().find((h) => h.source && h.source !== 'keia_atlas');
+const SOURCE = fromTicket ? { from: SOURCE_LABEL[fromTicket.source] ?? fromTicket.source, ref: inc.number, at: fromTicket.at } : undefined;
 const kindIcon = { ticket: 'inbox', install: 'box', incident: 'alert', task: 'project' };
 const stateTone = { new: 'new', 'in-progress': 'prog', 'on-hold': 'hold', resolved: 'done' };
 const taskHref = (prj) => href(`/projects/${prj.id.toLowerCase()}/`);
@@ -93,7 +102,7 @@ const incHref = (n) => href(incidentPath(n));
 ---
 <Shell about={{ kind: 'incident', label: `${inc.number} ${inc.short_description}`, to: v.href }} title={`${inc.number} ${inc.short_description}`} section="incidents" minStage={2}
   crumbs={[{ label: 'Incidents', to: '/incidents/' }, { label: site.name, to: `/incidents/?site=${s.site}` }, { label: v.roomTitle, to: `/rooms/${s.id}/` }, { label: inc.number }]}>
-  <PageBand overline="Incident" title={inc.short_description} numbers={NUMBERS} sim>
+  <PageBand overline="Incident" title={inc.short_description} answer={ANSWER} source={SOURCE} numbers={NUMBERS} sim>
     <Fragment slot="overline">
       <span class="mono ib-no" data-help="incident.number" {...recHere(inc.number)}>{inc.number}</span>
       <span data-help="incident.priority" class={`prio p-${inc.priority}`} title={`Priority ${inc.priority}: ${PRIORITY_LABEL[inc.priority]}`}>P{inc.priority} {PRIORITY_LABEL[inc.priority]}</span>
@@ -164,7 +173,7 @@ const incHref = (n) => href(incidentPath(n));
         <section class="dc-sec" id="evidence">
           <h3 data-help="incident.evidence">Evidence</h3>
           <ul class="ev">
-            {inc.keia_atlas.evidence.map((e) => <li class={`ev-${e.level}`}><i class="hl" data-state={e.level} aria-hidden="true"></i><span><b>{e.from}</b>{e.says}</span><span class="sr-only">{WORD[e.level]}</span></li>)}
+            {inc.keia_atlas.evidence.map((e) => <li class={`ev-${e.level}`}><HealthGlyph state={e.level} size={12} title={WORD[e.level]} /><span><b>{e.from}</b>{e.says}</span><span class="sr-only">{WORD[e.level]}</span></li>)}
           </ul>
         </section>
 
@@ -186,17 +195,17 @@ const incHref = (n) => href(incidentPath(n));
           <section class="dc-sec">
             <h3>Devices in the space</h3>
             <ul class="dc-health">
-              {roomPositions.map((p) => <li><i class="hl" data-state={v.open ? 'bad' : 'ok'} aria-hidden="true"></i><span>{(p.role ?? className(p.cls)).replace(/:.*$/, '')}</span><small>{v.open ? 'Offline' : 'Back online'}</small></li>)}
+              {roomPositions.map((p) => <li><HealthGlyph state={v.open ? 'fault' : 'fine'} size={12} title={v.open ? 'offline' : 'back online'} /><span>{(p.role ?? className(p.cls)).replace(/:.*$/, '')}</span><small>{v.open ? 'Offline' : 'Back online'}</small></li>)}
             </ul>
           </section>
         ) : (
           <section class="dc-sec">
             <h3 data-help="incident.health">Health checks <small class="faint">when Keia Atlas matched the ticket</small></h3>
             <ul class="dc-health">
-              {health.map((hc) => <li title={hc.says || undefined}><i class="hl" data-state={hc.level} aria-hidden="true"></i><span>{hc.name}</span><small class={`w-${hc.level}`}>{hc.word}</small></li>)}
+              {health.map((hc) => <li title={hc.says || undefined}><HealthGlyph state={hc.level} size={12} title={hc.word} /><span>{hc.name}</span><small class={`w-${hc.level}`}>{hc.word}</small></li>)}
               {std && (
                 <li title={fwReported ? `Device management reported ${fwReported}` : 'Device management did not report a version for this ticket'}>
-                  <i class="hl" data-state={fwLevel ?? 'off'} aria-hidden="true"></i><span>Firmware <span class="mono">{fwReported ?? 'not reported'}</span></span>
+                  <HealthGlyph state={fwLevel ?? 'off'} size={12} title={fwLevel === 'ok' ? 'on the standard' : fwLevel ? 'behind the standard' : 'not reported'} /><span>Firmware <span class="mono">{fwReported ?? 'not reported'}</span></span>
                   <small class={fwLevel ? `w-${fwLevel}` : ''}>{fwLevel === 'ok' ? 'Standard' : fwLevel === 'warn' ? `Standard is ${std.version}` : `Standard ${std.version}`}</small>
                 </li>
               )}
@@ -459,11 +468,11 @@ const incHref = (n) => href(incidentPath(n));
   .dc-sec h3 small { font: 500 11px var(--font-sans); letter-spacing: 0; text-transform: none; }
   .ev { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
   .ev li { display: grid; grid-template-columns: 12px minmax(0, 1fr); gap: 8px; font-size: 13px; line-height: 1.35; }
-  .ev .hl { margin-top: 3px; width: 10px; height: 10px; }
+  .ev .hg { margin-top: 3px; }
   .ev b { display: block; font: 650 11.5px/1.3 var(--font-sans); color: var(--text-2); }
   .dc-health { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
   .dc-health li { display: grid; grid-template-columns: 12px minmax(0, 1fr); column-gap: 7px; font-size: 12.5px; line-height: 1.25; align-items: start; }
-  .dc-health .hl { width: 10px; height: 10px; margin-top: 2px; grid-row: span 2; }
+  .dc-health .hg { margin-top: 2px; grid-row: span 2; }
   .dc-health small { color: var(--text-3); font-size: 11.5px; }
   .dc-health .w-bad { color: var(--red-ink); font-weight: 650; } .dc-health .w-warn { color: var(--amber-ink); font-weight: 650; } .dc-health .w-ok { color: var(--green-ink); }
   .dc-sym { margin: 0; font-size: 12.5px; color: var(--text-2); }

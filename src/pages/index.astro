@@ -29,8 +29,28 @@ import {
 import { PEOPLE, person, INBOX_SEED } from '../lib/demo.mjs';
 import { PATHS } from './learn/_lessons.mjs';
 import GuideLive from '../components/GuideLive.astro';
+import HealthGlyph from '../components/HealthGlyph.astro';
 
 const H = homeData();
+// The answer sentence per person (UI-V2 §8.1, UX-V2 §3): what is not all right first, calmly; drawn for whoever is viewing.
+const pl = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+function answerOf(p) {
+  const N = H.numbers[p.id] ?? [], f = (id) => N.find((x) => x.id === id)?.n ?? 0;
+  const office = sites[p.office]?.name ?? 'Your office', today = `${pl(f('today'), 'job')} today`;
+  const waiting = (n, of) => (n ? `${pl(n, 'task')} waiting on something${of}` : `nothing waiting on anyone${of}`);
+  switch (p.roleId) {
+    case 'tech': return f('inc') ? `${office}: ${pl(f('inc'), 'open incident')} · ${today}` : `${office}: ${siteStats[p.office]?.spaces ?? 0} spaces, no open incidents · ${today}`;
+    case 'delivery': case 'network': case 'innovation': return `${pl(f('tasks'), 'open task')}, ${waiting(f('blocked'), '')} · ${today}`;
+    case 'sm-av': case 'sm-infra': return `${f('approval') ? `${pl(f('approval'), 'item')} for your approval` : 'Nothing for your approval'} · ${pl(f('inc'), 'open incident')}`;
+    case 'pm': return `${pl(f('projects'), 'project')}, ${waiting(f('blocked'), '')}`;
+    case 'programme': return `${pl(f('projects'), 'live project')}, ${waiting(f('blocked'), '')}`;
+    case 'head': return f('inc') ? `${pl(f('inc'), 'open incident')} across ${pl(f('sites'), 'office')} · everything else running` : `All ${pl(f('sites'), 'office')} running, no open incidents`;
+    case 'desk': return f('new') ? `${pl(f('new'), 'new incident')} to take · ${f('doing')} in progress` : `No new incidents · ${f('doing')} in progress`;
+    case 'vendor': case 'service-vendor': return f('snags') ? `${pl(f('snags'), 'space')} with snags · ${today}` : `No snags in your installation · ${today}`;
+    default: return `${pl(f('tasks'), 'open task')} in your team, ${waiting(f('blocked'), '')}`;
+  }
+}
+H.answers = { ...Object.fromEntries(PEOPLE.map((p) => [p.id, answerOf(p)])), everyone: 'Every role at once; each block says whose first screen it is' };
 const json = JSON.stringify(H).replace(/</g, '\\u003c');
 const OPEN_STATES = 'new,in-progress,on-hold';
 const TASK_KINDS = 'provision,install,configure,commission,task';
@@ -104,10 +124,10 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
 ---
 <Shell title="Home" section="home" vendorOk crumbs={[{ label: 'Home' }]}>
   <RoomPlanSprite />
-  <PageBand overline="Home" title="Aoife, ready for you">
-    <span slot="overline"><span data-greet>Hello</span> · <span class="faint">{fmtDate(DEMO_TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}</span></span>
-    <span slot="lede" class="hp-lede"><span class="hp-lede-who"><span data-who-role>AV and IT delivery engineer</span> · <span data-who-where></span></span><span class="hp-caption" data-caption aria-live="polite"></span></span>
-    <a slot="action" class="btn primary" data-home-action href={href('/work/')}>Open Work overview</a>
+  <PageBand overline="Home" title="Aoife, ready for you" heartbeat>
+    <span slot="overline"><span data-greet>Hello</span> · <span class="faint">{fmtDate(DEMO_TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}</span> · <span class="faint" data-who-line><span data-who-role>AV and IT delivery engineer</span> · <span data-who-where></span></span></span>
+    <span slot="answer" class="hp-lede"><span class="hp-lede-who" data-home-answer>{H.answers.aoife}</span><span class="hp-caption" data-caption aria-live="polite"></span></span>
+    <a slot="action" class="btn primary" data-home-action href={href('/support/')}>Open Support</a>
     <!-- Four figures, filled for whoever is viewing (src/lib/home.mjs numbersFor): each opens the list it counts (rule P10). -->
     <KeyNumbers slot="numbers" items={[
       { n: 0, label: 'Today', id: 'k0', to: '/work/schedule/?view=day' },
@@ -117,7 +137,7 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
     ]} />
   </PageBand>
 
-  <div class="content home" data-home>
+  <div class="content home" data-home data-cockpit>
     <!-- 1. My day: where you are, the day in order, the current time. Drawn for whoever is viewing. -->
     <section class="card hp-day" aria-labelledby="h-day" data-help="home.day" data-day>
       <header class="hp-h">
@@ -192,7 +212,7 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
         <div class="proj-mini">
           {projList.map(({ p, L, G, open, blocked, worst }) => (
             <a class="pm-row" href={href(`/projects/${p.id.toLowerCase()}/`)} data-pm={p.owner} data-help="home.project-row" data-vt-rec={p.id}>
-              <span class="pm-lights" aria-label={`Schedule ${L.schedule.word}, cost ${L.cost.word}, scope ${L.scope.word}`}>{[L.schedule, L.cost, L.scope].map((l) => <i class="hl" data-state={l.state}></i>)}</span>
+              <span class="pm-lights" aria-label={`Schedule ${L.schedule.word}, cost ${L.cost.word}, scope ${L.scope.word}`}>{[L.schedule, L.cost, L.scope].map((l) => <HealthGlyph state={l.state} size={12} quiet />)}</span>
               <span class="pm-name"><b>{p.name}</b><small>{p.id} · {sites[p.site]?.name} · {PHASE_LABEL[p.phase]}{G ? ` · gate ${short(G.date)}` : ''}</small></span>
               <span class="pm-word">{worst === 'bad' ? [L.schedule, L.cost, L.scope].find((l) => l.state === 'bad').word : worst === 'warn' ? [L.schedule, L.cost, L.scope].find((l) => l.state === 'warn').word : 'On plan'}</span>
               {blocked.length ? <span class="pill bad">{blocked.length} waiting</span> : <span class="pill plain">{open.length} open</span>}
@@ -459,9 +479,9 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
       var personOf = function (id) { return H.people[id] || { id: id, name: id, first: id, role: '', roleId: 'delivery', initials: '?' }; };
       var STATUS = { todo: 'To do', doing: 'Doing', blocked: 'Waiting on', done: 'Done', booked: 'Booked' };
       var KIND_WORD = { task: 'Task', incident: 'Incident', lab: 'Lab test', visit: 'Site visit', refresh: 'Work plan', plan: 'Planning', inbox: 'Approval' };
-      var ACTION = { tech: function (p) { return ['Open ' + siteName(p.office), '/rooms/?site=' + p.office]; }, delivery: function (p) { var n = H.next[p.id]; return n ? ['Open the batch', n.href] : ['Open Work overview', '/work/']; },
-        network: function (p) { var n = H.next[p.id]; return n ? ['Open the batch', n.href] : ['Open Work overview', '/work/']; }, 'sm-av': function () { return ['Open Proposals', '/changes/']; }, 'sm-infra': function () { return ['Open Proposals', '/changes/']; },
-        pm: function (p) { return ['Open your projects', '/projects/?owner=' + p.id]; }, programme: function () { return ['Open the year plan', '/work/schedule/?view=year']; }, head: function () { return ['Open Work overview', '/work/']; },
+      var ACTION = { tech: function (p) { return ['Open ' + siteName(p.office), '/rooms/?site=' + p.office]; }, delivery: function (p) { var n = H.next[p.id]; return n ? ['Open the batch', n.href] : ['Open Support', '/support/']; },
+        network: function (p) { var n = H.next[p.id]; return n ? ['Open the batch', n.href] : ['Open Support', '/support/']; }, 'sm-av': function () { return ['Open Proposals', '/changes/']; }, 'sm-infra': function () { return ['Open Proposals', '/changes/']; },
+        pm: function (p) { return ['Open your projects', '/projects/?owner=' + p.id]; }, programme: function () { return ['Open the year plan', '/work/schedule/?view=year']; }, head: function () { return ['Open Support', '/support/']; },
         desk: function () { return ['Open Incidents', '/incidents/?state=new']; }, vendor: function () { return ['Open your installation', '/vendor/']; }, 'service-vendor': function () { return ['Open your installation', '/vendor/']; }, innovation: function () { return ['Open the Lab', '/lab/']; } };
 
       // ---- The live layer: a task's status and owner are the base plus every event since (src/lib/live.mjs). ----
@@ -564,10 +584,11 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
         var hr = new Date().getHours(); D.querySelector('[data-greet]').textContent = hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
         var t = D.getElementById('pb-title'), title = all ? 'Everyone, from every point of view' : me.first + ", ready for you";
         if (t && t.textContent !== title) morphText(t, title, fresh);
-        var ledeWho = D.querySelector('.hp-lede-who'); if (ledeWho) { ledeWho.querySelector('[data-who-role]').textContent = all ? 'Everyone (overview)' : me.role; ledeWho.querySelector('[data-who-where]').textContent = all ? 'every role at once; each block says whose first screen it is' : me.where; }
+        var whoLine = D.querySelector('[data-who-line]'); if (whoLine) { whoLine.querySelector('[data-who-role]').textContent = all ? 'Everyone (overview)' : me.role; whoLine.querySelector('[data-who-where]').textContent = all ? 'every role' : me.where; }
+        var ans = D.querySelector('[data-home-answer]'), at = (H.answers && (all ? H.answers.everyone : H.answers[who])) || ''; if (ans && ans.textContent !== at) ans.textContent = at;
         if (fresh && lastWho && lastWho !== who) caption(all ? 'Every role at once: each block says whose first screen it is.' : H.captions[who] || '');
         lastWho = who;
-        var act = D.querySelector('[data-home-action]'), a = all ? ['Open Work overview', '/work/'] : (ACTION[me.roleId] || ACTION.head)(me);
+        var act = D.querySelector('[data-home-action]'), a = all ? ['Open Support', '/support/'] : (ACTION[me.roleId] || ACTION.head)(me);
         if (act) { act.textContent = a[0]; act.setAttribute('href', link(a[1])); }
         var nums = all ? H.everyone : H.numbers[who] || H.everyone;
         nums.forEach(function (n, i) {
@@ -902,10 +923,10 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
   .inbox { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
   .inbox .ib { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 12px 14px; border-radius: var(--radius); background: var(--surface-2); animation: rs-ib-in var(--dur-enter, 440ms) var(--ease-settle) both; animation-delay: calc(var(--i, 0) * var(--stagger)); transition: opacity var(--dur-state), background var(--dur-state); }
   .inbox .ib-urgent { background: color-mix(in srgb, var(--red-soft) 55%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--red) 45%, transparent); }
-  .inbox .ib-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 6px; background: var(--text-3); }
-  .inbox .ib-urgent .ib-dot { background: var(--red); animation: rs-pulse var(--dur-pulse) var(--ease-settle) 2; }
-  .inbox .ib-firmware .ib-dot { background: var(--amber, #d8a200); }
-  .inbox .ib-change .ib-dot { background: var(--accent); }
+  /* The inbox mark is the health glyph's shape (base.css masks): urgent a fault, firmware and proposals to review. */
+  .inbox .ib-dot { width: 12px; height: 12px; margin-top: 5px; background: var(--h-off); -webkit-mask: var(--hg-mask-off) center / contain no-repeat; mask: var(--hg-mask-off) center / contain no-repeat; }
+  .inbox .ib-urgent .ib-dot { background: var(--h-fault); -webkit-mask-image: var(--hg-mask-fault); mask-image: var(--hg-mask-fault); }
+  .inbox .ib-firmware .ib-dot, .inbox .ib-change .ib-dot { background: var(--h-review); -webkit-mask-image: var(--hg-mask-review); mask-image: var(--hg-mask-review); }
   .inbox .ib-top { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 2px; font-size: 12.5px; }
   .inbox .ib-kind { font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
   .inbox .ib-urgent .ib-kind { color: var(--red-ink); }
@@ -959,7 +980,6 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
   .pm-row:hover { background: var(--surface-2); }
   .pm-row[hidden] { display: none; }
   .pm-lights { display: inline-flex; gap: 4px; }
-  .pm-lights .hl { width: 10px; height: 10px; }
   .pm-name b { display: block; font-size: 14.5px; } .pm-name small { color: var(--text-2); font-size: 12.5px; }
   .pm-word { font-size: 13px; font-weight: 600; white-space: nowrap; color: var(--text-2); }
 
@@ -1011,7 +1031,7 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
     .hp-h .aside { margin-left: 0; width: 100%; }
     .th { grid-template-columns: 24px minmax(0, 1fr); } .th-due { grid-column: 2; margin-top: -4px; }
   }
-  @media (prefers-reduced-motion: reduce) { .inbox .ib, .inbox .ib-urgent .ib-dot, .day-blk, .stagger .th { animation: none; } .hp-lede > span, .tick-toast, .th, .tbox { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .inbox .ib, .day-blk, .stagger .th { animation: none; } .hp-lede > span, .tick-toast, .th, .tbox { transition: none; } }
   }
 </style>
 <!-- Which blocks each role sees comes last, so it wins over the hidden default above. -->

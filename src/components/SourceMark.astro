@@ -1,0 +1,29 @@
+---
+/* SourceMark: where a borrowed record or figure came from, and when (UI-V2 §8.4). "ServiceNow · INC0012345 · 09:14 ↗"
+   in Mono 11, --quiet, a hairline border. The arrow is the link back to the source.
+   Props:  from    the system it came from ("ServiceNow")
+           ref     its id there (optional)
+           at      when it was read: an ISO date-time or a short time ("09:14")
+           to      the link back (optional; the arrow shows only with a link)
+           synced  words instead of the time ("synced 2 min ago")
+           stale   true when the source has gone quiet: fault ink and a dashed border ("last 2 h 10 min ago"),
+                   and it counts as a fault
+           native  the source's own status word, shown after Keia's ("Awaiting Vendor")
+   Used in PageBand's overline (`source` prop) and beside any borrowed figure. Never left off a borrowed figure. */
+interface Props { from: string; ref?: string; at?: string; to?: string; synced?: string; stale?: boolean; native?: string }
+const { from, ref, at, to, synced, stale = false, native } = Astro.props;
+const time = at && /T\d\d:\d\d/.test(at) ? at.slice(11, 16) : at;
+const when = synced ?? time;
+const parts = [from, ref, when].filter(Boolean);
+const Tag = to ? 'a' : 'span';
+---
+<Tag class:list={['srcm', { 'is-stale': stale }]} href={to} data-help="source" title={`From ${from}${ref ? `, ${ref}` : ''}${time ? `, read at ${time}` : ''}`} {...(to ? { target: '_blank', rel: 'noopener' } : {})}>
+  {parts.join(' · ')}{native && <span class="srcm-n"> · {from}: {native}</span>}{to && <span aria-hidden="true"> ↗</span>}
+</Tag>
+
+<style is:global>
+  .srcm { display: inline-flex; align-items: center; gap: 0; height: 20px; padding: 0 7px; border: 1px solid var(--hairline, var(--line)); border-radius: 4px; font: 500 11px/1 var(--font-mono); color: var(--quiet); white-space: nowrap; text-decoration: none; }
+  a.srcm:hover { color: var(--text); border-color: var(--line-strong); }
+  .srcm .srcm-n { color: var(--text-2); }
+  .srcm.is-stale { color: var(--h-fault-ink); border-style: dashed; border-color: var(--h-fault); }
+</style>

@@ -43,6 +43,9 @@ const blockedTasks = p.tasks.filter((t) => t.status === 'blocked').length;
 const openLog = (p.log ?? []).filter((l) => l.status === 'open').length;
 const waitingCR = (p.changes ?? []).filter((c) => c.status === 'proposed').length;
 const closed = p.phase === 'closed';
+const gateLine = G ? (G.late ? `${G.phase} gate ${plural(G.slip, 'day')} past its date` : `${G.phase} gate due ${short(G.date)}`) : null;
+const taskLine = blockedTasks ? `${plural(blockedTasks, 'task')} waiting on something` : openTasks ? `${plural(openTasks, 'open task')}, none waiting` : 'no open tasks';
+const answer = closed ? `Closed · ${openTasks ? `${plural(openTasks, 'task')} still open` : 'nothing open'}` : [gateLine, taskLine].filter(Boolean).join(' · ');
 const NUMBERS = [
   { n: PHASE_LABEL[p.phase], label: `Phase ${phasesOf(p).indexOf(p.phase) + 1} of ${phasesOf(p).length}`, to: '#timeline' },
   { n: G ? short(G.date) : short(p.target), label: closed ? 'Closed' : G?.late ? 'Gate, late' : 'Next gate', tone: G?.late ? 'bad' : undefined, to: '#timeline' },
@@ -57,7 +60,7 @@ const TABS = [
 ];
 ---
 <Shell about={{ kind: 'project', label: `${p.id} ${p.name}`, to: home }} title={p.name} section="projects" minStage={3} crumbs={[{ label: 'Projects', to: '/projects/' }, { label: p.name }]}>
-  <PageBand overline={`Project ${p.id}`} title={p.name} lede={p.summary} sim numbers={NUMBERS}>
+  <PageBand overline={`Project ${p.id}`} title={p.name} answer={answer} lede={p.summary} sim numbers={NUMBERS}>
     <Fragment slot="overline">
       <span>{PROJECT_KIND[p.kind]}</span>
       <a href={href(`/rooms/?site=${p.site}`)}>{sites[p.site].name}</a>
@@ -346,13 +349,10 @@ const TABS = [
   :root[data-agents="off"] .agents-panel, :root[data-agents="off"] .proj-tabs [data-dt-tab="agents"] { display: none; }
   .agent { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px; }
   .ag-icon { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--violet-soft); color: var(--violet-ink); }
-  .a-working .ag-icon { animation: ag-glow var(--dur-pulse) ease-in-out infinite; }
-  @keyframes ag-glow { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--violet) 22%, transparent); } }
+  .a-working .ag-icon { box-shadow: 0 0 0 3px color-mix(in srgb, var(--violet) 22%, transparent); } /* still: the loop is retired (MOTION-V2 §2) */
   .ag-body { display: grid; gap: 4px; min-width: 0; } .ag-body b { font-size: 13.5px; }
   .ag-state { font: 700 10.5px/1.2 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--violet-ink); display: flex; align-items: center; gap: 6px; }
-  .dots { display: inline-flex; gap: 3px; } .dots i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; animation: dot calc(var(--dur-pulse) / 2) ease-in-out infinite; }
-  .dots i:nth-child(2) { animation-delay: .15s; } .dots i:nth-child(3) { animation-delay: .3s; }
-  @keyframes dot { 50% { opacity: .2; transform: translateY(-2px); } }
+  .dots { display: inline-flex; gap: 3px; } .dots i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; opacity: .6; }
   .ag-says { font-size: 13px; color: var(--text); }
   .ag-prop { display: grid; gap: 6px; font-size: 13px; padding: 8px 10px; border-radius: 8px; border: 1.5px dashed var(--violet); background: var(--surface); }
   .ag-prop-h { font: 700 10px/1.3 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--violet-ink); }

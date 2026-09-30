@@ -17,6 +17,7 @@ import LiveSide from '../../components/LiveSide.astro';
 import { REGION_LABEL, KIND_LABEL, href } from '../../lib/data.mjs';
 import { roomsModel, lean } from '../../lib/livemodel.mjs';
 import { REGIONS, REGION_SHORT, officesIn, HOME_SITE } from '../../lib/locations.mjs';
+import HealthGlyph from '../../components/HealthGlyph.astro';
 
 const model = roomsModel();
 const SITE = model.sites;
@@ -43,8 +44,8 @@ const find = (r, s) => `${r.no} ${r.n} ${r.prof} ${s.name} ${s.city ?? ''} ${r.t
 const json = JSON.stringify({ ...lean(model, ['id', 'n', 'cls', 'old', 'inc']), base: href('/') }).replace(/</g, '\\u003c');
 ---
 <Shell title="Locations" section="locations-overview" crumbs={[{ label: 'Locations' }]} about={{ kind: 'page', label: 'Locations overview' }}>
-  <PageBand overline="Locations" title="Overview" lede="Simulated live from space usage and device health. Real feeds replace this with the same shape." sim="live" numbers={NUMBERS}>
-    <span slot="overline" class="lv-live" data-lv-live title="A new moment every five seconds, the same in every window"><span class="lv-dot" aria-hidden="true"></span>Live</span>
+  <PageBand overline="Locations" title="Overview" answer={`${model.rooms.length} spaces across ${OFFICES.length} offices and ${HOMES.length} home office regions`} lede="Simulated live from space usage and device health. Real feeds replace this with the same shape." sim="live" numbers={NUMBERS}>
+    <span slot="overline" class="lv-live" data-lv-live title="A new moment every five seconds, the same in every window"><HealthGlyph state="fine" size={12} quiet class="lv-dot" title="The feed is running" />Live</span>
   </PageBand>
 
   <div class="content lvr lv-page" data-lv="rooms">
@@ -271,6 +272,7 @@ const json = JSON.stringify({ ...lean(model, ['id', 'n', 'cls', 'old', 'inc']), 
         number('lv-use', String(n.use)); number('lv-free', String(n.free));
         number('lv-problem', String(n.problem), n.problem ? 'bad' : '');
         number('lv-open', `${open} of ${offices.length}`);
+        if (W.rsAnswer) W.rsAnswer(n.problem ? `${n.problem} ${n.problem === 1 ? 'space' : 'spaces'} not working now · ${open} of ${offices.length} offices open` : `All ${model.rooms.length} spaces working · ${open} of ${offices.length} offices open`);
         // Region tiles: the same counts per region (home offices included, as the Status filter counts them).
         root.querySelectorAll('[data-rg]').forEach((tile: HTMLElement) => {
           const g = tile.dataset.rg;

@@ -93,11 +93,17 @@ const NUMBERS = infra ? [
 const guidelineSource = !isHouse ? sources[rs.guideline] : null;
 const openAt = (sid) => incidentList.filter((v) => v.open && v.inc.room === sid).length;
 // How many of each part a comms room needs, in words, from the sizing rules.
+// The answer: for a comms room, how many match the standard and are big enough; for a space type, the spaces
+// built to it and their open incidents.
+const openHere = builtAll.reduce((n, s) => n + openAt(s.id), 0);
+const answer = infra
+  ? `${matching} of ${usingCount} match the ${HOUSE_NETWORK.name} standard · ${shortOf ? `${shortOf} short of what ${shortOf === 1 ? 'it serves' : 'they serve'}` : 'none short of what they serve'}`
+  : usingCount ? `${plural(usingCount, 'space')} built to it · ${openHere ? plural(openHere, 'open incident') : 'no open incidents'}` : 'No spaces built to it yet';
 const PART_RULE = { 'access-switch': 'one per 48 ports needed, with 20 percent headroom', 'core-switch': 'a pair, for every floor comms room', firewall: 'a pair in Shadow Mode', 'av-switch': 'one per floor, for Dante and Q-SYS', codec: 'when the floor has a large space' };
 const nParts = infra ? current.equipment.reduce((k, e) => k + (typeof e.quantity === 'number' ? e.quantity : 1), 0) : 0;
 ---
 <Shell vendorOk about={{ kind: infra ? 'comms' : 'space type', label: t.profile.name }} title={t.profile.name} section="types" crumbs={[{ label: 'Space types', to: '/room-profiles/' }, { label: t.profile.name }]}>
-  <PageBand overline={CATEGORY_HEADING[rs.category]} title={t.profile.name} lede={t.profile.purpose} numbers={NUMBERS}>
+  <PageBand overline={CATEGORY_HEADING[rs.category]} title={t.profile.name} answer={answer} lede={t.profile.purpose} numbers={NUMBERS}>
     {isHouse ? <span slot="overline" class="tag">House standard</span> : <a slot="overline" class="tag" href={guidelineSource.url} target="_blank" rel="noopener" title={guidelineSource.title}>Industry guidance <Icon name="link" size={12} /></a>}
   </PageBand>
 

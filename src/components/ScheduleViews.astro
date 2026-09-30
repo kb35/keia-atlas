@@ -27,7 +27,7 @@ import Icon from './Icon.astro';
 import ScheduleYear from './ScheduleYear.astro';
 import { work } from '../lib/work.mjs';
 import { schedule, ALLOWANCE } from '../lib/schedule.mjs';
-import { projects, sites, spaces, SITE_ORDER, PHASE_LABEL, STEP_LABEL, PROJECT_KIND, DEMO_TODAY, href } from '../lib/data.mjs';
+import { projects, sites, spaces, SITE_ORDER, PHASE_LABEL, STEP_LABEL, PROJECT_KIND, DEMO_TODAY, href, plural } from '../lib/data.mjs';
 import { PEOPLE, TEAMS, ROLES } from '../lib/demo.mjs';
 import { addDays, WORK_STATUS } from '../lib/workcore.mjs';
 import { KIND_WORDS, monday, weekDays, workdaysIn, placeOn, weekLoad, loadBand, unscheduled, defaultsFor } from '../lib/schedulecore.mjs';
@@ -92,6 +92,8 @@ const awayToday = placesToday.filter((pl) => pl.kind === 'away').length;
 const cover = unscheduled('olivia', { items, people, projects: projList, sites: siteList, today: TODAY, horizon: P.horizon, timeOff: P.timeOff, holidays: P.holidays }).filter((u) => u.why === 'cover').length;
 const next4 = [0, 1, 2, 3].map((i) => addDays(monday(TODAY), i * 7));
 const over = people.filter((p) => !p.vendor && next4.some((m) => { const l = weekLoad(p, m, { ...ctx, reserved }); return loadBand(l.hours, l.cap) === 4; })).length;
+// The answer: work that needs cover and anyone booked past their hours in the next four weeks.
+const answer = `${cover ? `${plural(cover, 'item')} ${cover === 1 ? 'needs' : 'need'} cover` : 'All work has cover'} · ${over ? `${plural(over, 'person', 'people')} over-booked in the next 4 weeks` : 'nobody over-booked in the next 4 weeks'}`;
 const NUMBERS = [
   { n: onSite, label: 'On site today', to: '?view=day&scope=all' },
   { n: awayToday, label: 'Away today', to: '?view=day&scope=all#away' },
@@ -117,7 +119,7 @@ const KEY = [
   ['visit', 'Site visit'], ['incident', 'Incident'], ['lab', 'Lab test'], ['refresh', 'Work plan'], ['time-off', 'Time off'], ['holiday', 'Public holiday'], ['phase', 'Phase end'], ['plan', 'Planning'],
 ];
 ---
-<PageBand overline="Planning" title="Schedule" lede="Who is where and doing what: today across the offices, each person's week, the month and the year." sim numbers={NUMBERS}>
+<PageBand overline="Planning" title="Schedule" answer={answer} lede="Who is where and doing what: today across the offices, each person's week, the month and the year." sim numbers={NUMBERS}>
   <a slot="action" class="btn primary" href="?view=month#time-off" data-sch-timeoff>Request time off</a>
 </PageBand>
 

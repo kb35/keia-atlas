@@ -31,10 +31,14 @@ const next = rooms[rooms.findIndex((x) => x.id === rid) + 1] ?? null;
 const kept = plan.kept.filter((k) => k.room === rid);
 const units = r.units.map((id) => M.U.get(id));
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many ?? `${one}s`}`;
+const answer = s.signed ? `Signed off · ${s.passed} of ${plural(s.tests.length, 'test')} passed`
+  : s.failed.length ? `${plural(s.failed.length, 'test')} not passing · ${s.setUp} of ${s.total} units set up`
+  : s.setUp < s.total ? `${s.total - s.setUp} of ${plural(s.total, 'unit')} still to set up, then the tests`
+  : `All ${plural(s.total, 'unit')} set up · ${s.passed} of ${plural(s.tests.length, 'test')} passed`;
 ---
 <Shell title={`${r.name}: ${p.name}`} section="projects" minStage={3} vendorOk about={{ kind: 'room', label: `${r.name}, ${p.id} ${PHASE}`, to: `${home}integrate/room/${rid}/` }}
   crumbs={[{ label: 'Projects', to: '/projects/' }, { label: p.name, to: home }, { label: PHASE, to: `${home}integrate/` }, { label: r.name }]}>
-  <PageBand overline={`Space · Project ${p.id} · ${STEP_LABEL.commission}`} title={r.name} lede={`${r.profile}. A short room test once every unit is set up, then sign it off.`} sim="live" rec={`int-r-${rid}`}
+  <PageBand overline={`Space · Project ${p.id} · ${STEP_LABEL.commission}`} title={r.name} answer={answer} lede={`${r.profile}. A short room test once every unit is set up, then sign it off.`} sim="live" rec={`int-r-${rid}`}
     numbers={[
       { n: `${s.setUp}/${s.total}`, label: 'Units set up', to: '#in-room', id: 'int-setup' },
       { n: kept.length, label: 'Kept as they are', to: '#in-room' },

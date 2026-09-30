@@ -10,8 +10,10 @@
 //   [data-loc-room="<id>"]          anything that shows one room's state (data-st); the floor map's rooms too
 //   [data-loc-att] [data-loc-att-none]  the list of rooms with a problem now, and its empty line
 //   Key numbers loc-use, loc-problem and loc-open (PageBand ids), changed with rsKeyNumber.
+//   [data-loc-answer]               the page's answer sentence follows the live state (window.rsAnswer)
 import { prepare, snapshot, tickOf, hhmm, openAt, nextSwitch, local, OFFICE_HOURS } from './livesim.mjs';
 import { every, esc } from './liveview.mjs';
+import { glyph } from './health.mjs';
 
 const DAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const STW = { use: 'In use', free: 'Free', problem: 'Problem', closed: 'Closed' };
@@ -73,6 +75,7 @@ export function startLocations(root) {
     snap.rooms.forEach((s) => { if (s.st === 'use') use++; if (s.st === 'problem') prob++; });
     number('loc-use', String(use));
     number('loc-problem', String(prob), prob ? 'bad' : '');
+    if (root.hasAttribute('data-loc-answer') && W.rsAnswer) W.rsAnswer(prob ? `${prob} ${prob === 1 ? 'space' : 'spaces'} not working now` : `All ${snap.rooms.length} spaces working`);
     if (!root.querySelector('[data-fi][data-loc-tz]')) {
       const offices = model.sites.map((s, i) => ({ s, i })).filter((x) => !x.s.remote && x.s.tz && model.rooms.some((r) => r.site === x.i));
       if (offices.length > 1) number('loc-open', String(offices.filter((x) => snap.sites[x.i]).length));
@@ -80,7 +83,7 @@ export function startLocations(root) {
     const att = root.querySelector('[data-loc-att]');
     if (att) {
       const list = model.rooms.map((r, i) => ({ r, s: snap.rooms[i] })).filter((x) => x.s.st === 'problem').slice(0, 6);
-      att.innerHTML = list.map(({ r }) => `<li><a href="${B}rooms/${esc(r.id)}/"><i class="hl lit" data-state="bad" aria-hidden="true"></i><span>${esc(r.no ? `${r.no} ${r.n}` : r.n)}</span><small>${esc(STW.problem)} now</small></a></li>`).join('');
+      att.innerHTML = list.map(({ r }) => `<li><a href="${B}rooms/${esc(r.id)}/">${glyph('fault', { size: 12, title: 'not working now' })}<span>${esc(r.no ? `${r.no} ${r.n}` : r.n)}</span><small>${esc(STW.problem)} now</small></a></li>`).join('');
       const none = root.querySelector('[data-loc-att-none]');
       if (none) none.hidden = list.length > 0;
     }
@@ -101,7 +104,8 @@ export function startLocations(root) {
     const room = kind === 'rack' ? racks[id] : id;
     if (!room) return;
     e.preventDefault();
-    location.href = `${B}rooms/${room}/`;
+    // A zoom: the room's shape on the plan becomes the space's drawing (src/lib/zoom-client.mjs).
+    if (window.rsGo) window.rsGo(`${B}rooms/${room}/`, g); else location.href = `${B}rooms/${room}/`;
   };
   root.addEventListener('click', open);
   root.addEventListener('keydown', open);

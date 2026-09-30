@@ -13,7 +13,7 @@ import KeyNumbers from '../../components/KeyNumbers.astro';
 import SidePanel from '../../components/SidePanel.astro';
 import Section from '../../components/Section.astro';
 import DetailTabs from '../../components/DetailTabs.astro';
-import { models, projects, spaces, sites, classes, spaceTypes, modelName, className, roomWords, href, vendors as VENDORS, playbooks, PHASE_LABEL, PHASES, configFor, advisoriesFor, incidents, commsRooms, INC_STATE, ADV_LEVEL } from '../../lib/data.mjs';
+import { models, projects, spaces, sites, classes, spaceTypes, modelName, className, roomWords, href, vendors as VENDORS, playbooks, PHASE_LABEL, PHASES, configFor, advisoriesFor, incidents, commsRooms, INC_STATE, ADV_LEVEL, plural } from '../../lib/data.mjs';
 import { PEOPLE, person, ROLES } from '../../lib/demo.mjs';
 
 const vendors = PEOPLE.filter((p) => p.vendor);
@@ -66,9 +66,16 @@ const VIEW = vendors.map((v) => {
   };
 });
 const TABS = vendors.map((v) => ({ id: v.id, label: `${v.name}, ${v.vendorName}` }));
+// The answer for each vendor: a service vendor's open incidents and advisories; an installer's devices still to record.
+const answerOf = (x) => {
+  if (x.kind === 'service') return `${x.tickets.length ? `${plural(x.tickets.length, 'open incident')} on devices you cover` : 'No open incidents on devices you cover'} · ${x.advs.length ? `${plural(x.advs.length, 'advisory', 'advisories')} to review` : 'no advisories'}`;
+  const rooms = x.prjs.flatMap((y) => y.rooms), count = (st) => rooms.filter((r) => r.st === st).reduce((n, r) => n + r.rows.length, 0);
+  return `${count('todo') ? `${plural(count('todo'), 'device')} to record` : 'Every device recorded'} · ${count('review')} waiting on Aigna's review`;
+};
 ---
 <Shell vendorOk title="Your installation" section="vendor" crumbs={[{ label: 'Your installation' }]}>
   <PageBand overline="Vendor portal" title="Your installation" rec="dd-vendor" lede="Your project, each space's design, and where to record serial numbers and MACs." sim>
+    <Fragment slot="answer">{VIEW.map((x, i) => <span class="vp-num" data-for={x.v.id} data-vp-num={x.v.id} hidden={i > 0}>{answerOf(x)}</span>)}</Fragment>
     <Fragment slot="numbers">
       {VIEW.map((x, i) => <div class="vp-num" data-for={x.v.id} data-vp-num={x.v.id} hidden={i > 0}><KeyNumbers items={x.numbers} /></div>)}
     </Fragment>

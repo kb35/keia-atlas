@@ -6,7 +6,7 @@
 import Shell from '../../layouts/Shell.astro';
 import PageBand from '../../components/PageBand.astro';
 import Section from '../../components/Section.astro';
-import { spaces, sites, href } from '../../lib/data.mjs';
+import { spaces, sites, href, plural } from '../../lib/data.mjs';
 import { loadPrivacy, recordFor, CAPTURE_LABEL } from '../../lib/privacy.mjs';
 import { HANDLING } from '../../lib/classification.mjs';
 
@@ -21,6 +21,8 @@ for (const s of Object.values(spaces)) for (const p of [...s.positions, ...s.old
 const totalCovered = Object.values(covered).reduce((a, b) => a + b, 0);
 const minGroup = Math.min(...list.filter((r) => r.occupancy.counted).map((r) => r.occupancy.min_group_size));
 const perPersonOn = list.some((r) => r.occupancy.per_person_views);
+// The answer: the demo keeps nothing about you, and how far the privacy records reach.
+const answer = `This demo keeps nothing about you · ${plural(totalCovered, 'sensing unit')} covered by ${plural(list.length, 'privacy record')}`;
 const NUMBERS = [
   { n: list.length, label: 'Privacy records', to: '#sensing' },
   { n: totalCovered, label: 'Sensing units covered', to: '#sensing' },
@@ -29,14 +31,14 @@ const NUMBERS = [
 ];
 // The settings this demo keeps in your browser, by what they hold (none leaves the browser).
 const BROWSER = [
-  ['Look, theme and stage', 'The look, light or dark, and how much of the product the demo shows.'],
+  ['Look and theme', 'The look, and light or dark.'],
   ['Who you are viewing as', 'The demo person whose pages you see. Nobody signs in.'],
   ['Learning progress', 'Which lessons you have finished.'],
   ['Your demo changes', 'Suggested changes, reports, time off and notes you make while trying the demo.'],
 ];
 ---
 <Shell title="What Keia logs about users" section="about" crumbs={[{ label: 'About this project', to: '/about/' }, { label: 'What Keia logs about users' }]}>
-  <PageBand overline="About Keia Atlas" title="What Keia logs about users" lede="What Keia Atlas keeps about the people who use it, what it never keeps, and what the devices in Aigna's rooms pick up." numbers={NUMBERS} />
+  <PageBand overline="About Keia Atlas" title="What Keia logs about users" answer={answer} lede="What Keia Atlas keeps about the people who use it, what it never keeps, and what the devices in Aigna's rooms pick up." numbers={NUMBERS} />
 
   <div class="content wkl">
     <Section title="This demo keeps nothing about you" id="demo">

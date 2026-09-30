@@ -7,7 +7,7 @@ import PageBand from '../../components/PageBand.astro';
 import FilterBar from '../../components/FilterBar.astro';
 import Section from '../../components/Section.astro';
 import EmptyState from '../../components/EmptyState.astro';
-import { href, plural } from '../../lib/data.mjs';
+import { href, plural, fmtDate, DEMO_TODAY } from '../../lib/data.mjs';
 import { library, AREAS, AREA_LABEL, AREA_GLYPH, BASED, KIND_LABEL, publicSources, totals, byId } from './_lib.mjs';
 
 const P = library.map((s, i) => ({ id: s.id, i, name: s.name, rules: s.counts.rules }));
@@ -23,6 +23,10 @@ const NUMBERS = [
   { n: totals.house, label: 'House choices', to: '?based=house' },
   { n: totals.publicSources, label: 'Public standards named', to: '#public-standards' },
 ];
+const coming = library.filter((s) => s.effective > DEMO_TODAY).sort((a, b) => a.effective.localeCompare(b.effective));
+const answer = coming.length
+  ? `${totals.standards - coming.length} of ${totals.standards} standards in force · ${coming.length} new from ${fmtDate(coming[0].effective, { day: 'numeric', month: 'short' })}`
+  : `All ${totals.standards} standards in force · ${plural(totals.rules, 'rule')}`;
 const attrs = (s) => ({
   'data-fi': '', 'data-id': s.id,
   'data-find': [s.name, AREA_LABEL[s.area], s.summary, ...(s.publicNames ?? []), ...(s.rules ?? []).map((r) => r.rule)].join(' '),
@@ -31,7 +35,7 @@ const attrs = (s) => ({
 const stdLabel = (id) => byId[id]?.name ?? id;
 ---
 <Shell vendorOk title="Standards" section="standards" crumbs={[{ label: 'Standards' }]}>
-  <PageBand overline="Library" title="Standards" lede="How Aigna's offices are built and set up: the rules integrators follow, why, and how each is checked." numbers={NUMBERS} />
+  <PageBand overline="Library" title="Standards" answer={answer} lede="How Aigna's offices are built and set up: the rules integrators follow, why, and how each is checked." numbers={NUMBERS} />
 
   <div class="content stdl">
     <FilterBar facets={FACETS} placeholder="Find a standard, rule or source" label="Find a standard" noun={['standard', 'standards']} scope=".content.stdl" views={VIEWS} viewKey="rs5-standards-view" sort={SORT} />

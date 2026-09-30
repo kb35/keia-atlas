@@ -31,6 +31,9 @@ const VIEWS = [{ value: 'cards', label: 'Cards', show: '[data-grid]' }, { value:
 const findText = (p) => [p.id, p.name, p.summary, KIND[p.kind], sites[p.site].name, PHASE_LABEL[p.phase], person(p.owner).name, playbooks[p.playbook]?.name].filter(Boolean).join(' ');
 const open = list.filter((p) => p.phase !== 'closed');
 const blocked = list.reduce((n, p) => n + count(p, 'blocked'), 0);
+// The answer: projects past target on schedule, cost or scope first, then tasks waiting on something.
+const pastTarget = open.filter((p) => { const L = lights(p); return [L.schedule, L.cost, L.scope].some((l) => l.state === 'bad'); }).length;
+const ANSWER = `${open.length} open projects · ${pastTarget ? `${pastTarget} past target` : 'none past target'}${blocked ? ` · ${blocked} tasks waiting on something` : ''}`;
 // Each figure opens what it counts (rule P10): open projects here, blocked tasks in the Work list.
 const NUMBERS = [
   { n: open.length, label: 'Open projects', to: `?phase=${[...new Set(open.map((p) => p.phase))].join(',')}` },
@@ -42,13 +45,13 @@ const attrs = (p) => ({
   'data-k-id': p.id, 'data-k-due': p.target, 'data-k-phase': String(PHASES.indexOf(p.phase)), 'data-k-blocked': String(count(p, 'blocked')),
 });
 // The three lights on each card: schedule, cost and scope, with the reason on hover.
-const LIGHT = { ok: 'green', warn: 'amber', bad: 'red', off: 'grey' };
+const LIGHT = { ok: 'fine', warn: 'to review', bad: 'past target', off: 'not set' };
 const lightsOf = (p) => { const L = lights(p); return [['Schedule', L.schedule], ['Cost', L.cost], ['Scope', L.scope]]; };
 const lightsLabel = (p) => lightsOf(p).map(([k, l]) => `${k} ${LIGHT[l.state]}: ${l.word}`).join('. ');
 const taskLabel = (p) => ['done', 'doing', 'blocked', 'todo'].map((st) => `${count(p, st)} ${TASK_STATUS[st].toLowerCase()}`).join(', ');
 ---
 <Shell title="Projects" section="projects" minStage={3} crumbs={[{ label: 'Projects' }]}>
-  <PageBand overline="Work" title="Projects" rec="dd-projects" lede="Delivery work at each site: refreshes, fit-outs and custom designs, each following a playbook." sim numbers={NUMBERS}>
+  <PageBand overline="Work" title="Projects" rec="dd-projects" answer={ANSWER} lede="Delivery work at each site: refreshes, fit-outs and custom designs, each following a playbook." sim numbers={NUMBERS}>
     <a slot="action" class="btn primary" href={href('/edit/?kind=project')}><Icon name="plus" size={16} />New project</a>
   </PageBand>
   <div class="content projects">
@@ -66,7 +69,7 @@ const taskLabel = (p) => ['done', 'doing', 'blocked', 'todo'].map((st) => `${cou
           <span class="muted pc-sum">{p.summary}</span>
           <span class="pc-rail" data-vt-rec={p.id}><PhaseRail phase={p.phase} project={p} small /></span>
           <span class="pc-meta faint">{fmtDate(p.start, { day: 'numeric', month: 'short' })} to {fmtDate(p.target)} · run by {person(p.owner).name}{p.playbook && playbooks[p.playbook] ? ` · ${playbooks[p.playbook].name}` : ''}</span>
-          <span class="pc-lights" data-help="project.light" data-help-name="Schedule, cost and scope" role="img" aria-label={lightsLabel(p)}>{lightsOf(p).map(([k, l]) => <span title={`${k}: ${l.word}. ${l.why}`}><i class="hl" data-state={l.state}></i>{k}</span>)}</span>
+          <span class="pc-lights" data-help="project.light" data-help-name="Schedule, cost and scope" role="img" aria-label={lightsLabel(p)}>{lightsOf(p).map(([k, l]) => <span title={`${k}: ${l.word}. ${l.why}`}><i class="hg-m" data-state={l.state} aria-hidden="true"></i>{k}</span>)}</span>
           <span class="pc-foot">
             <span class="task-bar" role="img" aria-label={taskLabel(p)}>
               {['done', 'doing', 'blocked', 'todo'].map((st) => count(p, st) > 0 && <i class={`tb-${st}`} style={`flex:${count(p, st)}`}></i>)}
@@ -86,7 +89,7 @@ const taskLabel = (p) => ['done', 'doing', 'blocked', 'todo'].map((st) => `${cou
           </span>
           <span class="end">
             <span class="faint">{plural(p.tasks.length, 'task')}{count(p, 'blocked') ? `, ${count(p, 'blocked')} waiting` : ''}</span>
-            <span class="pc-lights" role="img" aria-label={lightsLabel(p)}>{lightsOf(p).map(([k, l]) => <span title={`${k}: ${l.word}. ${l.why}`}><i class="hl" data-state={l.state}></i></span>)}</span>
+            <span class="pc-lights" role="img" aria-label={lightsLabel(p)}>{lightsOf(p).map(([k, l]) => <span title={`${k}: ${l.word}. ${l.why}`}><i class="hg-m" data-state={l.state} aria-hidden="true"></i></span>)}</span>
             <span class:list={['pill', p.phase === 'closed' ? 'plain' : p.phase === 'integrate' ? 'deploy' : 'plan']}>{PHASE_LABEL[p.phase]}</span>
           </span>
         </a>
@@ -129,7 +132,7 @@ const taskLabel = (p) => ['done', 'doing', 'blocked', 'todo'].map((st) => `${cou
   .pc-rail { display: block; padding-top: 2px; }
   .pc-meta { font-size: 12.5px; }
   .pc-lights { display: flex; flex-wrap: wrap; gap: 4px 14px; font: 600 11.5px/1 var(--font-sans); color: var(--text-2); }
-  .pc-lights span { display: inline-flex; align-items: center; gap: 5px; } .pc-lights .hl { width: 9px; height: 9px; }
+  .pc-lights span { display: inline-flex; align-items: center; gap: 5px; }
   .proj-rows .pc-lights { gap: 4px; }
   .pc-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 12.5px; }
   .pc-blocked { color: var(--red-ink); font-weight: 700; }

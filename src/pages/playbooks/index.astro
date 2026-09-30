@@ -28,6 +28,9 @@ const SORT = { options: [
   { value: 'used', label: 'Most used first' }, { value: 'name', label: 'By name' },
   { value: 'weeks', label: 'Shortest first' }, { value: 'steps', label: 'Most steps first' }, { value: 'intensity', label: 'Heaviest first' },
 ] };
+const liveProjects = Object.values(projects).filter((p) => p.phase !== 'closed' && playbooks[p.playbook]);
+const liveBooks = new Set(liveProjects.map((p) => p.playbook)).size;
+const answer = `${plural(liveProjects.length, 'live project')} following ${liveBooks} of ${plural(list.length, 'playbook')}`;
 const NUMBERS = [
   { n: list.length, label: 'Playbooks', fact: true },
   { n: inUse, label: 'In use', to: '?status=in-use' },
@@ -37,7 +40,7 @@ const findText = (pb) => [pb.name, pb.summary, INTENSITY[pb.intensity], ...pb.ph
 const shapeLabel = (pb) => pb.phases.map((ph) => `${PHASE_LABEL[ph.phase]}: ${plural(ph.steps.length, 'step')}`).join(', ');
 ---
 <Shell title="Playbooks" section="playbooks" minStage={3} crumbs={[{ label: 'Playbooks' }]}>
-  <PageBand overline="Catalogue" title="Playbooks" lede="The repeatable way to run each kind of project: the steps in every phase, who does them, and who signs off each gate." sim numbers={NUMBERS}>
+  <PageBand overline="Catalogue" title="Playbooks" answer={answer} lede="The repeatable way to run each kind of project: the steps in every phase, who does them, and who signs off each gate." sim numbers={NUMBERS}>
     <a slot="action" class="btn primary" href={href('/edit/?kind=playbook')}><Icon name="plus" size={16} />New playbook</a>
   </PageBand>
 

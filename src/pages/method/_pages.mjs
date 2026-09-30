@@ -40,11 +40,11 @@ const TRY = {
   },
   modules: {
     to: '/', as: 'liam', label: 'Open Home as Liam',
-    steps: ['Open Home as Liam: his first screen is built from the places his work uses.', 'Open Settings (the gear): in v0.1 it still switches adoption stages. Next: each module On, Connected or Off.'],
+    steps: ['Open Home as Liam: his first screen is built from the places his work uses.', 'Open Settings (the gear): it switches modules on, connected or off. Next: each module On, Connected or Off.'],
   },
   'how-the-work-gets-done': {
-    to: '/changes/', as: 'niamh', label: 'Open Changes',
-    steps: ['Open Changes: every change to a standard, who proposed it and who approved it.', 'In v0.1 automatic work is simulated. Next: standing rules with "How was this done?" on every run.'],
+    to: '/changes/', as: 'niamh', label: 'Open Proposals',
+    steps: ['Open Proposals: every edit to a standard, who proposed it and who approved it.', 'In v0.1 automatic work is simulated. Next: standing rules with "How was this done?" on every run.'],
   },
   trust: {
     to: '/device/?tag=AG-000335', as: 'liam', label: 'Open the Whooper Swan video bar',

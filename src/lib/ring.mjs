@@ -1,6 +1,7 @@
 // The health ring (UI-V2 section 6): one family of shapes, so state is read from the shape first and colour only
-// reinforces it. Used by the method pages and the front door until the shared HealthGlyph part exists; the shapes
-// and words match it, so swapping one for the other changes nothing a person sees.
+// reinforces it. The shared HealthGlyph part (src/lib/health.mjs) draws every glyph on a 16-unit box; these parts
+// draw the same shapes at any centre and radius, for rings inside another drawing (the front door's hero plan, in
+// metres). The shapes and words match HealthGlyph, so a person sees one family.
 //
 //   ringParts(state, cx, cy, r, stroke)  the SVG elements for one ring, as [{ tag, attrs }]
 //   RING_WORD                            the word shown beside each state
