@@ -76,8 +76,8 @@ test('the validator flags a date field that is neither on the shift list nor fix
   assert.deepEqual(bad[0].at, ['follow_up', 'due']);
   assert.match(bad[0].message, /DATE_FIELDS.*"incidents".*shift.*fixed/);
   // A new folder is flagged until it is registered.
-  assert.equal(dateFieldProblems('events/open-day.yaml', { date: '2026-10-08' }).length, 1);
-  assert.equal(dateFieldProblems('events/open-day.yaml', { date: '2026-10-08' }, { events: { shift: ['date'] } }).length, 0);
+  assert.equal(dateFieldProblems('open-days/open-day.yaml', { date: '2026-10-08' }).length, 1);
+  assert.equal(dateFieldProblems('open-days/open-day.yaml', { date: '2026-10-08' }, { 'open-days': { shift: ['date'] } }).length, 0);
   // Not every string with digits is a date.
   assert.equal(dateFieldProblems('incidents/inc9.yaml', { number: 'INC0041210', version: '4.7.0-466077', year: 2026 }).length, 0);
 });

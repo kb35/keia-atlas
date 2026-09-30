@@ -9,6 +9,7 @@
 import { opsView, readLocal } from './provider-ops.mjs';
 import { shortHtml, placesHtml, itemsHtml, jobsHtml, ordersHtml, visitsHtml, ramsSignHtml, ramsListHtml, ordersAnswer, ramsListAnswer, ramsStatusWord } from './provider-ops-view.mjs';
 import { WEEKS } from './provider-ops.mjs';
+import { NOW } from './vendors.mjs';
 
 const KEY = 'rs9-ops';
 const load = () => { try { return readLocal(JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (_) { return readLocal({}); } };
@@ -71,7 +72,7 @@ function act(kind, id) {
   if (kind === 'reserve' && !L.reserved.includes(id)) L.reserved.push(id);
   if (kind === 'send' && !L.sent.includes(id)) L.sent.push(id);
   if (kind === 'receive' && !L.received.includes(id)) L.received.push(id);
-  if (kind === 'approve') L.approved[id] = { by: (window.rsWhoId && window.rsWhoId()) || 'sam', at: '2026-09-28T12:00' };
+  if (kind === 'approve') L.approved[id] = { by: (window.rsWhoId && window.rsWhoId()) || 'sam', at: NOW };
   save(L);
   const V = opsView(base, L);
   const box = kind === 'reserve' ? root.querySelector(`[data-job="${CSS.escape(id)}"]`)?.closest('[data-po-slot]') : kind === 'receive' || kind === 'send' ? root.querySelector('[data-po-orders]') : null;

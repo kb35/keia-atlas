@@ -17,6 +17,7 @@
 // order, an approval) and in the tests (tests/provider-ops.test.mjs). src/lib/provider-ops-load.mjs gathers the data.
 // Everything is SIMULATED, fixed at the demo's now, 28 Sept 12:00.
 import { NOW, addWorkingDays, dateWords, daysBetween } from './vendors.mjs';
+import { demoShift } from './demo-clock.mjs';
 
 export { NOW, dateWords };
 export const TODAY = NOW.slice(0, 10);
@@ -35,8 +36,8 @@ export const dayName = (d) => DAY[utc(d).getUTCDay()];
 export const dayWords = (d) => `${DAY[utc(d).getUTCDay()].slice(0, 3)} ${utc(d).getUTCDate()} ${MON[utc(d).getUTCMonth()]}`;
 const weekday = (d) => { const w = utc(d).getUTCDay(); return w !== 0 && w !== 6; };
 export const WEEKS = {
-  this: { id: 'this', label: 'This week', from: '2026-09-28', to: '2026-10-02' },
-  next: { id: 'next', label: 'Next week', from: '2026-10-05', to: '2026-10-09' },
+  this: { id: 'this', label: 'This week', from: demoShift('2026-09-28'), to: demoShift('2026-10-02') },
+  next: { id: 'next', label: 'Next week', from: demoShift('2026-10-05'), to: demoShift('2026-10-09') },
 };
 /** The five working days of a week. */
 export const weekDays = (w) => Array.from({ length: 5 }, (_, i) => addDays(w.from, i));
