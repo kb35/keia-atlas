@@ -1,32 +1,25 @@
-// One-off generator, 30 Sept 2026: floor plans for every office, and access points as units
-// (after the Dublin pilot). Rerunnable; its output is committed.
-// Superseded for the layout by tools/migrations/2026-09-30-realistic-floors.mjs: rerunning this undoes that.
+// One-off generator, 30 Sept 2026: every office's floors laid out as real office floors (after the Dublin one,
+// tools/migrations/2026-09-30-realistic-floors-dub.mjs). Rerunnable; its output is committed. It replaces the layout
+// tools/migrations/2026-09-30-office-floors.mjs wrote (spaces scattered along wide bands, with gaps between them).
 //
-//   node tools/migrations/2026-09-30-office-floors.mjs
+//   node tools/migrations/2026-09-30-realistic-floors.mjs
 //
-// For each office with rooms other than Dublin (chi, cph, jnu, lon, mel, nyc, sin, tor, tyo) it writes what
-// tools/migrations/2026-09-30-dublin-floors.mjs wrote for Dublin:
-//   data/floors/<site>-<floor>.yaml   outline, core, corridors, areas, the riser, racks, trays, where the access points hang
-//   data/spaces/<site>/*.yaml          a `geometry` block on every room: where it sits and how it differs from its profile
-//   data/runs/<site>.yaml              a permanent link from a panel port to every data outlet and access point, and the
-//                                      riser fibre between floors
-//   data/circuits/<site>.yaml          the providers' circuits and the building entry
-// and, for every office floor with a plan (Dublin's too):
-//   data/spaces/<site>/<site>-<floor>-open.yaml    the floor's "Open areas and corridors" space
-//   data/installs/<site>/<site>-<floor>-open.yaml  its access points as units (serial, asset tag, hostname, stage)
-// Dublin's access points move out of its floor files into those installs with their serials and tags; the floor
-// files keep only where each one hangs. Nothing else of Dublin's changes.
+// For each office with a floor plan other than Dublin (chi, cph, jnu, lon, mel, nyc, sin, tor, tyo) it writes what the
+// office-floors generator wrote: the floor files, every space's `geometry`, the runs, the circuits, and each floor's
+// open-area space and its access points as units (same ids, serials and tags while the counts stay the same).
 //
-// Everything is made up (rule F9). Each office is one building type: a plate with a central core (two stairs, lifts,
-// toilets, riser 1 and the comms room beside it), a corridor ring, the smaller rooms back to back in the middle zone
-// either side of the core, and desks, shared rooms and large rooms along the facades. The plate is as long as the
-// busiest floor needs. Room sizes come from the room profiles, some stretched within the profile's area range; some
-// rooms are mirrored, have a moved door, a column, a cut corner or a glass wall to the corridor.
+// The building type: a plate with a 6.4 m row of spaces along each facade, two 1.6 m corridors, and an 8 m middle
+// zone with the core (stair A, lifts and their lobby, the comms room over riser 1, a cleaner's store, the toilets) and
+// small spaces back to back either side of it, with a link corridor each side of the core and the escape stair at the
+// east end. Spaces are packed wall to wall in rows along the corridors, with the door on the corridor wall:
+//   - a space on a facade row is as deep as the row, and as wide as its area needs (the space type's area, sometimes
+//     a little more or less, always within the type's range);
+//   - a small space in the middle zone is 4 m deep where its area allows; a smaller one keeps its type's size and the
+//     depth behind it is a store (a building element, not a space);
+//   - desks stand in the open on the facade rows, in banks with an aisle between them; the pantry or cafeteria sits
+//     on a facade, with the town hall area beside the cafeteria where there is one.
 //
-// Panel ports follow the patch cords recorded in data/cables/<site>.yaml, which do not change: each patched port is a
-// live outlet or access point. Where a floor has more outlets than patched ports, the outlets with nothing plugged in
-// are terminated on unpatched ports and marked `spare` (a real install terminates every jack). Access points are
-// placed by the Wi-Fi standard's spacing; asset tags continue the global numbering after the highest AG- tag in data/.
+// Everything is made up (rule F9). Panel ports follow the patch cords in data/cables/<site>.yaml, as before.
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { parseDocument, Document, visit, isScalar, isSeq } from 'yaml';
@@ -38,7 +31,7 @@ const r2 = (v) => Math.round(v * 100) / 100;
 const r1 = (v) => Math.round(v * 10) / 10;
 let seed = 1;
 const rand = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
-const THIS = 'tools/migrations/2026-09-30-office-floors.mjs';
+const THIS = 'tools/migrations/2026-09-30-realistic-floors.mjs';
 
 // ---------- YAML ----------
 const flowShort = (doc) => { visit(doc, { Seq(_, n) { if (n.items.every((i) => isScalar(i) && typeof i.value === 'number') || (n.items.length && n.items.every((i) => isSeq(i) && i.flow))) n.flow = true; } }); return doc; };
@@ -49,7 +42,7 @@ const write = (rel, text) => { mkdirSync(path.dirname(path.join(ROOT, rel)), { r
 // ---------- The house building ----------
 // y from the south facade: south band (desks, shared and large rooms), south corridor, the middle zone (the core, and
 // small rooms back to back either side of it), north corridor, north band.
-const P = 7.2, CW = 1.8, DM = 7.4, MID_ROW = DM / 2;
+const P = 6.4, CW = 1.6, DM = 8, MID_ROW = DM / 2;
 const m0 = P + CW, m1 = m0 + DM, DEPTH = r2(m1 + CW + P);
 const YS = r2(P + CW / 2), YN = r2(m1 + CW / 2);
 const TRAY_Z = 3.1, LADDER_Z = 2.4, SLAB = 3.8, STAIR_B = 3.5, CORR_X0 = 4;
@@ -83,8 +76,7 @@ const OFFICES = {
   nyc: { seed: 101, lifts: 3 }, chi: { seed: 211, lifts: 3 }, lon: { seed: 307, lifts: 2 }, tor: { seed: 401, lifts: 2 },
   sin: { seed: 503, lifts: 2 }, mel: { seed: 601, lifts: 3 }, tyo: { seed: 701, lifts: 3 }, cph: { seed: 809, lifts: 2 }, jnu: { seed: 907, lifts: 2 },
 };
-const SHARED_BIG = { pantry: 6.8, cafeteria: 7, 'pantry-expanded': 7 };   // laid long along the facade to fit the band
-const TOWN_HALL = { w: 16, d: 6.6 };
+const TOWN_HALL = { w: 16, d: P };
 
 // ---------- Asset tags: continue after the highest in data/ (not counting the tags this script writes) ----------
 function highestTag() {
@@ -149,9 +141,10 @@ for (const [SITE, cfg] of Object.entries(OFFICES)) {
   const isComms = (id) => ['mdf', 'idf'].includes(raw.spaces[id].space_type);
   const LIFTS = cfg.lifts, SPAN = coreSpan(LIFTS);
 
-  // Every room's footprint along its row: x along the row, y across it (towards the corridor).
+  // Every space's footprint: W along its row (its display wall), D across it (towards the corridor). A room has a
+  // facade-row size (as deep as the row) and a middle-zone size (4 m deep, or its type's own size with a store behind).
   const itemOf = (id) => {
-    const s = raw.spaces[id], t = raw.types[s.space_type], pg = t.keia_atlas.geometry;
+    const s = raw.spaces[id], t = raw.types[s.space_type], pg = t.keia_atlas?.geometry ?? {};
     if ((s.count ?? 1) > 1) {
       const N = s.count, b = Math.ceil(N / 6), per = Math.floor(N / b / 2) * 2;
       const counts = Array.from({ length: b }, () => per); let rest = N - per * b;
@@ -161,36 +154,25 @@ for (const [SITE, cfg] of Object.entries(OFFICES)) {
       const benches = counts.map((n, i) => ({ x_m: r2(0.6 + Math.floor(i / rows) * pitch), y_m: i % rows ? 3.9 : 0.7, desks: n }));
       return { id, kind: 'bank', xext: width, yext: depth, width, depth, benches };
     }
-    if (s.space_type === 'it-store') return { id, kind: 'room', W: 3, D: 2.6, W0: 3, D0: 2.6, doorWall: 'back', door: { from_m: 1.9, to_m: 2.8 }, xext: 3, yext: 2.6, store: true };
-    let W = pg.width_m, D = pg.depth_m, fixed = null;
-    if (SHARED_BIG[s.space_type] && W > P - 0.2) { const w = SHARED_BIG[s.space_type]; D = r1((W * D) / w); fixed = `Laid out along the facade, ${w} × ${D} m (the profile is ${W} × ${pg.depth_m} m), to fit the floor's ${P} m band.`; W = w; }
-    const doorWall = pg.door.wall;
-    const [xext, yext] = doorWall === 'back' ? [W, D] : [D, W];
-    return { id, kind: 'room', W, D, W0: pg.width_m, D0: pg.depth_m, doorWall, xext, yext, fixed };
+    if (s.space_type === 'it-store') return { id, kind: 'room', store: true, pg: {}, doorBack: false, per: { W: 3, D: P }, mid: { W: 3, D: MID_ROW }, small: true };
+    const range = areaRange(t);
+    const area0 = pg.width_m * pg.depth_m;
+    let f = 1;
+    if (range && rand() < 0.3) f = [0.94, 0.97, 1.03, 1.06][Math.floor(rand() * 4)];
+    const target = range ? Math.min(range.max - 0.06, Math.max(range.min + 0.06, area0 * f)) : area0;
+    const fit = (D) => { const W = r2(target / D); return range && W * D > range.max ? r2(Math.floor((range.max / D) * 100) / 100) : W; };
+    const per = fit(P) >= 2.4 ? { W: fit(P), D: P } : null;
+    const midW = fit(MID_ROW);
+    const mid = midW >= 2.1 ? { W: midW, D: MID_ROW } : pg.depth_m <= MID_ROW ? { W: pg.width_m, D: pg.depth_m } : null;
+    return { id, kind: 'room', pg, doorBack: pg.door?.wall === 'back', per, mid, small: target <= 16 && !!mid };
   };
-
-  // Size variations first (they change the footprint): some rooms are a little longer or shorter along the row.
   const items = {};
-  for (const fid of FLOORS) for (const id of spacesOn(fid)) {
-    if (isComms(id)) continue;
-    const it = itemOf(id);
-    const range = areaRange(raw.types[raw.spaces[id].space_type]);
-    if (it.kind === 'room' && !it.store && !it.fixed && range && rand() < 0.22) {
-      const f = [0.93, 0.95, 1.05, 1.07][Math.floor(rand() * 4)];
-      const along = it.doorWall === 'back' ? 'W' : 'D';
-      const nv = r2(it[along] * f), area = along === 'W' ? nv * it.D : it.W * nv;
-      if (area >= range.min + 0.05 && area <= range.max - 0.05) {
-        it[along] = nv; it.stretched = f;
-        [it.xext, it.yext] = it.doorWall === 'back' ? [it.W, it.D] : [it.D, it.W];
-      }
-    }
-    items[id] = it;
-  }
+  for (const fid of FLOORS) for (const id of spacesOn(fid)) if (!isComms(id)) items[id] = itemOf(id);
 
   // Pack: find the shortest plate that takes every floor. Small rooms go in the middle zone first; desks, shared and
   // large rooms along the facades; a town-hall area beside the cafeteria where there is one.
   let plan = null;
-  for (let L = Math.ceil(SPAN + 2 * CW + CORR_X0 + STAIR_B + 8); L <= 120 && !plan; L += 1) {
+  for (let L = Math.ceil(SPAN + 2 * CW + CORR_X0 + STAIR_B + 8); L <= 120 && !plan; L += 0.5) {
     const w = (L - STAIR_B - CORR_X0 - 2 * CW - SPAN) / 2;
     const cx0 = r1(CORR_X0 + w + CW);
     const core = coreOf(cx0, LIFTS);
@@ -198,29 +180,35 @@ for (const [SITE, cfg] of Object.entries(OFFICES)) {
     let ok = true;
     for (const fid of FLOORS) {
       const rows = {
-        ps: { side: 'N', x0: 0.6, x1: L - 0.6, per: true, used: 0, list: [] },
-        pn: { side: 'S', x0: 0.6, x1: L - 0.6, per: true, used: 0, list: [] },
-        msw: { side: 'S', x0: CORR_X0, x1: r2(cx0 - CW), used: 0, list: [] },
-        mnw: { side: 'N', x0: CORR_X0, x1: r2(cx0 - CW), used: 0, list: [] },
-        mse: { side: 'S', x0: r2(core.ce + CW), x1: r2(L - STAIR_B), used: 0, list: [] },
-        mne: { side: 'N', x0: r2(core.ce + CW), x1: r2(L - STAIR_B), used: 0, list: [] },
+        ps: { side: 'N', edge: P, depth: P, x0: 0, x1: L, per: true, used: 0, list: [] },
+        pn: { side: 'S', edge: r2(m1 + CW), depth: P, x0: 0, x1: L, per: true, used: 0, list: [] },
+        msw: { side: 'S', edge: m0, depth: MID_ROW, x0: CORR_X0, x1: r2(cx0 - CW), used: 0, list: [] },
+        mnw: { side: 'N', edge: m1, depth: MID_ROW, x0: CORR_X0, x1: r2(cx0 - CW), used: 0, list: [] },
+        mse: { side: 'S', edge: m0, depth: MID_ROW, x0: r2(core.ce + CW), x1: r2(L - STAIR_B), used: 0, list: [] },
+        mne: { side: 'N', edge: m1, depth: MID_ROW, x0: r2(core.ce + CW), x1: r2(L - STAIR_B), used: 0, list: [] },
       };
-      const GAP = { per: 0.8, mid: 0 };
-      const room = (r) => r.x1 - r.x0 - r.used - (r.per ? 3 : 0);   // leave a few metres of every facade open
+      const room = (r) => r.x1 - r.x0 - r.used;
       const ids = spacesOn(fid).filter((id) => !isComms(id));
-      const hasHall = ids.some((id) => ['cafeteria', 'pantry-expanded'].includes(raw.spaces[id].space_type)) && ids.some((id) => raw.spaces[id].space_type === 'cafeteria');
+      const hasHall = ids.some((id) => raw.spaces[id].space_type === 'cafeteria');
       const units = ids.map((id) => ({ ...items[id] }));
-      if (hasHall) { const c = units.find((u) => raw.spaces[u.id].space_type === 'cafeteria'); c.hall = true; c.xext = r2(c.xext + TOWN_HALL.w); }
-      const rank = (u) => (u.hall ? 0 : u.kind === 'bank' ? 1 : u.yext > MID_ROW ? 2 : 3);
-      units.sort((a, b) => rank(a) - rank(b) || b.xext - a.xext || a.id.localeCompare(b.id));
+      if (hasHall) units.find((u) => raw.spaces[u.id].space_type === 'cafeteria').hall = true;
+      const rank = (u) => (u.hall ? 0 : u.kind === 'bank' ? 1 : !u.small ? 2 : 3);
+      const along = (u) => (u.kind === 'bank' ? u.xext : (u.per ?? u.mid).W);
+      units.sort((a, b) => rank(a) - rank(b) || along(b) - along(a) || a.id.localeCompare(b.id));
       for (const u of units) {
-        const mid = u.yext <= MID_ROW && u.kind !== 'bank';
-        const cands = Object.entries(rows).filter(([k, r]) => (mid ? true : r.per) && room(r) >= u.xext + (r.per ? GAP.per : GAP.mid));
-        const pref = mid ? cands.filter(([, r]) => !r.per) : cands;
-        const pool = pref.length ? pref : cands;
+        // Each row it could go in, with its size there: small spaces in the middle zone first, the rest on a facade.
+        const opts = Object.entries(rows).map(([k, r]) => {
+          if (u.kind === 'bank') return r.per ? { k, r, W: u.xext, D: u.yext, need: u.xext + 1.2 } : null;
+          const dims = r.per ? (u.per ?? u.mid) : u.mid;
+          if (!dims || (!r.per && dims.D > MID_ROW)) return null;
+          const W = dims.W + (u.hall ? TOWN_HALL.w : 0);
+          return { k, r, W: dims.W, D: dims.D, need: W };
+        }).filter((o) => o && room(o.r) >= o.need);
+        const mids = opts.filter((o) => !o.r.per), pers = opts.filter((o) => o.r.per);
+        const pool = u.small && mids.length ? mids : pers.length ? pers : mids;
         if (!pool.length) { ok = false; break; }
-        const [, r] = pool.sort((a, b) => room(b[1]) - room(a[1]))[0];
-        r.list.push(u); r.used += u.xext + (r.per ? GAP.per : GAP.mid);
+        const o = pool.sort((a, b) => room(b.r) - room(a.r))[0];
+        o.r.list.push({ ...u, W: o.W, D: o.D, need: o.need }); o.r.used += o.need;
       }
       if (!ok) break;
       floors[fid] = rows;
@@ -231,81 +219,90 @@ for (const [SITE, cfg] of Object.entries(OFFICES)) {
   const { L, cx0, core } = plan;
   const OUTLINE = [[0, 0], [L, 0], [L, DEPTH], [0, DEPTH]];
 
-  // ---------- Place each room ----------
+  // ---------- Place each space ----------
   const placed = {};
   const halls = {};
-  const place = (u, side, x0, y0, perimeter) => {
-    const s = raw.spaces[u.id];
+  const extras = Object.fromEntries(FLOORS.map((f) => [f, []])), nooks = Object.fromEntries(FLOORS.map((f) => [f, []]));
+  // Add a rect to a list, merged into the last one when they share an edge (a run of stores or of window seats).
+  const addRect = (list, rect, make) => {
+    const prev = list[list.length - 1];
+    if (prev && prev.rect[1] === rect[1] && prev.rect[3] === rect[3] && (Math.abs(prev.rect[2] - rect[0]) < 0.01 || Math.abs(prev.rect[0] - rect[2]) < 0.01)) prev.rect = [Math.min(prev.rect[0], rect[0]), rect[1], Math.max(prev.rect[2], rect[2]), rect[3]];
+    else list.push(make(list.length + 1));
+  };
+  const pick = (a) => a[Math.floor(rand() * a.length)];
+  const place = (u, r, x0) => {
     const g = {}; const notes = [];
+    const yy0 = r.side === 'N' ? r.edge - u.D : r.edge;
     if (u.kind === 'bank') {
+      const y = r.side === 'N' ? r.edge - u.D - 0.1 : r.edge + 0.1;
       g.size_m = { width: u.width, depth: u.depth };
-      g.on_floor = { x_m: r2(x0), y_m: r2(y0), turn_deg: 0 };
-      g.data_entry = { via: 'ceiling', wall: side === 'N' ? 'front' : 'back', at_m: r2(u.width / 2) };
+      g.on_floor = { x_m: r2(x0), y_m: r2(y), turn_deg: 0 };
+      g.data_entry = { via: 'ceiling', wall: r.side === 'N' ? 'front' : 'back', at_m: r2(u.width / 2) };
       g.benches = u.benches;
       return g;
     }
-    let back, mirror = false;
-    if (u.doorWall === 'back') { back = side; mirror = !u.store && rand() < 0.3; }
-    else { back = rand() < 0.5 ? 'E' : 'W'; mirror = LEFT_FACES[TURN[back]] !== side; }
+    const { W, D, pg } = u;
+    // The display wall away from the corridor and the door on the corridor wall; a space type with its door on the
+    // display wall turns to face the corridor instead.
+    const back = u.doorBack ? r.side : OPP[r.side];
     const turn = TURN[back];
-    const { W, D } = u;
-    const ext = turn % 180 === 0 ? [W, D] : [D, W];
-    const origin = { 0: [x0, y0], 90: [x0 + ext[0], y0], 180: [x0 + ext[0], y0 + ext[1]], 270: [x0, y0 + ext[1]] }[turn];
-    if (u.store || W !== u.W0 || D !== u.D0) g.size_m = { width: W, depth: D };
-    if (mirror) g.mirror = true;
+    const origin = turn === 0 ? [x0, yy0] : [x0 + W, yy0 + D];
+    if (u.store || W !== pg.width_m || D !== pg.depth_m) g.size_m = { width: W, depth: D };
+    if (!u.store && rand() < 0.3) g.mirror = true;
     g.on_floor = { x_m: r2(origin[0]), y_m: r2(origin[1]), turn_deg: turn };
-    const pd = u.store ? { wall: 'back', ...u.door } : raw.types[s.space_type].keia_atlas.geometry.door;
-    const sx = W / u.W0, sy = D / u.D0;
-    // The door as built, before any move.
-    let door = pd.wall === 'left' ? { wall: mirror ? 'right' : 'left', from_m: r2(pd.from_m * sy), to_m: r2(pd.to_m * sy) }
-      : (() => { const a = pd.from_m * sx, b = pd.to_m * sx; return { wall: 'back', from_m: r2(mirror ? W - b : a), to_m: r2(mirror ? W - a : b) }; })();
-    if (u.store) g.door = door;
-    const wallLen = door.wall === 'back' ? W : D;
-    const roll = rand();
-    if (!u.store && roll < 0.1) {
-      const shift = (rand() < 0.5 ? -1 : 1) * r1(0.3 + rand() * 0.4);
-      const from = r2(Math.max(0.15, Math.min(wallLen - 0.15 - (door.to_m - door.from_m), door.from_m + shift)));
-      door = { ...door, from_m: from, to_m: r2(from + (door.to_m - door.from_m)) };
-      g.door = door;
-      notes.push(pick(['Door moved along the wall to clear a column in the corridor.', 'Door moved to line up with the corridor\'s glazing module.', 'Door moved to clear a fire door hold-open outside.']));
+    if (!u.doorBack) {
+      const dw = pg.door ? r2(pg.door.to_m - pg.door.from_m) : 0.9;
+      const a0 = rand() < 0.5 ? 0.3 : r2(W - 0.3 - dw);
+      g.door = { wall: 'front', from_m: a0, to_m: r2(a0 + dw) };
     }
     const odd = [];
-    const doorSide = door.wall === 'left' ? 'left' : door.wall === 'right' ? 'right' : 'back';
-    if (!u.store && rand() < 0.14 && W > 2.6 && D > 2.6) {
-      const x = doorSide === 'left' ? r2(W - 0.55) : 0.1;
-      odd.push({ kind: 'column', x_m: x, y_m: r2(D - 0.55), w_m: 0.45, d_m: 0.45, note: pick(['A structural column in the corner', 'A column on the long wall, boxed in', 'A structural column by the window']) });
-    } else if (!u.store && rand() < 0.1 && W > 2.6 && D > 2.6) {
-      const x = doorSide === 'left' ? r2(W - 0.8) : 0;
-      odd.push({ kind: 'corner', x_m: x, y_m: r2(D - 0.8), w_m: 0.8, d_m: 0.8, note: pick(['A corner cut out for a rainwater pipe', 'A duct in the corner', 'A corner boxed in for a service riser']) });
-    }
-    if (!u.store && rand() < 0.16) odd.push({ kind: 'window-wall', wall: doorSide, note: 'A glass wall to the corridor: no wall plates on that side' });
+    const roll = rand();
+    if (!u.store && roll < 0.14 && W > 2.6 && D > 2.6) odd.push({ kind: 'column', x_m: 0.1, y_m: 0.1, w_m: 0.45, d_m: 0.45, note: pick(['A structural column in the corner', 'A column on the long wall, boxed in', 'A structural column by the window']) });
+    else if (!u.store && roll < 0.24 && W > 2.6 && D > 2.6) odd.push({ kind: 'corner', x_m: r2(W - 0.8), y_m: 0, w_m: 0.8, d_m: 0.8, note: pick(['A corner cut out for a rainwater pipe', 'A duct in the corner', 'A corner boxed in for a service riser']) });
+    if (!u.store && rand() < 0.16) odd.push({ kind: 'window-wall', wall: u.doorBack ? 'back' : 'front', note: 'A glass wall to the corridor: no wall plates on that side' });
     if (odd.length) g.odd = odd;
-    if (u.fixed) notes.push(u.fixed);
-    else if (u.stretched) notes.push(`${u.stretched > 1 ? 'A little longer' : 'A little shorter'} than the profile to fill its bay (${W} × ${D} m, the profile is ${u.W0} × ${u.D0} m).`);
     if (u.store) notes.push('An IT store off the corridor: locked cabinets, no devices built in.');
+    else if (g.size_m) notes.push(`Built to its row: ${W} × ${D} m (the space type is ${pg.width_m} × ${pg.depth_m} m).`);
+    if (!u.doorBack && !u.store) notes.push('Door on the corridor wall.');
     if (notes.length) g.notes = notes;
     return g;
   };
-  const pick = (a) => a[Math.floor(rand() * a.length)];
   for (const fid of FLOORS) {
     const rows = plan.floors[fid];
     for (const [k, r] of Object.entries(rows)) {
-      const used = r.list.reduce((n, u) => n + u.xext, 0);
-      const gap = r.per ? Math.min(2.4, Math.max(0.8, (r.x1 - r.x0 - used) / (r.list.length + 1))) : 0;
-      let x = r.x0 + (r.per ? gap : 0);
-      // Mid rows on the west side run from the link corridor outwards, so the open end is by the facade.
-      const list = k.endsWith('w') ? [...r.list] : r.list;
-      if (k === 'msw' || k === 'mnw') x = r.x1 - r.list.reduce((n, u) => n + u.xext, 0);
-      for (const u of list) {
-        const inner = u.hall ? u.xext - TOWN_HALL.w : u.xext;
-        const yext = u.yext;
-        const y0 = r.side === 'N' ? (r.per ? P - yext : m1 - yext) : (r.per ? m1 + CW : m0);
-        placed[u.id] = place({ ...u, xext: inner }, r.side, x, y0, r.per);
+      // Facade rows: the enclosed spaces wall to wall from one end, then the desks in the open with an aisle between
+      // banks. Middle rows: wall to wall from the core's link corridor outwards.
+      const rooms = r.list.filter((u) => u.kind !== 'bank'), banks = r.list.filter((u) => u.kind === 'bank');
+      const fromEast = r.per ? rand() < 0.5 : k === 'msw' || k === 'mnw';
+      const seq = [...rooms, ...banks];
+      let x = fromEast ? r.x1 : r.x0;
+      for (const u of seq) {
+        const w = u.kind === 'bank' ? u.xext + 1.2 : u.W + (u.hall ? TOWN_HALL.w : 0);
+        const x0 = fromEast ? x - w : x;
+        const inner = u.kind === 'bank' ? x0 + 0.6 : u.hall && fromEast ? x0 + TOWN_HALL.w : x0;
+        placed[u.id] = place(u, r, inner);
         if (u.hall) {
-          const hy0 = r.side === 'N' ? P - TOWN_HALL.d : m1 + CW;
-          halls[fid] = { id: 'town-hall', kind: 'town-hall', name: 'Town hall area', rect: [r2(x + inner + 0.2), r2(hy0), r2(x + inner + 0.2 + TOWN_HALL.w - 0.4), r2(hy0 + TOWN_HALL.d)] };
+          const hx0 = fromEast ? x0 : x0 + u.W;
+          const hy0 = r.side === 'N' ? r.edge - TOWN_HALL.d : r.edge;
+          halls[fid] = { id: 'town-hall', kind: 'town-hall', name: 'Town hall area', rect: [r2(hx0), r2(hy0), r2(hx0 + TOWN_HALL.w), r2(hy0 + TOWN_HALL.d)] };
         }
-        x += u.xext + (r.per ? gap : 0);
+        // A space shallower than its row: on a facade the depth behind it is window seating, in the middle zone a store.
+        if (u.kind !== 'bank' && u.D < r.depth - 0.05) {
+          const ys = r.side === 'N' ? [r.edge - r.depth, r.edge - u.D] : [r.edge + u.D, r.edge + r.depth];
+          const rect = [r2(inner), r2(ys[0]), r2(inner + u.W), r2(ys[1])];
+          if (r.per) addRect(nooks[fid], rect, (n) => ({ id: `window-seats-${n}`, kind: 'breakout', name: 'Window seats', rect }));
+          else addRect(extras[fid], rect, (n) => ({ id: `store-${fid}-${n}`, kind: 'store', name: pick(['Store', 'Lockers', 'Coats and lockers', 'Stationery store']), rect }));
+        }
+        x = fromEast ? x0 : x0 + w;
+      }
+      // The open end of a row: touchdown in the middle zone, breakout on a facade (a short end is a store).
+      {
+        const ys = r.side === 'N' ? [r2(r.edge - r.depth), r.edge] : [r.edge, r2(r.edge + r.depth)];
+        const rect = fromEast ? [r.x0, ys[0], r2(x), ys[1]] : [r2(x), ys[0], r.x1, ys[1]];
+        const w = rect[2] - rect[0];
+        if (!r.per && w > 0.2 && w < 1.5) extras[fid].push({ id: `store-${fid}-${k}`, kind: 'store', name: 'Store', rect });
+        else if (!r.per && w >= 1.5) nooks[fid].push({ id: `touchdown-${k}`, kind: 'breakout', name: 'Touchdown', rect });
+        else if (r.per && w >= 2) nooks[fid].push({ id: `breakout-${k}`, kind: 'breakout', name: 'Breakout', rect });
       }
     }
     for (const id of spacesOn(fid).filter(isComms)) {
@@ -319,13 +316,14 @@ for (const [SITE, cfg] of Object.entries(OFFICES)) {
   const geoOf = (id) => roomGeometry(raw.spaces[id], raw.types[raw.spaces[id].space_type]);
   const LEVEL = Object.fromEntries(FLOORS.map((f) => [f, r2(Number(f) * SLAB)]));
   const CORE = [...core.parts, { id: 'stair-b', kind: 'stair', name: 'Stair B (escape)', rect: [r2(L - STAIR_B), m0, L, m1] }];
+  const coreOn = (f) => [...CORE, ...extras[f]];
   const CORRIDORS = [
-    { id: 'corridor-south', name: 'South corridor', rect: [CORR_X0, P, r2(L - STAIR_B), m0] },
-    { id: 'corridor-north', name: 'North corridor', rect: [CORR_X0, m1, r2(L - STAIR_B), r2(m1 + CW)] },
+    { id: 'corridor-south', name: 'South corridor', rect: [0, P, L, m0] },
+    { id: 'corridor-north', name: 'North corridor', rect: [0, m1, L, r2(m1 + CW)] },
     { id: 'corridor-west', name: 'West link', rect: [r2(cx0 - CW), m0, cx0, m1] },
     { id: 'corridor-east', name: 'East link', rect: [core.ce, m0, r2(core.ce + CW), m1] },
   ];
-  const xs0 = r2(CORR_X0 + CW / 2), xs1 = r2(L - STAIR_B - CW / 2), lwx = r2(cx0 - CW / 2), lex = r2(core.ce + CW / 2);
+  const xs0 = 0.8, xs1 = r2(L - 0.8), lwx = r2(cx0 - CW / 2), lex = r2(core.ce + CW / 2);
   const mainTrays = (f) => [
     { id: `t${f}-comms`, kind: 'ladder', name: 'Ladder in the comms room', path: [core.riserC, [core.riserC[0], core.rackAt[1]], core.rackAt, [core.jx, core.rackAt[1]], [core.jx, YS]], z_m: LADDER_Z, width_mm: 450, depth_mm: 100 },
     { id: `t${f}-south-w`, kind: 'tray', name: 'South corridor tray, west', path: [[core.jx, YS], [xs0, YS]], z_m: TRAY_Z },
@@ -364,7 +362,7 @@ for (const [SITE, cfg] of Object.entries(OFFICES)) {
       const geo = geoOf(id);
       trays.push({ id: `t${f}-b-${short(id)}`, kind: 'basket', name: `Branch to ${raw.spaces[id].number ?? ''} ${raw.spaces[id].name}`.replace(/\s+/g, ' '), path: branchTo(trays, [geo.entry[0], geo.entry[1]]), z_m: TRAY_Z, feeds: `room-${id}` });
     }
-    floorsOut[f] = { trays, aps: [], areas: [{ id: 'breakout-west', kind: 'breakout', name: 'Touchdown and breakout', rect: [0, m0, CORR_X0, m1] }, ...(halls[f] ? [halls[f]] : [])] };
+    floorsOut[f] = { trays, aps: [], areas: [{ id: 'breakout-west', kind: 'breakout', name: 'Touchdown and breakout', rect: [0, m0, CORR_X0, m1] }, ...(halls[f] ? [halls[f]] : []), ...nooks[f]] };
   }
 
   // ---------- Runs: panel ports in the order the patch cords were recorded ----------
@@ -409,7 +407,7 @@ for (const [SITE, cfg] of Object.entries(OFFICES)) {
 
   // ---------- Access points: the Wi-Fi standard's spacing, on clear spots ----------
   const enclosedOn = (f) => spacesOn(f).filter((id) => (raw.spaces[id].count ?? 1) === 1).map((id) => geoOf(id).rect);
-  const coreSolid = CORE.filter((c) => !c.circulation).map((c) => c.rect);
+  const coreSolidOn = (f) => coreOn(f).filter((c) => !c.circulation).map((c) => c.rect);
   const commsInst = (f) => raw.installs[spacesOn(f).find(isComms)];
   const unitDates = (inst) => (inst?.positions ?? []).flatMap((p) => p.units.map((u) => u.installed)).filter(Boolean).sort();
   const siteDates = FLOORS.flatMap((f) => unitDates(commsInst(f))).sort();
@@ -419,7 +417,7 @@ for (const [SITE, cfg] of Object.entries(OFFICES)) {
   for (const f of FLOORS) {
     const { trays } = floorsOut[f];
     const hall = halls[f];
-    const encl = enclosedOn(f);
+    const encl = enclosedOn(f), coreSolid = coreSolidOn(f);
     const open = polyArea(OUTLINE) - encl.reduce((n, r) => n + rectArea(r), 0) - coreSolid.reduce((n, r) => n + rectArea(r), 0) - (hall ? rectArea(hall.rect) : 0);
     const needHall = hall ? Math.ceil(rectArea(hall.rect) / WIFI_RULE.gathering_m2) : 0, needOpen = Math.ceil(open / WIFI_RULE.open_m2);
     // A patched port left over once every outlet has one is an access point the predictive design added.
@@ -582,17 +580,17 @@ for (const [SITE, cfg] of Object.entries(OFFICES)) {
     const doc = {
       site: SITE, floor: f, name: site.floors.find((x) => x.id === f).name, fictional: FICTION,
       level_m: LEVEL[f], slab_to_slab_m: SLAB, ceiling_m: 2.7, raised_floor_m: 0.15, tray_m: TRAY_Z,
-      outline: OUTLINE, core: CORE, corridors: CORRIDORS, areas: floorsOut[f].areas, risers: [RISER],
+      outline: OUTLINE, core: coreOn(f), corridors: CORRIDORS, areas: floorsOut[f].areas, risers: [RISER],
       racks: [{ rack: perFloor[f].rackId, at: core.rackAt, facing: 's' }],
       trays: floorsOut[f].trays.map(trayOut),
       access_points: placedAps,
       notes: [
-        `A ${L} × ${DEPTH} m floor plate with a central core (two stairs, ${LIFTS} lifts, toilets, riser 1). The comms room sits in the core beside the riser${FLOORS.length > 1 ? ', one above the other on every floor' : ''}.`,
-        'Small rooms sit back to back in the middle zone either side of the core; desks, shared rooms and large rooms line the facades.',
-        'Trays run in the corridor ceiling void at 3.1 m; a basket branches off to each room\'s data entry (above its door) and to each access point. Tray sizes are chosen for the cables they carry plus a quarter for growth, at a 40 percent fill.',
+        `A ${L} × ${DEPTH} m floor plate: a row of spaces along each facade, two 1.6 m corridors, and a middle zone with the core (two stairs, ${LIFTS} lifts, toilets, riser 1). The comms room sits in the core beside the riser${FLOORS.length > 1 ? ', one above the other on every floor' : ''}.`,
+        'Spaces are packed wall to wall along the corridors, each with its door on the corridor: small spaces back to back in the middle zone either side of the core; desks, shared spaces and large spaces along the facades.',
+        'Trays run in the corridor ceiling void at 3.1 m; a basket branches off to each space\'s data entry (above its door) and to each access point. Tray sizes are chosen for the cables they carry plus a quarter for growth, at a 40 percent fill.',
         ...(halls[f] ? ['The town hall area beside the cafeteria is where people gather, so it has U7 Pro Max access points (one per 100 m²); the rest of the open area has U7 Pro (one per 150 m²).'] : []),
         ...(perFloor[f].spare ? [`${perFloor[f].spare} data outlets with nothing plugged in are terminated on panel ports without a patch cord (spare): the comms room's recorded patching has fewer live ports than the floor has outlets.`] : []),
-        ...(g.length ? [`The Wi-Fi standard wants an access point in every room of 12 or more seats (${g.join(', ')}); no room profile has one yet, so these are gaps.`] : []),
+        ...(g.length ? [`The Wi-Fi standard wants an access point in every space of 12 or more seats (${g.join(', ')}); no space type has one yet, so these are gaps.`] : []),
       ],
     };
     write(`data/floors/${SITE}-${f}.yaml`, `# ${site.name}, ${doc.name.replace(/:.*$/, '').toLowerCase()}: the floor plan for the 3D model and the floor map. Made up (rule F9); written by\n# ${THIS}. Metres from the outline's south-west corner, x east, y north.\n${stringify(doc)}`);

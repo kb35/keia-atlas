@@ -124,13 +124,15 @@ export function createScene(host, D, hooks) {
     const slabE = new EdgesGeometry(slabG); disposables.push(slabE); g.add(new LineSegments(slabE, mk('line', '--line-strong', 1, f.id)));
     label(f.name, world(bx[0] - 0.5, by[0], L + 0.4), f.id, 'o3-label-floor');
     const coreMat = mk('lambert', '--grey-soft', 0.7, f.id), coreEdge = mk('line', '--line-strong', 0.7, f.id), patch = mk('lambert', '--grey-soft', 0.9, f.id);
+    // Toilets in the floor plan's blue tint, stores and ducts a shade darker (the plan's key, FloorMap.astro).
+    const wcMat = mk('lambert', '--blue-soft', 0.8, f.id), storeMat = mk('lambert', '--grey', 0.35, f.id);
     for (const c of f.core) {
       if (c.k === 'riser') continue;
       if (c.circ) box(g, [c.r[0], c.r[1], L], [c.r[2], c.r[3], L + 0.02], patch);
-      else box(g, [c.r[0], c.r[1], L], [c.r[2], c.r[3], top], coreMat, coreEdge);
+      else box(g, [c.r[0], c.r[1], L], [c.r[2], c.r[3], top], c.k === 'toilets' ? wcMat : ['store', 'shaft', 'plant'].includes(c.k) ? storeMat : coreMat, coreEdge);
     }
     for (const c of f.corr) box(g, [c.r[0], c.r[1], L], [c.r[2], c.r[3], L + 0.015], patch);
-    for (const a of f.areas) box(g, [a.r[0], a.r[1], L], [a.r[2], a.r[3], L + 0.012], mk('lambert', a.k === 'town-hall' ? '--amber-soft' : '--green-soft', 0.95, f.id));
+    for (const a of f.areas.filter((x) => x.k !== 'open-office')) box(g, [a.r[0], a.r[1], L], [a.r[2], a.r[3], L + 0.012], mk('lambert', a.k === 'town-hall' ? '--amber-soft' : '--green-soft', 0.95, f.id));
     // Rooms.
     const deskMat = mk('lambert', '--surface-3', 1, f.id), oddMat = mk('lambert', '--line-strong', 1, f.id);
     const desks = D.rooms.filter((r) => r.f === f.id).flatMap((r) => r.desks);

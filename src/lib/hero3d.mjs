@@ -23,7 +23,9 @@ import {
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { spring } from './spring.mjs';
 
-const TOKENS = ['--hz-slab-top', '--hz-core', '--hz-corr', '--hz-top', '--hz-edge', '--hz-ground', '--quiet', '--h-fault', '--text-3', '--hz-area'];
+const TOKENS = ['--hz-slab-top', '--hz-core', '--hz-corr', '--hz-top', '--hz-edge', '--hz-ground', '--quiet', '--h-fault', '--text-3', '--hz-area', '--hz-k-meeting', '--hz-k-small', '--hz-k-shared', '--hz-wc', '--hz-desk'];
+// A space's kind, for its tint (the floor plan's key uses the same kinds: src/components/FloorMap.astro).
+const KIND_TOKEN = { meeting: '--hz-k-meeting', small: '--hz-k-small', reception: '--hz-k-shared', pantry: '--hz-k-shared', print: '--hz-k-shared' };
 const world = (x, y, z) => new Vector3(x, z, -y);
 
 // Read the tokens as colours (any CSS colour syntax) by painting one pixel each.
@@ -106,14 +108,18 @@ export function mountHero(host, D, hooks = {}) {
     g.add(new Mesh(slab, mk('lambert', '--hz-slab-top', 1, f.id)));
     g.add(new LineSegments(new EdgesGeometry(slab), mk('line', '--hz-edge', 1, f.id)));
     const coreMat = mk('lambert', '--hz-core', 1, f.id), corrMat = mk('lambert', '--hz-corr', 1, f.id), areaMat = mk('lambert', '--hz-area', 1, f.id), edge = mk('line', '--hz-edge', 1, f.id);
-    for (const c of f.core) box(g, [c.r[0], c.r[1], L], [c.r[2], c.r[3], L + (c.flat ? 0.02 : 0.9)], coreMat, c.flat ? null : edge);
+    const wcMat = mk('lambert', '--hz-wc', 1, f.id);
+    for (const c of f.core) box(g, [c.r[0], c.r[1], L], [c.r[2], c.r[3], L + (c.flat ? 0.02 : 0.9)], c.kind === 'toilets' ? wcMat : coreMat, c.flat ? null : edge);
     for (const r of f.corr) box(g, [r[0], r[1], L], [r[2], r[3], L + 0.015], corrMat);
     for (const a of f.areas) box(g, [a[0], a[1], L], [a[2], a[3], L + 0.012], areaMat);
-    const roomMat = mk('lambert', '--hz-top', 1, f.id);
+    const kindMats = {}, deskMat = mk('lambert', '--hz-desk', 1, f.id);
+    const matOf = (k) => (kindMats[k] ??= mk('lambert', KIND_TOKEN[k] ?? '--hz-top', 1, f.id));
     for (const r of D.rooms.filter((x) => x.f === f.id)) {
       const fault = r.id === D.story.room;
-      const mat = fault ? mk('lambert', '--hz-top', 1, f.id) : roomMat;
-      const m = box(g, [r.r[0], r.r[1], L], [r.r[2], r.r[3], L + r.h], mat, edge);
+      const mat = fault ? mk('lambert', '--hz-top', 1, f.id) : matOf(r.k);
+      // Desks stand in the open: the bank is a flat outline on the floor with each desk on it.
+      const m = box(g, [r.r[0], r.r[1], L], [r.r[2], r.r[3], L + (r.bank ? 0.03 : r.h)], r.bank ? corrMat : mat, edge);
+      for (const d of r.desks ?? []) box(g, [d[0] - 0.7, d[1] - 0.34, L], [d[0] + 0.7, d[1] + 0.34, L + 0.38], deskMat, edge);
       m.userData.room = r;
       const centre = [(r.r[0] + r.r[2]) / 2, (r.r[1] + r.r[3]) / 2];
       const rg = ring(g, new Vector3(centre[0], centre[1], L + r.h + 0.55), { px: fault ? 19 : 13, fault, floor: f.id });
