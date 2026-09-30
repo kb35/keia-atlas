@@ -95,6 +95,14 @@ const FLOWS = [
     await key(page, 'ArrowDown'); await page.keyboard.press('Meta+a'); await page.keyboard.type('?who is on site in APAC'); await settle(page, 400);
     await key(page, 'Escape'); await settle(page, 300);
   }],
+  // The Keia Atlas mark (src/lib/brand-mark.mjs reports its own moves): arrival, a hover, and a page change (leave,
+  // then the turntable if it runs past 300 ms, then the landing).
+  ['brand', '/', async (page) => {
+    await settle(page, 1500);
+    await page.hover('.brand svg.kam'); await settle(page); await page.mouse.move(600, 400); await settle(page);
+    await page.locator('.nav a[href*="/locations/"]:visible').first().click();
+    await page.waitForURL(/locations\//, { waitUntil: 'commit' }); await settle(page, 1500);
+  }],
   ['palette-verb', '/locations/dub/', async (page) => {
     await key(page, '/'); await settle(page, 300);
     await page.keyboard.type('>settings'); await settle(page, 300);
