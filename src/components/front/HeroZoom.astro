@@ -35,7 +35,7 @@ const fb = fit(B.prims, { width: VW, height: VH, pad: 60 });
 const FL = isoFloor(F, roomsOf(FLOOR), { h: 1.1 });
 const ff = fit(FL.prims, { width: VW, height: VH, pad: 46 });
 const swan = FL.rings.find((r) => r.room.id === ROOM);
-const floorCentre = fb.T(iso(30, 12, FL.z));
+const floorCentre = fb.T(iso((FL.box[0] + FL.box[2]) / 2, (FL.box[1] + FL.box[3]) / 2, FL.z));
 const swanTop = ff.T(swan.top);
 const nRooms = Object.values(M.rooms).filter((r) => r.rect).length;
 
@@ -56,7 +56,8 @@ const devAt = art(160, 62);
 
 // ---- How far each level zooms into the next (clamped so a leaving layer never grows past what a GPU draws well).
 const clamp = (v) => Math.max(1.5, Math.min(5, v));
-const S = [clamp(ff.k / fb.k), clamp(roomW / ((5.2 + 6.6) * 0.866 * ff.k)), clamp((294 * 3 * ART.s) / barW)];
+const swanW = (swan.room.rect[2] - swan.room.rect[0]) + (swan.room.rect[3] - swan.room.rect[1]);
+const S = [clamp(ff.k / fb.k), clamp(roomW / (swanW * 0.866 * ff.k)), clamp((294 * 3 * ART.s) / barW)];
 const hot = [floorCentre, swanTop, barAt];
 
 // ---- What the 3D scene needs, inline (no fetch): each floor, every room, the story's devices where they sit.
@@ -67,7 +68,9 @@ const kindOf = (t) => (t === 'mdf' || t === 'idf' ? 'comms' : t?.startsWith('wor
   : t === 'focus-room' || t === 'office' || t?.startsWith('huddle-room') ? 'small' : 'meeting');
 const peekOf = (r) => { const n = (r.positions ?? []).reduce((k, p) => k + (p.units?.length ?? 0), 0); return r.id === ROOM ? `Fault · video bar offline since ${STORY.since} · With ${STORY.who}` : `Fine · ${n === 1 ? '1 device' : `${n} devices`}`; };
 const DEV_WORDS = { 'display#1': 'Display 1', 'display#2': 'Display 2', 'video-bar': 'Video bar', 'touch-controller': 'Touch controller', 'scheduler-panel': 'Scheduler panel' };
-const nudge = (o) => { const [x, y, z] = o.at; return o.surface === 'back' ? [x - 0.45, y, z] : o.surface === 'floor' ? [x, y, z + 0.45] : o.surface === 'left' ? [x, y + 0.35, z] : [x, y, z]; };
+// A device ring sits a little in from its outlet, towards the room's centre (an outlet is on a wall or under a table).
+const swanC = [(M.rooms[ROOM].rect[0] + M.rooms[ROOM].rect[2]) / 2, (M.rooms[ROOM].rect[1] + M.rooms[ROOM].rect[3]) / 2];
+const nudge = (o) => { const [x, y, z] = o.at, dx = swanC[0] - x, dy = swanC[1] - y, d = Math.hypot(dx, dy) || 1; return [x + (dx / d) * 0.45, y + (dy / d) * 0.45, o.surface === 'floor' ? z + 0.45 : z]; };
 const D3 = {
   floors: M.floors.map((f) => ({ id: f.id, name: f.name, level: f.level_m, outline: f.outline, core: f.core.map((c) => ({ r: c.rect.map(r2), kind: c.kind, flat: !!c.circulation || c.kind === 'lift-lobby' })), corr: f.corridors.map((c) => c.rect.map(r2)), areas: f.areas.map((a) => a.rect.map(r2)) })),
   rooms: Object.values(M.rooms).filter((r) => r.rect).map((r) => ({ id: r.id, no: r.number ?? '', n: `${r.number ? `${r.number} ` : ''}${r.name}`, f: r.floor, r: r.rect.map(r2), h: 1, peek: peekOf(r),
@@ -357,7 +360,8 @@ const P = (t, pts) => t.pts(pts);
   }
 
   .hz-stage {
-    position: relative; height: clamp(380px, 62vh, 620px); overflow: clip; border-radius: 22px; background: var(--hz-bg); cursor: zoom-in; outline: none;
+    /* The stage takes the viewport left after the masthead, three rows of text, the caption and strip: the whole hero fits one screen. */
+    position: relative; height: clamp(300px, calc(100svh - 420px), 720px); overflow: clip; border-radius: 22px; background: var(--hz-bg); cursor: zoom-in; outline: none;
     box-shadow: inset 0 0 0 1px var(--hairline);
   }
   .hz-stage.at-end { cursor: default; }
@@ -399,7 +403,8 @@ const P = (t, pts) => t.pts(pts);
   .hz-tag span { color: var(--text-2); }
   .hz-tag.is-fault b::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--h-fault, var(--red)); margin-right: 7px; vertical-align: -1px; }
   .hz-hover b::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--quiet, var(--text-3)); margin-right: 7px; vertical-align: -1px; }
-  .hz-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; }
+  .hz { gap: 10px; }
+  .hz-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px 24px; flex-wrap: wrap; }
   .hz-cap { margin: 0; font-size: 14.5px; line-height: 1.4; color: var(--text-2); min-width: 0; flex: 1 1 320px; }
   .hz-beat { font: 500 12.5px/1.4 var(--font-mono); color: var(--quiet, var(--text-3)); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .hz-levels { position: relative; display: inline-flex; padding: 3px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); flex: none; }
