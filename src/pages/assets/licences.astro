@@ -1,0 +1,72 @@
+---
+// Licences (the Licences capability, src/lib/modules.mjs; src/lib/licences.mjs): every room and platform licence pool,
+// soonest renewal first. The answer first ("3 licences renew in 30 days"), then the list: seats used of seats bought,
+// the renewal and its distance, the cost a year and who owns it. Seats in use are counted from the units, so they never
+// drift from the fleet. Demo data (data/licences/). While the capability is off, the page says so (FeatureGate).
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import HealthGlyph from '../../components/HealthGlyph.astro';
+import FeatureGate from '../../components/FeatureGate.astro';
+import FeatureSource from '../../components/FeatureSource.astro';
+import { href, fmtDate, plural, modelName } from '../../lib/data.mjs';
+import { ROLES } from '../../lib/demo.mjs';
+import { licences, licenceTotals as T } from '../../lib/capabilities-view.mjs';
+import { licenceAnswer, inDays, money, SOON_DAYS, KIND_LABEL } from '../../lib/licences.mjs';
+import '../../styles/capabilities.css';
+
+const REGION = { amer: 'Americas', emea: 'EMEA', apac: 'Asia Pacific' };
+const where = (r) => (r.assigned ? (r.used ? plural(r.used, 'unit') + ' named' : 'Assigned by hand') : r.scope?.region ? REGION[r.scope.region] : r.scope?.sites ? r.scope.sites.join(', ') : 'Every office');
+const state = (r) => (r.lapsed ? 'fault' : r.short ? 'fault' : r.soon ? 'review' : 'fine');
+const word = (r) => (r.lapsed ? 'Lapsed' : r.short ? `${r.short} short` : r.soon ? 'Renews soon' : 'Fine');
+const FACETS = [
+  { key: 'kind', label: 'Kind', options: Object.entries(KIND_LABEL).map(([value, label]) => ({ value, label })) },
+  { key: 'status', label: 'Status', options: [{ value: 'soon', label: `Renews in ${SOON_DAYS} days` }, { value: 'short', label: 'Seats short' }, { value: 'fine', label: 'Fine' }] },
+  { key: 'vendor', label: 'Vendor', options: [...new Set(licences.map((r) => r.vendor))].map((v) => ({ value: v, label: v })) },
+];
+const NUMBERS = [
+  { n: T.renewing, label: `Renew in ${SOON_DAYS} days`, to: '?status=soon', tone: T.renewing ? 'warn' : undefined },
+  { n: T.seatsShort, label: T.seatsShort === 1 ? 'Seat short' : 'Seats short', to: '?status=short', tone: T.seatsShort ? 'bad' : undefined },
+  { n: T.unused, label: 'Seats spare', fact: true },
+  { n: money(T.cost, T.currency), label: 'A year', fact: true },
+];
+const answer = licenceAnswer(T);
+---
+<Shell title="Licences" section="licences" crumbs={[{ label: 'Assets', to: '/assets/' }, { label: 'Licences' }]}>
+  <FeatureGate id="licences">
+    <PageBand overline="Licences" title="Licences" answer={answer} lede="Room and platform licences: seats used of seats bought, when each renews and what it costs." sim heartbeat={false} numbers={NUMBERS}>
+      <FeatureSource slot="overline" id="licences" />
+    </PageBand>
+
+    <div class="content lic">
+      <FilterBar facets={FACETS} placeholder="Find a licence, platform or model" label="Find a licence" noun={['licence', 'licences']} scope=".content.lic" />
+      <div class="card cap-t">
+        <table class="to-cards cap-tbl">
+          <thead><tr><th>Licence</th><th>Seats</th><th>Renews</th><th>Cost a year</th><th>Owner</th></tr></thead>
+          <tbody>
+            {licences.map((r) => (
+              <tr id={r.id} class:list={[{ 'is-alert': r.short || r.lapsed, 'is-warn': !r.short && r.soon }]} data-fi data-help="licence.row"
+                data-find={`${r.name} ${r.platformLabel} ${r.vendor} ${r.models.map(modelName).join(' ')}`} data-f-kind={r.kind} data-f-vendor={r.vendor}
+                data-f-status={[r.soon || r.lapsed ? 'soon' : null, r.short ? 'short' : null, !r.soon && !r.short && !r.lapsed ? 'fine' : null].filter(Boolean).join('|')}>
+                <td data-label=""><span class="cap-g"><HealthGlyph state={state(r)} size={16} word={word(r)} /></span><b>{r.name}</b><small>{r.kindLabel} · {r.vendor} · {where(r)}</small><small>{r.models.map(modelName).join(', ')}</small></td>
+                <td data-label="Seats">
+                  <span class="cap-meter" title={`${r.used} of ${r.seats} seats in use`}>
+                    <b>{r.used} of {r.seats}</b>
+                    <span class:list={['cap-bar', { 'is-short': r.short, 'is-near': !r.short && r.seats && r.used / r.seats > 0.9 }]}><i style={`width:${r.seats ? Math.min(100, Math.round((r.used / r.seats) * 100)) : 100}%`}></i></span>
+                  </span>
+                  <small>{r.short ? `${plural(r.short, 'unit')} without a seat` : r.used === 0 ? 'None in use' : `${plural(r.spare, 'seat')} spare`}</small>
+                </td>
+                <td data-label="Renews" class="num">{fmtDate(r.renews)}<small class:list={['cap-w', { 't-warn': r.soon, 't-bad': r.lapsed }]}>{inDays(r.days)}{r.autoRenew ? ', renews by itself' : ', needs an order'}</small></td>
+                <td data-label="Cost a year" class="num">{money(r.cost.amount, r.cost.currency)}<small>{r.perSeat != null ? `${money(r.perSeat, r.cost.currency)} a seat · ${r.termLabel.toLowerCase()} term` : r.termLabel}</small></td>
+                <td data-label="Owner">{ROLES[r.owner]?.name ?? r.owner}{r.notes && <small>{r.notes}</small>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <EmptyState text="No licences match these filters." />
+      <p class="cap-note">Seats in use are counted from the units in each licence's scope, so a new room shows here the day its video bar is recorded. Made-up pools for the demo: Aigna runs Google Meet and Webex rooms; the Teams Rooms seats are a Lab trial. The same licences show on each space and unit that holds a seat.</p>
+    </div>
+  </FeatureGate>
+</Shell>

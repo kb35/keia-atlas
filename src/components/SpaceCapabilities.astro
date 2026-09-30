@@ -1,0 +1,41 @@
+---
+/* SpaceCapabilities: what the capabilities know about one space (src/lib/modules.mjs), as one section of cards on the
+   space page: its licences, its next room check and its call quality. Each card belongs to its capability
+   (data-feature) and shows only what exists for this space, so a space with no licence has no licence card; the
+   section (a Section, so featureCss takes it away with its heading when every card is gated) holds whatever is left.
+   Props: space  the space id */
+import Section from './Section.astro';
+import FeatureSource from './FeatureSource.astro';
+import { href, fmtDate, plural } from '../lib/data.mjs';
+import { featureAnyCss } from '../lib/modules.mjs';
+import { licences } from '../lib/capabilities-view.mjs';
+import { rowsForSpace, inDays } from '../lib/licences.mjs';
+import '../styles/capabilities.css';
+
+interface Props { space: string }
+const { space } = Astro.props;
+const lic = rowsForSpace(licences, space);
+const cards = [lic.length ? 'licences' : null].filter(Boolean);
+---
+{cards.length > 0 && (
+  <Section title="Upkeep" id="upkeep" help="room.upkeep" data-feat-any={cards.join(' ')}>
+    <style is:global set:html={featureAnyCss(cards)}></style>
+    <div class="cap-grid">
+      {lic.length > 0 && (
+        <section class="card pad cap-card" data-feature="licences" data-help="room.licences" aria-labelledby="up-lic">
+          <h3 id="up-lic">Licences <FeatureSource id="licences" /></h3>
+          <p class="cap-a">{lic.some((r) => r.soon || r.lapsed) ? `${lic.filter((r) => r.soon || r.lapsed).length === 1 ? 'One renews' : 'Some renew'} within 30 days` : lic.some((r) => r.short) ? 'Its pool is short of seats' : `${plural(lic.length, 'licence')}, each with a seat for this space`}</p>
+          <ul class="cap-list">
+            {lic.map((r) => (
+              <li>
+                <a href={href(`/assets/licences/#${r.id}`)}><b>{r.platformLabel}</b></a>
+                <span>{r.name.includes(',') ? r.name.split(', ').slice(1).join(', ') : r.kindLabel} · renews {fmtDate(r.renews)} <span class:list={['cap-w', { 't-warn': r.soon, 't-bad': r.lapsed }]}>({inDays(r.days)})</span></span>
+                {r.short > 0 && <small class="cap-w t-bad">{plural(r.short, 'seat')} short across the pool</small>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </div>
+  </Section>
+)}

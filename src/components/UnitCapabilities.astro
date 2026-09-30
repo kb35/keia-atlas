@@ -1,0 +1,52 @@
+---
+/* UnitCapabilities: what the capabilities know about one unit (src/lib/modules.mjs), as a section of cards under the
+   unit page's own: its licences, its certificates and secrets, the security flaws its firmware is exposed to and its
+   last config backup. The unit page is drawn in the browser from ?tag=, so this draws itself the same way, from
+   /device/caps.json (src/pages/device/caps.json.js): one entry per unit that has anything, each card already worded
+   when the site was built. Each card carries its capability (data-feature); the section carries the list of the
+   cards it holds (data-feat-any) and goes when they are all off, heading and all.
+   Motion: none of its own. It arrives with the unit's cards, and a capability switched on or off grows or shrinks it
+   in place through rsChange (M12, row 26). */
+import { CAPABILITIES, featureAnyCss } from '../lib/modules.mjs';
+import '../styles/capabilities.css';
+// The unit's capabilities, in the registry's order, and the rule for every set of them a unit can hold.
+const UNIT_CAPS = ['licences', 'credentials', 'cves', 'config-backups'];
+const subsets = [];
+for (let m = 1; m < 1 << UNIT_CAPS.length; m++) subsets.push(UNIT_CAPS.filter((_, i) => m & (1 << i)));
+const css = subsets.map(featureAnyCss).join('');
+const SOURCES = Object.fromEntries(CAPABILITIES.filter((c) => UNIT_CAPS.includes(c.id)).map((c) => [c.id, c.source]));
+---
+<section class="sec unit-caps" id="upkeep" data-unit-caps data-sources={JSON.stringify(SOURCES)} aria-labelledby="unit-caps-h" hidden>
+  <header class="section-head" data-help="unit.upkeep"><h2 id="unit-caps-h">Upkeep and security</h2></header>
+  <div class="cap-grid" data-unit-caps-grid></div>
+</section>
+<style is:global set:html={css}></style>
+
+<script is:inline data-astro-rerun>
+  (function () {
+    var sec = document.querySelector('[data-unit-caps]'); if (!sec || sec.__uc) return; sec.__uc = true;
+    var tag = (new URLSearchParams(location.search).get('tag') || '').toUpperCase();
+    if (!tag) return;
+    var SRC = JSON.parse(sec.dataset.sources || '{}');
+    var preview = /\.html$/.test(location.pathname);
+    var L = function (p) { return '../' + p + (preview ? 'index.html' : ''); };
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+    fetch('caps.json').then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; }).then(function (all) {
+      var cards = (all[tag] || {}).cards || [];
+      if (!cards.length || !sec.isConnected) return;
+      sec.querySelector('[data-unit-caps-grid]').innerHTML = cards.map(function (c) {
+        return '<section class="card pad cap-card" data-feature="' + c.feature + '" data-help="' + c.help + '">'
+          + '<h3>' + esc(c.title) + ' <span class="srcm fsrc" data-feat-src="' + c.feature + '">from ' + esc(SRC[c.feature]) + '</span></h3>'
+          + '<p class="cap-a' + (c.tone ? ' cap-w t-' + c.tone : '') + '">' + esc(c.answer) + '</p>'
+          + '<ul class="cap-list">' + c.items.map(function (it) {
+            var name = it.to ? '<a href="' + L(it.to) + '"><b>' + esc(it.b) + '</b></a>' : '<b>' + esc(it.b) + '</b>';
+            return '<li>' + name + (it.text ? '<span>' + esc(it.text) + (it.w ? ' <span class="cap-w' + (it.tone ? ' t-' + it.tone : '') + '">' + esc(it.w) + '</span>' : '') + '</span>' : '') + (it.small ? '<small>' + esc(it.small) + '</small>' : '') + '</li>';
+          }).join('') + '</ul>'
+          + (c.more ? '<a class="sec-to" href="' + L(c.more.to) + '">' + esc(c.more.label) + ' <span aria-hidden="true">→</span></a>' : '')
+          + '</section>';
+      }).join('');
+      sec.setAttribute('data-feat-any', cards.map(function (c) { return c.feature; }).join(' '));
+      sec.hidden = false;
+    });
+  })();
+</script>

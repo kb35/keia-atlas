@@ -11,7 +11,7 @@ import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { MODULES, MODULE_STATES, CAPABILITIES, CAPABILITY_IDS, CAPABILITY_DEFAULTS, resolveFeatures, readFeatures, featureAttrs, featureOn, featureCss, offBecause } from '../src/lib/modules.mjs';
+import { MODULES, MODULE_STATES, CAPABILITIES, CAPABILITY_IDS, CAPABILITY_DEFAULTS, resolveFeatures, readFeatures, featureAttrs, featureOn, featureCss, featureAnyCss, offBecause } from '../src/lib/modules.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const walk = (d) => readdirSync(d).flatMap((n) => { const p = join(d, n); return statSync(p).isDirectory() ? walk(p) : [p]; });
@@ -106,7 +106,7 @@ test('every capability named in src/ is registered (data-feature, data-feat-src,
   for (const f of walk(join(ROOT, 'src')).filter((f) => /\.(astro|mjs|js)$/.test(f))) {
     const src = readFileSync(f, 'utf8');
     const found = [
-      ...[...src.matchAll(/data-(?:feature|feat-src|feat-offshow)=["']([a-z -]+)["']/g)].flatMap((m) => m[1].split(/\s+/)),
+      ...[...src.matchAll(/data-(?:feature|feat-src|feat-offshow|feat-any)=["']([a-z -]+)["']/g)].flatMap((m) => m[1].split(/\s+/)),
       ...[...src.matchAll(/\bfeature(?:On)?\(\s*'([a-z-]+)'/g)].map((m) => m[1]),
       ...[...src.matchAll(/\brsFeature(?:On)?\(\s*'([a-z-]+)'/g)].map((m) => m[1]),
       ...[...src.matchAll(/\bfeature: '([a-z-]+)'/g)].map((m) => m[1]),
@@ -142,7 +142,8 @@ async function loadPlaywright() {
 }
 const browser = await loadPlaywright();
 
-const FIXTURE = `<!doctype html><html><head><style>${featureCss()}</style></head><body><main>
+const FIXTURE = `<!doctype html><html><head><style>${featureCss()}${featureAnyCss(['licences', 'maintenance'])}</style></head><body><main>
+  <section class="sec" id="s-any" data-feat-any="licences maintenance"><header class="section-head"><h2 id="h-any">Upkeep</h2></header><div class="cap-grid"><div data-feature="licences">L</div><div data-feature="maintenance">M</div></div></section>
   <section class="band"><ul class="kn">
     <li id="kn-units">12 units</li><li id="kn-lic" data-feature="licences">3 renewing</li>
   </ul><p id="answer">All units in service<span id="ans-lic" data-feature="licences"> · 3 licences renew in 30 days</span></p></section>
@@ -180,6 +181,11 @@ test('an off capability leaves no heading or count behind; On shows everything; 
     assert.equal(v.wrap, false, 'a box marked data-feat-wrap goes when all it holds is gated'); assert.equal(v['h-card'], false);
     assert.equal(v['s-mixed'], true, 'a section with other content stays'); assert.equal(v['h-mixed'], true); assert.equal(v.plain, true);
     assert.equal(v['kn-units'], true); assert.equal(v.src, false); assert.equal(v.offshow, true);
+    // A section holding two capabilities' cards stays while either is on, and goes with its heading when both are off.
+    assert.equal((await shown(['h-any']))['h-any'], true, 'one of its two is still on');
+    await set('credentials licences maintenance', '');
+    v = await shown(['s-any', 'h-any']);
+    assert.equal(v['s-any'], false); assert.equal(v['h-any'], false);
   } finally {
     await page.close();
   }

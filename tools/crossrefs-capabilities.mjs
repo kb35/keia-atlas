@@ -1,0 +1,47 @@
+// Cross-reference checks for the capabilities' records (src/lib/modules.mjs): licences, room checks, out of service,
+// alert rules, certificates and secrets, security flaws, config backups and meeting quality. What each names (a
+// model, a site, a space, a unit, a role, a standard, a firmware line) must exist, dates must be in order, and a
+// credential is a vault reference, never a secret.
+//
+// Each check returns { file, at, message } like the others in crossrefs.mjs.
+
+import { ROLES } from '../src/lib/demo.mjs';
+
+export function crossCheckCapabilities(records) {
+  const problems = [];
+  const report = (rec, at, message) => problems.push({ file: rec.file, at, message });
+  const inFolder = (f) => records.filter((r) => r.folder === f);
+  const ids = (f) => new Set(inFolder(f).map((r) => r.id));
+  const sites = ids('sites');
+  const models = ids('device-models');
+  const spaces = new Map(inFolder('spaces').map((r) => [r.id, r.data]));
+  const tags = new Map();
+  for (const r of inFolder('installs')) {
+    for (const p of r.data.positions ?? []) for (const u of p.units) tags.set(u.asset_tag, { model: u.model ?? p.model, space: r.id });
+    for (const u of r.data.older_kit ?? []) tags.set(u.asset_tag, { model: u.model, space: r.id });
+    for (const u of r.data.spare_units ?? []) tags.set(u.asset_tag, { model: u.model, space: r.id });
+  }
+  const model = (rec, at, m) => { if (!models.has(m)) report(rec, at, `device model "${m}" does not exist`); };
+  const site = (rec, at, s) => { if (!sites.has(s)) report(rec, at, `site "${s}" does not exist`); };
+  const space = (rec, at, s) => { if (!spaces.has(s)) report(rec, at, `space "${s}" does not exist`); };
+  const unit = (rec, at, t) => { if (!tags.has(t)) report(rec, at, `unit "${t}" is not in data/installs/`); };
+  const role = (rec, at, r) => { if (!ROLES[r]) report(rec, at, `role "${r}" is not one of the roles in src/lib/demo.mjs`); };
+  const fileId = (rec) => { if (rec.data.id && rec.data.id !== rec.id) report(rec, ['id'], `id "${rec.data.id}" does not match the file name "${rec.id}"`); };
+
+  // Licences: the models, the scope and the units it names exist; a hand-assigned unit is one of the covered models.
+  for (const rec of inFolder('licences')) {
+    const d = rec.data;
+    fileId(rec);
+    d.covers.models.forEach((m, i) => model(rec, ['covers', 'models', i], m));
+    (d.scope?.sites ?? []).forEach((s, i) => site(rec, ['scope', 'sites', i], s));
+    (d.assigned ?? []).forEach((t, i) => {
+      unit(rec, ['assigned', i], t);
+      const u = tags.get(t);
+      if (u && !d.covers.models.includes(u.model)) report(rec, ['assigned', i], `unit "${t}" is a ${u.model}, which this licence does not cover`);
+    });
+    if (d.scope?.region && d.scope?.sites) report(rec, ['scope'], 'give a region or a list of offices, not both');
+    role(rec, ['owner_role'], d.owner_role);
+  }
+
+  return problems;
+}

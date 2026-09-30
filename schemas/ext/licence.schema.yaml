@@ -1,0 +1,50 @@
+# Licence pool: seats of one room or platform licence (the Licences capability, src/lib/modules.mjs). A pool is bought
+# for a region, for some offices, or for everything; the units that take a seat are the ones whose model is under
+# covers, in its scope, unless `assigned` lists them. Seats in use are counted from data/installs/, never written here.
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/licence
+title: Licence pool
+type: object
+additionalProperties: false
+required: [id, name, platform, kind, vendor, covers, seats, term, renews, cost, owner_role, demo]
+properties:
+  id: { type: string, pattern: "^[a-z0-9-]+$" }
+  name: { type: string }
+  platform:
+    description: The licence's product. Meeting-room licences let a room system join calls; device-management ones let a platform manage it.
+    enum: [google-meet-hardware, teams-rooms-pro, teams-rooms-basic, zoom-rooms, webex-device, poly-lens, logitech-sync, bsn-cloud, samsung-vxt, lg-business-cloud]
+  kind: { enum: [meeting-room, device-management] }
+  vendor: { type: string }
+  covers:
+    type: object
+    additionalProperties: false
+    required: [models]
+    properties:
+      models: { description: Models (data/device-models/) whose units take a seat., type: array, minItems: 1, items: { type: string } }
+  scope:
+    description: Where the pool applies. Leave it out for every office and home office.
+    type: object
+    additionalProperties: false
+    properties:
+      region: { enum: [amer, emea, apac] }
+      sites: { type: array, minItems: 1, items: { type: string } }
+  assigned:
+    description: The units (asset tags) holding a seat, when the pool is assigned by hand rather than by model. An empty list means nobody uses it yet.
+    type: array
+    items: { type: string, pattern: "^AG-[0-9]{6}$" }
+  seats: { type: integer, minimum: 0 }
+  term: { enum: [monthly, annual, three-year] }
+  renews: { type: string, format: date }
+  auto_renew: { type: boolean }
+  cost:
+    type: object
+    additionalProperties: false
+    required: [amount, currency, per]
+    properties:
+      amount: { type: number, minimum: 0 }
+      currency: { enum: [EUR, USD, GBP] }
+      per: { enum: [year, month, term] }
+  owner_role: { description: The role that owns the renewal (a role in src/lib/demo.mjs)., type: string }
+  reference: { description: The order or contract reference in the finance system., type: string }
+  notes: { type: string }
+  demo: { description: Made up for the demo., const: true }

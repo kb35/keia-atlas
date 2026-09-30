@@ -148,6 +148,14 @@ export function featureOn(id, feats = readFeatures(null, null)) {
   return feats[id] !== 'off';
 }
 
+/* A box that holds the work of several capabilities (a section of cards on a space page) goes when every one of them
+   is off: mark it data-feat-any="<ids>" (in this order, space-separated) and put this rule on the page with it. */
+export function featureAnyCss(ids) {
+  const list = [...new Set(ids)];
+  for (const id of list) if (!CAPABILITY_IDS.includes(id)) throw new Error(`featureAnyCss: no capability "${id}" in src/lib/modules.mjs`);
+  return `:root${list.map((id) => `[data-feat-off~="${id}"]`).join('')} [data-feat-any="${list.join(' ')}"]{display:none!important}`;
+}
+
 /* The rules that take gated things out of view, keyed only on the two lists on <html>: a change of state is one
    change of attribute, which rsChange measures before and after (what leaves shrinks, what arrives grows).
      [data-feature~=id]       belongs to a capability; with several ids it needs all of them
