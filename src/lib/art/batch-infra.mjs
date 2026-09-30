@@ -30,9 +30,15 @@ function stage(s, W, H, dy = 0) {
 }
 const seq = (n, prefix) => Array.from({ length: n }, (_, i) => prefix + i);
 
-// Part order of each type. The first two are copied from art.mjs because this batch reuses those types
-// (its extra parts follow the type's own); the rest are this batch's own types.
+// Part order of each type. The first block is copied from art.mjs and batch-av.mjs because this batch reuses
+// those types, at their scales, so its models morph with theirs (its extra parts follow the type's own parts).
+// The rest are this batch's own types.
 const ORDER = {
+  disp: ['shadow', 'body', 'screen', 'rcv'],
+  codec: ['shadow', 'body', 'led', 'logo'],
+  sig: ['shadow', 'body', 'scL', 'scR', 'ant1', 'ant2', 'audio', 'ir', 'serial', 'gpio', 'l0', 'l1', 'l2', 'l3', 'pwr'],
+  adapter: ['shadow', 'body', 'scL', 'scR', 'usba1', 'usba2', 'lan', 'usbb'],
+  cam: ['shadow', 'body', 'foot1', 'foot2', 'pod', 'yoke', 'ring', 'lens1', 'glass', 'lens2', 'led', 'led2'],
   ext: ['shadow', 'body', 'btn', 'usbc', 'usbb', 'l0', 'l1', 'l2', 'l3', 'led', 'l5', 'label', 'model'],
   touch: ['shadow', 'body', 'screen', 't1', 't2', 't3', 'sensor', 'ledL', 'ledR', 'led', 'stand'],
   // Rack switches, gateways and the small desktop gateway.
@@ -47,8 +53,6 @@ const ORDER = {
   'inf-printer': ['shadow', 'body', 'adf', 'top', 'tray', 'panel', 'screen', 'logo', 'led', ...seq(4, 'd'), ...seq(4, 'h'), 'foot1', 'foot2'],
   // Ceiling speaker, seen from below.
   'inf-spk': ['shadow', 'body', 'rim', 'cone', 'dome', ...seq(4, 's'), 'dial'],
-  // Flat-panel displays.
-  'inf-flat': ['shadow', 'body', 'screen', 'spkL', 'spkR', 'led', 'logo', 'btn', 'stand'],
   // Lamp projectors.
   'inf-proj': ['shadow', 'body', 'top', 'vent', 'lens', 'glass', 'ir', ...seq(3, 'led'), 'logo', 'foot1', 'foot2'],
 };
@@ -144,16 +148,18 @@ function dockParts() {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// inf-box: 1.35 px per mm; the widest here (a half-rack 215 mm box) is about 290 px.
-const BOX = 1.35;
+// Small boxes at 1.4 px per mm, the same scale as batch-av's adapter type: a half-rack 215 mm box is about 300 px.
+// The four adapter-class models use the shared adapter type; the two amplifiers use inf-box; the codecs (0.9 px per
+// mm, like the G62) use codec; the player (0.9, like the BrightSign) uses sig.
+const BOX = 1.4;
 function boxScrews(g, P, W, H, inset, cy1, cy2) {
   [[inset, cy1], [W - inset, cy1], [inset, cy2], [W - inset, cy2]].forEach(([x, y], i) => P.push(g.o('s' + i, x, y, 4.4, 'art-port')));
 }
-function boxParts(m) {
+function boxParts(m, s = BOX) {
   const P = [];
   if (m === 'pa-240z') {
     // Kramer PA-240Z: 214.6 x 43.6, four corner screws, logo plate, ON light, five status lights, rule and model line
-    const g = stage(BOX, 214.6, 43.6);
+    const g = stage(s, 214.6, 43.6);
     P.push(...g.shell(1.5, 'art-dev'), g.r('logo', 13.9, 14.7, 15, 15, 2, 'art-logo'), g.r('stripe', 14.1, 36.1, 188.2, 0.6, 0.3, 'art-logo'));
     boxScrews(g, P, 214.6, 43.6, 7.3, 8.9, 34.2);
     [35.6, 86.1, 102.9, 119.3, 135.9, 152.5].forEach((x, i) => P.push(g.o('led' + i, x, 31.5, 3.2, i === 0 ? 'art-ledon' : 'art-ledoff')));
@@ -161,25 +167,25 @@ function boxParts(m) {
   }
   if (m === 'vp-440h2') {
     // Kramer VP-440H2: 214.6 x 42.8, logo ring, mic switch and jack, five input buttons, menu, arrow pad, two more buttons
-    const g = stage(BOX, 214.6, 42.8);
+    const g = stage(s, 214.6, 42.8);
     P.push(...g.shell(1.5, 'art-dev'), g.o('logo', 14.4, 10.3, 9, 'art-logo'), g.r('sw', 12, 19, 5.7, 7.1, 1, 'art-port'), g.o('jack', 27.6, 21.9, 10.5, 'art-port'));
     [38.5, 54.3, 69.5, 85.3, 100.7].forEach((x, i) => P.push(g.r('b' + i, x, 16.4, 10.5, 10.4, 1.5, 'art-cream')));
     P.push(g.r('b5', 134.1, 16.4, 9.5, 9.6, 1.5, 'art-cream'), g.o('pad', 162.5, 21.5, 29.2, 'art-cream'), g.o('k0', 162.5, 21.5, 11, 'art-fabric'),
       g.r('b6', 182.2, 17, 8.7, 8.6, 1.2, 'art-cream'), g.r('b7', 195.2, 17, 9, 8.6, 1.2, 'art-cream'),
       g.r('stripe', 12.8, 36.1, 141.7, 0.5, 0.25, 'art-logo'), g.r('vent', 170, 36.1, 31, 0.5, 0.25, 'art-logo'));
-    boxScrews(g, P, 214.6, 42.8, 4.9, 6.9, 36.3);
+    P.push(g.c('scL', 4.9, 6.9, 2.2, 'art-port'), g.c('scR', 209.7, 6.9, 2.2, 'art-port'), g.o('s2', 4.9, 36.3, 4.4, 'art-port'), g.o('s3', 209.7, 36.3, 4.4, 'art-port'));
     return P;
   }
   if (m === 'poly-poe-injector') {
     // Poly PoE++ 65 W 2.5G adapter: a 90 x 28.5 mm black brick with a mounting ear at one end
-    const g = stage(BOX, 90, 28.5);
+    const g = stage(s, 90, 28.5);
     P.push(...g.shell(2, 'art-dev'), g.r('plate', 6, 4.5, 60, 19.5, 1.5, 'art-podline'), g.r('logo', 70, 8.5, 14, 3, 1.5, 'art-logo'), g.o('led0', 77, 19, 3, 'art-ledon'), g.r('mount', 6, 28.5, 12, 4, 1, 'art-mount'));
     return P;
   }
   if (m === 'usb-pdi-100') {
     // SCT USB-PDI-100, front: 97 x 36 mm. Logo tile and wordmark line top left, model line top right,
     // locking USB-C (power and data) low left of centre, two lights beside it.
-    const g = stage(BOX, 97, 36);
+    const g = stage(s, 97, 36);
     P.push(...g.shell(1, 'art-dev'), g.r('logo', 3.6, 3.7, 9.2, 9.2, 1.5, 'art-lens'), g.r('stripe', 14.5, 5, 26, 2.6, 1.2, 'art-logo'), g.r('plate', 65, 4.4, 27, 6, 1.5, 'art-logo'),
       g.o('k0', 38.4, 23.1, 2.2, 'art-port'), g.rc('usbc', 38.9, 28.7, 8.4, 3.2, 1.6, 'art-port'), g.o('led0', 64.7, 29.6, 2, 'art-ledoff'), g.o('led1', 69.5, 29.6, 2, 'art-ledon'));
     return P;
@@ -187,14 +193,14 @@ function boxParts(m) {
   if (m === 'us1gc30b') {
     // StarTech US1GC30B seen end-on at the RJ45 end of the dongle. The vendor gives no body size; the
     // retailer listing gives about 25 x 15 mm, drawn here.
-    const g = stage(BOX, 25.4, 15.2, 0);
-    P.push(...g.shell(3, 'art-dev'), g.r('plate', 3, 2.5, 19.4, 10.2, 2, 'art-podline'), g.rc('jack', 12.7, 7.6, 11.6, 7.8, 0.6, 'art-port'));
+    const g = stage(s, 25.4, 15.2, 0);
+    P.push(...g.shell(3, 'art-dev'), g.r('plate', 3, 2.5, 19.4, 10.2, 2, 'art-podline'), g.rc('lan', 12.7, 7.6, 11.6, 7.8, 0.6, 'art-port'));
     return P;
   }
   if (m === 'ap-60') {
     // Fictional Solano AP-60, a two-channel installation amplifier: two level knobs, two rows of level lights,
     // a power button, a vent strip.
-    const g = stage(BOX, 220, 60);
+    const g = stage(s, 220, 60);
     P.push(...g.shell(2, 'art-dev'), g.r('vent', 14, 8, 60, 3, 1.5, 'art-vent'), g.r('stripe', 14, 51, 192, 0.7, 0.35, 'art-logo'), g.r('logo', 14, 40, 30, 4, 2, 'art-logo'));
     boxScrews(g, P, 220, 60, 6.5, 6.5, 53.5);
     P.push(g.o('k0', 78, 27, 17, 'art-ring'), g.o('k1', 112, 27, 17, 'art-ring'));
@@ -205,7 +211,7 @@ function boxParts(m) {
   if (m === 'vc-300') {
     // Fictional Kestrel VC-300, a 2002 standard-definition codec: small status display, four buttons,
     // an infra-red window and three lights on a pale case.
-    const g = stage(BOX, 215, 62);
+    const g = stage(s, 215, 62);
     P.push(...g.shell(2.5, 'art-devlight'), g.r('scr', 14, 10, 52, 20, 2, 'art-screen'));
     for (let i = 0; i < 4; i++) P.push(g.r('b' + i, 76 + i * 14, 14, 10, 8, 1.5, 'art-btn'));
     P.push(g.r('ir', 160, 11, 22, 8, 2, 'art-gloss'), g.o('led0', 190, 15, 3.4, 'art-ledon'), g.o('led1', 198, 15, 3.4, 'art-ledoff'), g.o('led2', 206, 15, 3.4, 'art-ledoff'),
@@ -214,15 +220,15 @@ function boxParts(m) {
   }
   if (m === 'vc-700') {
     // Fictional Kestrel VC-700, a 2010 HD codec: dark slim case, a vented panel, one power button and three lights.
-    const g = stage(BOX, 215, 44);
-    P.push(...g.shell(2, 'art-dev'), g.r('vent', 104, 8, 96, 28, 2, 'art-vent'), g.r('b0', 14, 14, 11, 11, 2.5, 'art-btn'), g.o('led0', 36, 19.5, 3.4, 'art-ledon'), g.o('led1', 44, 19.5, 3.4, 'art-ledoff'), g.o('led2', 52, 19.5, 3.4, 'art-ledoff'),
-      g.r('ir', 68, 15, 20, 8, 2, 'art-gloss'), g.r('logo', 14, 32, 34, 3.5, 1.7, 'art-logo'));
+    const g = stage(s, 215, 44);
+    P.push(...g.shell(2, 'art-dev'), g.r('vent', 104, 8, 96, 28, 2, 'art-vent'), g.r('b0', 14, 14, 11, 11, 2.5, 'art-btn'), g.r('led', 34, 18.4, 10, 2.4, 1.1, 'art-led'), g.o('led1', 52, 19.6, 3.4, 'art-ledoff'), g.o('led2', 60, 19.6, 3.4, 'art-ledoff'),
+      g.r('ir', 74, 15.5, 20, 8, 2, 'art-gloss'), g.r('logo', 14, 32, 34, 3.5, 1.7, 'art-logo'));
     return P;
   }
   if (m === 'sp-100') {
     // Fictional Lumen SP-100 signage player: a small dark box with a power light, a button and a name line.
-    const g = stage(BOX, 160, 28);
-    P.push(...g.shell(3, 'art-dev'), g.o('led0', 13, 14, 4, 'art-ledon'), g.r('logo', 40, 12.5, 62, 3, 1.5, 'art-logo'), g.r('b0', 130, 8.5, 11, 11, 2.5, 'art-btn'));
+    const g = stage(s, 160, 28);
+    P.push(...g.shell(3, 'art-dev'), g.c('l0', 13, 14, 2, 'art-ledon'), g.r('logo', 40, 12.5, 62, 3, 1.5, 'art-logo'), g.r('pwr', 130, 8.5, 11, 11, 2.5, 'art-btn'));
     return P;
   }
   return null;
@@ -270,9 +276,9 @@ function spkParts() {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// inf-flat: 0.16 px per mm; a 1060 x 640 mm panel is 170 x 102 px.
+// Flat panels use batch-av's disp type at its 0.15 px per mm: a 1060 x 640 mm panel is 159 x 96 px.
 function flatParts(m) {
-  const g = stage(0.16, m === 'lcd-46' ? 1060 : 1030, 640, -2), lcd = m === 'lcd-46', W = lcd ? 1060 : 1030;
+  const g = stage(0.15, m === 'lcd-46' ? 1060 : 1030, 640, -2), lcd = m === 'lcd-46', W = lcd ? 1060 : 1030;
   const P = [...g.shell(lcd ? 14 : 10, lcd ? 'art-dev' : 'art-devlight')];
   if (lcd) P.push(g.r('screen', 32, 32, W - 64, 562, 3, 'art-screen'), g.r('logo', W / 2 - 30, 610, 60, 10, 3, 'art-logo'), g.r('led', W - 80, 608, 22, 12, 3, 'art-led'), g.r('btn', W - 150, 608, 40, 12, 3, 'art-podline'));
   else P.push(g.r('screen', 50, 45, W - 100, 523, 3, 'art-screen'), g.r('spkL', 50, 588, 270, 36, 8, 'art-mesh'), g.r('spkR', W - 320, 588, 270, 36, 8, 'art-mesh'), g.r('logo', W / 2 - 25, 594, 50, 10, 3, 'art-podline'), g.r('led', W - 60, 596, 18, 10, 3, 'art-led'));
@@ -299,7 +305,8 @@ function projParts(m) {
 // ---------------------------------------------------------------------------------------------------------
 // Types art.mjs already has, reused so these models morph with the ones already drawn.
 // ext (1.42 px per mm): Kramer TP-58x extenders and WP-20CT wall plate, and the fictional Halden MS-42 switcher.
-// Their extra parts (scr0, scr1, panel, hdmi, b1-b3) sit after the type's own parts.
+// Their extra parts (scr0, scr1, hdmi, b1-b3) are drawn after the type's own parts, so anything that has to sit
+// under another part takes one of the type's own keys (the WP-20CT's metal insert is the 'btn').
 const EXT = 1.42;
 function extParts(m) {
   const P = [];
@@ -316,7 +323,7 @@ function extParts(m) {
     // Kramer WP-20CT, US wall plate: 69.8 x 114.3 mm plate, a smaller metal insert holding three lights,
     // USB-C, HDMI and a name bar
     const g = stage(EXT, 69.8, 114.3);
-    P.push(...g.shell(3, 'art-devlight'), g.r('panel', 19.4, 25.2, 30.9, 61.9, 2.5, 'art-mount'));
+    P.push(...g.shell(3, 'art-devlight'), g.r('btn', 19.4, 25.2, 30.9, 61.9, 2.5, 'art-mount'));
     [26.8, 34.5, 42.1].forEach((x, i) => P.push(g.c('l' + i, x, 36.5, 1.5, 'art-ledoff')));
     P.push(g.r('usbc', 29.8, 46.2, 9.4, 3.6, 1.8, 'art-port'), g.rc('hdmi', 34.5, 68.7, 14.7, 6.1, 1, 'art-port'), g.r('label', 27, 80.4, 15, 2.6, 1.2, 'art-dev'));
     return P;
@@ -337,12 +344,17 @@ function touchParts() {
   const g = stage(0.78, 190, 125, 2);
   return [...g.shell(10, 'art-dev'), g.r('screen', 12, 12, 166, 92, 3, 'art-screen'), g.r('t1', 20, 20, 74, 76, 4, 'art-ui'), g.r('t2', 100, 20, 70, 34, 3, 'art-uitile'), g.r('t3', 100, 62, 70, 34, 3, 'art-uitile'), g.r('led', 168, 112, 8, 4, 2, 'art-led')];
 }
-// cam: the fictional Kestrel pan-tilt-zoom cameras, in canvas px like the E70 (the drawing has no mm scale)
+// cam: the fictional Kestrel pan-tilt-zoom cameras in the cam type at 0.9 px per mm, laid out like the E60: a wide
+// base slab on two feet, a narrow tier, a yoke, and a round head with its lens. The 2010 HD camera is dark and
+// neat; the 2003 SD camera is a bigger pale case.
 function camParts(m) {
-  const hd = m === 'cam-hd', pod = hd ? [106, 42, 108, 84, 16] : [98, 38, 124, 94, 10], body = hd ? [120, 128, 80, 18, 5] : [110, 134, 100, 20, 4], cls = hd ? 'art-dev' : 'art-devlight';
-  const [px, py, pw, ph, pr] = pod, [bx, by, bw, bh, br] = body;
-  return [R('shadow', bx + 5, by + 5, bw, bh, br, 'art-shadow'), R('body', bx, by, bw, bh, br, cls), R('pod', px, py, pw, ph, pr, cls), R('glass', px + 8, py + 8, pw - 16, ph - 16, hd ? 12 : 8, 'art-gloss'),
-    Ck('lens2', 160, py + ph / 2, hd ? 17 : 14, 'art-lens'), R('lens1', px + pw - 22, py + 14, 10, 7, 2, 'art-port'), R('led', px + 14, py + ph - 4, 24, 2.5, 1.2, 'art-led'), R('logo', 146, py + ph - 14, 28, 3, 1.5, 'art-logo')];
+  const hd = m === 'cam-hd';
+  const D = hd ? { bw: 150, bh: 24, pw: 96, ph: 16, yw: 50, yh: 34, rr: 32, lr: 20 } : { bw: 172, bh: 28, pw: 114, ph: 20, yw: 62, yh: 40, rr: 40, lr: 25 };
+  const yy = 2 * D.rr - 3, py = yy + D.yh - 2, by = py + D.ph - 1, H = by + D.bh + 6, g = stage(0.9, D.bw, H), cx = D.bw / 2, cls = hd ? 'art-dev' : 'art-devlight';
+  const shadow = g.r('shadow', 0, by, D.bw, D.bh, 3, 'art-shadow'); shadow.g.x += 5; shadow.g.y += 5;
+  return [shadow, g.r('body', 0, by, D.bw, D.bh, 3, cls), g.r('foot1', 8, by + D.bh, 14, 6, 1.5, 'art-grille'), g.r('foot2', D.bw - 22, by + D.bh, 14, 6, 1.5, 'art-grille'),
+    g.r('pod', cx - D.pw / 2, py, D.pw, D.ph, 6, cls), g.r('yoke', cx - D.yw / 2, yy, D.yw, D.yh, 8, cls), g.c('ring', cx, D.rr, D.rr, 'art-ring'), g.o('lens1', cx, D.rr, 2 * D.lr, 'art-lens'),
+    g.r('led', 12, by + D.bh / 2 - 1.6, 3.2, 3.2, 1, 'art-led')];
 }
 // mic: the fictional Kestrel MIC-1, a round table pod seen from above, in canvas px
 function micParts() {
@@ -352,11 +364,13 @@ function micParts() {
 
 // ---------------------------------------------------------------------------------------------------------
 // Fill a drawing to its type's ORDER: a part it lacks becomes a zero-size part at the centre (same rule as art.mjs).
-const tagOf = (k) => /^(g\d|lens\d|ring|sensor|reset|l\d)$/.test(k) ? 'circle' : 'rect';
+const CIRCLE = { sig: /^(scL|scR|ant\d|audio|ir|serial|l\d)$/, adapter: /^(scL|scR)$/, cam: /^(ring|lens2)$/, disp: /^$/, codec: /^$/ };
+const CIRCLE_DEFAULT = /^(g\d|lens\d|ring|sensor|reset|l\d)$/;
 function fill(type, parts) {
   const order = ORDER[type]; if (!order) return parts;
   const by = {}; parts.forEach((p) => by[p.k] = p);
-  const zero = (k) => tagOf(k) === 'circle' ? Ck(k, CX, CY, 0, 'art-none') : R(k, CX, CY, 0, 0, 0, 'art-none');
+  const isCircle = (k) => (CIRCLE[type] ?? CIRCLE_DEFAULT).test(k);
+  const zero = (k) => isCircle(k) ? Ck(k, CX, CY, 0, 'art-none') : R(k, CX, CY, 0, 0, 0, 'art-none');
   return order.map((k) => by[k] || zero(k)).concat(parts.filter((p) => !order.includes(p.k)));
 }
 
@@ -377,14 +391,14 @@ const BUILD = {
   'unifi-u7-pro-max': ['inf-ap', () => apParts('u7-pro-max')],
   'kramer-galil-6': ['inf-spk', spkParts],
   'kramer-pa-240z': ['inf-box', () => boxParts('pa-240z')],
-  'kramer-vp-440h2': ['inf-box', () => boxParts('vp-440h2')],
-  'poly-poe-injector': ['inf-box', () => boxParts('poly-poe-injector')],
-  'sct-usb-pdi-100': ['inf-box', () => boxParts('usb-pdi-100')],
-  'startech-us1gc30b': ['inf-box', () => boxParts('us1gc30b')],
+  'kramer-vp-440h2': ['adapter', () => boxParts('vp-440h2')],
+  'poly-poe-injector': ['adapter', () => boxParts('poly-poe-injector')],
+  'sct-usb-pdi-100': ['adapter', () => boxParts('usb-pdi-100')],
+  'startech-us1gc30b': ['adapter', () => boxParts('us1gc30b')],
   'solano-ap-60': ['inf-box', () => boxParts('ap-60')],
-  'kestrel-vc-300': ['inf-box', () => boxParts('vc-300')],
-  'kestrel-vc-700': ['inf-box', () => boxParts('vc-700')],
-  'lumen-sp-100': ['inf-box', () => boxParts('sp-100')],
+  'kestrel-vc-300': ['codec', () => boxParts('vc-300', 0.9)],
+  'kestrel-vc-700': ['codec', () => boxParts('vc-700', 0.9)],
+  'lumen-sp-100': ['sig', () => boxParts('sp-100', 0.9)],
   'kramer-tp-580rxr': ['ext', () => extParts('tp-580rxr')],
   'kramer-tp-583rxr': ['ext', () => extParts('tp-583rxr')],
   'kramer-tp-583txr': ['ext', () => extParts('tp-583txr')],
@@ -394,8 +408,8 @@ const BUILD = {
   'kestrel-cam-hd': ['cam', () => camParts('cam-hd')],
   'kestrel-cam-sd': ['cam', () => camParts('cam-sd')],
   'kestrel-mic-1': ['mic', micParts],
-  'solano-lcd-46': ['inf-flat', () => flatParts('lcd-46')],
-  'solano-pl-42': ['inf-flat', () => flatParts('pl-42')],
+  'solano-lcd-46': ['disp', () => flatParts('lcd-46')],
+  'solano-pl-42': ['disp', () => flatParts('pl-42')],
   'brightline-px-2000': ['inf-proj', () => projParts('px-2000')],
   'brightline-px-4500': ['inf-proj', () => projParts('px-4500')],
 };
