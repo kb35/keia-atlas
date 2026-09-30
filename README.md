@@ -26,7 +26,8 @@ What is real today: schemas, validation, floor plans, drawings, build sheets, th
 
 **Status:** Version 0.x: a preview with no support guarantee and no long-term-support release; releases roughly monthly.
 
-- [Roadmap](ROADMAP.md)
+- [Roadmap](ROADMAP.md), including the [road to production](ROADMAP.md#road-to-production) · [Changelog](CHANGELOG.md)
+- [Admin guide](docs/admin/README.md) (being written)
 - [Governance](GOVERNANCE.md) · [Maintainers](MAINTAINERS.md)
 - [Code of conduct](CODE_OF_CONDUCT.md) · [Security](SECURITY.md)
 

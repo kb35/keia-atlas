@@ -18,12 +18,15 @@ Thank you for looking. Keia Atlas is Apache 2.0, Copyright Red Hat, Inc., create
 
    ```sh
    npm run validate   # schemas and cross-reference checks
-   npm test           # unit tests, help-key coverage, Keia drift check
    npm run build      # the whole site must build
+   npm test           # unit tests, help-key coverage, Keia drift check, and checks on the built pages
    ```
 
+   CI runs the same three in this order. The tests that read the built pages are skipped if `dist/` does not exist yet, so build first to run them all.
+
    For a page: check it at 375, 768, 1024, 1280, 1440 and 1920 wide (`node tools/responsive-check.mjs`), in light and dark, and with reduced motion on.
-5. **Open a pull request** that says what changed and why, with a screenshot for anything visual. Small, complete pull requests are merged faster than large ones.
+5. **Open a pull request** that says what changed and why, with a screenshot for anything visual. The template asks for a short checklist. Small, complete pull requests are merged faster than large ones.
+6. **Add a line to the changelog** under `Unreleased` in [CHANGELOG.md](CHANGELOG.md) if people will notice the change.
 
 ## Optional: catch secrets before you commit
 
@@ -59,13 +62,29 @@ Follow `docs/standards/new-device.md`. In short:
 
 ## Sign your commits
 
-This project uses the [Developer Certificate of Origin](https://developercertificate.org/) (DCO), as many open-source projects do. Sign off each commit to say you have the right to submit it under the project's licence:
+This project uses the [Developer Certificate of Origin](https://developercertificate.org/) (DCO), as many open-source projects do. The DCO is a short statement that you wrote the change, or otherwise have the right to give it to the project under its licence; signing off a commit is how you make that statement. Every commit in a pull request must be signed off:
 
 ```sh
 git commit -s -m "Add the Poly Studio X72 model"
 ```
 
-That adds a `Signed-off-by: Your Name <you@example.com>` line. Pull requests with unsigned commits are asked to add it.
+That adds a `Signed-off-by: Your Name <you@example.com>` line, using the name and email in your Git settings. A check on every pull request (`.github/workflows/dco.yml`) fails if any commit is missing it.
+
+Forgot? `git commit --amend -s --no-edit` fixes the last commit; `git rebase --signoff main` fixes every commit on your branch. Then push again with `--force-with-lease`.
+
+## Releases
+
+Keia Atlas uses semantic versions (major.minor.patch). The version lives in one place, `package.json`. While it is 0.x, any release may change things; from 1.0, only a major version may break something, and anything removed is announced a release ahead ([the roadmap's production principles](ROADMAP.md#production-principles)).
+
+A maintainer makes a release:
+
+1. **Choose the number.** A patch for fixes only, a minor for anything new, a major for anything that breaks.
+2. **Update two files in one pull request:** `version` in `package.json` (and `package-lock.json`, with `npm version <number> --no-git-tag-version`), and [CHANGELOG.md](CHANGELOG.md), where `Unreleased` becomes `## [<number>] - <date>` with a fresh, empty `Unreleased` above it and the compare links at the bottom updated.
+3. **Merge it, then tag that commit on `main`:** `git tag -a v<number> -m "Keia Atlas <number>"` (or `-s` to sign the tag, if you have a signing key set up in Git) and `git push origin v<number>`.
+4. **The release workflow does the rest** (`.github/workflows/release.yml`): it checks the tag matches `package.json`, validates, builds and tests, builds the container image, pushes it to the GitHub Container Registry, writes an SBOM (a software bill of materials, the list of every package inside), signs the image and the SBOM with Sigstore, and creates the GitHub release with the changelog section and the SBOM attached.
+5. **Check it:** the release page is there, and `cosign verify` (the command is at the top of the workflow file) passes for the new image.
+
+If the workflow fails in its first job (the checks), nothing was published: fix the cause on `main`, delete the tag (`git push origin :v<number>` and `git tag -d v<number>`) and tag again. If an image was already pushed, never reuse the number; fix the cause and release the next patch.
 
 ## Code of conduct
 
