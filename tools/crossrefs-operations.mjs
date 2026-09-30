@@ -11,6 +11,10 @@
 // never one circuit. An internet circuit's contract renews after it starts. An office's hours close after they open,
 // a change window closes at another time than it opens, and neither is on a remote site.
 //
+// Fault history (schemas/ext/fault-history.schema.yaml): one file per site, every space at that site; a unit is one
+// installed in that space; a symptom is in the unit's device class guide; ticket numbers are unique across the history
+// and the incidents; a fault is resolved after it opened.
+//
 // Each check returns { file, at, message } like the others in crossrefs.mjs.
 import { PEOPLE } from '../src/lib/demo.mjs';
 
@@ -94,6 +98,34 @@ export function crossCheckOperations(records) {
     if (s.change_window && s.change_window.from === s.change_window.to) report(rec, ['change_window', 'to'], 'the change window must close at a different time from when it opens');
     if (s.office_hours && s.office_hours.close <= s.office_hours.open) report(rec, ['office_hours', 'close'], 'the office must close after it opens');
     if ((s.office_hours || s.change_window) && s.kind !== 'office') report(rec, [s.office_hours ? 'office_hours' : 'change_window'], 'office hours and a change window are for offices; a home office keeps its person\'s hours');
+  }
+
+  // Fault history.
+  const spaceRecs = new Map(inFolder('spaces').map((r) => [r.id, r.data]));
+  const installRecs = new Map(inFolder('installs').map((r) => [r.id, r.data]));
+  const classes = new Map(inFolder('device-classes').map((r) => [r.id, r.data]));
+  const modelRecs = new Map(inFolder('device-models').map((r) => [r.id, r.data]));
+  const spaceTypes = new Map(inFolder('space-types').map((r) => [r.id, r.data]));
+  const numbers = new Map(inFolder('incidents').map((r) => [r.data.number, r.rel]));
+  for (const rec of inFolder('fault-history')) {
+    if (rec.id !== rec.data.site) report(rec, ['site'], `the file is named ${rec.id} but its site is ${rec.data.site}`);
+    rec.data.faults.forEach((f, i) => {
+      const at = ['faults', i];
+      if (numbers.has(f.number)) report(rec, [...at, 'number'], `${f.number} is already used in ${numbers.get(f.number)}`);
+      numbers.set(f.number, rec.rel);
+      if (f.resolved <= f.opened) report(rec, [...at, 'resolved'], 'a fault is resolved after it opened');
+      const sp = spaceRecs.get(f.space);
+      if (!sp) { report(rec, [...at, 'space'], `"${f.space}" is not a space`); return; }
+      if (sp.site !== rec.data.site) report(rec, [...at, 'space'], `${f.space} is at ${sp.site}, not ${rec.data.site}`);
+      if (!f.unit) { if (f.symptom) report(rec, [...at, 'symptom'], 'a symptom belongs to a unit; name the unit'); return; }
+      const inst = installRecs.get(f.space);
+      const pos = (inst?.positions ?? []).find((p) => p.units.some((u) => u.asset_tag === f.unit));
+      if (!pos) { report(rec, [...at, 'unit'], `${f.unit} is not a unit in ${f.space}`); return; }
+      const model = pos.units.find((u) => u.asset_tag === f.unit).model ?? pos.model;
+      const opt = spaceTypes.get(sp.space_type)?.keia_atlas?.options?.find((o) => o.id === sp.option);
+      const cls = modelRecs.get(model)?.class ?? opt?.equipment?.find((e) => e.key === pos.position.replace(/^[a-z]+-\d+\//, '').replace(/#\d+$/, ''))?.class;
+      if (f.symptom && cls && classes.has(cls) && !classes.get(cls).discrimination?.[f.symptom]) report(rec, [...at, 'symptom'], `symptom "${f.symptom}" is not in the ${cls} guide`);
+    });
   }
 
   return problems;

@@ -16,6 +16,8 @@ import RackView from '../../components/RackView.astro';
 import CommsSummary from '../../components/CommsSummary.astro';
 import CommsPower from '../../components/CommsPower.astro';
 import Arrive from '../../components/Arrive.astro';
+import TrendStrip from '../../components/TrendStrip.astro';
+import { spaceRepeats } from '../../lib/repeats-view.mjs';
 import RackPatching from '../../components/RackPatching.astro';
 import CommsServes from '../../components/CommsServes.astro';
 import CommsSizing from '../../components/CommsSizing.astro';
@@ -134,6 +136,8 @@ const ANSWER = lead
   : replacing.length ? 'Kit being replaced · no open incidents'
   : x.stages.deploy ? `Being installed · ${plural(x.stages.deploy, 'unit')} still going in`
   : unitCount ? `All ${plural(unitCount, 'unit')} in service · no open incidents` : 'No tracked devices · no open incidents';
+// Repeat faults (the overlooked items, #15): this quarter's faults here, and a strip by month for the last year.
+const REP = spaceRepeats(x.id);
 const kiTitles = JSON.stringify(Object.fromEntries(knownIssues.map((i) => [i.id, i.title])));
 const deskWord =kind === 'kits' ? 'kit' : 'desk';
 ---
@@ -280,6 +284,13 @@ const deskWord =kind === 'kits' ? 'kit' : 'desk';
     <div class="g12">
       <div class:list={['card side-card ri-card s-4', { 'rs-radiate': openCount > 0 }]} id="incidents">
         <h3 data-help="room.incidents">Incidents</h3>
+        {REP && (
+          <div class:list={['rp', { 'is-repeat': REP.repeat }]} data-feature="repeat-faults" data-arrive data-help="room.repeats">
+            <p class="rp-a">{REP.ordinal ? <><b class="rs-tick">{REP.ordinal}</b> fault this quarter</> : REP.text}</p>
+            <TrendStrip bars={REP.bars} label="Faults here per month, the last 12 months" tone={REP.repeat ? 'fault' : 'quiet'} mark={REP.bars.length - 1} height={24} step={12} ends />
+            <p class="rp-s">{REP.year} in the last 12 months{REP.repeat ? ' · worth a look at the model or the room, not another restart' : ''}</p>
+          </div>
+        )}
         {roomInc.length === 0 ? <p class="muted" style="margin:0;font-size:13.5px">No incidents recorded for this space.</p> : (
           <ul class="ri-list">
             {roomInc.map((v) => (
@@ -409,6 +420,12 @@ const deskWord =kind === 'kits' ? 'kit' : 'desk';
   .ri-t small { font-size: var(--fs-code); color: var(--text-3); }
   .ri-s.s-on-hold { color: var(--amber-ink); } .ri-s.s-new, .ri-s.s-in-progress { color: var(--red-ink); font-weight: 600; } .ri-s.s-resolved { color: var(--green-ink); }
   .ri-all { font-size: var(--fs-support); font-weight: 600; }
+  /* Repeat faults: the answer, the strip, the year. */
+  .rp { display: grid; gap: 6px; padding: 0 0 12px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+  .rp-a { margin: 0; font: var(--fw-title) var(--fs-h3)/1.25 var(--font-display); color: var(--text); }
+  .rp.is-repeat .rp-a b { color: var(--red-ink); font-weight: inherit; }
+  .rp-a b { font-weight: inherit; }
+  .rp-s { margin: 0; font-size: var(--fs-code); color: var(--text-2); }
   .rg { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: var(--gutter); align-items: stretch; }
   .rg-qr { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: center; }
   .rg-qr-t p { margin: 0; font-size: var(--fs-body); color: var(--text-2); max-width: 60ch; }

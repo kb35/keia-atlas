@@ -1,42 +1,17 @@
 ---
 /* TrendStrip: a small strip of bars, one per period (a month, a week), drawn once as it comes into view and then
-   still (src/lib/arrive.mjs, the library's km-draw). Used for repeat faults and for warranties ending by month.
+   still (src/lib/arrive.mjs, the library's km-draw). Used for repeat faults and for warranties ending by month. The
+   markup comes from src/lib/strip.mjs, so a page that draws in a script makes the same strip; styles are in
+   src/styles/arrive.css. The markup is the end frame: with scripts off or reduced motion, the strip is simply there.
    Props:  bars    [{ label, n }] oldest first
            label   what the strip shows, for people who cannot see it ("Faults per month, last 12 months")
            tone    'fault' draws the bars in the fault ink, 'warn' in amber; otherwise the quiet ink
-           height  px, 28 by default
+           height  px, 28 by default; step, px a bar, 14 by default
            ends    true: the first and last labels under the strip
-           mark    the index of a bar to mark (the current period): it is drawn in full ink
-   The markup is the end frame: with scripts off or reduced motion, the strip is simply there. */
+           mark    the index of a bar to mark (the current period): it is drawn in full ink */
+import '../styles/arrive.css';
+import { trendStrip } from '../lib/strip.mjs';
 interface Bar { label: string; n: number }
 interface Props { bars: Bar[]; label: string; tone?: 'fault' | 'warn' | 'quiet'; height?: number; ends?: boolean; mark?: number; step?: number }
-const { bars, label, tone = 'quiet', height = 28, ends = false, mark = -1, step = 14 } = Astro.props;
-const max = Math.max(1, ...bars.map((b) => b.n));
-// Drawn at its own size (step px a bar), never stretched, so the bars keep their shape at every width.
-const W = step, H = height;
-const said = `${label}: ${bars.map((b) => `${b.label} ${b.n}`).join(', ')}`;
 ---
-<figure class:list={['ts', `ts-${tone}`]} data-draw>
-  <svg viewBox={`0 0 ${bars.length * W} ${H}`} width={bars.length * W} height={H} role="img" aria-label={said}>
-    <title>{said}</title>
-    <line class="ts-base" x1="0" x2={bars.length * W} y1={H - 0.5} y2={H - 0.5} />
-    {bars.map((b, i) => b.n > 0 && (
-      <line class:list={['ts-bar km-draw', { 'is-mark': i === mark }]} style={`--k:${i}`} pathLength="1"
-        x1={i * W + W / 2} x2={i * W + W / 2} y1={H - 1} y2={H - 1 - Math.max(3, ((H - 4) * b.n) / max)} />
-    ))}
-  </svg>
-  {ends && bars.length > 1 && <figcaption class="ts-ends"><span>{bars[0].label}</span><span>{bars[bars.length - 1].label}</span></figcaption>}
-</figure>
-
-<style>
-  .ts { margin: 0; display: inline-grid; gap: 2px; min-width: 0; max-width: 100%; }
-  .ts svg { display: block; overflow: visible; max-width: 100%; height: auto; }
-  .ts-base { stroke: var(--line-strong); stroke-width: 1; }
-  .ts-bar { stroke: var(--text-3); stroke-width: 6; stroke-linecap: round; }
-  .ts-bar.is-mark { stroke: var(--text); }
-  .ts-fault .ts-bar { stroke: color-mix(in srgb, var(--h-fault, var(--red)) 55%, var(--surface)); }
-  .ts-fault .ts-bar.is-mark { stroke: var(--h-fault, var(--red)); }
-  .ts-warn .ts-bar { stroke: color-mix(in srgb, var(--amber) 60%, var(--surface)); }
-  .ts-warn .ts-bar.is-mark { stroke: var(--amber-ink); }
-  .ts-ends { display: flex; justify-content: space-between; font: 500 var(--fs-mark)/1.2 var(--font-mono); color: var(--text-3); }
-</style>
+<Fragment set:html={trendStrip(Astro.props)} />

@@ -312,6 +312,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
         // History: incidents, tasks in this room, Lab tests of this model, and the unit's own dates. Newest first.
         var H = [];
         inc.forEach(function (i) { H.push({ d: i.opened, k: 'inc', open: OPEN(i.state), href: L('incidents/' + i.number.toLowerCase() + '/'), id: i.number, t: i.title, sub: 'Incident · P' + i.priority + ' · ' + (W.inc[i.state] || cap(i.state)) }); });
+        if (u.repeats) u.repeats.past.forEach(function (f) { H.push({ d: f.d, k: 'inc', id: f.number, t: f.t, sub: 'Resolved' + (f.fix ? ': ' + esc(f.fix) : '') + ' · in the service desk' }); });
         r.tasks.forEach(function (t) { H.push({ d: t.due, k: 'task', open: t.status !== 'done', href: L('projects/' + t.project.toLowerCase() + '/'), id: t.id, t: t.title, sub: 'Task · ' + esc(t.projectName || t.project) + ' · ' + (W.task[t.status] || cap(t.status)) + (t.status !== 'done' ? ', due' : '') }); });
         if (m) m.labs.forEach(function (l) { H.push({ d: l.end || l.start, k: 'lab', href: L('lab/') + '#' + l.id.toLowerCase(), id: l.id, t: l.title, sub: 'Lab test of the ' + esc(m.name) + ' · ' + cap(l.status) }); });
         if (u.installed) H.push({ d: u.installed, k: 'life', t: 'Installed', sub: 'Went live in ' + esc(roomLabel(r)) });
@@ -322,7 +323,10 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
           return '<li class="hx hx-' + h.k + (h.open ? ' open' : '') + '"' + (i >= FIRST - 1 ? ' data-more hidden' : '') + '><time>' + when(h) + '</time><i aria-hidden="true"></i><div>' +
             (h.href ? '<a href="' + h.href + '"><span class="mono">' + esc(h.id) + '</span> ' + esc(h.t) + '</a>' : '<b>' + esc(h.t) + '</b>') + '<small>' + h.sub + '</small></div></li>';
         }).join('');
-        var histCard = '<section class="card dv-card s-4 c-history" data-help="unit.history" id="history">' + head('Work and incidents', '<span class="faint dv-aside">Newest first</span>') +
+        // Repeat faults (the overlooked items, #15): this quarter's faults on this unit, with a strip by month.
+        var rp = u.repeats;
+        var repBlock = rp ? '<div class="rp' + (rp.repeat ? ' is-repeat' : '') + '" data-feature="repeat-faults" data-arrive data-help="unit.repeats"><p class="rp-a">' + (rp.ordinal ? '<b class="rs-tick">' + rp.ordinal + '</b> fault this quarter' : esc(rp.text)) + '</p>' + rp.strip + '<p class="rp-s">' + rp.year + ' in the last 12 months' + (rp.repeat ? ' · a case for the manufacturer or a replacement' : '') + '</p></div>' : '';
+        var histCard = '<section class="card dv-card s-4 c-history" data-help="unit.history" id="history">' + head('Work and incidents', '<span class="faint dv-aside">Newest first</span>') + repBlock +
           (H.length ? '<ol class="dv-hx">' + hx + '</ol>' + (H.length >= FIRST ? '<button type="button" class="btn small dv-all" data-help="section.showall" data-show-all>Show all ' + H.length + '</button>' : '') : '<p class="faint">No work or incidents on this unit yet.</p>') + '</section>';
 
         // Key numbers in the band (REVIEW-SITE fix 8): figures that say something about this unit. Open work first,
@@ -535,6 +539,13 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
   @keyframes hc-spin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .dv-c .sp { animation: none !important; } }
 
+
+  /* Repeat faults on this unit: the answer, the strip, the year. */
+  .c-history .rp { display: grid; gap: 6px; padding: 0 0 10px; border-bottom: 1px solid var(--line); }
+  .c-history .rp-a { margin: 0; font: var(--fw-title) var(--fs-h3)/1.25 var(--font-display); color: var(--text); }
+  .c-history .rp-a b { font-weight: inherit; }
+  .c-history .rp.is-repeat .rp-a b { color: var(--red-ink); }
+  .c-history .rp-s { margin: 0; font-size: var(--fs-code); color: var(--text-2); }
 
   /* History: a timeline, newest first. Open incidents are red, open work blue. */
   .dv-hx { list-style: none; margin: 0; padding: 0; display: grid; }

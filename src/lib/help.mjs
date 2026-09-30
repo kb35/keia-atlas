@@ -317,6 +317,7 @@ const OVERVIEW = {
   'overview.queue': e('The queue', 'Every open job, worst first: priority, then nobody on it, then past its target, then oldest. Each row says who has it.', 'Open a job, or take it or hand it on from its chip. See all opens the Queue with its filters.', 'g:task'),
   'overview.row': e('A piece of open work', 'One task, step or visit: what it is, who has it, when and its status.', 'Select it to open it. Changes made in the Schedule or on a project show here too.', 'g:task'),
   'overview.today': e('Today across offices', 'For each office, who is on site today and what work is on there.', 'Select an office to open Day in the Schedule at that site.'),
+  'overview.repeats': e('Repeat faults this quarter', 'The spaces that have failed twice or more since the quarter began, most first, with a strip of faults per month for the last year.', 'Open a space to see its faults. A space that keeps failing needs its model or the room looked at, or a known error raised.'),
   'overview.recent': e('Recent changes', 'The latest changes anyone has made to work, with who made them and when.', 'Change something in another window to watch it appear here.'),
 };
 
@@ -489,6 +490,7 @@ const ROOM = {
   'comms.uplinks': e('Uplinks', 'Where this comms room connects to: the MDF over the riser fibre, or for an MDF the internet circuits, the firewalls and each floor comms room it feeds.', 'Select a space to open it.', 'g:idf'),
   'room.banner': e('Replacement in progress', 'A device in this space is being replaced. The old one and the new one are both on record.', 'Select the links to see the project and the new unit.'),
   'room.kit': e('What\'s installed', 'Every device in the space, with its model and status.', 'Select a device for its health, settings and history.', 'g:unit'),
+  'room.repeats': e('Repeat faults', 'How many faults this space has had this quarter, counting its open incidents and the faults resolved before them, with a strip of faults per month for the last year.', 'A space with a second or third fault this quarter needs its model or the room looked at, not another restart.'),
   'room.incidents': e('Incidents', 'Incidents raised for this space and how they ended.', 'Select one to open it, or All incidents to see the office.', 'g:incident'),
   'room.compared': e('Compared against', 'The space type and build option this space is built to, and whether anything required is missing.', 'Select the space type to see what it needs. A missing device is a task to raise.', 'g:room-profile'),
   'room.lifecycle': e('Lifecycle', 'How many devices are at each step of their life: ordered, procured, being installed, in service and retired.', 'Nothing to do.', 'g:lifecycle'),
@@ -523,6 +525,7 @@ const UNIT = {
   'team.oncall': e('On call', 'Who answers out of hours in each region this week, until when, their backup and who they escalate to, and the weeks after.', 'Select a name to see their week. Paging happens in the paging tool; the rota is kept here.'),
   'home.oncall': e('On call', 'Shown when you are on the out-of-hours rota this week or next: until when, your backup and who to escalate to.', 'Open the rota on Team to swap a week with a colleague.'),
   'incident.oncall': e('On call', 'Who answers out of hours in this office\'s region now. Out of hours they answer first; in office hours the office technician does.', 'Select it to open the rota on Team.'),
+  'unit.repeats': e('Repeat faults', 'How many faults this unit has had this quarter, from the incidents and the fault history recorded against it, with a strip of faults per month for the last year.', 'A unit that keeps failing is a case for the manufacturer or a replacement, not another restart.'),
   'unit.security': e('Security support', 'How long the manufacturer keeps fixing security holes in this model, its firmware line, where to report a flaw, and whether this unit\'s default password was changed.', 'When support ends within a year, plan the replacement. A unit still on the default password needs its vault password set.', 'g:firmware'),
   'unit.security-chip': e('Security support warning', 'The manufacturer stops fixing security holes in this model within 12 months, or already has.', 'Select it for the dates, then plan the replacement.', 'g:firmware'),
   'unit.password-chip': e('Default password not changed', 'This unit still has the manufacturer\'s default admin password, which anyone can look up.', 'Set the office\'s vault password on it, then record the change.'),

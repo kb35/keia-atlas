@@ -255,6 +255,8 @@ export function networkPath(space) {
 export const vendors = readFolder('vendors');
 // On call per region (data/on-call/, src/lib/oncall.mjs).
 export const onCall = readFolder('on-call');
+// Faults resolved before the incidents held in full (data/fault-history/, src/lib/repeats-view.mjs).
+export const faultHistory = readFolder('fault-history');
 export const VENDOR_KIND = { integration: 'Integration', service: 'Service and maintenance', manufacturer: 'Manufacturer' };
 
 // The name people use for a device: where it is and what it does ("Curlew video bar", "Reception

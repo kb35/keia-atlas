@@ -11,6 +11,7 @@ import { parse } from 'yaml';
 import { warrantyWords, supportWords, monthsUntil, endingSoon, money, renewalWords } from '../src/lib/cover.mjs';
 import { TARGETS, upsWords, tempWords, envAnswer, simulatedTemp } from '../src/lib/environment.mjs';
 import { hoursWords, daysWords, windowWords, nextWindow, plusHour } from '../src/lib/hours.mjs';
+import { ordinal, quarterStart, lastMonths, repeatsOf, mostRepeats } from '../src/lib/repeats.mjs';
 import { FEATURES_ADDED } from '../src/lib/features-added.mjs';
 import { rotaAt, lineFor, outOfHours, localAt, utcOf, whenWords } from '../src/lib/oncall.mjs';
 import { PEOPLE } from '../src/lib/demo.mjs';
@@ -191,4 +192,41 @@ test('hours and windows in words, and when the window next opens', () => {
   assert.equal(nextWindow(w, '2026-10-02T01:30').open, true, 'still open in the small hours of Friday');
   assert.equal(nextWindow(w, '2026-09-30T09:00').text, 'tomorrow, 22:00 to 02:00');
   assert.equal(plusHour('19:00'), '20:00');
+});
+
+// ---- Repeat faults -----------------------------------------------------------------------------------------------
+
+test('ordinals and quarters', () => {
+  assert.deepEqual([1, 2, 3, 4, 11, 12, 13, 21, 22, 23].map(ordinal), ['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '23rd']);
+  assert.equal(quarterStart('2026-09-28'), '2026-07-01');
+  assert.equal(quarterStart('2026-01-01'), '2026-01-01');
+  assert.deepEqual(lastMonths('2026-09-28').map((m) => m.key).slice(0, 2), ['2025-10', '2025-11']);
+});
+
+test('a space\'s faults: the count this quarter, as the page says it, and a bar a month', () => {
+  const f = (opened) => ({ opened, space: 's' });
+  const r = repeatsOf([f('2026-08-11T09:20'), f('2026-09-25T14:30'), f('2026-09-28T07:52'), f('2026-02-17T14:05'), f('2024-01-01T10:00')], TODAY);
+  assert.equal(r.text, '3rd fault this quarter');
+  assert.equal(r.quarter, 3);
+  assert.equal(r.year, 4, 'a fault older than 12 months is left out');
+  assert.equal(r.bars.length, 12);
+  assert.equal(r.bars[11].n, 2);
+  assert.equal(repeatsOf([f('2026-05-01T10:00')], TODAY).text, 'No faults this quarter');
+  assert.equal(repeatsOf([f('2026-09-01T10:00')], TODAY).repeat, false);
+  assert.equal(repeatsOf([], TODAY), null, 'nothing this year: the page shows nothing');
+  const top = mostRepeats([{ ...f('2026-09-01T10:00'), space: 'a' }, { ...f('2026-09-02T10:00'), space: 'a' }, { ...f('2026-09-03T10:00'), space: 'b' }], TODAY);
+  assert.deepEqual(top.map((x) => x.space), ['a'], 'a single fault is not a repeat');
+});
+
+test('the fault history agrees with the incidents: Whooper Swan in Dublin is on its third fault this quarter', () => {
+  const faults = [
+    ...load('fault-history').flatMap((h) => h.faults.map((x) => ({ opened: x.opened, space: x.space, unit: x.unit }))),
+    ...load('incidents').map((i) => ({ opened: i.opened, space: i.subject.room, unit: i.subject.device ?? null })),
+  ];
+  assert.equal(repeatsOf(faults.filter((x) => x.space === 'dub-3-09'), TODAY).text, '3rd fault this quarter');
+  assert.equal(repeatsOf(faults.filter((x) => x.unit === 'AG-000335'), TODAY).text, '2nd fault this quarter');
+  for (const h of load('fault-history')) {
+    assert.ok(h.demo, `${h.id} is marked demo`);
+    for (const x of h.faults) assert.ok(x.opened < `${TODAY}T23:59` && x.resolved > x.opened, x.number);
+  }
 });

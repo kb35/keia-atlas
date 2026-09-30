@@ -43,6 +43,7 @@ The way of working: **you propose, the validator checks, a person accepts.** Eve
 | House standards | `data/standards/` | standard |
 | Privacy record for sensing devices | `data/privacy/` | class and site group |
 | Who is on call out of hours | `data/on-call/<region>.yaml` | region |
+| Faults resolved before the incidents held in full | `data/fault-history/<site>.yaml` | site |
 
 `schemas/registry.yaml` says which schema checks each folder. The full table is in [GETTING-STARTED.md](GETTING-STARTED.md), section 3.
 
