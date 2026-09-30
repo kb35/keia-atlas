@@ -22,6 +22,7 @@ export const LINKS = {
   contributing: `${REPO}/blob/main/CONTRIBUTING.md`,
   gettingStarted: `${REPO}/blob/main/GETTING-STARTED.md`,
   discussions: `${REPO}/discussions`,
+  issues: `${REPO}/issues`,
   methodText: `${REPO}/blob/main/docs/keia-method.md`,
   ccbysa: 'https://creativecommons.org/licenses/by-sa/4.0/',
 };

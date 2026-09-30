@@ -157,14 +157,15 @@
   a.card:hover, a.site-card:hover, .card.oc:hover, [data-lift]:hover { translate: 0 calc(-2px * var(--km-t)); box-shadow: var(--shadow-md); }
 }
 
-/* ---------- Reduced motion from the site's own switch (html data-motion="off" or "reduced"), as well as the
-   system's: every library motion lands on its end state, CSS moves stop, and pages change without a move.
+/* ---------- Reduced motion from the site's own switch (html data-motion="off" or "reduced", set by Settings ›
+   Accessibility), as well as the system's: every library motion lands on its end state.
    data-motion="full" keeps motion on even when the system asks for less. */
 :root[data-motion="off"], :root[data-motion="reduced"] { --km-t: 0; }
 :root[data-motion="full"], :root[data-motion="on"] { --km-t: 1; }
-:root[data-motion="off"] *, :root[data-motion="off"] *::before, :root[data-motion="off"] *::after,
-:root[data-motion="reduced"] *, :root[data-motion="reduced"] *::before, :root[data-motion="reduced"] *::after { animation: none !important; transition: none !important; }
-:root[data-motion="off"]::view-transition-group(*), :root[data-motion="off"]::view-transition-old(*), :root[data-motion="off"]::view-transition-new(*),
-:root[data-motion="reduced"]::view-transition-group(*), :root[data-motion="reduced"]::view-transition-old(*), :root[data-motion="reduced"]::view-transition-new(*) { animation: none !important; }
+/* Reduced keeps short fades: every reduced-motion rule in every file applies to it too (the build copies them,
+   tools/postcss-a11y.mjs). Off stops everything, and its rules are in src/styles/a11y.css. */
 :root[data-motion="off"] .km-settle-wait, :root[data-motion="reduced"] .km-settle-wait { opacity: 1; translate: none; }
 @media (prefers-reduced-motion: reduce) { :root:not([data-motion="full"]):not([data-motion="on"]) .km-settle-wait { opacity: 1; translate: none; } }
+/* Keep things still (Settings › Accessibility): nothing settles in or lifts on its own; the rest of motion is kept. */
+:root[data-still="on"] .km-settle-wait { opacity: 1; translate: none; }
+@media (hover: hover) { :root[data-still="on"] :is(a.card, a.site-card, .card.oc, [data-lift]):hover { translate: none; } }

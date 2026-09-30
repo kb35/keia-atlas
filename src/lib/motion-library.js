@@ -19,6 +19,8 @@ export const km = {
      or the older data-reduced="true"), else the system's prefers-reduced-motion. data-motion="full" (or
      data-reduced="false") keeps motion on even when the system asks for less. */
   reduced() {
+    // The one question (window.rsReducedNow, src/lib/a11y.mjs): Settings › Accessibility › Motion first.
+    if (typeof window.rsReducedNow === 'function') return window.rsReducedNow();
     const m = root.dataset.motion;
     if (m === 'off' || m === 'reduced') return true;
     if (m === 'full' || m === 'on') return false;
@@ -26,6 +28,10 @@ export const km = {
     if (root.dataset.reduced === 'false') return false;
     return matchMedia('(prefers-reduced-motion: reduce)').matches;
   },
+  /* Keep things still (Settings › Accessibility, or the front page's Pause animations): the site-wide grammar's
+     moves (settle, disclose, tick, draw-in, lift) land at once, as under reduced motion. Moves the person asks for
+     elsewhere (a zoom, a menu) keep their motion setting. */
+  still() { return km.reduced() || root.getAttribute('data-still') === 'on'; },
   t: {
     get pop() { return tokenMs('--dur-pop', 200); },
     get exit() { return tokenMs('--dur-exit', 240); },
@@ -288,7 +294,7 @@ export const km = {
      waiting section at once (used when the page changes). Reduced motion: nothing waits. */
   settle(scope, sel = 'section.sec, [data-settle]') {
     // An automated browser (a full-page screenshot, a check) sees every section in its place: nothing waits.
-    if (!scope || km.reduced() || !('IntersectionObserver' in window) || (navigator.webdriver && !window.__kmSettleAlways)) return () => {};
+    if (!scope || km.still() || !('IntersectionObserver' in window) || (navigator.webdriver && !window.__kmSettleAlways)) return () => {};
     const vh = innerHeight, all = [...scope.querySelectorAll(sel)];
     const els = all.filter((el) => {
       if (el.closest('[data-no-settle], [hidden], dialog, .peek')) return false;
@@ -322,7 +328,7 @@ export const km = {
     const sum = d.querySelector(':scope > summary');
     if (!sum) { d.open = open; return; }
     if (d.__km) { d.__km(); d.__km = null; }
-    if (km.reduced() || !d.animate) { d.open = open; return; }
+    if (km.still() || !d.animate) { d.open = open; return; }
     const kids = () => [...d.children].filter((k) => k !== sum && k.nodeType === 1);
     const floating = (k) => /absolute|fixed/.test(getComputedStyle(k).position);
     if (open) d.open = true;
@@ -361,7 +367,7 @@ export const km = {
      It never counts through the numbers in between (M9): the figure is exact on every frame, only its place eases.
      from: the old text, to tell up from down. Reduced motion: the new value is simply there. */
   tick(el, from = '') {
-    if (!el || km.reduced() || !el.animate) return;
+    if (!el || km.still() || !el.animate) return;
     const num = (s) => { const m = String(s).replace(/,/g, '').match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : NaN; };
     const a = num(from), b = num(el.textContent);
     const dir = isNaN(a) || isNaN(b) || a === b ? 1 : (b > a ? 1 : -1);
@@ -405,7 +411,7 @@ export const km = {
      Transform and stroke only, over --dur-morph, once. After that a chart is redrawn still (M9). Reduced
      motion: the chart is simply there. */
   drawIn(el, { delay = 0 } = {}) {
-    if (!el || km.reduced() || !el.animate) return;
+    if (!el || km.still() || !el.animate) return;
     const d = km.t.morph, ease = km.t.settle, st = km.t.stagger;
     const lines = el.matches('svg') ? [...el.querySelectorAll('path, polyline, line')].filter((p) => !p.closest('defs')) : [...el.querySelectorAll('svg.spk path, [data-draw]')];
     lines.forEach((p, i) => {
@@ -442,7 +448,7 @@ export const km = {
   BARS: '[data-chart-bar], .sp-bar, .cfc-bar, .cf-prog-bar, .vd-bar, .vrec-bar, .hbar, .bud-bar, .task-bar, .pbs-bar, .mdp-bar, .lv-bar, .lv-hbar, .sv-hbar, .pl-mbar, .pl-kbar, .pl-hbar, .wp-bars',
   /* Draw every chart in scope in once as it first comes into view. Returns a function that stops watching. */
   watchCharts(scope, sel = '[data-chart], svg.spk') {
-    if (!scope || km.reduced() || !('IntersectionObserver' in window)) return () => {};
+    if (!scope || km.still() || !('IntersectionObserver' in window)) return () => {};
     const els = [...scope.querySelectorAll(`${sel}, ${km.BARS}`)].filter((el) => !el.closest('[data-no-draw], .sm-grid') && !(el.parentElement && el.parentElement.closest(km.BARS)));
     if (!els.length) return () => {};
     let n = 0;
