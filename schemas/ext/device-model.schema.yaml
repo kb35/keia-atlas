@@ -90,6 +90,46 @@ properties:
       end_of_sale: { type: string, format: date }
       end_of_support: { type: string, format: date }
 
+  security_support:
+    description: >
+      How long the maker keeps fixing security holes in this model, and how to reach it about one (the EU Cyber
+      Resilience Act and the UK PSTI rules ask for these). Only for models with firmware worth attacking: anything
+      networked, and every camera and microphone. A date the maker has published cites its source; a date made
+      up for the demo says demo: true, and the page says so. The unit page warns when support ends within 12
+      months or has ended. Public, like every model fact.
+    type: object
+    additionalProperties: false
+    required: [ends, firmware_line]
+    properties:
+      ends:
+        description: The last month (or day) the maker promises security updates.
+        type: object
+        additionalProperties: false
+        required: [date]
+        properties:
+          date: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])(-[0-3][0-9])?$", description: "YYYY-MM, or YYYY-MM-DD when the maker gives a day." }
+          source: { $ref: "#/$defs/slug", description: A source entry id (data/sources/) where the maker publishes the date. }
+          demo: { const: true, description: The date is made up for the demo. }
+        oneOf:
+          - { properties: { source: true }, required: [source] }
+          - { properties: { demo: true }, required: [demo] }
+      firmware_line:
+        description: The maker's name for the firmware this model runs (Poly VideoOS, UniFi OS). When data/firmware/ tracks the line, its id.
+        type: string
+        minLength: 1
+      vulnerability_contact:
+        description: Where the maker takes reports of security holes. Left out when the maker publishes none (listed in gaps).
+        type: object
+        additionalProperties: false
+        required: [url]
+        properties:
+          url: { type: string, format: uri }
+          source: { $ref: "#/$defs/slug", description: "A source entry id for the page, checked on its last_verified date." }
+          demo: { const: true, description: A made-up maker's made-up page. }
+        oneOf:
+          - { properties: { source: true }, required: [source] }
+          - { properties: { demo: true }, required: [demo] }
+
   sources:
     description: Source entry ids (in data/sources/) this model's facts come from.
     type: array

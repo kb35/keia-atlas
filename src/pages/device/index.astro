@@ -17,6 +17,7 @@ import SimTag from '../../components/SimTag.astro';
 import { models, spaces, STAGES, STAGE_LABEL, TASK_STATUS, INC_STATE } from '../../lib/data.mjs';
 import { artParts, artSource } from '../../lib/art.mjs';
 import '../../styles/viz.css';
+import '../../styles/classification.css';
 const used = [...new Set(Object.values(spaces).flatMap((s) => [...s.positions, ...s.olderKit].map((p) => p.model).filter(Boolean)))];
 const clsUsed = [...new Set(Object.values(spaces).flatMap((s) => [...s.positions, ...s.olderKit].map((p) => p.cls)))];
 const words = { stages: STAGES.map((s) => [s, STAGE_LABEL[s]]), task: TASK_STATUS, inc: INC_STATE };
@@ -99,6 +100,9 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
       // Long lists show their first few rows, so the cards in a row stay the same height; the rest are a click away.
       var FIRST = 5;
       function showAll(n, what) { return n > FIRST ? '<button type="button" class="btn small dv-all" data-help="section.showall" data-show-all>Show all ' + n + ' ' + what + '</button>' : ''; }
+      // Classification (docs/rules/data.md F10): the small label beside Restricted content. Same as src/components/Restricted.astro.
+      function R(what) { return '<span class="cls-tag" data-help="classification.restricted"><b>Restricted:</b> ' + esc(what) + '</span>'; }
+      function demoVal() { return ' <span class="demo-val" data-help="unit.demo-value">Demo value</span>'; }
       function head(title, aside) { return '<header class="dv-ch"><h2>' + title + '</h2>' + (aside || '') + '</header>'; }
       // The path you can climb: Units > site > room > this unit. Each step is a link but the last.
       function crumbs(u, r, s, nm) {
@@ -116,7 +120,10 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
         crumbs(u, r, s, nm);
         document.getElementById('pb-title').textContent = nm;
         var stEl = root.querySelector('[data-dv-status]');
-        stEl.innerHTML = '<span class="pill ' + u.stage + '" data-help="unit.status">' + status + '</span>' + (openInc.length ? ' <span class="pill bad">' + openInc.length + ' open incident' + (openInc.length > 1 ? 's' : '') + '</span>' : '');
+        var sec = m && m.sec;
+        stEl.innerHTML = '<span class="pill ' + u.stage + '" data-help="unit.status">' + status + '</span>' + (openInc.length ? ' <span class="pill bad">' + openInc.length + ' open incident' + (openInc.length > 1 ? 's' : '') + '</span>' : '') +
+          (sec && sec.chip ? ' <a class="ss-chip ' + sec.tone + '" href="#security" data-help="unit.security-chip">' + esc(sec.chip) + '</a>' : '') +
+          (u.pw === false ? ' <a class="ss-chip bad" href="#security" data-help="unit.password-chip">Default password not changed</a>' : '');
         stEl.hidden = false;
         root.querySelector('[data-dv-sim]').hidden = !u.usage;
         root.querySelector('[data-dv-lede]').innerHTML = esc(u.pos.role) + (m ? ', ' + esc(m.name) : '') + ', in <a href="' + L('rooms/' + u.room + '/') + '">' + esc(roomLabel(r)) + '</a> at ' + esc(s.name) + (s.city ? ', ' + esc(s.city) : '') + '.';
@@ -154,7 +161,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
             row('Hostname', u.host ? '<span class="mono">' + esc(u.host) + '</span>' : 'None') +
             row('Serial', '<span class="mono">' + esc(u.serial) + '</span>') +
             row('Asset tag', '<span class="mono">' + esc(u.tag) + '</span>') +
-            (u.net ? row('IP address', '<span class="mono">' + u.net.ip + '</span>') + row('MAC', '<span class="mono">' + u.net.mac + '</span>') : '') +
+            (u.net ? row('IP address', '<span class="mono">' + u.net.ip + '</span> ' + R(D.restricted.ipPlan)) + row('MAC', '<span class="mono">' + u.net.mac + '</span>') : '') +
             row('Installed', u.installed ? fmt(u.installed) : (u.stage === 'manage' || u.stage === 'retire' ? 'Not recorded' : 'Not yet')) +
             (u.retired ? row('Taken out', fmt(u.retired)) : '') +
           '</dl></div></div></section>';
@@ -174,6 +181,31 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
             '<ul class="dv-kis">' + kis.map(function (k) {
               return '<li><a href="' + k.to + '"><span class="mono">' + esc(k.id) + '</span> ' + esc(k.t) + '</a><small class="faint"> · ' + esc(k.maker) + ', ' + (k.sure ? 'this unit runs ' + esc(k.fw) : 'version not tracked yet') + ' · ' + esc(k.st) + (k.fx ? ', fixed in ' + esc(k.fx) : '') + '</small></li>';
             }).join('') + '</ul></section>';
+        }
+
+        // Security support and privacy: when the maker stops fixing security holes (with a warning within 12 months),
+        // whether the default password was changed, and for a sensing unit its privacy record. Side by side when both show.
+        var pv = u.privacy ? D.privacy[u.privacy] : null;
+        var hasSec = Boolean(sec) || u.pw !== null;
+        var sp = hasSec && pv ? 's-6' : 's-12';
+        if (hasSec) {
+          var pwTxt = u.pw === true ? 'Yes' : u.pw === false ? '<span class="ss-chip bad">No: still the maker\'s default</span>' : 'Not recorded';
+          var cite = function (x) { return x ? (x.url ? ' <a class="faint" href="' + esc(x.url) + '">' + esc(x.title) + '</a>' : ' <span class="faint">' + esc(x.title) + '</span>') : ''; };
+          body += '<section class="card dv-card ' + sp + ' c-sec" data-help="unit.security" id="security">' + head('Security support', sec && sec.chip ? '<span class="ss-chip ' + sec.tone + '">' + esc(sec.chip) + '</span>' : '') +
+            '<dl class="dv-kv dv-sec">' +
+              (sec ? row('Firmware line', esc(sec.line)) +
+                row('Support', esc(sec.text) + (sec.endsDemo ? demoVal() : cite(sec.endsSrc))) +
+                row('Report a flaw', sec.contact ? '<a href="' + esc(sec.contact.url) + '">' + esc(sec.contact.url.replace(/^https?:\/\//, '').replace(/\/$/, '')) + '</a>' + (sec.contact.demo ? demoVal() : '') : 'The maker publishes no page')
+                : row('Support', m ? 'Not recorded for this model' : 'No model is set for this position, so no maker dates')) +
+              row('Default password changed', pwTxt + ' ' + R(D.restricted.passwords)) +
+            '</dl>' + (sec ? '<p class="faint dv-foot">From the model\'s record. The maker sets the dates; Keia Atlas tracks them and does not vouch for them.</p>' : '') + '</section>';
+        }
+        if (pv) {
+          body += '<section class="card dv-card ' + sp + ' c-privacy" data-help="unit.privacy" id="privacy">' + head('Privacy', '<span class="faint dv-aside">' + esc(pv.name) + '</span>') +
+            (u.spare ? '<p class="dv-sub">In the store it captures nothing. Once fitted at this office, this record applies.</p>' : '') +
+            '<dl class="dv-kv dv-priv">' + pv.rows.map(function (x, i) { return row(esc(x[0]), esc(x[1]), i >= 6); }).join('') + '</dl>' + showAll(pv.rows.length, 'rows') +
+            (pv.never.length ? '<p class="dv-sub dv-never"><b>Switched off:</b> ' + pv.never.map(esc).join('; ') + '.</p>' : '') +
+            '<p class="faint dv-foot">Aigna\'s record for these devices (demo). Keia Atlas keeps the record; it is not legal advice.</p></section>';
         }
 
         // Row 2: Health, Configuration, and the unit's history.
@@ -335,6 +367,9 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
   .dv-cfg .dv-row { grid-template-columns: minmax(96px, 42%) minmax(0, 1fr); }
   .dv-cfg .mono { font-size: 12.5px; }
   .dv-use .dv-row { grid-template-columns: minmax(110px, 48%) minmax(0, 1fr); }
+  .dv-sec .dv-row, .dv-priv .dv-row { grid-template-columns: minmax(110px, 30%) minmax(0, 1fr); align-items: baseline; }
+  .dv-never { overflow-wrap: anywhere; }
+  [data-dv-status] .ss-chip { text-decoration: none; }
 
   /* Health */
   .dv-checks { list-style: none; margin: 0; padding: 0; }

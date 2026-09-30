@@ -1,0 +1,104 @@
+# Privacy record: what a kind of sensing device at a group of sites captures, why, on what legal footing, who
+# was told and how long anything is kept. Sensing devices are cameras, microphones, video bars, codecs, desk
+# video devices and door or CCTV equipment (SENSING_CLASSES in src/lib/privacy.mjs). Every installed sensing
+# unit must be covered by exactly one record for its site and class (tools/crossrefs-privacy.mjs), and the
+# unit page shows the record.
+#
+# Rule: count, never identify. Occupancy is a room-level count with a minimum group size; per-person views are
+# off, and turning them on needs a logged decision. Keia Atlas keeps the records; it does not make anyone
+# compliant, and a record is not legal advice.
+#
+# The file name is the record's id. Demo data: Aigna's records are made up.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/privacy-record
+title: Privacy record
+type: object
+additionalProperties: false
+required: [name, covers, captures, identifies_people, processing, purpose, law, lawful_basis, dpia, notice, retention, works_council, approver, occupancy, demo]
+$defs:
+  slug: { type: string, pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
+properties:
+  name: { type: string, minLength: 1, description: "What the record covers, in words (Meeting room cameras and microphones, Ireland and UK)." }
+  covers:
+    description: The device classes and sites this record is for. A unit is covered when its class and its site are both listed.
+    type: object
+    additionalProperties: false
+    required: [classes, sites]
+    properties:
+      classes: { type: array, minItems: 1, uniqueItems: true, items: { $ref: "#/$defs/slug" }, description: Device class ids (data/device-classes/). }
+      sites: { type: array, minItems: 1, uniqueItems: true, items: { $ref: "#/$defs/slug" }, description: Site ids (data/sites/). }
+  captures:
+    description: What the devices pick up while they work.
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items: { enum: [video, audio, people-count, presence, badge-id] }
+  identifies_people: { type: boolean, description: Whether anything kept can be tied to a named person. }
+  processing:
+    description: Where the capture is processed.
+    type: object
+    additionalProperties: false
+    required: [where, note]
+    properties:
+      where: { enum: [on-device, cloud, on-device-and-cloud] }
+      note: { type: string, minLength: 1, description: "What leaves the device, and where it goes." }
+  purpose: { type: string, minLength: 1 }
+  law: { type: string, minLength: 1, description: "The rules that apply at these sites, by name (GDPR, UK GDPR, New York Civil Rights Law 52-c)." }
+  lawful_basis: { type: string, minLength: 1, description: "The footing for the processing under those rules, in words (Legitimate interests, GDPR Article 6(1)(f))." }
+  dpia:
+    description: The data protection impact assessment (or, outside the GDPR, the privacy impact assessment) that covers these devices.
+    type: object
+    additionalProperties: false
+    required: [ref, date]
+    properties:
+      ref: { type: string, minLength: 1 }
+      date: { type: string, format: date }
+      reviewed: { type: string, format: date, description: The last review. }
+  notice:
+    description: Whether people in the room are told, and where the notice is.
+    type: object
+    additionalProperties: false
+    required: [posted]
+    properties:
+      posted: { type: boolean }
+      where: { type: string, minLength: 1 }
+      text: { type: string, minLength: 1, description: The words of the notice. }
+    if: { properties: { posted: { const: true } } }
+    then: { properties: { where: true, text: true }, required: [where, text] }
+  retention: { type: string, minLength: 1, description: "How long each thing captured is kept, in words." }
+  works_council:
+    description: The works council or staff body agreement for these devices, or why there is none.
+    type: object
+    additionalProperties: false
+    properties:
+      body: { type: string, minLength: 1, description: "The works council or staff body (Samarbejdsudvalg, the cooperation committee)." }
+      ref: { type: string, minLength: 1 }
+      date: { type: string, format: date }
+      none: { type: string, minLength: 1, description: Why there is no agreement (no works council at these sites). }
+    oneOf:
+      - { properties: { body: true, ref: true, date: true }, required: [body, ref, date] }
+      - { properties: { none: true }, required: [none] }
+  approver: { type: string, minLength: 1, description: The role that approved the record (not a person's name). }
+  occupancy:
+    description: >
+      People counting. Counts are per room, never per person, and a count below the minimum group size is shown
+      as "fewer than N". Per-person views are off; turning them on for this tenant needs a logged decision.
+    type: object
+    additionalProperties: false
+    required: [counted, per_person_views]
+    properties:
+      counted: { type: boolean }
+      min_group_size: { type: integer, minimum: 2 }
+      per_person_views: { type: boolean }
+      decision: { type: string, minLength: 1, description: The logged decision that turned per-person views on. }
+    allOf:
+      - if: { properties: { counted: { const: true } } }
+        then: { properties: { min_group_size: true }, required: [min_group_size] }
+      - if: { properties: { per_person_views: { const: true } } }
+        then: { properties: { decision: true }, required: [decision] }
+  never:
+    description: Things these devices can do that are switched off and stay off, in words.
+    type: array
+    items: { type: string, minLength: 1 }
+  demo: { const: true }
