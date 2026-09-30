@@ -13,6 +13,7 @@ import { seatHolders, licenceRows, licenceSummary, licenceAnswer, inDays } from 
 import { outNow, lostBookings, noticeLines, whenWords, alternativesFor } from '../src/lib/outofservice.mjs';
 import { sentence, quietWords, simulatedAlerts, alertCounts, ruleAnswer } from '../src/lib/alerts.mjs';
 import { warnLevel, credentialRows, credentialSummary, credentialAnswer } from '../src/lib/credentials.mjs';
+import { exposure, fixState, flawRows, flawSummary, flawAnswer } from '../src/lib/flaws.mjs';
 import { nthWeekday, planDates, rounds, checksForSpace, checksSummary, checksAnswer, checkItem, addMonths } from '../src/lib/checks.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -36,7 +37,7 @@ for (const f of readdirSync(join(ROOT, 'data/installs'))) for (const n of readdi
   for (const u of inst.older_kit ?? []) add(u, u.model);
 }
 
-const FOLDERS = ['licences', 'checks', 'out-of-service', 'alert-rules', 'credentials'];
+const FOLDERS = ['licences', 'checks', 'out-of-service', 'alert-rules', 'credentials', 'security-flaws'];
 let result;
 test('each capability\'s data validates: schema, secrets and cross-references', async () => {
   result = await validate(ROOT);
@@ -167,6 +168,30 @@ test('credentials: references only, warned at 60, 30 and 7 days, soonest first',
   assert.ok(rows.find((r) => r.id === 'cert-printer-jnu').units.includes('AG-000482'));
   assert.ok(rows.find((r) => r.id === 'cert-8021x-poly-emea').units.length > 10, 'used by every Poly system in its offices');
   assert.equal(credentialAnswer({ expired: 0, in30: 0, in60: 0 }), 'Nothing expires in the next 60 days');
+});
+
+// ---- Security flaws ------------------------------------------------------------------------------------------------
+test('security flaws: exposed when older than the fix on a tracked line, may be when untracked, all when no fix', () => {
+  const line = read('firmware').find((l) => l.id === 'poly-videoos');
+  const lines = { 'poly-videoos': line };
+  const fleet = [
+    { tag: 'A', model: 'poly-studio-x52', firmware: '4.6.1.444241', site: 'dub' },
+    { tag: 'B', model: 'poly-studio-x52', firmware: '4.6.2.460046', site: 'dub' },
+    { tag: 'C', model: 'unifi-express-7', firmware: null, site: 'rem' },
+    { tag: 'D', model: 'logitech-meetup-2', firmware: null, site: 'nyc' },
+  ];
+  const all = Object.fromEntries(read('security-flaws').map((f) => [f.id, f]));
+  const x1 = exposure(all['CVE-DEMO-2026-0101'], fleet, lines);
+  assert.deepEqual([x1.exposed.map((u) => u.tag), x1.fixed.map((u) => u.tag)], [['A'], ['B']]);
+  assert.equal(fixState(all['CVE-DEMO-2026-0101'], line), 'standard');
+  assert.equal(fixState(all['CVE-DEMO-2026-0102'], line), 'lab');
+  assert.deepEqual(exposure(all['CVE-DEMO-2026-0102'], fleet, lines).exposed.map((u) => u.tag), ['A', 'B'], 'the fix is only in the Lab');
+  assert.deepEqual(exposure(all['CVE-DEMO-2026-0103'], fleet, lines).unknown.map((u) => u.tag), ['C'], 'versions not tracked');
+  assert.deepEqual(exposure(all['CVE-DEMO-2026-0105'], fleet, lines).exposed.map((u) => u.tag), ['D'], 'no fix: every unit');
+  const rows = flawRows(Object.values(all), fleet, lines);
+  assert.equal(rows[0].severity, 'critical', 'worst first');
+  assert.match(flawAnswer(flawSummary(rows)), /^\d flaws? exposes? \d+ units? · \d more may affect \d+ units?, 1 critical$/);
+  assert.ok(Object.values(all).every((f) => /^CVE-DEMO-/.test(f.id)), 'made-up flaws say so in their id');
 });
 
 test('out of service: the space offered instead is the same kind in the same office, same floor first, never one that is out', () => {

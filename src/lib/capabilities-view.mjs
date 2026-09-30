@@ -8,6 +8,9 @@ import { parse } from 'yaml';
 import { spaces, sites, models, classes, DEMO_TODAY, href, KIND } from './data.mjs';
 import { sentence, subjectOf, routeWords, simulatedAlerts, alertCounts } from './alerts.mjs';
 import { credentialRows, credentialSummary, expiryWords, LEVEL_WORD } from './credentials.mjs';
+import { flawRows, flawSummary, flawsForUnit, SEVERITY_WORD, SEVERITY_TONE, FIX_WORD } from './flaws.mjs';
+import { fleet as kiFleet } from './knownissues-view.mjs';
+import { firmwareLines } from './data.mjs';
 import { alternativesFor } from './outofservice.mjs';
 import { PEOPLE } from './demo.mjs';
 import { licenceRows, licenceSummary, inDays } from './licences.mjs';
@@ -115,6 +118,11 @@ export const credentials = credentialRows(readRecords('credentials'), fleetUnits
 export const credentialTotals = credentialSummary(credentials);
 export const platformName = (id) => readRecords('house-values')[0]?.platforms?.find((p) => p.id === id)?.name ?? id;
 
+// ---- Security flaws ----------------------------------------------------------------------------------------------------
+// Matched to the fleet with each unit's firmware version (simulated, as on Known errors: src/lib/knownissues-view.mjs).
+export const flaws = flawRows(readRecords('security-flaws'), kiFleet, firmwareLines);
+export const flawTotals = flawSummary(flaws);
+
 // ---- The unit page's cards (/device/caps.json, UnitCapabilities.astro) --------------------------------------------
 // Each card already worded: { feature, help, title, answer, tone?, items: [{ b, text?, w?, tone?, small?, to? }], more? }.
 // Cards come in the order UnitCapabilities.astro lists them (licences, credentials, cves, config-backups).
@@ -140,6 +148,19 @@ UNIT_CARDS.push((u) => {
     answer: first.level ? `${first.kindLabel} ${expiryWords(first, fmt)}` : `${cr.length === 1 ? 'One credential' : `${cr.length} credentials`}, none expiring within 60 days`,
     tone: first.tone ?? undefined,
     items: cr.map((r) => ({ b: r.name, text: `${r.kindLabel} · ${r.days < 0 ? 'expired' : 'expires'} ${fmt(r.expires)}`, w: r.level ? `(${LEVEL_WORD[r.level].toLowerCase()})` : '', tone: r.tone ?? undefined, small: `In the vault as ${r.vault.slice(6)}`, to: `assets/certificates/#${r.id}` })),
+  };
+});
+UNIT_CARDS.push((u) => {
+  const fl = flawsForUnit(flaws, u.tag);
+  if (!fl.length) return null;
+  const ex = fl.filter((x) => x.state === 'exposed');
+  const ki = kiFleet.find((x) => x.tag === u.tag);
+  return {
+    feature: 'cves', help: 'unit.flaws', title: 'Security flaws',
+    answer: ex.length ? `Exposed to ${ex.length === 1 ? 'one flaw' : `${ex.length} flaws`}${ki?.firmware ? ` on ${ki.firmware}` : ''}` : `May be exposed to ${fl.length === 1 ? 'one flaw' : `${fl.length} flaws`}: its version is not tracked`,
+    tone: ex.some((x) => SEVERITY_TONE[x.row.severity] === 'bad') ? 'bad' : 'warn',
+    items: fl.map(({ row, state }) => ({ b: `${row.id}: ${row.title}`, text: `${SEVERITY_WORD[row.severity]}${row.cvss != null ? ` (${row.cvss})` : ''} · ${state === 'exposed' ? 'exposed' : 'may be exposed'}`, tone: SEVERITY_TONE[row.severity] ?? undefined,
+      small: row.fixed_in ? `${FIX_WORD[row.fix]}: ${row.fixed_in}` : FIX_WORD.none, to: `assets/security-flaws/#${row.id.toLowerCase()}` })),
   };
 });
 export function unitCaps() {

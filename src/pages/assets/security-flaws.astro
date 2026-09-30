@@ -1,0 +1,90 @@
+---
+// Security flaws (the Security flaws capability, src/lib/modules.mjs; src/lib/flaws.mjs): each published flaw in a
+// model's firmware, matched to the fleet. The answer first (how many flaws expose how many units, and which may), then
+// the flaws worst first: severity, the firmware line and models, the affected versions, where the fix stands for
+// Aigna (in the standard, in the Lab, none yet), and the units exposed, office by office. Unit versions are simulated,
+// as on Known errors; the flaws are made up for the demo (CVE-DEMO- ids).
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import HealthGlyph from '../../components/HealthGlyph.astro';
+import FeatureGate from '../../components/FeatureGate.astro';
+import FeatureSource from '../../components/FeatureSource.astro';
+import Restricted from '../../components/Restricted.astro';
+import { href, fmtDate, plural, modelName, sites, SITE_ORDER } from '../../lib/data.mjs';
+import { flaws, flawTotals as T } from '../../lib/capabilities-view.mjs';
+import { flawAnswer, SEVERITY_WORD, SEVERITY_TONE, FIX_WORD } from '../../lib/flaws.mjs';
+import '../../styles/capabilities.css';
+
+const STATE = { bad: 'fault', warn: 'review' };
+const bySite = (list) => SITE_ORDER.map((s) => ({ s, us: list.filter((u) => u.site === s) })).filter((x) => x.us.length);
+const FACETS = [
+  { key: 'severity', label: 'Severity', options: Object.entries(SEVERITY_WORD).filter(([k]) => flaws.some((f) => f.severity === k)).map(([value, label]) => ({ value, label })) },
+  { key: 'status', label: 'Exposure', options: [{ value: 'exposed', label: 'Units exposed' }, { value: 'maybe', label: 'May be exposed' }, { value: 'clear', label: 'None exposed' }] },
+  { key: 'fix', label: 'Fix', options: Object.entries(FIX_WORD).filter(([k]) => flaws.some((f) => f.fix === k)).map(([value, label]) => ({ value, label })) },
+];
+const status = (f) => (f.exposed.length ? 'exposed' : f.unknown.length ? 'maybe' : 'clear');
+const NUMBERS = [
+  { n: T.units, label: 'Units exposed', to: '?status=exposed', tone: T.units ? 'bad' : undefined },
+  { n: T.maybeUnits, label: 'May be exposed', to: '?status=maybe', tone: T.maybeUnits ? 'warn' : undefined },
+  { n: T.critical, label: 'Critical', to: '?severity=critical', tone: T.critical ? 'bad' : undefined },
+  { n: T.flaws, label: 'Flaws', fact: true },
+];
+---
+<Shell title="Security flaws" section="security-flaws" crumbs={[{ label: 'Assets', to: '/assets/' }, { label: 'Security flaws' }]}>
+  <FeatureGate id="cves">
+    <PageBand overline="Security flaws" title="Security flaws" answer={flawAnswer(T)} lede="Published flaws in each model's firmware, the versions affected, where the fix stands and the units exposed." sim heartbeat={false} numbers={NUMBERS}>
+      <FeatureSource slot="overline" id="cves" />
+    </PageBand>
+    <div class="content flw">
+      <FilterBar facets={FACETS} placeholder="Find a flaw, model or version" label="Find a flaw" noun={['flaw', 'flaws']} scope=".content.flw" />
+      <p class="flw-cls"><Restricted view="exposure" /></p>
+      <ul class="flw-list">
+        {flaws.map((f) => (
+          <li class="card pad flw-row" id={f.id.toLowerCase()} data-fi data-help="flaw.row" data-find={`${f.id} ${f.title} ${f.models.map(modelName).join(' ')} ${f.affected} ${f.fixed_in ?? ''}`} data-f-severity={f.severity} data-f-status={status(f)} data-f-fix={f.fix}>
+            <div class="flw-top">
+              <HealthGlyph state={f.exposed.length ? STATE[SEVERITY_TONE[f.severity]] ?? 'review' : f.unknown.length ? 'review' : 'fine'} size={16} word={f.exposed.length ? plural(f.exposed.length, 'unit') + ' exposed' : f.unknown.length ? `${plural(f.unknown.length, 'unit')} may be` : 'None exposed'} />
+              <span class={`flw-sev s-${f.severity}`}>{SEVERITY_WORD[f.severity]}{f.cvss != null ? ` ${f.cvss}` : ''}</span>
+              <span class="mono faint">{f.id}</span>
+            </div>
+            <h2 class="flw-t">{f.title}</h2>
+            <dl class="kv flw-kv">
+              <div><dt>In</dt><dd>{f.lineName ? `${f.lineName}: ` : ''}{f.models.map(modelName).join(', ')}</dd></div>
+              <div><dt>Affected</dt><dd>{f.affected}</dd></div>
+              <div><dt>Fix</dt><dd><span class:list={['cap-w', { 't-good': f.fix === 'standard', 't-warn': f.fix === 'lab' || f.fix === 'none' }]}>{FIX_WORD[f.fix]}</span>{f.fixed_in ? `: ${f.fixed_in}` : ''}</dd></div>
+              <div><dt>Published</dt><dd>{fmtDate(f.published)}</dd></div>
+            </dl>
+            {f.aigna && <p class="flw-note">{f.aigna}</p>}
+            {(f.exposed.length > 0 || f.unknown.length > 0) && (
+              <details class="flw-units">
+                <summary>{f.exposed.length ? `The ${plural(f.exposed.length, 'unit')} exposed` : `The ${plural(f.unknown.length, 'unit')} that may be`}, by office</summary>
+                {bySite(f.exposed.length ? f.exposed : f.unknown).map(({ s, us }) => (
+                  <p><b>{sites[s].name}</b> <span class="faint">{us.length}</span><br />{us.slice(0, 24).map((u, i) => <>{i > 0 && ', '}<a href={href(`/device/?tag=${u.tag}`)}>{u.host ?? u.tag}</a>{u.firmware ? <span class="faint"> ({u.firmware})</span> : ''}</>)}{us.length > 24 ? ` and ${us.length - 24} more` : ''}</p>
+                ))}
+              </details>
+            )}
+          </li>
+        ))}
+      </ul>
+      <EmptyState text="No flaws match these filters." />
+      <p class="cap-note">Made-up flaws for the demo, with made-up ids (CVE-DEMO-...): not real advisories. A unit on a tracked firmware line (Poly VideoOS) is exposed when its version is older than the fix; its version is simulated, as on Known errors. Where Atlas does not track a model's versions, each unit may be exposed until checked in its management platform.</p>
+    </div>
+  </FeatureGate>
+</Shell>
+
+<style>
+  .flw-cls { margin: 0; }
+  .flw-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .flw-row { display: grid; gap: 8px; }
+  .flw-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: var(--fs-code); }
+  .flw-top .mono { margin-left: auto; }
+  .flw-sev { font: 500 var(--fs-overline)/1 var(--font-mono); padding: 4px 6px; border-radius: 4px; background: var(--surface-3); text-transform: uppercase; letter-spacing: .06em; }
+  .flw-sev.s-critical, .flw-sev.s-high { background: var(--red); color: #fff; }
+  .flw-sev.s-medium { background: var(--amber-soft); color: var(--amber-ink); }
+  .flw-t { margin: 0; font-size: var(--fs-h3); }
+  .flw-kv { margin: 0; }
+  .flw-note { margin: 0; font-size: var(--fs-body); color: var(--text-2); max-width: 80ch; }
+  .flw-units summary { cursor: pointer; font-size: var(--fs-code); font-weight: 600; color: var(--accent-ink); }
+  .flw-units p { margin: 8px 0 0; font-size: var(--fs-code); line-height: 1.6; }
+</style>

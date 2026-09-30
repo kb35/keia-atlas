@@ -104,5 +104,19 @@ export function crossCheckCapabilities(records) {
     role(rec, ['owner_role'], d.owner_role);
   }
 
+  // Security flaws: real models; a firmware line that exists and covers them; a fixed version that is one of its
+  // releases; the file named after the flaw.
+  const lines = new Map(inFolder('firmware').map((r) => [r.id, r.data]));
+  for (const rec of inFolder('security-flaws')) {
+    const d = rec.data;
+    if (d.id.toLowerCase() !== rec.id) report(rec, ['id'], `id "${d.id}" does not match the file name "${rec.id}"`);
+    d.models.forEach((m, i) => model(rec, ['models', i], m));
+    if (d.firmware_line) {
+      const line = lines.get(d.firmware_line);
+      if (!line) report(rec, ['firmware_line'], `firmware line "${d.firmware_line}" does not exist`);
+      else if (d.fixed_in && !line.releases.some((x) => x.version === d.fixed_in)) report(rec, ['fixed_in'], `"${d.fixed_in}" is not a release of ${line.name}`);
+    }
+  }
+
   return problems;
 }
