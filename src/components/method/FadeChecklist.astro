@@ -1,0 +1,77 @@
+---
+// Learn as you go: the same setup guide on a person's first, third and fifth setup (FRONT-DOOR section 3). Guidance is
+// full the first time and shortens as her own record shows she no longer needs it. The explorable: pick the setup;
+// the lines she no longer needs fade (cross-fade, no travel), and the box eases to its new height.
+// The steps are the real setup guide for the video bar (data/configurations/poly-x-google-meet.yaml).
+// Reduced motion: the change is instant.
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { parse } from 'yaml';
+
+const cfg = parse(readFileSync(path.join(process.cwd(), 'data', 'configurations', 'poly-x-google-meet.yaml'), 'utf8'));
+const steps = (cfg.setup ?? []).slice(0, 7).map((s) => ({ title: s.title, detail: s.detail ?? '', why: s.why_order ?? '' }));
+const RUNS = [
+  { id: '1', label: 'First setup', note: 'Every step with its detail and why the order matters.' },
+  { id: '3', label: 'Third', note: 'Steps she has done right twice: detail folded away; why the order matters stays.' },
+  { id: '5', label: 'Fifth', note: 'The steps alone. A step she has not done for a long time comes back in full.' },
+];
+---
+<div class="fc" data-fc data-run="1" data-help="method.fade">
+  <div class="fc-runs" role="group" aria-label="Which setup">
+    {RUNS.map((r, i) => <button type="button" data-fc-go={r.id} aria-pressed={i === 0 ? 'true' : 'false'}>{r.label}</button>)}
+  </div>
+  <div class="fc-box" data-fc-box>
+    <p class="fc-over">Setup guide · {cfg.name} · {steps.length} of {cfg.setup.length} steps shown</p>
+    <ol class="fc-steps">
+      {steps.map((s) => (
+        <li>
+          <b>{s.title}</b>
+          {s.detail && <p class="fc-detail">{s.detail}</p>}
+          {s.why && <p class="fc-why"><span>Why this order:</span> {s.why}</p>}
+        </li>
+      ))}
+    </ol>
+  </div>
+  <p class="fc-note" data-fc-note aria-live="polite">{RUNS[0].note}</p>
+  <script type="application/json" data-fc-runs set:html={JSON.stringify(RUNS)} />
+</div>
+
+<script>
+  import { motion, holdSwap } from '../../lib/motion-read.mjs';
+  function init(root: HTMLElement) {
+    if ((root as any).__fc) return; (root as any).__fc = true;
+    const runs = JSON.parse(root.querySelector('[data-fc-runs]')!.textContent!);
+    const box = root.querySelector<HTMLElement>('[data-fc-box]')!;
+    const note = root.querySelector<HTMLElement>('[data-fc-note]')!;
+    const btns = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-fc-go]'));
+    btns.forEach((b) => b.addEventListener('click', () => {
+      const id = b.dataset.fcGo!;
+      if (root.dataset.run === id) return;
+      const m = motion();
+      holdSwap(box, () => { root.dataset.run = id; }, m);
+      if (!m.reduced) box.animate([{ opacity: 0.4 }, { opacity: 1 }], { duration: m.state, easing: m.ease });
+      btns.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      note.textContent = runs.find((r: any) => r.id === id).note;
+    }));
+  }
+  const boot = () => document.querySelectorAll<HTMLElement>('[data-fc]').forEach(init);
+  boot();
+  document.addEventListener('astro:page-load', boot);
+</script>
+
+<style>
+  .fc { display: grid; gap: 12px; }
+  .fc-runs { display: flex; gap: 4px; flex-wrap: wrap; }
+  .fc-runs button { font: 550 12.5px/1 var(--font-sans); color: var(--text-2); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; min-height: 32px; padding: 0 12px; cursor: pointer; }
+  .fc-runs button[aria-pressed="true"] { background: var(--surface); color: var(--text); border-color: var(--line-strong); }
+  .fc-box { border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); padding: 12px 14px; display: grid; gap: 8px; }
+  .fc-over { margin: 0; font: 500 10.5px/1.3 var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); }
+  .fc-steps { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
+  .fc-steps li { font-size: 13.5px; }
+  .fc-steps b { font-weight: 550; }
+  .fc-detail, .fc-why { margin: 2px 0 0; font-size: 12.5px; color: var(--text-2); }
+  .fc-why span { color: var(--text-3); }
+  .fc[data-run="3"] .fc-detail { display: none; }
+  .fc[data-run="5"] .fc-detail, .fc[data-run="5"] .fc-why { display: none; }
+  .fc-note { margin: 0; font-size: 13.5px; }
+</style>

@@ -1,0 +1,81 @@
+---
+// Level 1 on one screen: the sentence, the paragraph, the five ideas with one example each, the eight words, how
+// routine work gets done and where it comes from. Everything from docs/keia-method.md. Below it, the way into
+// Level 2 and Level 3 (MethodNav).
+import MethodPage from '../../components/method/MethodPage.astro';
+import Section from '../../components/Section.astro';
+import IdeaArt from '../../components/method/IdeaArt.astro';
+import { href } from '../../lib/data.mjs';
+import { METHOD, LEVEL1, md } from '../../lib/method.mjs';
+import { LEVEL1_TRY } from './_pages.mjs';
+---
+<MethodPage slug="level1" title={METHOD.title} lede={METHOD.sentence} level={1} num="one screen" try={LEVEL1_TRY}>
+  <section class="card pad l1-top" aria-label="In one paragraph" data-help="method.paragraph">
+    <p class="l1-para" set:html={md(LEVEL1.paragraph)} />
+    <p class="l1-intro" set:html={md(METHOD.intro)} />
+  </section>
+  <Section title={LEVEL1.ideasHeading}>
+    <ol class="l1-ideas" data-help="method.ideas">
+      {LEVEL1.ideas.map((i) => (
+        <li>
+          <a class="card l1-idea" href={href(`/method/${i.slug}/`)}>
+            <IdeaArt idea={i.slug} />
+            <span class="l1-n">Idea {i.n}</span>
+            <b>{i.name}</b>
+            <span class="l1-line" set:html={md(i.line)} />
+            <span class="l1-ex" set:html={md(i.example)} />
+          </a>
+        </li>
+      ))}
+    </ol>
+  </Section>
+  <Section title={LEVEL1.wordsLabel}>
+    <dl class="l1-words">
+      {LEVEL1.words.map((w) => <div><dt>{w.word}</dt>{w.meaning && <dd>{w.meaning}</dd>}</div>)}
+    </dl>
+    <p class="l1-more">Every word, mapped to ITIL, PMI and ISO: <a href={href('/method/words/')}>the words</a>.</p>
+  </Section>
+  <div class="g12">
+    {LEVEL1.routine && (
+      <section class="card pad s-6 l1-block" aria-labelledby="l1-routine">
+        <h2 id="l1-routine">{LEVEL1.routine.label}</h2>
+        <p set:html={md(LEVEL1.routine.text)} />
+        <a href={href('/method/how-the-work-gets-done/')}>How the work gets done, in full</a>
+      </section>
+    )}
+    {LEVEL1.origin && (
+      <section class="card pad s-6 l1-block" aria-labelledby="l1-origin">
+        <h2 id="l1-origin">{LEVEL1.origin.label}</h2>
+        <p set:html={md(LEVEL1.origin.text)} />
+        <a href={href('/method/words/')}>The words, mapped</a>
+      </section>
+    )}
+  </div>
+  <p class="l1-licence" set:html={md(METHOD.licence)} />
+</MethodPage>
+
+<style>
+  .l1-top { display: grid; gap: 10px; }
+  .l1-para { margin: 0; font-size: 16px; line-height: 1.55; max-width: 72ch; }
+  .l1-intro { margin: 0; font-size: 13.5px; color: var(--text-2); }
+  .l1-ideas { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--gutter); }
+  .l1-ideas li { display: grid; min-width: 0; }
+  .l1-idea { display: grid; grid-template-rows: auto auto auto auto 1fr; gap: 6px; padding: 16px; color: var(--text); text-decoration: none; transition: box-shadow var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle); }
+  .l1-idea:hover { color: var(--text); box-shadow: var(--shadow-md); }
+  .l1-n { font: 500 10.5px/1.2 var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); margin-top: 6px; }
+  .l1-idea b { font-size: 15px; font-weight: 600; }
+  .l1-line { font-size: 13px; }
+  .l1-ex { font-size: 12.5px; color: var(--text-2); }
+  .l1-words { margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .l1-words div { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--surface); }
+  .l1-words dt { font-weight: 600; font-size: 14px; }
+  .l1-words dd { margin: 2px 0 0; font-size: 13px; color: var(--text-2); }
+  .l1-more { margin: 10px 0 0; font-size: 13.5px; }
+  .l1-block { display: grid; gap: 8px; align-content: start; }
+  .l1-block h2 { font: 600 15px/1.3 var(--font-sans); }
+  .l1-block p { margin: 0; font-size: 14px; line-height: 1.55; }
+  .l1-licence { margin: 0; font-size: 12.5px; color: var(--text-2); }
+  @container content (max-width: 1099px) { .l1-ideas { grid-template-columns: repeat(3, minmax(0, 1fr)); } .l1-words { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @container content (max-width: 699px) { .l1-ideas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @container content (max-width: 459px) { .l1-ideas, .l1-words { grid-template-columns: minmax(0, 1fr); } }
+</style>

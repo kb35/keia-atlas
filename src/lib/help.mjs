@@ -719,7 +719,27 @@ const SERVICES = {
   'number:Units not working': e('Units not working', 'Units across the three services that are offline or alerting now. Simulated live.', 'Select it to see the three services and their worst items.'),
 };
 
+// ---- The Keia Method pages (/method/) ---------------------------------------------------------------------------
+const METHOD_PAGES = {
+  'page.method': e('The Keia Method', 'A way of running IT from one living record of every room, device and job. Level 1 is one screen; Level 2 has a page per practice; Level 3 is the reference.', 'Read the page, explore its picture, then use Try it in the demo at the foot of the page.'),
+  'method.paragraph': e('In one paragraph', 'What the practice asks you to do, in the method\'s own words, with a worked example from the demo.', 'Read it first; the sections below go deeper.'),
+  'method.ideas': e('The five ideas', 'The five ideas everything else in the method follows from, each with one line and one example.', 'Select an idea to open its page.'),
+  'method.zoom': e('The zoom', 'Six levels, region to port, with the same device marked in each. Every level is the same record at a different depth.', 'Select Zoom in or Zoom out, or pick a level.'),
+  'method.capture': e('Where each field came from', 'An alert and the incident it becomes. Each field is marked with the system it was read from; one field is asked of a person.', 'Select Show it fill in to watch the fields arrive in order.'),
+  'method.drill': e('The answer, the list, the log', 'Three layers: the answer, the list a figure counts, and one record\'s log. Each opens from where it was selected.', 'Select the figure, then a row.'),
+  'method.with': e('The With chip', 'Who holds a job now, and why. The chip changes; the record under it stays the same.', 'Select Hand it on, or pick who holds it.'),
+  'method.fade': e('Guidance that shortens', 'The same setup guide on a first, third and fifth setup. Detail folds away as the person\'s own record shows it is no longer needed.', 'Pick a setup to compare.'),
+  'method.modules': e('Modules', 'Each module On, Connected or Off, and the sidebar it makes. Off means absent, not greyed.', 'Switch a module, or pick a starting setup.'),
+  'method.rule': e('A standing rule and one run', 'A rule a named person approved once, and each step of one run, with both endings: done, or unable to complete and rolled back.', 'Point at or select a step; choose how the read back went.'),
+  'method.trust': e('What surrounds the record', 'The eight guarantees the method makes, drawn around the record they protect.', 'Read the table below for each one in full.'),
+  'method.problems': e('Four of the costs', 'Figures from the method\'s table of problems, each with its source and year.', 'Read the table below for all of them.'),
+  'method.words': e('The words, mapped', 'Every word on screen, its plain meaning, and what it maps to in ITIL, PMI and ISO.', 'Use your browser\'s find to look a word up.'),
+  'method.try': e('Try it in the demo', 'A few steps to see this practice in the demo, and who the demo opens as.', 'Select the button. View as switches to that person; Back to you returns.'),
+  'method.nav': e('Where this page sits', 'The four levels of the method and every page in reading order, with this one marked.', 'Select a page, or step to the previous or next one.'),
+};
+
 export const HELP = {
+  ...METHOD_PAGES,
   ...SHELL, ...PLACES, ...PAGES, ...PARTS, ...FILTER, ...HOME, ...OVERVIEW, ...SCHEDULE, ...INTEGRATE, ...INCIDENT,
   ...ROOM, ...UNIT, ...TEAM_KEYS, ...STANDARDS, ...OTHER, ...PROJECT, ...PLANNING, ...NUMBERS, ...TERMS, ...KNOWN_ISSUES, ...OFFICE3D, ...LOCATIONS, ...SERVICES,
 };

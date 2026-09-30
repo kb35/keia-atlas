@@ -1,0 +1,96 @@
+---
+// Capture, don't ask: an alert beside the incident it becomes, each field marked with where it came from
+// (FRONT-DOOR section 3). Still, the picture shows every field filled with its source. "Show it fill in" plays the
+// one motion: the alert slides into the incident's frame and the fields fill one after another, each with its source
+// mark. Reduced motion: the fields are simply there. The one field a person fills is the last.
+const FIELDS = [
+  { k: 'Space', v: '3.09 Whooper Swan, Dublin office', src: 'space record' },
+  { k: 'Unit', v: 'Video bar, Poly Studio X72 (dub-309-vc01)', src: 'fleet tool' },
+  { k: 'Resembles', v: 'A known error for this model', src: 'known errors' },
+  { k: 'Last change', v: 'Firmware, twelve days ago', src: 'change log' },
+  { k: 'Priority', v: 'Proposed from the 09:00 booking; a person may change it', src: 'calendar' },
+];
+---
+<div class="cd" data-cd data-help="method.capture">
+  <div class="cd-row">
+    <div class="cd-alert" data-cd-alert>
+      <p class="cd-over">Alert · 07:52</p>
+      <p class="cd-alert-t"><span class="cd-dot" aria-hidden="true"></span>dub-309-vc01 offline</p>
+      <p class="cd-src">fleet tool</p>
+    </div>
+    <span class="cd-arrow" aria-hidden="true">→</span>
+    <div class="cd-inc" data-cd-inc>
+      <p class="cd-over">Incident · opened 07:52 · filled in before anyone saw it</p>
+      <dl class="cd-fields">
+        {FIELDS.map((f) => (
+          <div class="cd-f" data-cd-f>
+            <dt>{f.k}</dt>
+            <dd><span>{f.v}</span><span class="cd-mark">from the {f.src}</span></dd>
+          </div>
+        ))}
+        <div class="cd-f cd-ask" data-cd-f>
+          <dt>What fixed it?</dt>
+          <dd><span>Asked once, when it closes</span><span class="cd-mark cd-you">from you</span></dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+  <div class="cd-foot">
+    <button type="button" class="btn small" data-cd-play>Show it fill in</button>
+    <span class="cd-note">Five fields captured, one asked.</span>
+  </div>
+</div>
+
+<script>
+  import { motion } from '../../lib/motion-read.mjs';
+  function init(root: HTMLElement) {
+    if ((root as any).__cd) return; (root as any).__cd = true;
+    const btn = root.querySelector<HTMLButtonElement>('[data-cd-play]')!;
+    const alert = root.querySelector<HTMLElement>('[data-cd-alert]')!;
+    const inc = root.querySelector<HTMLElement>('[data-cd-inc]')!;
+    const fields = Array.from(root.querySelectorAll<HTMLElement>('[data-cd-f]'));
+    btn.addEventListener('click', () => {
+      const m = motion();
+      [alert, ...fields].forEach((el) => el.getAnimations().forEach((a) => a.cancel()));
+      if (m.reduced) return;
+      const a = alert.getBoundingClientRect(), b = inc.getBoundingClientRect();
+      const dx = b.left + 16 - a.left, dy = b.top + 16 - a.top;
+      alert.animate([{ transform: 'none', opacity: 1 }, { transform: `translate(${dx}px, ${dy}px) scale(.9)`, opacity: 0 }], { duration: m.page, easing: m.ease, fill: 'backwards' })
+        .onfinish = () => alert.animate([{ opacity: 0 }, { opacity: 1 }], { duration: m.state, easing: m.ease });
+      // Each field fills after the one before; its source mark arrives with it.
+      const step = m.state + m.stagger * 4;
+      fields.forEach((f, i) => f.animate(
+        [{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'none' }],
+        { duration: m.state, delay: m.page + i * step, easing: m.ease, fill: 'backwards' }));
+    });
+  }
+  const boot = () => document.querySelectorAll<HTMLElement>('[data-cd]').forEach(init);
+  boot();
+  document.addEventListener('astro:page-load', boot);
+</script>
+
+<style>
+  .cd { display: grid; gap: 14px; container: cd / inline-size; }
+  .cd-row { display: grid; grid-template-columns: minmax(150px, .8fr) auto minmax(0, 2fr); gap: 12px; align-items: start; }
+  .cd-alert, .cd-inc { border-radius: 10px; border: 1px solid var(--line-strong); background: var(--surface); padding: 12px 14px; display: grid; gap: 6px; min-width: 0; }
+  .cd-alert { background: var(--bg); }
+  .cd-over { margin: 0; font: 500 10.5px/1.3 var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); }
+  .cd-alert-t { margin: 0; display: flex; align-items: center; gap: 8px; font: 500 13px/1.3 var(--font-mono); }
+  .cd-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px dashed var(--h-fault, var(--red)); flex: none; }
+  .cd-src, .cd-mark { font: 500 11px/1.3 var(--font-mono); color: var(--quiet, var(--text-3)); }
+  .cd-arrow { align-self: center; color: var(--text-3); font-size: 18px; }
+  .cd-fields { margin: 0; display: grid; gap: 0; }
+  .cd-f { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); }
+  .cd-f:first-child { border-top: 0; }
+  .cd-f dt { font-size: 12.5px; color: var(--text-2); }
+  .cd-f dd { margin: 0; display: flex; justify-content: space-between; gap: 4px 12px; flex-wrap: wrap; font-size: 13.5px; font-weight: 550; }
+  .cd-ask dd > span:first-child { font-weight: 400; color: var(--text-2); }
+  .cd-you { color: var(--accent); }
+  .cd-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .cd-note { font-size: 13px; color: var(--text-2); }
+  @container cd (max-width: 560px) {
+    .cd-row { grid-template-columns: minmax(0, 1fr); }
+    .cd-arrow { transform: rotate(90deg); justify-self: center; }
+    .cd-f { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  }
+</style>

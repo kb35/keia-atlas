@@ -1,6 +1,6 @@
 # Keia Atlas
 
-The open-source platform for workplace technology and the IT work around it.
+**The open-source platform for workplace technology and the IT work around it.**
 
 Keia is a way of running IT from one living record of every room, device and job: kept by the work itself, readable in a minute, as deep as you need.
 
@@ -12,9 +12,10 @@ Created by **Keith Brady**. Design decisions are recorded in [`docs/decisions/`]
 
 ## Start here
 
+- **Start at the front door:** [kb35.github.io/keia-atlas/welcome/](https://kb35.github.io/keia-atlas/welcome/)
 - **Try it (no sign-up):** [live demo](https://kb35.github.io/keia-atlas/)
+- **Read the method (ten minutes):** [on the site](https://kb35.github.io/keia-atlas/method/), or as text in [docs/keia-method.md](docs/keia-method.md)
 - **Run it for your own estate:** [GETTING-STARTED](GETTING-STARTED.md)
-- **Read the method (ten minutes):** [docs/keia-method.md](docs/keia-method.md)
 - **Contribute:** [CONTRIBUTING](CONTRIBUTING.md)
 
 **v0.1 is a preview:** a working demo of a fictional company with simulated live data. Repo mode (your estate as YAML in Git) is real today; database mode is on the [roadmap](ROADMAP.md).
