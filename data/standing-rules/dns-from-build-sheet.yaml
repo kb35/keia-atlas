@@ -1,0 +1,38 @@
+# Standing rule: keep a device's DNS record the same as its build sheet after it is renamed. Demo data (rule F8):
+# the zone, addresses and runs are made up. It keeps the previous record, so it declares Roll back.
+id: dns-from-build-sheet
+name: DNS rule
+title: Update a device's DNS record from its build sheet
+owner: niamh
+service: network
+approved: { at: "2026-05-11T09:30", change: CHG-171, version: 3 }
+verb: Update the DNS record for {target}
+reversal: { kind: rollback, words: "Roll back restores the record it replaced, kept with the run." }
+applies_to:
+  trigger: A device's hostname changes in its build sheet
+window: "01:00 to 05:00"
+conditions:
+  - Inside the window, 01:00 to 05:00
+  - The build sheet was approved since the last run
+  - The device answers a ping, so the address in the build sheet is in use
+  - Not in a change freeze
+caps: { per_wave: 20, booked_meeting: never, freeze: never, halt_after: 2 }
+steps:
+  - { kind: read, words: "Read the hostname and address from the build sheet", seconds: 0.3 }
+  - { kind: write, words: "Write the A record in the DNS zone, keeping the one it replaces", seconds: 0.6 }
+  - { kind: readback, words: "Read the record back and compare it with the build sheet", seconds: 0.5 }
+reads:
+  - Build sheet (Keia Atlas, 27 Sept 16:02)
+  - DNS zone corp.example (the DNS tool, through its connector, 01:59)
+rules_out:
+  - Unit unreachable (no, it answered a ping at 01:59)
+  - Booking in progress (no, none until 08:30)
+not_checked:
+  - Whether the switch port VLAN matches the build sheet (not in this rule)
+cadence: nightly 02:00
+runs:
+  - { id: RUN-5101, at: "2026-09-09T02:00", result: done, target: dub-303-vc01, did: "Wrote A record dub-303-vc01 → 10.20.3.33", before: "heron-vc.corp.example → 10.20.3.33", after: "dub-303-vc01 → 10.20.3.33", ms: 1300 }
+  - { id: RUN-5114, at: "2026-09-22T02:00", result: done, target: dub-305-sch01, did: "Wrote A record dub-305-sch01 → 10.20.3.57", before: "gannet-panel.corp.example → 10.20.3.57", after: "dub-305-sch01 → 10.20.3.57", ms: 1200 }
+  - { id: RUN-5118, at: "2026-09-26T02:00", result: done, target: dub-304-vc90, change: CHG-212, did: "Wrote A record dub-304-vc90 → 10.20.3.49", before: "curlew-spare-vc.corp.example → 10.20.3.49", after: "dub-304-vc90 → 10.20.3.49", ms: 1400, ai: "Drafted by AI (a local model, EU region): the What happened line, from the run's trace. The rule checked it against the read back." }
+  - { id: RUN-5120, at: "2026-09-28T02:00", result: unable, target: dub-306-vc01, incident: INC0041211, change: CHG-214, stopped_at: write, why: "The DNS tool refused the write: the service account no longer has permission on the zone. The read back did not match, so the rule restored the previous record.", did: "Tried to write A record dub-306-vc01 → 10.20.3.61", before: "kestrel-vc.corp.example → 10.20.3.61", after: "dub-306-vc01 → 10.20.3.61", ms: 1400 }
+demo: true
