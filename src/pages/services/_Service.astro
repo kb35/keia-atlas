@@ -16,7 +16,11 @@ import EmptyState from '../../components/EmptyState.astro';
 import LiveSide from '../../components/LiveSide.astro';
 import Section from '../../components/Section.astro';
 import HealthGlyph from '../../components/HealthGlyph.astro';
-import { REGION_LABEL, href } from '../../lib/data.mjs';
+import FigureTile from '../../components/FigureTile.astro';
+import ServiceMap from '../../components/ServiceMap.astro';
+import { REGION_LABEL, siteStats, href } from '../../lib/data.mjs';
+import { experience, officeSeries, MEASURES, serviceLevels } from '../../lib/experience.mjs';
+import { sparkSvg } from '../../lib/spark.mjs';
 import { serviceModel, KIND_LABEL_OF } from '../../lib/services-view.mjs';
 import { PEOPLE } from '../../lib/demo.mjs';
 
@@ -61,6 +65,18 @@ const json = JSON.stringify(client).replace(/</g, '\\u003c');
 // The answer, from the open incidents until the live feed takes over (services-client.mjs paintNumbers).
 const ANSWER = m.incidents.length ? `${m.incidents.length} open ${m.incidents.length === 1 ? 'incident' : 'incidents'} on this service` : 'No open incidents on this service';
 const PRI = { 1: 'Critical', 2: 'High', 3: 'Moderate', 4: 'Low' };
+// Experience (UI-V2 §3.7): four figures counted per space, then per office (weighted by its spaces), never per person.
+// Simulated, seeded (src/lib/experience.mjs). The tiles follow the Region and Office filters: the page script
+// re-weights the offices' series in the browser (src/lib/experience-client.mjs).
+const expSites = m.sites.map((s) => ({ id: s.id, region: s.region, weight: Math.max(1, siteStats[s.id]?.spaces.length ?? s.units.length) }));
+const EXP = experience(id, expSites);
+const expJson = JSON.stringify({ svc: id, measures: MEASURES[id].map((x) => ({ id: x.id, unit: x.unit, better: x.better, target: x.target })), offices: expSites.map((s) => ({ ...s, series: Object.fromEntries(MEASURES[id].map((x) => [x.id, officeSeries(id, s.id, x).map((v) => Math.round(v * 1000) / 1000)])) })) }).replace(/</g, '\\u003c');
+const EXP_SOURCE = { av: ['Room booking and device monitoring', 'Incident records and room booking', 'Incident records', 'Incident records'], network: ['UniFi Site Manager', 'Incident records', 'Incident records', 'Incident records'], infrastructure: ['UPS and power strip monitoring', 'Incident records', 'Incident records', 'Incident records'] }[id];
+const expFmt = { '%': '%', min: 'min', x: 'x' };
+const LEVELS = serviceLevels(id);
+const levelsKept = LEVELS.filter((r) => r.kept).length;
+// Both states on a connected record (UI-V2 §8.4): Keia's word first, the ticket system's own after the dot.
+const NATIVE = { new: 'New', 'in-progress': 'Work in Progress', 'on-hold': 'On Hold', New: 'New', 'In progress': 'Work in Progress', 'On hold': 'On Hold' };
 const ROLE_TO = (p) => href(`/team/?p=${p.id}`);
 const nOwners = m.owners.length;
 const blurb = {
@@ -77,8 +93,22 @@ const blurb = {
     <span slot="overline" class="sv-light" data-sv-light data-l="none" data-help="services.light" title="Red when several are offline or one in ten has a fault, amber for any fault, green when all is well"></span>
   </PageBand>
 
-  <div class="content svc lv-page" data-sv={id}>
+  <div class="content svc lv-page" data-sv={id} data-svc={id}>
     <FilterBar facets={FACETS} toggles={TOGGLES} placeholder={id === 'av' ? 'Find a unit, hostname or space' : 'Find an item, office or space'} label={`Find ${id === 'av' ? 'a unit' : 'an item'}`} noun={word} scope=".content.svc" sort={SORT} />
+
+    <ServiceMap svc={id} kinds={m.kinds} systems={svc.systems} />
+
+    <section class="sv-exp" id="experience" aria-labelledby="exp-h" data-exp data-help="services.experience">
+      <header class="sv-exp-h"><h2 id="exp-h">The experience</h2><span class="faint" data-exp-scope>Every office, last 30 days · counted per space, never per person</span></header>
+      <div class="g12 sv-exp-g">
+        {EXP.map((x, i) => (
+          <FigureTile class="s-3" id={x.id} label={x.label} value={x.words} spark={x.series} fmt={expFmt[x.unit]} state={x.within ? 'fine' : 'review'} word="Past target"
+            sub={`Target ${x.unit === 'min' ? `under ${x.target} min` : x.unit === 'x' ? `under ${x.target} per job` : `${x.target}%`} · ${x.method}`}
+            source={{ from: EXP_SOURCE[i], at: '09:14' }} help="services.exp-figure" />
+        ))}
+      </div>
+      <script type="application/json" data-exp-model set:html={expJson}></script>
+    </section>
 
     <div class="lv-layout">
       <LiveSide attention="Not working" feedTitle="Alerts and changes" none={`Every ${word[0]} in this service is online, with no alerts.`} attentionTo="?status=offline,alert#units" attentionPlace={`the ${word[0]} map`} note={blurb} />
@@ -146,6 +176,24 @@ const blurb = {
       </Section>
     )}
 
+    <Section title="Service levels" id="levels" aside={`${levelsKept} of ${LEVELS.length} promises kept this month`} help="services.levels">
+      <div class="tablewrap"><table class="to-cards sv-tbl sv-lv">
+        <thead><tr><th>Promise</th><th>Target</th><th>This month</th><th>Kept</th><th>Last 12 weeks</th></tr></thead>
+        <tbody>
+          {LEVELS.map((r) => (
+            <tr>
+              <td data-label=""><b>{r.what}</b></td>
+              <td data-label="Target">{r.promise}</td>
+              <td data-label="This month" class="num">{r.words}</td>
+              <td data-label="Kept"><HealthGlyph state={r.kept ? 'fine' : 'review'} size={16} word={r.kept ? 'Kept' : 'To review'} quiet={r.kept} /></td>
+              <td data-label="Last 12 weeks"><span class="sv-lv-s" set:html={sparkSvg(r.weeks, { span: '12 weeks', fmt: (v) => `${Math.round(v)}% met`, state: r.kept ? 'fine' : 'review' })} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table></div>
+      <p class="sv-note">Measured from the incident records' own times, with no manual reporting: response is when someone had the job, fix is when it worked again. A promise is kept when nine in ten of the month's jobs met it. The results are simulated.</p>
+    </Section>
+
     {id !== 'infrastructure' ? (
       <Section title="Firmware against the standard" id="firmware" aside={m.firmware.length ? 'Per model, following the filters above' : undefined} help="services.firmware">
         <div class="tablewrap"><table class="to-cards sv-tbl">
@@ -165,7 +213,7 @@ const blurb = {
           </tbody>
         </table></div>
         <p class="sv-none" data-fw-none hidden>No model matches these filters.</p>
-        <p class="sv-note">Only the Poly line has release data, so other models name no versions. Which units run behind is simulated; a real device management feed replaces it with the same shape.</p>
+        <p class="sv-note">Only the Poly line has release data, so other models name no versions. Which units run behind is simulated; a real device management feed replaces it with the same shape. Changes to the standard go through <a href={href('/changes/')}>Proposals</a>.</p>
       </Section>
     ) : (
       <Section title="Equipment against the standard" id="firmware" aside="Rack equipment in the comms rooms" help="services.firmware">
@@ -196,7 +244,7 @@ const blurb = {
               <tr>
                 <td data-label=""><a href={i.to}><b class="code">{i.no}</b> {i.title}</a></td>
                 <td data-label="Priority">P{i.pri} {PRI[i.pri]}</td>
-                <td data-label="Status">{i.state}</td>
+                <td data-label="Status">{i.state}{NATIVE[i.state] && <span class="sv-native"> · ServiceNow: {NATIVE[i.state]}</span>}</td>
                 <td data-label="Space">{i.room}, <a href={href(`/rooms/?site=${i.site}`)}>{i.siteName}</a></td>
                 <td data-label="Opened">{i.opened?.replace('T', ' ')}</td>
               </tr>
@@ -282,10 +330,11 @@ const blurb = {
 
   <script>
     import { initService } from '../../lib/services-client.mjs';
+    import { initExperience } from '../../lib/experience-client.mjs';
     let stop = () => {};
     function init() {
       const root = document.querySelector('.content.svc[data-sv]');
-      if (root) stop = initService(root);
+      if (root) { stop = initService(root); initExperience(root); }
     }
     init();
     document.addEventListener('astro:before-swap', () => stop(), { once: true });
@@ -330,6 +379,14 @@ const blurb = {
   .sv-hx :global(.t-bad) { color: var(--red-ink); } .sv-hx :global(.t-warn) { color: var(--amber-ink); }
   .lv-sites :global(.lv-counts .t-warn) { color: var(--amber-ink); }
   @container lvmain (max-width: 699px) { .sv-hrows { grid-template-columns: minmax(0, 1fr); } }
+
+  /* The experience: four tiles in a row (two on a tablet, one on a phone), each with its sparkline in the service's colour. */
+  .sv-exp { display: grid; gap: 10px; min-width: 0; }
+  .sv-exp-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+  .sv-exp-h h2 { margin: 0; font-size: var(--fs-h3); }
+  .sv-exp-h .faint { font-size: var(--fs-code); }
+  .sv-lv-s { display: inline-flex; }
+  .sv-native { color: var(--text-2); }
 
   /* The sections below. */
   .sv-tbl :global(td.t-warn), .sv-tbl :global(.t-warn) { color: var(--amber-ink); font-weight: 600; }

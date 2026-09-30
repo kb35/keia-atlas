@@ -13,9 +13,13 @@
    (data-kn-plain). A figure with neither `to` nor `fact` warns when the site is built.
    Live figures: give an item an `id`, then a page script calls window.rsKeyNumber(id, value, { label?, tone?,
    title? }) to change it (a number is written with thousands separators; tone 'bad', 'warn', 'good' or ''
-   to clear). The id may also be the item's place, 0 for the first. Nothing moves; the figure just changes. */
+   to clear). The id may also be the item's place, 0 for the first. Nothing moves; the figure just changes.
+   Sparklines (UI-V2 §8.2): `spark` (a series, oldest first) draws a 64 by 16 line beside the number, `sparkState`
+   (review, fault) marks its last point, `sparkWords` is its tooltip. A script passes { spark: '<svg...>' } (from
+   sparkSvg in src/lib/spark.mjs) to redraw it, or { spark: '' } to take it away. */
 import { href } from '../lib/data.mjs';
-interface Item { n: string | number; label: string; to?: string; fact?: boolean; tone?: 'bad' | 'warn' | 'good'; id?: string }
+import { sparkSvg } from '../lib/spark.mjs';
+interface Item { n: string | number; label: string; to?: string; fact?: boolean; tone?: 'bad' | 'warn' | 'good'; id?: string; spark?: number[]; sparkState?: string; sparkWords?: string }
 interface Props { items: Item[] }
 const { items = [] } = Astro.props;
 if (items.length > 4) console.warn(`KeyNumbers: ${items.length} items given, showing the first 4 (rule L9).`);
@@ -30,9 +34,9 @@ const fmt = (n) => (typeof n === 'number' ? n.toLocaleString('en-IE') : n);
     {shown.map((it) => (
       <li class:list={['kn-i', it.tone && `t-${it.tone}`]} data-kn={it.id} data-kn-plain={!it.to && it.fact ? 'fact' : undefined} data-help={`number:${it.label}`} data-help-name={it.label}>
         {it.to ? (
-          <a href={link(it.to)}><b class="num" data-vt-rec={it.to.startsWith('/') ? ddId(it.to) : undefined}>{fmt(it.n)}</b><span>{it.label}</span></a>
+          <a href={link(it.to)}><span class="kn-v"><b class="num" data-vt-rec={it.to.startsWith('/') ? ddId(it.to) : undefined}>{fmt(it.n)}</b><i class="kn-spk" data-kn-spk set:html={it.spark ? sparkSvg(it.spark, { state: it.sparkState, label: it.sparkWords }) : ''} /></span><span>{it.label}</span></a>
         ) : (
-          <span class="kn-s"><b class="num">{fmt(it.n)}</b><span>{it.label}</span></span>
+          <span class="kn-s"><span class="kn-v"><b class="num">{fmt(it.n)}</b><i class="kn-spk" data-kn-spk set:html={it.spark ? sparkSvg(it.spark, { state: it.sparkState, label: it.sparkWords }) : ''} /></span><span>{it.label}</span></span>
         )}
       </li>
     ))}
@@ -46,10 +50,11 @@ const fmt = (n) => (typeof n === 'number' ? n.toLocaleString('en-IE') : n);
       : document.querySelector('.kn-i[data-kn="' + String(id).replace(/"/g, '') + '"]');
     if (!li) return false;
     opt = opt || {};
-    var b = li.querySelector('b'), l = li.querySelector('a > span, .kn-s > span');
+    var b = li.querySelector('b'), l = li.querySelector('a > span:not(.kn-v), .kn-s > span:not(.kn-v)');
     if (value !== undefined && value !== null && b) b.textContent = typeof value === 'number' ? value.toLocaleString('en-IE') : value;
     if (opt.label !== undefined && l) l.textContent = opt.label;
     if (opt.title !== undefined) li.title = opt.title;
+    if (opt.spark !== undefined) { var sp = li.querySelector('[data-kn-spk]'); if (sp) sp.innerHTML = opt.spark || ''; }
     if (opt.tone !== undefined) ['bad', 'warn', 'good'].forEach(function (t) { li.classList.toggle('t-' + t, t === opt.tone); });
     return true;
   };
@@ -62,6 +67,13 @@ const fmt = (n) => (typeof n === 'number' ? n.toLocaleString('en-IE') : n);
   .kn-i > a:hover { background: var(--surface-2); color: inherit; }
   .kn-i > a:hover span { text-decoration: underline; text-underline-offset: 2px; }
   .kn-i b { font: var(--fw-title) 22px/1 var(--font-sans); letter-spacing: -.02em; color: var(--text); }
+  /* A sparkline sits under its number, so it never widens the band. */
+  .kn-v { display: grid; justify-items: start; gap: 4px; }
+  .kn-spk { display: inline-flex; }
+  .kn-spk:empty { display: none; }
+  .kn-spk .spk path { fill: none; stroke: var(--quiet); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+  .kn-spk .spk-dot[data-state=review] { fill: var(--h-review); }
+  .kn-spk .spk-dot[data-state=fault] { fill: var(--h-fault); }
   .kn-i span { font-size: var(--fs-code); line-height: 1.2; color: var(--text-3); white-space: nowrap; }
   .kn-i.t-bad b { color: var(--red-ink); }
   .kn-i.t-warn b { color: var(--amber-ink); }
