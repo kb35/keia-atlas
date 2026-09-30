@@ -1,0 +1,54 @@
+# Room check plan: a check that recurs (the Room checks capability, src/lib/modules.mjs). What it covers, how often
+# and on which day, how long a space takes, the role that does it and its checklist. src/lib/checks.mjs turns plans
+# into dated rounds per office; nothing about a round is written here.
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/check-plan
+title: Room check plan
+type: object
+additionalProperties: false
+required: [id, name, summary, applies_to, every, minutes, role, checklist, demo]
+properties:
+  id: { type: string, pattern: "^[a-z0-9-]+$" }
+  name: { type: string }
+  summary: { type: string }
+  applies_to:
+    description: The spaces it covers. Space types, or every space whose accessibility record has a hearing loop.
+    type: object
+    additionalProperties: false
+    minProperties: 1
+    properties:
+      space_types: { type: array, minItems: 1, items: { type: string } }
+      hearing_loop: { const: true }
+  every:
+    type: object
+    additionalProperties: false
+    required: [n, unit]
+    properties:
+      n: { type: integer, minimum: 1 }
+      unit: { enum: [week, month] }
+  on:
+    description: "The day a round falls on: the nth weekday of the month (week 1 is the first), in the months listed (every month when left out). Left out, each space is due n units after its last check."
+    type: object
+    additionalProperties: false
+    required: [week, weekday]
+    properties:
+      week: { type: integer, minimum: 1, maximum: 4 }
+      weekday: { enum: [mon, tue, wed, thu, fri] }
+      months: { type: array, items: { type: integer, minimum: 1, maximum: 12 } }
+      before: { description: The local time the round is finished by., type: string, pattern: "^\\d\\d:\\d\\d$" }
+  minutes: { description: Minutes per space., type: integer, minimum: 1 }
+  role: { description: The role that does it at each office (a role in src/lib/demo.mjs)., type: string }
+  standard: { description: A published standard the check follows., type: string }
+  checklist:
+    type: array
+    minItems: 1
+    items:
+      oneOf:
+        - type: string
+        - type: object
+          additionalProperties: false
+          required: [do]
+          properties:
+            do: { type: string }
+            rule: { description: "The house standard's rule it proves: <standard>/<rule id> (data/standards/).", type: string, pattern: "^[a-z0-9-]+/[a-z0-9-]+$" }
+  demo: { description: Made up for the demo., const: true }

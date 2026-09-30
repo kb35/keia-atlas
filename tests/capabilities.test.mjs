@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
 import { validate } from '../tools/validate.mjs';
 import { seatHolders, licenceRows, licenceSummary, licenceAnswer, inDays } from '../src/lib/licences.mjs';
+import { nthWeekday, planDates, rounds, checksForSpace, checksSummary, checksAnswer, checkItem, addMonths } from '../src/lib/checks.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const TODAY = '2026-09-28';
@@ -32,7 +33,7 @@ for (const f of readdirSync(join(ROOT, 'data/installs'))) for (const n of readdi
   for (const u of inst.older_kit ?? []) add(u, u.model);
 }
 
-const FOLDERS = ['licences'];
+const FOLDERS = ['licences', 'checks'];
 let result;
 test('each capability\'s data validates: schema, secrets and cross-references', async () => {
   result = await validate(ROOT);
@@ -62,4 +63,38 @@ test('licences: the answer leads with what renews in 30 days, then seats short; 
   const meet = rows.filter((r) => r.platform === 'google-meet-hardware');
   assert.ok(meet.every((r) => r.used > 0), 'every Meet pool has rooms in it');
   assert.equal(inDays(0), 'today'); assert.equal(inDays(21), 'in 21 days'); assert.equal(inDays(-3), '3 days ago');
+});
+
+// ---- Room checks ---------------------------------------------------------------------------------------------------
+const spaceList = [];
+for (const f of readdirSync(join(ROOT, 'data/spaces'))) for (const n of readdirSync(join(ROOT, 'data/spaces', f))) {
+  const s = parse(readFileSync(join(ROOT, 'data/spaces', f, n), 'utf8'));
+  spaceList.push({ id: n.slice(0, -5), site: s.site, type: s.space_type });
+}
+const loops = {};
+for (const a of read('accessibility')) for (const [id, r] of Object.entries(a.rooms ?? {})) if (r.hearing_loop?.tested) loops[id] = r.hearing_loop.tested;
+
+test('room checks: a plan falls on its day of the month, in its months only', () => {
+  assert.equal(nthWeekday(2026, 10, 1, 'tue'), '2026-10-06');
+  assert.equal(nthWeekday(2026, 10, 2, 'thu'), '2026-10-08');
+  assert.deepEqual(planDates({ on: { week: 1, weekday: 'tue' } }, '2026-09-28', '2026-12-31'), ['2026-10-06', '2026-11-03', '2026-12-01']);
+  assert.deepEqual(planDates({ on: { week: 2, weekday: 'thu', months: [1, 4, 7, 10] } }, '2026-07-01', '2027-02-01'), ['2026-07-09', '2026-10-08', '2027-01-14']);
+});
+
+test('room checks: rounds per office, each with its technician; a hearing loop is due a year after its last test', () => {
+  const plans = read('checks');
+  const list = rounds(plans, { spaces: spaceList, techs: { dub: 'liam' }, loops, from: '2026-07-28', to: '2027-01-26', today: TODAY });
+  const dub = list.filter((r) => r.plan === 'meeting-room-monthly' && r.site === 'dub');
+  assert.ok(dub.length >= 5 && dub.every((r) => r.who[0] === 'liam' && r.spaces.length > 1));
+  assert.equal(dub.find((r) => r.date === '2026-10-01')?.status, 'due', 'the first Thursday of October is in the next seven days');
+  assert.ok(dub.filter((r) => r.date < TODAY).every((r) => r.status === 'done'), 'past rounds are done');
+  const loop = list.filter((r) => r.plan === 'hearing-loop-yearly');
+  assert.ok(loop.length > 0 && loop.every((r) => r.spaces.length === 1 && r.date === addMonths(r.last, 12)));
+  const next = checksForSpace(list, 'dub-3-09');
+  assert.equal(next.next.date, '2026-10-01'); assert.equal(next.last.date, '2026-09-03');
+  const s = checksSummary(list, TODAY);
+  assert.equal(checksAnswer({ overdue: 0, due: 0, next: null }), 'No checks due');
+  assert.match(checksAnswer(s), s.overdue ? /overdue/ : /check|round/);
+  const item = checkItem(dub[0]);
+  assert.equal(item.kind, 'check'); assert.equal(item.feature, 'maintenance', 'a work item carries its capability, so it leaves the Schedule when the capability is off');
 });

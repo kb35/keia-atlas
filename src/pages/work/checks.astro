@@ -1,0 +1,152 @@
+---
+// Room checks (the Room checks capability, src/lib/modules.mjs; src/lib/checks.mjs): the rounds of recurring checks
+// and planned maintenance, from the plans in data/checks/. The answer first (what is overdue, then what is due in the
+// next seven days), then every round in date order, each with its spaces, who does it and its checklist. The same
+// rounds are on the Schedule, on each space's page ("Next check: 6 Oct") and on the technician's Home.
+// Ticking a checklist and marking a round done are kept in this browser (rs7-checks). Demo data.
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import HealthGlyph from '../../components/HealthGlyph.astro';
+import Section from '../../components/Section.astro';
+import FeatureGate from '../../components/FeatureGate.astro';
+import FeatureSource from '../../components/FeatureSource.astro';
+import { href, sites, SITE_ORDER, DEMO_TODAY, plural, fmtDate } from '../../lib/data.mjs';
+import { PEOPLE } from '../../lib/demo.mjs';
+import { checkPlans, checkRounds, checkTotals as T, spaceTitle } from '../../lib/capabilities-view.mjs';
+import { checksAnswer, dayWords, addDays, DUE_DAYS } from '../../lib/checks.mjs';
+import '../../styles/capabilities.css';
+
+const PLAN = Object.fromEntries(checkPlans.map((p) => [p.id, p]));
+const name = (id) => PEOPLE.find((p) => p.id === id)?.name ?? 'Nobody yet';
+const horizon = addDays(DEMO_TODAY, 56);
+const open = checkRounds.filter((r) => r.status !== 'done' && r.date <= horizon);
+const done = checkRounds.filter((r) => r.status === 'done').reverse();
+const STATE = { overdue: 'fault', due: 'review', planned: 'planned', done: 'fine' };
+const WORD = { overdue: 'Overdue', due: 'Due this week', planned: 'Planned', done: 'Done' };
+const usedSites = SITE_ORDER.filter((s) => open.some((r) => r.site === s));
+const FACETS = [
+  { key: 'site', label: 'Office', options: usedSites.map((s) => ({ value: s, label: sites[s].name, sub: sites[s].city })) },
+  { key: 'kind', label: 'Check', options: checkPlans.map((p) => ({ value: p.id, label: p.name })) },
+  { key: 'status', label: 'Status', options: ['overdue', 'due', 'planned'].map((v) => ({ value: v, label: WORD[v] })) },
+];
+const NUMBERS = [
+  { n: T.overdue, label: 'Overdue', to: '?status=overdue', tone: T.overdue ? 'bad' : undefined },
+  { n: T.due, label: `Due in ${DUE_DAYS} days`, to: '?status=due', tone: T.due ? 'warn' : undefined },
+  { n: open.length, label: 'Rounds in 8 weeks', to: '#rounds' },
+  { n: checkPlans.length, label: 'Plans', to: '#plans' },
+];
+const steps = (p) => p.checklist.map((c) => (typeof c === 'string' ? { do: c } : c));
+const rid = (r) => r.id.replace(/:/g, '-');
+---
+<Shell title="Room checks" section="checks" crumbs={[{ label: 'Projects', to: '/projects/' }, { label: 'Room checks' }]}>
+  <FeatureGate id="maintenance">
+    <PageBand overline="Planned maintenance" title="Room checks" answer={checksAnswer(T)} lede="Recurring checks and planned maintenance: every round, its spaces, who does it and its checklist." sim heartbeat={false} numbers={NUMBERS}>
+      <FeatureSource slot="overline" id="maintenance" />
+      <a slot="action" class="btn primary" href={href('/work/schedule/?view=month')}>On the Schedule</a>
+    </PageBand>
+
+    <div class="content chk" data-checks>
+      <FilterBar facets={FACETS} placeholder="Find a check, office or space" label="Find a round" noun={['round', 'rounds']} scope=".content.chk" />
+      <Section title="The next eight weeks" id="rounds" rows={8} help="checks.rounds">
+        <div class="card cap-t">
+          <table class="to-cards cap-tbl">
+            <thead><tr><th>Round</th><th>When</th><th>Spaces</th><th>Who</th></tr></thead>
+            <tbody data-items>
+              {open.map((r) => (
+                <tr id={rid(r)} class:list={[{ 'is-alert': r.status === 'overdue', 'is-warn': r.status === 'due' }]} data-fi data-round={r.id} data-help="checks.round"
+                  data-find={`${r.name} ${sites[r.site].name} ${r.spaces.map(spaceTitle).join(' ')} ${name(r.who[0])}`} data-f-site={r.site} data-f-kind={r.plan} data-f-status={r.status}>
+                  <td data-label="">
+                    <span class="cap-g" data-chk-glyph><HealthGlyph state={STATE[r.status]} size={16} word={WORD[r.status]} /></span>
+                    <b>{r.name}</b><small>{sites[r.site].name}{PLAN[r.plan].standard ? ` · ${PLAN[r.plan].standard}` : ''}</small>
+                    <details class="chk-list">
+                      <summary>Checklist, {steps(PLAN[r.plan]).length} steps</summary>
+                      <ol>
+                        {steps(PLAN[r.plan]).map((s, i) => (
+                          <li><label><input type="checkbox" data-step={i} /> <span>{s.do}</span></label>{s.rule && <a class="chk-rule" href={href(`/standards/${s.rule.split('/')[0]}/#r-${s.rule.split('/')[1]}`)}>the rule</a>}</li>
+                        ))}
+                      </ol>
+                      <button type="button" class="btn small" data-chk-done>Mark the round done</button>
+                    </details>
+                  </td>
+                  <td data-label="When" class="num">{dayWords(r.date)}<small>{PLAN[r.plan].on?.before ? `before ${PLAN[r.plan].on.before}` : r.last ? `last tested ${fmtDate(r.last)}` : ''}{` · ${Math.round(r.minutes / 6) / 10} h`}</small></td>
+                  <td data-label="Spaces">{r.spaces.length === 1 ? <a href={href(`/rooms/${r.spaces[0]}/`)}>{spaceTitle(r.spaces[0])}</a> : <span>{plural(r.spaces.length, 'space')}</span>}{r.spaces.length > 1 && <small>{r.spaces.slice(0, 6).map(spaceTitle).join(', ')}{r.spaces.length > 6 ? ` and ${r.spaces.length - 6} more` : ''}</small>}</td>
+                  <td data-label="Who">{name(r.who[0])}<small>On-site technician</small></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+      <EmptyState text="No rounds match these filters." />
+
+      <Section title="The plans" id="plans" help="checks.plans">
+        <div class="cap-grid">
+          {checkPlans.map((p) => (
+            <section class="card pad cap-card" aria-labelledby={`plan-${p.id}`}>
+              <h3 id={`plan-${p.id}`}>{p.name}</h3>
+              <p class="cap-a">{p.summary}</p>
+              <ul class="cap-list">{steps(p).map((s) => <li>{s.do}</li>)}</ul>
+            </section>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Done lately" id="done" showAll={6} help="checks.done">
+        <ul class="cap-list card pad" data-items>
+          {done.map((r) => <li><b>{r.name}</b><small>{sites[r.site].name} · {dayWords(r.date)} · {plural(r.spaces.length, 'space')} · {name(r.who[0])}</small></li>)}
+        </ul>
+      </Section>
+      <p class="cap-note">Rounds come from the plans: a round falls on its plan's day in each office with spaces it covers, and a hearing loop is due a year after its last recorded test. Past rounds count as done in the demo. Ticking a step or marking a round done is kept in this browser only.</p>
+    </div>
+  </FeatureGate>
+
+  <script>
+    // Ticking a step and marking a round done, kept in this browser (rs7-checks). The glyph changes in place (M8).
+    import { setGlyph } from '../../lib/health.mjs';
+    const KEY = 'rs7-checks';
+    const read = () => { try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (_) { return {}; } };
+    const save = (v) => { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (_) {} };
+    function boot() {
+      const root = document.querySelector('[data-checks]'); if (!root || root.__chk) return; root.__chk = true;
+      const paint = (tr) => {
+        const st = read()[tr.dataset.round] || {};
+        tr.querySelectorAll('[data-step]').forEach((b) => { b.checked = (st.steps || []).includes(+b.dataset.step); });
+        tr.querySelector('[data-chk-done]').textContent = st.done ? 'Done · undo' : 'Mark the round done';
+        tr.classList.toggle('is-done', !!st.done);
+        const g = tr.querySelector('[data-chk-glyph] .hg');
+        if (g) setGlyph(g, st.done ? 'fine' : g.dataset.was, { word: st.done ? 'Done' : g.dataset.wasWord });
+      };
+      root.querySelectorAll('tr[data-round]').forEach((tr) => {
+        const g = tr.querySelector('[data-chk-glyph] .hg');
+        if (g) { g.dataset.was = g.dataset.state; g.dataset.wasWord = g.querySelector('.hg-w')?.textContent ?? ''; }
+        paint(tr);
+        tr.addEventListener('change', (e) => {
+          if (!e.target.matches('[data-step]')) return;
+          const all = read(), st = all[tr.dataset.round] || {}, n = +e.target.dataset.step, s = st.steps || [];
+          st.steps = e.target.checked ? [...s, n] : s.filter((x) => x !== n);
+          all[tr.dataset.round] = st; save(all);
+        });
+        tr.querySelector('[data-chk-done]').addEventListener('click', () => {
+          const all = read(), st = all[tr.dataset.round] || {};
+          st.done = !st.done; all[tr.dataset.round] = st; save(all); paint(tr);
+        });
+      });
+      // A link to a round (#check-...) opens its checklist.
+      const h = location.hash && document.getElementById(location.hash.slice(1));
+      if (h && h.matches('tr[data-round]')) { const d = h.querySelector('details'); if (d) d.open = true; }
+    }
+    document.addEventListener('astro:page-load', boot);
+    boot();
+  </script>
+</Shell>
+
+<style>
+  .chk-list { margin-top: 8px; }
+  .chk-list summary { cursor: pointer; font-size: var(--fs-code); font-weight: 600; color: var(--accent-ink); }
+  .chk-list ol { margin: 8px 0 10px; padding-left: 20px; display: grid; gap: 6px; font-size: var(--fs-body); }
+  .chk-list label { display: inline-flex; gap: 8px; align-items: baseline; cursor: pointer; }
+  .chk-rule { margin-left: 6px; font-size: var(--fs-code); }
+  :global(tr.is-done) b { text-decoration: line-through; text-decoration-color: var(--text-3); }
+</style>

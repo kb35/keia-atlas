@@ -1,0 +1,55 @@
+---
+/* HomeChecks: the rounds of room checks due for the person viewing, on Home (the Room checks capability,
+   src/lib/modules.mjs; src/lib/checks.mjs). "Which rooms do I check this morning?" answered on a technician's Home:
+   overdue first, then what is due in the next two weeks, each a link to its round and checklist. It is one of Home's
+   sections (data-sec="checks", placed by the role's layout in src/lib/homecore.mjs), belongs to its capability
+   (data-feature), and has no empty state: with nothing due for the viewer, it is not there.
+   Motion: none of its own. View as and a capability switched on or off change it inside rsChange (M12, row 26). */
+import { href, sites } from '../lib/data.mjs';
+import { checkRounds, spaceTitle } from '../lib/capabilities-view.mjs';
+import { dayWords, addDays } from '../lib/checks.mjs';
+import { DEMO_TODAY } from '../lib/data.mjs';
+const until = addDays(DEMO_TODAY, 14);
+const ROUNDS = checkRounds.filter((r) => r.status !== 'done' && r.date <= until).map((r) => ({
+  id: r.id, name: r.name, when: dayWords(r.date), status: r.status, who: r.who, n: r.spaces.length,
+  where: r.spaces.length === 1 ? `${spaceTitle(r.spaces[0])}, ${sites[r.site].name}` : `${r.spaces.length} spaces, ${sites[r.site].name}`,
+  to: href(`/work/checks/#${r.id.replace(/:/g, '-')}`),
+}));
+---
+<section class="ck card hk" data-sec="checks" id="checks" data-feature="maintenance" aria-labelledby="h-checks" data-home-checks data-rounds={JSON.stringify(ROUNDS)} hidden>
+  <header class="ck-h"><h2 id="h-checks" data-help="home.checks">Checks due</h2><span class="ck-n faint" data-hk-say></span><a class="aside" href={href('/work/checks/')}>Room checks <span aria-hidden="true">→</span></a></header>
+  <ol class="hk-list" data-hk-list></ol>
+</section>
+
+<script is:inline data-astro-rerun>
+  (function () {
+    var sec = document.querySelector('[data-home-checks]'); if (!sec) return;
+    var R = JSON.parse(sec.dataset.rounds || '[]');
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+    function draw() {
+      var who = window.rsWhoId ? window.rsWhoId() : 'anna';
+      var mine = R.filter(function (r) { return who === 'everyone' || r.who.indexOf(who) >= 0; });
+      sec.classList.toggle('hk-none', mine.length === 0);
+      var over = mine.filter(function (r) { return r.status === 'overdue'; }).length;
+      sec.querySelector('[data-hk-say]').textContent = mine.length ? (over ? over + ' overdue · ' : '') + mine.length + (mine.length === 1 ? ' round' : ' rounds') + ' in the next two weeks' : '';
+      sec.querySelector('[data-hk-list]').innerHTML = mine.slice(0, 6).map(function (r) {
+        return '<li class="hk-row' + (r.status === 'overdue' ? ' is-over' : '') + '"><a href="' + r.to + '"><b>' + esc(r.name) + '</b><small>' + esc(r.where) + '</small></a><span class="hk-when">' + (r.status === 'overdue' ? 'Overdue, ' : '') + esc(r.when) + '</span></li>';
+      }).join('');
+    }
+    draw();
+    if (!sec.__hk) { sec.__hk = true; document.addEventListener('rs:demo-change', function () { if (sec.isConnected) draw(); }); }
+  })();
+</script>
+
+<style is:global>
+  .home .hk.hk-none { display: none !important; }
+  .hk-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; }
+  .hk-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: baseline; padding: 8px 0; border-top: var(--border-rule); }
+  .hk-row:first-child { border-top: 0; }
+  .hk-row a { display: grid; gap: 1px; color: inherit; text-decoration: none; min-width: 0; }
+  .hk-row a:hover b { text-decoration: underline; text-underline-offset: 2px; }
+  .hk-row b { font-size: var(--name-size, 14.5px); font-weight: 600; }
+  .hk-row small { font-size: var(--support-size, 13px); color: var(--text-3); }
+  .hk-when { font-size: var(--support-size, 13px); color: var(--text-2); white-space: nowrap; }
+  .hk-row.is-over .hk-when { color: var(--h-fault-ink); font-weight: 600; }
+</style>

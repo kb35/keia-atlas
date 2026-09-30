@@ -8,14 +8,20 @@ import Section from './Section.astro';
 import FeatureSource from './FeatureSource.astro';
 import { href, fmtDate, plural } from '../lib/data.mjs';
 import { featureAnyCss } from '../lib/modules.mjs';
-import { licences } from '../lib/capabilities-view.mjs';
+import { licences, checkRounds, checkPlans } from '../lib/capabilities-view.mjs';
+import { checksForSpace, dayWords } from '../lib/checks.mjs';
+import { PEOPLE } from '../lib/demo.mjs';
 import { rowsForSpace, inDays } from '../lib/licences.mjs';
 import '../styles/capabilities.css';
 
 interface Props { space: string }
 const { space } = Astro.props;
 const lic = rowsForSpace(licences, space);
-const cards = [lic.length ? 'licences' : null].filter(Boolean);
+const chk = checksForSpace(checkRounds, space);
+const planName = (id) => checkPlans.find((p) => p.id === id)?.name ?? id;
+const first = (id) => PEOPLE.find((p) => p.id === id)?.name.split(' ')[0];
+// In the registry's order, so the section's data-feat-any matches its rule.
+const cards = [lic.length ? 'licences' : null, chk.next || chk.last ? 'maintenance' : null].filter(Boolean);
 ---
 {cards.length > 0 && (
   <Section title="Upkeep" id="upkeep" help="room.upkeep" data-feat-any={cards.join(' ')}>
@@ -33,6 +39,17 @@ const cards = [lic.length ? 'licences' : null].filter(Boolean);
                 {r.short > 0 && <small class="cap-w t-bad">{plural(r.short, 'seat')} short across the pool</small>}
               </li>
             ))}
+          </ul>
+        </section>
+      )}
+      {(chk.next || chk.last) && (
+        <section class="card pad cap-card" data-feature="maintenance" data-help="room.checks" aria-labelledby="up-chk">
+          <h3 id="up-chk">Room checks <FeatureSource id="maintenance" /></h3>
+          <p class:list={['cap-a', { 'cap-w t-bad': chk.next?.status === 'overdue', 'cap-w t-warn': chk.next?.status === 'due' }]}>{chk.next ? `${chk.next.status === 'overdue' ? 'Overdue since' : 'Next check:'} ${dayWords(chk.next.date)}` : 'No check planned'}</p>
+          <ul class="cap-list">
+            {chk.next && <li><a href={href(`/work/checks/#${chk.next.id.replace(/:/g, '-')}`)}><b>{chk.next.name}</b></a><span>{dayWords(chk.next.date)}{chk.next.who[0] ? `, ${first(chk.next.who[0])}` : ''}{chk.next.spaces.length > 1 ? `, with ${chk.next.spaces.length - 1} more ${chk.next.spaces.length === 2 ? 'space' : 'spaces'}` : ''}</span></li>}
+            {chk.last && <li><b>Last checked</b><span>{fmtDate(chk.last.date)}{chk.last.name ? `, ${chk.last.name.toLowerCase()}` : ''}</span></li>}
+            {chk.plans.filter((p) => p !== chk.next?.plan).map((p) => <li><b>{planName(p)}</b><small>Also covers this space</small></li>)}
           </ul>
         </section>
       )}

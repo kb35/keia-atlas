@@ -124,7 +124,7 @@ export const ROLE_KIND = {
 // The sections per kind of role, in order, in two layers: Summary (the figures opened) and Record (the rest).
 // "work" is the row With you | To review. Every section exists for everyone; the order is the role's.
 export const LAYOUT = {
-  field: { summary: ['ready', 'day', 'work', 'floors'], record: ['quiet', 'tasks', 'device', 'provision', 'lab'] },
+  field: { summary: ['ready', 'day', 'checks', 'work', 'floors'], record: ['quiet', 'tasks', 'device', 'provision', 'lab'] },
   desk: { summary: ['ready', 'queue', 'work', 'estate'], record: ['quiet', 'tasks'] },
   owner: { summary: ['ready', 'approval', 'work', 'estate'], record: ['quiet', 'tasks', 'firmware', 'lab'] },
   pm: { summary: ['ready', 'projects', 'work'], record: ['quiet', 'tasks', 'gates', 'blocked'] },

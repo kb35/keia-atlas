@@ -43,5 +43,22 @@ export function crossCheckCapabilities(records) {
     role(rec, ['owner_role'], d.owner_role);
   }
 
+  // Room checks: real space types, a real role, and each checklist rule a rule in that house standard.
+  const spaceTypes = ids('space-types');
+  const standards = new Map(inFolder('standards').map((r) => [r.id, r.data]));
+  const ruleIds = (std) => new Set((std?.sections ?? []).flatMap((s) => (s.rules ?? []).map((x) => x.id)));
+  for (const rec of inFolder('checks')) {
+    const d = rec.data;
+    fileId(rec);
+    (d.applies_to.space_types ?? []).forEach((t, i) => { if (!spaceTypes.has(t)) report(rec, ['applies_to', 'space_types', i], `space type "${t}" does not exist`); });
+    role(rec, ['role'], d.role);
+    d.checklist.forEach((c, i) => {
+      if (typeof c !== 'object' || !c.rule) return;
+      const [std, rule] = c.rule.split('/');
+      if (!standards.has(std)) report(rec, ['checklist', i, 'rule'], `house standard "${std}" does not exist`);
+      else if (!ruleIds(standards.get(std)).has(rule)) report(rec, ['checklist', i, 'rule'], `the ${std} standard has no rule "${rule}"`);
+    });
+  }
+
   return problems;
 }

@@ -5,8 +5,10 @@
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { parse } from 'yaml';
-import { spaces, sites, models, DEMO_TODAY } from './data.mjs';
+import { spaces, sites, models, DEMO_TODAY, href } from './data.mjs';
+import { PEOPLE } from './demo.mjs';
 import { licenceRows, licenceSummary, inDays } from './licences.mjs';
+import { rounds, checksSummary, checkItem, addDays } from './checks.mjs';
 
 const DATA = path.join(process.cwd(), 'data');
 export function readRecords(folder) {
@@ -44,6 +46,24 @@ export const spaceTitle = (id) => { const s = spaces[id]; return s ? (s.number ?
 export const licencePools = readRecords('licences');
 export const licences = licenceRows(licencePools, fleetUnits, DEMO_TODAY);
 export const licenceTotals = licenceSummary(licences);
+
+// ---- Room checks ---------------------------------------------------------------------------------------------------
+// Rounds from two months back (the last done) to four months ahead, each office's own technician doing its rounds.
+export const checkPlans = readRecords('checks');
+export const techOf = {};
+for (const [sid, s] of Object.entries(sites)) {
+  if (s.kind === 'remote') continue;
+  const t = PEOPLE.find((p) => p.roleId === 'tech' && p.site === sid) ?? PEOPLE.find((p) => p.roleId === 'tech' && s.city && p.scope?.includes(s.city));
+  if (t) techOf[sid] = t.id;
+}
+export const hearingLoops = {};
+for (const a of readRecords('accessibility')) for (const [sid, r] of Object.entries(a.rooms ?? {})) if (r.hearing_loop?.tested) hearingLoops[sid] = r.hearing_loop.tested;
+export const checkRounds = rounds(checkPlans, {
+  spaces: Object.values(spaces).map((s) => ({ id: s.id, site: s.site, type: s.space_type })), techs: techOf, loops: hearingLoops,
+  from: addDays(DEMO_TODAY, -62), to: addDays(DEMO_TODAY, 120), today: DEMO_TODAY,
+});
+export const checkTotals = checksSummary(checkRounds, DEMO_TODAY);
+export const checkWork = checkRounds.map((r) => checkItem(r, { link: href, siteName: (s) => sites[s]?.name ?? s, spaceTitle }));
 
 // ---- The unit page's cards (/device/caps.json, UnitCapabilities.astro) --------------------------------------------
 // Each card already worded: { feature, help, title, answer, tone?, items: [{ b, text?, w?, tone?, small?, to? }], more? }.
