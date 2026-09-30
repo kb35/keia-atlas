@@ -64,6 +64,8 @@ function netOf(s, p, u, networked, n) {
   if (!networked || !p.hostname || sites[s.site]?.kind !== 'remote') return null;
   return { ip: `10.${(SITE_ORDER.indexOf(s.site) + 1) * 10}.${s.floor ?? 1}.${20 + (n % 200)}`, mac: ['02', hex(n), hex(n >> 8), hex(n >> 16), hex(n >> 24), hex(n >> 4)].join(':'), fqdn: `${p.hostname}.aigna.example`, how: 'From the home router' };
 }
+// What of a unit's address may go in the public device/data.json: how it is given, never the address itself.
+export const publicNet = (a) => (a ? { how: a.how } : null);
 // One port of a unit, compact for data.json: where it goes (words), the VLAN, the check and the trace's hops.
 const hopRow = (h) => ({ k: h.kind, l: h.label, s: h.sub ?? '', ...(h.to ? { p: h.to.path, q: h.to.q ?? '', h: h.to.hash ?? '' } : {}), ...(h.vlan != null ? { v: h.vlan } : {}) });
 const portRow = (r) => ({
@@ -126,15 +128,16 @@ export function buildDevices() {
           tag: u.asset_tag, serial: u.serial, host: p.hostname ?? null, name: deviceName(s, p), stage: u.stage, stageLabel: STAGE_LABEL[u.stage], installed: u.installed ?? null, arrived: u.arrived ?? null, retired: u.retired ?? null, spare: Boolean(p.spare), store: p.spare ? { cabinet: p.cabinet, shelf: p.shelf } : null, notes: u.notes ?? null, legacy: Boolean(u.legacy), older: Boolean(p.older),
           room: s.id,
           pos: { key: p.position, role: p.role ?? className(p.cls), cls: p.cls, className: className(p.cls), model: u.model ?? p.model ?? null, location: p.spare ? null : LOC_LABEL[p.equipment?.location ?? 'tbd'] ?? null },
-          // The address: the office's address plan (data/switch-ports addresses: an address in its VLAN's prefix, its MAC
-          // and DNS name). A home office's kit gets its address from the home router, so it keeps the old made-up one.
-          net: netOf(s, p, u, networked, n),
+          // The address: only how it is given (static, reserved, from the home router). The address, MAC and DNS name are
+          // Restricted (docs/rules/data.md F10: the IP plan), and this file is public, so they stay out of it.
+          net: publicNet(netOf(s, p, u, networked, n)),
           ports: portsOfUnit(s.site, u.asset_tag).map(portRow),
           conn, rack: rackItem ? { name: rack.name, u: rackItem.u, size: rackItem.size } : null,
           platforms: p.spare ? ['inventory'] : Object.keys(cls?.platforms ?? {}),
           usage: usageCard(u.asset_tag),
           privacy: pr ? pr.id : null,
-          pw: typeof u.default_password_changed === 'boolean' ? u.default_password_changed : null,
+          // Whether the default password was changed is Restricted (F10), so the public file says only that it is recorded.
+          pwRecorded: typeof u.default_password_changed === 'boolean',
           cover: coverInfo(u),
           repeats: repeatsInfo(u.asset_tag),
         });

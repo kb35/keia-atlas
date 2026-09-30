@@ -114,6 +114,8 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
       function showAll(n, what) { return n > FIRST ? '<button type="button" class="btn small dv-all" data-help="section.showall" data-show-all>Show all ' + n + ' ' + what + '</button>' : ''; }
       // Classification (docs/rules/data.md F10): the small label beside Restricted content. Same as src/components/Restricted.astro.
       function R(what) { return '<span class="cls-tag" data-help="classification.restricted"><b>Restricted:</b> ' + esc(what) + '</span>'; }
+      // Restricted values are kept out of this page's public data (device/data.json), so the row says where they are.
+      var HELD = 'Held back from the published pages';
       function demoVal() { return ' <span class="demo-val" data-help="unit.demo-value">Demo value</span>'; }
       // Warranty, support cover and purchase (the overlooked items, #3): the answer first ("Warranty ends in 4 months"),
       // then what backs it. Only what the unit's record holds; a unit with none of it has no block.
@@ -162,7 +164,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
         else { var z = window.rsZoom; window.rsZoom = function () { return null; }; P.push(name, 6, location.pathname + location.search); window.rsZoom = z; }
       }
       // The space a unit sits in, drawn to scale (src/pages/device/scene/[room].astro), with the unit lit the way the
-      // incident page lights it (UI-V2 §2; REVIEW-SITE fix 8). The outline for its kind stays until the drawing is
+      // incident page lights it (design notes; REVIEW-SITE fix 8). The outline for its kind stays until the drawing is
       // ready, and stays for good when the space has no drawing or does not draw this unit.
       var scenes = {};
       function loadScene(u, r, m, slot, bad) {
@@ -205,11 +207,10 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
         var stEl = root.querySelector('[data-dv-status]');
         var sec = m && m.sec;
         stEl.innerHTML = '<span class="pill ' + u.stage + '" data-help="unit.status">' + status + '</span>' + (openInc.length ? ' <span class="pill bad">' + openInc.length + ' open incident' + (openInc.length > 1 ? 's' : '') + '</span>' : '') +
-          (sec && sec.chip ? ' <a class="ss-chip ' + sec.tone + '" href="#security" data-help="unit.security-chip">' + esc(sec.chip) + '</a>' : '') +
-          (u.pw === false ? ' <a class="ss-chip bad" href="#security" data-help="unit.password-chip">Default password not changed</a>' : '');
+          (sec && sec.chip ? ' <a class="ss-chip ' + sec.tone + '" href="#security" data-help="unit.security-chip">' + esc(sec.chip) + '</a>' : '');
         stEl.hidden = false;
         root.querySelector('[data-dv-sim]').hidden = !u.usage;
-        // The answer (UI-V2 §3.4): an open incident first; otherwise its status. Where it is goes in the line's tooltip.
+        // The answer (design notes): an open incident first; otherwise its status. Where it is goes in the line's tooltip.
         var advN0 = m ? m.advisories.length : 0;
         var answer = openInc.length ? openInc[0].title + (openInc.length > 1 ? ' · ' + (openInc.length - 1) + ' more open' : '')
           : status + ' · no open incidents' + (advN0 ? ' · ' + advN0 + (advN0 === 1 ? ' advisory' : ' advisories') + ' to review' : '');
@@ -243,7 +244,8 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
             row('Hostname', u.host ? '<span class="mono">' + esc(u.host) + '</span>' : 'None') +
             row('Serial', '<span class="mono">' + esc(u.serial) + '</span>') +
             row('Asset tag', '<span class="mono">' + esc(u.tag) + '</span>') +
-            (u.net ? row('IP address', '<span class="mono">' + esc(u.net.prefix || u.net.ip) + '</span> <span class="faint">' + esc(u.net.how || '') + '</span> ' + R(D.restricted.ipPlan)) + (u.net.mac ? row('MAC', '<span class="mono">' + u.net.mac + '</span>') : '') : '') +
+            // The address, MAC and DNS name are Restricted (F10) and are left out of the public data: only how it is given shows.
+            (u.net ? row('IP address', '<span class="faint">' + esc(u.net.how || '') + '. ' + HELD + '</span> ' + R(D.restricted.ipPlan)) : '') +
             row('Installed', u.installed ? fmt(u.installed) : (u.stage === 'manage' || u.stage === 'retire' ? 'Not recorded' : 'Not yet')) +
             (u.retired ? row('Taken out', fmt(u.retired)) : '') +
             // No setup guide: one line here instead of an empty card (REVIEW-SITE fix 8).
@@ -277,10 +279,10 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
         // Security support and privacy: when the maker stops fixing security holes (with a warning within 12 months),
         // whether the default password was changed, and for a sensing unit its privacy record. Side by side when both show.
         var pv = u.privacy ? D.privacy[u.privacy] : null;
-        var hasSec = Boolean(sec) || u.pw !== null;
+        var hasSec = Boolean(sec) || u.pwRecorded;
         var sp = hasSec && pv ? 's-6' : 's-12';
         if (hasSec) {
-          var pwTxt = u.pw === true ? 'Yes' : u.pw === false ? '<span class="ss-chip bad">No: still the maker\'s default</span>' : 'Not recorded';
+          var pwTxt = u.pwRecorded ? '<span class="faint">' + HELD + '</span>' : 'Not recorded';
           var cite = function (x) { return x ? (x.url ? ' <a class="faint" href="' + esc(x.url) + '">' + esc(x.title) + '</a>' : ' <span class="faint">' + esc(x.title) + '</span>') : ''; };
           body += '<section class="card dv-card ' + sp + ' c-sec" data-help="unit.security" id="security">' + head('Security support', sec && sec.chip ? '<span class="ss-chip ' + sec.tone + '">' + esc(sec.chip) + '</span>' : '') +
             '<dl class="dv-kv dv-sec">' +
@@ -301,7 +303,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
 
         // Row 2: Health, Configuration, and the unit's history.
         var healthCard = '<section class="card dv-card s-4 c-health" data-help="unit.health">' + head('Health', '<button type="button" class="btn small" data-help="unit.check" data-dv-check>Check again</button>') + '<ul class="dv-checks">' +
-          u.platforms.map(function (p) { var bad = p === 'device_management' && u.stage === 'deploy'; return '<li><span class="dv-c" data-c' + (bad ? ' data-bad' : '') + '>' + '<span class="sp"></span>' + tick + '<svg class="x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg></span><b>' + (PLAT[p] || p) + '</b><span class="faint">' + ({ keia_atlas: 'Recorded where the space type expects it', inventory: 'Active record in this space', dhcp_dns: u.net ? (u.net.how === 'From the home router' ? 'Address from the home router' : 'Reservation ' + u.net.ip + ' and DNS ' + u.host) : 'No address recorded', device_management: bad ? 'Not enrolled yet: finish provisioning' : m && m.fw ? 'Online, firmware ' + m.fw.version + ' (standard)' : 'Online', room_booking: 'Calendar resource linked', monitoring: 'Reporting, no critical alerts' }[p] || '') + '</span></li>'; }).join('') +
+          u.platforms.map(function (p) { var bad = p === 'device_management' && u.stage === 'deploy'; return '<li><span class="dv-c" data-c' + (bad ? ' data-bad' : '') + '>' + '<span class="sp"></span>' + tick + '<svg class="x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg></span><b>' + (PLAT[p] || p) + '</b><span class="faint">' + ({ keia_atlas: 'Recorded where the space type expects it', inventory: 'Active record in this space', dhcp_dns: u.net ? (u.net.how === 'From the home router' ? 'Address from the home router' : 'Address reservation and DNS name recorded') : 'No address recorded', device_management: bad ? 'Not enrolled yet: finish provisioning' : m && m.fw ? 'Online, firmware ' + m.fw.version + ' (standard)' : 'Online', room_booking: 'Calendar resource linked', monitoring: 'Reporting, no critical alerts' }[p] || '') + '</span></li>'; }).join('') +
           '</ul><p class="faint dv-foot">These checks are simulated. With real feeds they read the real systems.</p></section>';
 
         var cfg = '';
@@ -393,7 +395,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
         }
         if (!P.length && (u.net || r.path.idf || r.path.mdf)) {
           r3.push('<section class="card dv-card SPAN c-net" data-help="unit.network">' + head('Network') + '<ol class="dv-path">' +
-            '<li><b>' + esc(u.host || u.pos.role) + '</b>' + (u.net ? '<small class="mono">' + u.net.fqdn + '</small>' : '') + '</li>' +
+            '<li><b>' + esc(u.host || u.pos.role) + '</b>' + (u.net ? '<small>' + esc(u.net.how) + '</small>' : '') + '</li>' +
             (r.path.idf ? '<li><a href="' + L('rooms/' + r.path.idf.id + '/') + '">' + esc(r.path.idf.name) + '</a><small>Floor switch</small></li>' : '<li><b>Floor comms room</b><small>Not recorded for this site yet</small></li>') +
             (r.path.mdf && (!r.path.idf || r.path.mdf.id !== r.path.idf.id) ? '<li><a href="' + L('rooms/' + r.path.mdf.id + '/') + '">' + esc(r.path.mdf.name) + '</a><small>Core and firewall</small></li>' : '') +
             '<li><b>Internet</b><small>Meeting services and device management</small></li></ol></section>');
