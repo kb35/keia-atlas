@@ -276,6 +276,7 @@ const HOME = {
   'depth.open-here': e('Open pages like this here', 'Where pages of this kind open for you: at the band, or straight at this layer. Remembered for you in this browser; a link with #record or #raw still opens there.', 'Select it to open pages like this here from now on. Undo is beside it for a moment; Settings puts everything back at the band.'),
   'settings.density': e('Density', 'Comfortable or Compact: row height, card padding and type one step smaller. It never hides anything, and touch targets stay large.', 'Choose one. It is kept for you in this browser.'),
   'settings.depth': e('Where pages open', 'The layer every page opens at for you: Band (the top), Summary, Record or Raw. Kept in this browser. "Open pages like this here" on a page sets it for that kind of page only.', 'Pick a layer. Band opens every page at the top again.'),
+  'settings.a11y': e('Accessibility', 'How the site moves and reads for you: motion (follow your device, Reduced or Off), text size, High contrast, stronger outlines and focus rings, underlined links, words beside every status mark, and moving pictures that start paused, with nothing sliding or drawing in by itself. Kept in this browser, whoever you view as.', 'Choose what helps. Each one applies at once and can be switched back the same way.'),
   'settings.leave': e('Back from leave', 'A demo switch: Anna is back from two weeks away. Her Home opens once on Welcome back, and Marcus, who covered, sees the hand-over card until she starts her day.', 'Switch it on, then use View as to see Anna or Marcus.'),
   'home.day': e('My day', 'Where you are today, and your day in order: incidents first, then tasks by due date, then Lab work and visits, each for the hours it takes. Times are a plan for the day, not bookings; the red line is now, in your office\'s time.', 'Select an item to open it. Full schedule opens your day in the Schedule.', 'l:home'),
   'home.day-item': e('Something on today', 'One thing that takes your time today: when it starts in the day\'s order, how long, and where.', 'Select it to open the task, incident, test or visit.'),
@@ -511,7 +512,6 @@ const UNIT = {
   'unit.config': e('Setup guide', 'The settings that are unique to this unit, such as its name and calendar, filled in from its record.', 'Select Every setting to see the whole setup guide.', 'l:configurations'),
   'unit.history': e('Work and incidents', 'Everything that has happened to this unit and its space, newest first: incidents, tasks, Lab tests of the model, and when it went in or came out.', 'Select a line to open it.'),
   'unit.usage': e('Usage', 'How much this unit is used. The figures are simulated.', 'Select the button to compare it across the fleet.'),
-  'unit.connections': e('Connections', 'Each port on this unit, where its cable goes and which cable it is.', 'Use it when you trace a fault or replace the unit.'),
   'unit.port': e('A port', 'One port on this unit. Choosing it marks its row and adds it to the path: the last level of the zoom.', 'Select it to zoom in to the port. Press [ to zoom back out to the unit.'),
   'unit.network': e('Network', 'The path from this unit to the internet: the floor switch, the core and the firewall.', 'Select a comms room to open it.', 'g:mdf'),
   // Classification, security support and privacy records (docs/rules/data.md F10 and F11).
@@ -525,6 +525,7 @@ const UNIT = {
   'model.security': e('Security support', 'The manufacturer\'s end date for security updates, its firmware line and where it takes reports of flaws. Dates the manufacturer has not published are marked as demo values.', 'Plan a replacement before support ends.', 'g:firmware'),
   'model.security-chip': e('Security support', 'Until when the manufacturer fixes security holes in this model. A warning shows from 12 months before the end.', 'Select it for the dates and the manufacturer\'s contact.', 'g:firmware'),
   'incident.priority-changed': e('Priority changed', 'The priority was proposed from impact and urgency, and a person changed it. This is the priority it replaced, and the reason they gave.', 'Nothing to do. The ticket details say who changed it and when.', 'g:incident'),
+  'about.a11y': e('Accessibility', 'The accessibility statement: what works with a keyboard, a screen reader, larger text or less motion, the settings that change it, the known gaps, and how to report a problem.', 'Select it to read the page.'),
   'about.logs': e('What Keia logs about users', 'What Keia Atlas keeps about the people who use it, what it never keeps, and the privacy records for the cameras and microphones in the rooms.', 'Select it to read the page.'),
 };
 
@@ -916,7 +917,24 @@ const GUIDE = {
   'guide.privacy': e('Cameras and microphones', 'What the cameras and microphones in this space do and do not do, from Aigna\'s privacy records.', 'Nothing to do. Ask the office team for the full record.'),
 };
 
+// ---- Switch ports and VLANs: the switch page, a unit's ports, Change VLAN, an office's VLANs -------------------------
+const PORTS = {
+  'switch.grid': e('The ports', 'Every port on this switch, laid out as on its front. The colour and the number in each port are its VLAN; P is parked, a dash is disabled.', 'Select a port to open what is plugged into it.'),
+  'switch.key': e('Key', 'What each colour means: the VLANs on this switch, by number and name. Colour never stands alone: the number is in every port.', 'Nothing to do.'),
+  'switch.facts': e('This switch', 'What it is, where it is, the platform it is run from and the group it belongs to.', 'Select the comms room or the unit to open it.'),
+  'switch.ports': e('Every port', 'Each port in use or parked: what is on the far end, its mode and its VLAN, and whether that follows the VLAN plan.', 'Select what is on a port to open it, or Change VLAN to set a new one.'),
+  'switch.review': e('To review', 'Ports whose VLAN does not follow the network standard\'s VLAN plan, with the reason in words.', 'Change the VLAN, or record why it is right.'),
+  'switch.raw': e('As recorded', 'This switch as it is recorded, in NetBox\'s names: each interface, its VLANs and its cable trace.', 'Nothing to do. It is what a connector would read and write.'),
+  'vlan.change': e('Change VLAN', 'Opens a small form to put this port on another VLAN from the plan, with the reason.', 'Select it, pick the VLAN and say why.'),
+  'vlan.form': e('Change VLAN', 'Pick the new VLAN and say why. The form shows what the change touches and the approval it needs. In the demo the change is recorded as simulated: nothing is sent to a switch.', 'Select Record the change, or Cancel.'),
+  'vlan.plan-link': e('See it on the plan', 'Shows what this port reaches on the floor plans, in If this were off below.', 'Select it.'),
+  'vlan.summary': e('VLANs', 'The office\'s VLANs from the network standard\'s plan: each one\'s prefix and gateway, how many ports sit on it, and the ports that do not follow the plan.', 'Select a switch or a port to open it.'),
+  'unit.trace': e('Trace', 'The path from this port to its switch, hop by hop: outlet, permanent link, patch panel port, patch cord, switch port and VLAN. Each hop opens its record.', 'Open it to see the path.'),
+  'unit.ports': e('Ports', 'Each port on this unit: where its cable goes, all the way to the switch port, and the VLAN it lands on.', 'Open Trace for the path, or Change VLAN to set a new one.'),
+};
+
 export const HELP = {
+  ...PORTS,
   ...METHOD_PAGES, ...GUIDE,
   ...SHELL, ...PLACES, ...PAGES, ...PARTS, ...FILTER, ...HOME, ...OVERVIEW, ...SCHEDULE, ...INTEGRATE, ...INCIDENT,
   ...SUPPORT_V5,

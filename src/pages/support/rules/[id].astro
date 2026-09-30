@@ -154,7 +154,8 @@ const logHere = LOG.filter((e) => e.rule === r.id).slice(0, 12);
     function init() {
       const act = D.querySelector<HTMLElement>('[data-rule-act]'); if (!act || act.dataset.on) return; act.dataset.on = '1';
       const id = act.dataset.rule!, btn = act.querySelector<HTMLButtonElement>('[data-rule-run]')!, st = D.querySelector<HTMLElement>('[data-rule-state]')!;
-      const say = (html: string) => { const show = () => { st.hidden = false; st.innerHTML = html; }; if (W.rsHold && st.hidden) W.rsHold(st.parentElement, show); else show(); };
+      // The state line: a changed glyph eases from its old ring to the new one (km.ringSwap), never jumps.
+      const say = (html: string) => { const show = () => { st.hidden = false; if (W.km?.ringSwap) W.km.ringSwap(st, () => { st.innerHTML = html; }); else st.innerHTML = html; }; if (W.rsHold && st.hidden) W.rsHold(st.parentElement, show); else show(); };
       const addRow = (run: any) => {
         const rule = ruleOf(id), list = D.querySelector('[data-rule-runs]'); if (!list || D.getElementById(`run-${run.id}`)) return;
         const li = D.createElement('li'); li.className = 'row rr-row'; li.id = `run-${run.id}`;

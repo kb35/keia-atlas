@@ -48,6 +48,7 @@ import { leadership } from '../lib/costs.mjs';
 import { partnerBand } from '../lib/vendors.mjs';
 import { portfolio } from '../lib/engagements.mjs';
 import { sparkSvg } from '../lib/spark.mjs';
+import { tally } from '../lib/health.mjs';
 
 const H = homeData();
 // Leadership (V7): "are we OK, and what does it cost?" The AV service's experience across every office (the same figures
@@ -86,8 +87,9 @@ const floorCards = offices.flatMap((s) => floorsOf(s).map((f) => ({ key: `${s}-$
 const rank = (id) => (health[id]?.h === 'fault' ? 0 : health[id]?.h === 'review' ? 1 : 2);
 const estateCards = offices.map((s) => {
   const fl = floorsOf(s), worst = fl.map((f) => ({ f, r: Math.min(2, ...Object.keys(health).filter((id) => id.startsWith(`${s}-${f.id}-`)).map(rank)) })).sort((a, b) => a.r - b.r)[0];
-  const sh = SITE_HEALTH[s], bad = sh.fault.length + sh.review.length;
-  return { key: s, site: s, floor: (worst?.f ?? fl[0])?.id, title: sites[s].name.replace(/ office$/, ''), to: `/locations/${s}/`, figure: sh.fault.length ? `${sh.fault.length} fault${sh.fault.length === 1 ? '' : 's'}` : bad ? `${bad} to review` : `${sh.n} ready`, sub: fl.length > 1 ? `${(worst?.f ?? fl[0]).name} of ${fl.length} floors` : undefined };
+  const sh = SITE_HEALTH[s];
+  const f = worst?.f ?? fl[0];
+  return { key: s, site: s, floor: f?.id, title: sites[s].name.replace(/ office$/, ''), to: `/locations/${s}/?floor=${f?.id}`, figure: tally(sh.fault.length, sh.review.length), sub: fl.length > 1 ? `${f.name} of ${fl.length} floors` : undefined };
 }).filter((c) => c.floor);
 
 // ---- Static blocks for the record layer (the same for everyone of a role) --------------------------------------------
@@ -158,7 +160,7 @@ const pmCss = pms.map((pm) => `:root[data-who="${pm.id}"] [data-pm]:not([data-pm
           <span class="day-place" data-day-place></span>
           <a class="aside" data-day-full href={href(`/work/schedule/?view=day&d=${DEMO_TODAY}`)}>Full schedule <span aria-hidden="true">→</span></a>
         </header>
-        <div class="day-bar" data-day-bar aria-hidden="true"></div>
+        <div class="day-bar" data-day-bar data-chart-bar="each" aria-hidden="true"></div>
         <ol class="day-list" data-day-list></ol>
         <p class="hp-empty" data-day-empty hidden>Nothing booked today. Your open work is below.</p>
       </section>
@@ -222,13 +224,13 @@ const pmCss = pms.map((pm) => `:root[data-who="${pm.id}"] [data-pm]:not([data-pm
 
       <!-- Your office's floors, every space a quiet ring unless it is not fine. -->
       <section class="ck card" data-sec="floors" id="floors" aria-labelledby="h-floors" hidden>
-        <header class="ck-h"><h2 id="h-floors" data-help="home.floors"><span data-floors-name>Your office</span>, every space</h2><span class="ck-n faint" data-floors-say></span><a class="aside" data-floors-link href={href('/locations/')}>Open the office <span aria-hidden="true">→</span></a></header>
+        <header class="ck-h"><h2 id="h-floors" data-help="home.floors"><span data-floors-name>Your office</span>, every space</h2><span class="ck-say" data-floors-say></span><a class="aside" data-floors-link href={href('/locations/')}>Open the office <span aria-hidden="true">→</span></a></header>
         <SmallMultiples cards={floorCards} health={health} people={FIRST} min={300} label="Your office's floors" />
       </section>
 
       <!-- The estate: one card per office, the same tiny plan at the same scale (UI-V2 §8.7). -->
       <section class="ck card" data-sec="estate" id="estate" aria-labelledby="h-estate" hidden>
-        <header class="ck-h"><h2 id="h-estate" data-help="home.estate">The estate</h2><span class="ck-n faint" data-estate-say></span><a class="aside" href={href('/locations/')}>Locations <span aria-hidden="true">→</span></a></header>
+        <header class="ck-h"><h2 id="h-estate" data-help="home.estate">The estate</h2><span class="ck-say" data-estate-say></span><a class="aside" href={href('/locations/')}>Locations <span aria-hidden="true">→</span></a></header>
         <SmallMultiples cards={estateCards} health={health} people={FIRST} min={200} label="Every office, one card each" />
       </section>
 

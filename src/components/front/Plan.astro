@@ -39,10 +39,10 @@ const D = { max, next: NEXT.id, add: ADD.eur, envelope: next.envelope, base: COL
 
     <div class="pl-chart-box">
       <p class="pl-h4"><span>Spend by financial year</span><span class="pl-key"><i class="pl-k pl-k-committed"></i>Committed<i class="pl-k pl-k-planned"></i>Planned<i class="pl-k pl-k-add"></i>Brought forward<i class="pl-k pl-k-env"></i>Envelope</span></p>
-      <ol class="pl-chart" role="img" aria-label={`Spend by financial year: ${COLUMNS.map((c) => `${c.label} ${kmoney(c.spend)}`).join(', ')}`} data-pl-chart>
+      <ol class="pl-chart" aria-label="Spend by financial year" data-pl-chart>
         {COLUMNS.map((c) => (
           <li class:list={['pl-col', { 'is-next': c.id === NEXT.id, 'is-now': c.current }]} data-pl-col={c.id}>
-            <div class="pl-bar">
+            <div class="pl-bar" aria-hidden="true">
               {c.envelope != null && <i class="pl-env" style={`--h:${frac(c.envelope).toFixed(4)}`} title={`Envelope ${kmoney(c.envelope)} (${c.envelopeStatus})`}></i>}
               <i class="pl-seg pl-committed" data-pl-seg="committed" style={`--h:${frac(c.committed).toFixed(4)}`}></i>
               <i class="pl-seg pl-planned" data-pl-seg="planned" style={`--h:${frac(c.planned).toFixed(4)}`}></i>
@@ -92,7 +92,7 @@ const D = { max, next: NEXT.id, add: ADD.eur, envelope: next.envelope, base: COL
 
 <script>
   import { motion } from '../../lib/motion-read.mjs';
-  import { loop } from '../../lib/front-loop.mjs';
+  import { loop, clock as loopClock } from '../../lib/front-loop.mjs';
   const kmoney = (n: number) => (Math.abs(n) >= 1e6 ? `€${(n / 1e6).toFixed(2)}m` : `€${Math.round(n / 1000)}k`);
   function init(root: HTMLElement) {
     if ((root as any).__pl) return; (root as any).__pl = true;
@@ -104,8 +104,8 @@ const D = { max, next: NEXT.id, add: ADD.eur, envelope: next.envelope, base: COL
     const addSeg = root.querySelector<HTMLElement>('[data-pl-seg="add"]');
     const pills = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-pl-sc]')), mark = q('[data-pl-mark]'), tryBox = q('[data-pl-try]');
     const f = (k: string) => root.querySelector<HTMLElement>(`[data-pl-f="${k}"]`)!;
-    let timers: number[] = [], decided = false, sc = '';
-    const later = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
+    const clk = loopClock(); let decided = false, sc = '';
+    const later = (ms: number, fn: () => void) => { clk.later(ms, fn); };
     const frac = (v: number) => Math.max(0, v / D.max).toFixed(4);
     const headWords = (h: number) => (h >= 0 ? `${kmoney(h)} headroom` : `${kmoney(-h)} over the envelope`);
 
@@ -138,7 +138,7 @@ const D = { max, next: NEXT.id, add: ADD.eur, envelope: next.envelope, base: COL
       draw();
     };
     const reset = () => {
-      timers.forEach(clearTimeout); timers = []; decided = false; sc = '';
+      clk.clear(); decided = false; sc = '';
       Object.values(cards).forEach((c) => c.classList.remove('is-in'));
       addRow.classList.remove('is-in'); addSeg?.classList.remove('is-in');
       pills.forEach((p) => p.setAttribute('aria-pressed', String(!p.dataset.plSc))); setMark(false);
@@ -161,7 +161,7 @@ const D = { max, next: NEXT.id, add: ADD.eur, envelope: next.envelope, base: COL
     let lp: { stop(): void } | null = null;
     pills.forEach((b) => b.addEventListener('click', () => {
       lp?.stop(); lp = null;
-      if (!tryBox.classList.contains('is-on')) { timers.forEach(clearTimeout); timers = []; finish(); }
+      if (!tryBox.classList.contains('is-on')) { clk.clear(); finish(); }
       sc = b.dataset.plSc || '';
       pills.forEach((p) => p.setAttribute('aria-pressed', String(p === b)));
       setMark(); draw();
@@ -170,7 +170,7 @@ const D = { max, next: NEXT.id, add: ADD.eur, envelope: next.envelope, base: COL
     setMark(false); draw();
     requestAnimationFrame(() => mark.classList.remove('no-slide'));
     if (motion().reduced) { finish(); return; }
-    lp = loop(q('.pl-stage'), { play: run, reset });
+    lp = loop(q('.pl-stage'), { play: run, reset, finish, clock: clk });
   }
   const boot = () => document.querySelectorAll<HTMLElement>('[data-pl]').forEach(init);
   boot();

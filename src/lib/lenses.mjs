@@ -49,7 +49,7 @@ export const LENS_KEY = {
   ],
   network: [
     { h: 'fault', word: 'Fault', says: 'A switch port serving the space is down or draws no power' },
-    { h: 'review', word: 'To review', says: 'A cable passed its test with little margin to spare' },
+    { h: 'review', word: 'To review', says: 'A switch port serving it is off the VLAN plan, or a cable passed its test with little margin' },
     { h: 'fine', word: 'Fine', says: 'Every port up; its access point in service' },
     { h: 'off', word: 'Not recorded', says: 'No switch port recorded for the space' },
   ],
@@ -90,13 +90,15 @@ export function supportLens({ jobs = [] } = {}) {
 }
 
 // ---- Network: the switch ports and access point serving the space ------------------------------------------------
-// { ports, portFault?, minMargin?, ap?, vlans?, sw? }. A port fault comes from the monitoring fact on an open
-// incident; a low margin from the cable's own test (a pass, but under MARGIN_DB to spare).
+// { ports, portFault?, vlanOff?, minMargin?, ap?, vlans?, sw? }. A port fault comes from the monitoring fact on an
+// open incident; vlanOff from the recorded switch ports (the switch reports a port off the VLAN plan); a low margin
+// from the cable's own test (a pass, but under MARGIN_DB to spare).
 export const MARGIN_DB = 2.55;
-export function networkLens({ ports = 0, portFault = null, minMargin = null, ap = null, vlans = [], sw = null } = {}) {
+export function networkLens({ ports = 0, portFault = null, vlanOff = null, minMargin = null, ap = null, vlans = [], sw = null } = {}) {
   const on = [vlans.length ? `VLAN ${vlans.join(' and ')}` : null, sw].filter(Boolean).join(' · ');
   if (!ports && !ap) return { h: 'off', word: 'Not recorded', label: '', line: 'No switch port recorded for the space.' };
   if (portFault) return { h: 'fault', word: 'Fault', label: 'Port', line: portFault, on };
+  if (vlanOff) return { h: 'review', word: 'To review', label: 'VLAN', line: vlanOff, on };
   if (minMargin != null && minMargin < MARGIN_DB) return { h: 'review', word: 'To review', label: `${minMargin.toFixed(1)} dB`, line: `A cable passed its test with ${minMargin.toFixed(2)} dB to spare; retest at the next visit.`, on };
   return { h: 'fine', word: 'Fine', label: ports ? plural(ports, 'port') : '', line: `${ports ? `${plural(ports, 'port')} up` : 'No wired ports'}${ap ? `; Wi-Fi from ${ap}` : ''}.`, on };
 }

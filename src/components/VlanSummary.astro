@@ -1,0 +1,73 @@
+---
+/* VlanSummary: an office's VLANs, on its comms rooms' pages (the office level of the switch-port work).
+   The answer first: how many ports the switches report off the plan, each one linked to its port. Then the switches
+   in this comms room, then the VLAN table: each VLAN from the network standard's plan with its prefix, gateway,
+   where addresses come from, what it may reach (the plan's Reaches column), and how many ports sit on it.
+   Props:  site   the office id
+           space  the comms room (its switches are listed first) */
+import Section from './Section.astro';
+import HealthGlyph from './HealthGlyph.astro';
+import { siteNet, switchPath } from '../lib/switchports.mjs';
+import { href, plural } from '../lib/data.mjs';
+import '../styles/vlan.css';
+interface Props { site: string; space: string }
+const { site, space } = Astro.props;
+const N = siteNet(site);
+const here = N ? N.switches.filter((s) => s.space === space) : [];
+const fed = N ? N.switches.filter((s) => s.where === 'room') : [];
+const range = (r) => (r ? r.replace('-', ' to ') : null);
+const VL = [10, 20, 30, 31, 40, 50, 60, 70, 90];
+---
+{N && (
+  <Section title={`VLANs at the ${N.siteName}`} id="vlans" help="vlan.summary" aside={`${N.vlans.length} VLANs · ${plural(N.review.length, 'port')} to review`}>
+    <div class="card pad vs">
+      {N.review.length ? (
+        <ul class="vs-rev" aria-label="Ports to review">
+          {N.review.map((r) => (
+            <li><HealthGlyph state="review" size={16} word="To review" />
+              <span><a href={href(`/${switchPath(r.sw)}#${r.slug}`)}>{r.sw} {r.word}</a> · {r.far}{r.place ? `, ${r.place}` : ''}<small>{r.why}</small></span></li>
+          ))}
+        </ul>
+      ) : <p class="vs-ok"><HealthGlyph state="fine" size={16} word="Every port on its planned VLAN" /></p>}
+      {here.length > 0 && <p class="vs-sw"><b>Switches here</b> {here.map((s) => <a class="vs-chip" href={href(`/${switchPath(s.id)}`)}>{s.id}<small>{s.label.split(',')[0]}</small></a>)}</p>}
+      {fed.length > 0 && <p class="vs-sw"><b>In-room switches</b> {fed.map((s) => <a class="vs-chip" href={href(`/${switchPath(s.id)}`)}>{s.id}<small>{s.spaceLabel}</small></a>)}</p>}
+      <div class="tablewrap">
+        <table class="stack-sm vs-t">
+          <thead><tr><th scope="col">VLAN</th><th scope="col">Prefix</th><th scope="col">Gateway</th><th scope="col">Addresses</th><th scope="col">Reaches</th><th scope="col">Ports</th></tr></thead>
+          <tbody>
+            {N.vlans.map((v) => (
+              <tr>
+                <th scope="row"><span class="vl"><span class:list={['vl-sw', { 'vl-hatch': v.vlan === 90 }]} style={`--vl:${VL.includes(v.vlan) ? `var(--vl-${v.vlan})` : 'var(--text)'}`}></span><b class="vl-n">{v.vlan}</b> {v.name}</span></th>
+                <td data-label="Prefix" class="mono">{v.subnet}</td>
+                <td data-label="Gateway" class="mono">{v.gateway ?? 'None: not routed'}</td>
+                <td data-label="Addresses">{v.routed ? <>{v.addresses ? `${plural(v.addresses, 'reservation')}` : 'None reserved'}<small>{[v.reserved ? `reserved ${range(v.reserved)}` : null, v.pool ? `pool ${range(v.pool)}` : null].filter(Boolean).join(' · ')}</small></> : <span class="faint">Link-local, in each room</span>}</td>
+                <td data-label="Reaches">{v.reaches}</td>
+                <td data-label="Ports" class="num">{v.ports}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="faint vs-foot">From the network standard's VLAN plan. Prefixes, gateways and addresses are made up for the demo; the ports are as recorded for the demo, as the switch platforms would report them.</p>
+    </div>
+  </Section>
+)}
+
+<style is:global>
+  .vs { display: grid; gap: 14px; }
+  .vs-rev { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .vs-rev li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; font-size: var(--fs-support); }
+  .vs-rev small { display: block; color: var(--text-2); font-size: var(--fs-code); margin-top: 2px; }
+  .vs-ok { margin: 0; }
+  .vs-sw { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: var(--fs-support); }
+  .vs-sw b { font-weight: 550; margin-right: 4px; }
+  .vs-chip { display: inline-grid; padding: 5px 10px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); font: 500 var(--fs-code)/1.25 var(--font-mono); text-decoration: none; color: var(--text); }
+  .vs-chip small { font: 400 var(--fs-mark)/1.2 var(--font-sans); color: var(--text-3); }
+  .vs-chip:hover { border-color: var(--text-2); }
+  .vs-t { width: 100%; border-collapse: collapse; }
+  .vs-t th, .vs-t td { text-align: left; vertical-align: top; padding: 9px 12px 9px 0; border-top: 1px solid var(--line); font-size: var(--fs-support); }
+  .vs-t thead th { border-top: 0; font: 500 var(--fs-overline)/1.2 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+  .vs-t tbody th { font: 400 var(--fs-support)/1.4 var(--font-sans); text-transform: none; letter-spacing: 0; color: var(--text); white-space: nowrap; }
+  .vs-t td small { display: block; color: var(--text-3); font-size: var(--fs-code); }
+  .vs-foot { margin: 0; font-size: var(--fs-code); }
+</style>

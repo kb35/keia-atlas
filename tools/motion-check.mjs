@@ -2,7 +2,10 @@
 /* Motion check (MOTION-V2 §6 and §7, docs/rules/motion.md M7): with prefers-reduced-motion: reduce, no script may
    animate. It opens pages in a browser set to reduced motion, does what a person does on them (zoom into a space
    on the floor plan and back out with [ and ], open the palette in each of its modes, switch a module off and on
-   in Settings, choose a port on a unit), and fails when any Element.animate() call asks for a duration above 0.
+   in Settings, choose a port on a unit, press a space and a floor on a Home thumbnail; open and close a disclosure, filter a list, scroll sections and charts into
+   view, switch a project's phase, hover a card), and fails when any Element.animate() call asks for a duration above 0.
+   It runs every flow twice: once with the system set to reduced motion, and once with the system at full motion but
+   the site's own switch on (html data-motion="off"), which must win.
    CSS transitions and animations are checked by motion.css's own reduce rules, not here.
 
    Usage:
@@ -74,6 +77,17 @@ const FLOWS = [
     await page.click('[data-rpl-play]'); await settle(page, 1500);
     await page.click('[data-rpl-now]'); await settle(page);
   }],
+  ['thumb', '/', async (page) => {
+    // The floor map's thumbnail on Home: a space changes state and back (tint and glyph), a space zooms open, and
+    // the card zooms into the office plan on its floor.
+    await page.evaluate(() => { document.dispatchEvent(new CustomEvent('rs:space-state', { detail: { id: 'dub-3-03', h: 'review', why: 'check' } })); }); await settle(page);
+    await page.evaluate(() => { document.dispatchEvent(new CustomEvent('rs:space-state', { detail: { id: 'dub-3-03', h: 'fine' } })); }); await settle(page);
+    await page.locator('.fm-t-hit:has(.hg):visible').first().click();
+    await page.waitForURL(/rooms\//, { waitUntil: 'commit' }); await settle(page);
+    await page.goBack(); await page.waitForURL(/keia-atlas\/$/, { waitUntil: 'commit' }); await settle(page);
+    await page.locator('a.fm-t-open:visible').first().click();
+    await page.waitForURL(/locations\/[a-z]+\/\?floor=/, { waitUntil: 'commit' }); await settle(page);
+  }],
   ['palette', '/', async (page) => {
     await key(page, '/'); await settle(page, 300);
     await page.keyboard.type('x52'); await settle(page, 300);
@@ -101,12 +115,45 @@ const FLOWS = [
     await key(page, '['); await settle(page);
     await key(page, ']'); await settle(page);
   }],
+  // The site-wide grammar (motion.md M19): a disclosure opens and closes (km-disclose), a filter reflows a list and
+  // ticks its count (km-tick), sections settle and charts draw in as they scroll into view (km-settle, km-draw-in),
+  // a phase switch comes in from the side, a card lifts on hover (km-lift, CSS).
+  ['disclose', '/', async (page) => {
+    const s = page.locator('main details:not([hidden]) > summary:visible').first();
+    await s.click(); await settle(page);
+    await s.click(); await settle(page);
+  }],
+  ['filter-tick', '/support/queue/', async (page) => {
+    await page.locator('[data-fb-facet="prio"] .fb-chip-btn').first().click(); await settle(page, 300);
+    await page.locator('[data-fb-facet="prio"] [data-fopt][data-v="3"]').first().click(); await settle(page);
+    await page.locator('[data-fb-facet="prio"] [data-fopt][data-v="3"]').first().click(); await settle(page);
+    await key(page, 'Escape'); await settle(page, 300);
+  }],
+  ['settle-draw', '/services/av/', async (page) => {
+    await page.addInitScript(() => { window.__kmSettleAlways = true; });   // an automated browser skips km-settle otherwise
+    await page.reload({ waitUntil: 'load' }); await settle(page, 500);
+    for (let i = 0; i < 8; i++) { await page.mouse.wheel(0, 700); await settle(page, 250); }
+  }],
+  ['phase', '/projects/prj-09/', async (page) => {
+    const tabs = page.locator('.ptl-row[data-phx]:visible, .pr-step[data-phx]:visible');
+    if (await tabs.count() > 1) { await tabs.first().click(); await settle(page); await tabs.last().click(); await settle(page); }
+  }],
+  ['lift', '/locations/offices/', async (page) => {
+    await page.locator('main .card.oc').first().hover(); await settle(page, 400);
+    await page.mouse.move(2, 2); await settle(page, 300);
+  }],
 ];
 
 const { browser } = await loadPlaywright();
-const run = async (reduced) => {
+const run = async (reduced, motionAttr = '') => {
   const ctx = await browser.newContext({ reducedMotion: reduced ? 'reduce' : 'no-preference', viewport: { width: 1440, height: 900 } });
   await ctx.addInitScript(hook);
+  // The site's own switch (html data-motion="off"), as a Settings control would set it, kept through page changes.
+  if (motionAttr) await ctx.addInitScript((v) => {
+    const set = () => { if (document.documentElement) document.documentElement.setAttribute('data-motion', v); };
+    document.addEventListener('readystatechange', set); document.addEventListener('astro:after-swap', set); document.addEventListener('DOMContentLoaded', set);
+    set(); new MutationObserver((_, mo) => { if (document.documentElement) { set(); mo.disconnect(); } }).observe(document, { childList: true });
+  }, motionAttr);
   const out = [];
   for (const [name, path, flow] of FLOWS.filter(([n]) => !ONLY.length || ONLY.includes(n))) {
     const page = await ctx.newPage();
@@ -126,13 +173,16 @@ const run = async (reduced) => {
 };
 
 let failed = 0;
-for (const r of await run(true)) {
+const report = (rs, how) => { for (const r of rs) {
   const bad = r.anims.length || r.errors.length;
   if (bad) failed++;
-  console.log(`${bad ? 'FAIL' : 'ok  '}  ${r.name.padEnd(13)} ${r.anims.length} scripted animation${r.anims.length === 1 ? '' : 's'} under reduced motion${r.errors.length ? `, ${r.errors.length} error${r.errors.length === 1 ? '' : 's'}` : ''}`);
+  console.log(`${bad ? 'FAIL' : 'ok  '}  ${r.name.padEnd(13)} ${r.anims.length} scripted animation${r.anims.length === 1 ? '' : 's'} ${how}${r.errors.length ? `, ${r.errors.length} error${r.errors.length === 1 ? '' : 's'}` : ''}`);
   r.anims.slice(0, 8).forEach((a) => console.log(`        ${a.d} ms on ${a.el}  (${a.at})`));
   r.errors.slice(0, 4).forEach((e) => console.log(`        error: ${e}`));
-}
+} };
+report(await run(true), 'under reduced motion');
+// The site's own switch must hold even when the system asks for full motion.
+report(await run(false, 'off'), 'with data-motion="off"');
 if (FULL) for (const r of await run(false)) console.log(`full  ${r.name.padEnd(13)} ${r.anims.length} scripted moves${r.errors.length ? `, errors: ${r.errors.join('; ')}` : ''}`);
 await browser.close();
 console.log(failed ? `\n${failed} flow${failed === 1 ? '' : 's'} animate under reduced motion (or stopped).` : '\nNo scripted animation under reduced motion.');

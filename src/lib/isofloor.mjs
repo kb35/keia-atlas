@@ -2,25 +2,26 @@
 // front door uses wherever it shows a floor (the Deliver stage, Fix it yourself, the first moment). The projection is
 // src/lib/iso.mjs; this adds what a drawing on a page needs: every primitive in draw order in viewBox units, where
 // each space's ring sits, where each device in a space sits on its top face, and the space's kind for its tint.
+// Its floor and spaces come from src/lib/floorplan.mjs, the geometry the plan and the thumbnails share.
 // Pure geometry, no DOM: IsoFloor.astro draws it, and a parent reads the same points to place words.
 //
 //   floorScene(M, floorId, opts)   { F, rooms, prims, ground, rings, devs, k, width, height, T }
 //     opts.kit    true: a dot per device in each single space (desk banks and their per-desk kit are left out)
 //     opts.rings  'all' (every space, as the hero) or 'rooms' (single spaces only: the ones a fit-out equips)
 import { isoFloor, fit, iso } from './iso.mjs';
+import { planOf, KIND_GROUP } from './floorplan.mjs';
 
-// A space's kind, as the floor plan's key has it (src/components/FloorMap.astro).
-export const kindOf = (t) => (t === 'mdf' || t === 'idf' ? 'comms' : t?.startsWith('workstation') ? 'desks' : t === 'reception-concierge' ? 'reception'
-  : ['pantry', 'pantry-expanded', 'cafeteria'].includes(t) ? 'pantry' : ['copy-print-room', 'it-store'].includes(t) ? 'print'
-  : t === 'focus-room' || t === 'office' || t?.startsWith('huddle-room') ? 'small' : 'meeting');
+// A space's kind, as the floor plan's key has it: the one definition in src/lib/floorplan.mjs, desk banks as "desks".
+export const kindOf = KIND_GROUP;
 
 // The order kit goes in on a fit-out (src/lib/integrate.mjs: the room system, then what pairs with it, then the rest).
 export const BATCH_ORDER = ['video-bar', 'display', 'touch-controller', 'scheduler-panel'];
 
 export function floorScene(M, floorId, { width = 960, height = 560, pad = 40, h = 1.1, kit = false, rings = 'all', ringLift = kit ? 1.05 : 0.35 } = {}) {
-  const F = M.floors.find((f) => f.id === floorId);
-  if (!F) throw new Error(`floorScene: no floor ${floorId}`);
-  const rooms = Object.values(M.rooms).filter((r) => r.floor === floorId && r.rect);
+  // The same floor and spaces as the plan and the thumbnail (src/lib/floorplan.mjs), projected.
+  const P = planOf(M, floorId);
+  if (!P) throw new Error(`floorScene: no floor ${floorId}`);
+  const { F, rooms } = P;
   const FL = isoFloor(F, rooms, { h, ringLift });
   const f = fit(FL.prims, { width, height, pad });
   const single = (r) => (r.count ?? 1) === 1;
