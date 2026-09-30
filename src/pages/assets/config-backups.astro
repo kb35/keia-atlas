@@ -1,0 +1,68 @@
+---
+// Config backups and drift (the Config backups capability, src/lib/modules.mjs; src/lib/backups.mjs): each network
+// device's last config backup, as read from Oxidized, and where its config differs from the network standard. The
+// answer first (devices that differ, backups that failed or are late), then the devices, what needs a look first,
+// each difference naming the standard's rule. Atlas keeps the date and the drift, never the config. Connected by
+// default; simulated in the demo (data/config-backups/).
+import Shell from '../../layouts/Shell.astro';
+import PageBand from '../../components/PageBand.astro';
+import FilterBar from '../../components/FilterBar.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import HealthGlyph from '../../components/HealthGlyph.astro';
+import FeatureGate from '../../components/FeatureGate.astro';
+import FeatureSource from '../../components/FeatureSource.astro';
+import Restricted from '../../components/Restricted.astro';
+import { href, fmtDate, sites, SITE_ORDER, modelName } from '../../lib/data.mjs';
+import { backups, backupTotals as T, unitByTag, spaceTitle } from '../../lib/capabilities-view.mjs';
+import { backupAnswer, backupWhen, SOURCE_LABEL } from '../../lib/backups.mjs';
+import '../../styles/capabilities.css';
+
+const WORD = { fault: 'Backup failed or late', review: 'Differs from the standard', fine: 'Backed up, to the standard' };
+const usedSites = SITE_ORDER.filter((s) => backups.some((b) => b.site === s));
+const FACETS = [
+  { key: 'site', label: 'Office', options: usedSites.map((s) => ({ value: s, label: sites[s].name, sub: sites[s].city })) },
+  { key: 'status', label: 'Status', options: Object.entries(WORD).map(([value, label]) => ({ value, label })) },
+];
+const NUMBERS = [
+  { n: T.drifted, label: 'Differ from the standard', to: '?status=review', tone: T.drifted ? 'warn' : undefined },
+  { n: T.late, label: 'Failed or late', to: '?status=fault', tone: T.late ? 'bad' : undefined },
+  { n: T.changed, label: 'Changed overnight', fact: true },
+  { n: T.devices, label: 'Devices', fact: true },
+];
+---
+<Shell title="Config backups" section="config-backups" crumbs={[{ label: 'Assets', to: '/assets/' }, { label: 'Config backups' }]}>
+  <FeatureGate id="config-backups">
+    <PageBand overline="Config backups" title="Config backups" answer={backupAnswer(T)} lede="Each network device's last config backup, and where its config differs from the network standard." sim heartbeat={false} numbers={NUMBERS}>
+      <FeatureSource slot="overline" id="config-backups" />
+    </PageBand>
+    <div class="content cfb">
+      <FilterBar facets={FACETS} placeholder="Find a device, office or setting" label="Find a device" noun={['device', 'devices']} scope=".content.cfb" />
+      <p class="cfb-cls"><Restricted view="rack" /></p>
+      <div class="card cap-t">
+        <table class="to-cards cap-tbl">
+          <thead><tr><th>Device</th><th>Last backup</th><th>Differs from the standard</th></tr></thead>
+          <tbody>
+            {backups.map((b) => {
+              const u = unitByTag.get(b.unit);
+              return (
+                <tr class:list={[{ 'is-alert': b.state === 'fault', 'is-warn': b.state === 'review' }]} data-fi data-help="backup.row" data-find={`${b.unit} ${u?.host ?? ''} ${u ? modelName(u.model) : ''} ${sites[b.site].name} ${b.drift.map((d) => d.setting).join(' ')}`} data-f-site={b.site} data-f-status={b.state}>
+                  <td data-label=""><span class="cap-g"><HealthGlyph state={b.state} size={16} word={WORD[b.state]} /></span><a href={href(`/device/?tag=${b.unit}`)}><b>{u?.host ?? b.unit}</b></a><small>{u ? modelName(u.model) : ''}</small><small>{u ? `${spaceTitle(u.space)}, ` : ''}{sites[b.site].name}</small></td>
+                  <td data-label="Last backup" class="num">{b.status === 'failed' ? 'Failed' : backupWhen(b)}<small class:list={['cap-w', { 't-bad': b.late }]}>{b.status === 'failed' ? `last good ${backupWhen(b)}` : b.late ? 'late' : `${fmtDate(b.last.slice(0, 10))}`}</small><small>{b.changed ? `${b.changed} ${b.changed === 1 ? 'line' : 'lines'} changed` : 'No change'}</small></td>
+                  <td data-label="Differs">{b.drift.length ? (
+                    <ul class="cap-list">{b.drift.map((d) => <li><b>{d.setting}</b><span>{d.found}; the standard says {d.expected}</span><small><a href={href(`/standards/${d.rule.split('/')[0]}/#r-${d.rule.split('/')[1]}`)}>Network standard, {d.rule.split('/')[1]}</a></small></li>)}</ul>
+                  ) : <span class="faint">Nothing</span>}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <EmptyState text="No devices match these filters." />
+      <p class="cap-note">Read from {SOURCE_LABEL[backups[0]?.source ?? 'oxidized']} each morning at 06:00: the time of each device's last backup, the lines changed since the one before, and each setting that differs from the network standard. Atlas never keeps the config itself, which can hold secrets. Simulated for the demo.</p>
+    </div>
+  </FeatureGate>
+</Shell>
+
+<style>
+  .cfb-cls { margin: 0; }
+</style>

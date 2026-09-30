@@ -118,5 +118,30 @@ export function crossCheckCapabilities(records) {
     }
   }
 
+  // Config backups: a real office, named in the file; each unit a network switch or gateway in that office, listed
+  // once; each difference names a rule of the house standard.
+  const netModels = new Set(inFolder('device-models').filter((r) => ['network-switch', 'network-gateway'].includes(r.data.class)).map((r) => r.id));
+  for (const rec of inFolder('config-backups')) {
+    const d = rec.data, seen = new Set();
+    site(rec, ['site'], d.site);
+    if (d.site !== rec.id) report(rec, ['site'], `the file is named "${rec.id}" but holds office "${d.site}"`);
+    d.devices.forEach((x, i) => {
+      const u = tags.get(x.unit);
+      if (!u) report(rec, ['devices', i, 'unit'], `unit "${x.unit}" is not in data/installs/`);
+      else {
+        if (!netModels.has(u.model)) report(rec, ['devices', i, 'unit'], `unit "${x.unit}" is a ${u.model}, not a network switch or gateway`);
+        if (spaces.get(u.space)?.site !== d.site) report(rec, ['devices', i, 'unit'], `unit "${x.unit}" is not in this office`);
+      }
+      if (seen.has(x.unit)) report(rec, ['devices', i, 'unit'], `unit "${x.unit}" is listed twice`);
+      seen.add(x.unit);
+      if (x.last_backup > d.read_at) report(rec, ['devices', i, 'last_backup'], 'backed up after the snapshot was read');
+      (x.drift ?? []).forEach((f, j) => {
+        const [std, rule] = f.rule.split('/');
+        if (!standards.has(std)) report(rec, ['devices', i, 'drift', j, 'rule'], `house standard "${std}" does not exist`);
+        else if (!ruleIds(standards.get(std)).has(rule)) report(rec, ['devices', i, 'drift', j, 'rule'], `the ${std} standard has no rule "${rule}"`);
+      });
+    });
+  }
+
   return problems;
 }

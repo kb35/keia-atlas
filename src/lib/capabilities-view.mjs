@@ -10,6 +10,7 @@ import { sentence, subjectOf, routeWords, simulatedAlerts, alertCounts } from '.
 import { credentialRows, credentialSummary, expiryWords, LEVEL_WORD } from './credentials.mjs';
 import { flawRows, flawSummary, flawsForUnit, SEVERITY_WORD, SEVERITY_TONE, FIX_WORD } from './flaws.mjs';
 import { fleet as kiFleet } from './knownissues-view.mjs';
+import { backupRows, backupSummary, backupWhen, SOURCE_LABEL as BACKUP_SOURCE } from './backups.mjs';
 import { firmwareLines } from './data.mjs';
 import { alternativesFor } from './outofservice.mjs';
 import { PEOPLE } from './demo.mjs';
@@ -123,6 +124,10 @@ export const platformName = (id) => readRecords('house-values')[0]?.platforms?.f
 export const flaws = flawRows(readRecords('security-flaws'), kiFleet, firmwareLines);
 export const flawTotals = flawSummary(flaws);
 
+// ---- Config backups --------------------------------------------------------------------------------------------------
+export const backups = backupRows(readRecords('config-backups'));
+export const backupTotals = backupSummary(backups);
+
 // ---- The unit page's cards (/device/caps.json, UnitCapabilities.astro) --------------------------------------------
 // Each card already worded: { feature, help, title, answer, tone?, items: [{ b, text?, w?, tone?, small?, to? }], more? }.
 // Cards come in the order UnitCapabilities.astro lists them (licences, credentials, cves, config-backups).
@@ -161,6 +166,20 @@ UNIT_CARDS.push((u) => {
     tone: ex.some((x) => SEVERITY_TONE[x.row.severity] === 'bad') ? 'bad' : 'warn',
     items: fl.map(({ row, state }) => ({ b: `${row.id}: ${row.title}`, text: `${SEVERITY_WORD[row.severity]}${row.cvss != null ? ` (${row.cvss})` : ''} · ${state === 'exposed' ? 'exposed' : 'may be exposed'}`, tone: SEVERITY_TONE[row.severity] ?? undefined,
       small: row.fixed_in ? `${FIX_WORD[row.fix]}: ${row.fixed_in}` : FIX_WORD.none, to: `assets/security-flaws/#${row.id.toLowerCase()}` })),
+  };
+});
+UNIT_CARDS.push((u) => {
+  const b = backups.find((r) => r.unit === u.tag);
+  if (!b) return null;
+  return {
+    feature: 'config-backups', help: 'unit.backup', title: 'Config backup',
+    answer: `${b.status === 'failed' ? 'Last backup failed; the last good one was' : 'Last backed up'} ${backupWhen(b)}${b.drift.length ? ` · ${b.drift.length === 1 ? 'one setting differs' : `${b.drift.length} settings differ`} from the standard` : ''}`,
+    tone: b.late ? 'bad' : b.drift.length ? 'warn' : undefined,
+    items: [
+      { b: `${BACKUP_SOURCE[b.source]}, ${fmt(b.last.slice(0, 10))} ${b.last.slice(11, 16)}`, text: b.changed ? `${b.changed} ${b.changed === 1 ? 'line' : 'lines'} changed since the backup before` : 'No change since the backup before' },
+      ...b.drift.map((d) => ({ b: d.setting, text: `${d.found}; the standard says ${d.expected}`, tone: 'warn', small: `Network standard, rule ${d.rule.split('/')[1]}`, to: `standards/${d.rule.split('/')[0]}/#r-${d.rule.split('/')[1]}` })),
+    ],
+    more: { to: 'assets/config-backups/', label: 'Every device\'s backup' },
   };
 });
 export function unitCaps() {

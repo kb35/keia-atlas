@@ -14,6 +14,7 @@ import { outNow, lostBookings, noticeLines, whenWords, alternativesFor } from '.
 import { sentence, quietWords, simulatedAlerts, alertCounts, ruleAnswer } from '../src/lib/alerts.mjs';
 import { warnLevel, credentialRows, credentialSummary, credentialAnswer } from '../src/lib/credentials.mjs';
 import { exposure, fixState, flawRows, flawSummary, flawAnswer } from '../src/lib/flaws.mjs';
+import { backupRows, backupSummary, backupAnswer, backupWhen } from '../src/lib/backups.mjs';
 import { nthWeekday, planDates, rounds, checksForSpace, checksSummary, checksAnswer, checkItem, addMonths } from '../src/lib/checks.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -37,7 +38,7 @@ for (const f of readdirSync(join(ROOT, 'data/installs'))) for (const n of readdi
   for (const u of inst.older_kit ?? []) add(u, u.model);
 }
 
-const FOLDERS = ['licences', 'checks', 'out-of-service', 'alert-rules', 'credentials', 'security-flaws'];
+const FOLDERS = ['licences', 'checks', 'out-of-service', 'alert-rules', 'credentials', 'security-flaws', 'config-backups'];
 let result;
 test('each capability\'s data validates: schema, secrets and cross-references', async () => {
   result = await validate(ROOT);
@@ -192,6 +193,23 @@ test('security flaws: exposed when older than the fix on a tracked line, may be 
   assert.equal(rows[0].severity, 'critical', 'worst first');
   assert.match(flawAnswer(flawSummary(rows)), /^\d flaws? exposes? \d+ units? · \d more may affect \d+ units?, 1 critical$/);
   assert.ok(Object.values(all).every((f) => /^CVE-DEMO-/.test(f.id)), 'made-up flaws say so in their id');
+});
+
+// ---- Config backups ------------------------------------------------------------------------------------------------
+test('config backups: failed or late first, then drift; the answer counts both; never the config itself', () => {
+  const snaps = read('config-backups');
+  assert.ok(snaps.every((s) => s.simulated === true && s.source === 'oxidized'));
+  assert.ok(snaps.every((s) => s.devices.every((d) => !('config' in d))), 'no config is kept');
+  const rows = backupRows(snaps);
+  const rank = { fault: 0, review: 1, fine: 2 };
+  assert.deepEqual(rows.map((r) => rank[r.state]), [...rows.map((r) => rank[r.state])].sort((a, b) => a - b));
+  const s = backupSummary(rows);
+  assert.ok(s.drifted > 0 && s.late > 0);
+  assert.match(backupAnswer(s), /^\d+ devices? differs? from the standard · \d+ backups? failed or late$/);
+  assert.equal(backupAnswer({ devices: 3, drifted: 0, late: 0 }), 'All 3 devices backed up and to the standard');
+  const late = backupRows([{ site: 'x', source: 'oxidized', read_at: '2026-09-28T06:00', devices: [{ unit: 'AG-1', last_backup: '2026-09-25T02:00', status: 'ok', lines_changed: 0 }] }])[0];
+  assert.equal(late.state, 'fault', 'a backup older than 48 hours is late');
+  assert.equal(backupWhen(late), '3 days ago');
 });
 
 test('out of service: the space offered instead is the same kind in the same office, same floor first, never one that is out', () => {
