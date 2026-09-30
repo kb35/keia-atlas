@@ -366,6 +366,12 @@ export function diffQuotes(a, b) {
   return { from: a.v, to: b.v, added, removed, changed, rooms, options, discount, totals, n, answer: `Version ${b.v} is ${dir} than version ${a.v}: ${plural(n, 'change')}` };
 }
 
+// A line's role in the space type, short and in running text: "HDBaseT transmitter", "powers the video bar".
+const roleWords = (role) => {
+  const t = role.replace(/:.*$/, '').replace(/\s*\(.*\)\s*$/, '').trim();
+  return /^[A-Z][a-z]/.test(t) ? t[0].toLowerCase() + t.slice(1) : t;
+};
+
 // ---- Statement of work ------------------------------------------------------------------------------------------------
 /** Outlets a room needs, from its build option's infrastructure: power, data and direct runs (the lower figure of a range). */
 export function outletsFor(room) {
@@ -384,7 +390,7 @@ export function buildSow(opp, ver, ctx) {
   const vWord = `version ${ver.v}`;
   const scope = ver.rooms.map((r) => ({
     space: r.space, label: r.label, type: `${r.typeName}, ${r.optionName.toLowerCase()}`,
-    lines: r.lines.map((l) => `${l.qty} × ${l.name}${l.role ? ` (${l.role.replace(/:.*$/, '').toLowerCase()})` : ''}`),
+    lines: r.lines.map((l) => `${l.qty} × ${l.name}${l.role ? ` (${roleWords(l.role)})` : ''}`),
   }));
   const guides = new Map();
   for (const r of ver.rooms) for (const l of r.lines) if (l.guide) guides.set(l.guide.id, { name: l.guide.name, units: (guides.get(l.guide.id)?.units ?? 0) + l.qty });
@@ -399,8 +405,9 @@ export function buildSow(opp, ver, ctx) {
     builds.set(k, b);
   }
   const outletWords = [...builds.values()].map((b) => {
-    const parts = [b.out.power && `${b.out.power} power`, b.out.data && `${b.out.data} data`, b.out['direct-run'] && `${b.out['direct-run']} direct cable runs`].filter(Boolean);
-    return parts.length ? `${b.name} (${b.rooms.join(', ')}): ${parts.join(', ')} outlets in place before the install day, as the space type lists them.` : null;
+    const parts = [b.out.power && plural(b.out.power, 'power outlet'), b.out.data && plural(b.out.data, 'data outlet'), b.out['direct-run'] && plural(b.out['direct-run'], 'direct cable run')].filter(Boolean);
+    const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0];
+    return parts.length ? `${b.name} (${b.rooms.join(', ')}): ${list} in place in each room before the install day, as the space type lists them.` : null;
   }).filter(Boolean);
   const notLib = ver.bom.lines.filter((l) => l.notInLibrary);
   const days = ver.labour.days;

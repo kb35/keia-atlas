@@ -1,0 +1,31 @@
+---
+/* SalesFrame: a page of a provider's own sales (src/lib/provider-sales.mjs). Only the provider's own people see what
+   is inside; anyone else gets a line saying whose Keia this is (the same gate as the portfolio pages). While the
+   Provider sales capability is off, the page says so in one line and offers Settings.
+   Props:  provider  the provider's id (northlight) */
+import { href } from '../lib/data.mjs';
+import { PEOPLE } from '../lib/demo.mjs';
+import { orgName } from '../lib/engagements.mjs';
+import '../styles/engagements.css';
+import '../styles/sales.css';
+interface Props { provider: string }
+const { provider } = Astro.props;
+const name = orgName(provider);
+const css = PEOPLE.filter((p) => p.vendor === provider).map((p) => `:root[data-who="${p.id}"] .pf-for{display:revert}:root[data-who="${p.id}"] .pf-gate-wrap{display:none}`).join('');
+const who = PEOPLE.find((p) => p.vendor === provider);
+---
+<div class="pf-for">
+  <div data-feature="provider-sales"><slot /></div>
+  <div class="content" data-feat-offshow="provider-sales">
+    <p class="sl-off card pad">Provider sales is switched off in Settings. Your clients, jobs and visits are still under Your clients.</p>
+  </div>
+</div>
+<div class="pf-gate-wrap content">
+  <div class="card pad pf-gate">
+    <p class="overline">A provider's own Keia</p>
+    <h1 class="sl-gh">This is {name}'s sales</h1>
+    <p>A provider keeps its opportunities, designs, quotes and margins in its own Keia. None of it reaches a client until a quote is accepted, and then only the design, as a proposal. To see it, pick one of its people in View as{who ? ` (${who.name}, ${name})` : ''}.</p>
+    <a class="btn" href={href('/vendors/northlight/engagement/')}>See Aigna's engagement with Northlight AV</a>
+  </div>
+</div>
+<style is:global set:html={css}></style>

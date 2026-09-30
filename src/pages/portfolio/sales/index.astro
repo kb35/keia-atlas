@@ -1,0 +1,77 @@
+---
+// Sales, in a provider's own Keia (src/lib/provider-sales.mjs): the pipeline. One card per opportunity, by stage, each
+// with its answer sentence and value; then the thread that runs from a design to the client's as-built, and what this
+// does not try to be. Only Northlight AV's people see it. Simulated; every price is fictional.
+import Shell from '../../../layouts/Shell.astro';
+import PageBand from '../../../components/PageBand.astro';
+import SalesFrame from '../../../components/SalesFrame.astro';
+import { href } from '../../../lib/data.mjs';
+import { sales } from '../../../lib/provider-sales-data.mjs';
+import { money, STAGES } from '../../../lib/provider-sales.mjs';
+
+const M = sales();
+const P = M.pipeline;
+const whole = (n: number) => money(Math.round(n));
+const NUMBERS = [
+  { n: P.open.n, label: P.open.n === 1 ? 'Opportunity open' : 'Opportunities open', to: '#pipeline' },
+  { n: whole(P.open.value), label: 'In play', to: '#pipeline' },
+  { n: P.stages.find((s) => s.id === 'quoted').n, label: 'Quoted', to: '#stage-quoted' },
+  { n: P.won.n, label: 'Accepted this year', to: '#stage-accepted' },
+];
+const linkOf = (o: any) => (o.hasDesign ? `/portfolio/sales/${o.slug}/` : null);
+const quoteOf = (o: any) => (o.versions.length ? `/portfolio/sales/${o.slug}/quote/` : null);
+const valueWords = (o: any) => (o.current ? `${whole(o.value)} · ${o.current.status === 'draft' ? `draft version ${o.current.v}` : `version ${o.current.v}`}` : `about ${whole(o.value)}, a rough estimate`);
+---
+<Shell vendorOk title="Sales" section="sales" crumbs={[{ label: 'Your clients', to: '/portfolio/' }, { label: 'Sales' }]}>
+  <SalesFrame provider="northlight">
+    <PageBand overline="Sales" title="Sales" answer={P.answer} lede="Northlight AV's opportunities, from a lead to the client's project" sim heartbeat={false} numbers={NUMBERS} />
+
+    <div class="content sl-page">
+      <section id="pipeline" class="sl-pipe" aria-label="The pipeline" data-feature="provider-sales" data-help="sales.pipeline">
+        {P.stages.map((s) => (
+          <div class="sl-stage" id={`stage-${s.id}`} data-stage={s.id} data-help="sales.stage">
+            <header class="sl-stage-h">
+              <h2>{s.word}</h2>
+              <span class="sl-stage-n">{s.n} · {whole(s.value)}</span>
+              <small>{s.what}</small>
+            </header>
+            {s.opps.map((o: any) => (
+              <article class="card sl-opp" data-stage={o.stage} data-help="sales.opp" data-vt-rec={`sl-${o.slug}`}>
+                <p class="sl-opp-o"><span class="mono">{o.id}</span><span>{o.clientName}</span>{o.fictional && <span class="pf-fict">Made-up client</span>}</p>
+                <h3>{linkOf(o) ? <a href={href(linkOf(o))}>{o.title}</a> : o.title}</h3>
+                <p class="sl-opp-a">{o.answer}</p>
+                <p class="sl-opp-v"><b>{valueWords(o)}</b><small>{o.siteName}{o.contactName ? ` · ${o.contactName}` : ''}</small></p>
+                {o.next && <p class="sl-opp-next"><span>Next</span> {o.next}</p>}
+                {(linkOf(o) || quoteOf(o)) && (
+                  <p class="sl-opp-go">
+                    {linkOf(o) && <a href={href(linkOf(o))}>Design</a>}
+                    {quoteOf(o) && <a href={href(quoteOf(o))}>Quote</a>}
+                    {o.hasQuote && <a href={href(`/portfolio/sales/${o.slug}/accept/`)}>{o.stage === 'accepted' ? `Became ${o.becomes}` : 'Accept'}</a>}
+                  </p>
+                )}
+              </article>
+            ))}
+            {!s.opps.length && <p class="pf-none">Nothing at this stage.</p>}
+          </div>
+        ))}
+      </section>
+
+      <section class="card pad sl-why" data-feature="provider-sales" data-help="sales.why">
+        <h2 class="sl-h">One thread, typed once</h2>
+        <p>A design is drawn from the space types and the device library. Its bill of materials prices the quote; the quote and the design write the statement of work. Accepted, the design goes to the client's Keia over the engagement as a proposal, becomes the client's project, and its BOM becomes the install positions the build sheets start from. The as-built comes back as a reviewed change. Nothing is typed twice.</p>
+        <ol class="sl-why-steps">
+          {['Design', 'Bill of materials', 'Quote', 'Statement of work', 'Accepted', 'Client\'s project', 'Build sheets', 'As-built'].map((w) => <li>{w}</li>)}
+        </ol>
+      </section>
+
+      <section class="sl-connects" data-feature="provider-sales" data-help="sales.connects" aria-label="Connects to">
+        <h2 class="sl-h">Connects to</h2>
+        <ul>
+          <li><b>Invoicing: Xero or QuickBooks.</b> An accepted quote's payments would go to the accounts tool as invoices. Designed, not built; Keia Atlas keeps no ledger.</li>
+          <li><b>Import: D-Tools or Jetbuilt.</b> A project from a quoting tool would come in as a design, matched to the space types and the library. Designed, not built.</li>
+          <li><b>Not a replacement</b> for a PSA (ConnectWise, Halo, Simpro) or for accounts. Keia keeps the thread from design to as-built, and hands the money to the tools that already do it.</li>
+        </ul>
+      </section>
+    </div>
+  </SalesFrame>
+</Shell>

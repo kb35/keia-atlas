@@ -85,6 +85,8 @@ const PAGES = [
   // Organisations and engagements (docs/service-providers.md): the client's side, and the provider's own (--who sam).
   ['vendor-engagement', '/vendors/northlight/engagement/', 'other'],
   ['portfolio', '/portfolio/', 'other'], ['portfolio-client', '/portfolio/aigna-northlight/', 'other'], ['portfolio-client-fw', '/portfolio/fenwater-northlight/', 'other'], ['portfolio-engagement', '/portfolio/aigna-northlight/engagement/', 'other'],
+  // A provider's sales (--who sam): the pipeline, a design, its quote, the statement of work and the handoff.
+  ['sales', '/portfolio/sales/', 'other'], ['sales-design', '/portfolio/sales/opp-2611/', 'other'], ['sales-quote', '/portfolio/sales/opp-2611/quote/', 'other'], ['sales-sow', '/portfolio/sales/opp-2611/sow/', 'other'], ['sales-accept', '/portfolio/sales/opp-2611/accept/', 'other'], ['sales-accepted', '/portfolio/sales/opp-2602/accept/', 'other'], ['sales-design-fw', '/portfolio/sales/opp-2613/', 'other'],
   ['usage', '/usage/', 'other'],
   ['learn', '/learn/', 'other'],
   // The capabilities (src/lib/modules.mjs): their own pages, and the space and unit pages that carry their cards

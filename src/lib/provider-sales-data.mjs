@@ -55,7 +55,7 @@ export function salesModel(root = process.cwd(), provider = 'northlight') {
     const cur = currentVersion(o);
     const current = cur ? versions.find((v) => v.v === cur.v) : null;
     const diffs = versions.slice(1).map((v, i) => diffQuotes(versions[i], v));
-    const more = { terms: S.terms, labour: S.labour, clientName, providerName, engagement, contactName: personName(o.contact), installs: S.lib.installs };
+    const more = { terms: S.terms, labour: S.labour, clientName, providerName, engagement, contactName: personName(o.contact), installs: o.becomes ? S.lib.installs : {} };
     const sow = current ? buildSow(o, current, more) : null;
     const hand = current ? handoff(o, current, more) : null;
     const value = current ? current.quote.totals.sell : o.estimate ?? 0;

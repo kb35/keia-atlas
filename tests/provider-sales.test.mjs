@@ -258,7 +258,7 @@ test('the statement of work is generated from the design and the quote, and each
   const price = S.sections.find((s) => s.id === 'price');
   assert.equal(Math.round(price.payments.reduce((n, p) => n + p.amount, 0)), Math.round(price.total));
   assert.ok(S.sections.find((s) => s.id === 'client').items.some((x) => /50 inch commercial display to the device library/.test(x)), 'a line not in the library is the client\'s to add');
-  assert.ok(S.sections.find((s) => s.id === 'assumptions').items.some((x) => /power, .*data/.test(x)), 'the outlets come from the space type');
+  assert.ok(S.sections.find((s) => s.id === 'assumptions').items.some((x) => /\d+ power outlets.*\d+ data outlets/.test(x)), 'the outlets come from the space type');
   assert.deepEqual(outletsFor({ infrastructure: [{ service: 'power', quantity: 4 }, { service: 'data', quantity: { min: 2, max: 4 } }] }), { power: 4, data: 2, 'direct-run': 0 });
   void buildSow;
 });
@@ -269,6 +269,7 @@ test('accepted: the design becomes the client\'s project, its BOM the install po
   for (const p of jnu.handoff.positions) for (const m of p.match) assert.ok(m.found && m.sameModel, `${p.label}: ${m.key} is a position in Aigna's record`);
   const chi = opp('OPP-2611').handoff;
   assert.equal(chi.inScope, true);
+  assert.ok(chi.positions.every((p) => p.match === null), 'a quote not yet accepted is not matched against the rooms\' kit today');
   assert.equal(chi.steps.length, 6);
   assert.match(chi.positions[0].yaml, /^space: chi-13-02\npositions:\n {2}- position: display\n {4}model: samsung-qm65c/);
   assert.ok(chi.guides.some((g) => g.id === 'poly-x-google-meet'));
