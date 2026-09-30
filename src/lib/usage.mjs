@@ -20,16 +20,16 @@ const round1 = (n) => Math.round(n * 10) / 10;
 
 // Where each figure would come from. Generic kinds of system, no product names.
 export const SOURCE = {
-  booked: 'Room booking system: bookings for the room\'s calendar.',
-  occupied: 'Occupancy sensing: a people counter in the room, or the video bar\'s own people count, matched against bookings.',
-  noShow: 'Room booking against occupancy: a booking with nobody in the room after 10 minutes counts as a no-show.',
+  booked: 'Room booking system: bookings for the space\'s calendar.',
+  occupied: 'Occupancy sensing: a people counter in the space, or the video bar\'s own people count, matched against bookings.',
+  noShow: 'Room booking against occupancy: a booking with nobody in the space after 10 minutes counts as a no-show.',
   headcount: 'Occupancy sensing: the number of people, reported only as a band. No names, no meeting titles, no organisers.',
   calls: 'Device management platform: call history from the video bar or codec (start, end, far ends). No call content.',
   display: 'Control system or device management: the display\'s power state, polled over its control port or the network.',
   signage: 'Signage manager: the player\'s set on and off schedule, and the panel power state it reports.',
   switch: 'Monitoring over SNMP: uptime, interface status and power over Ethernet draw, polled every five minutes.',
   lamp: 'The projector\'s own lamp hour counter, read over its control port.',
-  incidents: 'Service desk: tickets raised against the room or its devices in the last 12 months.',
+  incidents: 'Service desk: tickets raised against the space or its devices in the last 12 months.',
 };
 
 // ---------- Rooms ----------
@@ -87,15 +87,15 @@ function roomUsage(s) {
   if ((occupied >= 0.62 && typical / cap >= 0.8) || occupied >= 0.78) {
     flag = 'over';
     why = typical >= cap ? `In use ${Math.round(occupied * 100)}% of the working week, usually with ${typical} people in ${cap} seats.` : `In use ${Math.round(occupied * 100)}% of the working week: people struggle to find it free.`;
-    act = 'A candidate for more space: a larger room, or another room of this profile on the floor. Protect it in any cut.';
+    act = 'A candidate for more space: a larger space, or another space of this profile on the floor. Protect it in any cut.';
   } else if (noShow >= 0.3) {
     flag = 'ghost';
     why = `Booked ${Math.round(bookH)} hours a week, but nobody turns up for ${Math.round(noShow * 100)}% of them.`;
-    act = 'Release bookings nobody checks in to after 10 minutes before spending on the room.';
+    act = 'Release bookings nobody checks in to after 10 minutes before spending on the space.';
   } else if (occupied < 0.25 || (cap >= 8 && typical / cap < 0.4)) {
     flag = 'under';
-    why = occupied < 0.25 ? `In use only ${Math.round(occupied * 100)}% of the working week.` : `Usually ${typical} people in a room for ${cap}.`;
-    act = occupied < 0.25 ? 'A candidate for not refreshing, or for a lighter room profile when it is due.' : 'A candidate for downsizing: two smaller rooms would serve the same meetings.';
+    why = occupied < 0.25 ? `In use only ${Math.round(occupied * 100)}% of the working week.` : `Usually ${typical} people in a space for ${cap}.`;
+    act = occupied < 0.25 ? 'A candidate for not refreshing, or for a lighter space type when it is due.' : 'A candidate for downsizing: two smaller spaces would serve the same meetings.';
   }
   return { cap, typical, peak, booked, occupied, noShow, bookH, occH, noShowH: booked * noShow * WEEK_H, seatUse, fullShare, heat, flag, why, act, kind };
 }
@@ -199,7 +199,7 @@ export function usageCard(tag) {
   if (!e) return null;
   let lines = [];
   if (e.kind === 'video') lines = [['Call hours a week', num(e.callH, 1)], ['Calls a week', num(e.calls)], ['Average call', `${e.avgMin} min`], ...(roomUse[e.room] ? [['Meetings on a call', `${e.share}%`]] : [])];
-  if (e.kind === 'display') lines = [['On a week', `${num(e.onH)} h`], [roomUse[e.room] ? 'Room in use a week' : 'Expected a week', `${num(e.expected)} h`], ['Panel hours since install', num(e.panelH)], ['Wear', `${e.wear}% of ${num(PANEL_LIFE)} h`]];
+  if (e.kind === 'display') lines = [['On a week', `${num(e.onH)} h`], [roomUse[e.room] ? 'Space in use a week' : 'Expected a week', `${num(e.expected)} h`], ['Panel hours since install', num(e.panelH)], ['Wear', `${e.wear}% of ${num(PANEL_LIFE)} h`]];
   if (e.kind === 'signage') lines = [['Set schedule', e.schedule.label], ['Actually', e.mode === 'never' ? 'On around the clock' : `Off at ${e.offAt}:00${e.weekends ? ', on at weekends' : ''}`], ['Hours a week', `${e.actualH} of ${e.setH} set`], ['Panel hours since install', `${num(e.panelH)} (${e.wear}% of rated)`]];
   if (e.kind === 'switch') lines = [['Uptime', `${e.uptimeD} days since restart`], ['Availability, 30 days', `${e.avail}%`], ['Ports in use', `${e.used} of ${e.ports}`], ['Power over Ethernet', `${e.poeW} of ${e.budget} W`]];
   if (e.kind === 'projector') lines = [['Lamp hours', `${num(e.lampH)} of ${num(e.life)} rated`], ['On a week', `${num(e.onH)} h`], ['Lamps since install', String(e.lampsFitted)], ...(e.eos ? [['End of support', e.eos.slice(0, 7)]] : [])];
@@ -238,7 +238,7 @@ function packageFor(s, recs) {
   const projector = recs.map((x) => equipmentByTag[x.unit.asset_tag]).find((e) => e?.kind === 'projector' && e.lampPct >= 90);
   const failingPsu = kind === 'comms' && r() < 0.5;
   const mount = !projector && !failingPsu && r() < 0.08 && recs.some((x) => x.cls === 'display');
-  const safety = projector ? `Projector lamp at ${projector.lampPct}% of its rated hours: a heat and failure risk.` : failingPsu ? 'Switch with a failed power supply: rooms on the floor run on the second one.' : mount ? 'Display mount flagged at the last inspection.' : null;
+  const safety = projector ? `Projector lamp at ${projector.lampPct}% of its rated hours: a heat and failure risk.` : failingPsu ? 'Switch with a failed power supply: spaces on the floor run on the second one.' : mount ? 'Display mount flagged at the last inspection.' : null;
   const typeName = s.type.profile?.name ?? s.space_type;
   return {
     id: s.id, name: s.name, number: s.number ?? null, site: s.site, siteName: site.name, siteCode: site.code, region: site.region, role: site.role, profile: typeName,
@@ -264,9 +264,9 @@ for (const x of dueList.filter((d) => d.due <= NOW_YEAR + 1)) {
 export const packages = [...byRoom.entries()].map(([id, recs]) => packageFor(spaces[id], recs));
 export const planCost = packages.reduce((n, p) => n + p.cost, 0);
 export const FACTORS = [
-  { id: 'usage', label: 'Usage', plain: 'How much the room is used: share of the working week it is occupied.', source: SOURCE.occupied },
+  { id: 'usage', label: 'Usage', plain: 'How much the space is used: share of the working week it is occupied.', source: SOURCE.occupied },
   { id: 'age', label: 'Age', plain: 'How far past its planned life the oldest device in the work is.', source: 'The work plan: each unit\'s install date against the house policy.' },
-  { id: 'eos', label: 'End of support', plain: 'Whether the maker has stopped supporting a device (full) or stops within a year (half).', source: 'Device model records: end of support dates.' },
-  { id: 'incidents', label: 'Incidents', plain: 'Incidents in the room in the last 12 months; six or more counts as full.', source: SOURCE.incidents },
+  { id: 'eos', label: 'End of support', plain: 'Whether the manufacturer has stopped supporting a device (full) or stops within a year (half).', source: 'Device model records: end of support dates.' },
+  { id: 'incidents', label: 'Incidents', plain: 'Incidents in the space in the last 12 months; six or more counts as full.', source: SOURCE.incidents },
   { id: 'site', label: 'Office', plain: 'How much the business depends on the site: headquarters highest, remote lowest.', source: 'Site records: the site\'s role.' },
 ];

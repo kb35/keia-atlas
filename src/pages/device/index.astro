@@ -29,7 +29,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
     <PageBand overline="Unit" title="Find a unit">
       <span slot="overline" data-dv-status hidden></span>
       <span slot="overline" data-dv-sim hidden><SimTag kind="simulated" /></span>
-      <span slot="lede" data-dv-lede>Search every unit by hostname, serial number, asset tag, room or model. Scanning an asset tag lands here.</span>
+      <span slot="lede" data-dv-lede>Search every unit by hostname, serial number, asset tag, space or model. Scanning an asset tag lands here.</span>
       <div slot="numbers" data-dv-kn></div>
     </PageBand>
     <div class="content dv-content">
@@ -92,7 +92,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
           list.innerHTML = hits.length ? hits.map(function (x) {
             var r = D.rooms[x.room];
             return '<li><a class="dv-hit" href="?tag=' + x.tag + '"><span class="dv-hit-art">' + art(x) + '</span><span><b>' + esc(x.host || x.pos.role) + '</b><small>' + esc(x.pos.role) + (x.pos.model ? ' · ' + esc(D.models[x.pos.model].name) : '') + '</small></span><span class="mono faint">' + x.tag + '</span><span class="faint">' + esc(roomLabel(r)) + ', ' + esc(D.sites[r.site].code) + '</span></a></li>';
-          }).join('') : '<li class="faint">No unit matches. Try fewer letters, or a hostname, serial or room.</li>';
+          }).join('') : '<li class="faint">No unit matches. Try fewer letters, or a hostname, serial or space.</li>';
         };
         input.addEventListener('input', run); run(); input.focus({ preventScroll: true });
       }
@@ -134,7 +134,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
         var kn = function (n, label, to, tone) { return '<li class="kn-i' + (tone ? ' t-' + tone : '') + '" data-help="number:' + label + '" data-help-name="' + label + '"><a href="' + to + '"><b class="num">' + n + '</b><span>' + label + '</span></a></li>'; };
         root.querySelector('[data-dv-kn]').innerHTML = '<ul class="kn" aria-label="Key numbers">' +
           kn(openInc.length, 'Open incidents', '#history', openInc.length ? 'bad' : '') +
-          kn(openTasks, 'Open tasks in room', '#history', '') +
+          kn(openTasks, 'Open tasks in space', '#history', '') +
           kn(advN, 'Advisories', '#advisories', advN ? 'warn' : '') +
           kn(u.conn.length, 'Connections', '#connections', '') + '</ul>';
         var at = STAGES.findIndex(function (x) { return x[0] === u.stage; });
@@ -150,7 +150,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
         body += '<section class="card dv-card s-7 c-facts" data-help="unit.facts" aria-label="Facts">' +
           '<div class="dv-facts"><div><p class="overline">Where</p><dl class="dv-kv">' +
             row('Office', '<a href="' + L('devices/') + '?site=' + r.site + '">' + esc(s.name) + '</a>' + (s.city ? ', ' + esc(s.city) : '')) +
-            row('Room', '<a href="' + L('rooms/' + u.room + '/') + '">' + esc(roomLabel(r)) + '</a>' + (r.floor ? ', floor ' + esc(r.floor) : '')) +
+            row('Space', '<a href="' + L('rooms/' + u.room + '/') + '">' + esc(roomLabel(r)) + '</a>' + (r.floor ? ', floor ' + esc(r.floor) : '')) +
             row('Built to', '<a href="' + L('room-profiles/' + r.typeId + '/') + '">' + esc(r.type) + '</a>') +
             row('Position', esc(u.pos.role) + (u.pos.location ? ' · ' + esc(u.pos.location) : '')) +
             (u.rack ? row('Rack', esc(u.rack.name) + ', U' + u.rack.u + (u.rack.size > 1 ? ' to U' + (u.rack.u + u.rack.size - 1) : '')) : '') +
@@ -177,7 +177,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
         // Known issues for this firmware (decision 0029): what the maker publishes about the version this unit runs.
         var kis = KI[u.tag] || [];
         if (kis.length) {
-          body += '<section class="card dv-card" data-help="unit.known-issues" id="known-issues">' + head('Known issues for this firmware', '<a class="faint dv-aside" href="' + L('known-issues/') + '">All known issues</a>') +
+          body += '<section class="card dv-card" data-help="unit.known-issues" id="known-issues">' + head('Known errors for this firmware', '<a class="faint dv-aside" href="' + L('known-issues/') + '">All known errors</a>') +
             '<ul class="dv-kis">' + kis.map(function (k) {
               return '<li><a href="' + k.to + '"><span class="mono">' + esc(k.id) + '</span> ' + esc(k.t) + '</a><small class="faint"> · ' + esc(k.maker) + ', ' + (k.sure ? 'this unit runs ' + esc(k.fw) : 'version not tracked yet') + ' · ' + esc(k.st) + (k.fx ? ', fixed in ' + esc(k.fx) : '') + '</small></li>';
             }).join('') + '</ul></section>';
@@ -210,13 +210,13 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
 
         // Row 2: Health, Configuration, and the unit's history.
         body += '<section class="card dv-card s-4 c-health" data-help="unit.health">' + head('Health', '<button type="button" class="btn small" data-help="unit.check" data-dv-check>Check again</button>') + '<ul class="dv-checks">' +
-          u.platforms.map(function (p) { var bad = p === 'device_management' && u.stage === 'deploy'; return '<li><span class="dv-c" data-c' + (bad ? ' data-bad' : '') + '>' + '<span class="sp"></span>' + tick + '<svg class="x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg></span><b>' + (PLAT[p] || p) + '</b><span class="faint">' + ({ keia_atlas: 'Recorded where the room profile expects it', inventory: 'Active record in this room', dhcp_dns: u.net ? 'Reservation ' + u.net.ip + ' and DNS ' + u.host : 'Not networked', device_management: bad ? 'Not enrolled yet: finish provisioning' : m && m.fw ? 'Online, firmware ' + m.fw.version + ' (standard)' : 'Online', room_booking: 'Calendar resource linked', monitoring: 'Reporting, no critical alerts' }[p] || '') + '</span></li>'; }).join('') +
-          '</ul><p class="faint dv-foot">These checks are simulated. At Stage 2 they read the real systems.</p></section>';
+          u.platforms.map(function (p) { var bad = p === 'device_management' && u.stage === 'deploy'; return '<li><span class="dv-c" data-c' + (bad ? ' data-bad' : '') + '>' + '<span class="sp"></span>' + tick + '<svg class="x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg></span><b>' + (PLAT[p] || p) + '</b><span class="faint">' + ({ keia_atlas: 'Recorded where the space type expects it', inventory: 'Active record in this space', dhcp_dns: u.net ? 'Reservation ' + u.net.ip + ' and DNS ' + u.host : 'Not networked', device_management: bad ? 'Not enrolled yet: finish provisioning' : m && m.fw ? 'Online, firmware ' + m.fw.version + ' (standard)' : 'Online', room_booking: 'Calendar resource linked', monitoring: 'Reporting, no critical alerts' }[p] || '') + '</span></li>'; }).join('') +
+          '</ul><p class="faint dv-foot">These checks are simulated. With real feeds they read the real systems.</p></section>';
 
         var cfg = '';
         if (m && m.config) {
           var val = function (x) {
-            var v = { 'Device Name': u.host, 'Host Name': u.host, 'Room Name': roomLabel(r), 'Location': s.country, 'Time Zone': s.tz, 'Time zone': s.tz, 'Room calendar': (s.city || s.name).replace(/ /g, '-') + '-' + roomLabel(r).replace(/ /g, '-'), 'Enroll a device with a code': 'Device name: ' + u.host, 'Sign-in Address': u.host + '@sip.aigna.example' }[x.name];
+            var v = { 'Device Name': u.host, 'Host Name': u.host, 'Space Name': roomLabel(r), 'Location': s.country, 'Time Zone': s.tz, 'Time zone': s.tz, 'Room calendar': (s.city || s.name).replace(/ /g, '-') + '-' + roomLabel(r).replace(/ /g, '-'), 'Enroll a device with a code': 'Device name: ' + u.host, 'Sign-in Address': u.host + '@sip.aigna.example' }[x.name];
             return v || x.value;
           };
           cfg += '<p class="dv-sub">' + esc(m.config.name) + ', version ' + esc(m.config.version) + (m.fw ? ', on firmware <span class="mono">' + esc(m.fw.version) + '</span>' : '') + '. Set from this unit\'s record.</p>' +
@@ -224,7 +224,7 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
         } else {
           cfg += '<p class="dv-sub">Nothing to set on this unit itself. It works as it comes, or it is set up through the device it connects to.</p>';
         }
-        body += '<section class="card dv-card s-4 c-config" data-help="unit.config">' + head('Configuration', m && m.config ? '<a class="btn small" href="' + L('configurations/' + m.config.id + '/') + '">Every setting</a>' : '') + cfg + '</section>';
+        body += '<section class="card dv-card s-4 c-config" data-help="unit.config">' + head('Setup guide', m && m.config ? '<a class="btn small" href="' + L('configurations/' + m.config.id + '/') + '">Every setting</a>' : '') + cfg + '</section>';
 
         // History: incidents, tasks in this room, Lab tests of this model, and the unit's own dates. Newest first.
         var H = [];

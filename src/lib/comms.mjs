@@ -168,13 +168,13 @@ export function commsFacts(space) {
 
 // One line for the band: "Serves 32 rooms: the third floor directly, the fourth through 4.21".
 function servesLine(serves, isMdf) {
-  if (!serves.roomCount) return 'Serves no rooms recorded yet';
+  if (!serves.roomCount) return 'Serves no spaces recorded yet';
   const low = (s) => s.replace(/^Floor/, 'floor').replace(/^(\w)/, (c) => c.toLowerCase());
   const parts = [];
   if (serves.direct.length) parts.push(`the ${serves.direct.map((f) => low(f.name)).join(' and ')}${isMdf ? ' directly' : ''}`);
   for (const v of serves.via) if (v.floors.length) parts.push(`the ${v.floors.map((f) => low(f.name)).join(' and ')} through ${v.room.number}`);
   if (serves.unplaced.length) parts.push(`${serves.unplaced.map((f) => low(f.name)).join(' and ')} with no comms room recorded`);
-  return `Serves ${serves.roomCount} ${serves.roomCount === 1 ? 'room' : 'rooms'}${parts.length ? `: ${parts.join(', ')}` : ''}`;
+  return `Serves ${serves.roomCount} ${serves.roomCount === 1 ? 'space' : 'spaces'}${parts.length ? `: ${parts.join(', ')}` : ''}`;
 }
 
 // Patching, grouped by the rack item at the near end of each run (top of the rack first): one line per
@@ -215,8 +215,8 @@ export function standardPill(space) {
 // states it. From that: access ports with headroom, switches, patch panels, rack units with growth, and
 // the PoE budget. The rules are house rules; public standards leave the figures to the designer.
 export const SIZING_RULES = [
-  { id: 'outlets', name: 'Data outlets', rule: 'One per data outlet in every room served, from the room profile\'s outlets; a repeated space (desks) counts each desk.', source: 'The room profiles' },
-  { id: 'headroom', name: 'Headroom', rule: '20 percent spare access ports above the outlets, rounded up, so a floor can add rooms without a new switch.', source: 'House rule. Structured cabling guides plan for spare capacity; TIA-568 sets no figure.' },
+  { id: 'outlets', name: 'Data outlets', rule: 'One per data outlet in every space served, from the space type\'s outlets; a repeated space (desks) counts each desk.', source: 'The space types' },
+  { id: 'headroom', name: 'Headroom', rule: '20 percent spare access ports above the outlets, rounded up, so a floor can add spaces without a new switch.', source: 'House rule. Structured cabling guides plan for spare capacity; TIA-568 sets no figure.' },
   { id: 'switches', name: 'Access switches', rule: 'Ports with headroom divided by the ports on the standard access switch, rounded up.', source: 'The standard\'s access switch' },
   { id: 'panels', name: 'Patch panels', rule: 'One 48-port panel per 48 outlets, rounded up, each with a cable manager.', source: 'House rule (Panduit 48-port panels, 2U)' },
   { id: 'poe', name: 'PoE budget', rule: 'The sum of what each PoE-powered device draws, as its vendor states (its PoE class where there is no figure). Devices with no figure are counted, not guessed.', source: 'The device models' },
@@ -280,7 +280,7 @@ export function sizeFor(space, facts = null) {
     outlets, headroom: Math.round(HEADROOM * 100), withHeadroom, portsEach, switches, panels, poeW: Math.round(poeW), poeKnown, poeUnknown, partsU, growth: Math.round(GROWTH * 100), withGrowth, rackU,
     has,
     rows: [
-      { id: 'outlets', name: 'Data outlets', need: `${outlets}`, needNote: `${plural(rooms.length, 'room')}${workspaces ? `, ${workspaces} desks` : ''}${videoRooms ? `, ${plural(videoRooms, 'video room')}` : ''}${unknownRooms ? `; ${plural(unknownRooms, 'room')} set per project` : ''}`, have: has.outlets != null ? `${has.outlets}` : null, haveNote: has.outlets != null ? 'panel ports' : null, v: verdict(outlets, has.outlets) },
+      { id: 'outlets', name: 'Data outlets', need: `${outlets}`, needNote: `${plural(rooms.length, 'space')}${workspaces ? `, ${workspaces} desks` : ''}${videoRooms ? `, ${plural(videoRooms, 'video room')}` : ''}${unknownRooms ? `; ${plural(unknownRooms, 'space')} set per project` : ''}`, have: has.outlets != null ? `${has.outlets}` : null, haveNote: has.outlets != null ? 'panel ports' : null, v: verdict(outlets, has.outlets) },
       { id: 'ports', name: 'Access ports', need: `${withHeadroom}`, needNote: `${outlets} + ${Math.round(HEADROOM * 100)}% headroom`, have: has.ports != null ? `${has.ports}` : null, haveNote: has.ports != null ? `on ${plural(has.switches, 'switch', 'switches')}` : null, v: verdict(withHeadroom, has.ports) },
       { id: 'switches', name: 'Access switches', need: `${switches}`, needNote: `${portsEach} ports each`, have: `${has.switches}`, haveNote: null, v: verdict(switches, has.switches) },
       { id: 'poe', name: 'PoE budget', need: poeKnown ? `${Math.round(poeW)} W` : 'Not recorded', needNote: `${poeKnown ? `${plural(poeKnown, 'device')} as the vendors state` : ''}${poeUnknown ? `${poeKnown ? '; ' : ''}${plural(poeUnknown, 'PoE device')} with no figure` : ''}` || 'no PoE devices recorded', have: has.poeW != null ? `${has.poeW} W` : null, haveNote: has.poeW != null ? 'as the vendor states' : null, v: poeKnown ? verdict(Math.round(poeW), has.poeW, ' W') : { tone: 'faint', text: 'Draw not recorded' } },

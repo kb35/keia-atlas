@@ -6,7 +6,7 @@
    the status word opens a small menu; cards can be dragged between columns. Every change is an
    event in the live layer (src/lib/live.mjs): who, when, undo, live between windows.
    "Add a task" (for work the playbook does not list) is kept in this browser (rs4-added-tasks);
-   a suggestion for the playbook becomes a proposed change on the Changes page. */
+   a suggestion for the playbook becomes a proposed change on the Proposals page. */
 import Icon from './Icon.astro';
 import PeoplePicker from './PeoplePicker.astro';
 import { spaces, playbooks, PHASE_LABEL, phasesOf, TASK_STATUS, DEMO_TODAY, PHASES, fmtDate, href, plural, className } from '../lib/data.mjs';
@@ -53,7 +53,7 @@ const adderCss = TASK_ADDERS.map((r) => `:root[data-role="${r}"] .at-open`).join
       <label class="ef"><span class="ef-l">What is it about?</span>
         <select name="about">
           <option value="">Nothing in particular</option>
-          <optgroup label="Rooms">{roomOpts.map((r) => <option value={`room:${r.id}`} data-label={r.label}>{r.label}</option>)}</optgroup>
+          <optgroup label="Spaces">{roomOpts.map((r) => <option value={`room:${r.id}`} data-label={r.label}>{r.label}</option>)}</optgroup>
           <optgroup label="Devices">{roomOpts.flatMap((r) => r.devices).map((d) => <option value={`device:${d.id}`} data-label={d.label}>{d.label}</option>)}</optgroup>
         </select>
       </label>
@@ -146,7 +146,7 @@ const adderCss = TASK_ADDERS.map((r) => `:root[data-role="${r}"] .at-open`).join
 <script is:inline data-astro-rerun>
   (function () {
     var tb = document.querySelector('[data-tb]'); if (!tb) return;
-    var STATUS = { todo: 'To do', doing: 'Doing', blocked: 'Blocked', done: 'Done' }, ORDER = ['todo', 'doing', 'blocked', 'done'];
+    var STATUS = { todo: 'To do', doing: 'Doing', blocked: 'Waiting on', done: 'Done' }, ORDER = ['todo', 'doing', 'blocked', 'done'];
     var board = tb.querySelector('[data-board]'), menu = tb.querySelector('[data-tk-menu]');
     var people = JSON.parse(tb.dataset.people || '[]');
     var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
@@ -170,7 +170,7 @@ const adderCss = TASK_ADDERS.map((r) => `:root[data-role="${r}"] .at-open`).join
       var all = board.querySelectorAll('.tk:not(.leaving)').length, open = all - board.querySelectorAll('[data-col="done"] .tk:not(.leaving)').length;
       var c = tb.querySelector('[data-tb-count]'); if (c) c.textContent = open + ' open of ' + all;
       var blocked = board.querySelectorAll('[data-col="blocked"] .tk:not(.leaving)').length;
-      if (window.rsKeyNumber) window.rsKeyNumber('open', open, { label: blocked ? 'Open tasks, ' + blocked + ' blocked' : 'Open tasks', tone: blocked ? 'bad' : '' });
+      if (window.rsKeyNumber) window.rsKeyNumber('open', open, { label: blocked ? 'Open tasks, ' + blocked + ' waiting' : 'Open tasks', tone: blocked ? 'bad' : '' });
     };
     /* FLIP: remember where every card is, change the DOM, then slide each moved card from its old place. */
     var flip = function (change) {
@@ -331,7 +331,7 @@ const adderCss = TASK_ADDERS.map((r) => `:root[data-role="${r}"] .at-open`).join
   })();
   (function () {
     /* Added tasks: kept in this browser (rs4-added-tasks); a suggestion for the playbook is a proposed
-       change on the Changes page (rs4-changes). Archive, never delete. */
+       change on the Proposals page (rs4-changes). Archive, never delete. */
     var KEY = 'rs4-added-tasks', form = document.querySelector('[data-at-form]'), tb = document.querySelector('[data-tb]');
     if (!form || !tb) return;
     var cfg = JSON.parse(form.dataset.cfg), wrap = document.querySelector('[data-at-wrap]'), noteEl = document.querySelector('[data-at-note]'), board = tb.querySelector('[data-board]'), list = tb.querySelector('[data-view-list]');
@@ -343,9 +343,9 @@ const adderCss = TASK_ADDERS.map((r) => `:root[data-role="${r}"] .at-open`).join
     var byId = function (id) { return mine().filter(function (t) { return t.id === id; })[0]; };
     var upd = function (id, fn) { var l = all(); l.forEach(function (t) { if (t.id === id && t.project === cfg.project) fn(t); }); save(l); };
     var fmt = function (d) { return d ? new Date(d).toLocaleDateString('en-IE', { day: 'numeric', month: 'short' }) : ''; };
-    var STATUS = { todo: 'To do', doing: 'Doing', blocked: 'Blocked', done: 'Done' };
+    var STATUS = { todo: 'To do', doing: 'Doing', blocked: 'Waiting on', done: 'Done' };
     var changeState = function (t) { var c = t.changeId ? S.get('rs4-changes', []).filter(function (x) { return x.id === t.changeId; })[0] : null; return c ? c.status : null; };
-    var CH = { review: 'waiting for review', approved: 'approved', merged: 'in the playbook', changes: 'changes asked for', withdrawn: 'withdrawn' };
+    var CH = { review: 'waiting for review', approved: 'approved', merged: 'in the playbook', changes: 'edits asked for', withdrawn: 'withdrawn' };
     var pName = function (id) { return H() ? H().person(id) : { name: id, initials: '' }; };
     var st = function (t) { return STATUS[t.status] ? t.status : 'todo'; };
     var cardHtml = function (t) {
@@ -432,7 +432,7 @@ const adderCss = TASK_ADDERS.map((r) => `:root[data-role="${r}"] .at-open`).join
         l.push(task); A.save(l);
         if (window.__rsTb) window.__rsTb.flip(A.render); else A.render();
         f.reset(); A.open(false);
-        A.say('Added "' + esc(title) + '" to To do.' + (task.changeId ? ' Sent to ' + esc(A.cfg.approverNames) + ' as ' + task.changeId + '. <a href="' + A.cfg.changes + '#' + task.changeId.toLowerCase() + '">See it on Changes</a>.' : ''), task.id);
+        A.say('Added "' + esc(title) + '" to To do.' + (task.changeId ? ' Sent to ' + esc(A.cfg.approverNames) + ' as ' + task.changeId + '. <a href="' + A.cfg.changes + '#' + task.changeId.toLowerCase() + '">See it on Proposals</a>.' : ''), task.id);
       });
       document.addEventListener('rs:demo-change', function () { var A = window.__rsAt; if (!A || !document.body.contains(A.form)) return; window.rsHold(A.form.closest('[data-tb]'), function () { A.open(false); A.render(); }); });
     }

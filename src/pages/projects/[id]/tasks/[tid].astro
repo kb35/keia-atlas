@@ -61,7 +61,7 @@ const snCfg = { project: p.id, task: t.id, title: t.title, pb: pbk?.id ?? '', pb
   <div class="content task">
     <div class="g12 top">
       <section class="card tk-steps s-7" aria-labelledby="h-steps">
-          {t.status === 'blocked' && <div class="tk-block"><Icon name="alert" size={20} /><span><b>Blocked.</b> {t.blocked_by}</span><button type="button" class="btn small" data-open-report="urgent">Raise it as urgent</button></div>}
+          {t.status === 'blocked' && <div class="tk-block"><Icon name="alert" size={20} /><span><b>Waiting on:</b> {t.blocked_by}</span><button type="button" class="btn small" data-open-report="urgent">Raise it as urgent</button></div>}
           {intLink && t.status !== 'done' && <a class="tk-int" href={intLink}><span><b>On the Deploy board</b><small>{D.devices.length ? `${plural(D.devices.length, 'device')}, ` : ''}each with its {STEP_LABEL[intStep]} checklist to tick, live with the rest of the team.</small></span><span class="btn small">Open in Deploy<Icon name="arrow" size={14} /></span></a>}
           <header class="tk-h"><h2 id="h-steps">What to do</h2><span class="faint" data-step-count></span></header>
           <ol class="steps" data-steps={`${p.id}-${t.id}`}>
@@ -103,7 +103,7 @@ const snCfg = { project: p.id, task: t.id, title: t.title, pb: pbk?.id ?? '', pb
         </dl>
         {D.rooms.length > 0 && (
           <div class="tk-sub">
-            <h3 class="overline">{D.rooms.length === 1 ? 'The room' : 'The rooms'}</h3>
+            <h3 class="overline">{D.rooms.length === 1 ? 'The space' : 'The spaces'}</h3>
             <ul class="rooms-mini">{D.rooms.map((r) => <li><a href={href(`/rooms/${r.id}/`)}>{r.number ? `${r.number} ` : ''}{r.name}</a><small>{r.type.profile.name}</small></li>)}</ul>
           </div>
         )}
@@ -187,16 +187,16 @@ const snCfg = { project: p.id, task: t.id, title: t.title, pb: pbk?.id ?? '', pb
 
   <script is:inline data-astro-rerun slot="end">
     (function () {
-      /* A quick note that a step is missing something: a suggested change on the Changes page (rs4-changes). */
+      /* A quick note that a step is missing something: a suggested change on the Proposals page (rs4-changes). */
       var fb = document.querySelector('[data-sn]'); if (!fb) return;
       var cfg = JSON.parse(fb.dataset.cfg), S = window.rsStore, wrap = fb.querySelector('[data-sn-wrap]'), form = fb.querySelector('[data-sn-form]'), listEl = fb.querySelector('[data-sn-list]');
       var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
-      var ST = { review: 'Waiting for review', approved: 'Approved', merged: 'Merged', changes: 'Changes asked for', withdrawn: 'Withdrawn' };
+      var ST = { review: 'Waiting for review', approved: 'Approved', merged: 'Merged', changes: 'Edits asked for', withdrawn: 'Withdrawn' };
       var notes = function () { return S.get('rs4-changes', []).filter(function (c) { return c.project === cfg.project && c.task === cfg.task && c.fromNote; }); };
       var render = function (flash) {
         var n = notes();
         listEl.innerHTML = n.map(function (c) {
-          return '<div class="sn-n st-' + c.status + '" data-sn-id="' + esc(c.id) + '"><span><b>' + esc(c.noteText) + '</b><small>' + esc(c.id) + ' · ' + esc(ST[c.status] || c.status) + ' · <a href="' + cfg.changes + '#' + esc(c.id.toLowerCase()) + '">See it on Changes</a></small></span>' +
+          return '<div class="sn-n st-' + c.status + '" data-sn-id="' + esc(c.id) + '"><span><b>' + esc(c.noteText) + '</b><small>' + esc(c.id) + ' · ' + esc(ST[c.status] || c.status) + ' · <a href="' + cfg.changes + '#' + esc(c.id.toLowerCase()) + '">See it on Proposals</a></small></span>' +
             (c.status === 'withdrawn' ? '<button type="button" class="btn small ghost" data-sn-act="back">Put back</button>' : c.status === 'review' ? '<button type="button" class="btn small ghost" data-sn-act="withdraw">Withdraw</button>' : '') + '</div>';
         }).join('');
         if (flash) { var el = listEl.querySelector('[data-sn-id="' + flash + '"]'); if (el && !matchMedia('(prefers-reduced-motion: reduce)').matches) { var M = window.rsMotion(); el.animate([{ opacity: 0, transform: 'scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: M.enter, easing: M.ease }); } }
@@ -232,7 +232,7 @@ const snCfg = { project: p.id, task: t.id, title: t.title, pb: pbk?.id ?? '', pb
       /* The owner and status follow the live layer, the same events the project board records
          (item task:<id>). The avatar opens the people picker; History and Undo are in the drawer. */
       var box = document.querySelector('[data-tk-live]'); if (!box) return;
-      var STATUS = { todo: 'To do', doing: 'Doing', blocked: 'Blocked', done: 'Done' }, PILL = { todo: 'plain', doing: 'deploy', blocked: 'bad', done: 'manage' };
+      var STATUS = { todo: 'To do', doing: 'Doing', blocked: 'Waiting on', done: 'Done' }, PILL = { todo: 'plain', doing: 'deploy', blocked: 'bad', done: 'manage' };
       var people = JSON.parse(box.dataset.people || '[]'), item = 'task:' + box.dataset.tkLive;
       var person = function (id) { return people.filter(function (x) { return x.id === id; })[0] || (window.RS_PEOPLE || []).filter(function (x) { return x.id === id; })[0] || { id: id, name: id, initials: String(id).slice(0, 2).toUpperCase(), role: '' }; };
       var base = function () { return { status: box.dataset.status, owner: box.dataset.owner }; };

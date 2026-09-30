@@ -22,7 +22,7 @@ export const WORK_KIND = {
   task: 'Project task', incident: 'Incident', lab: 'Lab test', plan: 'Planning', inbox: 'Inbox',
   'time-off': 'Time off', visit: 'Site visit', refresh: 'Work plan',
 };
-export const WORK_STATUS = { todo: 'To do', doing: 'Doing', blocked: 'Blocked', done: 'Done', booked: 'Booked' };
+export const WORK_STATUS = { todo: 'To do', doing: 'Doing', blocked: 'Waiting on', done: 'Done', booked: 'Booked' };
 // Work done at the room itself. Everything else can be done from anywhere.
 export const ONSITE_KINDS = new Set(['survey', 'install', 'configure', 'commission', 'records']);
 

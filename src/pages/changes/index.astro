@@ -22,8 +22,8 @@ const SEED = [
   { id: 'CHG-035', title: 'New device model: Logitech Rally Bar Mini', kind: 'model', path: 'data/device-models/logitech-rally-bar-mini.yaml', change: 'new file', by: 'Niamh Walsh', byRole: 'Innovation engineer', approver: 'Sofia Reyes, after a Lab check', date: '2026-09-12', status: 'changes',
     text: '# Device model: Logitech Rally Bar Mini\nmanufacturer: Logitech\nmodel: Rally Bar Mini\nclass: video-bar\n…\n', note: 'Sofia: "Needs a second reading of the ports against the data sheet before it counts."' },
 ];
-const STATUS = { review: 'Waiting for review', approved: 'Approved', merged: 'Merged', changes: 'Changes asked for', withdrawn: 'Withdrawn' };
-const KIND = { project: 'Project', playbook: 'Playbook', profile: 'Device profile', model: 'Device model', config: 'Configuration', firmware: 'Firmware' };
+const STATUS = { review: 'Waiting for review', approved: 'Approved', merged: 'Merged', changes: 'Edits asked for', withdrawn: 'Withdrawn' };
+const KIND = { project: 'Project', playbook: 'Playbook', profile: 'Device type', model: 'Device model', config: 'Setup guide', firmware: 'Firmware' };
 const slug = (v) => String(v).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const FACETS = [
   { key: 'kind', label: 'Kind', options: Object.entries(KIND).map(([value, label]) => ({ value, label })) },
@@ -34,26 +34,26 @@ const SORT = { options: [{ value: 'newest', label: 'Newest first' }, { value: 'r
 const count = (st) => SEED.filter((c) => c.status === st).length;
 const NUMBERS = [
   { n: count('review'), label: 'Waiting for review', to: '?status=review' },
-  { n: count('changes'), label: 'Changes asked for', to: '?status=changes', tone: count('changes') ? 'warn' : undefined },
+  { n: count('changes'), label: 'Edits asked for', to: '?status=changes', tone: count('changes') ? 'warn' : undefined },
   { n: count('approved'), label: 'Approved', to: '?status=approved' },
   { n: count('merged'), label: 'Merged', to: '?status=merged' },
 ];
 ---
-<Shell title="Changes" section="changes" crumbs={[{ label: 'Changes' }]}>
-  <PageBand overline="Register" title="Changes" lede="Every proposed change to what Keia Atlas knows, who approves it, and the file it writes." sim numbers={NUMBERS}>
-    <a slot="action" class="btn primary" href={href('/edit/')}><Icon name="plus" size={16} />Propose a change</a>
+<Shell title="Proposals" section="changes" crumbs={[{ label: 'Proposals' }]}>
+  <PageBand overline="Register" title="Proposals" lede="Every proposal to change what Keia Atlas knows, who approves it, and the file it writes." sim numbers={NUMBERS}>
+    <a slot="action" class="btn primary" href={href('/edit/')}><Icon name="plus" size={16} />Propose an edit</a>
   </PageBand>
   <div class="content changes">
-    <FilterBar facets={FACETS} placeholder="Find a change, file or person" label="Find a change" noun={['change', 'changes']} scope=".content.changes" sort={SORT} />
+    <FilterBar facets={FACETS} placeholder="Find a proposal, file or person" label="Find a proposal" noun={['proposal', 'proposals']} scope=".content.changes" sort={SORT} />
     <div class="chg-list" data-chg-list></div>
-    <EmptyState text="No changes match these filters." />
-    <Section title="How a change works" id="how" aside="Like a pull request on the data: nothing changes until it is approved and merged.">
+    <EmptyState text="No proposals match these filters." />
+    <Section title="How a proposal works" id="how" aside="Like a pull request on the data: nothing changes until it is approved and merged.">
       <div class="card pad chg-flow">
         <ol>
           <li><b>Propose</b><span>From any page, or from a task when it closes with a fix</span></li>
           <li><b>Check</b><span>The same rules as the rest of the data: required fields, real models, a source</span></li>
-          <li><b>Review</b><span>The owner of that knowledge approves or asks for changes</span></li>
-          <li><b>Merge</b><span>Keia Atlas rebuilds; every device, room and vendor pack shows it</span></li>
+          <li><b>Review</b><span>The owner of that knowledge approves or asks for edits</span></li>
+          <li><b>Merge</b><span>Keia Atlas rebuilds; every device, space and vendor pack shows it</span></li>
         </ol>
       </div>
     </Section>
@@ -65,8 +65,8 @@ const NUMBERS = [
       var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
       var get = function () { try { return JSON.parse(localStorage.getItem('rs4-changes') || '[]'); } catch (_) { return window.__rsLocalChanges || []; } };
       var put = function (l) { try { localStorage.setItem('rs4-changes', JSON.stringify(l)); } catch (_) { window.__rsLocalChanges = l; } };
-      var STATUS = { review: 'Waiting for review', approved: 'Approved', merged: 'Merged', changes: 'Changes asked for', withdrawn: 'Withdrawn' };
-      var KIND = { project: 'Project', playbook: 'Playbook', profile: 'Device profile', model: 'Device model', config: 'Configuration', firmware: 'Firmware' };
+      var STATUS = { review: 'Waiting for review', approved: 'Approved', merged: 'Merged', changes: 'Edits asked for', withdrawn: 'Withdrawn' };
+      var KIND = { project: 'Project', playbook: 'Playbook', profile: 'Device type', model: 'Device model', config: 'Setup guide', firmware: 'Firmware' };
       var slug = function (v) { return String(v).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); };
       var bar0 = document.querySelector('[data-fb]');
       var sort = function () { return bar0 && bar0.rsFilter ? bar0.rsFilter.sort() : (new URLSearchParams(location.search).get('sort') || 'newest'); };
@@ -95,8 +95,8 @@ const NUMBERS = [
             '<p class="chg-meta"><span>Proposed by <b>' + esc(c.by) + '</b>, ' + esc(c.byRole) + '</span><span>Approves: <b>' + esc(c.approver) + '</b></span></p>' +
             (c.note ? '<p class="faint chg-note">' + esc(c.note) + '</p>' : '') +
             '<details><summary><span class="mono">' + esc(c.path) + '</span> · ' + esc(c.change) + '</summary><pre class="ed-yaml">' + esc(c.text).replace(/^(\+.*)$/gm, '<ins>$1</ins>').replace(/^(-.*)$/gm, '<del>$1</del>').replace(/^(#.*)$/gm, '<i>$1</i>') + '</pre></details>' +
-            (c.status === 'review' ? '<p class="chg-acts"><button type="button" class="btn small primary" data-act="approved" data-id="' + c.id + '">Approve</button><button type="button" class="btn small" data-act="changes" data-id="' + c.id + '">Ask for changes</button>' + (local ? '<button type="button" class="btn small" data-act="withdraw" data-id="' + c.id + '">Withdraw</button>' : '') + '<span class="faint">Demo: anyone can play the approver.</span></p>' : '') +
- (c.status === 'withdrawn' ? '<p class="chg-acts"><button type="button" class="btn small" data-act="review" data-id="' + c.id + '">Put back for review</button><span class="faint">Withdrawn changes are kept, not deleted.</span></p>' : '') +
+            (c.status === 'review' ? '<p class="chg-acts"><button type="button" class="btn small primary" data-act="approved" data-id="' + c.id + '">Approve</button><button type="button" class="btn small" data-act="changes" data-id="' + c.id + '">Ask for edits</button>' + (local ? '<button type="button" class="btn small" data-act="withdraw" data-id="' + c.id + '">Withdraw</button>' : '') + '<span class="faint">Demo: anyone can play the approver.</span></p>' : '') +
+ (c.status === 'withdrawn' ? '<p class="chg-acts"><button type="button" class="btn small" data-act="review" data-id="' + c.id + '">Put back for review</button><span class="faint">Withdrawn proposals are kept, not deleted.</span></p>' : '') +
             (c.status === 'approved' ? '<p class="chg-acts"><button type="button" class="btn small primary" data-act="merged" data-id="' + c.id + '">Merge</button><span class="faint">In the real system, merging rebuilds Keia Atlas from the data.</span></p>' : '') +
             '</article>';
         }).join('');

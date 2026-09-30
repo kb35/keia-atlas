@@ -88,15 +88,15 @@ const NUMBERS = infra ? [
   rs.capacity && { n: rs.capacity.min === rs.capacity.max ? rs.capacity.min : `${rs.capacity.min} to ${rs.capacity.max}`, label: rs.capacity.max === 1 ? 'Person' : 'People', fact: true },
   rs.area && { n: rangeLabel(rs.area.m2), label: 'm²', fact: true },
   { n: options.length, label: options.length === 1 ? 'Build option' : 'Build options', fact: true },
-  { n: usingCount, label: usingCount === 1 ? 'Room built to it' : 'Rooms built to it', to: `/rooms/?type=${id}` },
+  { n: usingCount, label: usingCount === 1 ? 'Space built to it' : 'Spaces built to it', to: `/rooms/?type=${id}` },
 ].filter(Boolean);
 const guidelineSource = !isHouse ? sources[rs.guideline] : null;
 const openAt = (sid) => incidentList.filter((v) => v.open && v.inc.room === sid).length;
 // How many of each part a comms room needs, in words, from the sizing rules.
-const PART_RULE = { 'access-switch': 'one per 48 ports needed, with 20 percent headroom', 'core-switch': 'a pair, for every floor comms room', firewall: 'a pair in Shadow Mode', 'av-switch': 'one per floor, for Dante and Q-SYS', codec: 'when the floor has a large room' };
+const PART_RULE = { 'access-switch': 'one per 48 ports needed, with 20 percent headroom', 'core-switch': 'a pair, for every floor comms room', firewall: 'a pair in Shadow Mode', 'av-switch': 'one per floor, for Dante and Q-SYS', codec: 'when the floor has a large space' };
 const nParts = infra ? current.equipment.reduce((k, e) => k + (typeof e.quantity === 'number' ? e.quantity : 1), 0) : 0;
 ---
-<Shell vendorOk about={{ kind: infra ? 'comms' : 'room profile', label: t.profile.name }} title={t.profile.name} section="types" crumbs={[{ label: 'Room profiles', to: '/room-profiles/' }, { label: t.profile.name }]}>
+<Shell vendorOk about={{ kind: infra ? 'comms' : 'space type', label: t.profile.name }} title={t.profile.name} section="types" crumbs={[{ label: 'Space types', to: '/room-profiles/' }, { label: t.profile.name }]}>
   <PageBand overline={CATEGORY_HEADING[rs.category]} title={t.profile.name} lede={t.profile.purpose} numbers={NUMBERS}>
     {isHouse ? <span slot="overline" class="tag">House standard</span> : <a slot="overline" class="tag" href={guidelineSource.url} target="_blank" rel="noopener" title={guidelineSource.title}>Industry guidance <Icon name="link" size={12} /></a>}
   </PageBand>
@@ -106,13 +106,13 @@ const nParts = infra ? current.equipment.reduce((k, e) => k + (typeof e.quantity
       <div class="rt-opt">
         <p class="rt-sum">
           <span class="pill manage">{HOUSE_NETWORK.name} standard</span>
-          <span>{current.summary} How new and refreshed comms rooms are built{current.since ? ` from ${new Date(current.since).toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}. There is no standard rack: each comms room is sized for the rooms it serves (<a href="#sizing">how</a>), and older network kit is replaced in the <a href={href('/playbooks/network-refresh/')}>network refresh</a>.</span>
+          <span>{current.summary} How new and refreshed comms rooms are built{current.since ? ` from ${new Date(current.since).toLocaleDateString('en-IE', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}. There is no standard rack: each comms room is sized for the spaces it serves (<a href="#sizing">how</a>), and older network kit is replaced in the <a href={href('/playbooks/network-refresh/')}>network refresh</a>.</span>
         </p>
 
         <div class="g12 top" id="sizing">
           <section class="card sz-card s-7 stick" aria-label="How a comms room is sized" data-help="profile.sizing" {...recHere(id)}>
             <h2 class="sz-h">How a comms room is sized</h2>
-            <p class="sz-lede faint">From the rooms it serves to the rack that holds it. House rules where public standards leave the figure to the designer; unknowns stay unknown.</p>
+            <p class="sz-lede faint">From the spaces it serves to the rack that holds it. House rules where public standards leave the figure to the designer; unknowns stay unknown.</p>
             <ol class="sz-steps">
               {SIZING_RULES.map((r, i) => (
                 <li class="sz-step" data-help="profile.rule" data-help-name={r.name}>
@@ -131,7 +131,7 @@ const nParts = infra ? current.equipment.reduce((k, e) => k + (typeof e.quantity
                   <b class="pt-n num">{howMany(e.quantity)}</b>
                   <span class="pt-main">
                     <span class="pt-name">{e.role ?? className(e.class)}</span>
-                    <small>{e.model ? <a href={href(`/models/${e.model}/`)}>{modelName(e.model)}</a> : 'Model set per room'}{PART_RULE[e.key] ? ` · ${PART_RULE[e.key]}` : ''}</small>
+                    <small>{e.model ? <a href={href(`/models/${e.model}/`)}>{modelName(e.model)}</a> : 'Model set per space'}{PART_RULE[e.key] ? ` · ${PART_RULE[e.key]}` : ''}</small>
                   </span>
                   <span class={`pill ${e.requirement === 'required' ? 'manage' : 'info'}`}>{e.requirement === 'required' ? 'Required' : 'Optional'}</span>
                 </li>
@@ -157,7 +157,7 @@ const nParts = infra ? current.equipment.reduce((k, e) => k + (typeof e.quantity
           </SidePanel>
         </div>
 
-        <Section title="How the comms rooms compare" id="compare" help="profile.compare" aside={`${matching} of ${plural(compare.length, 'room')} on the ${HOUSE_NETWORK.name} standard · ${shortOf} short of what ${shortOf === 1 ? 'it serves' : 'they serve'}`}>
+        <Section title="How the comms rooms compare" id="compare" help="profile.compare" aside={`${matching} of ${plural(compare.length, 'space')} on the ${HOUSE_NETWORK.name} standard · ${shortOf} short of what ${shortOf === 1 ? 'it serves' : 'they serve'}`}>
           {compare.length === 0 ? <p class="muted">None built yet.</p> : (
             <div class="list cb-list">
               {compare.map(({ s, f, st, z, rf }) => {
@@ -183,7 +183,7 @@ const nParts = infra ? current.equipment.reduce((k, e) => k + (typeof e.quantity
               })}
             </div>
           )}
-          <p class="faint rt-note">Ports and rack are what the room has against what the rooms it serves need (the sizing method above). A comms room is on the standard when every switch, gateway and controller in its rack is {HOUSE_NETWORK.name}; the AV switch stays Netgear AV Line (tested for Dante and Q-SYS). Point at a room to see its older kit.</p>
+          <p class="faint rt-note">Ports and rack are what the room has against what the rooms it serves need (the sizing method above). A comms room is on the standard when every switch, gateway and controller in its rack is {HOUSE_NETWORK.name}; the AV switch stays Netgear AV Line (tested for Dante and Q-SYS). Point at a space to see its older kit.</p>
         </Section>
       </div>
     ) : (
@@ -197,18 +197,18 @@ const nParts = infra ? current.equipment.reduce((k, e) => k + (typeof e.quantity
             {id === 'open-area' ? (
               <div class="card pad" {...rec}>
                 <p class="rt-sum">{opt.summary}</p>
-                <p class="faint">No room drawing: where each access point hangs is on each office's floor plan and in its 3D model. Built to it: <a href={`#rooms-${opt.id}`}>{plural(built.length, 'floor')}</a>.</p>
+                <p class="faint">No space drawing: where each access point hangs is on each office's floor plan and in its 3D model. Built to it: <a href={`#rooms-${opt.id}`}>{plural(built.length, 'floor')}</a>.</p>
               </div>
             ) : (
             <RoomScene option={opt} type={id} uid={`rt-${opt.id}`} pair rec={rec}>
-              <SidePanel slot="side" title="What's in the room" meta={`${plural(nItems, 'item')} · hover one to find it`}>
+              <SidePanel slot="side" title="What's in the space" meta={`${plural(nItems, 'item')} · hover one to find it`}>
                 <p class="rt-sum">{!hasTabs && <b>{opt.name}: </b>}{opt.summary}</p>
                 <RoomKey option={opt} uid={`rt-${opt.id}`} />
                 <dl class="kv rt-facts">
                   {rs.capacity && <div><dt>Seats</dt><dd>{rs.capacity.min === rs.capacity.max ? rs.capacity.min : `${rs.capacity.min} to ${rs.capacity.max}`}</dd></div>}
                   {opt.infrastructure?.length > 0 && <div><dt>Outlets</dt><dd><a href={`#outlets-${opt.id}`}>{outletLine(opt.infrastructure)}</a></dd></div>}
                   {opt.clients?.length > 0 && <div><dt>Works with</dt><dd>{opt.clients.map((c) => OS_LABEL[c] ?? c).join(', ')} laptops</dd></div>}
-                  <div><dt>Built to it</dt><dd><a href={`#rooms-${opt.id}`}>{plural(built.length, 'room')}</a></dd></div>
+                  <div><dt>Built to it</dt><dd><a href={`#rooms-${opt.id}`}>{plural(built.length, 'space')}</a></dd></div>
                 </dl>
               </SidePanel>
             </RoomScene>
@@ -225,13 +225,13 @@ const nParts = infra ? current.equipment.reduce((k, e) => k + (typeof e.quantity
                     </article>
                   ))}
                 </div>
-                {!isHouse && <p class="faint rt-note">Power for the room's kit is never on a light switch, so nothing turns it off (house assumption).</p>}
+                {!isHouse && <p class="faint rt-note">Power for the space's kit is never on a light switch, so nothing turns it off (house assumption).</p>}
               </Section>
             )}
 
-            <Wiring option={opt} allOptional heading="Wiring" note={opt.equipment.some((e) => e.requirement === 'optional') ? 'Shown with every optional device fitted. Each room page shows its own.' : ''} />
+            <Wiring option={opt} allOptional heading="Wiring" note={opt.equipment.some((e) => e.requirement === 'optional') ? 'Shown with every optional device fitted. Each space page shows its own.' : ''} />
 
-            <Section title="Rooms built to it" id={`rooms-${opt.id}`} aside={plural(built.length, 'room')} showAll={12}>
+            <Section title="Spaces built to it" id={`rooms-${opt.id}`} aside={plural(built.length, 'space')} showAll={12}>
               {built.length === 0 ? <p class="muted">None yet.</p> : (
                 <div class="built-grid" data-items>
                   {built.map((b) => <a class="built" href={href(`/rooms/${b.id}/`)}><b>{b.number ? `${b.number} ` : ''}{b.name}</b><small>{sites[b.site]?.name}, {sites[b.site]?.city ?? ''}</small></a>)}

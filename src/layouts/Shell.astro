@@ -33,7 +33,7 @@ const NAV = [
     { id: 'schedule', label: 'Schedule', to: '/work/schedule/' },
     { id: 'projects', label: 'Projects', to: '/projects/', stage: 3 },
     { id: 'incidents', label: 'Incidents', to: '/incidents/', stage: 2 },
-    { id: 'known-issues', label: 'Known issues', to: '/known-issues/', stage: 2 },
+    { id: 'known-issues', label: 'Known errors', to: '/known-issues/', stage: 2 },
     { id: 'playbooks', label: 'Playbooks', to: '/playbooks/', stage: 3 },
     { id: 'planning', label: 'Planning', to: '/work/planning/', stage: 3, lead: true },
     { id: 'refresh', label: 'Work plan', to: '/refresh/' },
@@ -44,8 +44,8 @@ const NAV = [
   { id: 'locations', label: 'Locations', to: '/locations/', icon: 'sites', mobile: true, tabs: [
     { id: 'locations-overview', label: 'Overview', to: '/locations/' },
     { id: 'offices', label: 'Offices', to: '/locations/offices/' },
-    { id: 'rooms', label: 'Rooms', to: '/rooms/' },
-    { id: 'types', label: 'Room profiles', to: '/room-profiles/' },
+    { id: 'rooms', label: 'Spaces', to: '/rooms/' },
+    { id: 'types', label: 'Space types', to: '/room-profiles/' },
     { id: 'usage', label: 'Usage', to: '/usage/', stage: 2, lead: true },
   ], also: ['sites', 'office', 'region', 'home-offices'] },
   // Services: the health, fleet, standard and owners of each service.
@@ -57,10 +57,10 @@ const NAV = [
   ], also: ['service'] },
   { id: 'devices', label: 'Devices', to: '/devices/overview/', vendorTo: '/profiles/', icon: 'devices', mobile: true, vendorOk: true, tabs: [
     { id: 'devices-overview', label: 'Overview', to: '/devices/overview/' },
-    { id: 'profiles', label: 'Device profiles', to: '/profiles/', vendorOk: true },
+    { id: 'profiles', label: 'Device types', to: '/profiles/', vendorOk: true },
     { id: 'devices', label: 'Units', to: '/devices/' },
     { id: 'models', label: 'Models', to: '/models/', vendorOk: true },
-    { id: 'configurations', label: 'Configurations', to: '/configurations/', vendorOk: true },
+    { id: 'configurations', label: 'Setup guides', to: '/configurations/', vendorOk: true },
     { id: 'standards', label: 'Standards', to: '/standards/', vendorOk: true },
     { id: 'equipment-usage', label: 'Usage', to: '/usage/equipment/', stage: 2, lead: true },
     { id: 'spares', label: 'IT stores', to: '/spares/' },
@@ -101,7 +101,7 @@ const EVERYONE = { id: 'everyone', name: 'Everyone', role: 'Everyone (overview)'
 const DEMO_ADMIN = { id: 'demo-admin', name: 'Demo admin (Everyone view)', roleId: 'delivery', role: 'Demo admin', initials: 'DA', vendor: false };
 const PEOPLE_LITE = [...PEOPLE.map((p) => ({ id: p.id, name: p.name, roleId: p.roleId, role: p.role, initials: p.initials, vendor: !!p.vendor })), DEMO_ADMIN];
 const who0 = PEOPLE[0];
-// The object this page is about, for the Report drawer ("Suggest a change about ...").
+// The object this page is about, for the Report drawer ("Propose an edit about ...").
 const aboutThis = about ?? { kind: 'page', label: title ?? 'this page' };
 // Styles that hide anything above the chosen stage (data-stage on <html>, set from Settings).
 const below = (min) => Array.from({ length: min - 1 }, (_, i) => i + 1);
@@ -154,7 +154,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
       var id = window.rsActorId();
       var all = window.RS_PEOPLE || []; return all.filter(function (p) { return p.id === id; })[0] || all[0] || { id: id, name: id, role: '' };
     };
-    /* Add a proposed change to the Changes page (rs4-changes, newest first) and return it. */
+    /* Add a proposed change to the Proposals page (rs4-changes, newest first) and return it. */
     window.rsPropose = function (c) {
       var list = window.rsStore.get('rs4-changes', []);
       var n = list.reduce(function (m, x) { var k = parseInt(String(x.id).replace(/\D/g, ''), 10) || 0; return Math.max(m, k); }, 40);
@@ -355,7 +355,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
     <span class="spacer"></span>
     <button class="search-btn" type="button" data-help="shell.search" data-open-search aria-label="Search everything (/ or Ctrl K)" title="Search everything"><Icon name="search" size={16} /><span>Search</span><kbd data-search-kbd>Ctrl K</kbd></button>
     <button class="help-btn" type="button" data-help-toggle data-help="shell.help" data-help-src={href('/help/index.json')} aria-pressed="false" aria-label="Help: explain what things are (?)" title="Help: explain what things are (press ? to switch on or off)"><span class="hb-q" aria-hidden="true">?</span></button>
-    <button class="report-btn" type="button" data-help="shell.report" data-open-report title="Suggest a change, log new firmware or raise an urgent issue about this page"><Icon name="plus" size={16} /><span>Report</span></button>
+    <button class="report-btn" type="button" data-help="shell.report" data-open-report title="Propose an edit, log new firmware or raise an urgent issue about this page"><Icon name="plus" size={16} /><span>Report</span></button>
     <button class="icon-btn mobile-gear" type="button" data-help="shell.mode" data-toggle-mode aria-label="Colour mode: Auto" title="Colour mode: Auto"><span class="m-system"><Icon name="auto" /></span><span class="m-light"><Icon name="sun" /></span><span class="m-dark"><Icon name="moon" /></span></button>
     <button class="icon-btn mobile-gear" type="button" data-help="shell.settings" data-open-settings aria-label="Settings"><Icon name="gear" /></button>
   </header>
@@ -371,7 +371,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
             </a>
           );
         })}
-        <p class="nav-div" aria-hidden="true">Everything else</p>
+        <p class="nav-div" aria-hidden="true"></p>
         <button class="nav-more" type="button" aria-expanded="false" data-nav-more data-help="shell.more"><Icon name="menu" /><span class="short">More</span></button>
       </nav>
       <div class="foot">
@@ -433,15 +433,15 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
       <section class="vendor-gate">
         <p class="kind">Vendor access</p>
         <h1>This part is for Aigna staff</h1>
-        <p class="lede">Vendors see their own installation and the device reference they need to build it: profiles, configurations and models. Everything else stays with Aigna.</p>
+        <p class="lede">Vendors see their own installation and the device reference they need to build it: profiles, setup guides and models. Everything else stays with Aigna.</p>
         <a class="btn primary" href={href('/vendor/')}>Go to your installation</a>
       </section>
       {minStage > 1 && (
         <section class="stage-gate">
-          <p class="kind">Stage {minStage}: {stageInfo?.name}</p>
-          <h1>This arrives at stage {minStage}</h1>
-          <p class="lede">{stageInfo?.adds}. It's switched off because the demo is set to an earlier stage.</p>
-          <button class="btn primary" type="button" data-help="shell.stage-gate" data-set-stage={minStage}>Switch on stage {minStage}</button>
+          <p class="kind">{stageInfo?.name}</p>
+          <h1>{stageInfo?.name} is switched off</h1>
+          <p class="lede">{stageInfo?.adds}. The demo is set to switch on less than this.</p>
+          <button class="btn primary" type="button" data-help="shell.stage-gate" data-set-stage={minStage}>Switch on {stageInfo?.name}</button>
         </section>
       )}
       {tabs.length > 0 && (
@@ -564,7 +564,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         more.setAttribute('aria-expanded', String(open));
       });
       document.querySelectorAll('.nav a').forEach(function (a) { a.addEventListener('click', function () { document.documentElement.classList.remove('nav-sheet'); }); });
-      /* "Switch on stage n" on a gated page. */
+      /* "Switch on" on a gated page. */
       document.querySelectorAll('[data-set-stage]').forEach(function (b) {
         b.addEventListener('click', function () { window.rsSetStage(b.dataset.setStage); });
       });

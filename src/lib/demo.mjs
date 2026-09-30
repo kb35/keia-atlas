@@ -13,7 +13,7 @@ export const ROLES = {
   },
   'sm-av': {
     name: 'Service manager, AV', team: 'av-it',
-    owns: ['Device profiles and configurations', 'The house standard for every room profile', 'Which firmware is standard'],
+    owns: ['Device types and setup guides', 'The house standard for every space type', 'Which firmware is standard'],
     decides: ['What goes into the standard after a Lab test', 'Design sign-off for AV'],
     hands: 'Asks the Lab to test before anything new enters the standard.',
   },
@@ -43,7 +43,7 @@ export const ROLES = {
   },
   'pm-manager': {
     name: 'Project management lead', team: 'delivery',
-    owns: ['The project managers they lead: staffing, workload, skills and one-to-ones', 'Escalations about dates, budget and blocked projects'],
+    owns: ['The project managers they lead: staffing, workload, skills and one-to-ones', 'Escalations about dates, budget and projects waiting on something'],
     decides: ['Which project manager runs which project', 'When a late project is escalated to the programme manager'],
     hands: 'Reports to the delivery manager. Which project starts and when stays with the programme manager.',
   },
@@ -57,12 +57,12 @@ export const ROLES = {
     name: 'Project manager', team: 'delivery',
     owns: ['One project, day to day: dates, tasks, risks', 'Vendors and access to site', 'Handover pack'],
     decides: ['Task order and who does what', 'When a phase is ready for its gate'],
-    hands: 'Engineering decisions go to the delivery engineer; standard changes to the service managers; a late or blocked project goes to the project management lead.',
+    hands: 'Engineering decisions go to the delivery engineer; standard changes to the service managers; a late project, or one waiting on something, goes to the project management lead.',
   },
   delivery: {
     name: 'AV and IT delivery engineer', team: 'delivery',
-    owns: ['Room designs and signal routes', 'Commissioning and verification', 'Captured fixes'],
-    decides: ['How a room is built to the standard', 'Whether a room passes commissioning'],
+    owns: ['Space designs and signal routes', 'Commissioning and verification', 'Captured fixes'],
+    decides: ['How a space is built to the standard', 'Whether a space passes commissioning'],
     hands: 'Installs go to technicians or a vendor; network changes to IT infrastructure.',
   },
   network: {
@@ -87,7 +87,7 @@ export const ROLES = {
     name: 'Service desk analyst', team: 'service-desk',
     owns: ['Incidents as they arrive in ServiceNow', 'First triage'],
     decides: ['Priority and which group gets it'],
-    hands: 'Room and device incidents go to on-site technicians.',
+    hands: 'Space and device incidents go to on-site technicians.',
   },
   vendor: {
     name: 'Integration vendor', team: 'vendor',
@@ -194,7 +194,7 @@ export const PEOPLE = [
   { id: 'hana', name: 'Hana Mori', roleId: 'pm', region: 'apac', scope: 'Projects in Asia Pacific', initials: 'HM' },
   { id: 'marco', name: 'Marco Bianchi', roleId: 'network', scope: 'Americas and EMEA', initials: 'MB' },
   { id: 'farah', name: 'Farah Idris', roleId: 'network', region: 'apac', scope: 'Asia Pacific', initials: 'FI' },
-  { id: 'sofia', name: 'Sofia Reyes', roleId: 'sm-av', scope: 'Owns device profiles and configurations', initials: 'SR' },
+  { id: 'sofia', name: 'Sofia Reyes', roleId: 'sm-av', scope: 'Owns device types and setup guides', initials: 'SR' },
   { id: 'declan', name: 'Declan Moore', roleId: 'sm-infra', scope: 'Network, comms rooms (MDF and IDF)', initials: 'DM' },
   { id: 'niamh', name: 'Niamh Walsh', roleId: 'innovation', scope: 'The Lab: new devices and firmware', initials: 'NW' },
   { id: 'tomas', name: 'Tomás Varga', roleId: 'programme', scope: 'Fit-outs, refreshes and the year plan', initials: 'TV' },
@@ -222,7 +222,7 @@ export const PROJECT_ROLE = {
 };
 
 export const STAGES_DEMO = [
-  { n: 1, name: 'Knowledge', adds: 'Standards, rooms and devices; the knowledge loop', real: true },
+  { n: 1, name: 'Knowledge', adds: 'Standards, spaces and devices; the knowledge loop', real: true },
   { n: 2, name: 'Live', adds: 'Health and incidents from asset register, device management, monitoring and ServiceNow', real: false },
   { n: 3, name: 'Process', adds: 'Projects, playbooks, the year plan and the Lab', real: false },
   { n: 4, name: 'Act', adds: 'Changes to systems from an approved task, read back', real: false },
@@ -235,13 +235,13 @@ export const STAGES_DEMO = [
 export const INBOX_SEED = [
   { id: 'RPT-097', kind: 'urgent', to: 'sofia', by: 'sam', at: '2026-09-28T09:40', status: 'new',
     about: { kind: 'device', label: 'Heron video bar, Juneau office', to: '/rooms/jnu-2-02/' },
-    fields: { happened: 'The new Studio X52 arrived on VideoOS 4.7.0, which is still in the Lab. The configuration is written for 4.6.2, so I stopped before provisioning. Do we downgrade to 4.6.2 or go ahead on 4.7.0?', blocks: "Yes, I can't continue" } },
+    fields: { happened: 'The new Studio X52 arrived on VideoOS 4.7.0, which is still in the Lab. The setup guide is written for 4.6.2, so I stopped before provisioning. Do we downgrade to 4.6.2 or go ahead on 4.7.0?', blocks: "Yes, I can't continue" } },
   { id: 'RPT-096', kind: 'firmware', to: 'sofia', by: 'sam', at: '2026-09-28T09:32', status: 'new',
     about: { kind: 'model', label: 'Poly Studio X52', to: '/profiles/video-bar/poly-studio-x52/' },
     fields: { model: 'Poly Studio X52', version: '4.7.0-466077', how: 'Arrived from the factory with it', works: 'Something is different or broken', notes: 'Six of the eight units for PRJ-14 shipped on 4.7.0, which is still in the Lab (LAB-07). Standard is 4.6.2.' } },
   { id: 'RPT-095', kind: 'urgent', to: 'declan', by: 'liam', at: '2026-09-27T16:10', status: 'new',
     about: { kind: 'comms', label: 'Dublin office IDF, floor 4', to: '/rooms/dub-4-21/' },
-    fields: { happened: 'Access switch 2 in the floor 4 IDF shows a failed power supply. Rooms on floor 4 still have power over Ethernet from the second supply.', blocks: 'No, but it needs fixing' } },
+    fields: { happened: 'Access switch 2 in the floor 4 IDF shows a failed power supply. Spaces on floor 4 still have power over Ethernet from the second supply.', blocks: 'No, but it needs fixing' } },
   { id: 'RPT-094', kind: 'change', to: 'sofia', by: 'liam', at: '2026-09-26T12:20', status: 'new',
     about: { kind: 'config', label: 'TC10 paired to its room system', to: '/profiles/touch-controller/#configuration' },
     fields: { what: 'Pairing step', now: 'Find the TC10 by its MAC address and select Pair', should: 'Wait for the TC10 to finish its own update first (about 10 minutes out of the box), then pair', why: 'Pairing during the TC10 update failed three times in Curlew. After the update it paired first time.' } },

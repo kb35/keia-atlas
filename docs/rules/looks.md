@@ -26,7 +26,7 @@ Text passes WCAG AA (4.5 to 1) on its surfaces in every look and mode; large tex
 
 ### T4. Colour has jobs
 
-The accent marks where you are, focus and the main action. Green is healthy, amber needs attention, red is a fault, blue in progress, violet planning, grey off or unknown. Cables and ports use signal colours.
+The accent marks where you are, focus and the main action. Green is healthy, amber to review, red is a fault, blue in progress, violet planning, grey off or unknown. Cables and ports use signal colours.
 
 - **Why:** when a colour means one thing, people read it without thinking.
 - **Do:** pair each status colour with its word.

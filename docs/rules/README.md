@@ -1,6 +1,6 @@
 # The Keia Atlas rule book
 
-How Keia Atlas moves, lays out a page, draws a device or a room, and words things. Anyone adding to Keia Atlas, or starting a sister project in the same design language, follows it. Each rule has a number, a why, a do and a don't. The app shows the book with live examples under About, The rule book (`/about/rules/`).
+How Keia Atlas moves, lays out a page, draws a device or a space, and words things. Anyone adding to Keia Atlas, or starting a sister project in the same design language, follows it. Each rule has a number, a why, a do and a don't. The app shows the book with live examples under About, The rule book (`/about/rules/`).
 
 ## The book on one page
 
@@ -10,9 +10,9 @@ How Keia Atlas moves, lays out a page, draws a device or a room, and words thing
 
 **Devices.** Data first. Drawn front-on from the vendor's picture, to scale, with the same parts in the same order so models morph. Ports coloured by signal. State beside the drawing, never on it.
 
-**Rooms.** To scale in metres, one viewpoint, a numbered key, outlets in the site's plug type, wiring left to right.
+**Spaces.** To scale in metres, one viewpoint, a numbered key, outlets in the site's plug type, wiring left to right.
 
-**Platform.** Find and filter on every list; search, Report, View as and Help on every page; later stages and simulated data say so; nothing is deleted, and actions can be undone. Every number on a summary opens the list it counts, filtered, showing the same count; overviews never grow a list in place.
+**Platform.** Find and filter on every list; search, Report, View as and Help on every page; simulated data says so; nothing is deleted, and actions can be undone. Every number on a summary opens the list it counts, filtered, showing the same count; overviews never grow a list in place.
 
 **Words.** Plain English, glossary words used exactly, no internal names, no em dashes. Filter bars, buttons, status words, the simulated tag and the overline are worded the same on every page.
 
@@ -25,7 +25,7 @@ How Keia Atlas moves, lays out a page, draws a device or a room, and words thing
 1. [Motion](motion.md)
 2. [Layout](layout.md)
 3. [Devices](devices.md)
-4. [Rooms](rooms.md)
+4. [Spaces](rooms.md)
 5. [Platform pages](platform.md)
 6. [Words](words.md)
 7. [Looks and tokens](looks.md)

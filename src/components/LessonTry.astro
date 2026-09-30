@@ -17,7 +17,7 @@ const others = Object.values(spaces).filter((s) => s.id !== curlew.id && s.posit
 const vbModels = Object.entries(models).filter(([, m]) => m.class === 'video-bar').map(([mid, m]) => ({ id: mid, name: `${m.manufacturer} ${m.model}`, rooms: Object.values(spaces).filter((s) => s.positions.some((p) => p.model === mid)).length }));
 const PROFILES = ['video-bar', 'display', 'touch-controller', 'scheduler-panel'];
 const roomCount = (cls) => Object.values(spaces).filter((s) => s.positions.some((p) => p.cls === cls)).length;
-const cfgName = Object.values(configurations).find((c) => c.models.includes(vbar.model))?.name ?? 'Its configuration';
+const cfgName = Object.values(configurations).find((c) => c.models.includes(vbar.model))?.name ?? 'Its setup guide';
 
 // Search: a small index of the demo's own rooms, models, settings, projects and retired devices.
 const REGION = { amer: 'Americas', emea: 'EMEA', apac: 'APAC' };
@@ -34,7 +34,7 @@ const SEARCH = id === 'search' ? {
   ],
 } : null;
 
-// Making a change: how many Studio X units would pick the new value up.
+// Making a proposal: how many Studio X units would pick the new value up.
 const studioX = ['poly-studio-x32', 'poly-studio-x52', 'poly-studio-x72'];
 const studioUnits = Object.values(spaces).reduce((n, s) => n + s.positions.filter((p) => studioX.includes(p.model) && p.current).length, 0);
 
@@ -45,7 +45,7 @@ const due = (d) => new Date(d).toLocaleDateString('en-IE', { day: 'numeric', mon
 
 const HOME = [
   { role: 'delivery', label: 'Delivery engineer', name: 'Aoife', panels: [
-    { k: 'tasks', h: 'Your tasks', rows: ['Commission Curlew and run the verification · 6 Oct', 'Check Heron against the X52 configuration · 2 Oct', 'Write the Wren commissioning notes · 9 Oct'] },
+    { k: 'tasks', h: 'Your tasks', rows: ['Commission Curlew and run the verification · 6 Oct', 'Check Heron against the X52 setup guide · 2 Oct', 'Write the Wren commissioning notes · 9 Oct'] },
     { k: 'projects', h: 'Your projects', rows: ['PRJ-12 New York office video bar refresh · Deploy', 'PRJ-14 Juneau office fit-out · Deploy'] },
   ] },
   { role: 'sm-av', label: 'Service manager, AV', name: 'Sofia', panels: [
@@ -53,7 +53,7 @@ const HOME = [
     { k: 'lab', h: 'In the Lab', rows: ['LAB-07 VideoOS 4.7.0 · Testing', 'LAB-11 VideoOS 5 · Failed'] },
   ] },
   { role: 'pm', label: 'Project manager', name: 'Ruth', panels: [
-    { k: 'projects', h: 'Projects', rows: ['PRJ-12 New York office video bar refresh · 1 blocked', 'PRJ-16 Dublin office IDF switch refresh · Design', 'PRJ-15 Dublin office town hall · Design'] },
+    { k: 'projects', h: 'Projects', rows: ['PRJ-12 New York office video bar refresh · 1 waiting', 'PRJ-16 Dublin office IDF switch refresh · Design', 'PRJ-15 Dublin office town hall · Design'] },
     { k: 'tasks', h: 'Your tasks', rows: ['Hand over with a snag list · 27 Nov', 'Rebook Whooper Swan after 14 Oct'] },
   ] },
   { role: 'tech', label: 'On-site technician', name: 'Liam', panels: [
@@ -62,7 +62,7 @@ const HOME = [
   ] },
 ];
 const STAGE_TEXT = [
-  ['Knowledge', 'Holds the standard: room profiles, device profiles, configurations and rooms.', 'Everything else, by hand, as today.'],
+  ['Knowledge', 'Holds the standard: space types, device types, setup guides and spaces.', 'Everything else, by hand, as today.'],
   ['Live', 'Shows health and incidents from the asset register, device management and monitoring.', 'Fix what is red; decide what is urgent.'],
   ['Process', 'Runs projects, playbooks, the year plan and the Lab.', 'Own the tasks; sign each gate.'],
   ['Act', 'Makes an approved change in the other systems, then reads it back to check.', 'Approve every change before it is made.'],
@@ -81,7 +81,7 @@ const TROUBLE = [
     ctx: `The service desk passes on a call from Dana in ${curlew.number} ${curlew.name}: "I plug my laptop into the table cable and nothing shows on the second screen. Meeting at 11:00."`,
     q: 'What do you do first?',
     a: [
-      { t: 'Go to the room with a spare cable', say: 'Not yet. You do not know the cause, and someone may already be on the way. Look for an open incident first.' },
+      { t: 'Go to the space with a spare cable', say: 'Not yet. You do not know the cause, and someone may already be on the way. Look for an open incident first.' },
       { t: `Check whether an incident is already open for ${curlew.name}`, ok: true },
       { t: 'Open a new incident', say: 'Look first. If one is already open you make a duplicate, and two people chase the same fault.' },
     ],
@@ -94,12 +94,12 @@ const TROUBLE = [
     q: 'Before you go, where do you look?',
     a: [
       { t: 'Nowhere: go and look', say: 'The walk may not be needed, and without looking you do not know what to take. Most of what you need is visible from your desk.' },
-      { t: 'Restart the video bar remotely', say: 'A restart ends any meeting in the room and can hide the evidence. Look before you change anything.' },
+      { t: 'Restart the video bar remotely', say: 'A restart ends any meeting in the space and can hide the evidence. Look before you change anything.' },
       { t: `${curlew.name}'s health in Keia Atlas`, ok: true },
     ],
-    got: 'Keia Atlas puts monitoring and device management for the room in one place:',
+    got: 'Keia Atlas puts monitoring and device management for the space in one place:',
     read: [
-      { lv: 'ok', from: 'Monitoring', t: 'Display 2 is online, on input HDMI 1: the input in the room\'s configuration.' },
+      { lv: 'ok', from: 'Monitoring', t: 'Display 2 is online, on input HDMI 1: the input in the space\'s setup guide.' },
       { lv: 'warn', from: 'Device management', t: 'The video bar is online and ready for calls, but has no picture on its content input.' },
       { lv: 'unk', from: 'Not monitored', t: 'The transmitter and receiver are not on the network, so they cannot report. Their lights will tell you, on site.' },
     ],
@@ -130,19 +130,19 @@ const TROUBLE = [
       { t: 'Reseat it, check the link light, then test', ok: true },
       { t: 'Leave it: it is still partly in', say: 'Partly in is what broke the link. It will fail again at the next knock.' },
     ],
-    got: 'The transmitter lights up and the link light comes on. Now test it the way the room will use it: share the laptop from the table cable, check both screens, then start a test call from the touch controller. Had the link stayed off, the next move was the known-good spare cable, then the transmitter.',
+    got: 'The transmitter lights up and the link light comes on. Now test it the way the space will use it: share the laptop from the table cable, check both screens, then start a test call from the touch controller. Had the link stayed off, the next move was the known-good spare cable, then the transmitter.',
   },
   {
     k: 'Record it',
     light: 'logged',
-    ctx: 'The room works. The incident is still open.',
+    ctx: 'The space works. The incident is still open.',
     q: 'What goes in the incident before you resolve it?',
     a: [
       { t: '"Fixed"', say: 'Then the next person learns nothing, and nobody can see it if table box cables keep coming loose.' },
-      { t: 'Nothing: the room works now', say: 'Then the incident stays open and neither caller hears back.' },
+      { t: 'Nothing: the space works now', say: 'Then the incident stays open and neither caller hears back.' },
       { t: 'The cause, the fix and the test', ok: true },
     ],
-    got: '"Table box HDBaseT cable half out, so the transmitter had no power. Reseated; laptop and a test call checked on both screens." Both callers hear back. If the fault teaches something new, add a captured fix too: here, a clip to hold the cable in the table box. The room profile owner decides whether every large room gets one.',
+    got: '"Table box HDBaseT cable half out, so the transmitter had no power. Reseated; laptop and a test call checked on both screens." Both callers hear back. If the fault teaches something new, add a captured fix too: here, a clip to hold the cable in the table box. The space type owner decides whether every large space gets one.',
   },
 ];
 const tick = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
@@ -151,14 +151,14 @@ const tick = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke
   <div class="tr tr-prof" data-tr="profiles">
     <ol class="tp-legend" aria-label="Where you are">
       <span class="tp-glide" aria-hidden="true"></span>
-      <li data-lv="0"><small>1</small>Device profiles</li>
-      <li data-lv="1"><small>2</small>A device profile</li>
+      <li data-lv="0"><small>1</small>Device types</li>
+      <li data-lv="1"><small>2</small>A device type</li>
       <li data-lv="2"><small>3</small>A model</li>
       <li data-lv="3"><small>4</small>An installed unit</li>
     </ol>
     <div class="tp-main">
       <nav class="tp-crumbs" aria-label="Path">
-        <button type="button" data-crumb="0">Device profiles</button>
+        <button type="button" data-crumb="0">Device types</button>
         <button type="button" data-crumb="1" hidden>Video bar</button>
         <button type="button" data-crumb="2" hidden>{vbModel.model}</button>
         <button type="button" data-crumb="3" hidden>{vbar.hostname}</button>
@@ -168,31 +168,31 @@ const tick = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke
           <div class="tp-tiles">
             {PROFILES.map((c) => (
               <button type="button" class="tp-tile" data-go-lv={c === 'video-bar' ? '1' : undefined} data-hint={c === 'video-bar' ? undefined : 'Curlew\'s video bar is under Video bar.'}>
-                <DeviceGlyph cls={c} size={40} /><b>{className(c)}</b><small>In {roomCount(c)} rooms</small>
+                <DeviceGlyph cls={c} size={40} /><b>{className(c)}</b><small>In {roomCount(c)} spaces</small>
               </button>
             ))}
           </div>
         </div>
         <div class="tp-pan" data-pan="1" hidden>
-          <p class="tp-kind">Device profile</p>
+          <p class="tp-kind">Device type</p>
           <p class="tp-lead"><b>Video bar.</b> {classes['video-bar'].profile.object_role}.</p>
           <p class="tp-sub">Models that fit this profile:</p>
           <div class="tp-tiles">
             {vbModels.map((m) => (
-              <button type="button" class="tp-tile" data-go-lv={m.id === vbar.model ? '2' : undefined} data-hint={m.id === vbar.model ? undefined : `Curlew is a large room. Large rooms use the ${vbModel.model}.`}>
-                <b>{m.name}</b><small>In {m.rooms} rooms</small>
+              <button type="button" class="tp-tile" data-go-lv={m.id === vbar.model ? '2' : undefined} data-hint={m.id === vbar.model ? undefined : `Curlew is a large space. Large spaces use the ${vbModel.model}.`}>
+                <b>{m.name}</b><small>In {m.rooms} spaces</small>
               </button>
             ))}
           </div>
         </div>
         <div class="tp-pan" data-pan="2" hidden>
           <p class="tp-kind">Model</p>
-          <p class="tp-lead"><b>{modelName(vbar.model)}.</b> One product. Set up with <span class="tp-chip">{cfgName}</span>, its configuration.</p>
+          <p class="tp-lead"><b>{modelName(vbar.model)}.</b> One product. Set up with <span class="tp-chip">{cfgName}</span>, its setup guide.</p>
           <p class="tp-sub">Units of this model:</p>
           <div class="tp-units">
             <button type="button" class="tp-unit" data-go-lv="3"><span class="mono">{vbar.hostname}</span><span>{curlew.number} {curlew.name} · {siteName(curlew)}</span></button>
             {others.map(({ s, p }) => (
-              <button type="button" class="tp-unit" data-hint="That one is in another room. Look for Curlew."><span class="mono">{p.hostname}</span><span>{s.number} {s.name} · {siteName(s)}</span></button>
+              <button type="button" class="tp-unit" data-hint="That one is in another space. Look for Curlew."><span class="mono">{p.hostname}</span><span>{s.number} {s.name} · {siteName(s)}</span></button>
             ))}
           </div>
         </div>
@@ -200,12 +200,12 @@ const tick = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke
           <p class="tp-kind">Unit</p>
           <dl class="tp-dl">
             <div><dt>Hostname</dt><dd class="mono">{vbar.hostname}</dd></div>
-            <div><dt>Room</dt><dd>{curlew.number} {curlew.name}, {siteName(curlew)}</dd></div>
+            <div><dt>Space</dt><dd>{curlew.number} {curlew.name}, {siteName(curlew)}</dd></div>
             <div><dt>Model</dt><dd>{modelName(vbar.model)}</dd></div>
             <div><dt>Serial</dt><dd class="mono">{vbar.current.serial}</dd></div>
             <div><dt>Status</dt><dd><span class="pill deploy">Being installed</span></dd></div>
           </dl>
-          <p class="tp-room"><b>Rooms work the same way.</b> Room profile <span class="tp-chip">{curlew.type.profile.name}</span> then room <span class="tp-chip">{curlew.number} {curlew.name}</span>.</p>
+          <p class="tp-room"><b>Spaces work the same way.</b> Space type <span class="tp-chip">{curlew.type.profile.name}</span> then space <span class="tp-chip">{curlew.number} {curlew.name}</span>.</p>
         </div>
       </div>
       <p class="tr-hint" data-hint-out aria-live="polite"></p>
@@ -250,9 +250,9 @@ const tick = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke
 {id === 'room' && (
   <div class="tr tr-room" data-tr="room" data-at="1">
     <div class="rm-chain">
-      <span><small>Room profile</small><b>{curlew.type.profile.name}</b></span><Icon name="arrow" size={14} />
+      <span><small>Space type</small><b>{curlew.type.profile.name}</b></span><Icon name="arrow" size={14} />
       <span><small>Build option</small><b>{curlew.option.name}</b></span><Icon name="arrow" size={14} />
-      <span><small>Room</small><b>{curlew.number} {curlew.name}</b></span>
+      <span><small>Space</small><b>{curlew.number} {curlew.name}</b></span>
     </div>
     <ol class="rt-steps" aria-label="Steps">
       {TROUBLE.map((s, i) => <li data-rt-s={i + 1}><span class="rt-n mono">{i + 1}</span><span class="rt-t">{s.k}</span></li>)}
@@ -339,13 +339,13 @@ const tick = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke
 
 {id === 'search' && (
   <div class="tr tr-search" data-tr="search" data-search-data={JSON.stringify(SEARCH)}>
-    <label class="ts-box"><Icon name="search" size={18} /><span class="sr-only">Search Keia Atlas</span><input type="search" autocomplete="off" placeholder="Search rooms, devices, settings, projects..." data-ts-q /></label>
+    <label class="ts-box"><Icon name="search" size={18} /><span class="sr-only">Search Keia Atlas</span><input type="search" autocomplete="off" placeholder="Search spaces, devices, settings, projects..." data-ts-q /></label>
     <div class="ts-try"><span class="faint">Try:</span>
-      {['emea rooms with x52', 'curlew', 'automatic updates', 'retired displays oak house'].map((q) => <button type="button" class="ts-chip" data-ts-ex={q}>{q}</button>)}
+      {['emea spaces with x52', 'curlew', 'automatic updates', 'retired displays oak house'].map((q) => <button type="button" class="ts-chip" data-ts-ex={q}>{q}</button>)}
     </div>
     <p class="ts-understood" data-ts-und hidden></p>
     <div class="ts-kinds" role="radiogroup" aria-label="Show">
-      {[['all', 'Everything'], ['room', 'Rooms'], ['model', 'Models'], ['setting', 'Settings'], ['project', 'Projects'], ['retired', 'Retired']].map(([k, l]) => <button type="button" role="radio" aria-checked={String(k === 'all')} data-ts-k={k}>{l}<span data-ts-c={k}></span></button>)}
+      {[['all', 'Everything'], ['room', 'Spaces'], ['model', 'Models'], ['setting', 'Settings'], ['project', 'Projects'], ['retired', 'Retired']].map(([k, l]) => <button type="button" role="radio" aria-checked={String(k === 'all')} data-ts-k={k}>{l}<span data-ts-c={k}></span></button>)}
     </div>
     <ol class="ts-res" data-ts-res></ol>
     <p class="ts-more faint" data-ts-more></p>
@@ -358,13 +358,13 @@ const tick = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke
       <span class="tg-ic"><Icon name="calendar" size={16} /></span>
       <span class="tg-name"><b>Maintenance Hours</b><small>Studio X in Google Meet mode · owned by Sofia Reyes, service manager, AV</small></span>
       <span class="tg-val" data-tg-val>01:00 to 04:00</span>
-      <button type="button" class="btn small" data-tg-open>Suggest a change</button>
+      <button type="button" class="btn small" data-tg-open>Propose an edit</button>
     </div>
     <div class="tg-form" data-tg-form hidden>
       <p class="tg-l">New value</p>
       <div class="tc-seg" role="radiogroup" aria-label="New value">{['02:00 to 05:00', '00:00 to 03:00'].map((v, i) => <button type="button" role="radio" aria-checked={String(i === 0)} data-tg-v={v}>{v}</button>)}</div>
       <p class="tg-l">Why</p>
-      <div class="tg-why" role="radiogroup" aria-label="Why">{['Cleaners use the rooms at 01:00 and trip the restart', 'Matches the network maintenance window'].map((v, i) => <button type="button" role="radio" aria-checked={String(i === 0)} data-tg-w={v}>{v}</button>)}</div>
+      <div class="tg-why" role="radiogroup" aria-label="Why">{['Cleaners use the spaces at 01:00 and trip the restart', 'Matches the network maintenance window'].map((v, i) => <button type="button" role="radio" aria-checked={String(i === 0)} data-tg-w={v}>{v}</button>)}</div>
       <button type="button" class="btn small primary" data-tg-send>Send for review</button>
     </div>
     <ol class="tg-steps" data-tg-steps hidden>
@@ -373,7 +373,7 @@ const tick = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke
       <li data-st="3"><span class="tg-dot" set:html={tick}></span><b>Shows everywhere</b><small>Every page that uses the setting, at once.</small></li>
     </ol>
     <div class="tg-every" data-tg-every hidden>
-      <span style="--i:0"><Icon name="sliders" size={16} /><small>The configuration</small><b data-tg-out>02:00 to 05:00</b></span>
+      <span style="--i:0"><Icon name="sliders" size={16} /><small>The setup guide</small><b data-tg-out>02:00 to 05:00</b></span>
       <span style="--i:1"><Icon name="devices" size={16} /><small>{studioUnits} Studio X units</small><b data-tg-out>02:00 to 05:00</b></span>
       <span style="--i:2"><Icon name="kit" size={16} /><small>Vendor install pack</small><b data-tg-out>02:00 to 05:00</b></span>
       <span style="--i:3"><Icon name="decisions" size={16} /><small>History</small><b>You, approved by Sofia</b></span>
@@ -386,7 +386,7 @@ const tick = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke
     <div class="tq-drawer">
       <p class="tq-top"><Icon name="plus" size={16} /><b>Report</b><span class="faint">about 20.05 Curlew, New York office</span></p>
       <div class="tq-kinds" role="radiogroup" aria-label="What kind">
-        {[['change', 'Suggest a change', 'A setting, step or fact is wrong'], ['firmware', 'New firmware found', 'A version the standard does not list'], ['urgent', 'Urgent issue', 'Something is blocking a room']].map(([k, b, s]) => (
+        {[['change', 'Propose an edit', 'A setting, step or fact is wrong'], ['firmware', 'New firmware found', 'A version the standard does not list'], ['urgent', 'Urgent issue', 'Something is blocking a space']].map(([k, b, s]) => (
           <button type="button" role="radio" aria-checked="false" data-tq-k={k}><b>{b}</b><small>{s}</small></button>
         ))}
       </div>
@@ -421,8 +421,8 @@ const tick = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke
         <li class={`tk st-${t.status}`} data-tk={t.id}>
           <div class="tk-row">
             <button type="button" class="tk-box" aria-label={`Mark ${t.id} done`} data-tk-done={t.id === 'T-1204' ? '' : undefined} disabled={t.id !== 'T-1204'} set:html={tick}></button>
-            <span class="tk-t"><b>{t.title}</b><small><span class="mono">{t.id}</span> · {WHO[t.owner]} · {due(t.due)}{t.blocked_by ? ` · Blocked: ${t.blocked_by}` : ''}</small></span>
-            <span class={`pill st-${t.status}`} data-tk-pill>{{ todo: 'To do', doing: 'Doing', blocked: 'Blocked', done: 'Done' }[t.status]}</span>
+            <span class="tk-t"><b>{t.title}</b><small><span class="mono">{t.id}</span> · {WHO[t.owner]} · {due(t.due)}{t.blocked_by ? ` · Waiting on: ${t.blocked_by}` : ''}</small></span>
+            <span class={`pill st-${t.status}`} data-tk-pill>{{ todo: 'To do', doing: 'Doing', blocked: 'Waiting on', done: 'Done' }[t.status]}</span>
           </div>
           {t.id === 'T-1204' && (
             <div class="tk-cap" data-tk-cap hidden>
@@ -460,7 +460,7 @@ const tick = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke
     <div class="th-screens" data-th-host>
       {HOME.map((h, i) => (
         <div class="th-screen" data-th-screen={h.role} hidden={i > 0}>
-          <p class="th-hello" data-vk="hello">Good morning, {h.name}. Here's what needs you.</p>
+          <p class="th-hello" data-vk="hello">Good morning, {h.name}. Ready for you.</p>
           <div class="th-panels">
             {h.panels.map((p) => (
               <div class={`th-panel th-${p.k}`} data-vk={p.k}>
@@ -489,7 +489,7 @@ const tick = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke
 
 {id === 'stages' && (
   <div class="tr tr-stg" data-tr="stages">
-    <label class="sg-l" for="sg-range">Stage switched on: <b data-sg-n>1</b></label>
+    <label class="sg-l" for="sg-range">Modules switched on: <b data-sg-n>1</b> of 6</label>
     <input id="sg-range" type="range" min="1" max="6" step="1" value="1" data-sg-range />
     <ol class="sg-ladder" aria-hidden="true">{STAGE_TEXT.map((s, i) => <li class={i === 0 ? 'on' : ''} data-sg={i + 1}><span class="mono">{i + 1}</span>{s[0]}</li>)}</ol>
     <div class="sg-cols" data-sg-host>

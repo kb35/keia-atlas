@@ -53,7 +53,7 @@ const FACETS = [
   { key: 'site', label: 'Office', options: siteRoll.map((x) => ({ value: x.id, label: x.site.name, sub: x.site.city })) },
   { key: 'kind', label: 'Kind', options: Object.keys(KEY).filter((k) => R.some((r) => r.kind === k)).map((k) => ({ value: k, label: KIND_LABEL[k] })) },
   { key: 'status', label: 'Status', options: [{ value: 'over', label: FLAG.over.label }, { value: 'under', label: FLAG.under.label }, { value: 'ghost', label: 'Booked but empty' }, { value: 'steady', label: 'Steady' }] },
-  { key: 'type', label: 'Room profile', options: [...new Set(R.map((r) => r.s.space_type))].map((t) => ({ value: t, label: spaceTypes[t].profile.name })).sort((a, b) => a.label.localeCompare(b.label)) },
+  { key: 'type', label: 'Space type', options: [...new Set(R.map((r) => r.s.space_type))].map((t) => ({ value: t, label: spaceTypes[t].profile.name })).sort((a, b) => a.label.localeCompare(b.label)) },
   ...(HOME ? [{ key: 'where', label: 'Where', options: WHERE }] : []),
 ];
 const SORT = { options: [
@@ -61,9 +61,9 @@ const SORT = { options: [
   { value: 'now', label: 'In use now first' }, { value: 'issues', label: 'Engineering first' }, { value: 'site', label: 'By office' }, { value: 'name', label: 'By name' },
 ] };
 const TOGGLES = [
-  { key: 'now', label: 'In use now', title: 'Only rooms in use right now (worked out live on this page)' },
-  { key: 'issues', label: 'Open incidents', title: 'Only rooms with an open incident' },
-  { key: 'failed', label: 'Failed calls', title: 'Only rooms where video calls keep failing' },
+  { key: 'now', label: 'In use now', title: 'Only spaces in use right now (worked out live on this page)' },
+  { key: 'issues', label: 'Open incidents', title: 'Only spaces with an open incident' },
+  { key: 'failed', label: 'Failed calls', title: 'Only spaces where video calls keep failing' },
 ];
 const NUMBERS = [
   { n: '–', label: 'In use now', id: 'inuse', to: '?now=1' },
@@ -72,12 +72,12 @@ const NUMBERS = [
   { n: withIncidents, label: 'With open incidents', to: '?issues=1', tone: withIncidents ? 'bad' : undefined },
 ];
 ---
-<Shell title="Room usage" section="usage" minStage={2} crumbs={[{ label: 'Rooms', to: '/rooms/' }, { label: 'Usage' }]}>
-  <PageBand overline="Occupancy" title="Room usage" lede="How much each room is used over a typical four weeks, and which are in use now. Never meeting titles or who booked." sim numbers={NUMBERS} />
+<Shell title="Space usage" section="usage" minStage={2} crumbs={[{ label: 'Spaces', to: '/rooms/' }, { label: 'Usage' }]}>
+  <PageBand overline="Occupancy" title="Space usage" lede="How much each space is used over a typical four weeks, and which are in use now. Never meeting titles or who booked." sim numbers={NUMBERS} />
 
   <div class="content ru" data-ru>
     <RoomPlanSprite />
-    <FilterBar facets={FACETS} toggles={TOGGLES} placeholder="Find a room, number or office" label="Find a room" noun={['room', 'rooms']} scope=".content.ru" sort={SORT} />
+    <FilterBar facets={FACETS} toggles={TOGGLES} placeholder="Find a space, number or office" label="Find a space" noun={['space', 'spaces']} scope=".content.ru" sort={SORT} />
 
     <div class="g12 top" id="rooms">
       <div class="s-8 ut-main">
@@ -86,7 +86,7 @@ const NUMBERS = [
           <div class="ut-scroll">
             <table class="ut ut-rooms">
               <thead><tr>
-                <th scope="col">Room</th>
+                <th scope="col">Space</th>
                 <th scope="col" class="r" title="People in a typical meeting, of the seats">People</th>
                 <th scope="col" title="Share of the working week occupied; the lighter bar is booked">Occupied</th>
                 <th scope="col" class="r">No-shows</th>
@@ -131,25 +131,25 @@ const NUMBERS = [
             </table>
           </div>
           <div class="ut-foot">
-            <p class="src-note"><b>Privacy:</b> only occupied or free, and a headcount band. Never meeting titles, organisers or who booked a room.</p>
+            <p class="src-note"><b>Privacy:</b> only occupied or free, and a headcount band. Never meeting titles, organisers or who booked a space.</p>
             <button type="button" class="btn small ghost" data-sa-btn hidden></button>
           </div>
         </div>
         </Section>
-        <EmptyState text="No rooms match these filters." />
+        <EmptyState text="No spaces match these filters." />
       </div>
 
-      <SidePanel class="s-4" title="This room" meta="Pick a row to change it">
+      <SidePanel class="s-4" title="This space" meta="Pick a row to change it">
         <div data-ru-detail aria-live="polite"></div>
       </SidePanel>
     </div>
 
-    <Section title="By office" aside="Occupied share of the working week, and how many rooms need a look. Pick a site to filter the table.">
+    <Section title="By office" aside="Occupied share of the working week, and how many spaces to review. Pick a site to filter the table.">
       <div class="card ut-card">
         <div class="ut-scroll">
           <table class="ut ut-sites">
             <thead><tr>
-              <th scope="col">Office</th><th scope="col" class="r">Rooms</th><th scope="col" class="r">Seats</th><th scope="col">Occupied</th>
+              <th scope="col">Office</th><th scope="col" class="r">Spaces</th><th scope="col" class="r">Seats</th><th scope="col">Occupied</th>
               <th scope="col" class="r">No-shows</th><th scope="col" class="r">Over-used</th><th scope="col" class="r">Under-used</th><th scope="col" class="r">Booked, empty</th>
             </tr></thead>
             <tbody>
@@ -254,7 +254,7 @@ const NUMBERS = [
           return '<div class="bo"><span class="bo-l">' + label + '</span><span class="bo-t"><i class="' + cls + '" style="width:' + Math.min(100, (h / CFG.WEEK_H) * 100) + '%"></i></span><span class="bo-v num">' + Math.round(h) + ' h</span>' + (note ? '<small class="bo-n">' + note + '</small>' : '') + '</div>';
         };
         var devs = DEVICES[r.id] || [];
-        var eng = '<section class="rd-sec"><h3>For engineers <span class="faint">what to look at in this room</span></h3>' +
+        var eng = '<section class="rd-sec"><h3>For engineers <span class="faint">what to look at in this space</span></h3>' +
           (r.inc.length ? '<ul class="rd-list">' + r.inc.map(function (n) { return '<li><a class="uc bad" href="' + n.h + '">' + esc(n.n) + '</a><span>' + esc(n.t) + '</span></li>'; }).join('') + '</ul>' : '<p class="rd-p">No open incidents.</p>') +
           (devs.length ? '<ul class="rd-list rd-devs">' + devs.map(function (d) {
             return '<li><a href="' + d.h + '"><b>' + esc(d.n) + '</b><small>' + esc(d.l) + '</small></a>' +
@@ -262,7 +262,7 @@ const NUMBERS = [
           }).join('') + '</ul>' : '') + '</section>';
         return '<div class="rd" data-room="' + r.id + '">' +
           '<header class="rd-h"><div><p class="rd-k">' + esc(r.code) + ' · ' + esc(r.num) + '</p><h3 class="rd-t">' + esc(r.name) + '</h3><p class="rd-s">' + esc(r.profile) + ', ' + esc(r.siteName) + '</p></div>' +
-          '<a class="btn small ghost rd-go" href="' + CFG.ROOM_BASE + r.id + '/">Room page</a></header>' +
+          '<a class="btn small ghost rd-go" href="' + CFG.ROOM_BASE + r.id + '/">Space page</a></header>' +
           '<p class="rd-now ' + (x.on ? 'on' : x.open ? 'free' : 'closed') + '"><i></i>' + (x.on ? 'In use now, ' + CFG.BANDS[x.band].toLowerCase() + ' people' : x.open ? 'Free now' : 'Closed now') + '<small>' + x.t.wd + ' ' + (x.t.h < 10 ? '0' : '') + x.t.h + ':' + x.t.m + ' local time</small></p>' +
           (f ? '<div class="rd-flag ' + f.tone + '"><span class="uflag ' + f.tone + '">' + f.long + '</span><p>' + esc(r.why) + '</p><p class="rd-act">' + esc(r.act) + '</p></div>' : '') +
           '<section class="rd-sec"><h3>Seats and people <span class="faint">typical meeting</span></h3><div class="rd-seats" aria-hidden="true">' + seats + '</div>' +

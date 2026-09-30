@@ -16,7 +16,7 @@ const roomTitle = (s) => (s.number ? `${s.number} ${s.name}` : s.name);
 
 // A room's configure state inside a project: its own configure task first, then a project-wide one,
 // then the room's state in the project.
-export const ROOM_STATE = { done: 'Configured', doing: 'Being configured', todo: 'To do', blocked: 'Blocked' };
+export const ROOM_STATE = { done: 'Configured', doing: 'Being configured', todo: 'To do', blocked: 'Waiting on' };
 function roomState(p, entry) {
   const own = p.tasks.find((t) => t.kind === 'configure' && t.space === entry.space);
   const all = p.tasks.find((t) => t.kind === 'configure' && !t.space);
@@ -73,7 +73,7 @@ const DRIFT = {
   fw: 'Firmware behind the standard',
   dns: 'Address does not match DNS',
   mon: 'Missing from monitoring',
-  asset: 'Asset record in the wrong room',
+  asset: 'Asset record in the wrong space',
 };
 function unitsFor(cfg, fs) {
   const cls = models[cfg.models[0]].class, plat = classes[cls]?.platforms ?? {};

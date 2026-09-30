@@ -13,7 +13,7 @@ export const USTEPS = ['provision', 'install', 'configure'];
 const DONE = { provision: 'Provisioned', install: 'Installed', configure: 'Configured', commission: 'Commissioned' };
 export const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many ?? `${one}s`}`;
-export const PSEUDO = { keia_atlas: 'Keia Atlas', agent: 'The configuration agent' };
+export const PSEUDO = { keia_atlas: 'Keia Atlas', agent: 'The setup guide agent' };
 const first = (name) => String(name ?? '').split(' ')[0];
 
 export function integrateModel(plan, io) {
@@ -80,12 +80,12 @@ export function integrateModel(plan, io) {
       });
     }
     if (step === 'install') {
-      if (!u.networked) return [{ id: 'hand', t: 'Mounted and connected', exp: u.where ?? 'Where the room profile puts it', ok: null, found: 'Keia Atlas cannot see this one: a person confirms it' }];
+      if (!u.networked) return [{ id: 'hand', t: 'Mounted and connected', exp: u.where ?? 'Where the space type puts it', ok: null, found: 'Keia Atlas cannot see this one: a person confirms it' }];
       return [{ id: 'online', t: 'Online on its switch port', exp: u.port, ok: Boolean(s.online), found: s.online ? `Online on ${u.port}` : s.installed ? 'Marked installed, not seen online yet' : 'Not seen yet' }];
     }
     if (step === 'configure') {
       const b = B.get(u.batch);
-      if (!u.readable) return [{ id: 'hand', t: 'Set as the configuration says', exp: b?.cfg ? `${b.cfg.name} ${b.cfg.version}` : '', ok: null, found: 'Keia Atlas cannot read this one back: a person confirms it' }];
+      if (!u.readable) return [{ id: 'hand', t: 'Set as the setup guide says', exp: b?.cfg ? `${b.cfg.name} ${b.cfg.version}` : '', ok: null, found: 'Keia Atlas cannot read this one back: a person confirms it' }];
       const reach = (u.networked ? Boolean(s.online) : true) && hostOnline(u);
       const ok = reach && Boolean(s.read) && !s.drift;
       return [{ id: 'read', t: b?.cfg ? `Settings match ${b.cfg.name} ${b.cfg.version}` : 'Settings match the standard', exp: b?.via ?? '', ok, found: s.drift ? s.drift : ok ? 'Read back: matches' : !reach ? (!hostOnline(u) ? 'Its video bar is not online yet' : 'Not online yet') : s.read ? 'Matches' : 'Not read back yet' }];
@@ -119,11 +119,11 @@ export function integrateModel(plan, io) {
     const issue = issueOf(u, step);
     const by = (w) => (w === 'keia_atlas' ? 'Keia Atlas' : first(nameOf(w)));
     if (x === false) return { st: 'todo', label: 'To do', sub: `Unticked by ${by(xo.w)}`, why: xo.n ?? null, cs };
-    if (issue) return { st: 'issue', label: 'Needs you', sub: { host: 'No hostname', dns: 'DNS', fw: 'Firmware', offline: 'Offline', drift: 'Drifted' }[issue.kind] ?? '', issue, cs };
+    if (issue) return { st: 'issue', label: 'Ready for you', sub: { host: 'No hostname', dns: 'DNS', fw: 'Firmware', offline: 'Offline', drift: 'Drifted' }[issue.kind] ?? '', issue, cs };
     if (allOk) return a ? { st: 'done', label: DONE_W[step], sub: `Accepted by ${by(a.who)}`, acc: a, cs, seen: true } : { st: 'verified', label: 'Checked', sub: 'Seen by Keia Atlas', cs, seen: true };
     if (x === true) return { st: 'done', label: DONE_W[step], sub: `${step === 'install' && u.vendor ? 'Marked' : 'Ticked'} by ${by(xo.w)}`, why: xo.n ?? null, cs };
     if (a && !seeable) return { st: 'done', label: DONE_W[step], sub: `Confirmed by ${by(a.who)}`, acc: a, cs };
-    if (u.blocked?.[step]) return { st: 'blocked', label: 'Waiting', sub: u.blocked[step], cs };
+    if (u.blocked?.[step]) return { st: 'blocked', label: 'Waiting on', sub: u.blocked[step], cs };
     const okN = cs.filter((c) => c.ok).length;
     if (step === 'provision' && okN > 0) return { st: 'doing', label: 'Under way', sub: `${okN} of ${cs.length} seen`, cs };
     if (step === 'install' && s.installed) return { st: 'doing', label: 'Under way', sub: seeable ? 'Waiting to see it online' : 'Marked installed', cs };
@@ -176,7 +176,7 @@ export function integrateModel(plan, io) {
     }
     for (const t of plan.blocked) {
       const r = t.room ? R.get(t.room) : null;
-      out.push({ k: `task|${t.id}`, kind: 'blocked', room: t.room, where: r ? r.name : plan.name, t: `Waiting: ${t.why}`, fix: `${t.id} ${t.title}. ${first(nameOf(t.owner))} is on it; nothing to do here until it clears.`, act: 'task', href: t.href, quiet: true });
+      out.push({ k: `task|${t.id}`, kind: 'blocked', room: t.room, where: r ? r.name : plan.name, t: `Waiting on: ${t.why}`, fix: `${t.id} ${t.title}. ${first(nameOf(t.owner))} is on it; nothing to do here until it clears.`, act: 'task', href: t.href, quiet: true });
     }
     return out;
   }
@@ -194,7 +194,7 @@ export function integrateModel(plan, io) {
         else if (x.st === 'issue') blockedN += 1;
       }
       if (!keys.length) continue;
-      const ev = USTEPS.filter((s) => stepsSeen.has(s)).map((s) => (s === 'configure' && g.cfg ? `settings match the configuration (${g.cfg.name}, ${g.cfg.version})` : EVIDENCE[s]));
+      const ev = USTEPS.filter((s) => stepsSeen.has(s)).map((s) => (s === 'configure' && g.cfg ? `settings match the setup guide (${g.cfg.name}, ${g.cfg.version})` : EVIDENCE[s]));
       const n = unitsIn.size;
       const all = n === g.units.length && !blockedN && g.units.every((id) => U.get(id).steps.every((st) => ['verified', 'done'].includes(stepOf(id, st).st)));
       const what = by === 'room' ? `in ${g.title}` : (g.noun ?? 'units');
@@ -240,7 +240,7 @@ export function metersHtml(M, bid) {
 // The one line at the foot of a batch or room card: what it needs next.
 export function batchFootHtml(M, bid) {
   const s = M.batchSum(bid);
-  if (s.status === 'needs') return `<span class="bf needs"><i class="nd-dot"></i>${plural(new Set(s.issues.map((z) => z.id)).size, 'unit needs', 'units need')} you</span>`;
+  if (s.status === 'needs') return `<span class="bf needs"><i class="nd-dot"></i>${plural(new Set(s.issues.map((z) => z.id)).size, 'unit is', 'units are')} ready for you</span>`;
   if (s.status === 'accept') return `<span class="bf accept">${glyph('verified')}${plural(new Set(s.ready.map((z) => z.id)).size, 'unit')} checked, ready to accept</span>`;
   if (s.status === 'done') return `<span class="bf done">${glyph('done')}All ${s.total} set up and accepted</span>`;
   return `<span class="bf">${s.done} of ${s.total} set up</span>`;
@@ -249,7 +249,7 @@ export function roomFootHtml(M, rid) {
   const s = M.roomSum(rid);
   if (s.signed) return `<span class="bf done">${glyph('done')}Commissioned</span>`;
   if (s.failed.length) return `<span class="bf needs"><i class="nd-dot"></i>Room test: ${plural(s.failed.length, 'failure')}</span>`;
-  if (s.issues.length) return `<span class="bf needs"><i class="nd-dot"></i>${plural(new Set(s.issues.map((z) => z.id)).size, 'unit needs', 'units need')} you</span>`;
+  if (s.issues.length) return `<span class="bf needs"><i class="nd-dot"></i>${plural(new Set(s.issues.map((z) => z.id)).size, 'unit is', 'units are')} ready for you</span>`;
   if (s.ready) return `<span class="bf accept">${glyph('verified')}Ready for the room test</span>`;
   return `<span class="bf">${s.setUp} of ${s.total} set up, then the room test</span>`;
 }
@@ -268,7 +268,7 @@ export function needsHtml(M, { room = null, batch = null, limit = 0 } = {}) {
   let list = M.needs();
   if (room) list = list.filter((x) => x.room === room);
   if (batch) list = list.filter((x) => x.batch === batch);
-  if (!list.length) return `<p class="nd-none">${glyph('done')}<span>Nothing needs you${room || batch ? ' here' : ''}. Keia Atlas keeps checking ${room || batch ? 'these units' : `all ${M.plan.units.length} units`}.</span></p>`;
+  if (!list.length) return `<p class="nd-none">${glyph('done')}<span>Nothing is ready for you${room || batch ? ' here' : ''}. Keia Atlas keeps checking ${room || batch ? 'these units' : `all ${M.plan.units.length} units`}.</span></p>`;
   const shown = limit ? list.slice(0, limit) : list;
   const base = M.plan.base;
   return `<ul class="nd-list">${shown.map((x) => {
@@ -287,7 +287,7 @@ export function readyHtml(M, { by = 'batch', only = null } = {}) {
   let groups = M.readyGroups(by);
   if (only) groups = groups.filter((g) => g.id === only);
   if (!groups.length) {
-    return `<p class="rd-none">${M.seeOn() ? 'Nothing waiting. When units pass their checks, they gather here for you to accept in one go.' : 'From stage 2, Keia Atlas checks the systems and gathers what passed here. Until then, mark each step done by hand.'}</p>`;
+    return `<p class="rd-none">${M.seeOn() ? 'Nothing waiting. When units pass their checks, they gather here for you to accept in one go.' : 'Once real feeds replace the simulation, Keia Atlas checks the systems and gathers what passed here. Until then, mark each step done by hand.'}</p>`;
   }
   const total = groups.reduce((n, g) => n + g.keys.length, 0), unitsN = new Set(groups.flatMap((g) => g.keys.map((k) => k.split('|')[0]))).size;
   const rows = groups.map((g) => `<li class="rd" data-k="${esc(`${g.scope}:${g.id}`)}" data-help="integrate.ready"><div class="rd-b"><p class="rd-t">${glyph('verified')}<b>${esc(g.head)}</b></p><p class="rd-e">${esc(g.ev)}. ${plural(g.checksN, 'check')} passed${g.left ? `; ${plural(g.left, 'exception')} left out` : ''}.</p></div><button type="button" class="btn small primary" data-help="integrate.accept" data-act="accept" data-scope="${esc(g.scope)}" data-id="${esc(g.id)}">${g.all && g.n > 1 ? `Accept all ${g.n}` : 'Accept'}</button></li>`).join('');
@@ -333,12 +333,12 @@ export function sheetCheck(M, uid, ck, name = '') {
     if (x.st === 'done') return { st: 'done', label: x.acc ? 'Accepted' : 'Confirmed' };
     if (x.st === 'verified' || (x.st === 'issue' && s.read)) return { st: 'verified', label: 'Read back' };
     if (!u.readable) return { st: 'todo', label: 'Confirm by hand' };
-    if (x.st === 'blocked') return { st: 'blocked', label: 'Waiting' };
+    if (x.st === 'blocked') return { st: 'blocked', label: 'Waiting on' };
     return { st: x.st === 'doing' ? 'doing' : 'todo', label: 'Not read back yet' };
   }
   const c = (x.cs ?? []).find((y) => y.id === ck.rec) ?? (x.cs ?? [])[0] ?? null;
   const issue = x.st === 'issue' && M.issuesOf(u, ck.step).some((i) => ISSUE_REC[i.kind] === (ck.rec ?? c?.id));
-  if (issue) return { st: 'issue', label: 'Needs you' };
+  if (issue) return { st: 'issue', label: 'Ready for you' };
   if (!c) return { st: x.st, label: x.label };
   if (c.ok === null) return x.st === 'done' ? { st: 'done', label: 'Confirmed' } : { st: 'todo', label: 'Confirm by hand' };
   if (c.ok) return x.st === 'done' ? { st: 'done', label: 'Accepted' } : { st: 'verified', label: 'Seen' };
@@ -365,10 +365,10 @@ export function sharedHtml(M, bid) {
     const seen = b.units.filter((id) => ['verified', 'done'].includes(M.stepOf(id, 'configure').st)).length;
     status = `<p class="sh-st">${glyph(seen === b.units.length ? 'done' : 'doing')}<span><b>Profile applied</b> through ${esc(b.via)}. Read back from ${seen} of ${b.units.length}${reachable < b.units.length ? `; the other ${b.units.length - reachable} ${b.units.length - reachable === 1 ? 'takes it' : 'take it'} when ${b.units.length - reachable === 1 ? 'it' : 'they'} can be reached` : ''}.</span></p>`;
   } else if (agents && st.prepared) {
-    status = `<div class="sh-agent" data-help="integrate.agent"><p class="sh-ah">Prepared by the configuration agent</p><p>One run for all ${plural(b.units.length, 'unit')} through ${esc(b.via)}: ${b.settings ? `${b.settings.set} settings to set and ${b.settings.verify} to check` : 'its settings'}, plus each unit's own name and address. Nothing has changed on any unit yet.</p><p class="faint">Agents only propose. A person applies it, then accepts what Keia Atlas reads back.</p></div>`;
+    status = `<div class="sh-agent" data-help="integrate.agent"><p class="sh-ah">Prepared by the setup guide agent</p><p>One run for all ${plural(b.units.length, 'unit')} through ${esc(b.via)}: ${b.settings ? `${b.settings.set} settings to set and ${b.settings.verify} to check` : 'its settings'}, plus each unit's own name and address. Nothing has changed on any unit yet.</p><p class="faint">Agents only propose. A person applies it, then accepts what Keia Atlas reads back.</p></div>`;
     acts = `<button type="button" class="btn primary" data-help="integrate.apply-agent" data-act="apply" data-id="${esc(bid)}" data-via="agent">Apply the prepared run</button><button type="button" class="btn ghost" data-act="discard" data-id="${esc(bid)}">Discard</button>`;
   } else if (agents && st.handed) {
-    status = `<p class="sh-st">${glyph('doing')}<span><b>With the configuration agent</b>. It is preparing the run; nothing changes until a person applies it.</span></p>`;
+    status = `<p class="sh-st">${glyph('doing')}<span><b>With the setup guide agent</b>. It is preparing the run; nothing changes until a person applies it.</span></p>`;
   } else {
     status = `<p class="sh-st">${glyph('todo')}<span><b>Not applied yet.</b> One profile sets the shared settings on all ${b.units.length}${reachable < b.units.length ? `; ${reachable} can take it now, the rest when they can be reached` : ''}.</span></p>`;
     acts = `<button type="button" class="btn primary" data-help="integrate.apply" data-act="apply" data-id="${esc(bid)}" data-via="${M.stage() >= 4 ? 'push' : 'hand'}">${M.stage() >= 4 ? `Apply to all ${b.units.length}` : 'I have applied it'}</button>` +
@@ -408,11 +408,11 @@ export function testsHtml(M, rid) {
   } else if (!s.ready) {
     foot = `<p class="rt-wait">${glyph('todo')}<span>Ready once every unit is set up: ${s.setUp} of ${s.total} so far. You can still note results as you go.</span></p>`;
   } else if (s.failed.length) {
-    foot = `<p class="rt-wait">${glyph('issue')}<span>${plural(s.failed.length, 'test')} failed. Fix ${s.failed.length === 1 ? 'it' : 'them'}, then select Pass; it shows under Needs you until then.</span></p>`;
+    foot = `<p class="rt-wait">${glyph('issue')}<span>${plural(s.failed.length, 'test')} failed. Fix ${s.failed.length === 1 ? 'it' : 'them'}, then select Pass; it shows under Ready for you until then.</span></p>`;
   } else if (s.passed === s.tests.length) {
-    foot = `<div class="rt-go"><button type="button" class="btn primary" data-help="integrate.sign" data-act="sign" data-id="${esc(rid)}">Sign off the room</button><span class="faint">Every test passed.</span></div>`;
+    foot = `<div class="rt-go"><button type="button" class="btn primary" data-help="integrate.sign" data-act="sign" data-id="${esc(rid)}">Sign off the space</button><span class="faint">Every test passed.</span></div>`;
   } else {
-    foot = `<div class="rt-go"><button type="button" class="btn primary" data-help="integrate.all-passed" data-act="all-passed" data-id="${esc(rid)}">All passed</button><span class="faint">Records every test as passed and signs the room off. A failure: select Fail on just that test.</span></div>`;
+    foot = `<div class="rt-go"><button type="button" class="btn primary" data-help="integrate.all-passed" data-act="all-passed" data-id="${esc(rid)}">All passed</button><span class="faint">Records every test as passed and signs the space off. A failure: select Fail on just that test.</span></div>`;
   }
   return `<ul class="rt-list">${rows}</ul>${foot}`;
 }
@@ -437,10 +437,10 @@ export function describe(M, e) {
   else if (/^x-/.test(f)) { const st = f.slice(2), v = on?.v; t = v === true ? `Marked ${(M.DONE_W[st] ?? st).toLowerCase()}${on.n ? `: ${on.n}` : ''}` : v === false ? `Unticked ${(M.LABEL[st] ?? st).toLowerCase()}${on.n ? `: ${on.n}` : ''}` : `Cleared the tick on ${(M.LABEL[st] ?? st).toLowerCase()}`; }
   else if (/^su-/.test(f)) { const b = kind === 'batch' ? M.B.get(id) : u ? M.B.get(u.batch) : null; const s = b?.setup.find((x) => `su-${x.id}` === f); t = `${on ? 'Ticked' : 'Unticked'} setup step "${s?.t ?? f.slice(3)}"${kind === 'batch' ? ' on every unit' : ''}`; }
   else if (f === 'applied') t = on ? 'Applied the profile' : 'Took back the profile';
-  else if (f === 'handed') t = on ? 'Handed to the configuration agent' : 'Took it back from the agent';
-  else if (f === 'prepared') t = on ? 'The configuration agent prepared the run' : 'Discarded the prepared run';
+  else if (f === 'handed') t = on ? 'Handed to the setup guide agent' : 'Took it back from the agent';
+  else if (f === 'prepared') t = on ? 'The setup guide agent prepared the run' : 'Discarded the prepared run';
   else if (f === 'tests') t = 'Room test results';
-  else if (f === 'signed') t = on ? 'Signed off the room' : 'Took back the sign-off';
+  else if (f === 'signed') t = on ? 'Signed off the space' : 'Took back the sign-off';
   else t = `${f}: ${String(e.before ?? 'none')} to ${String(on ?? 'none')}`;
   return e.undoes ? `${e.note}: ${t.charAt(0).toLowerCase()}${t.slice(1)}` : t;
 }

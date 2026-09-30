@@ -513,7 +513,7 @@ export function trace(M, ref) {
     const tag = position.units.find((u) => !u.legacy)?.asset_tag ?? null;
     hops.push({ kind: 'device', id: `${room.id}/${position.position}`, label: `${room.name}, ${position.position.replace('/', ' ').replace(/-/g, ' ').replace(/#/, ' ')}`, hostname: position.hostname ?? null, model: position.model ?? null, floor: room.floor, health: tag });
     const w = wiringToOutlet(room, position.position);
-    if (!w) return { ref, hops, complete: false, reason: 'No network cable from this device in the room wiring' };
+    if (!w) return { ref, hops, complete: false, reason: 'No network cable from this device in the space wiring' };
     for (const h of w.hops) if (!h.to.startsWith('outlet:') && h.to !== position.position.split('/').pop()) hops.push({ kind: 'room-device', id: `${room.id}/${h.to}`, label: `${room.name} ${h.to.replace(/-/g, ' ').replace(/#/, ' ')}`, via: h.l.cable, health: tagOf(room, h.to) });
     const o = room.outlets.find((x) => x.id === w.outlet);
     hops.push(outletHop(room, o, w.hops[w.hops.length - 1]?.l?.cable));

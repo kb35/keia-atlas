@@ -8,11 +8,11 @@ A list longer than a screen gets `FilterBar` (`src/components/FilterBar.astro`):
 
 - **Why:** scrolling is the slowest way to find something, and one filter that looks and moves the same everywhere is learnt once.
 - **Do:** mark items `data-fi` with `data-find` and `data-f-<key>` (several values with a bar, `a|b`), and give the bar `facets` (`{ key, label, options: [{ value, label }] }`). Switches use `data-t-<key>="1"`. A view switch is `views`, a sort is `sort` (both at the right); anything else inside the bar tag sits to their left. Items and groups hide through the bar, which holds the page still (`rsHold`) and uses the motion tokens.
-- **Don't:** build a one-off filter, or hide list items yourself. `PageFind` is the older flat version still on Configurations and Device profiles; move them to `FilterBar` when they are next redesigned.
+- **Don't:** build a one-off filter, or hide list items yourself. `PageFind` is the older flat version still on Setup guides and Device types; move them to `FilterBar` when they are next redesigned.
 
 ### P2. Search reaches everything
 
-The top bar Search (`/` or Ctrl K) finds rooms, profiles, devices, models, configurations, projects, people, spares, cables and retired kit, and reads "EMEA rooms with X52" into chips people can change. The same words always give the same answer.
+The top bar Search (`/` or Ctrl K) finds spaces, profiles, devices, models, setup guides, projects, people, spares, cables and retired kit, and reads "EMEA spaces with X52" into chips people can change. The same words always give the same answer.
 
 - **Why:** one box beats knowing where things live.
 - **Do:** add a new kind of thing to `src/lib/search-index.mjs` in the same change.
@@ -20,7 +20,7 @@ The top bar Search (`/` or Ctrl K) finds rooms, profiles, devices, models, confi
 
 ### P3. Report on every page
 
-Report offers Suggest a change, New firmware found or Urgent issue, filled in with what the page is about (the `about` prop on `Shell`), and sends it to the owner.
+Report offers Propose an edit, New firmware found or Urgent issue, filled in with what the page is about (the `about` prop on `Shell`), and sends it to the owner.
 
 - **Why:** people fix knowledge where they notice it is wrong.
 - **Do:** pass `about` on every page about one thing.
@@ -34,9 +34,9 @@ Anyone can see Keia Atlas as any role from the menu under their name. Role chang
 - **Do:** order by role in `ROLE_NAV`.
 - **Don't:** build a page only one role can open.
 
-### P5. Stages and simulated data say so
+### P5. Simulated data says so
 
-A page from a later stage sets `minStage`; below it, the page says what arrives and offers to switch it on. Invented numbers (usage, costs, scenarios) carry the dashed "Simulated" tag, and a later-stage page a "Stage n" tag, both from `SimTag` in the band's overline row.
+A page from a module the demo has switched off sets `minStage`; while it is off, the page says what arrives and offers to switch it on. Invented numbers (usage, costs, scenarios) carry the dashed "Simulated" tag, and made-up figures that change as you watch "Simulated live", both from `SimTag` in the band's overline row.
 
 - **Why:** trust depends on knowing what is real.
 - **Do:** label simulated numbers where they appear.
@@ -60,7 +60,7 @@ Actions take effect at once and offer Undo for about five seconds. Records are a
 
 ### P8. Propose, then approve
 
-Anyone proposes a change to a profile, configuration or playbook; its owner approves; nothing changes before that. Agents only propose.
+Anyone proposes a change to a profile, setup guide or playbook; its owner approves; nothing changes before that. Agents only propose.
 
 - **Why:** the standard stays right when a person or an AI is wrong.
 - **Do:** say who will see a proposal.
@@ -76,7 +76,7 @@ Every page has a **Help** switch in the top bar (the round ? beside Report; the 
 
 ### P10. Every number drills down
 
-On overview and summary pages (Home, the Work overview, the Rooms and Devices overviews, office and region pages, service pages, and the band and summary tiles of a record), every count, key number, tile, matrix cell, chip and "See all" is a drill-down: selecting it opens the page that owns that list, with the matching filters already in the address, which the filter bar reads when the page opens. The link says where it goes ("See all 9 in Incidents →", "See all 288 in the Work list →"), and the page it opens shows the same count in its "N of M". Back returns to the same place on the page you came from.
+On overview and summary pages (Home, the Work overview, the Spaces and Devices overviews, office and region pages, service pages, and the band and summary tiles of a record), every count, key number, tile, matrix cell, chip and "See all" is a drill-down: selecting it opens the page that owns that list, with the matching filters already in the address, which the filter bar reads when the page opens. The link says where it goes ("See all 9 in Incidents →", "See all 288 in the Work list →"), and the page it opens shows the same count in its "N of M". Back returns to the same place on the page you came from.
 
 - **Why:** a number is a question ("which nine?"), and the answer lives on one page, with its filters, sort and actions. A summary that grows 288 rows in place stops being a summary, hides where the list really lives, and makes two versions of the same list.
 - **Do:** give `KeyNumbers` items a `to` (`'/incidents/?state=new,in-progress,on-hold'`, or `'?status=problem'` when this page holds the list). Give an overview's `Section` a `to` and a `place` (and `carry` when both pages share a filter bar): it shows the first few items and "See all N in <place> →", never "Show all". A figure that counts no list (a phase, a date, an estimate, a size, a percentage, or the total of the list right under it) is the one exception, and says so with `fact: true`. Mark a drill-down's number or chip `data-vt-rec="dd-<path>"` (`KeyNumbers` and `Section` do it for you) and give the destination's `PageBand` `rec="dd-<path>"`, so the number flies into its title (M5). A hover peek may preview; the click always navigates, or opens the record. A control that changes how this page is seen (See as) or filters this page's own list may stay on the page; mark its box `data-dd="<why>"`.

@@ -4,7 +4,7 @@ A device looks the same everywhere: a front-on drawing of the real product, its 
 
 ### D1. Data before drawing
 
-Write `data/device-models/<maker>-<model>.yaml` from two independent readings of the vendor's documents. What they don't state goes under `gaps`.
+Write `data/device-models/<manufacturer>-<model>.yaml` from two independent readings of the vendor's documents. What they don't state goes under `gaps`.
 
 - **Why:** drawing, ports, wiring and checks all read this file.
 - **Do:** cite each document in `data/sources/`.

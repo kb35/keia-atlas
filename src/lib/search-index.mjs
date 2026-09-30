@@ -24,8 +24,8 @@ import { allFacts } from './modelinfo.mjs';
 import { searchItems as serviceItems } from './services.mjs';
 import { issues as knownIssues } from './knownissues-view.mjs';
 
-// Say "room profile" wherever older text says "room type".
-const say = (s) => String(s ?? '').replace(/\broom type(s?)\b/g, 'room profile$1').replace(/\bRoom type(s?)\b/g, 'Room profile$1');
+// Say "space type" wherever older text says "room type" or "room profile".
+const say = (s) => String(s ?? '').replace(/\broom (?:type|profile)(s?)\b/g, 'space type$1').replace(/\bRoom (?:type|profile)(s?)\b/g, 'Space type$1');
 const clip = (s, n = 260) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n).replace(/\s\S*$/, '')}` : t; };
 const who = (id) => PEOPLE.find((p) => p.id === id)?.name ?? '';
 const siteName = (id) => sites[id]?.name ?? id;
@@ -55,7 +55,7 @@ export function buildSearchIndex() {
     const n = Object.values(spaces).filter((x) => x.site === id).length;
     // An office opens its page in Locations; a remote site opens its region's home offices.
     const url = s.kind === 'remote' ? `locations/${s.region}/home-offices/` : `locations/${id}/`;
-    push('site', url, s.name, `${s.city ?? 'Home offices'}${s.region ? ` · ${REGION_LABEL[s.region]}` : ''} · ${n} rooms`, `${s.code} ${s.country ? countryName(s.country) : ''} ${s.kind === 'remote' ? 'home offices remote' : 'office'} ${s.meaning ?? ''}`, { st: id, r: s.region });
+    push('site', url, s.name, `${s.city ?? 'Home offices'}${s.region ? ` · ${REGION_LABEL[s.region]}` : ''} · ${n} spaces`, `${s.code} ${s.country ? countryName(s.country) : ''} ${s.kind === 'remote' ? 'home offices remote' : 'office'} ${s.meaning ?? ''}`, { st: id, r: s.region });
   }
   // Regions (cohesion review, section 2: regions were not searchable).
   for (const r of ['emea', 'amer', 'apac']) {
@@ -79,18 +79,18 @@ export function buildSearchIndex() {
       { st: s.site, fl: s.floor, p: s.space_type, m: uniq(inRoom.map((p) => p.model)), c: uniq(inRoom.map((p) => p.cls)), z });
   }
 
-  // Room profiles.
+  // Space types.
   for (const [id, t] of Object.entries(spaceTypes)) {
     const eq = t.keia_atlas.options.flatMap((o) => o.equipment);
     const n = Object.values(spaces).filter((s) => s.space_type === id).length;
-    push('rp', `room-profiles/${id}/`, t.profile.name, `${t.profile.capacity ? `${t.profile.capacity} · ` : ''}${n} rooms · ${t.keia_atlas.options.length} build options`,
+    push('rp', `room-profiles/${id}/`, t.profile.name, `${t.profile.capacity ? `${t.profile.capacity} · ` : ''}${n} spaces · ${t.keia_atlas.options.length} build options`,
       `${t.profile.purpose ?? ''} ${t.keia_atlas.options.map((o) => o.name).join(' ')}`, { p: id, m: uniq(eq.map((e) => e.model)), c: uniq(eq.map((e) => e.class)) });
   }
 
-  // Device profiles (classes) and models.
+  // Device types (classes) and models.
   for (const [id, c] of Object.entries(classes)) {
     const ms = Object.keys(models).filter((m) => models[m].class === id);
-    push('dp', `profiles/${id}/`, c.profile.name, `Device profile · ${ms.length} models`, `${c.profile.object_role ?? ''} ${(c.profile.naming_prefixes ?? []).join(' ')}`, { c: [id], m: ms });
+    push('dp', `profiles/${id}/`, c.profile.name, `Device type · ${ms.length} models`, `${c.profile.object_role ?? ''} ${(c.profile.naming_prefixes ?? []).join(' ')}`, { c: [id], m: ms });
   }
   for (const [id, m] of Object.entries(models)) {
     const f = allFacts[id];
@@ -154,7 +154,7 @@ export function buildSearchIndex() {
   for (const i of Object.values(incidents)) {
     const s = spaces[i.room];
     const pos = s?.positions.find((p) => p.position === i.position);
-    const what = !s ? i.room : pos ? unitTitle(s, pos) : `${s.name}, the whole room`;
+    const what = !s ? i.room : pos ? unitTitle(s, pos) : `${s.name}, the whole space`;
     const res = i.history.findLast((h) => h.resolution)?.resolution;
     push('inc', incidentPath(i.number).slice(1), i.short_description, `${i.number} · ${what}${s ? `, ${siteName(s.site)}` : ''} · P${i.priority} · ${INC_STATE[i.state] ?? i.state}`,
       `${i.caller ?? ''} ${i.assignment_group ?? ''} ${i.device ?? ''} ${pos?.hostname ?? ''} ${i.keia_atlas?.captured_fix ?? ''} ${res?.notes ?? ''} ${i.history.map((h) => h.note ?? '').join(' ')}`,
@@ -194,10 +194,10 @@ export function buildSearchIndex() {
   // Services (AV, Network, IT infrastructure and the overview).
   for (const [k, u, t, sub, x, f] of serviceItems()) push(k, u, t, sub, x, f);
 
-  // Known issues: the makers' published problems, each with its own page.
+  // Known errors: the manufacturers' published problems, each with its own page.
   for (const it of knownIssues) {
     push('ki', it.path.slice(1), it.title, `${it.id} · ${it.maker} · ${it.statusLabel}${it.fixed_in ? ` · fixed in ${it.fixed_in}` : ''}`,
-      `known issue ${it.ref ?? ''} ${it.symptom ?? ''} ${(it.signs ?? []).join(' ')} ${(it.modelNames ?? []).join(' ')} ${it.workaround?.text ?? ''}`,
+      `known error known issue ${it.ref ?? ''} ${it.symptom ?? ''} ${(it.signs ?? []).join(' ')} ${(it.modelNames ?? []).join(' ')} ${it.workaround?.text ?? ''}`,
       { m: it.models, c: uniq(it.models.map((m) => models[m]?.class)), z: [it.status] });
   }
 

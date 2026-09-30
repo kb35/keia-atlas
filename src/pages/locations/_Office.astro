@@ -68,7 +68,7 @@ const FACTS = [
   ['Region', REGION_SHORT[s.region]],
   ['Time zone', s.time_zone],
   ['Floors', (s.floors ?? []).map((f) => f.name.replace(/:.*$/, '')).join(', ') || 'Not recorded'],
-  ['Rooms', `${plural(o.peopleRooms.filter((r) => KIND(r) !== 'desks').length, 'room')}, ${plural(o.desks, 'desk')}, ${plural(o.comms.length, 'comms room')}`],
+  ['Spaces', `${plural(o.peopleRooms.filter((r) => KIND(r) !== 'desks').length, 'space')}, ${plural(o.desks, 'desk')}, ${plural(o.comms.length, 'comms room')}`],
   ['Devices', plural(o.units, 'unit')],
   ['Mains', s.mains ? `${s.mains.volts} V, ${s.mains.hz} Hz, plug ${s.mains.plugs?.join(', ')}` : 'Not recorded'],
   ['On-site technician', o.tech.length ? o.tech.map((p) => p.name).join(', ') : 'None; covered from another office'],
@@ -83,7 +83,7 @@ const json = JSON.stringify({ ...liveModelFor([o.id]), base: href('/') }).replac
       <a href={href(`/locations/${s.region}/`)} data-help="loc.region">{REGION_SHORT[s.region]}</a>
       <span class="ob-tz" data-loc-tz={s.time_zone} data-help="loc.open"><span data-loc-clock>--:--</span> local · <span class="ob-open" data-loc-open>&nbsp;</span></span>
     </Fragment>
-    <Fragment slot="lede">{ROLE_WORD[s.role] ?? 'Office'} in {s.city}, {countryName(s.country)}. {plural(o.peopleRooms.filter((r) => KIND(r) !== 'desks').length, 'room')} and {plural(o.desks, 'desk')} on {plural((s.floors ?? []).length, 'floor')}.</Fragment>
+    <Fragment slot="lede">{ROLE_WORD[s.role] ?? 'Office'} in {s.city}, {countryName(s.country)}. {plural(o.peopleRooms.filter((r) => KIND(r) !== 'desks').length, 'space')} and {plural(o.desks, 'desk')} on {plural((s.floors ?? []).length, 'floor')}.</Fragment>
     {M ? <a slot="action" class="btn primary" href={href(`/locations/${o.id}/3d/`)} data-help="loc.3d">Open in 3D</a>
       : <span slot="action" class="ob-no3d faint" data-help="loc.3d">3D model: not modelled yet</span>}
   </PageBand>
@@ -100,7 +100,7 @@ const json = JSON.stringify({ ...liveModelFor([o.id]), base: href('/') }).replac
           </DetailTabs>
         ) : (
           <div class="ofc-floors">
-            <p class="faint ofc-note">No floor plan is modelled for this office yet. Its rooms, floor by floor:</p>
+            <p class="faint ofc-note">No floor plan is modelled for this office yet. Its spaces, floor by floor:</p>
             {o.floors.map((f) => (
               <div class="ofc-fl">
                 <h3>{f.name}</h3>
@@ -130,12 +130,12 @@ const json = JSON.stringify({ ...liveModelFor([o.id]), base: href('/') }).replac
             ) : <p class="faint td-none">Nobody is booked in today.</p>}
           </div>
           <div>
-            <h3 class="td-h">Needs attention</h3>
+            <h3 class="td-h">To review</h3>
             <ul class="td-att" data-loc-att></ul>
             <ul class="td-att">
               {attention.map((a) => <li><a href={href(a.to)}><i class="hl" data-state={a.tone} aria-hidden="true"></i><span>{a.text}</span><small>{a.sub}</small></a></li>)}
             </ul>
-            {!attention.length && <p class="faint td-none" data-loc-att-none>Nothing needs attention right now.</p>}
+            {!attention.length && <p class="faint td-none" data-loc-att-none>Nothing to review right now.</p>}
           </div>
         </div>
       </SidePanel>
@@ -183,11 +183,11 @@ const json = JSON.stringify({ ...liveModelFor([o.id]), base: href('/') }).replac
       </div>
     </div>
 
-    <Section title="Rooms by floor" id="rooms" help="loc.rooms" aside={plural(o.peopleRooms.length, 'room')}>
+    <Section title="Spaces by floor" id="rooms" help="loc.rooms" aside={plural(o.peopleRooms.length, 'space')}>
       <div class="rf">
         {o.floors.map((f) => roomsOn(f).length > 0 && (
           <div class="rf-floor">
-            <h3 class="rf-h">{f.name} <span class="faint">{plural(roomsOn(f).length, 'room')}</span></h3>
+            <h3 class="rf-h">{f.name} <span class="faint">{plural(roomsOn(f).length, 'space')}</span></h3>
             <div class="rf-grid">
               {roomsOn(f).map((r) => (
                 <a class:list={['rf-card', { alert: incIn(r.id).length > 0 }]} href={href(`/rooms/${r.id}/`)} data-loc-room={r.id}>
@@ -200,7 +200,7 @@ const json = JSON.stringify({ ...liveModelFor([o.id]), base: href('/') }).replac
           </div>
         ))}
       </div>
-      <a slot="aside" href={href(`/rooms/?site=${o.id}`)} data-vt-rec="dd-rooms">All {plural(o.rooms.length, 'room')} in Rooms →</a>
+      <a slot="aside" href={href(`/rooms/?site=${o.id}`)} data-vt-rec="dd-rooms">All {plural(o.rooms.length, 'space')} in Spaces →</a>
     </Section>
 
     <Section title="Comms rooms and racks" id="comms" help="loc.comms">

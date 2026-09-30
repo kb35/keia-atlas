@@ -35,7 +35,7 @@ const TOGGLES = m.behind ? [{ key: 'fw', label: 'Firmware out of date', title: '
 const SORT = { options: [{ value: 'attention', label: 'Problems first' }, { value: 'site', label: 'By office' }, { value: 'count', label: `Most ${word[1]} first` }] };
 const NUMBERS = {
   av: [
-    { id: 'sv-1', n: '–', label: 'Rooms working now', to: '/rooms/overview/?status=use,free' },
+    { id: 'sv-1', n: '–', label: 'Spaces working now', to: '/rooms/overview/?status=use,free' },
     { id: 'sv-2', n: '–', label: 'Units alerting', to: '?status=alert,offline#units' },
     { id: 'sv-3', n: m.behind, label: 'Firmware behind the standard', to: '?fw=1#units' },
     { id: 'sv-4', n: m.incidents.length, label: 'Open incidents', to: '#incidents' },
@@ -61,9 +61,9 @@ const PRI = { 1: 'Critical', 2: 'High', 3: 'Moderate', 4: 'Low' };
 const ROLE_TO = (p) => href(`/team/?p=${p.id}`);
 const nOwners = m.owners.length;
 const blurb = {
-  av: 'Rooms, units and firmware are simulated from each unit\'s kind and age and the open incidents, the same in every window. At stage 2 the real feeds plug in: monitoring, device management and room booking.',
-  network: 'Simulated from each item\'s kind and the open incidents, the same in every window. Access points are units in the open areas and corridors of each floor. At stage 2 UniFi and the switch management feed this page.',
-  infrastructure: 'Simulated from each item\'s kind and the open incidents, the same in every window. The comms room checks read the recorded racks. At stage 2 the UPS, power strip and console server feeds plug in.',
+  av: 'Spaces, units and firmware are simulated from each unit\'s kind and age and the open incidents, the same in every window. Real feeds replace this with the same shape: monitoring, device management and room booking.',
+  network: 'Simulated from each item\'s kind and the open incidents, the same in every window. Access points are units in the open areas and corridors of each floor. Real feeds from UniFi and the switch management replace this with the same shape.',
+  infrastructure: 'Simulated from each item\'s kind and the open incidents, the same in every window. The comms room checks read the recorded racks. Real feeds from the UPS, power strip and console server replace this with the same shape.',
 }[id];
 ---
 <Shell title={svc.title} section={`services-${id}`} crumbs={[{ label: 'Services', to: '/services/' }, { label: svc.name }]} about={{ kind: 'page', label: svc.title }}>
@@ -74,10 +74,10 @@ const blurb = {
   </PageBand>
 
   <div class="content svc lv-page" data-sv={id}>
-    <FilterBar facets={FACETS} toggles={TOGGLES} placeholder={id === 'av' ? 'Find a unit, hostname or room' : 'Find an item, office or room'} label={`Find ${id === 'av' ? 'a unit' : 'an item'}`} noun={word} scope=".content.svc" sort={SORT} />
+    <FilterBar facets={FACETS} toggles={TOGGLES} placeholder={id === 'av' ? 'Find a unit, hostname or space' : 'Find an item, office or space'} label={`Find ${id === 'av' ? 'a unit' : 'an item'}`} noun={word} scope=".content.svc" sort={SORT} />
 
     <div class="lv-layout">
-      <LiveSide attention="Needs attention" feedTitle="Alerts and changes" none={`Every ${word[0]} in this service is online, with no alerts.`} attentionTo="?status=offline,alert#units" attentionPlace={`the ${word[0]} map`} note={blurb} />
+      <LiveSide attention="Not working" feedTitle="Alerts and changes" none={`Every ${word[0]} in this service is online, with no alerts.`} attentionTo="?status=offline,alert#units" attentionPlace={`the ${word[0]} map`} note={blurb} />
 
       <div class="lv-main">
         <section class="card sv-hcard" id="health" aria-labelledby="hs-h" data-steady data-dd="filters this page's own list" data-help="services.health">
@@ -99,7 +99,7 @@ const blurb = {
               <article class="lv-site" data-fb-group data-steady data-site={s.i} aria-label={s.name}>
                 <header class="lv-sh">
                   <span class="code">{s.code}</span>
-                  <span class="lv-sn"><a class="lv-sl" href={href(`/rooms/?site=${s.id}`)} title={`Every room at ${s.name}`}><b>{s.name}</b></a><small>{s.city ?? 'Home offices'}</small></span>
+                  <span class="lv-sn"><a class="lv-sl" href={href(`/rooms/?site=${s.id}`)} title={`Every space at ${s.name}`}><b>{s.name}</b></a><small>{s.city ?? 'Home offices'}</small></span>
                   <span class="lv-counts" data-counts></span>
                 </header>
                 <div class="lv-tiles lv-dots">
@@ -138,14 +138,14 @@ const blurb = {
             ))}
           </tbody>
         </table></div>
-        <p class="sv-note">The standard: a UPS, two power feeds (A and B), an out-of-band console, a fibre patch panel, and switches on the house standard. A rack is short of space with under {m.statics.shortU}U free, counting reserved growth space as free. Older rooms are due in the network refresh.</p>
+        <p class="sv-note">The standard: a UPS, two power feeds (A and B), an out-of-band console, a fibre patch panel, and switches on the house standard. A rack is short of space with under {m.statics.shortU}U free, counting reserved growth space as free. Older spaces are due in the network refresh.</p>
       </Section>
     )}
 
     {id !== 'infrastructure' ? (
       <Section title="Firmware against the standard" id="firmware" aside={m.firmware.length ? 'Per model, following the filters above' : undefined} help="services.firmware">
         <div class="tablewrap"><table class="to-cards sv-tbl">
-          <thead><tr><th>Model</th><th>Kind</th><th>Units</th><th>Behind the standard</th><th>The standard</th><th>Advisories</th><th>Known issues</th></tr></thead>
+          <thead><tr><th>Model</th><th>Kind</th><th>Units</th><th>Behind the standard</th><th>The standard</th><th>Advisories</th><th>Known errors</th></tr></thead>
           <tbody data-items>
             {m.firmware.map((f) => (
               <tr data-m={f.m}>
@@ -155,13 +155,13 @@ const blurb = {
                 <td data-label="Behind"><span data-fwb>{f.behind}</span>{f.found.length > 0 && <small class="faint"> ({f.found.join(', ')})</small>}</td>
                 <td data-label="Standard">{f.standard ? <>{f.line} {f.standard}</> : <span class="faint">Version not tracked yet</span>}</td>
                 <td data-label="Advisories">{f.advisories.length ? f.advisories.map((a, i) => <>{i > 0 && ', '}<a href={href(f.profile)} title={a.title}>{a.id}</a></>) : <span class="faint">None</span>}</td>
-                <td data-label="Known issues">{f.issues ? <a href={href(`/known-issues/?model=${f.m}`)}>{f.issues} {f.issues === 1 ? 'issue' : 'issues'}</a> : <span class="faint">None</span>}</td>
+                <td data-label="Known errors">{f.issues ? <a href={href(`/known-issues/?model=${f.m}`)}>{f.issues} {f.issues === 1 ? 'issue' : 'issues'}</a> : <span class="faint">None</span>}</td>
               </tr>
             ))}
           </tbody>
         </table></div>
         <p class="sv-none" data-fw-none hidden>No model matches these filters.</p>
-        <p class="sv-note">Only the Poly line has release data, so other models name no versions. Which units run behind is simulated; at stage 2 device management reports it.</p>
+        <p class="sv-note">Only the Poly line has release data, so other models name no versions. Which units run behind is simulated; a real device management feed replaces it with the same shape.</p>
       </Section>
     ) : (
       <Section title="Equipment against the standard" id="firmware" aside="Rack equipment in the comms rooms" help="services.firmware">
@@ -179,21 +179,21 @@ const blurb = {
             ))}
           </tbody>
         </table></div>
-        <p class="sv-note">Firmware for rack equipment is not tracked yet. At stage 2 the switch and console server feeds report it here.</p>
+        <p class="sv-note">Firmware for rack equipment is not tracked yet. Real switch and console server feeds will report it here.</p>
       </Section>
     )}
 
     <Section title="Incidents" id="incidents" aside={m.incidents.length ? `${m.incidents.length} open` : undefined} help="services.incidents">
       {m.incidents.length ? (
         <div class="tablewrap"><table class="to-cards sv-tbl">
-          <thead><tr><th>Incident</th><th>Priority</th><th>Status</th><th>Room</th><th>Opened</th></tr></thead>
+          <thead><tr><th>Incident</th><th>Priority</th><th>Status</th><th>Space</th><th>Opened</th></tr></thead>
           <tbody data-items>
             {m.incidents.map((i) => (
               <tr>
                 <td data-label=""><a href={i.to}><b class="code">{i.no}</b> {i.title}</a></td>
                 <td data-label="Priority">P{i.pri} {PRI[i.pri]}</td>
                 <td data-label="Status">{i.state}</td>
-                <td data-label="Room">{i.room}, <a href={href(`/rooms/?site=${i.site}`)}>{i.siteName}</a></td>
+                <td data-label="Space">{i.room}, <a href={href(`/rooms/?site=${i.site}`)}>{i.siteName}</a></td>
                 <td data-label="Opened">{i.opened?.replace('T', ' ')}</td>
               </tr>
             ))}

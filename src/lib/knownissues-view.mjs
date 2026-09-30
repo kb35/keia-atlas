@@ -199,7 +199,7 @@ for (const it of issues) {
   draftCases.push({
     id, path: casePath(id), draft: true, issueDraft: it, feed: it.feed, route: routeOf(it.feed), ev,
     models: it.models, modelName: it.modelNames.join(', '), title: `${it.ref ?? it.id}: ${it.title}`,
-    summary: `Your known issue ${it.ref ?? `"${it.title}"`} affects us. ${n ? `${n} of our units in ${offices} ${offices === 1 ? 'office' : 'offices'} run an affected version (${versions.join(', ')}).` : `${u} of our units in ${offices} ${offices === 1 ? 'office' : 'offices'} may run an affected version.`} ${incs.length ? `${incs.length} of our incidents look like it (${incs.map((i) => i.number).join(', ')}).` : ''} ${it.fix.kind === 'blocked' ? `The fix is in ${it.fixed_in}, which we can't install.` : ''}`.replace(/ +/g, ' ').trim(),
+    summary: `Your known error ${it.ref ?? `"${it.title}"`} affects us. ${n ? `${n} of our units in ${offices} ${offices === 1 ? 'office' : 'offices'} run an affected version (${versions.join(', ')}).` : `${u} of our units in ${offices} ${offices === 1 ? 'office' : 'offices'} may run an affected version.`} ${incs.length ? `${incs.length} of our incidents look like it (${incs.map((i) => i.number).join(', ')}).` : ''} ${it.fix.kind === 'blocked' ? `The fix is in ${it.fixed_in}, which we can't install.` : ''}`.replace(/ +/g, ' ').trim(),
     ask: ASK[it.fix.kind] ?? ASK.none,
     fleetCount: n + u, fleetSites: offices,
   });

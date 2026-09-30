@@ -40,7 +40,7 @@ export function modelFacts(id) {
   if (ch?.why?.[0]) purpose = `${ch.why[0].point} ${usedIn}`.trim();
   else if (types.length) purpose = `${role ? `${role.replace(/\.$/, '').replace(/^./, (c) => c.toUpperCase())}. ` : ''}${usedIn}`;
   else if (older) purpose = `An older ${lower(className(m.class))} from before today's standard. It is kept on record because ${live.length ? `${live.length === 1 ? 'one is' : `${live.length} are`} still installed and due for replacement` : 'it was in service and has since been taken out'}.`;
-  else purpose = `${className(m.class)}, not yet placed in a room profile.`;
+  else purpose = `${className(m.class)}, not yet placed in a space type.`;
 
   // Install years, for the small histogram.
   const perYear = {};
