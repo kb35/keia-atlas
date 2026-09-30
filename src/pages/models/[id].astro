@@ -9,6 +9,8 @@ import DeviceGlyph from '../../components/DeviceGlyph.astro';
 import PortPanel from '../../components/PortPanel.astro';
 import DeviceArt from '../../components/DeviceArt.astro';
 import { allFacts, portCounts } from '../../lib/modelinfo.mjs';
+import { securityInfo } from '../../lib/devices.mjs';
+import '../../styles/classification.css';
 import { sites, models, classes, spaceTypes, sources, usedIn, typesUsing, className, modelName, portColour, CONNECTOR_LABEL, OS_LABEL, plural, href } from '../../lib/data.mjs';
 
 export function getStaticPaths() {
@@ -49,6 +51,8 @@ const NUMBERS = [
   { n: f.overdue, label: 'Past planned life', to: '#rooms-using', tone: f.overdue ? 'warn' : undefined },
 ];
 const dims = m.dimensions_mm;
+// Security support (CRA, UK PSTI): the maker's end date and contact, with the warning within 12 months or after.
+const sec = securityInfo(m);
 const legend = [...new Set(ports.map((p) => portColour(p)))];
 const LEGEND_NAME = { 'var(--c-hdmi)': 'Video', 'var(--c-hdbt)': 'HDBaseT', 'var(--c-poe)': 'PoE', 'var(--c-usb)': 'USB', 'var(--c-lan)': 'Network', 'var(--c-power)': 'Power', 'var(--c-audio)': 'Audio', 'var(--grey)': 'Other' };
 ---
@@ -90,6 +94,7 @@ const LEGEND_NAME = { 'var(--c-hdmi)': 'Video', 'var(--c-hdbt)': 'HDBaseT', 'var
           {m.weight_kg && <div><dt>Weight</dt><dd class="num">{m.weight_kg} kg</dd></div>}
           {m.power?.inputs?.map((p) => <div><dt>Power</dt><dd>{p.type === 'poe' ? 'PoE' : p.type === 'ac' ? 'Mains' : 'DC'}{p.watts ? `, ${p.watts} W` : ''}</dd></div>)}
           {m.mounting?.length > 0 && <div><dt>Mounting</dt><dd>{m.mounting.map((x) => (x === 'vesa' ? 'VESA' : x.replace('-', ' '))).join(', ').replace(/^./, (c) => c.toUpperCase())}</dd></div>}
+          {sec && <div><dt>Security support</dt><dd><a href="#security" data-help="model.security-chip">{sec.chip ? <span class={`ss-chip ${sec.tone}`}>{sec.chip}</span> : sec.text}</a></dd></div>}
           <div><dt>Works with</dt><dd>{m.client_os?.length ? m.client_os.map((o) => OS_LABEL[o]).join(', ') : <span class="faint" style="font-weight:400">Not stated</span>}</dd></div>
         </dl>
       </SidePanel>
@@ -130,6 +135,19 @@ const LEGEND_NAME = { 'var(--c-hdmi)': 'Video', 'var(--c-hdbt)': 'HDBaseT', 'var
               </table>
             </div>
           </details>
+        </div>
+      </Section>
+    )}
+
+    {sec && (
+      <Section title="Security support" id="security" help="model.security" aside={sec.endsDemo ? 'Demo values' : undefined}>
+        <div class="card pad">
+          <dl class="kv">
+            <div><dt>Firmware line</dt><dd>{sec.line}</dd></div>
+            <div><dt>Security updates</dt><dd>{sec.text}{sec.chip && <> <span class={`ss-chip ${sec.tone}`}>{sec.chip}</span></>}{sec.endsDemo ? <> <span class="demo-val" data-help="unit.demo-value">Demo value</span></> : sec.endsSrc && <small class="faint"> {sec.endsSrc.url ? <a href={sec.endsSrc.url}>{sec.endsSrc.title}</a> : sec.endsSrc.title}</small>}</dd></div>
+            <div><dt>Report a flaw</dt><dd>{sec.contact ? <><a href={sec.contact.url}>{sec.contact.url.replace(/^https?:[/][/]/, '').replace(/[/]$/, '')}</a>{sec.contact.demo && <> <span class="demo-val" data-help="unit.demo-value">Demo value</span></>}</> : 'The maker publishes no page we could open (see gaps)'}</dd></div>
+          </dl>
+          <p class="faint" style="margin:10px 0 0;font-size:12.5px">The maker sets these dates; Keia Atlas tracks them and does not vouch for them. A warning shows from 12 months before support ends.</p>
         </div>
       </Section>
     )}

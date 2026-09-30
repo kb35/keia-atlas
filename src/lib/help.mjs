@@ -426,6 +426,17 @@ const UNIT = {
   'unit.usage': e('Usage', 'How much this unit is used. The figures are simulated.', 'Select the button to compare it across the fleet.'),
   'unit.connections': e('Connections', 'Each port on this unit, where its cable goes and which cable it is.', 'Use it when you trace a fault or replace the unit.'),
   'unit.network': e('Network', 'The path from this unit to the internet: the floor switch, the core and the firewall.', 'Select a comms room to open it.', 'g:mdf'),
+  // Classification, security support and privacy records (docs/rules/data.md F10 and F11).
+  'classification.restricted': e('Restricted', 'Facts about Aigna\'s buildings that would help an attacker: floor plans, racks and switch ports, IP plans, the vulnerable-firmware list and default password status. Only people who need them see them, and exports are watermarked and logged.', 'Do not copy it into a ticket, a chat or a slide. Share the link instead.'),
+  'unit.security': e('Security support', 'How long the maker keeps fixing security holes in this model, its firmware line, where to report a flaw, and whether this unit\'s default password was changed.', 'When support ends within a year, plan the replacement. A unit still on the default password needs its vault password set.', 'g:firmware'),
+  'unit.security-chip': e('Security support warning', 'The maker stops fixing security holes in this model within 12 months, or already has.', 'Select it for the dates, then plan the replacement.', 'g:firmware'),
+  'unit.password-chip': e('Default password not changed', 'This unit still has the maker\'s default admin password, which anyone can look up.', 'Set the site\'s vault password on it, then record the change.'),
+  'unit.demo-value': e('Demo value', 'The maker has not published this, so the value is made up for the demo. A real one would cite the maker\'s page.', 'Nothing to do. Do not rely on it.'),
+  'unit.privacy': e('Privacy', 'The privacy record for this sensing device: what it captures, why, the legal footing, the room notice, how long anything is kept and the works-council agreement. Rooms are counted, never people.', 'Show all opens the rest of the record. Questions go to the data protection officer.'),
+  'model.security': e('Security support', 'The maker\'s end date for security updates, its firmware line and where it takes reports of flaws. Dates the maker has not published are marked as demo values.', 'Plan a replacement before support ends.', 'g:firmware'),
+  'model.security-chip': e('Security support', 'Until when the maker fixes security holes in this model. A warning shows from 12 months before the end.', 'Select it for the dates and the maker\'s contact.', 'g:firmware'),
+  'incident.priority-changed': e('Priority changed', 'The priority was proposed from impact and urgency, and a person changed it. This is the priority it replaced, and the reason they gave.', 'Nothing to do. The ticket details say who changed it and when.', 'g:incident'),
+  'about.logs': e('What Keia logs about users', 'What Keia Atlas keeps about the people who use it, what it never keeps, and the privacy records for the cameras and microphones in the rooms.', 'Select it to read the page.'),
 };
 
 // ---- Team ---------------------------------------------------------------------------------------------------------

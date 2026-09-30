@@ -13,6 +13,7 @@ import { crossCheckStock } from './crossrefs-stock.mjs';
 import { crossCheckIncidents } from './crossrefs-incidents.mjs';
 import { crossCheckKnownIssues } from './crossrefs-knownissues.mjs';
 import { crossCheckFloors } from './crossrefs-floors.mjs';
+import { crossCheckPrivacy } from './crossrefs-privacy.mjs';
 import path from 'node:path';
 
 
@@ -637,6 +638,7 @@ export function crossCheck(records, root) {
   // Spares, cables and the cable standard (their own file, tools/crossrefs-stock.mjs).
   problems.push(...crossCheckStock(records));
   problems.push(...crossCheckFloors(records));
+  problems.push(...crossCheckPrivacy(records));
 
   return problems;
 }

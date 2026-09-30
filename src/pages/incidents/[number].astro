@@ -33,6 +33,9 @@ const kiRepeat = kiClusters.find((c) => c.incidents.some((i) => i.number === inc
 const cls = pos ? classes[pos.cls] : null;
 const isRoom = inc.subject.kind === 'room';
 const assigned = inc.keia_atlas.assigned ? person(inc.keia_atlas.assigned) : null;
+// Priority is proposed; a person may change it, and the reason is kept (priority_override).
+const override = inc.priority_override ?? null;
+const overrideBy = override ? person(override.by) : null;
 
 // Units at the same desk or kit as the device (or every unit in the room).
 const prefix = inc.position?.match(/^([a-z]+-\d+\/)/)?.[1] ?? null;
@@ -94,6 +97,7 @@ const incHref = (n) => href(incidentPath(n));
     <Fragment slot="overline">
       <span class="mono ib-no" data-help="incident.number" {...recHere(inc.number)}>{inc.number}</span>
       <span data-help="incident.priority" class={`prio p-${inc.priority}`} title={`Priority ${inc.priority}: ${PRIORITY_LABEL[inc.priority]}`}>P{inc.priority} {PRIORITY_LABEL[inc.priority]}</span>
+      {override && <span class="prio-was" data-help="incident.priority-changed">changed from P{inc.priority_proposed}: {override.reason}</span>}
       <span data-help="incident.state" class={`ist ist-${stateTone[inc.state]}`}>{INC_STATE[inc.state]}{v.reopened && inc.state !== 'resolved' ? ', reopened' : ''}</span>
       {assigned && <span class="ib-who"><span class="av">{assigned.initials}</span>{assigned.name}</span>}
     </Fragment>
@@ -328,6 +332,7 @@ const incHref = (n) => href(incidentPath(n));
                 <div><dt>Opened</dt><dd>{when(inc.opened, { year: true })}</dd></div>
                 <div><dt>Caller</dt><dd>{inc.caller}</dd></div>
                 <div><dt>Priority</dt><dd>{inc.priority}, {PRIORITY_LABEL[inc.priority].toLowerCase()}</dd></div>
+                <div><dt>Proposed priority</dt><dd>{inc.priority_proposed}, {PRIORITY_LABEL[inc.priority_proposed].toLowerCase()}{override ? <>. Changed to {override.priority} by {overrideBy?.name ?? override.by}, {when(override.at)}: {override.reason}</> : ', not changed'}</dd></div>
                 <div><dt>State</dt><dd>{INC_STATE[inc.state]}{v.hold ? `: ${v.hold.holdLabel.toLowerCase()}` : ''}</dd></div>
                 <div><dt>Assignment group</dt><dd>{inc.assignment_group}</dd></div>
                 {assigned && <div><dt>Assigned to</dt><dd>{assigned.name}</dd></div>}
@@ -405,6 +410,8 @@ const incHref = (n) => href(incidentPath(n));
 
   .inc-page { padding-top: 18px; gap: 20px; }
   .ib-who { display: inline-flex; align-items: center; gap: 6px; }
+  /* A priority a person changed: the proposal it replaced and why, beside the priority in force. */
+  .prio-was { font-size: 12px; line-height: 1.35; color: var(--text-2); text-transform: none; letter-spacing: 0; white-space: normal; overflow-wrap: anywhere; }
   .ib-who .av { width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; background: var(--surface-3); color: var(--text); font: 700 9px/1 var(--font-mono); letter-spacing: 0; }
 
   /* Lifecycle steps. */
