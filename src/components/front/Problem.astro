@@ -1,0 +1,53 @@
+---
+// The problem, with evidence (the front door, after the hero): three numbers, each with what it counts and who found
+// it, from the research notes' strongest rows (src/lib/front.mjs EVIDENCE). The figures are drawn large and still:
+// numbers are read, never counted up (MOTION-V2 §5). The three columns make one quiet stagger as they scroll into view
+// (row 34), once. Every source is named in full with its strength; vendor-sponsored studies say so.
+import { EVIDENCE } from '../../lib/front.mjs';
+---
+<section class="pb" id="problem" data-pb data-shot="problem" aria-labelledby="pb-h">
+  <header class="fd-head">
+    <p class="fd-eyebrow">The problem</p>
+    <h2 id="pb-h">Rooms fail often, and the cost lands on the people in them.</h2>
+    <p class="fd-sub">Three figures from the research, with their sources. None is ours.</p>
+  </header>
+  <ol class="pb-list">
+    {EVIDENCE.map((e, i) => (
+      <li class="pb-item" style={`--i:${i}`}>
+        <p class="pb-figure">{e.figure}</p>
+        <p class="pb-unit">{e.unit}</p>
+        <p class="pb-line">{e.line}</p>
+        <p class="pb-src"><a href={e.url} rel="noopener">{e.source}</a></p>
+      </li>
+    ))}
+  </ol>
+</section>
+
+<script>
+  import { motion, onceInView } from '../../lib/motion-read.mjs';
+  function init(root: HTMLElement) {
+    if ((root as any).__pb) return; (root as any).__pb = true;
+    const on = () => root.classList.add('is-on');
+    if (motion().reduced) { on(); return; }
+    onceInView(root, on, Math.min(0.3, Math.max(0.05, (window.innerHeight * 0.5) / Math.max(1, root.offsetHeight))));
+  }
+  const boot = () => document.querySelectorAll<HTMLElement>('[data-pb]').forEach(init);
+  boot();
+  document.addEventListener('astro:page-load', boot);
+</script>
+
+<style>
+  .pb { display: grid; gap: 28px; }
+  .pb-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+  .pb-item { display: grid; gap: 6px; align-content: start; padding: 22px 24px 20px; border-radius: 20px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-md); min-width: 0;
+    opacity: 0; transform: scale(.97); transition: opacity var(--dur-enter) var(--ease-settle) calc(var(--i, 0) * var(--stagger) * 4), transform var(--dur-enter) var(--ease-settle) calc(var(--i, 0) * var(--stagger) * 4); }
+  .pb.is-on .pb-item { opacity: 1; transform: none; }
+  .pb-figure { margin: 0; font: 600 clamp(34px, 3.4vw, 46px)/1 var(--font-sans); letter-spacing: -.035em; font-variant-numeric: tabular-nums; color: var(--text); text-wrap: balance; }
+  .pb-unit { margin: 0; font-size: 15px; font-weight: 600; color: var(--text); letter-spacing: -.01em; }
+  .pb-line { margin: 2px 0 0; font-size: 14.5px; line-height: 1.5; color: var(--text-2); text-wrap: pretty; }
+  .pb-src { margin: 8px 0 0; padding-top: 10px; border-top: 1px solid var(--line); font-size: 12.5px; line-height: 1.45; color: var(--text-3); }
+  .pb-src a { color: var(--text-3); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-strong); }
+  .pb-src a:hover { color: var(--text-2); }
+  @container fd (max-width: 899px) { .pb-list { grid-template-columns: minmax(0, 1fr); } .pb-item { padding: 18px; } }
+  @media (prefers-reduced-motion: reduce) { .pb-item { transition: none; opacity: 1; transform: none; } }
+</style>

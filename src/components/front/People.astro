@@ -1,0 +1,121 @@
+---
+// For each person (the front door): technicians, service owners and leaders, employees, integrators and partners.
+// One line and one small picture each, drawn from the product's own parts, and a door into the demo as that person
+// (View as: the layout's data-as sets it just before the page changes). Pictures are still compositions: the page
+// says who sees what, not how it moves (the lifecycle above did that). The four cards make one quiet stagger, once.
+import HealthGlyph from '../HealthGlyph.astro';
+import { href } from '../../lib/data.mjs';
+import { experience } from '../../lib/experience.mjs';
+import { spaces, sites, SITE_ORDER } from '../../lib/data.mjs';
+
+const offices = SITE_ORDER.filter((id) => sites[id] && sites[id].kind !== 'remote').map((id) => ({ id, weight: Object.values(spaces).filter((s) => s.site === id).length }));
+const AV = experience('av', offices);
+const ontime = AV.find((m) => m.id === 'ontime'), first = AV.find((m) => m.id === 'first');
+const WHO = [
+  { id: 'tech', word: 'Technicians', line: 'Home opens on what is ready for you, in your office, with the room, the unit and the last change already filled in.', to: href('/'), as: 'liam', door: 'Open as Liam, Dublin' },
+  { id: 'lead', word: 'Service owners and leaders', line: 'Are we OK, and what does it cost? Experience measures and money on one page, each figure with its source and time.', to: href('/'), as: 'claire', door: 'Open as Claire, head of workplace IT' },
+  { id: 'staff', word: 'Employees', line: 'A card in the room. Two taps to say what is wrong, no login, no form; the record does the rest and tells you when it is fixed.', to: href('/guide/dub-3-09/'), door: 'Open the room guide' },
+  { id: 'partner', word: 'Integrators and partners', line: 'Your job, your floor and your build sheet, and nothing else. The as-built record you leave is the one the team runs from.', to: href('/'), as: 'lena', door: 'Open as Lena, Brightwave' },
+];
+---
+<section class="pp" id="people" data-pp data-shot="people" aria-labelledby="pp-h">
+  <header class="fd-head">
+    <p class="fd-eyebrow">For each person</p>
+    <h2 id="pp-h">One record, a different first screen for each of you.</h2>
+  </header>
+  <ul class="pp-list">
+    {WHO.map((w, i) => (
+      <li class="pp-card" style={`--i:${i}`}>
+        <a class="pp-link" href={w.to} data-as={w.as}>
+          <span class="pp-pic" aria-hidden="true">
+            {w.id === 'tech' && (
+              <span class="pp-home">
+                <span class="pp-over">Ready for you</span>
+                <span class="pp-row"><HealthGlyph state="fault" size={16} title="video bar offline" class="lit" /><b>3.09 Whooper Swan</b> · video bar offline · booked 09:00</span>
+                <span class="pp-row pp-quiet"><HealthGlyph state="fine" size={16} title="fine" class="lit" quiet />Everything else in Dublin is fine</span>
+              </span>
+            )}
+            {w.id === 'lead' && (
+              <span class="pp-figs">
+                <span class="pp-fig"><b>{ontime.words}</b><small>meetings on time</small></span>
+                <span class="pp-fig"><b>{first.words}</b><small>worked first time</small></span>
+                <span class="pp-fig"><b>€41k</b><small>this month, of €45k</small></span>
+                <span class="pp-src">Room booking, monitoring, finance · 08:00 · simulated</span>
+              </span>
+            )}
+            {w.id === 'staff' && (
+              <span class="pp-guide">
+                <span class="pp-over">3.09 Whooper Swan</span>
+                <span class="pp-guide-b pp-guide-bad">Something is wrong</span>
+                <span class="pp-guide-b">It is working</span>
+              </span>
+            )}
+            {w.id === 'partner' && (
+              <span class="pp-job">
+                <span class="pp-over">PRJ-15 · Dublin town hall · Brightwave</span>
+                <span class="pp-row"><HealthGlyph state="progress" size={16} title="being installed" class="lit" /><b>Batch 2</b> · displays · 6 of 8 checked</span>
+                <span class="pp-restricted"><b>Restricted:</b> floor plans stay with the owner</span>
+              </span>
+            )}
+          </span>
+          <b class="pp-word">{w.word}</b>
+          <span class="pp-line">{w.line}</span>
+          <small>{w.door} →</small>
+        </a>
+      </li>
+    ))}
+  </ul>
+</section>
+
+<script>
+  import { motion, onceInView } from '../../lib/motion-read.mjs';
+  function init(root: HTMLElement) {
+    if ((root as any).__pp) return; (root as any).__pp = true;
+    const on = () => root.classList.add('is-on');
+    if (motion().reduced) { on(); return; }
+    const list = root.querySelector<HTMLElement>('.pp-list')!;
+    onceInView(list, on, Math.min(0.25, Math.max(0.05, (window.innerHeight * 0.5) / Math.max(1, list.offsetHeight))));
+  }
+  const boot = () => document.querySelectorAll<HTMLElement>('[data-pp]').forEach(init);
+  boot();
+  document.addEventListener('astro:page-load', boot);
+</script>
+
+<style>
+  .pp { display: grid; gap: 22px; }
+  .pp-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  .pp-card { display: grid; min-width: 0; opacity: 0; transform: scale(.97); transition: opacity var(--dur-enter) var(--ease-settle) calc(var(--i, 0) * var(--stagger) * 4), transform var(--dur-enter) var(--ease-settle) calc(var(--i, 0) * var(--stagger) * 4); }
+  .pp.is-on .pp-card { opacity: 1; transform: none; }
+  .pp-link { display: grid; grid-template-rows: auto auto 1fr auto; gap: 8px; padding: 12px 12px 18px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-md); color: var(--text); text-decoration: none; transition: border-color var(--dur-hover) var(--ease-settle), transform var(--dur-hover) var(--ease-settle), box-shadow var(--dur-hover) var(--ease-settle); }
+  .pp-link:hover { color: var(--text); border-color: var(--text-3); transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+  .pp-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .pp-word { font: 600 17px/1.2 var(--font-sans); letter-spacing: -.015em; padding: 6px 6px 0; }
+  .pp-line { font-size: 13.5px; line-height: 1.5; color: var(--text-2); padding: 0 6px; }
+  .pp-link > small { display: inline-flex; align-items: center; width: max-content; min-height: 34px; margin: 4px 6px 0; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 550; color: var(--text); background: var(--surface-2); border: 1px solid var(--line-strong); }
+  .pp-pic {
+    --pic-bg: #EFE9DF; --pic-light: #FFFDF9;
+    display: grid; place-items: center; height: 160px; padding: 10px; border-radius: 12px; overflow: clip; box-shadow: inset 0 0 0 1px var(--hairline);
+    background: radial-gradient(90% 80% at 24% 8%, var(--pic-light) 0%, transparent 62%), var(--pic-bg);
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pp-pic { --pic-bg: #15130F; --pic-light: #2B2621; } }
+  :root[data-theme="dark"] .pp-pic { --pic-bg: #15130F; --pic-light: #2B2621; }
+  .pp-over { font-size: 11.5px; font-weight: 550; color: var(--text-3); }
+  .pp-home, .pp-job { display: grid; gap: 7px; width: 100%; padding: 11px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-md); font-size: 12px; line-height: 1.35; }
+  .pp-row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; color: var(--text-2); }
+  .pp-row b { color: var(--text); font-weight: 600; }
+  .pp-row .hg { flex: none; }
+  .pp-quiet { color: var(--text-3); }
+  .pp-figs { display: grid; gap: 4px; width: 100%; }
+  .pp-fig { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 3px 10px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); min-width: 0; }
+  .pp-fig b { font: 600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .pp-fig small { font-size: 11px; color: var(--text-2); line-height: 1.3; }
+  .pp-src { font-size: 10.5px; color: var(--text-3); }
+  .pp-guide { display: grid; gap: 7px; width: min(100%, 200px); padding: 11px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-md); }
+  .pp-guide-b { display: grid; place-items: center; min-height: 36px; border-radius: 9px; font-size: 12.5px; font-weight: 600; background: var(--surface-2); border: 1px solid var(--line-strong); }
+  .pp-guide-bad { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+  .pp-restricted { padding: 6px 9px; border-radius: 7px; background: var(--surface-2); color: var(--text-3); font-size: 11.5px; }
+  .pp-restricted b { font-weight: 600; color: var(--text-2); }
+  @container fd (max-width: 1099px) { .pp-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @container fd (max-width: 599px) { .pp-list { grid-template-columns: minmax(0, 1fr); gap: 12px; } }
+  @media (prefers-reduced-motion: reduce) { .pp-card, .pp-link { transition: none; } .pp-card { opacity: 1; transform: none; } }
+</style>

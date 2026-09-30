@@ -1,0 +1,280 @@
+---
+// Plan it (the front door's lifecycle, stage 2): the year's plan and one refresh decision, from the record. Seven
+// plan years as still bars (what projects have committed, what the refresh policy says is due, the envelope where
+// one is set), then the decision: units whose security support ends before the policy would replace them are listed
+// with their models and offices, priced from the same unit costs the Planning page uses, and brought forward into
+// next year's plan; the plan's figure and headroom change in place. Then the scenarios on record, one click each.
+// Every number comes from src/lib/front-plan.mjs (the record); nothing is typed in.
+//
+// Motion (MOTION-V2 §4.4, §4.15, §5): one sequence, once, when the stage scrolls into view. The chart is drawn at its
+// values and never fills; the list enters row by row (--stagger); the added segment on next year's bar is a new thing
+// and grows from its centre once (--dur-enter); figures change in place, never count. Picking a scenario redraws the
+// bars still and swaps the figures at once; the pills' marker slides (--dur-morph). Reduced motion: the final frame.
+import { NEXT, ENDING, ADD, COLUMNS, SCENARIOS, kmoney } from '../../lib/front-plan.mjs';
+import { href } from '../../lib/data.mjs';
+
+const max = Math.max(...COLUMNS.map((c) => Math.max(c.spend + (c.id === NEXT.id ? ADD.eur : 0), c.envelope ?? 0)), ...SCENARIOS.flatMap((s) => s.years.map((y) => y.spend + (y.id === NEXT.id ? ADD.eur : 0)))) * 1.08;
+const frac = (v) => Math.max(0, v / max);
+const next = COLUMNS.find((c) => c.id === NEXT.id);
+const headroom = (spend) => (next.envelope ?? 0) - spend - ADD.eur;
+const head0 = headroom(next.spend);
+const headWords = (h) => (h >= 0 ? `${kmoney(h)} headroom` : `${kmoney(-h)} over the envelope`);
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+const CAPS = [
+  `Seven plan years from the record: what projects have committed, what the refresh policy says is due, and the envelope where one is set.`,
+  `${plural(ADD.units, 'unit')} of ${plural(ADD.models, 'model')} reach the end of security support before the policy would replace them. Their offices and prices come from the record.`,
+  `Brought forward into ${NEXT.label}: ${kmoney(ADD.eur)} more, ${headWords(head0)}. Try a scenario on record.`,
+];
+const D = { max, next: NEXT.id, add: ADD.eur, envelope: next.envelope, base: COLUMNS.map((c) => ({ id: c.id, committed: c.committed, planned: c.planned, spend: c.spend, units: c.units })), scenarios: SCENARIOS.map((s) => ({ id: s.id, effect: s.effect, years: s.years })) };
+---
+<section class="pl" id="plan" data-pl data-shot="plan" aria-labelledby="pl-h">
+  <header class="fd-head">
+    <p class="fd-eyebrow">The year ahead</p>
+    <h2 id="pl-h">Plan it</h2>
+    <p class="fd-sub">The programme and the refresh plan come from the record, priced. A decision made here lands in next year's plan with its cost.</p>
+  </header>
+
+  <div class="pl-stage">
+    <div class="pl-light" aria-hidden="true"></div>
+
+    <div class="pl-chart-box">
+      <p class="pl-h4"><span>Spend by financial year</span><span class="pl-key"><i class="pl-k pl-k-committed"></i>Committed<i class="pl-k pl-k-planned"></i>Planned<i class="pl-k pl-k-add"></i>Brought forward<i class="pl-k pl-k-env"></i>Envelope</span></p>
+      <ol class="pl-chart" role="img" aria-label={`Spend by financial year: ${COLUMNS.map((c) => `${c.label} ${kmoney(c.spend)}`).join(', ')}`} data-pl-chart>
+        {COLUMNS.map((c) => (
+          <li class:list={['pl-col', { 'is-next': c.id === NEXT.id, 'is-now': c.current }]} data-pl-col={c.id}>
+            <div class="pl-bar">
+              {c.envelope != null && <i class="pl-env" style={`--h:${frac(c.envelope).toFixed(4)}`} title={`Envelope ${kmoney(c.envelope)} (${c.envelopeStatus})`}></i>}
+              <i class="pl-seg pl-committed" data-pl-seg="committed" style={`--h:${frac(c.committed).toFixed(4)}`}></i>
+              <i class="pl-seg pl-planned" data-pl-seg="planned" style={`--h:${frac(c.planned).toFixed(4)}`}></i>
+              {c.id === NEXT.id && <i class="pl-seg pl-add" data-pl-seg="add" style={`--h:${frac(ADD.eur).toFixed(4)}`}></i>}
+            </div>
+            <b><span class="pl-fy">FY</span>{c.n}</b>
+            <span data-pl-spend>{kmoney(c.spend)}</span>
+          </li>
+        ))}
+      </ol>
+      <div class="pl-try" role="group" aria-label="Scenarios on record" data-pl-try>
+        <span class="pl-try-word">Try</span>
+        <div class="pl-pills"><span class="pl-mark no-slide" aria-hidden="true" data-pl-mark></span>
+          <button type="button" data-pl-sc="" aria-pressed="true">The plan as it stands</button>
+          {SCENARIOS.map((s) => <button type="button" data-pl-sc={s.id} aria-pressed="false" title={s.say}>{s.name}</button>)}
+        </div>
+      </div>
+    </div>
+
+    <div class="pl-cards">
+      <article class="pl-card" data-pl-card="ending" aria-label="Security support ending">
+        <p class="pl-over"><b>Security support ends within a year</b><span>{plural(ADD.units, 'unit')} · before their refresh date</span></p>
+        <ul class="pl-list">
+          {ENDING.slice(0, 4).map((r, i) => <li class="pl-row" style={`--i:${i}`}><span class="pl-row-name">{r.name}</span><span class="pl-row-what">{plural(r.n, 'unit')} · {r.offices.slice(0, 3).join(', ')}{r.offices.length > 3 ? ' and more' : ''} · {r.ended ? 'ended' : 'ends'} {r.when}</span><em>{kmoney(r.eur)}</em></li>)}
+          {ENDING.length > 4 && <li class="pl-row pl-more" style={`--i:4`}><span class="pl-row-what">and {ENDING.length - 4} more models</span></li>}
+        </ul>
+        <p class="pl-from pl-row" style={`--i:${Math.min(ENDING.length, 4) + 1}`}>From each model's security support and each unit's install date. Prices: the class's unit cost in the budget.</p>
+      </article>
+
+      <article class="pl-card" data-pl-card="next" aria-label={`${NEXT.label} plan`}>
+        <p class="pl-over"><b>{NEXT.label} plan</b><span>{next.span}</span></p>
+        <dl class="pl-figs">
+          <div class="pl-row" style="--i:0"><dt>Envelope</dt><dd><span>{next.envelope != null ? kmoney(next.envelope) : 'Not set'}</span><small>{next.envelopeStatus === 'proposed' ? 'proposed' : next.envelopeStatus ?? ''}{next.envelopeNote ? ` · ${next.envelopeNote.replace(/\.$/, '')}` : ''}</small></dd></div>
+          <div class="pl-row" style="--i:1"><dt>Committed</dt><dd><span data-pl-f="committed">{kmoney(next.committed)}</span><small data-pl-f="projects">{next.projects ? `${plural(next.projects, 'project')} in flight` : 'no project raised yet'}</small></dd></div>
+          <div class="pl-row" style="--i:2"><dt>Planned</dt><dd><span data-pl-f="planned">{kmoney(next.planned)}</span><small data-pl-f="units">{plural(next.units, 'unit')} due by the policy, in {plural(next.rooms, 'room')}</small></dd></div>
+          <div class="pl-row pl-add-row" data-pl-addrow style="--i:3"><dt>Brought forward</dt><dd><span>+{kmoney(ADD.eur)}</span><small>{plural(ADD.units, 'unit')} at the end of security support</small></dd></div>
+          <div class="pl-row pl-head" style="--i:4" data-pl-headrow data-tone={head0 >= 0 ? 'fine' : 'review'}><dt>Against the envelope</dt><dd><span data-pl-f="head">{headWords(headroom(next.spend) + ADD.eur)}</span><small data-pl-f="effect">Before the decision.</small></dd></div>
+        </dl>
+        <p class="pl-links"><a href={href('/planning/')}>Open Planning</a> · <a href={href('/refresh/')}>the work plan</a> · <a href={href('/planning/scenarios/')}>scenarios</a></p>
+      </article>
+    </div>
+  </div>
+
+  <p class="pl-cap"><span data-pl-cap aria-live="polite">{CAPS[0]}</span></p>
+  <script type="application/json" data-pl-data set:html={JSON.stringify({ ...D, caps: CAPS })} />
+</section>
+
+<script>
+  import { motion } from '../../lib/motion-read.mjs';
+  import { loop } from '../../lib/front-loop.mjs';
+  const kmoney = (n: number) => (Math.abs(n) >= 1e6 ? `€${(n / 1e6).toFixed(2)}m` : `€${Math.round(n / 1000)}k`);
+  function init(root: HTMLElement) {
+    if ((root as any).__pl) return; (root as any).__pl = true;
+    const q = <T extends HTMLElement>(s: string) => root.querySelector<T>(s)!;
+    const D = JSON.parse(q('[data-pl-data]').textContent || '{}');
+    const cap = q('[data-pl-cap]');
+    const cards = Object.fromEntries(Array.from(root.querySelectorAll<HTMLElement>('[data-pl-card]')).map((c) => [c.dataset.plCard!, c]));
+    const addRow = q('[data-pl-addrow]'), headRow = q('[data-pl-headrow]');
+    const addSeg = root.querySelector<HTMLElement>('[data-pl-seg="add"]');
+    const pills = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-pl-sc]')), mark = q('[data-pl-mark]'), tryBox = q('[data-pl-try]');
+    const f = (k: string) => root.querySelector<HTMLElement>(`[data-pl-f="${k}"]`)!;
+    let timers: number[] = [], decided = false, sc = '';
+    const later = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
+    const frac = (v: number) => Math.max(0, v / D.max).toFixed(4);
+    const headWords = (h: number) => (h >= 0 ? `${kmoney(h)} headroom` : `${kmoney(-h)} over the envelope`);
+
+    // Redraw the bars and the figures for the plan as it stands or for one scenario: still, at once (M9).
+    const draw = () => {
+      const s = D.scenarios.find((x: any) => x.id === sc);
+      const years = s ? s.years : D.base;
+      for (const y of years) {
+        const col = root.querySelector<HTMLElement>(`[data-pl-col="${y.id}"]`); if (!col) continue;
+        col.querySelector<HTMLElement>('[data-pl-seg="committed"]')!.style.setProperty('--h', frac(y.committed));
+        col.querySelector<HTMLElement>('[data-pl-seg="planned"]')!.style.setProperty('--h', frac(y.planned));
+        col.querySelector<HTMLElement>('[data-pl-spend]')!.textContent = kmoney(y.spend + (decided && y.id === D.next ? D.add : 0));
+      }
+      const n = years.find((y: any) => y.id === D.next);
+      f('committed').textContent = kmoney(n.committed); f('planned').textContent = kmoney(n.planned);
+      f('units').textContent = `${n.units} ${n.units === 1 ? 'unit' : 'units'} due by the policy`;
+      const h = (D.envelope ?? 0) - n.spend - (decided ? D.add : 0);
+      f('head').textContent = D.envelope == null ? 'No envelope set' : headWords(h);
+      headRow.dataset.tone = h >= 0 ? 'fine' : 'review';
+      f('effect').textContent = s ? s.effect : decided ? 'After the decision.' : 'Before the decision.';
+    };
+    const setMark = (slide = true) => {
+      const b = pills.find((p) => p.getAttribute('aria-pressed') === 'true') ?? pills[0];
+      mark.classList.toggle('no-slide', !slide || motion().reduced);
+      mark.style.width = `${b.offsetWidth}px`; mark.style.transform = `translate(${b.offsetLeft}px, ${b.offsetTop - 3}px)`;
+    };
+    const decide = () => {
+      decided = true;
+      addRow.classList.add('is-in'); addSeg?.classList.add('is-in');
+      draw();
+    };
+    const reset = () => {
+      timers.forEach(clearTimeout); timers = []; decided = false; sc = '';
+      Object.values(cards).forEach((c) => c.classList.remove('is-in'));
+      addRow.classList.remove('is-in'); addSeg?.classList.remove('is-in');
+      pills.forEach((p) => p.setAttribute('aria-pressed', String(!p.dataset.plSc))); setMark(false);
+      tryBox.classList.remove('is-on'); cap.textContent = D.caps[0]; draw();
+    };
+    const finish = () => { Object.values(cards).forEach((c) => c.classList.add('is-in')); decide(); tryBox.classList.add('is-on'); cap.textContent = D.caps[2]; };
+    const run = () => {
+      const m = motion();
+      if (m.reduced) { finish(); return 0; }
+      const E = m.enter, S = m.state;
+      const rows = (c: HTMLElement) => c.querySelectorAll('.pl-row').length;
+      later(400, () => { cap.textContent = D.caps[1]; cards.ending.classList.add('is-in'); });
+      const t1 = 400 + E + rows(cards.ending) * 110 + 500;
+      later(t1, () => { cards.next.classList.add('is-in'); });
+      const t2 = t1 + E + 4 * 110 + 700;
+      later(t2, () => { cap.textContent = D.caps[2]; decide(); });
+      later(t2 + E + S, () => { tryBox.classList.add('is-on'); });
+      return t2 + E + S;
+    };
+    let lp: { stop(): void } | null = null;
+    pills.forEach((b) => b.addEventListener('click', () => {
+      lp?.stop(); lp = null;
+      if (!tryBox.classList.contains('is-on')) { timers.forEach(clearTimeout); timers = []; finish(); }
+      sc = b.dataset.plSc || '';
+      pills.forEach((p) => p.setAttribute('aria-pressed', String(p === b)));
+      setMark(); draw();
+    }));
+    if ('ResizeObserver' in window) new ResizeObserver(() => setMark(false)).observe(tryBox);
+    setMark(false); draw();
+    requestAnimationFrame(() => mark.classList.remove('no-slide'));
+    if (motion().reduced) { finish(); return; }
+    lp = loop(q('.pl-stage'), { play: run, reset });
+  }
+  const boot = () => document.querySelectorAll<HTMLElement>('[data-pl]').forEach(init);
+  boot();
+  document.addEventListener('astro:page-load', boot);
+</script>
+
+<style>
+  .pl { display: grid; gap: 20px; }
+  .pl-stage {
+    --pl-bg: #EFE9DF; --pl-light: #FFFDF9; --pl-glow: rgba(226, 122, 58, .14);
+    position: relative; display: grid; grid-template-columns: minmax(0, 7fr) minmax(320px, 5fr); gap: 16px 24px; padding: 22px 24px 20px; border-radius: 24px;
+    background: var(--pl-bg); box-shadow: inset 0 0 0 1px var(--hairline); overflow: clip; align-items: stretch;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pl-stage { --pl-bg: #15130F; --pl-light: #2B2621; --pl-glow: rgba(238, 138, 78, .12); } }
+  :root[data-theme="dark"] .pl-stage { --pl-bg: #15130F; --pl-light: #2B2621; --pl-glow: rgba(238, 138, 78, .12); }
+  .pl-light { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(80% 70% at 22% 6%, var(--pl-light) 0%, transparent 62%), radial-gradient(60% 46% at 90% 100%, var(--pl-glow) 0%, transparent 70%); }
+
+  .pl-chart-box { position: relative; display: grid; grid-template-rows: auto 1fr auto; gap: 14px; padding: 18px 20px 16px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-md); min-width: 0; }
+  .pl-h4 { margin: 0; display: flex; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; font-size: 13px; font-weight: 550; color: var(--text-3); }
+  .pl-key { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-weight: 450; }
+  .pl-k { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-left: 8px; }
+  .pl-k:first-child { margin-left: 0; }
+  .pl-k-committed { background: var(--text-3); }
+  .pl-k-planned { background: var(--h-planned, #5E479B); }
+  .pl-k-add { background: var(--h-review, #B36B00); }
+  .pl-k-env { height: 0; border-top: 2px dashed var(--text-2); border-radius: 0; }
+  .pl-chart { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; align-items: end; min-height: 250px; }
+  .pl-col { display: grid; grid-template-rows: 1fr auto auto; gap: 6px; justify-items: center; min-width: 0; height: 100%; }
+  .pl-bar { position: relative; width: 100%; max-width: 64px; height: 100%; min-height: 180px; display: flex; flex-direction: column-reverse; align-items: stretch; border-radius: 8px 8px 4px 4px; background: color-mix(in srgb, var(--surface-2) 70%, transparent); overflow: visible; }
+  .pl-seg { display: block; height: calc(var(--h, 0) * 100%); background: var(--text-3); flex: none; }
+  .pl-committed { border-radius: 0 0 4px 4px; }
+  .pl-planned { background: var(--h-planned, #5E479B); }
+  .pl-committed:last-child, .pl-planned:last-child { border-radius: 8px 8px 0 0; }
+  .pl-add { background: var(--h-review, #B36B00); border-radius: 8px 8px 0 0; opacity: 0; transform: scale(.94); transform-origin: center; transition: opacity var(--dur-enter) var(--ease-settle), transform var(--dur-enter) var(--ease-settle); }
+  .pl-add.is-in { opacity: 1; transform: none; }
+  .pl-env { position: absolute; left: -8px; right: -8px; bottom: calc(var(--h, 0) * 100%); height: 0; border-top: 2px dashed var(--text-2); z-index: 1; }
+  .pl-col b { font-size: 12.5px; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .pl-col.is-next b { color: var(--text); }
+  .pl-col span { font-size: 12.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+  .pl-col.is-next .pl-bar { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--text-3); }
+  .pl-try { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; opacity: .55; transition: opacity var(--dur-state) var(--ease-settle); }
+  .pl-try.is-on { opacity: 1; }
+  .pl-try-word { font-size: 13px; font-weight: 550; color: var(--text-3); }
+  .pl-pills { position: relative; display: inline-flex; flex-wrap: wrap; padding: 3px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); }
+  .pl-pills button { position: relative; z-index: 1; font: 550 12.5px/1 var(--font-sans); color: var(--text-2); background: none; border: 0; border-radius: 999px; padding: 0 12px; min-height: 32px; cursor: pointer; transition: color var(--dur-hover) var(--ease-settle); white-space: nowrap; }
+  .pl-pills button[aria-pressed="true"] { color: var(--text); }
+  .pl-pills button:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+  .pl-mark { position: absolute; left: 0; top: 3px; height: 32px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line-strong); transition: transform var(--dur-morph) var(--ease-settle), width var(--dur-morph) var(--ease-settle); }
+  .pl-mark.no-slide { transition: none; }
+
+  .pl-cards { position: relative; display: grid; gap: 12px; align-content: start; min-width: 0; }
+  .pl-card { display: grid; gap: 10px; padding: 14px 16px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-md); min-width: 0;
+    opacity: 0; transform: translateY(10px) scale(.985); transition: opacity var(--dur-enter) var(--ease-settle), transform var(--dur-enter) var(--ease-settle); }
+  .pl-card.is-in { opacity: 1; transform: none; }
+  .pl-over { margin: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 6px 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-2); }
+  .pl-over b { font-size: 14.5px; font-weight: 600; color: var(--text); letter-spacing: -.01em; }
+  .pl-row { opacity: 0; transform: translateY(4px); transition: opacity var(--dur-state) var(--ease-settle) calc(var(--dur-enter) * .5 + var(--i, 0) * 110ms), transform var(--dur-state) var(--ease-settle) calc(var(--dur-enter) * .5 + var(--i, 0) * 110ms); }
+  .pl-card.is-in .pl-row { opacity: 1; transform: none; }
+  .pl-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+  .pl-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 12px; align-items: baseline; font-size: 13.5px; line-height: 1.35; }
+  .pl-row-name { grid-column: 1; grid-row: 1; font-weight: 600; }
+  .pl-row-what { grid-column: 1; font-size: 12.5px; color: var(--text-2); }
+  .pl-list em { grid-column: 2; grid-row: 1 / span 2; font-style: normal; font-weight: 550; font-variant-numeric: tabular-nums; color: var(--text-2); }
+  .pl-more .pl-row-what { grid-row: 1; }
+  .pl-from { margin: 0; font-size: 12px; color: var(--text-3); line-height: 1.4; }
+  .pl-figs { margin: 0; display: grid; gap: 8px; }
+  .pl-figs div { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 2px 12px; align-items: baseline; }
+  .pl-figs dt { font-size: 12.5px; color: var(--text-3); }
+  .pl-figs dd { margin: 0; display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; }
+  .pl-figs dd span { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .pl-figs dd small { font-size: 12.5px; color: var(--text-2); }
+  .pl-add-row { display: none; }
+  .pl-add-row.is-in { display: grid; opacity: 1; transform: none; animation: pl-in var(--dur-enter) var(--ease-settle) both; }
+  .pl-add-row dd span { color: var(--h-review-ink, #614B05); }
+  @keyframes pl-in { from { opacity: 0; transform: scale(.96); } }
+  .pl-head { padding-top: 8px; border-top: 1px solid var(--line); }
+  .pl-head[data-tone="fine"] dd span { color: var(--h-fine-ink, #235537); transition: color var(--dur-state) var(--ease-settle); }
+  .pl-head[data-tone="review"] dd span { color: var(--h-review-ink, #614B05); transition: color var(--dur-state) var(--ease-settle); }
+  .pl-links { margin: 0; font-size: 13px; color: var(--text-3); }
+  .pl-cap { margin: -4px 0 0; display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; font-size: 14.5px; line-height: 1.45; color: var(--text-2); }
+
+  @container fd (max-width: 1099px) {
+    .pl-stage { grid-template-columns: minmax(0, 1fr); }
+    .pl-cards { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .pl-chart { min-height: 240px; }
+    .pl-bar { min-height: 170px; }
+  }
+  @container fd (max-width: 899px) {
+    .pl-cards { grid-template-columns: minmax(0, 1fr); }
+  }
+  @container fd (max-width: 699px) {
+    .pl-stage { padding: 18px 16px; border-radius: 18px; gap: 14px; }
+    .pl-chart-box, .pl-card { padding: 14px; border-radius: 14px; }
+    .pl-chart { gap: 6px; min-height: 200px; }
+    .pl-bar { min-height: 130px; }
+    .pl-col b { font-size: 11.5px; }
+    .pl-col span { font-size: 10.5px; }
+    .pl-fy { display: none; }
+    .pl-figs div { grid-template-columns: minmax(0, 1fr); }
+    .pl-key .pl-k { margin-left: 6px; }
+    .pl-pills { border-radius: 14px; }
+    .pl-pills button { flex: 1 1 100%; text-align: left; min-height: 34px; }
+    .pl-mark { display: none; }
+    .pl-pills button[aria-pressed="true"] { background: var(--surface); border-radius: 10px; box-shadow: 0 0 0 1px var(--line-strong); }
+  }
+  @media (prefers-reduced-motion: reduce) { .pl-card, .pl-row, .pl-add, .pl-mark, .pl-try, .pl-pills button { transition: none; } .pl-add-row.is-in { animation: none; } .pl-card, .pl-row { opacity: 1; transform: none; } }
+</style>

@@ -1,0 +1,84 @@
+---
+// Works with what you run (the front door): the systems a workplace team already has, as clean text marks (no
+// logos), each labelled honestly. "Import today" is what the connector kit does now (docs/connectors: the spreadsheet
+// and NetBox importers, read only, into data/connected/). "Next" is the roadmap's live connectors, one at a time.
+// The demo's figures name some of these systems ("from Poly Lens", "from ServiceNow"): those are the systems the
+// simulation stands in for, and the grid says so. Motion (MOTION-V2 §4.34): the marks make one quiet stagger as they
+// scroll into view, the first twelve --stagger apart, the rest together. Reduced motion: present at once.
+import { REPO, LINKS } from '../../lib/brand.mjs';
+
+const TODAY = 'Import today', NEXT = 'Next';
+const SYSTEMS = [
+  { name: 'Spreadsheet', what: 'CSV, one row per device', state: TODAY },
+  { name: 'NetBox', what: 'sites, racks, devices, cables', state: TODAY },
+  { name: 'ServiceNow', what: 'incidents and changes', state: NEXT, demo: true },
+  { name: 'Microsoft 365', what: 'room calendars, Teams Rooms', state: NEXT, demo: true },
+  { name: 'Google Workspace', what: 'room calendars', state: NEXT },
+  { name: 'Slack', what: 'a room reports itself', state: NEXT },
+  { name: 'Poly Lens', what: 'video bars, controllers', state: NEXT, demo: true },
+  { name: 'Logitech Sync', what: 'bars, cameras, panels', state: NEXT, demo: true },
+  { name: 'Crestron XiO Cloud', what: 'room systems', state: NEXT },
+  { name: 'Q-SYS Reflect', what: 'audio and control', state: NEXT },
+  { name: 'UniFi', what: 'switches, access points, ports', state: NEXT, demo: true },
+  { name: 'Meraki', what: 'switches, access points', state: NEXT },
+  { name: 'Datadog', what: 'monitoring signals', state: NEXT },
+  { name: 'Entra ID', what: 'people and sign-in', state: NEXT },
+  { name: 'Okta', what: 'people and sign-in', state: NEXT },
+];
+const DOCS = `${REPO}/blob/main/docs/connectors/README.md`;
+---
+<section class="cn" id="connectors" data-cn data-shot="connectors" aria-labelledby="cn-h">
+  <header class="fd-head">
+    <p class="fd-eyebrow">Works with what you run</p>
+    <h2 id="cn-h">Your systems stay. The record joins them.</h2>
+    <p class="fd-sub">Every connector is read first and shows you what would change before it writes. Two import today; the rest come one at a time, and the kit is open.</p>
+  </header>
+  <ul class="cn-grid">
+    {SYSTEMS.map((s, i) => (
+      <li class:list={['cn-mark', { 'is-today': s.state === TODAY }]} style={`--i:${Math.min(i, 12)}`}>
+        <b>{s.name}</b>
+        <span class="cn-what">{s.what}</span>
+        <span class="cn-state">{s.state}{s.demo ? ' · named in the demo' : ''}</span>
+      </li>
+    ))}
+    <li class="cn-mark cn-own" style="--i:12">
+      <b>Build your own</b>
+      <span class="cn-what">in an afternoon: read an export, show the diff, write YAML</span>
+      <a class="cn-link" href={DOCS}>The connector kit →</a>
+    </li>
+  </ul>
+  <p class="cn-note">"Named in the demo" means the simulation stands in for that system's figures; nothing in the demo is connected to anything real. Live, two-way connectors are <a href={LINKS.roadmap}>on the roadmap</a> after the API and export.</p>
+</section>
+
+<script>
+  import { motion, onceInView } from '../../lib/motion-read.mjs';
+  function init(root: HTMLElement) {
+    if ((root as any).__cn) return; (root as any).__cn = true;
+    const on = () => root.classList.add('is-on');
+    if (motion().reduced) { on(); return; }
+    const grid = root.querySelector<HTMLElement>('.cn-grid')!;
+    onceInView(grid, on, Math.min(0.2, Math.max(0.05, (window.innerHeight * 0.5) / Math.max(1, grid.offsetHeight))));
+  }
+  const boot = () => document.querySelectorAll<HTMLElement>('[data-cn]').forEach(init);
+  boot();
+  document.addEventListener('astro:page-load', boot);
+</script>
+
+<style>
+  .cn { display: grid; gap: 22px; }
+  .cn-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .cn-mark { display: grid; gap: 3px; align-content: start; padding: 14px 16px 12px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-md); min-width: 0;
+    opacity: 0; transform: scale(.96); transition: opacity var(--dur-enter) var(--ease-settle) calc(var(--i, 0) * var(--stagger) * 2), transform var(--dur-enter) var(--ease-settle) calc(var(--i, 0) * var(--stagger) * 2); }
+  .cn.is-on .cn-mark { opacity: 1; transform: none; }
+  .cn-mark b { font: 600 16px/1.2 var(--font-sans); letter-spacing: -.015em; }
+  .cn-what { font-size: 13px; color: var(--text-2); line-height: 1.4; }
+  .cn-state { margin-top: 6px; width: max-content; max-width: 100%; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 550; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--line); }
+  .cn-mark.is-today .cn-state { color: var(--h-fine-ink, var(--green-ink)); background: var(--h-fine-soft, var(--green-soft)); border-color: transparent; }
+  .cn-own { background: var(--surface-2); border-style: dashed; border-color: var(--line-strong); }
+  .cn-link { margin-top: 6px; width: max-content; font-size: 13px; font-weight: 600; min-height: 28px; display: inline-flex; align-items: center; }
+  .cn-note { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-3); max-width: 90ch; }
+  @container fd (max-width: 1099px) { .cn-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @container fd (max-width: 699px) { .cn-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .cn-mark { padding: 12px; border-radius: 12px; } .cn-mark b { font-size: 14.5px; } .cn-what { font-size: 12px; } }
+  @container fd (max-width: 339px) { .cn-grid { grid-template-columns: minmax(0, 1fr); } }
+  @media (prefers-reduced-motion: reduce) { .cn-mark { transition: none; opacity: 1; transform: none; } }
+</style>

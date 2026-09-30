@@ -4,6 +4,10 @@
 // Fix (a standing rule, with "How was this done?") · Verify (a test call) · Close ("What fixed it?" pre-filled).
 // The record beside it logs every step as it happens (time, who, what, source), the glyph and the With chip change
 // in place, and the floor's one broken ring closes. Self-contained: no backend, no state kept.
+// Every step is a button, clickable at any time: clicking one makes the steps before it complete quickly, in order,
+// and that step the current one; a thin line under the steps shows how far the fix has got. Left alone, the section
+// plays itself (src/lib/front-loop.mjs): step by step, into the resolved frame, a calm hold, a soft reset, and again.
+// A click, a hover or focus yields to the visitor; after about eight seconds idle it carries on from where they left it.
 //
 // One stage, one screen at 1440 x 900: the incident card with the product drawing on the left, the record and the
 // floor on the right, the five clicks along the bottom. Motion (MOTION-V2 4.15, 4.17, 4.19): each step changes
@@ -29,15 +33,19 @@ const STEPS = [
   { id: 'close', n: 5, verb: 'Close', what: 'One question, pre-filled from what you did.' },
 ];
 ---
-<section class="fx" data-fx data-shot="fix" aria-labelledby="fx-h" data-rooms={nRooms}>
+<section class="fx" id="fix" data-fx data-shot="fix" aria-labelledby="fx-h" data-rooms={nRooms}>
   <header class="fd-head">
-    <p class="fd-eyebrow">Run it</p>
-    <h2 id="fx-h">The fault the hero found. Fixed in five clicks, every one on the record.</h2>
-    <p class="fd-sub">This is the incident as Liam sees it. Take each step yourself; the record writes itself as you go. Simulated: the room, the unit and the fault are made up.</p>
+    <p class="fd-eyebrow">One morning</p>
+    <h2 id="fx-h">Fix it</h2>
+    <p class="fd-sub">The fault the hero found, as Liam sees it. Five clicks, every one on the record; take each step yourself. Simulated: the room, the unit and the fault are made up.</p>
   </header>
 
   <div class="fx-stage">
     <div class="fx-light" aria-hidden="true"></div>
+    <ol class="fx-do" aria-label="Five clicks: press any step to go to it" data-fx-steps>
+      {STEPS.map((s, i) => <li><button type="button" class="fx-step" data-fx-step={s.id} data-k={i} aria-current="false" title={`Go to step ${s.n}: ${s.verb}`}><span class="fx-n">{s.n}</span><b>{s.verb}</b><small>{s.what}</small></button></li>)}
+    </ol>
+    <div class="fx-progress" aria-hidden="true"><i data-fx-progress></i></div>
     <article class="fx-inc" aria-labelledby="fx-t">
       <p class="fx-over"><span>Incident · P2</span><span class="fx-src">from Poly Lens, 07:52</span></p>
       <h3 id="fx-t" class="fx-title"><HealthGlyph state="fault" size={40} title="video bar offline since 07:52" class="fx-glyph lit" /><span>Video bar offline<small>3.09 Whooper Swan · third floor</small></span></h3>
@@ -73,9 +81,6 @@ const STEPS = [
       </section>
     </aside>
 
-    <ol class="fx-do" aria-label="Five clicks">
-      {STEPS.map((s, i) => <li><button type="button" class:list={['fx-step', { 'is-next': i === 0 }]} data-fx-step={s.id} disabled={i !== 0}><span class="fx-n">{s.n}</span><b>{s.verb}</b><small>{s.what}</small></button></li>)}
-    </ol>
   </div>
 </section>
 
@@ -85,6 +90,7 @@ const STEPS = [
   import { chipOf } from '../../lib/ownership.mjs';
   import { setChip } from '../../lib/withchip.mjs';
   import { setSpace } from '../../lib/isofloor-client.mjs';
+  import { loop } from '../../lib/front-loop.mjs';
 
   const ORDER = ['take', 'check', 'fix', 'verify', 'close'];
   const PEOPLE = { liam: { name: 'Liam', first: 'Liam', initials: 'L' }, nora: { name: 'Nora', first: 'Nora', initials: 'N' } };
@@ -94,7 +100,7 @@ const STEPS = [
     if ((root as any).__fx) return; (root as any).__fx = true;
     const q = <T extends HTMLElement>(s: string) => root.querySelector<T>(s)!;
     const steps = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-fx-step]'));
-    const log = q<HTMLOListElement>('[data-fx-log]'), answer = q('[data-fx-answer]');
+    const log = q<HTMLOListElement>('[data-fx-log]'), answer = q('[data-fx-answer]'), progress = q('[data-fx-progress]');
     const nRooms = root.dataset.rooms || '';
     // The With chip (WithChip.astro), drawn for Liam as the viewer: "Ready for you", then "With you", then "Done".
     const chipHost = q('[data-wc-host]'), today = chipHost.dataset.wcToday || '';
@@ -110,61 +116,89 @@ const STEPS = [
     const glyph = q('.fx-glyph'), floor = q('svg.ifl'), planCap = q('[data-fx-plan-cap]'), beat = q('[data-fx-beat]');
     const done = q('[data-fx-done]'), how = q<HTMLButtonElement>('[data-fx-how]'), howCard = q('[data-fx-fact="how"]');
     const facts = (id: string) => Array.from(root.querySelectorAll<HTMLElement>(`[data-fx-fact="${id}"]`));
-    let i = 0, mins = 0, verified = false;
-    const chip = (k: number) => {
-      if (k === 1) { history.unshift({ at: clock(0), text: 'You took it' }); chipTo(own('with', clock(0)), history); }
-      if (k === 2) { history.unshift({ at: clock(4), text: 'You resolved it' }); chipTo(own('done', clock(4)), history); }
-      if (k === 3) { history.unshift({ at: clock(4), text: 'You closed it without a test' }); chipTo(own('done', clock(4)), history); }
-    };
-    const entry = (t: string, what: string, src: string) => {
+    const firstLog = log.innerHTML, firstAnswer = answer.textContent;
+    let i = 0, timers: number[] = [], lp: { stop(): void; pause(ms?: number): void } | null = null;
+    const later = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
+    const clearTimers = () => { timers.forEach(clearTimeout); timers = []; };
+
+    const entry = (t: string, what: string, src: string, quick = false) => {
       const li = document.createElement('li');
       li.innerHTML = `<time>${t}</time><span>${what}</span><small>${src}</small>`;
       log.appendChild(li);
       const m = motion();
-      if (!m.reduced) li.animate([{ opacity: 0, transform: 'scale(.94)' }, { opacity: 1, transform: 'none' }], { duration: m.enter, easing: m.ease });
+      if (!m.reduced && !quick) li.animate([{ opacity: 0, transform: 'scale(.94)' }, { opacity: 1, transform: 'none' }], { duration: m.enter, easing: m.ease });
     };
     const reveal = (id: string) => facts(id).forEach((f) => { f.hidden = false; f.classList.add('is-in'); });
-    const next = () => {
-      steps.forEach((b, k) => { b.disabled = k !== i && !(i === 3 && k === 4); b.classList.toggle('is-next', k === i); b.classList.toggle('is-done', k < i); });
-      // Verify is optional: Close is reachable from it, and says so if it was skipped.
-      if (i === 3) { steps[4].disabled = false; }
+    // The steps: done ones ticked, the current one filled, the line under them at how far the fix has got.
+    const paint = () => {
+      steps.forEach((b, k) => { b.classList.toggle('is-done', k < i - 1 || (k === i - 1 && i === ORDER.length)); b.classList.toggle('is-current', k === i - 1); b.setAttribute('aria-current', k === i - 1 ? 'step' : 'false'); });
+      progress.style.transform = `scaleX(${i / ORDER.length})`;
     };
-    const act: Record<string, () => void> = {
-      take() { mins = 0; chip(1); entry(clock(0), '<b>With Liam</b>', 'by Liam'); answer.textContent = 'With you. Offline since 07:52; booked 09:00, 8 people.'; },
-      check() { mins = 1; root.querySelector('[data-fx-now]')!.textContent = clock(1); reveal('check'); entry(clock(1), '<b>Checked remotely</b>: reachable, codec not responding; known error matched', 'from the unit and the change log'); answer.textContent = 'The codec is not responding after a firmware change at 02:10. A known error matches.'; },
-      fix() {
-        mins = 2; reveal('fix'); setGlyph(glyph, 'progress', { title: 'restarting, read back in 40 s' }); setSpace(floor, 'dub-3-09', 'progress');
-        entry(clock(2), '<b>Done automatically</b> · restarted under the restart rule (owner: Nora)', 'by the rule, for Liam');
+    const act: Record<string, (quick: boolean) => void> = {
+      take(quick) { history.unshift({ at: clock(0), text: 'You took it' }); chipTo(own('with', clock(0)), history); entry(clock(0), '<b>With Liam</b>', 'by Liam', quick); answer.textContent = 'With you. Offline since 07:52; booked 09:00, 8 people.'; },
+      check(quick) { root.querySelector('[data-fx-now]')!.textContent = clock(1); reveal('check'); entry(clock(1), '<b>Checked remotely</b>: reachable, codec not responding; known error matched', 'from the unit and the change log', quick); answer.textContent = 'The codec is not responding after a firmware change at 02:10. A known error matches.'; },
+      fix(quick) {
+        reveal('fix'); setGlyph(glyph, 'progress', { title: 'restarting, read back in 40 s' }); setSpace(floor, 'dub-3-09', 'progress');
+        entry(clock(2), '<b>Done automatically</b> · restarted under the restart rule (owner: Nora)', 'by the rule, for Liam', quick);
         answer.textContent = 'Restarting. Read back in 40 s.';
-        setTimeout(() => { setGlyph(glyph, 'fine', { title: 'in service again' }); answer.textContent = 'Back in service. Not yet verified.'; }, motion().reduced ? 0 : 900);
+        later(quick || motion().reduced ? 0 : 900, () => { setGlyph(glyph, 'fine', { title: 'in service again' }); answer.textContent = 'Back in service. Not yet verified.'; });
       },
-      verify() { mins = 3; verified = true; root.querySelector('[data-fx-now2]')!.textContent = clock(3); reveal('verify'); entry(clock(3), '<b>Test call connected</b> · camera and audio fine', 'from the test'); answer.textContent = 'Verified: test call connected, camera and audio fine.'; },
-      close() {
-        mins = 4;
-        const took = `${20 + mins} min`;
-        if (!verified) { setGlyph(glyph, 'review', { title: 'closed without a test' }); chip(3); entry(clock(4), '<b>Closed without verifying</b> · Unable to complete: not verified', 'by Liam'); answer.textContent = 'Unable to complete: closed without a test. It stays To review.'; }
-        else { reveal('ask'); chip(2); entry(clock(4), '<b>Resolved</b> · what fixed it: restart under the restart rule; codec hang after firmware 4.6.x', 'by Liam · kept on the known error, now used on 15'); answer.textContent = `Resolved in ${took}, before the 09:00 booking.`; }
-        // The floor: the one ring closes and the room's tint goes, or it stays To review.
-        setSpace(floor, 'dub-3-09', verified ? 'fine' : 'review');
-        planCap.textContent = verified ? `Third floor · all ${nRooms} spaces fine` : `Third floor · ${nRooms} spaces · 1 to review`;
+      verify(quick) { root.querySelector('[data-fx-now2]')!.textContent = clock(3); reveal('verify'); entry(clock(3), '<b>Test call connected</b> · camera and audio fine', 'from the test', quick); answer.textContent = 'Verified: test call connected, camera and audio fine.'; },
+      close(quick) {
+        reveal('ask'); history.unshift({ at: clock(4), text: 'You resolved it' }); chipTo(own('done', clock(4)), history);
+        entry(clock(4), '<b>Resolved</b> · what fixed it: restart under the restart rule; codec hang after firmware 4.6.x', 'by Liam · kept on the known error, now used on 15', quick);
+        answer.textContent = 'Resolved in 24 min, before the 09:00 booking.';
+        setSpace(floor, 'dub-3-09', 'fine'); planCap.textContent = `Third floor · all ${nRooms} spaces fine`;
         done.hidden = false;
-        const m = motion(); if (!m.reduced) done.animate([{ opacity: 0, transform: 'scale(.97)' }, { opacity: 1, transform: 'none' }], { duration: m.enter, easing: m.ease });
+        const m = motion(); if (!m.reduced && !quick) done.animate([{ opacity: 0, transform: 'scale(.97)' }, { opacity: 1, transform: 'none' }], { duration: m.enter, easing: m.ease });
       },
     };
-    steps.forEach((b) => b.addEventListener('click', () => {
-      const id = b.dataset.fxStep!, k = ORDER.indexOf(id);
-      if (b.disabled) return;
-      act[id]();
-      i = k + 1;
-      if (id === 'close') { steps.forEach((x) => { x.disabled = true; x.classList.remove('is-next'); x.classList.toggle('is-done', x.dataset.fxStep !== 'verify' || verified); }); return; }
-      next();
-    }));
-    how.addEventListener('click', () => { const open = how.getAttribute('aria-expanded') === 'true'; how.setAttribute('aria-expanded', String(!open)); howCard.classList.add('is-in'); howCard.hidden = open; if (!open) { const m = motion(); if (!m.reduced) howCard.animate([{ opacity: 0, transform: 'scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: m.pop, easing: m.ease }); } });
+    const doStep = (k: number, quick = false) => { act[ORDER[k]](quick); i = k + 1; paint(); };
+    // Back to 07:52: the incident as it arrived, nothing done yet.
+    const reset = () => {
+      clearTimers(); i = 0;
+      log.innerHTML = firstLog; answer.textContent = firstAnswer;
+      root.querySelectorAll<HTMLElement>('.fx-fact-hid').forEach((f) => { f.classList.remove('is-in'); if (f.dataset.fxFact === 'how') f.hidden = true; });
+      how.setAttribute('aria-expanded', 'false');
+      setGlyph(glyph, 'fault', { title: 'video bar offline since 07:52' }); setSpace(floor, 'dub-3-09', 'fault');
+      planCap.textContent = `Third floor · ${nRooms} spaces · 1 fault`; done.hidden = true;
+      history.length = 0; history.push({ at: '07:52', text: 'Offered to you by the record' }); chipTo(own('ready', '07:52'), history);
+      paint();
+    };
+    // Go to step k: the steps before it complete quickly, in order; k itself at its own pace. Going back rewinds first.
+    const goTo = (k: number) => {
+      clearTimers();
+      if (k < i) { root.classList.add('fd-resetting'); reset(); void root.offsetWidth; root.classList.remove('fd-resetting'); }
+      let t = 0;
+      for (let s = i; s < k; s++) { const at = s; later(t, () => doStep(at, true)); t += 200; }
+      later(t, () => doStep(k));
+    };
+    // Left alone: from wherever it is to the end, one step at a time.
+    const play = () => {
+      const gap = 1700; let t = 700;
+      for (let s = i; s < ORDER.length; s++) { const at = s; later(t, () => doStep(at)); t += gap; }
+      return Math.max(0, t - gap + 900 + motion().enter);
+    };
+    const yieldTo = () => lp?.pause(8000);
+    const list = q('[data-fx-steps]');
+    list.addEventListener('pointerenter', yieldTo);
+    list.addEventListener('focusin', yieldTo);
+    steps.forEach((b, k) => b.addEventListener('click', () => { yieldTo(); goTo(k); }));
+    // Arrow keys move between the steps; Enter and Space press them, as buttons do.
+    list.addEventListener('keydown', (e) => {
+      const at = steps.indexOf(document.activeElement as HTMLButtonElement); if (at < 0) return;
+      const to = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? at + 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? at - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? steps.length - 1 : -1;
+      if (to < 0 || to >= steps.length) return;
+      e.preventDefault(); steps[to].focus();
+    });
+    how.addEventListener('click', () => { yieldTo(); const open = how.getAttribute('aria-expanded') === 'true'; how.setAttribute('aria-expanded', String(!open)); howCard.classList.add('is-in'); howCard.hidden = open; if (!open) { const m = motion(); if (!m.reduced) howCard.animate([{ opacity: 0, transform: 'scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: m.pop, easing: m.ease }); } });
     // The heartbeat: words that change every 10 s.
     const t0 = Date.now();
     const tick = () => { if (!root.isConnected) return; const s = Math.round((Date.now() - t0) / 10000) * 10; beat.textContent = s < 10 ? 'checked just now' : s < 60 ? `checked ${s} s ago` : `checked ${Math.floor(s / 60)} min ago`; setTimeout(tick, 10000); };
     setTimeout(tick, 10000);
-    next();
+    paint();
+    if (motion().reduced) { for (let s = 0; s < ORDER.length; s++) doStep(s, true); return; }
+    lp = loop(q('.fx-stage'), { play, reset, hold: 3200 });
   }
   const boot = () => document.querySelectorAll<HTMLElement>('[data-fx]').forEach(init);
   boot();
@@ -175,7 +209,7 @@ const STEPS = [
   .fx { display: grid; gap: 22px; }
   .fx-stage {
     --fx-bg: #EFE9DF; --fx-light: #FFFDF9; --fx-glow: rgba(226, 122, 58, .14);
-    position: relative; display: grid; grid-template-columns: minmax(0, 7fr) minmax(300px, 4fr); grid-template-rows: auto auto; gap: 18px 24px; padding: 26px 28px 24px; border-radius: 24px;
+    position: relative; display: grid; grid-template-columns: minmax(0, 7fr) minmax(300px, 4fr); grid-template-rows: auto auto auto; gap: 18px 24px; padding: 22px 28px 24px; border-radius: 24px;
     background: var(--fx-bg); box-shadow: inset 0 0 0 1px var(--hairline); overflow: clip; align-items: start;
   }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .fx-stage { --fx-bg: #15130F; --fx-light: #2B2621; --fx-glow: rgba(238, 138, 78, .12); } }
@@ -211,26 +245,30 @@ const STEPS = [
   .fx-log, .fx-plan-box { display: grid; gap: 10px; padding: 16px 18px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-md); min-width: 0; align-content: start; }
   .fx-h4 { margin: 0; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; font-weight: 550; color: var(--text-3); }
   .fx-entries { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-  .fx-entries li { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 1px 10px; font-size: 13.5px; line-height: 1.4; transform-origin: center; }
-  .fx-entries time { font-size: 13px; line-height: 1.5; color: var(--text-3); font-variant-numeric: tabular-nums; grid-row: 1 / span 2; }
-  .fx-entries b { font-weight: 600; }
-  .fx-entries small { grid-column: 2; font-size: 12px; color: var(--text-3); }
+  .fx-entries :global(li) { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 1px 10px; font-size: 13.5px; line-height: 1.4; transform-origin: center; }
+  .fx-entries :global(time) { font-size: 13px; line-height: 1.5; color: var(--text-3); font-variant-numeric: tabular-nums; grid-row: 1 / span 2; }
+  .fx-entries :global(b) { font-weight: 600; }
+  .fx-entries :global(small) { grid-column: 2; font-size: 12px; color: var(--text-3); }
   .fx-beat { font-size: 12px; font-weight: 450; color: var(--text-3); font-variant-numeric: tabular-nums; }
   .fx-plan-box :global(.ifl) { width: 100%; }
 
-  .fx-do { grid-column: 1 / -1; list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; counter-reset: none; }
+  .fx-do { position: relative; grid-column: 1 / -1; order: 0; list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; counter-reset: none; }
+  .fx-inc { order: 2; } .fx-side { order: 3; }
   .fx-do li { display: grid; min-width: 0; }
   .fx-step { display: grid; grid-template-columns: 30px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 12px; row-gap: 2px; align-items: center; text-align: left; padding: 12px 14px; min-height: 64px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--text); font: inherit; cursor: pointer; box-shadow: var(--shadow-md); transition: background var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle), opacity var(--dur-state) var(--ease-settle), transform var(--dur-press, 80ms) var(--ease-settle); }
   .fx-step .fx-n { grid-row: 1 / span 2; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font: 600 13px/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--text-2); border: 1.5px solid var(--line-strong); }
   .fx-step b { font-size: 14.5px; font-weight: 600; letter-spacing: -.01em; }
   .fx-step small { font-size: 12.5px; line-height: 1.35; color: var(--text-2); }
-  .fx-step:disabled { cursor: default; opacity: .6; box-shadow: none; }
-  .fx-step.is-next { border-color: var(--ink); background: var(--ink); color: var(--on-ink); opacity: 1; }
-  .fx-step.is-next small { color: color-mix(in srgb, var(--on-ink) 72%, transparent); }
-  .fx-step.is-next .fx-n { color: var(--on-ink); border-color: color-mix(in srgb, var(--on-ink) 60%, transparent); }
-  .fx-step.is-next:hover { background: color-mix(in srgb, var(--ink) 88%, var(--accent)); }
-  .fx-step.is-next:active { transform: scale(.985); }
-  .fx-step.is-done { opacity: 1; border-color: var(--line); color: var(--text-2); }
+  .fx-step:hover { background: var(--surface-2); border-color: var(--text-3); }
+  .fx-step:active { transform: scale(var(--press-scale, .97)); }
+  .fx-step.is-current { border-color: var(--ink); background: var(--ink); color: var(--on-ink); }
+  .fx-step.is-current small { color: color-mix(in srgb, var(--on-ink) 72%, transparent); }
+  .fx-step.is-current .fx-n { color: var(--on-ink); border-color: color-mix(in srgb, var(--on-ink) 60%, transparent); }
+  .fx-step.is-current:hover { background: color-mix(in srgb, var(--ink) 88%, var(--accent)); border-color: var(--ink); }
+  .fx-step.is-done { border-color: var(--line); color: var(--text-2); }
+  .fx-step.is-done.is-current { color: var(--on-ink); }
+  .fx-progress { position: relative; grid-column: 1 / -1; order: 1; height: 3px; margin: -8px 0 -4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+  .fx-progress i { display: block; height: 100%; background: var(--ink); transform-origin: left center; transform: scaleX(0); transition: transform var(--dur-morph) var(--ease-settle); }
   .fx-step.is-done .fx-n { background: var(--h-fine-soft, var(--green-soft)); border-color: var(--h-fine, var(--green)); color: var(--h-fine-ink, var(--green-ink)); }
   .fx-step.is-done .fx-n::before { content: "\2713"; font-size: 13px; }
   .fx-step.is-done .fx-n { font-size: 0; }
@@ -242,7 +280,8 @@ const STEPS = [
     .fx-do { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   }
   @container fd (max-width: 899px) {
-    .fx-do { grid-template-columns: minmax(0, 1fr); }
+    .fx-do { grid-template-columns: minmax(0, 1fr); order: 4; }
+    .fx-progress { order: 5; margin: -6px 0 0; }
     .fx-step { min-height: 56px; }
     .fx-side { grid-template-columns: minmax(0, 1fr); }
   }
@@ -254,5 +293,5 @@ const STEPS = [
     .fx-facts, .fx-done { width: auto; grid-template-columns: minmax(0, 1fr); }
     .fx-step { grid-template-columns: 26px minmax(0, 1fr); }
   }
-  @media (prefers-reduced-motion: reduce) { .fx-step { transition: none; } .fx-fact-hid.is-in { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .fx-step, .fx-progress i { transition: none; } .fx-fact-hid.is-in { animation: none; } }
 </style>

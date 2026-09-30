@@ -7,7 +7,7 @@
 // (the With chip slides from the vendor to the Dublin team). Real: the floor, its spaces and their kit, the house
 // values the sheet is filled from. Simulated: the integrator, the day, the readings.
 //
-// Motion: one sequence, once, when the stage scrolls into view. Each beat changes exactly what it changed: dots
+// Motion: one sequence that plays while the stage is on screen, holds its last frame, cross-fades back and plays again (src/lib/front-loop.mjs). Each beat changes exactly what it changed: dots
 // come on in turn (--dur-state, 45 ms apart), rings ease planned -> in progress -> fine, a card enters at its
 // centre (--dur-enter), rows follow in turn, the chip slides (--dur-chip). Reduced motion: the final frame at once.
 import IsoFloor from './IsoFloor.astro';
@@ -62,11 +62,11 @@ const CAPS = [
 ];
 const chipOwn = { s: 'with', to: 'brightwave', kind: 'vendor', name: 'Brightwave', at: `${DEMO_TODAY}T08:30:00`, why: 'fit-out' };
 ---
-<section class="dl" data-dl data-shot="deliver" aria-labelledby="dl-h" data-n={N} data-rooms={ROOMS} data-exc={EXCEPTION}>
+<section class="dl" id="deliver" data-dl data-shot="deliver" aria-labelledby="dl-h" data-n={N} data-rooms={ROOMS} data-exc={EXCEPTION}>
   <header class="fd-head">
-    <p class="fd-eyebrow">Deliver it</p>
-    <h2 id="dl-h">A new floor, set up in batches and checked by the record.</h2>
-    <p class="fd-sub">The demo's Dublin fourth floor as an integrator fits it out: {N} devices, {ROOMS} spaces, one afternoon. Keia reads each unit back; a person fixes only the exceptions. The floor and its kit are real sample data; the integrator, the day and the readings are simulated.</p>
+    <p class="fd-eyebrow">One afternoon</p>
+    <h2 id="dl-h">Deliver it</h2>
+    <p class="fd-sub">A new floor, set up in batches and checked by the record: the Dublin fourth floor, {N} devices in {ROOMS} spaces, as an integrator fits it out. Keia reads each unit back; a person fixes only the exceptions. The floor and its kit are real sample data; the integrator, the day and the readings are simulated.</p>
   </header>
 
   <div class="dl-stage">
@@ -104,23 +104,24 @@ const chipOwn = { s: 'with', to: 'brightwave', kind: 'vendor', name: 'Brightwave
     </article>
   </div>
 
-  <p class="dl-cap"><span data-dl-cap aria-live="polite">{CAPS[0]}</span> <span class="dl-beat" data-dl-beat hidden>checked just now</span> <button type="button" class="dl-again" data-dl-again hidden>Play again</button></p>
+  <p class="dl-cap"><span data-dl-cap aria-live="polite">{CAPS[0]}</span> <span class="dl-beat" data-dl-beat hidden>checked just now</span></p>
   <script type="application/json" data-dl-data set:html={JSON.stringify({ batches: BATCHES.map((b) => ({ id: b.id, rooms: b.rooms, units: b.units, word: b.word })), caps: CAPS })} />
 </section>
 
 <script>
-  import { motion, onceInView } from '../../lib/motion-read.mjs';
+  import { motion } from '../../lib/motion-read.mjs';
   import { setGlyph } from '../../lib/health.mjs';
   import { setSpace, showKit } from '../../lib/isofloor-client.mjs';
   import { chipOf } from '../../lib/ownership.mjs';
   import { setChip } from '../../lib/withchip.mjs';
+  import { loop } from '../../lib/front-loop.mjs';
 
   function init(root: HTMLElement) {
     if ((root as any).__dl) return; (root as any).__dl = true;
     const q = <T extends HTMLElement>(s: string) => root.querySelector<T>(s)!;
     const D = JSON.parse(q('[data-dl-data]').textContent || '{}');
     const N = +root.dataset.n!, EXC = root.dataset.exc!;
-    const svg = q('svg.ifl'), cap = q('[data-dl-cap]'), beat = q('[data-dl-beat]'), again = q<HTMLButtonElement>('[data-dl-again]');
+    const svg = q('svg.ifl'), cap = q('[data-dl-cap]'), beat = q('[data-dl-beat]');
     const cards = Object.fromEntries(Array.from(root.querySelectorAll<HTMLElement>('[data-dl-card]')).map((c) => [c.dataset.dlCard!, c]));
     const checked = q('[data-dl-checked]'), exc = q('[data-dl-exc]');
     const chipHost = q('[data-wc-host]'), today = chipHost.dataset.wcToday || '';
@@ -145,7 +146,7 @@ const chipOwn = { s: 'with', to: 'brightwave', kind: 'vendor', name: 'Brightwave
       D.batches.forEach((b: any) => setBatch(b.id, 'planned'));
       Object.values(cards).forEach((c) => c.classList.remove('is-in'));
       root.querySelectorAll('.dl-cg').forEach((g) => setGlyph(g as HTMLElement, 'progress'));
-      exc.hidden = true; counts(0); cap.textContent = D.caps[0]; beat.hidden = true; again.hidden = true; t0 = 0;
+      exc.hidden = true; counts(0); cap.textContent = D.caps[0]; beat.hidden = true; t0 = 0;
       chipTo({ s: 'with', to: 'brightwave', kind: 'vendor', name: 'Brightwave', at: `${today}T08:30:00`, why: 'fit-out' });
     };
     const finish = () => {
@@ -156,7 +157,7 @@ const chipOwn = { s: 'with', to: 'brightwave', kind: 'vendor', name: 'Brightwave
       root.querySelectorAll('.dl-cg').forEach((g) => setGlyph(g as HTMLElement, 'fine'));
       setGlyph(root.querySelector('[data-dl-check="addr"] .hg'), 'review');
       exc.hidden = false; counts(N);
-      cap.textContent = D.caps[4]; t0 = Date.now(); beat.hidden = false; setTimeout(tick, 10000); again.hidden = false;
+      cap.textContent = D.caps[4]; t0 = Date.now(); beat.hidden = false; setTimeout(tick, 10000);
       chipTo(teamOwn);
     };
 
@@ -164,7 +165,7 @@ const chipOwn = { s: 'with', to: 'brightwave', kind: 'vendor', name: 'Brightwave
     // exception, then handover. Times are the tokens' (state 300, enter 440) so the tempo follows the look.
     const run = () => {
       const m = motion();
-      if (m.reduced) { finish(); return; }
+      if (m.reduced) { finish(); return 0; }
       const B = D.batches, n0 = B[0].units, S = m.state, E = m.enter;
       let done = 0;
       const rooms = (b: any, s: string) => b.rooms.forEach((id: string) => setSpace(svg, id, id === EXC && s === 'fine' && done > n0 ? 'review' : s));
@@ -185,11 +186,11 @@ const chipOwn = { s: 'with', to: 'brightwave', kind: 'vendor', name: 'Brightwave
       const t4 = t3 + (B.length - 1) * 620 + 800;
       later(t4, () => { cap.textContent = D.caps[4]; cards.hand.classList.add('is-in'); t0 = Date.now(); beat.hidden = false; setTimeout(tick, 10000); });
       later(t4 + E, () => chipTo(teamOwn));
-      later(t4 + E + m.chip + 600, () => { again.hidden = false; });
+      return t4 + E + m.chip + 600;
     };
     // Astro's own chip script redraws the chip at page load from its data; the sequence's chip state wins after that.
-    onceInView(root.querySelector('.dl-stage')!, run, 0.35);
-    again.addEventListener('click', () => { reset(); later(200, run); });
+    if (motion().reduced) { finish(); return; }
+    loop(root.querySelector<HTMLElement>('.dl-stage')!, { play: run, reset });
   }
   const boot = () => document.querySelectorAll<HTMLElement>('[data-dl]').forEach(init);
   boot();
@@ -249,7 +250,6 @@ const chipOwn = { s: 'with', to: 'brightwave', kind: 'vendor', name: 'Brightwave
   .dl-hand { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--text-2); }
   .dl-cap { margin: -4px 0 0; display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; font-size: 14.5px; line-height: 1.45; color: var(--text-2); }
   .dl-beat { font-size: 12.5px; color: var(--text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .dl-again { font: 550 13px/1 var(--font-sans); color: var(--accent-ink); background: none; border: 0; padding: 6px 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 
   @container fd (max-width: 1099px) {
     .dl-stage { grid-template-columns: minmax(0, 1fr); }
