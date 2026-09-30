@@ -152,6 +152,28 @@ A provider can draft a design in its own Keia before any contract: space types, 
 
 **Built:** "Propose a design" on the client page when design is in scope (simulated). **Designed:** the proposal record, the comparison with the client's standards, and turning an accepted proposal into a project.
 
+### 7.1 Winning the work: design, quote, statement of work, accepted
+
+**The edge is the unbroken thread.** A design is drawn from the space types and the device library; its bill of materials prices the quote; the design and the quote write the statement of work; accepted, the design crosses the engagement as a proposal, becomes the client's project, and its BOM becomes the install positions the build sheets start from; the as-built comes back as a reviewed change. Nothing is typed twice, and every line says where it came from: the space type's **standard**, the device **library**, or **changed** by a person.
+
+**What it is not.** Keia Atlas does not rebuild accounting, invoicing, a PSA (ConnectWise, Halo, Simpro) or a quoting tool (D-Tools, Jetbuilt). It keeps the thread and hands the money to the tools that already do it.
+
+| Step | What Keia does | Where the words come from |
+|---|---|---|
+| Opportunities | A small pipeline by stage (lead, design, quoted, accepted, lost), each with its value and one sentence | The provider's own records |
+| Design | Spaces, a space type and build option per space; the equipment fills from the option and the library; a person changes quantities and models | Space types, device models, the client's spaces over the engagement |
+| Bill of materials | Each room's lines roll up to the project's, by model, with the rooms and marks each carries | The design |
+| Labour | Install per unit (by device class), configure per unit (from the setup guide's settings), commission per room, manage as a share; rates by role | Task types and setup guides |
+| Quote | Cost, sell and margin by line and in total; options priced on their own; versions with a line-by-line difference; validity and terms | The BOM, the labour, the provider's price list and terms |
+| Statement of work | Scope per room, deliverables, assumptions, exclusions, the client's part, acceptance, timeline, change control, price; printable | The design, the quote, the terms, the space types' outlets, and Keia's verification |
+| Accepted | The design crosses as a proposal, lands in the client's review queue, becomes a project; its BOM becomes each space's install positions | The engagement, the design |
+
+**Acceptance is Keia's verification.** The statement of work's acceptance criteria are the ones Keia checks anyway: each unit read back against its setup guide, and each room's test (the space type's verification) passed.
+
+**Connects to** (designed, not built): **Xero or QuickBooks** for invoicing, from an accepted quote's payment schedule; **D-Tools or Jetbuilt** import, a project from a quoting tool brought in as a design and matched to the space types and the library.
+
+**Built (simulated):** `src/lib/provider-sales.mjs` (the maths, tested in `tests/provider-sales.test.mjs`), Northlight AV's records in `data/providers/northlight/sales/` (schema `schemas/ext/provider-sales.schema.yaml`), and the pages under `/portfolio/sales/`: the pipeline, a design, its quote, the statement of work and Accept. Behind the Provider sales capability (Vendors, on by default). What is simulated is listed in [gaps.md, gap 49](rules/gaps.md). **Designed:** saving a draft as a new version, the proposal record crossing a real engagement, and the connections above.
+
 ## 8. Standards
 
 **The client's standards win.** Work for a client follows that client's house standards, space types and setup guides. A provider can offer its own standards as a template: the client can adopt any part, which becomes the client's own, reviewed like any other change to a standard. A provider working for many clients keeps its templates in its own Keia and never applies them to a client's records by itself.

@@ -176,8 +176,8 @@ export async function validate(root = REPO_ROOT) {
   // 3. The data. Files that pass their schema are kept for the cross-reference checks.
   const records = [];
   for (const file of await listFiles(dataDir)) {
-    const [folder, ...rest] = path.relative(dataDir, file).split(path.sep);
-    if (rest.length === 0) {
+    const parts = path.relative(dataDir, file).split(path.sep);
+    if (parts.length < 2) {
       problem(file, 'data files must sit inside a folder under data/, such as data/device-models/');
       continue;
     }
@@ -185,8 +185,16 @@ export async function validate(root = REPO_ROOT) {
       problem(file, 'only .yaml files belong under data/');
       continue;
     }
-    if (!collections.some((c) => c?.folder === folder)) {
-      problem(file, `folder "${folder}" is not listed in schemas/registry.yaml`);
+    // A registered folder may be a path (providers/northlight/sales): the longest one the file sits in wins, so one
+    // organisation's records of different kinds can each have their own schema.
+    const dirs = parts.slice(0, -1);
+    let folder = null;
+    for (let n = dirs.length; n >= 1 && !folder; n -= 1) {
+      const f = dirs.slice(0, n).join('/');
+      if (collections.some((c) => c?.folder === f)) folder = f;
+    }
+    if (!folder) {
+      problem(file, `folder "${dirs[0]}" is not listed in schemas/registry.yaml`);
       continue;
     }
     const check = checkers.get(folder);

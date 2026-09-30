@@ -92,6 +92,7 @@ export const CAPABILITIES = [
   { id: 'maintenance', module: 'projects', label: 'Room checks', what: 'Recurring checks and planned maintenance, scheduled with a checklist', state: 'on', source: 'the maintenance planner', requires: ['locations'] },
   // Vendors
   { id: 'engagements', module: 'vendors', label: 'Service providers', what: 'Engagements with service providers: scope, service levels and reviews', state: 'on', source: 'the supplier portal' },
+  { id: 'provider-sales', module: 'vendors', label: 'Provider sales', what: 'For a provider: opportunities, designs, quotes and statements of work', state: 'on', source: 'the provider\'s own Keia', requires: ['engagements'] },
   // A provider's own operations (src/lib/provider-ops.mjs, /portfolio/ops/): what an integrator runs its work with.
   { id: 'provider-stock', module: 'vendors', label: 'Provider stock and orders', what: 'A provider\'s stock, reservations per job and purchase orders to distributors', state: 'on', source: 'the provider\'s stock system' },
   { id: 'provider-crews', module: 'vendors', label: 'Provider crews', what: 'A provider\'s crews, certifications and each visit\'s readiness', state: 'on', source: 'the provider\'s scheduling tool' },

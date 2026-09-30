@@ -1,0 +1,36 @@
+---
+/* SalesThread: the unbroken thread for one opportunity, in the provider's Keia and then the client's: design, quote,
+   statement of work, accepted; then the client's project, its build sheets and the as-built. Each step links where it
+   can; the one this page is marks itself. Nothing is typed twice along it.
+   Props:  o     the opportunity (from salesModel)
+           here  design | quote | sow | accept */
+import { href } from '../lib/data.mjs';
+interface Props { o: any; here: string }
+const { o, here } = Astro.props;
+const base = `/portfolio/sales/${o.slug}/`;
+const accepted = o.stage === 'accepted';
+const steps = [
+  { id: 'design', word: 'Design', to: o.hasDesign ? base : null, side: 'provider' },
+  { id: 'quote', word: 'Quote', to: o.versions.length ? `${base}quote/` : null, side: 'provider' },
+  { id: 'sow', word: 'Statement of work', to: o.versions.length ? `${base}sow/` : null, side: 'provider' },
+  { id: 'accept', word: accepted ? 'Accepted' : 'Accept', to: o.hasQuote ? `${base}accept/` : null, side: 'provider' },
+  { id: 'project', word: `${o.clientName}'s project`, to: o.becomes ? `/projects/${o.becomes.toLowerCase()}/` : null, side: 'client' },
+  { id: 'sheets', word: 'Build sheets', to: o.becomes ? `/projects/${o.becomes.toLowerCase()}/integrate/` : null, side: 'client' },
+  { id: 'asbuilt', word: 'As-built', to: null, side: 'client' },
+];
+const at = steps.findIndex((s) => s.id === here);
+---
+<nav class="sl-thread" aria-label="From design to as-built" data-help="sales.thread">
+  <ol>
+    {steps.map((s, i) => {
+      const state = i === at ? 'here' : s.side === 'client' ? (o.becomes ? 'client' : 'later') : s.to ? 'open' : 'later';
+      const inner = <><span class="sl-dot" aria-hidden="true"></span><span class="sl-w">{s.word}</span></>;
+      return (
+        <li data-state={state} data-side={s.side} class={i === 4 ? 'sl-cross' : undefined}>
+          {state === 'here' ? <span aria-current="step">{inner}</span> : s.to ? <a href={href(s.to)}>{inner}</a> : <span>{inner}</span>}
+        </li>
+      );
+    })}
+  </ol>
+  <p class="sl-thread-note"><span>In {o.providerName}'s Keia</span><span>In {o.clientName}'s Keia, once accepted</span></p>
+</nav>
