@@ -40,7 +40,8 @@
 //   D                                { site, floors, rooms, furn, people, story } from HeroZoom.astro (inline JSON);
 //                                    furn: [floor index, FURN index, 1 if in the story's room, z0, z1, x, y, x, y, ...]
 //   hooks                            { onReady(), onLevel(i, room?), onHover(o | null), onPick(room, go), onTouch(), onFrame(project), onBeat() }
-//   opts                             { labels: the element the labels are written into }
+//   opts                             { labels: the element the labels are written into, reduced: the site's reduced motion,
+//                                      ratio: a fixed pixel ratio (tools/hero-stills.mjs) }
 import {
   WebGLRenderer, Scene, PerspectiveCamera, OrthographicCamera, Group, Mesh, BoxGeometry, ExtrudeGeometry, Shape,
   RingGeometry, CircleGeometry, CylinderGeometry, PlaneGeometry, MeshLambertMaterial, MeshBasicMaterial,
@@ -146,15 +147,31 @@ function wallPlan(f, rooms) {
 
 export function mountHero(host, D, hooks = {}, opts = {}) {
   const cs = getComputedStyle(host);
-  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reduced = opts.reduced ?? matchMedia('(prefers-reduced-motion: reduce)').matches;
   const DUR = { theme: ms(cs, '--dur-theme', 360), move: ms(cs, '--dur-hero-move', 1800), hold: ms(cs, '--dur-hero-hold', 700), state: ms(cs, '--dur-state', 300), stagger: ms(cs, '--stagger', 24), lift: ms(cs, '--dur-hero-lift', 1400) };
   let T = readTokens(host);
   let lifted = 0, focus = 0, shadowDirty = true;   // the fourth floor's lift, the story room's fit-out (0..1)
 
-  // A laptop draws at up to twice its pixels; a machine that reports few cores or little memory at one and a half.
+  // Resolution adapts: the scene starts at one and a half times its pixels (at most the screen's), steps down a quarter
+  // whenever twenty frames in a move average over 22 ms, and steps back up (to at most twice, or one and a half on a
+  // low-power machine) only at the start of a later move whose frames had room to spare, so a change is never seen
+  // on a still frame.
   const lowPower = (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4;
   const renderer = new WebGLRenderer({ antialias: true, alpha: true, powerPreference: lowPower ? 'default' : 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lowPower ? 1.5 : 2));
+  const maxRatio = opts.ratio ?? Math.min(window.devicePixelRatio || 1, lowPower ? 1.5 : 2);
+  let ratio = opts.ratio ?? Math.min(maxRatio, 1.5), roomToSpare = false;   // opts.ratio: the stills' capture, fixed
+  renderer.setPixelRatio(ratio);
+  const frameMs = [];
+  let lastFrame = 0;
+  const adapt = (now) => {
+    if (lastFrame) frameMs.push(now - lastFrame);
+    lastFrame = now;
+    if (frameMs.length < 20) return;
+    const mean = frameMs.reduce((a, b) => a + b, 0) / frameMs.length; frameMs.length = 0;
+    if (mean > 22 && ratio > 1) { ratio = Math.max(1, ratio - 0.25); renderer.setPixelRatio(ratio); roomToSpare = false; }
+    else if (mean < 14 && ratio < maxRatio) roomToSpare = true;
+  };
+  const stepUp = () => { if (roomToSpare) { roomToSpare = false; ratio = Math.min(maxRatio, ratio + 0.25); renderer.setPixelRatio(ratio); } };
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = PCFShadowMap;
   renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true;
   renderer.domElement.className = 'hz-canvas';
@@ -388,6 +405,7 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
     if (reduced || !dur) { tween = null; target.copy(v.target); camera.position.copy(v.pos); camera.lookAt(target); planes(v.pos.distanceTo(v.target)); controls.update(); requestRender(); return; }
     const s0 = new Spherical().setFromVector3(camera.position.clone().sub(target)), s1 = new Spherical().setFromVector3(v.pos.clone().sub(v.target));
     let dt = s1.theta - s0.theta; if (dt > Math.PI) dt -= 2 * Math.PI; if (dt < -Math.PI) dt += 2 * Math.PI;
+    stepUp();
     tween = { t0: performance.now(), s: spring({ duration: dur, bounce: 0 }), from: { t: target.clone(), s: s0 }, to: { t: v.target.clone(), s: s1, dt } };
     requestRender();
   }
@@ -472,7 +490,7 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
     const size = [renderer.domElement.clientWidth, renderer.domElement.clientHeight];
     labels.place(project, lifted, size, keepClear());
     hooks.onFrame?.(project);
-    if (moving || more || damping) requestRender();
+    if (moving || more || damping) { adapt(now); requestRender(); } else lastFrame = 0;
   }
   const v3 = new Vector3();
   function project(pos) {
@@ -616,6 +634,7 @@ export function mountHero(host, D, hooks = {}, opts = {}) {
     storyAt: () => project(at3(story.ring.g)),
     deviceAt: () => { const vb = devRings.find((r) => r.g.userData.dev.fault); return vb && vb.g.visible && vb.on > 0.5 ? project(at3(vb.g)) : null; },
     level: () => level,
+    ratio: () => ratio,
     dispose() {
       alive = false; ro.disconnect(); io?.disconnect(); document.removeEventListener('visibilitychange', onVis); controls.dispose(); labels.dispose();
       renderer.domElement.remove(); renderer.dispose();
