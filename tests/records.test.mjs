@@ -107,6 +107,12 @@ test('support status: ended, ending within 12 months, or fine', () => {
   assert.equal(at('2019-06').chip, 'Security support ended');
   assert.equal(at('2027-06').state, 'soon');
   assert.equal(at('2027-06').chip, 'Security support ends Jun 2027');
+  // Warnings at 12, 6 and 3 months (V9 H3): To review until the last three months, then a fault.
+  assert.equal(at('2027-06').step, 12);
+  assert.equal(at('2027-02').step, 6);
+  assert.equal(at('2026-11').step, 3);
+  assert.equal(at('2026-11').tone, 'bad');
+  assert.equal(at('2027-02').tone, 'warn');
   assert.equal(at('2031-03').state, 'ok');
   assert.equal(at('2031-03').chip, null);
   assert.equal(supportStatus(undefined, '2026-09-28').text, 'Not recorded');

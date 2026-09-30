@@ -1,8 +1,10 @@
 // Security support (device-model security_support, install units' default_password_changed): how long the
 // maker keeps fixing security holes, and the warning before that ends. No Astro or browser dependency.
 
-// Warn this many months before support ends (the EU Cyber Resilience Act research suggests 12, 6 and 3).
+// Warn this many months before support ends, and again at each step (the EU Cyber Resilience Act research suggests
+// 12, 6 and 3): To review from 12 months, a Fault from 3.
 export const WARN_MONTHS = 12;
+export const WARN_STEPS = [12, 6, 3];
 
 // The last day of support: a YYYY-MM date means the end of that month.
 export function lastDay(date) {
@@ -26,7 +28,10 @@ export function supportStatus(ss, today) {
   const t = new Date(`${today}T00:00:00Z`), e = new Date(`${end}T00:00:00Z`);
   const months = (e.getUTCFullYear() - t.getUTCFullYear()) * 12 + (e.getUTCMonth() - t.getUTCMonth());
   if (end < today) return { state: 'ended', tone: 'bad', chip: 'Security support ended', text: `Ended ${when}` };
-  if (months <= WARN_MONTHS) return { state: 'soon', tone: 'warn', chip: `Security support ends ${when}`, text: `Ends ${when}, in ${months <= 1 ? 'under two months' : `${months} months`}` };
+  if (months <= WARN_MONTHS) {
+    const step = [...WARN_STEPS].reverse().find((n) => months <= n);
+    return { state: 'soon', step, tone: step <= 3 ? 'bad' : 'warn', chip: `Security support ends ${when}`, text: `Ends ${when}, in ${months <= 1 ? 'under two months' : `${months} months`} (the ${step}-month warning)` };
+  }
   return { state: 'ok', tone: 'ok', chip: null, text: `Until ${when}` };
 }
 
