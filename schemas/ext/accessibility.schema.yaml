@@ -1,0 +1,70 @@
+# Accessibility: what each room at one site offers people with a hearing, sight or mobility need, as tested
+# data (REG-SCAN: accessibility in two places). One file per site; the file name is the site id.
+#
+#   every_room   what holds for every room at the site with a room guide, unless the room says otherwise
+#   rooms        per room: a hearing loop and its last test, assistive listening, and anything that differs
+#
+# A hearing loop is an audio-frequency induction loop built and measured to IEC 60118-4: it sends the room's
+# sound to hearing aids set to T. A loop is only worth promising when it passed its last test, so every
+# loop carries the date and the result. The room guide reads these in plain words (src/lib/guide.mjs,
+# accessWords). tests/guide.test.mjs checks that every room named is a real room at the site.
+#
+# Demo data: Aigna's rooms and test dates are made up.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://kb35.github.io/keia-atlas/schemas/ext/accessibility
+title: Accessibility by room
+type: object
+additionalProperties: false
+required: [site, checked_by, every_room, rooms, demo]
+$defs:
+  date: { type: string, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+  step_free:
+    description: Can someone using a wheelchair get in and use the room without a step? A note says what to know when it is No, or when there is something to know.
+    type: object
+    additionalProperties: false
+    required: [value]
+    properties:
+      value: { type: boolean }
+      note: { type: string, minLength: 1 }
+  room:
+    type: object
+    additionalProperties: false
+    properties:
+      hearing_loop:
+        description: An induction loop for hearing aids, to IEC 60118-4, with its last field-strength test.
+        type: object
+        additionalProperties: false
+        required: [standard, tested, result]
+        properties:
+          standard: { const: IEC 60118-4 }
+          tested: { $ref: "#/$defs/date", description: The day it was last measured. A loop is tested once a year. }
+          result: { enum: [meets, below-standard], description: "Whether it met the standard's field strength and frequency response on that day." }
+          note: { type: string, minLength: 1 }
+      assistive_listening:
+        description: Portable receivers and neck loops for people without a T setting, and where to get them.
+        type: object
+        additionalProperties: false
+        required: [where]
+        properties:
+          where: { type: string, minLength: 1 }
+      captions: { type: boolean, description: "Live captions in calls, when it differs from every_room." }
+      step_free: { $ref: "#/$defs/step_free" }
+      checked: { $ref: "#/$defs/date", description: "The day the room's accessibility was last walked through, when it differs from every_room." }
+properties:
+  site: { type: string, pattern: "^[a-z0-9]+$", description: Site id (data/sites/). The same as the file name. }
+  checked_by: { type: string, minLength: 1, description: Who walks the rooms and tests the loops. }
+  every_room:
+    type: object
+    additionalProperties: false
+    required: [captions, step_free, checked]
+    properties:
+      captions: { type: boolean, description: Live captions are available in calls from the room. }
+      step_free: { $ref: "#/$defs/step_free" }
+      checked: { $ref: "#/$defs/date", description: The day the rooms were last walked through for access. }
+  rooms:
+    description: Room id (data/spaces/) to what that room has or where it differs.
+    type: object
+    propertyNames: { pattern: "^[a-z0-9]+(-[a-z0-9]+)*$" }
+    additionalProperties: { $ref: "#/$defs/room" }
+  demo: { const: true }
