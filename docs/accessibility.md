@@ -17,7 +17,7 @@ Open **Settings** (the gear at the bottom of the sidebar, or at the top right on
 | Motion: Follow my device | The default. If your device asks for reduced motion, Keia Atlas does too. |
 | Motion: Reduced | Short fades only. Nothing slides, grows or zooms. |
 | Motion: Off | Nothing moves at all. Every change is instant. |
-| Text size: Larger, Largest | All text 15% or 30% bigger. Pages reflow to fit, down to a 375 px phone. |
+| Text size: Larger, Largest | All text 15% or 30% bigger, and everything that sits beside text grows with it: status marks, icons, avatars, buttons and the columns they sit in. Marks on a floor plan or in a drawing keep the drawing's scale. Pages reflow to fit, down to a 375 px phone. |
 | High contrast | The High contrast look: darker text, stronger lines, a bolder focus ring. |
 | Stronger outlines and focus rings | Lines drawn in a text colour, and a thicker focus ring with a halo, on any look. |
 | Underline links | Every text link is underlined, not only told by its colour. |
@@ -40,7 +40,8 @@ Inside the console nothing loops. Things move only when you cause them, once, an
 - **Status by shape and word.** Each state has its own shape: a closed ring for Fine, a notch for To review, a broken ring with a dot for Fault, dashes for Not reporting, an open arc for In progress, a thin ring for Planned, a slash for Off. Colour only adds to the shape and the word.
 - **Live updates stay quiet.** Words that change on their own are not read out over and over: "who else is here" speaks only when it changes, and the front page's pictures are silent while they play by themselves.
 - **Contrast.** Text meets 4.5:1 (large text 3:1) in Studio, light and dark, and in High contrast, on the pages we checked; the health colours of every look are checked on every build (`npm run contrast`).
-- **Targets.** On the pages we checked, controls are at least 24 by 24 px, or have that much space around them.
+- **Targets.** On the pages we checked, controls are at least 24 by 24 px, or have that much space around them, and icon buttons grow with Text size.
+- **Icons follow the text.** At Larger and Largest, every status mark, icon and avatar beside text is 15% or 30% bigger too, so a mark never looks small against its words; the rule is in [docs/rules/looks.md](rules/looks.md), T5.
 - **Dragging.** Anything you can drag (a card on a project board, a job onto the schedule) can also be done with a button or a menu.
 
 ## How we checked
@@ -48,6 +49,7 @@ Inside the console nothing loops. Things move only when you cause them, once, an
 - [axe-core](https://github.com/dequelabs/axe-core) 4.13 in WebKit (Playwright) on one page of each kind: Home, the front page, an office, a space, a device, an incident, Support, the Schedule, Standards, the Method, the Settings dialog, a room guide and this page. At 1440 px and 375 px, light and dark, and again with every accessibility setting on.
 - A keyboard walk through the same pages: every stop has a visible ring and none is hidden under a sticky bar.
 - Reflow at 375 px with each text size, and at 320 px: no page scrolls sideways.
+- Text size on the incident page, Home, a device, the Support queue and the sidebar, at 1440 px and 375 px, in Enterprise dark and Studio light: every icon beside text measured at Default and Largest grows by 1.3; the floor thumbnails' marks do not. `npm test` checks that a health glyph renders at 1.3 times its size at Largest and a floor-map marker does not.
 - The motion check (`node tools/motion-check.mjs`) and a count of every scripted move under Reduced and Off: none.
 - `npm test` covers the settings reaching the page before it paints, Motion Off stopping every transition and scripted move, and the reduced-motion rules applying to Reduced and Off.
 
@@ -64,7 +66,8 @@ Before, the issues were: links too faint in dark mode (every look but Enterprise
 
 - **Not yet tested with people or screen readers.** The checks above are automatic or by keyboard. We have not yet tested with VoiceOver, NVDA or JAWS, or with disabled users.
 - **Floor plans and drawings.** Plans, room drawings and the 3D views are pictures first. Each space on a plan can be reached by keyboard and says its name and state, and the same facts are in lists on the page, but a plan cannot be explored by a screen reader the way it is seen.
-- **Text in drawings.** Larger text scales the words in drawings drawn with CSS, not words fixed inside a drawing's own size.
+- **Text in drawings.** Larger text scales the words in drawings drawn with CSS, not words fixed inside a drawing's own size. Marks on plans and drawings keep the drawing's scale on purpose, so they stay in their rooms.
+- **Timeline dots.** Plain dots on a drawn rail (a device's life, a project's steps) keep their size, so they stay on the rail; the words and status marks beside them grow.
 - **Status words on floor thumbnails.** On Home's small floor pictures, the word shows beside marks that are not Fine; Fine marks stay shapes, so the picture stays readable.
 - **Fine and Planned** differ by the ring's weight (thick or thin) as well as colour; at 12 px the difference is small. The word setting removes the doubt.
 - **The heartbeat** ("checked 40 s ago") changes its words every 10 seconds. It is not read out and does not move, but Pause animations does not stop it.
