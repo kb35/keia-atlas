@@ -1,0 +1,63 @@
+---
+/* WithChip: who has a piece of work, in one pill (UI-V2 §8.5; the rules in src/lib/ownership.mjs, the markup and the
+   slide in src/lib/withchip.mjs, the look in src/styles/withchip.css).
+   Props:  own      the ownership record ({ s, to, kind, at, ... }); what the job was built with
+           item     the work id ("inc:INC0041203"), so the live layer's changes (Take, Hand to, Park, Resume, from any
+                    window) move the chip in place, with a "Liam, just now" mark when someone else made them (M10)
+           history  the hand-off history lines ([{ at, text }], newest first) for the peek that opens on press
+           today    the demo's day, for "since 07:54" against "since 25 Sep"
+   The page is built once for everyone, so the chip is drawn for nobody in particular ("With Liam") and turns into
+   "With you" in the browser when Liam is the viewer (View as). Styles: src/styles/withchip.css. */
+import '../styles/withchip.css';
+import { chipOf, clockWords } from '../lib/ownership.mjs';
+import { chipHtml } from '../lib/withchip.mjs';
+import { PEOPLE } from '../lib/demo.mjs';
+import { DEMO_TODAY } from '../lib/data.mjs';
+interface Own { s: string; to?: string | null; kind?: string; at?: string; [k: string]: unknown }
+interface Props { own: Own | null; item?: string; history?: { at: string; text: string }[]; today?: string }
+const { own, item = '', history = [], today = DEMO_TODAY } = Astro.props;
+const people = Object.fromEntries(PEOPLE.map((p) => [p.id, { name: p.name, first: p.name.split(' ')[0], initials: p.initials }]));
+const html = chipHtml(chipOf(own, null, { people, today }), { item, history: history.map((h) => ({ at: clockWords(h.at, today), text: h.text })) });
+---
+<span class="wc-host" data-wc-host data-wc-own={JSON.stringify(own ?? null)} data-wc-today={today} set:html={html} />
+
+<script>
+  import { chipOf, historyLine, clockWords } from '../lib/ownership.mjs';
+  import { setChip } from '../lib/withchip.mjs';
+  // Draw each chip for the viewer, then follow the live layer: a change from another window moves the chip in place.
+  const W = window as any;
+  function people() { const out: Record<string, any> = {}; (W.RS_PEOPLE || []).forEach((p: any) => { out[p.id] = { name: p.name, first: String(p.name).split(' ')[0], initials: p.initials }; }); return out; }
+  function draw(host: HTMLElement, live: any, mark = false, by?: string) {
+    const el = host.querySelector<HTMLElement>('[data-wc]'); if (!el) return;
+    const item = el.dataset.wcItem || '', today = host.dataset.wcToday || '';
+    let own = null; try { own = JSON.parse(host.dataset.wcOwn || 'null'); } catch { /* keep null */ }
+    if (live && item) { const st = live.stateOf(item, { own }); own = st.own ?? own; }
+    const viewer = W.rsWhoId ? W.rsWhoId() : null, ppl = people();
+    const extra = live && item ? live.historyOf(item).filter((e: any) => e.field === 'own').map((e: any) => ({ at: clockWords(e.at, today), text: historyLine(e.before, e.after, { people: ppl, viewer }) })) : undefined;
+    const base = [...el.querySelectorAll('template[data-peek-body] small')].map((s) => ({ at: s.querySelector('.wc-h-at')?.textContent ?? '', text: (s.textContent ?? '').replace(s.querySelector('.wc-h-at')?.textContent ?? '', '').trim() }));
+    if (!host.dataset.wcBase) host.dataset.wcBase = JSON.stringify(base);
+    const history = extra ? [...extra, ...JSON.parse(host.dataset.wcBase)] : undefined;
+    setChip(el, chipOf(own, viewer, { people: ppl, today }), { history });
+    if (mark && by && W.rsMarkChanged) W.rsMarkChanged(host, by);
+  }
+  function init() {
+    const hosts = [...document.querySelectorAll<HTMLElement>('[data-wc-host]')];
+    if (!hosts.length) return;
+    hosts.forEach((h) => draw(h, W.rsLive?.live));
+    const go = () => {
+      const L = W.rsLive; if (!L) return;
+      hosts.forEach((h) => draw(h, L.live));
+      const stops = ['inc:', 'task:', 'lab:'].map((k) => L.live.subscribe(k, (e: any, info: any) => {
+        if (e.field !== 'own') return;
+        hosts.filter((h) => h.querySelector(`[data-wc-item="${CSS.escape(e.item)}"]`)).forEach((h) => draw(h, L.live, info?.remote, L.name ? String(L.name(e.who)).split(' ')[0] : e.who));
+      }));
+      document.addEventListener('astro:before-swap', () => stops.forEach((s: () => void) => s()), { once: true });
+    };
+    if (W.rsLive) go(); else document.addEventListener('rs:live-ready', go, { once: true });
+  }
+  document.addEventListener('astro:page-load', init);
+</script>
+
+<style is:global>
+  .wc-host { display: inline-flex; max-width: 100%; min-width: 0; vertical-align: middle; }
+</style>

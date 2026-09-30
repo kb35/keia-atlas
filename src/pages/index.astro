@@ -1,17 +1,18 @@
 ---
-// Home: one page, a different first screen per role (decision 0022).
-// Each role's first screen answers "what needs me today?" with the person's own numbers, never global totals:
-//   technician       today at your office, Next up (with the room drawing), incidents at your office
-//   delivery engineer the next device to set up (into the Deploy batch), provisioning waiting
-//   service managers  For your approval, your service's health, firmware and advisories
-//   project manager   projects by status light, gates due, blocked tasks
-//   head              the estate in four numbers, what is stuck, the regions
-//   service desk      new incidents, what is in progress or on hold, tickets not matched to a room
-//   vendor            your installation and the next device
-// Every role gets "My day" (where you are, the day in order, the current time) and the task list grouped
-// Today, This week, Later, where one tap ticks a task through the live layer (who, when, undo).
-// The work is built once (src/lib/home.mjs, from src/lib/work.mjs) and carried as JSON; the page draws whoever
-// is viewing in the browser, so View as and a stage change re-render in place, with no reload (gaps.md #2).
+// Home: the dark cockpit (UX-V2 §3, UI-V2 §3.1, BUILD-PLAN V3). One skeleton for every role:
+//   Band     the answer sentence ("Dublin: 1 space with a fault · 33 spaces ready · checked 40 s ago") and four
+//            figures that say how many need you; each opens the list it counts
+//   Summary  the figures opened, in the role's order: Ready for you, the role's first section (My day, the queue,
+//            For your approval, the projects, the estate, the team), With you | To review, the floors or the estate
+//   Record   everything else, below the "Open pages like this here" boundary: done automatically today, what changed
+//            overnight, knowledge to review, your tasks, and the role's detail (firmware, gates, regions...)
+// Quiet when fine: nothing fine is coloured, nothing moves; the heartbeat proves it was checked. When something is not
+// fine it shows once: the sentence changes, one figure takes the fault colour, the row appears (MOTION-V2 4.15).
+// Work has one owner and moves as a whole: every job row carries its With chip, and Take, Hand to, Park and Resume
+// act on it (src/lib/ownership.mjs, through the live layer so every window agrees). Welcome back replaces Home once
+// after time away (the demo switch in Settings), with the same handover card that parks a job.
+// Role changes what comes first, never what exists (P4). The page draws whoever is viewing in the browser
+// (src/lib/home-client.mjs), so View as re-renders in place.
 import Shell from '../layouts/Shell.astro';
 import Icon from '../components/Icon.astro';
 import PageBand from '../components/PageBand.astro';
@@ -19,71 +20,56 @@ import Section from '../components/Section.astro';
 import KeyNumbers from '../components/KeyNumbers.astro';
 import StageBar from '../components/StageBar.astro';
 import LiveBar from '../components/LiveBar.astro';
-import RoomPlanSprite from '../components/RoomPlanSprite.astro';
-import { homeData, ITEMS } from '../lib/home.mjs';
+import GuideLive from '../components/GuideLive.astro';
+import HealthGlyph from '../components/HealthGlyph.astro';
+import HandoverCard from '../components/HandoverCard.astro';
+import OpenHere from '../components/OpenHere.astro';
+import SmallMultiples from '../components/SmallMultiples.astro';
+import '../styles/withchip.css';
+import '../styles/handover.css';
+import '../styles/home.css';
+import { homeData, ITEMS, SPACE_HEALTH, SITE_HEALTH } from '../lib/home.mjs';
 import { lights, nextGate } from '../lib/project-status.mjs';
+import { building } from '../lib/floors.mjs';
 import {
-  advisories, ADV_LEVEL, ADV_ORDER, models as MODELS, firmwareLines, sites, siteStats, SITE_ORDER, totals, spaces, href, modelName,
-  projects, PHASE_LABEL, PHASES, OPEN_PHASES, fmtDate, DEMO_TODAY, labTests, LAB_STATUS, countryName, commsRooms, REGION_LABEL,
+  advisories, ADV_LEVEL, ADV_ORDER, models as MODELS, firmwareLines, sites, siteStats, SITE_ORDER, totals, href, modelName,
+  projects, PHASE_LABEL, fmtDate, DEMO_TODAY, labTests, LAB_STATUS, countryName, REGION_LABEL,
 } from '../lib/data.mjs';
 import { PEOPLE, person, INBOX_SEED } from '../lib/demo.mjs';
 import { PATHS } from './learn/_lessons.mjs';
-import GuideLive from '../components/GuideLive.astro';
-import HealthGlyph from '../components/HealthGlyph.astro';
 
 const H = homeData();
-// The answer sentence per person (UI-V2 §8.1, UX-V2 §3): what is not all right first, calmly; drawn for whoever is viewing.
-const pl = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-function answerOf(p) {
-  const N = H.numbers[p.id] ?? [], f = (id) => N.find((x) => x.id === id)?.n ?? 0;
-  const office = sites[p.office]?.name ?? 'Your office', today = `${pl(f('today'), 'job')} today`;
-  const waiting = (n, of) => (n ? `${pl(n, 'task')} waiting on something${of}` : `nothing waiting on anyone${of}`);
-  switch (p.roleId) {
-    case 'tech': return f('inc') ? `${office}: ${pl(f('inc'), 'open incident')} · ${today}` : `${office}: ${siteStats[p.office]?.spaces ?? 0} spaces, no open incidents · ${today}`;
-    case 'delivery': case 'network': case 'innovation': return `${pl(f('tasks'), 'open task')}, ${waiting(f('blocked'), '')} · ${today}`;
-    case 'sm-av': case 'sm-infra': return `${f('approval') ? `${pl(f('approval'), 'item')} for your approval` : 'Nothing for your approval'} · ${pl(f('inc'), 'open incident')}`;
-    case 'pm': return `${pl(f('projects'), 'project')}, ${waiting(f('blocked'), '')}`;
-    case 'programme': return `${pl(f('projects'), 'live project')}, ${waiting(f('blocked'), '')}`;
-    case 'head': return f('inc') ? `${pl(f('inc'), 'open incident')} across ${pl(f('sites'), 'office')} · everything else running` : `All ${pl(f('sites'), 'office')} running, no open incidents`;
-    case 'desk': return f('new') ? `${pl(f('new'), 'new incident')} to take · ${f('doing')} in progress` : `No new incidents · ${f('doing')} in progress`;
-    case 'vendor': case 'service-vendor': return f('snags') ? `${pl(f('snags'), 'space')} with snags · ${today}` : `No snags in your installation · ${today}`;
-    default: return `${pl(f('tasks'), 'open task')} in your team, ${waiting(f('blocked'), '')}`;
-  }
-}
-H.answers = { ...Object.fromEntries(PEOPLE.map((p) => [p.id, answerOf(p)])), everyone: 'Every role at once; each block says whose first screen it is' };
+// Welcome back is shown for Aoife (the demo switch in Settings); keep the blob to the people who need it.
+H.cockpit.welcome = { aoife: H.cockpit.welcome.aoife };
 const json = JSON.stringify(H).replace(/</g, '\\u003c');
 const OPEN_STATES = 'new,in-progress,on-hold';
 const TASK_KINDS = 'provision,install,configure,commission,task';
 
-// ---- Static blocks: the same for everyone of a role, shown by data-role on <html> ----------------------------------
+// ---- The pictures: every office's floors at one scale, and the estate as one card per office -------------------
+const FIRST = Object.fromEntries(PEOPLE.map((p) => [p.id, p.name.split(' ')[0]]));
+const health = Object.fromEntries(Object.entries(SPACE_HEALTH).map(([id, h]) => [id, { h: h.h, why: h.why, who: h.who }]));
+const offices = SITE_ORDER.filter((s) => sites[s].kind !== 'remote');
+const floorsOf = (s) => building(s)?.floors ?? [];
+const floorCards = offices.flatMap((s) => floorsOf(s).map((f) => ({ key: `${s}-${f.id}`, site: s, floor: f.id, title: `${sites[s].name.replace(/ office$/, '')}, ${f.name}`, to: `/locations/${s}/?floor=${f.id}` })));
+// One card per office: the floor with the space that most needs a look, else the first floor.
+const rank = (id) => (health[id]?.h === 'fault' ? 0 : health[id]?.h === 'review' ? 1 : 2);
+const estateCards = offices.map((s) => {
+  const fl = floorsOf(s), worst = fl.map((f) => ({ f, r: Math.min(2, ...Object.keys(health).filter((id) => id.startsWith(`${s}-${f.id}-`)).map(rank)) })).sort((a, b) => a.r - b.r)[0];
+  const sh = SITE_HEALTH[s], bad = sh.fault.length + sh.review.length;
+  return { key: s, site: s, floor: (worst?.f ?? fl[0])?.id, title: sites[s].name.replace(/ office$/, ''), to: `/locations/${s}/`, figure: sh.fault.length ? `${sh.fault.length} fault${sh.fault.length === 1 ? '' : 's'}` : bad ? `${bad} to review` : `${sh.n} ready`, sub: fl.length > 1 ? `${(worst?.f ?? fl[0]).name} of ${fl.length} floors` : undefined };
+}).filter((c) => c.floor);
+
+// ---- Static blocks for the record layer (the same for everyone of a role) --------------------------------------------
 const openAdv = Object.values(advisories).filter((a) => a.status !== 'closed').sort((a, b) => ADV_ORDER.indexOf(a.level) - ADV_ORDER.indexOf(b.level));
 const fwLines = Object.values(firmwareLines).map((f) => ({
   ...f, standard: f.releases.find((r) => r.status === 'standard')?.version ?? null, lab: f.releases.find((r) => r.status === 'lab')?.version ?? null,
   to: `/profiles/${MODELS[f.models[0]]?.class}/${f.models[0]}/#firmware`,
 }));
-const installing = Object.values(spaces).filter((s) => s.stages.deploy > 0 && !s.positions.some((p) => p.legacy));
 const openInc = ITEMS.filter((it) => it.kind === 'incident');
-const roomsWithInc = new Set(openInc.map((i) => i.room).filter(Boolean)).size;
-const inService = Object.values(spaces).filter((s) => s.stages.manage > 0 && !s.stages.deploy).length;
-const homeOffices = Object.values(spaces).filter((s) => /^r(em|am|ap)-/.test(s.id)).length;
-const netProjects = Object.values(projects).filter((p) => ['network-refresh', 'infra-refresh'].includes(p.kind) && p.phase !== 'closed');
-const HEALTH = {
-  'sm-av': [
-    { n: inService, label: 'Spaces in service', to: '/rooms/?status=service' },
-    { n: roomsWithInc, label: 'Spaces with an open incident', to: '/rooms/?issues=1', tone: roomsWithInc ? 'warn' : undefined },
-    { n: installing.length, label: 'Spaces being installed', to: '/rooms/?status=installing' },
-  ],
-  'sm-infra': [
-    { n: commsRooms.length, label: 'Comms rooms', to: '/rooms/?kind=comms' },
-    { n: homeOffices, label: 'Home offices', to: '/rooms/?kind=kits' },
-    { n: netProjects.length, label: 'Network projects live', to: `/projects/?kind=network-refresh,infra-refresh` },
-  ],
-};
 const review = [
   { id: 'CHG-039', title: 'Video bar profile: add a symptom for the external camera switching back after a reboot', by: 'Aoife Byrne', to: 'sofia' },
   { id: 'CHG-035', title: 'New device model: Logitech Rally Bar Mini', by: 'Niamh Walsh', to: 'sofia', note: 'Sent back for edits' },
 ];
-// Projects, with their lights, next gate and blocked tasks. Rows carry the project manager, so a PM sees theirs.
 const projList = Object.values(projects).filter((p) => p.phase !== 'closed').map((p) => {
   const L = lights(p), G = nextGate(p), open = p.tasks.filter((t) => t.status !== 'done'), blocked = open.filter((t) => t.status === 'blocked');
   const worst = ['bad', 'warn', 'ok', 'off'].find((s) => [L.schedule, L.cost, L.scope].some((l) => l.state === s)) ?? 'ok';
@@ -97,162 +83,242 @@ const days = (d) => Math.round((new Date(d) - new Date(DEMO_TODAY)) / 864e5);
 const short = (d) => fmtDate(d, { day: 'numeric', month: 'short' });
 const REGIONS = ['emea', 'amer', 'apac'].map((r) => {
   const ss = SITE_ORDER.filter((s) => sites[s].region === r);
-  return { r, label: REGION_LABEL[r].replace('Europe, Middle East and Africa', 'EMEA'), sites: ss.filter((s) => sites[s].kind !== 'remote').length, rooms: ss.reduce((n, s) => n + (siteStats[s]?.spaces ?? 0), 0), inc: openInc.filter((i) => sites[i.site]?.region === r).length };
+  return { r, label: REGION_LABEL[r].replace('Europe, Middle East and Africa', 'EMEA'), sites: ss.filter((s) => sites[s].kind !== 'remote').length, rooms: ss.reduce((n, s) => n + (siteStats[s]?.spaces.length ?? 0), 0), inc: openInc.filter((i) => sites[i.site]?.region === r).length };
 });
 const labWaiting = Object.values(labTests).filter((l) => ['passed', 'testing', 'queued'].includes(l.status));
 const pms = PEOPLE.filter((p) => p.roleId === 'pm');
-
-// Which blocks each role sees. "Everyone (overview)" sees every block, each saying whose first screen it is.
-const PANELS = {
-  next: ['tech'], office: ['tech'], device: ['delivery', 'network'], provision: ['delivery', 'network'],
-  inbox: ['sm-av', 'sm-infra'], health: ['sm-av', 'sm-infra'], firmware: ['sm-av', 'sm-infra'],
-  projects: ['pm', 'programme', 'head'], gates: ['pm', 'programme'], blocked: ['pm', 'programme'],
-  stuck: ['head'], regions: ['head'], desknew: ['desk'], deskopen: ['desk'], vendor: ['vendor', 'service-vendor'], vnext: ['vendor'],
-  team: ['delivery-manager', 'eng-manager', 'pm-manager', 'tech-manager'], lab: ['innovation', 'sm-av'],
-  tasks: ['delivery', 'tech', 'network', 'pm', 'innovation', 'programme', 'sm-av', 'sm-infra', 'vendor', 'head', 'delivery-manager', 'eng-manager', 'pm-manager', 'tech-manager'],
-};
-const WHO_SEES = {
-  next: 'What on-site technicians see first', office: 'What on-site technicians see', device: 'What delivery and network engineers see first', provision: 'What delivery engineers see',
-  inbox: 'What service managers see first', health: 'What service managers see', firmware: 'What service managers see',
-  projects: 'What project managers, the programme manager and the head of the service see first', gates: 'What project managers see', blocked: 'What project managers see',
-  stuck: 'What the head of the service sees first', regions: 'What the head of the service sees', desknew: 'What the service desk sees first', deskopen: 'What the service desk sees',
-  vendor: 'What vendors see first', vnext: 'What vendors see', team: 'What people managers see first', lab: 'What the innovation engineer and the AV service manager see', tasks: 'What everyone with tasks sees',
-};
-const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) => `:root[data-role="${r}"] .hp-${k}`), `:root[data-who="everyone"] .hp-${k}`].join(',') + '{display:block}').join('')
-  // A project manager sees only the projects they run; everyone else sees them all.
-  + pms.map((pm) => `:root[data-who="${pm.id}"] [data-pm]:not([data-pm="${pm.id}"]){display:none}`).join('');
+// A project manager sees the projects they run; everyone else sees them all.
+const pmCss = pms.map((pm) => `:root[data-who="${pm.id}"] [data-pm]:not([data-pm="${pm.id}"]){display:none}`).join('');
 ---
 <Shell title="Home" section="home" vendorOk crumbs={[{ label: 'Home' }]}>
-  <RoomPlanSprite />
-  <PageBand overline="Home" title="Aoife, ready for you" heartbeat>
-    <span slot="overline"><span data-greet>Hello</span> · <span class="faint">{fmtDate(DEMO_TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}</span> · <span class="faint" data-who-line><span data-who-role>AV and IT delivery engineer</span> · <span data-who-where></span></span></span>
-    <span slot="answer" class="hp-lede"><span class="hp-lede-who" data-home-answer>{H.answers.aoife}</span><span class="hp-caption" data-caption aria-live="polite"></span></span>
+  <PageBand overline="Home" title="Aoife, ready for you" answer={H.cockpit ? ' ' : ''} heartbeat>
+    <span slot="overline"><span class="faint">{fmtDate(DEMO_TODAY, { weekday: 'long', day: 'numeric', month: 'long' })}</span><span class="faint" data-who-where></span></span>
     <a slot="action" class="btn primary" data-home-action href={href('/work/')}>Open Work overview</a>
-    <!-- Four figures, filled for whoever is viewing (src/lib/home.mjs numbersFor): each opens the list it counts (rule P10). -->
     <KeyNumbers slot="numbers" items={[
-      { n: 0, label: 'Today', id: 'k0', to: '/work/schedule/?view=day' },
-      { n: 0, label: 'Open tasks', id: 'k1', to: `/work/list/?kind=${TASK_KINDS}` },
-      { n: 0, label: 'Open incidents', id: 'k2', to: `/incidents/?state=${OPEN_STATES}` },
-      { n: 0, label: 'Projects', id: 'k3', to: '/projects/' },
+      { n: 0, label: 'Ready for you', id: 'k0', to: '#ready' },
+      { n: 0, label: 'With you', id: 'k1', to: '#with' },
+      { n: 0, label: 'Today', id: 'k2', to: '#day' },
+      { n: 0, label: 'To review', id: 'k3', to: '#review' },
     ]} />
   </PageBand>
 
-  <div class="content home" data-home data-cockpit>
-    <!-- 1. My day: where you are, the day in order, the current time. Drawn for whoever is viewing. -->
-    <section class="card hp-day" aria-labelledby="h-day" data-help="home.day" data-day>
-      <header class="hp-h">
-        <h2 id="h-day"><Icon name="schedule" />My day</h2>
-        <span class="day-place" data-day-place></span>
-        <a class="aside" data-day-full href={href(`/work/schedule/?view=day&d=${DEMO_TODAY}`)}>Full schedule →</a>
-      </header>
-      <div class="day-bar" data-day-bar aria-hidden="true"></div>
-      <ol class="day-list" data-day-list></ol>
-      <p class="hp-empty" data-day-empty hidden>Nothing on today. Your open work is below.</p>
+  <div class="content home" data-home data-cockpit aria-busy="true">
+    <!-- Welcome back: replaces Home once after time away (UX-V2 §4.3). The same card as Hand over for cover. -->
+    <section data-sec="welcome" id="welcome" hidden aria-label="Welcome back">
+      <HandoverCard variant="welcome" id="wb" overline="While you were away" title="What happened while you were away" meta="" />
     </section>
 
-    <!-- 2. The answer for each role: one row of two cards. -->
-    <div class="g12 hp-row">
-      <!-- Technician: the next job, with the room drawing, and what is open at your office. -->
-      <section class="hp hp-next card s-7" aria-labelledby="h-next">
-        <p class="hp-who" data-help="home.who">{WHO_SEES.next}</p>
-        <header class="hp-h" data-help="home.next"><h2 id="h-next"><Icon name="room" />Next up</h2></header>
-        <div data-next></div>
-      </section>
-      <section class="hp hp-office card s-5" aria-labelledby="h-office">
-        <p class="hp-who" data-help="home.who">{WHO_SEES.office}</p>
-        <header class="hp-h" data-help="home.office"><h2 id="h-office"><Icon name="alert" />At <span data-office-name>your office</span></h2></header>
-        <div class="mini-list" data-office-inc></div>
-        <a class="hp-more" data-office-all data-vt-rec="dd-incidents" href={href(`/incidents/?state=${OPEN_STATES}`)}>See all in Incidents →</a>
+    <div class="layer" data-layer="summary" id="summary">
+      <!-- Hand over for cover: on the colleague's Home while the person is away (UX-V2 §4.3, step 4). -->
+      <section data-sec="cover" id="cover" hidden aria-label="Covering">
+        <HandoverCard variant="cover" id="cv" overline="Hand over for cover" title="Covering" meta="" />
       </section>
 
-      <!-- Delivery and network engineers: the next device, into its Deploy batch; provisioning waiting. -->
-      <section class="hp hp-device card s-7" aria-labelledby="h-device">
-        <p class="hp-who" data-help="home.who">{WHO_SEES.device}</p>
-        <header class="hp-h" data-help="home.device"><h2 id="h-device"><Icon name="devices" />Next device</h2></header>
-        <div data-device></div>
-      </section>
-      <section class="hp hp-provision card s-5" aria-labelledby="h-prov">
-        <p class="hp-who" data-help="home.who">{WHO_SEES.provision}</p>
-        <header class="hp-h" data-help="home.provision"><h2 id="h-prov"><Icon name="check" />Provisioning waiting</h2></header>
-        <div class="mini-list" data-provision></div>
-        <a class="hp-more" data-provision-all data-vt-rec="dd-work-list" href={href(`/work/list/?kind=provision`)}>See all in the Work list →</a>
+      <!-- Ready for you: offered to you, due now. Empty means nothing new: the section stays out of the way. -->
+      <section class="ck card" data-sec="ready" id="ready" aria-labelledby="h-ready" hidden>
+        <header class="ck-h"><h2 id="h-ready" data-help="home.ready">Ready for you</h2><span class="ck-n" data-n="ready"></span></header>
+        <ol class="jobs" data-list="ready"></ol>
       </section>
 
-      <!-- Service managers: For your approval (reports sent with Report land here, live), and the service's health. -->
-      <section class="hp hp-inbox card s-7" aria-labelledby="h-inbox">
-        <p class="hp-who" data-help="home.who">{WHO_SEES.inbox}</p>
-        <header class="hp-h" data-help="home.inbox"><h2 id="h-inbox"><Icon name="inbox" />For your approval</h2><span class="aside faint" data-inbox-summary></span></header>
+      <!-- My day: where you are, the day in order, the current time. -->
+      <section class="ck card hp-day" aria-labelledby="h-day" data-help="home.day" data-sec="day" id="day" data-day hidden>
+        <header class="ck-h">
+          <h2 id="h-day">My day</h2>
+          <span class="day-place" data-day-place></span>
+          <a class="aside" data-day-full href={href(`/work/schedule/?view=day&d=${DEMO_TODAY}`)}>Full schedule <span aria-hidden="true">→</span></a>
+        </header>
+        <div class="day-bar" data-day-bar aria-hidden="true"></div>
+        <ol class="day-list" data-day-list></ol>
+        <p class="hp-empty" data-day-empty hidden>Nothing booked today. Your open work is below.</p>
+      </section>
+
+      <!-- The service desk's queue: every open incident, worst first, each with its With chip. -->
+      <section class="ck card" data-sec="queue" id="queue" aria-labelledby="h-queue" hidden>
+        <header class="ck-h"><h2 id="h-queue" data-help="home.queue">The queue</h2><span class="ck-n" data-n="queue"></span><a class="aside" href={href(`/incidents/?state=${OPEN_STATES}`)} data-vt-rec="dd-incidents">See all in Incidents <span aria-hidden="true">→</span></a></header>
+        <ol class="jobs" data-list="queue"></ol>
+        <GuideLive where="home" />
+      </section>
+
+      <!-- Service owners: For your approval (reports sent with Report land here, live). -->
+      <section class="ck card" data-sec="approval" id="approval" aria-labelledby="h-inbox" hidden>
+        <header class="ck-h" data-help="home.inbox"><h2 id="h-inbox">For your approval</h2><span class="aside faint" data-inbox-summary></span></header>
         <ol class="inbox" data-inbox></ol>
         <div class="hp-sub" data-help="home.review">
           <h3>Proposals waiting for your review</h3>
           {review.map((c) => (
             <a class="mini-row" href={href(`/changes/#${c.id.toLowerCase()}`)} data-to={c.to}>
-              <span class="mono faint">{c.id}</span><span>{c.title}<small>{c.by}{c.note ? ` · ${c.note}` : ''}</small></span><Icon name="arrow" size={16} />
+              <span class="mono faint">{c.id}</span><span>{c.title}<small>{c.by}{c.note ? ` · ${c.note}` : ''}</small></span><span class="mr-arrow" aria-hidden="true">→</span>
             </a>
           ))}
-          <a class="hp-more" href={href('/changes/')}>Every proposal and who approved it <Icon name="arrow" size={14} /></a>
+          <a class="hp-more" href={href('/changes/')}>Every proposal and who approved it <span aria-hidden="true">→</span></a>
         </div>
       </section>
-      <section class="hp hp-health card s-5" aria-labelledby="h-health">
-        <p class="hp-who" data-help="home.who">{WHO_SEES.health}</p>
-        <header class="hp-h" data-help="home.health"><h2 id="h-health"><Icon name="pulse" />Your service's health</h2></header>
-        {Object.entries(HEALTH).map(([sm, tiles]) => (
-          <div class="tiles" data-sm={sm}>
-            {tiles.map((t) => (
-              <a class={`tile${t.tone ? ` t-${t.tone}` : ''}`} href={href(t.to)} data-help="home.tile" data-vt-rec={`dd${new URL(t.to, 'http://x').pathname.replace(/[^a-z0-9]+/gi, '-').replace(/-$/, '')}`}><b>{t.n.toLocaleString('en-IE')}</b><span>{t.label}</span></a>
-            ))}
-          </div>
-        ))}
+
+      <!-- People managers: the team today. -->
+      <section class="ck card" data-sec="team" id="team" aria-labelledby="h-team" hidden>
+        <header class="ck-h" data-help="home.team"><h2 id="h-team">Your team today</h2><a class="aside" href={href('/work/schedule/?view=day&scope=team')}>Team schedule <span aria-hidden="true">→</span></a></header>
+        <div class="team-rows" data-team></div>
       </section>
 
-      <!-- Project managers, the programme manager and the head: projects by status light, and the gates due. -->
-      <section class="hp hp-projects card s-7" aria-labelledby="h-proj">
-        <p class="hp-who" data-help="home.who">{WHO_SEES.projects}</p>
-        <header class="hp-h" data-help="home.projects"><h2 id="h-proj"><Icon name="project" />Projects by status</h2><a class="aside" data-projects-all href={href('/projects/')}>All projects →</a></header>
+      <!-- Projects by status: the programme as a list, worst first. -->
+      <section class="ck card" data-sec="projects" id="projects" aria-labelledby="h-proj" hidden>
+        <header class="ck-h" data-help="home.projects"><h2 id="h-proj">Projects by status</h2><a class="aside" data-projects-all href={href('/projects/')}>All projects <span aria-hidden="true">→</span></a></header>
         <div class="proj-mini">
           {projList.map(({ p, L, G, open, blocked, worst }) => (
             <a class="pm-row" href={href(`/projects/${p.id.toLowerCase()}/`)} data-pm={p.owner} data-help="home.project-row" data-vt-rec={p.id}>
               <span class="pm-lights" aria-label={`Schedule ${L.schedule.word}, cost ${L.cost.word}, scope ${L.scope.word}`}>{[L.schedule, L.cost, L.scope].map((l) => <HealthGlyph state={l.state} size={12} quiet />)}</span>
               <span class="pm-name"><b>{p.name}</b><small>{p.id} · {sites[p.site]?.name} · {PHASE_LABEL[p.phase]}{G ? ` · gate ${short(G.date)}` : ''}</small></span>
               <span class="pm-word">{worst === 'bad' ? [L.schedule, L.cost, L.scope].find((l) => l.state === 'bad').word : worst === 'warn' ? [L.schedule, L.cost, L.scope].find((l) => l.state === 'warn').word : 'On plan'}</span>
-              {blocked.length ? <span class="pill bad">{blocked.length} waiting</span> : <span class="pill plain">{open.length} open</span>}
-            </a>
-          ))}
-        </div>
-      </section>
-      <section class="hp hp-gates card s-5" aria-labelledby="h-gates">
-        <p class="hp-who" data-help="home.who">{WHO_SEES.gates}</p>
-        <header class="hp-h" data-help="home.gates"><h2 id="h-gates"><Icon name="calendar" />Gates due</h2></header>
-        <div class="mini-list">
-          {gates.map(({ p, G }) => (
-            <a class="mini-row" href={href(`/projects/${p.id.toLowerCase()}/`)} data-pm={p.owner}>
-              <span class={`gate-d${G.late ? ' late' : days(G.date) <= 14 ? ' soon' : ''}`}>{short(G.date)}</span>
-              <span>{G.phase} gate, {p.name}<small>{G.late ? `${G.slip} days over · ` : ''}{G.signer} signs</small></span><Icon name="arrow" size={16} />
+              <span class="pm-n">{blocked.length ? `${blocked.length} waiting` : `${open.length} open`}</span>
             </a>
           ))}
         </div>
       </section>
 
-      <!-- Head of the service: what is stuck, and the regions. -->
-      <section class="hp hp-stuck card s-7" aria-labelledby="h-stuck">
-        <p class="hp-who" data-help="home.who">{WHO_SEES.stuck}</p>
-        <header class="hp-h" data-help="home.stuck"><h2 id="h-stuck"><Icon name="alert" />What is stuck</h2></header>
-        <div class="mini-list">
-          {urgent.map((x) => (
-            <a class="mini-row" href={href(x.about.to)}><span class="pill bad">Urgent</span><span>{x.about.label}<small>{person(x.by).name} to {person(x.to).name} · {x.fields.happened?.slice(0, 90)}…</small></span><Icon name="arrow" size={16} /></a>
-          ))}
-          {redProjects.map(({ p, L }) => (
-            <a class="mini-row" href={href(`/projects/${p.id.toLowerCase()}/`)}><span class="pill bad">Project</span><span>{p.name}<small>{[L.schedule, L.cost, L.scope].filter((l) => l.state === 'bad').map((l) => l.why).join(' ')}</small></span><Icon name="arrow" size={16} /></a>
-          ))}
-          {blockedTasks.slice(0, 5).map(({ t, p }) => (
-            <a class="mini-row" href={href(`/projects/${p.id.toLowerCase()}/tasks/${t.id.toLowerCase()}/`)}><span class="pill bad">Waiting on</span><span>{t.title}<small>{p.name} · {person(t.owner).name} · {t.blocked_by}</small></span><Icon name="arrow" size={16} /></a>
+      <!-- With you | To review: one row, the two lists every role has. -->
+      <div class="g12 ck-row" data-sec="work">
+        <section class="ck card s-7" id="with" aria-labelledby="h-with">
+          <header class="ck-h"><h2 id="h-with" data-help="home.with">With you</h2><span class="ck-n" data-n="with"></span></header>
+          <ol class="jobs" data-list="with"></ol>
+          <div class="ck-empty" data-empty="with" hidden><p>Nothing with you. Take something from Ready for you, or pick up work in the Work list.</p><a class="btn ghost small" href={href('/work/list/')}>Open the Work list</a></div>
+        </section>
+        <section class="ck card s-5" id="review" aria-labelledby="h-review">
+          <header class="ck-h"><h2 id="h-review" data-help="home.to-review">To review</h2><span class="ck-n" data-n="review"></span></header>
+          <ol class="rv" data-list="review"></ol>
+          <div class="ck-empty" data-empty="review" hidden><p>Nothing to review. Things someone should look at, where nothing is down, show here.</p></div>
+        </section>
+      </div>
+
+      <!-- Your office's floors, every space a quiet ring unless it is not fine. -->
+      <section class="ck card" data-sec="floors" id="floors" aria-labelledby="h-floors" hidden>
+        <header class="ck-h"><h2 id="h-floors" data-help="home.floors"><span data-floors-name>Your office</span>, every space</h2><span class="ck-n faint" data-floors-say></span><a class="aside" data-floors-link href={href('/locations/')}>Open the office <span aria-hidden="true">→</span></a></header>
+        <SmallMultiples cards={floorCards} health={health} people={FIRST} min={300} label="Your office's floors" />
+      </section>
+
+      <!-- The estate: one card per office, the same tiny plan at the same scale (UI-V2 §8.7). -->
+      <section class="ck card" data-sec="estate" id="estate" aria-labelledby="h-estate" hidden>
+        <header class="ck-h"><h2 id="h-estate" data-help="home.estate">The estate</h2><span class="ck-n faint" data-estate-say></span><a class="aside" href={href('/locations/')}>Locations <span aria-hidden="true">→</span></a></header>
+        <SmallMultiples cards={estateCards} health={health} people={FIRST} min={200} label="Every office, one card each" />
+      </section>
+
+      <!-- Vendors: only their installation. -->
+      <section class="ck card" data-sec="install" id="install" aria-labelledby="h-vend" hidden>
+        <header class="ck-h" data-help="home.vendor"><h2 id="h-vend">Your installation</h2></header>
+        <p class="ck-p">Your spaces, the tasks assigned to your company, and the records Aigna needs from you: serial numbers, MAC addresses and photos.</p>
+        <a class="btn ghost small" href={href('/vendor/')}>Open your installation <Icon name="arrow" size={14} /></a>
+      </section>
+    </div>
+
+    <OpenHere kind="home" layer="record" />
+
+    <div class="layer" data-layer="record" id="record-layer">
+      <!-- Quiet by design: what was done for you, and what moved while you were not looking. Folded; one press opens. -->
+      <section class="ck card quiet" data-sec="quiet" id="quiet" aria-label="Done automatically, changed overnight, knowledge to review">
+        <details class="qd" data-q="auto"><summary data-help="home.auto"><span class="qd-t">Done automatically today</span><span class="qd-n" data-qn="auto"></span><Icon name="arrow" size={14} /></summary><ol class="qd-list" data-ql="auto"></ol></details>
+        <details class="qd" data-q="changed"><summary data-help="home.changed"><span class="qd-t">What changed overnight</span><span class="qd-n" data-qn="changed"></span><Icon name="arrow" size={14} /></summary><ol class="qd-list" data-ql="changed"></ol></details>
+        <details class="qd" data-q="knowledge"><summary data-help="home.knowledge"><span class="qd-t">Knowledge to review</span><span class="qd-n" data-qn="knowledge"></span><Icon name="arrow" size={14} /></summary><ol class="qd-list" data-ql="knowledge"></ol></details>
+      </section>
+
+      <!-- The task list: Today, This week, Later; one tap ticks a task through the live layer. -->
+      <Section title="Your tasks" help="home.tasks" id="h-tasks-sec" class="ck card hp-tasks" data-sec="tasks">
+        <span slot="aside" class="faint" data-task-summary></span>
+        <div class="tasks-home" data-tasks>
+          {['today', 'week', 'later', 'done'].map((g) => (
+            <div class="tg" data-group={g} hidden>
+              <h3 class="tg-h" data-help="home.tasks-group"><span>{{ today: 'Today', week: 'This week', later: 'Later', done: 'Done today' }[g]}</span><small data-n></small></h3>
+              <ol class="tg-list" data-rows></ol>
+            </div>
           ))}
         </div>
-        <a class="hp-more" data-vt-rec="dd-work-list" href={href(`/work/list/?kind=${TASK_KINDS}&status=blocked`)}>See all {blockedTasks.length} waiting on something in the Work list →</a>
+        <p class="hp-empty" hidden data-task-empty>Nothing assigned to you right now.</p>
+        <a class="hp-more" data-tasks-all data-vt-rec="dd-work-list" href={href(`/work/list/?kind=${TASK_KINDS}`)}>See all in the Work list <span aria-hidden="true">→</span></a>
+        <div class="tick-toast" data-toast hidden role="status"></div>
+        <LiveBar page="home" />
+      </Section>
+
+      <!-- Engineers: the next device, into its Deploy batch; provisioning waiting. -->
+      <section class="ck card" data-sec="device" aria-labelledby="h-device" hidden>
+        <header class="ck-h" data-help="home.device"><h2 id="h-device">Next device</h2></header>
+        <div data-device></div>
       </section>
-      <section class="hp hp-regions card s-5" aria-labelledby="h-reg">
-        <p class="hp-who" data-help="home.who">{WHO_SEES.regions}</p>
-        <header class="hp-h" data-help="home.regions"><h2 id="h-reg"><Icon name="globe" />The regions</h2></header>
+      <section class="ck card" data-sec="provision" aria-labelledby="h-prov" hidden>
+        <header class="ck-h" data-help="home.provision"><h2 id="h-prov">Provisioning waiting</h2></header>
+        <div class="mini-list" data-provision></div>
+        <a class="hp-more" data-provision-all data-vt-rec="dd-work-list" href={href('/work/list/?kind=provision')}>See all in the Work list <span aria-hidden="true">→</span></a>
+      </section>
+      <section class="ck card" data-sec="vnext" aria-labelledby="h-vnext" hidden>
+        <header class="ck-h" data-help="home.device"><h2 id="h-vnext">Next device</h2></header>
+        <div data-device-vendor></div>
+      </section>
+
+      <!-- Service owners: firmware and advisories. -->
+      <section class="ck card" data-sec="firmware" aria-labelledby="h-fw" hidden>
+        <header class="ck-h" data-help="home.firmware"><h2 id="h-fw">Firmware and advisories</h2><a class="aside" href={href('/known-issues/')}>Known errors <span aria-hidden="true">→</span></a></header>
+        <div class="g12 fw-grid">
+          <div class="s-5 fw-lines">
+            <h3 class="overline">Firmware standard</h3>
+            {fwLines.map((f) => (
+              <a class="mini-row" href={href(f.to)}><span class="mono faint">{f.standard ?? '?'}</span><span>{f.name}<small>{f.standard ? `${f.standard} is the standard` : 'No standard set'}{f.lab ? ` · ${f.lab} in the Lab` : ''} · {f.models.length} models</small></span><span class="mr-arrow" aria-hidden="true">→</span></a>
+            ))}
+          </div>
+          <div class="s-7 fw-adv">
+            <h3 class="overline">Advisories</h3>
+            {openAdv.map((a) => (
+              <a class="mini-row" href={href(`/profiles/${MODELS[a.models[0]].class}/${a.models[0]}/`)}><HealthGlyph state={a.level === 'do-not-install' || a.level === 'act' ? 'fault' : 'review'} size={12} /><span>{a.title}<small>{ADV_LEVEL[a.level]} · {a.models.map(modelName).join(', ')}</small></span><span class="mr-arrow" aria-hidden="true">→</span></a>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <!-- The Lab: the innovation engineer and the AV service owner. -->
+      <section class="ck card" data-sec="lab" aria-labelledby="h-lab" hidden>
+        <header class="ck-h" data-help="home.lab"><h2 id="h-lab">In the Lab</h2><a class="aside" href={href('/lab/')}>The Lab <span aria-hidden="true">→</span></a></header>
+        <div class="mini-list">
+          {labWaiting.map((l) => (
+            <a class="mini-row" href={href(`/lab/#${l.id.toLowerCase()}`)}><span class="mono faint">{l.id}</span><span>{l.title}<small>{LAB_STATUS[l.status]}{l.status === 'passed' ? ': waiting for the service owner' : ''}</small></span><span class="mr-arrow" aria-hidden="true">→</span></a>
+          ))}
+        </div>
+      </section>
+
+      <!-- Project managers: gates due, and everything waiting on something. -->
+      <section class="ck card" data-sec="gates" aria-labelledby="h-gates" hidden>
+        <header class="ck-h" data-help="home.gates"><h2 id="h-gates">Gates due</h2></header>
+        <div class="mini-list">
+          {gates.map(({ p, G }) => (
+            <a class="mini-row" href={href(`/projects/${p.id.toLowerCase()}/`)} data-pm={p.owner}>
+              <span class={`gate-d${G.late ? ' late' : days(G.date) <= 14 ? ' soon' : ''}`}>{short(G.date)}</span>
+              <span>{G.phase} gate, {p.name}<small>{G.late ? `${G.slip} days over · ` : ''}{G.signer} signs</small></span><span class="mr-arrow" aria-hidden="true">→</span>
+            </a>
+          ))}
+        </div>
+      </section>
+      <section class="ck card" data-sec="blocked" id="blocked" aria-labelledby="h-blocked" hidden>
+        <header class="ck-h" data-help="home.blocked"><h2 id="h-blocked">Waiting on, your projects</h2></header>
+        <div class="mini-list">
+          {blockedTasks.map(({ t, p }) => (
+            <a class="mini-row" href={href(`/projects/${p.id.toLowerCase()}/tasks/${t.id.toLowerCase()}/`)} data-pm={p.owner}><HealthGlyph state="review" size={12} /><span>{t.title}<small>{p.name} · {person(t.owner).name} · {t.blocked_by}</small></span><span class="mr-arrow" aria-hidden="true">→</span></a>
+          ))}
+        </div>
+      </section>
+
+      <!-- Leadership: what is stuck, and the regions. -->
+      <section class="ck card" data-sec="stuck" aria-labelledby="h-stuck" hidden>
+        <header class="ck-h" data-help="home.stuck"><h2 id="h-stuck">What is stuck</h2></header>
+        <div class="mini-list">
+          {urgent.map((x) => (
+            <a class="mini-row" href={href(x.about.to)}><HealthGlyph state="fault" size={12} /><span>{x.about.label}<small>Urgent · {person(x.by).name} to {person(x.to).name} · {x.fields.happened?.slice(0, 90)}…</small></span><span class="mr-arrow" aria-hidden="true">→</span></a>
+          ))}
+          {redProjects.map(({ p, L }) => (
+            <a class="mini-row" href={href(`/projects/${p.id.toLowerCase()}/`)}><HealthGlyph state="fault" size={12} /><span>{p.name}<small>{[L.schedule, L.cost, L.scope].filter((l) => l.state === 'bad').map((l) => l.why).join(' ')}</small></span><span class="mr-arrow" aria-hidden="true">→</span></a>
+          ))}
+          {blockedTasks.slice(0, 5).map(({ t, p }) => (
+            <a class="mini-row" href={href(`/projects/${p.id.toLowerCase()}/tasks/${t.id.toLowerCase()}/`)}><HealthGlyph state="review" size={12} /><span>{t.title}<small>Waiting on · {p.name} · {person(t.owner).name} · {t.blocked_by}</small></span><span class="mr-arrow" aria-hidden="true">→</span></a>
+          ))}
+        </div>
+        <a class="hp-more" data-vt-rec="dd-work-list" href={href(`/work/list/?kind=${TASK_KINDS}&status=blocked`)}>See all {blockedTasks.length} waiting on something in the Work list <span aria-hidden="true">→</span></a>
+      </section>
+      <section class="ck card" data-sec="regions" aria-labelledby="h-reg" hidden>
+        <header class="ck-h" data-help="home.regions"><h2 id="h-reg">The regions</h2></header>
         <table class="reg-t">
           <thead><tr><th>Region</th><th>Offices</th><th>Spaces</th><th>Incidents</th></tr></thead>
           <tbody>
@@ -263,131 +329,34 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
         </table>
       </section>
 
-      <!-- Service desk: what just came in, and what is under way or waiting. -->
-      <section class="hp hp-desknew card s-7" aria-labelledby="h-dnew">
-        <p class="hp-who" data-help="home.who">{WHO_SEES.desknew}</p>
-        <header class="hp-h" data-help="home.desk-new"><h2 id="h-dnew"><Icon name="inbox" />New incidents</h2></header>
-        <div class="mini-list" data-desk-new></div>
-        <a class="hp-more" data-vt-rec="dd-incidents" href={href('/incidents/?state=new')}>See all <span data-desk-new-n></span> in Incidents →</a>
-      </section>
-      <section class="hp hp-deskopen card s-5" aria-labelledby="h-dopen">
-        <p class="hp-who" data-help="home.who">{WHO_SEES.deskopen}</p>
-        <header class="hp-h" data-help="home.desk-open"><h2 id="h-dopen"><Icon name="alert" />In progress and on hold</h2></header>
-        <div class="mini-list" data-desk-open></div>
-        <a class="hp-more" data-vt-rec="dd-incidents" href={href('/incidents/?state=in-progress,on-hold')}>See all <span data-desk-open-n></span> in Incidents →</a>
-      </section>
-      <GuideLive where="home" />
-
-      <!-- Vendors: only their installation. -->
-      <section class="hp hp-vendor card s-7" aria-labelledby="h-vend">
-        <p class="hp-who" data-help="home.who">{WHO_SEES.vendor}</p>
-        <header class="hp-h" data-help="home.vendor"><h2 id="h-vend"><Icon name="kit" />Your installation</h2></header>
-        <p>Your spaces, the tasks assigned to your company, and the records Aigna needs from you: serial numbers, MAC addresses and photos.</p>
-        <a class="btn primary" href={href('/vendor/')}>Open your installation <Icon name="arrow" size={16} /></a>
-      </section>
-      <section class="hp hp-vnext card s-5" aria-labelledby="h-vnext">
-        <p class="hp-who" data-help="home.who">{WHO_SEES.vnext}</p>
-        <header class="hp-h" data-help="home.device"><h2 id="h-vnext"><Icon name="devices" />Next device</h2></header>
-        <div data-device-vendor></div>
-      </section>
-
-      <!-- People managers: the team today. -->
-      <section class="hp hp-team card s-12" aria-labelledby="h-team">
-        <p class="hp-who" data-help="home.who">{WHO_SEES.team}</p>
-        <header class="hp-h" data-help="home.team"><h2 id="h-team"><Icon name="team" />Your team today</h2><a class="aside" href={href('/work/schedule/?view=day&scope=team')}>Team schedule →</a></header>
-        <div class="team-rows" data-team></div>
-      </section>
-
-      <!-- The Lab: for the innovation engineer and the AV service manager. -->
-      <section class="hp hp-lab card s-12" aria-labelledby="h-lab">
-        <p class="hp-who" data-help="home.who">{WHO_SEES.lab}</p>
-        <header class="hp-h" data-help="home.lab"><h2 id="h-lab"><Icon name="flask" />In the Lab</h2><a class="aside" href={href('/lab/')}>The Lab →</a></header>
-        <div class="mini-list">
-          {labWaiting.map((l) => (
-            <a class="mini-row" href={href(`/lab/#${l.id.toLowerCase()}`)}>
-              <span class="mono faint">{l.id}</span><span>{l.title}<small>{LAB_STATUS[l.status]}{l.status === 'passed' ? ': waiting for the service manager' : ''}</small></span><Icon name="arrow" size={16} />
-            </a>
-          ))}
+      <details class="home-more card" data-sec="across" hidden>
+        <summary data-help="home.across"><span><b>Across Aigna</b><small>{totals.offices} offices · {totals.spaces} spaces · {totals.units.toLocaleString('en-IE')} devices</small></span><Icon name="arrow" size={16} /></summary>
+        <div class="site-tiles">
+          {SITE_ORDER.map((sid) => {
+            const s = sites[sid], st = siteStats[sid];
+            return (
+              <a class="site-tile" href={href(`/rooms/?site=${sid}`)}>
+                <span class="code">{s.code}</span>
+                <b>{s.name}</b>
+                <small>{s.kind === 'remote' ? `Home offices, ${({ amer: 'Americas', emea: 'EMEA', apac: 'APAC' })[s.region] ?? 'worldwide'}` : `${s.city}, ${countryName(s.country)}`}</small>
+                <StageBar stages={st.stages} />
+              </a>
+            );
+          })}
         </div>
-      </section>
+      </details>
+
+      <!-- First visit: a short tour for your role (Learn). Dismissed or finished, it stays away. -->
+      <aside class="tour card" data-help="home.tour" data-tour hidden aria-labelledby="h-tour">
+        <span class="tour-ic" aria-hidden="true"><Icon name="book" size={20} /></span>
+        <span class="tour-t"><b id="h-tour" data-tour-h>New here? Start the 5 minute tour</b><small data-tour-s>A few short lessons picked for your role, each with something to try.</small></span>
+        <a class="btn primary small" href={href('/learn/#start')} data-tour-go>Start the tour <Icon name="arrow" size={14} /></a>
+        <button type="button" class="icon-btn tour-x" data-tour-x aria-label="Dismiss the tour" title="Not now"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+      </aside>
     </div>
-
-    <!-- 3. The task list: Today, This week, Later; one tap ticks a task through the live layer. -->
-    <Section title="Your tasks" help="home.tasks" id="h-tasks-sec" class="hp hp-tasks card">
-      <span slot="aside" class="faint" data-task-summary></span>
-      <p class="hp-who" data-help="home.who">{WHO_SEES.tasks}</p>
-      <div class="tasks-home" data-tasks>
-        {['today', 'week', 'later', 'done'].map((g) => (
-          <div class="tg" data-group={g} hidden>
-            <h3 class="tg-h" data-help="home.tasks-group"><span>{{ today: 'Today', week: 'This week', later: 'Later', done: 'Done today' }[g]}</span><small data-n></small></h3>
-            <ol class="tg-list" data-rows></ol>
-          </div>
-        ))}
-      </div>
-      <p class="hp-empty" hidden data-task-empty>Nothing assigned to you right now.</p>
-      <!-- Every count drills down (rule P10): the same open tasks, this person's, in the Work list. -->
-      <a class="hp-more" data-tasks-all data-vt-rec="dd-work-list" href={href(`/work/list/?kind=${TASK_KINDS}`)}>See all in the Work list →</a>
-      <div class="tick-toast" data-toast hidden role="status"></div>
-      <LiveBar page="home" />
-    </Section>
-
-    <!-- 4. Service managers: firmware and advisories, full width. -->
-    <section class="hp hp-firmware card" aria-labelledby="h-fw">
-      <p class="hp-who" data-help="home.who">{WHO_SEES.firmware}</p>
-      <header class="hp-h" data-help="home.firmware"><h2 id="h-fw"><Icon name="chip" />Firmware and advisories</h2><a class="aside" href={href("/known-issues/")}>Known errors</a></header>
-      <div class="g12 fw-grid">
-        <div class="s-5 fw-lines">
-          <h3 class="overline">Firmware standard</h3>
-          {fwLines.map((f) => (
-            <a class="mini-row" href={href(f.to)}><span class="mono faint">{f.standard ?? '?'}</span><span>{f.name}<small>{f.standard ? `${f.standard} is the standard` : 'No standard set'}{f.lab ? ` · ${f.lab} in the Lab` : ''} · {f.models.length} models</small></span><Icon name="arrow" size={16} /></a>
-          ))}
-        </div>
-        <div class="s-7 fw-adv">
-          <h3 class="overline">Advisories</h3>
-          {openAdv.map((a) => (
-            <a class="mini-row" href={href(`/profiles/${MODELS[a.models[0]].class}/${a.models[0]}/`)}><span class={`pill ${a.level === 'do-not-install' || a.level === 'act' ? 'bad' : a.level === 'check' ? 'warn' : 'info'}`}>{ADV_LEVEL[a.level]}</span><span>{a.title}<small>{a.models.map(modelName).join(', ')}</small></span><Icon name="arrow" size={16} /></a>
-          ))}
-        </div>
-      </div>
-    </section>
-
-    <!-- Project managers: every blocked task on your projects, full width. -->
-    <section class="hp hp-blocked card" aria-labelledby="h-blocked">
-      <p class="hp-who" data-help="home.who">{WHO_SEES.blocked}</p>
-      <header class="hp-h" data-help="home.blocked"><h2 id="h-blocked"><Icon name="alert" />Waiting on, your projects</h2></header>
-      <div class="mini-list">
-        {blockedTasks.map(({ t, p }) => (
-          <a class="mini-row" href={href(`/projects/${p.id.toLowerCase()}/tasks/${t.id.toLowerCase()}/`)} data-pm={p.owner}><span class="pill bad">Waiting on</span><span>{t.title}<small>{p.name} · {person(t.owner).name} · {t.blocked_by}</small></span><Icon name="arrow" size={16} /></a>
-        ))}
-      </div>
-    </section>
-
-    <!-- First visit: a short tour of Keia Atlas for your role (Learn), below the task list. Dismissed or finished, it stays away. -->
-    <aside class="tour card" data-help="home.tour" data-tour hidden aria-labelledby="h-tour">
-      <span class="tour-ic" aria-hidden="true"><Icon name="book" size={20} /></span>
-      <span class="tour-t"><b id="h-tour" data-tour-h>New here? Start the 5 minute tour</b><small data-tour-s>A few short lessons picked for your role, each with something to try.</small></span>
-      <a class="btn primary small" href={href('/learn/#start')} data-tour-go>Start the tour <Icon name="arrow" size={14} /></a>
-      <button type="button" class="icon-btn tour-x" data-tour-x aria-label="Dismiss the tour" title="Not now"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
-    </aside>
-
-    <details class="home-more card">
-      <summary data-help="home.across"><span><b>Across Aigna</b><small>{totals.offices} offices · {totals.spaces} spaces · {totals.units.toLocaleString('en-IE')} devices</small></span><Icon name="arrow" size={16} /></summary>
-      <div class="site-tiles">
-        {SITE_ORDER.map((sid) => {
-          const s = sites[sid], st = siteStats[sid];
-          return (
-            <a class="site-tile" href={href(`/rooms/?site=${sid}`)}>
-              <span class="code">{s.code}</span>
-              <b>{s.name}</b>
-              <small>{s.kind === 'remote' ? `Home offices, ${({ amer: 'Americas', emea: 'EMEA', apac: 'APAC' })[s.region] ?? 'worldwide'}` : `${s.city}, ${countryName(s.country)}`}</small>
-              <StageBar stages={st.stages} />
-            </a>
-          );
-        })}
-      </div>
-    </details>
   </div>
 
+  <script is:inline data-astro-rerun set:html={`window.RS_HOME = ${json};`} slot="end"></script>
   <script is:inline data-astro-rerun define:vars={{ PATHS }} slot="end">
     (function () {
       /* The tour card: shown until dismissed or the path is done; folds away on the tokens. */
@@ -424,7 +393,7 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
       var base = (document.querySelector('link[rel=icon]').getAttribute('href') || '/').replace(/favicon\.svg$/, '');
       var KIND = { urgent: 'Urgent issue', firmware: 'New firmware found', change: 'Proposal' };
       var ORDER = { urgent: 0, firmware: 1, change: 2 };
-      var ago = function (iso) { var m = Math.max(1, Math.round((Date.now() - new Date(iso)) / 6e4)); return m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : (Math.round(m / 1440) === 1 ? '1 day ago' : Math.round(m / 1440) + ' days ago'); };
+      var ago = function (iso) { var m = Math.round((Date.now() - new Date(iso).getTime()) / 60000); if (m < 1) return 'just now'; if (m < 60) return m + ' min ago'; var h = Math.round(m / 60); if (h < 24) return h + ' h ago'; var d = new Date(iso); return d.getDate() + ' ' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]; };
       function render() {
         var who = window.rsWhoId ? window.rsWhoId() : 'aoife', all = who === 'everyone';
         var local = []; try { local = JSON.parse(localStorage.getItem('rs4-inbox') || '[]'); } catch (_) {}
@@ -459,580 +428,9 @@ const panelCss = Object.entries(PANELS).map(([k, roles]) => [...roles.map((r) =>
       }
     })();
   </script>
-  <script is:inline data-astro-rerun set:html={`window.RS_HOME = ${json};`} slot="end"></script>
-  <script is:inline data-astro-rerun slot="end">
-    (function () {
-      /* Home draws itself for whoever is viewing: the band, My day, the role's answer, the task list. It runs
-         again in place on View as and on a stage change (rs:demo-change), inside the Shell's rsChange, so the
-         sidebar slides into its new order while the old rows leave and the new ones stagger in (M12). */
-      var H = window.RS_HOME, D = document; if (!H || !D.querySelector('[data-home]')) return;
-      var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
-      var M = function () { return window.rsMotion ? window.rsMotion() : { reduced: true, morph: 520, enter: 440, exit: 240, state: 300, stagger: 24, delay: 120, ease: 'ease' }; };
-      var linger = function () { var v = parseFloat(getComputedStyle(D.documentElement).getPropertyValue('--dur-linger')); return isNaN(v) ? 4000 : v; };
-      var link = function (p) { return p.charAt(0) === '/' ? H.base.replace(/\/$/, '') + p : p; };
-      var TODAY = H.today, ITEMS = Object.values(H.items);
-      var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      var fd = function (d) { return d ? +d.slice(8, 10) + ' ' + MON[+d.slice(5, 7) - 1] : ''; };
-      var dayN = function (a, b) { return Math.round((Date.parse(b) - Date.parse(a)) / 864e5); };
-      var roomOf = function (id) { return id && H.rooms[id] ? H.rooms[id] : null; };
-      var siteName = function (id) { return id && H.sites[id] ? H.sites[id].name : ''; };
-      var personOf = function (id) { return H.people[id] || { id: id, name: id, first: id, role: '', roleId: 'delivery', initials: '?' }; };
-      var STATUS = { todo: 'To do', doing: 'Doing', blocked: 'Waiting on', done: 'Done', booked: 'Booked' };
-      var KIND_WORD = { task: 'Task', incident: 'Incident', lab: 'Lab test', visit: 'Site visit', refresh: 'Work plan', plan: 'Planning', inbox: 'Approval' };
-      var ACTION = { tech: function (p) { return ['Open ' + siteName(p.office), '/rooms/?site=' + p.office]; }, delivery: function (p) { var n = H.next[p.id]; return n ? ['Open the batch', n.href] : ['Open Work overview', '/work/']; },
-        network: function (p) { var n = H.next[p.id]; return n ? ['Open the batch', n.href] : ['Open Work overview', '/work/']; }, 'sm-av': function () { return ['Open Proposals', '/changes/']; }, 'sm-infra': function () { return ['Open Proposals', '/changes/']; },
-        pm: function (p) { return ['Open your projects', '/projects/?owner=' + p.id]; }, programme: function () { return ['Open the year plan', '/work/schedule/?view=year']; }, head: function () { return ['Open Work overview', '/work/']; },
-        desk: function () { return ['Open Incidents', '/incidents/?state=new']; }, vendor: function () { return ['Open your installation', '/vendor/']; }, 'service-vendor': function () { return ['Open your installation', '/vendor/']; }, innovation: function () { return ['Open the Lab', '/lab/']; } };
-
-      // ---- The live layer: a task's status and owner are the base plus every event since (src/lib/live.mjs). ----
-      var L = null;
-      var baseOf = function (item) { var it = H.items[item]; return it ? { status: it.status, owner: it.who[0] || null } : {}; };
-      var stateOf = function (it) { return L ? L.live.stateOf(it.id, baseOf(it.id)) : baseOf(it.id); };
-      // Each item as it stands now, with its live status and owner.
-      var current = function () {
-        return ITEMS.map(function (it) {
-          var s = stateOf(it); var who = it.kind === 'task' && s.owner && s.owner !== it.who[0] ? [s.owner] : it.who;
-          return Object.assign({}, it, { status: s.status || it.status, who: who });
-        });
-      };
-
-      // ---- The rules (src/lib/homecore.mjs, the same words in the browser) ----
-      var bucketOf = function (it) {
-        if (it.status === 'done') return 'done';
-        if (it.kind === 'incident' || it.kind === 'inbox') return 'today';
-        if (it.kind === 'refresh' || it.kind === 'plan') return 'later';
-        if (it.kind === 'time-off') return null;
-        var at = it.kind === 'task' ? it.end : it.start; if (!at) return 'later';
-        var n = dayN(TODAY, at);
-        if (n <= 0 || (it.start && it.start <= TODAY && it.end >= TODAY)) return 'today';
-        return n <= 7 ? 'week' : 'later';
-      };
-      var KR = { incident: 0, inbox: 1, task: 2, lab: 3, visit: 4, refresh: 5, plan: 6 };
-      var listOrder = function (a, b) {
-        var ka = KR[a.kind] == null ? 9 : KR[a.kind], kb = KR[b.kind] == null ? 9 : KR[b.kind]; if (ka !== kb) return ka - kb;
-        if (a.kind === 'incident') return (a.prio || 9) - (b.prio || 9);
-        var da = a.end || a.start || '9999', db = b.end || b.start || '9999'; if (da !== db) return da < db ? -1 : 1;
-        return ((a.status === 'blocked') - (b.status === 'blocked')) || a.title.localeCompare(b.title);
-      };
-      var groupFor = function (items, who) {
-        var all = who === 'everyone';
-        var mine = items.filter(function (it) { return (all || it.who.indexOf(who) >= 0) && it.kind !== 'time-off' && it.kind !== 'inbox' && it.kind !== 'plan' && it.kind !== 'visit' && (!all || it.kind === 'task'); });
-        var out = { today: [], week: [], later: [], done: [] }, plans = {};
-        mine.forEach(function (it) {
-          if (it.kind !== 'refresh') { var g = bucketOf(it); if (g) out[g].push(it); return; }
-          var k = it.site + ':' + (it.end || '').slice(0, 4), row = plans[k];
-          if (!row) row = plans[k] = Object.assign({}, it, { id: 'refresh:' + it.site + ':' + (it.end || '').slice(0, 4), room: null, units: 0, rooms: 0, folded: true, href: link('/refresh/?site=' + it.site + '&due=over,now') });
-          row.units += it.units || 0; row.rooms += 1;
-        });
-        Object.keys(plans).forEach(function (k) { var r = plans[k]; r.title = 'Replace ' + r.units + (r.units === 1 ? ' device' : ' devices') + ' due in ' + (r.end || '').slice(0, 4); out.later.push(r); });
-        Object.keys(out).forEach(function (g) { out[g].sort(listOrder); });
-        return out;
-      };
-      var hoursPerDay = function (it) { if (!it.hours || !it.start || !it.end) return 0; var n = 0; for (var d = new Date(it.start + 'T00:00:00Z'); d.toISOString().slice(0, 10) <= it.end; d.setUTCDate(d.getUTCDate() + 1)) { var w = d.getUTCDay(); if (w !== 0 && w !== 6) n++; } return it.hours / Math.max(1, n); };
-      var DR = { incident: 0, task: 1, lab: 2, visit: 3 };
-      var planDay = function (items, who) {
-        var start = 9, end = 18;
-        var todays = items.filter(function (it) { return it.who.indexOf(who) >= 0 && it.status !== 'done' && it.start && it.end && it.start <= TODAY && it.end >= TODAY && DR[it.kind] != null; })
-          .sort(function (a, b) { return (DR[a.kind] - DR[b.kind]) || (a.kind === 'incident' ? (a.prio || 9) - (b.prio || 9) : 0) || (a.end || '9').localeCompare(b.end || '9') || a.title.localeCompare(b.title); });
-        var out = [], t = start;
-        todays.forEach(function (it) {
-          var visit = it.kind === 'visit', h = visit ? end - start : Math.max(0.5, Math.min(end - start, Math.round(hoursPerDay(it) * 2) / 2 || 1));
-          var from = visit ? start : t, to = Math.min(end, from + h), fits = from < end;
-          out.push({ it: it, from: fits ? from : null, to: fits ? to : null, hours: h });
-          if (!visit && fits) t = to;
-        });
-        return out;
-      };
-      var clock = function (h) { return (Math.floor(h) < 10 ? '0' : '') + Math.floor(h) + ':' + (h % 1 ? '30' : '00'); };
-      var span = function (h) { return h >= 1 ? (h % 1 ? h.toFixed(1) : h) + ' h' : Math.round(h * 60) + ' min'; };
-      var dueWords = function (it) {
-        var at = it.kind === 'task' ? it.end : it.start;
-        if (!at) return it.kind === 'refresh' ? 'This year' : '';
-        var n = dayN(TODAY, at);
-        if (it.kind === 'incident') return n < 0 ? 'Open ' + (-n) + (n === -1 ? ' day' : ' days') : 'Opened today';
-        if (it.kind === 'refresh') return 'By ' + fd(it.end);
-        if (n < 0) return (-n) + (n === -1 ? ' day' : ' days') + ' late';
-        if (n === 0) return 'Today'; if (n === 1) return 'Tomorrow'; if (n < 7) return 'In ' + n + ' days';
-        return fd(at);
-      };
-      var localNow = function (tz) { try { var s = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz }).format(new Date()); var p = s.split(':'); return { text: s, h: +p[0] + (+p[1]) / 60 }; } catch (_) { var d = new Date(); return { text: d.toTimeString().slice(0, 5), h: d.getHours() + d.getMinutes() / 60 }; } };
-      var placeWords = function (pl) {
-        if (!pl) return 'Working remotely';
-        if (pl.kind === 'away') return pl.why === 'holiday' ? 'Away: ' + (pl.note || 'public holiday') : pl.why === 'weekend' ? 'Weekend' : 'Away: ' + (pl.note || 'time off');
-        if (pl.kind === 'office') return 'At ' + siteName(pl.site);
-        if (pl.kind === 'home') { var r = roomOf(pl.place); return 'At home' + (r ? ', ' + r.name : ''); }
-        if (pl.kind === 'visiting') { var v = roomOf(pl.place); return 'Visiting ' + (v ? v.name : siteName(pl.site)); }
-        return 'Working remotely';
-      };
-      var sub = function (it) {
-        var bits = [];
-        var r = roomOf(it.room); if (r) bits.push(r.name + (it.site && H.sites[it.site] && !H.sites[it.site].remote ? ', ' + siteName(it.site) : ''));
-        else if (it.site) bits.push(siteName(it.site));
-        if (it.project) bits.push(it.project + ' ' + (H.projectNames[it.project] || ''));
-        if (it.kind === 'refresh' && it.rooms) bits.push(it.rooms + (it.rooms === 1 ? ' space' : ' spaces'));
-        if (it.blocked) bits.push('Waiting on: ' + it.blocked);
-        return bits.join(' · ');
-      };
-
-      // ---- Draw ----
-      var lastWho = null;
-      function draw(fresh) {
-        var who = window.rsWhoId ? window.rsWhoId() : 'aoife', all = who === 'everyone';
-        var me = all ? null : personOf(who);
-        var items = current();
-        // The band: title, line, caption, action and the four figures.
-        var hr = new Date().getHours(); D.querySelector('[data-greet]').textContent = hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
-        var t = D.getElementById('pb-title'), title = all ? 'Everyone, from every point of view' : me.first + ", ready for you";
-        if (t && t.textContent !== title) morphText(t, title, fresh);
-        var whoLine = D.querySelector('[data-who-line]'); if (whoLine) { whoLine.querySelector('[data-who-role]').textContent = all ? 'Everyone (overview)' : me.role; whoLine.querySelector('[data-who-where]').textContent = all ? 'every role' : me.where; }
-        var ans = D.querySelector('[data-home-answer]'), at = (H.answers && (all ? H.answers.everyone : H.answers[who])) || ''; if (ans && ans.textContent !== at) ans.textContent = at;
-        if (fresh && lastWho && lastWho !== who) caption(all ? 'Every role at once: each block says whose first screen it is.' : H.captions[who] || '');
-        lastWho = who;
-        var act = D.querySelector('[data-home-action]'), a = all ? ['Open Work overview', '/work/'] : (ACTION[me.roleId] || ACTION.head)(me);
-        if (act) { act.textContent = a[0]; act.setAttribute('href', link(a[1])); }
-        var nums = all ? H.everyone : H.numbers[who] || H.everyone;
-        nums.forEach(function (n, i) {
-          var li = D.querySelector('.kn-i[data-kn="k' + i + '"]'); if (!li) return;
-          li.dataset.knId = n.id || '';
-          var aEl = li.querySelector('a'), sEl = li.querySelector('.kn-s');
-          if (n.to) { if (!aEl) { aEl = D.createElement('a'); aEl.innerHTML = '<b class="num"></b><span></span>'; li.replaceChildren(aEl); } aEl.setAttribute('href', link(n.to)); var b = aEl.querySelector('b'); if (n.to.charAt(0) === '/') b.setAttribute('data-vt-rec', 'dd' + n.to.split('?')[0].replace(/[^a-z0-9]+/gi, '-').replace(/-$/, '')); else b.removeAttribute('data-vt-rec'); li.removeAttribute('data-kn-plain'); }
-          else if (!sEl) { sEl = D.createElement('span'); sEl.className = 'kn-s'; sEl.innerHTML = '<b class="num"></b><span></span>'; li.replaceChildren(sEl); li.setAttribute('data-kn-plain', 'fact'); }
-          li.setAttribute('data-help-name', n.label);
-          window.rsKeyNumber('k' + i, n.n, { label: n.label, tone: n.tone || '', title: n.fact ? 'A fact about the whole: it counts no list' : '' });
-        });
-        drawDay(who, items); drawRole(who, me, items); drawTasks(who, items, fresh);
-        if (window.__rsInboxRender) window.__rsInboxRender();
-        D.dispatchEvent(new CustomEvent('rs:sa-refresh'));
-      }
-      // The title changes at once (so it is never stale, even in a window whose animations are paused) and
-      // the new words rise in, a beat after the old ones have gone.
-      function morphText(el, text, animate) {
-        var m = M();
-        el.getAnimations().forEach(function (a) { a.cancel(); });
-        el.textContent = text;
-        if (!animate || m.reduced || !el.animate) return;
-        el.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 0, transform: 'translateY(8px)', offset: 0.3 }, { opacity: 1, transform: 'none' }], { duration: m.exit + m.enter, easing: m.ease });
-      }
-      var capT = null;
-      function caption(text) {
-        var c = D.querySelector('[data-caption]'); if (!c) return;
-        if (capT) clearTimeout(capT);
-        c.textContent = text;
-        // A beat later: the Shell's change (rsChange) puts the root's attributes back as it measured them, and
-        // that would drop a class added during the change itself.
-        setTimeout(function () { D.documentElement.classList.add('hp-captioned'); }, 0);
-        capT = setTimeout(function () { D.documentElement.classList.remove('hp-captioned'); }, linger());
-      }
-
-      // My day: where you are, the hours bar with the day in order, the current time, and the list.
-      function drawDay(who, items) {
-        var box = D.querySelector('[data-day]'), all = who === 'everyone';
-        box.hidden = all; if (all) return;
-        var me = personOf(who), pl = H.place[who], now = localNow(me.tz), plan = planDay(items, who);
-        var placeEl = box.querySelector('[data-day-place]');
-        placeEl.innerHTML = '<i class="day-dot ' + esc(pl ? pl.kind : 'remote') + '" aria-hidden="true"></i>' + esc(placeWords(pl)) + ' <span class="faint">· ' + esc(now.text) + ' in ' + esc((H.sites[me.office] && H.sites[me.office].city) || 'your office') + '</span>';
-        box.querySelector('[data-day-full]').setAttribute('href', link('/work/schedule/?view=day&who=' + who + '&d=' + TODAY));
-        var start = 8, end = 18, pct = function (h) { return ((h - start) / (end - start) * 100).toFixed(2) + '%'; };
-        var bar = '';
-        for (var h = start; h <= end; h += 2) bar += '<span class="day-tick" style="left:' + pct(h) + '"><i></i>' + clock(h) + '</span>';
-        plan.forEach(function (x, i) { if (x.from == null) return; bar += '<a class="day-blk k-' + esc(x.it.kind) + (x.it.status === 'blocked' ? ' blocked' : '') + '" style="left:' + pct(x.from) + ';width:' + ((x.to - x.from) / (end - start) * 100).toFixed(2) + '%;--i:' + i + '" href="' + esc(x.it.href) + '" title="' + esc(x.it.title) + '" tabindex="-1"><span>' + esc(x.it.title) + '</span></a>'; });
-        if (now.h >= start && now.h <= end && pl && pl.kind !== 'away') bar += '<span class="day-now" style="left:' + pct(now.h) + '"><i></i><b>Now</b></span>';
-        box.querySelector('[data-day-bar]').innerHTML = bar;
-        var list = box.querySelector('[data-day-list]');
-        list.innerHTML = plan.map(function (x, i) {
-          var it = x.it, r = roomOf(it.room);
-          return '<li class="day-i" style="--i:' + i + '" data-help="home.day-item"><a href="' + esc(it.href) + '">' +
-            '<span class="day-t">' + (x.from == null ? '<small>Later</small>' : '<b>' + clock(x.from) + '</b><small>' + span(x.hours) + '</small>') + '</span>' +
-            '<span class="day-k k-' + esc(it.kind) + '" aria-hidden="true"></span>' +
-            '<span class="day-b"><b>' + esc(it.title) + '</b><small>' + esc(KIND_WORD[it.kind] || it.kind) + (r ? ' · ' + esc(r.name) : it.site ? ' · ' + esc(siteName(it.site)) : '') + (it.kind === 'incident' ? (it.prio ? ' · P' + it.prio : '') : it.status === 'blocked' ? ' · Waiting on something' : '') + '</small></span>' +
-            '<span class="day-arrow" aria-hidden="true">→</span></a></li>';
-        }).join('');
-        box.querySelector('[data-day-empty]').hidden = plan.length > 0;
-        box.querySelector('[data-day-bar]').hidden = plan.length === 0;
-      }
-
-      // The role's answer blocks that depend on the person.
-      function drawRole(who, me, items) {
-        var all = who === 'everyone';
-        var incRow = function (i) { var r = roomOf(i.room); return '<a class="mini-row" href="' + esc(i.href) + '">' + (i.prio ? '<span class="prio p' + i.prio + '">P' + i.prio + '</span>' : '') + '<span>' + esc(i.title) + '<small>' + esc(r ? r.name + ', ' + siteName(i.site) : siteName(i.site)) + ' · ' + esc({ todo: 'New', doing: 'In progress', blocked: 'On hold' }[i.status] || i.status) + (i.who.length ? ' · ' + esc(personOf(i.who[0]).first) : '') + '</small></span><span class="mr-arrow" aria-hidden="true">→</span></a>'; };
-        var none = function (t) { return '<p class="hp-empty">' + esc(t) + '</p>'; };
-        // Technician: Next up (with the room drawing) and incidents at your office.
-        var tech = all ? personOf('liam') : me;
-        var office = tech.office;
-        D.querySelectorAll('[data-office-name]').forEach(function (el) { el.textContent = siteName(office); });
-        var inc = items.filter(function (i) { return i.kind === 'incident' && i.site === office; }).sort(listOrder);
-        D.querySelector('[data-office-inc]').innerHTML = inc.length ? inc.map(incRow).join('') : none('Nothing open at ' + siteName(office) + '.');
-        var oa = D.querySelector('[data-office-all]'); oa.textContent = 'See all ' + inc.length + ' in Incidents →'; oa.setAttribute('href', link('/incidents/?site=' + office + '&state=' + H.openInc));
-        var g = groupFor(items, tech.id), plan = planDay(items, tech.id);
-        var nx = plan.length ? plan[0].it : g.today[0] || g.week[0] || g.later[0] || null;
-        var nxEl = D.querySelector('[data-next]');
-        if (nx) {
-          var r = roomOf(nx.room);
-          nxEl.innerHTML = '<a class="next" href="' + esc(nx.href) + '" data-help="home.next-card">' +
-            (r ? '<span class="next-plan"><svg class="rplan" viewBox="0 0 120 80" aria-hidden="true"><use href="#rp-' + esc(r.type) + '"></use></svg></span>' : '<span class="next-plan next-none" aria-hidden="true"></span>') +
-            '<span class="next-b"><span class="next-k">' + esc(KIND_WORD[nx.kind] || 'Task') + ' · ' + esc(dueWords(nx)) + '</span><b>' + esc(nx.title) + '</b><small>' + esc(sub(nx)) + '</small><span class="next-go">Open ' + (nx.kind === 'incident' ? 'the incident' : nx.kind === 'task' ? 'the task' : 'it') + ' →</span></span></a>';
-        } else nxEl.innerHTML = none('Nothing waiting: your day is clear.');
-        // Engineers and vendors: the next device, into its batch.
-        var dev = function (n, forWho) {
-          if (!n) return none('No device waiting: nothing of yours is in Deploy.');
-          var u = n.unit;
-          return '<a class="next dev" href="' + esc(n.href) + '" data-help="home.device-card">' +
-            (u && u.type ? '<span class="next-plan"><svg class="rplan" viewBox="0 0 120 80" aria-hidden="true"><use href="#rp-' + esc(u.type) + '"></use></svg></span>' : '<span class="next-plan next-none" aria-hidden="true"></span>') +
-            '<span class="next-b"><span class="next-k">' + esc(n.project) + ' ' + esc(n.projectName) + ' · ' + esc(n.siteName) + '</span><b>' + esc(u ? u.name : n.batch) + '</b><small>' + esc(u && u.model ? u.model + ' · ' : '') + esc(n.batch) + ': ' + n.done + ' of ' + n.total + ' set up' + (n.issues ? ' · ' + n.issues + ' ready for you' : n.ready ? ' · ' + n.ready + ' checked, to accept' : '') + '</small><span class="next-go">Open the batch →</span></span></a>';
-        };
-        var eng = all ? 'aoife' : who;
-        D.querySelector('[data-device]').innerHTML = dev(H.next[eng]);
-        D.querySelector('[data-device-vendor]').innerHTML = dev(H.next[all ? 'sam' : who]);
-        var prov = items.filter(function (i) { return i.kind === 'task' && i.taskKind === 'provision' && (all || i.who.indexOf(who) >= 0) && i.status !== 'done'; }).sort(listOrder);
-        D.querySelector('[data-provision]').innerHTML = prov.length ? prov.map(function (i) { return '<a class="mini-row" href="' + esc(i.href) + '"><span class="pill ' + (i.status === 'blocked' ? 'bad' : i.status === 'doing' ? 'deploy' : 'plain') + '">' + esc(STATUS[i.status]) + '</span><span>' + esc(i.title) + '<small>' + esc(sub(i)) + ' · ' + esc(dueWords(i)) + '</small></span><span class="mr-arrow" aria-hidden="true">→</span></a>'; }).join('') : none('Nothing waiting to be provisioned.');
-        var pa = D.querySelector('[data-provision-all]'); pa.textContent = 'See all ' + prov.length + ' in the Work list →'; pa.setAttribute('href', link('/work/list/?kind=provision' + (all ? '' : '&person=' + who)));
-        // Service desk: new, and in progress or on hold.
-        var allInc = items.filter(function (i) { return i.kind === 'incident'; }).sort(listOrder);
-        var nu = allInc.filter(function (i) { return i.state === 'new'; }), op = allInc.filter(function (i) { return i.state !== 'new'; });
-        D.querySelector('[data-desk-new]').innerHTML = nu.length ? nu.map(incRow).join('') : none('Nothing new. Every ticket has someone on it.');
-        D.querySelector('[data-desk-new-n]').textContent = nu.length;
-        D.querySelector('[data-desk-open]').innerHTML = op.length ? op.map(incRow).join('') : none('Nothing under way.');
-        D.querySelector('[data-desk-open-n]').textContent = op.length;
-        // Service managers: which health tiles.
-        D.querySelectorAll('[data-sm]').forEach(function (el) { el.hidden = !all && el.dataset.sm !== (me && me.roleId); if (all) el.hidden = el.dataset.sm !== 'sm-av'; });
-        // Project managers: "All projects" filtered to theirs.
-        var pa2 = D.querySelector('[data-projects-all]'); if (pa2) pa2.setAttribute('href', link(me && me.roleId === 'pm' ? '/projects/?owner=' + who : '/projects/'));
-        // People managers: the team today.
-        var team = D.querySelector('[data-team]'), ppl = all ? personOf('olivia').people : (me ? me.people : []);
-        team.innerHTML = ppl.length ? ppl.map(function (id) {
-          var p = personOf(id), pl = H.place[id], n = planDay(items, id).length;
-          return '<a class="team-row" href="' + esc(link('/work/schedule/?view=day&who=' + id + '&d=' + TODAY)) + '" data-help="home.team-row"><span class="av">' + esc(p.initials) + '</span><span class="team-n"><b>' + esc(p.name) + '</b><small>' + esc(p.role) + '</small></span><span class="team-p"><i class="day-dot ' + esc(pl ? pl.kind : 'remote') + '" aria-hidden="true"></i>' + esc(placeWords(pl)) + '</span><span class="team-w faint">' + (pl && pl.kind === 'away' ? '' : n + (n === 1 ? ' thing today' : ' things today')) + '</span></a>';
-        }).join('') : none('Nobody reports to you in this demo.');
-      }
-
-      // ---- The task list: grouped, live, one tap ticks. ----
-      var rowsById = {};
-      function rowHtml(it, who) {
-        var all = who === 'everyone', tick = it.kind === 'task';
-        var st = it.status, pill = st === 'blocked' ? 'bad' : st === 'doing' ? 'deploy' : st === 'done' ? 'manage' : 'plain';
-        var d = it.kind === 'task' && it.end ? dayN(TODAY, it.end) : 1;
-        return '<li class="th st-' + esc(st) + ' k-' + esc(it.kind) + '" data-row="' + esc(it.id) + '"' + (tick ? ' data-live-task="' + esc(it.id.slice(5)) + '"' : '') + ' data-help="home.task">' +
-          (tick ? '<button type="button" class="tbox" data-tick aria-label="' + (st === 'done' ? 'Ticked done. Select to reopen' : 'Tick done') + '" aria-pressed="' + (st === 'done') + '" data-help="home.tick"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' : '<span class="tbox k" aria-hidden="true">' + (it.kind === 'incident' ? (it.prio ? 'P' + it.prio : '·') : it.kind === 'lab' ? 'Lab' : it.kind === 'refresh' ? 'Plan' : '·') + '</span>') +
-          '<a class="th-main" href="' + esc(it.href) + '"><b>' + esc(it.title) + '</b><small>' + (all && it.who.length ? '<span class="th-owner">' + esc(personOf(it.who[0]).name) + ' · </span>' : '') + esc(sub(it)) + '</small></a>' +
-          '<span class="th-due' + (d < 0 ? ' late' : d <= 7 ? ' soon' : '') + '">' + esc(dueWords(it)) + '</span>' +
-          '<span class="pill ' + pill + '" data-pill>' + esc(it.kind === 'incident' ? { todo: 'New', doing: 'In progress', blocked: 'On hold' }[st] || st : STATUS[st] || st) + '</span></li>';
-      }
-      function drawTasks(who, items, fresh) {
-        var box = D.querySelector('[data-tasks]'), g = groupFor(items, who), n = 0;
-        rowsById = {};
-        ['today', 'week', 'later', 'done'].forEach(function (k) {
-          var grp = box.querySelector('[data-group="' + k + '"]'), rows = g[k];
-          if (k === 'done') rows = rows.filter(function (it) { return L && L.live.historyOf(it.id).some(function (e) { return e.at.slice(0, 10) === new Date().toISOString().slice(0, 10); }); });
-          grp.querySelector('[data-rows]').innerHTML = rows.map(function (it, i) { return rowHtml(it, who).replace('<li ', '<li style="--i:' + (n + i) + '" '); }).join('');
-          grp.querySelector('[data-n]').textContent = rows.length ? rows.length : '';
-          grp.hidden = rows.length === 0 && k !== 'today';
-          if (k !== 'done') n += rows.length;
-          rows.forEach(function (it) { rowsById[it.id] = grp.querySelector('[data-row="' + it.id.replace(/"/g, '') + '"]'); });
-          if (k === 'today' && !rows.length) grp.querySelector('[data-rows]').innerHTML = '<li class="th th-none">Nothing due today.</li>';
-        });
-        D.querySelector('[data-task-summary]').textContent = n ? n + ' open' : '';
-        D.querySelector('[data-task-empty]').hidden = n > 0 || who === 'everyone';
-        var seeAll = D.querySelector('[data-tasks-all]');
-        if (seeAll) { seeAll.textContent = 'See all ' + n + ' in the Work list →'; seeAll.setAttribute('href', link('/work/list/?kind=' + H.taskKinds + (who === 'everyone' ? '' : '&person=' + who))); seeAll.hidden = n === 0; }
-        box.classList.toggle('stagger', !!fresh);
-      }
-      // One tap: record the change through the live layer (who, when), or locally when it is not there yet.
-      var localEvents = [];
-      function tick(id) {
-        var it = H.items['task:' + id]; if (!it) return;
-        var now = L ? L.live.stateOf(it.id, baseOf(it.id)) : baseOf(it.id), after = now.status === 'done' ? (it.status === 'done' ? 'todo' : it.status) : 'done';
-        if (L) L.live.record({ item: it.id, field: 'status', before: now.status, after: after, who: L.who() });
-        else paint(it.id, { status: after }, null, false);
-      }
-      var moveT = {};
-      // Paint one row after a change: it eases to its new colour, says who and when, offers Undo, and after a
-      // pause slides to its new group (FLIP), so the list never jumps under the pointer.
-      function paint(item, st, ev, remote) {
-        var row = rowsById[item]; if (!row) return;
-        var it = Object.assign({}, H.items[item], { status: st.status });
-        var m = M();
-        row.className = 'th st-' + st.status + ' k-task';
-        var pill = row.querySelector('[data-pill]'); pill.className = 'pill ' + (st.status === 'blocked' ? 'bad' : st.status === 'doing' ? 'deploy' : st.status === 'done' ? 'manage' : 'plain'); pill.textContent = STATUS[st.status] || st.status;
-        var tb = row.querySelector('[data-tick]'); if (tb) { tb.setAttribute('aria-pressed', String(st.status === 'done')); tb.setAttribute('aria-label', st.status === 'done' ? 'Ticked done. Select to reopen' : 'Tick done'); }
-        var who = ev && ev.who ? personOf(ev.who).first : (L ? personOf(L.who()).first : 'You');
-        if (window.rsMarkChanged && (remote || ev)) window.rsMarkChanged(row.querySelector('.th-main'), who);
-        if (ev && !remote) toast(st.status === 'done' ? 'Ticked done' : 'Set to ' + (STATUS[st.status] || st.status), who, ev);
-        var target = bucketOf(it);
-        if (moveT[item]) clearTimeout(moveT[item]);
-        moveT[item] = setTimeout(function () { moveRow(row, target); }, m.reduced ? 0 : linger());
-      }
-      function moveRow(row, target) {
-        var box = D.querySelector('[data-tasks]'), grp = box.querySelector('[data-group="' + target + '"]'); if (!grp || row.parentElement === grp.querySelector('[data-rows]')) return;
-        var m = M(), rows = Array.prototype.slice.call(box.querySelectorAll('.th')), before = new Map();
-        if (!m.reduced) rows.forEach(function (r) { before.set(r, r.getBoundingClientRect()); });
-        var h0 = box.getBoundingClientRect().height;
-        var from = row.closest('[data-group]');
-        grp.querySelector('[data-rows]').appendChild(row); grp.hidden = false;
-        var none = grp.querySelector('.th-none'); if (none && target !== 'today') none.remove();
-        ['today', 'week', 'later', 'done'].forEach(function (k) { var gg = box.querySelector('[data-group="' + k + '"]'), c = gg.querySelectorAll('.th:not(.th-none)').length; gg.querySelector('[data-n]').textContent = c || ''; if (k !== 'today') gg.hidden = c === 0; else if (!c && !gg.querySelector('.th-none')) gg.querySelector('[data-rows]').innerHTML = '<li class="th th-none">Nothing due today.</li>'; });
-        var open = box.querySelectorAll('[data-group]:not([data-group="done"]) .th:not(.th-none)').length;
-        D.querySelector('[data-task-summary]').textContent = open ? open + ' open' : '';
-        var sa = D.querySelector('[data-tasks-all]'); if (sa) { sa.textContent = 'See all ' + open + ' in the Work list →'; sa.hidden = open === 0; }
-        var li = D.querySelector('.kn-i[data-kn-id="tasks"]'); if (li && window.rsKeyNumber) { var b = li.querySelector('b'); var cur = parseInt((b.textContent || '0').replace(/\D/g, ''), 10) || 0; var kn = li.getAttribute('data-kn'); window.rsKeyNumber(kn, target === 'done' ? Math.max(0, cur - 1) : cur + 1); }
-        D.dispatchEvent(new CustomEvent('rs:sa-refresh'));
-        if (m.reduced) return;
-        var h1 = box.getBoundingClientRect().height;
-        if (Math.abs(h1 - h0) > 1) box.animate([{ height: h0 + 'px' }, { height: h1 + 'px' }], { duration: m.morph, easing: m.ease });
-        rows.forEach(function (r) {
-          var b0 = before.get(r), b1 = r.getBoundingClientRect(); if (!b0 || !b1.height) return;
-          var dy = b0.top - b1.top; if (Math.abs(dy) < 1) return;
-          r.animate([{ transform: 'translateY(' + dy + 'px)' }, { transform: 'none' }], { duration: m.morph, easing: m.ease });
-        });
-        void from;
-      }
-      var toastT = null;
-      function toast(what, who, ev) {
-        var t = D.querySelector('[data-toast]'); if (!t) return;
-        t.innerHTML = '<span>' + esc(what) + ' · ' + esc(who) + ', just now</span>' + (ev && L ? '<button type="button" class="btn small ghost" data-undo="' + esc(ev.id) + '" data-help="live.undo">Undo</button>' : '');
-        t.hidden = false; t.classList.add('on');
-        if (toastT) clearTimeout(toastT);
-        toastT = setTimeout(function () { t.classList.remove('on'); setTimeout(function () { t.hidden = true; }, M().exit); }, linger());
-      }
-      D.querySelector('[data-tasks]').addEventListener('click', function (e) {
-        var b = e.target.closest('[data-tick]'); if (!b) return;
-        var row = b.closest('[data-live-task]'); if (row) tick(row.dataset.liveTask);
-      });
-      D.querySelector('[data-toast]').addEventListener('click', function (e) {
-        var u = e.target.closest('[data-undo]'); if (!u || !L) return;
-        var ev = L.live.events().filter(function (x) { return x.id === u.dataset.undo; })[0];
-        L.live.undo(u.dataset.undo, { who: L.who(), base: ev ? baseOf(ev.item) : {} });
-        var t = D.querySelector('[data-toast]'); t.classList.remove('on'); setTimeout(function () { t.hidden = true; }, M().exit);
-      });
-
-      // ---- Wire up: the live layer, View as and the stage (in place, never a reload). ----
-      var stop = null;
-      var describe = function (e) {
-        var what = e.field === 'status' ? (e.after === 'done' ? 'Ticked done' : e.before === 'done' ? 'Reopened, back to ' + (STATUS[e.after] || e.after) : 'Moved to ' + (STATUS[e.after] || e.after)) : e.field === 'owner' ? 'Assigned to ' + personOf(e.after).name : e.field + ' changed';
-        return e.undoes ? e.note + ': ' + what.charAt(0).toLowerCase() + what.slice(1) : what;
-      };
-      function goLive() {
-        L = window.rsLive; if (!L || !D.querySelector('[data-home]')) return;
-        L.register('task:', { base: function (item) { return baseOf(item); }, describe: describe });
-        draw(false);
-        if (stop) stop();
-        stop = L.live.subscribe('task:', function (e, info) {
-          if (!D.querySelector('[data-home]')) return;
-          var st = L.live.stateOf(e.item, baseOf(e.item));
-          if (e.field === 'status' && rowsById[e.item]) paint(e.item, st, e, info && info.remote);
-          else draw(false);
-        });
-        D.addEventListener('astro:before-swap', function () { if (stop) stop(); stop = null; }, { once: true });
-      }
-      draw(false);
-      if (window.rsLive) goLive(); else D.addEventListener('rs:live-ready', goLive, { once: true });
-      window.__rsHomeDraw = function () { draw(true); };
-      if (!window.__rsHomeHook) {
-        window.__rsHomeHook = true;
-        document.addEventListener('rs:demo-change', function () { if (document.querySelector('[data-home]') && window.__rsHomeDraw) window.__rsHomeDraw(); });
-      }
-    })();
+  <script>
+    import { start } from '../lib/home-client.mjs';
+    document.addEventListener('astro:page-load', start);
   </script>
 </Shell>
-<style is:global>
-  /* Global, nested under .content.home: most of Home is drawn in the browser, so scoped styles would miss it. */
-  @keyframes rs-ib-in { from { opacity: 0; transform: translateX(-10px); } }
-  @keyframes rs-pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--red) 25%, transparent); } }
-  @keyframes rs-th-in { from { opacity: 0; transform: translateY(8px); } }
-  :root[data-who="everyone"] .home .hp-who { display: block; margin: -4px 0 8px; font: 700 var(--overline-size, 11px)/1.2 var(--font-sans); letter-spacing: var(--overline-track, .1em); text-transform: var(--overline-case, uppercase); color: var(--accent-ink); }
-  :root[data-who="everyone"] .home .tour { display: none; }
-  /* The line under the title: who you are; after View as, for a few seconds, what this role does. */
-  .hp-lede { display: grid; }
-  .hp-lede > span { grid-area: 1 / 1; transition: opacity var(--dur-state) var(--ease-settle), transform var(--dur-state) var(--ease-settle); }
-  .hp-caption { opacity: 0; transform: translateY(6px); color: var(--accent-ink); font-weight: 600; pointer-events: none; }
-  :root.hp-captioned .hp-caption { opacity: 1; transform: none; }
-  :root.hp-captioned .hp-lede-who { opacity: 0; transform: translateY(-6px); }
-  @media (prefers-reduced-motion: reduce) { .hp-lede > span { transition: none; } }
-  .content.home {
-  gap: 20px;
-  .hp-row { align-items: stretch; }
-  .hp { display: none; padding: 18px 20px; min-width: 0; }
-  .hp-who, .hp-everyone-only { display: none; }
-  .hp-h { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 12px; }
-  .hp-h h2 { display: flex; align-items: center; gap: 10px; font-size: 19px; margin: 0; }
-  .hp-h h2 svg { color: var(--text-3); }
-  .hp-h .aside { margin-left: auto; font-size: 13.5px; white-space: nowrap; }
-  .hp-sub { margin-top: 16px; padding-top: 14px; border-top: var(--border-rule); }
-  .hp-sub h3, .fw-grid h3 { font: 700 var(--overline-size, 11px)/1.2 var(--font-sans); letter-spacing: var(--overline-track, .1em); text-transform: uppercase; color: var(--text-3); margin: 0 0 6px; }
-  .hp-more { display: inline-flex; gap: 6px; align-items: center; margin-top: 10px; font-size: 13.5px; }
-  .hp-empty { color: var(--text-2); font-size: 14px; list-style: none; padding: 8px 0; margin: 0; }
-
-  /* The line under the title: who you are; after View as, for a few seconds, what this role does. */
-
-  /* My day */
-  .hp-day { padding: 18px 20px; }
-  .hp-day[hidden] { display: none; }
-  .day-place { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
-  .day-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--text-3); flex: none; }
-  .day-dot.office { background: var(--green, #2f7a4f); } .day-dot.home { background: var(--accent); } .day-dot.visiting { background: var(--amber, #d8a200); } .day-dot.away { background: var(--red); }
-  .day-bar { position: relative; height: 58px; margin: 6px 0 12px; }
-  .day-bar[hidden] { display: none; }
-  .day-tick { position: absolute; top: 0; bottom: 0; font: 500 11px/1 var(--font-mono); color: var(--text-3); transform: translateX(-50%); display: grid; align-content: end; justify-items: center; gap: 4px; }
-  .day-tick i { display: block; width: 1px; height: 30px; background: var(--line); }
-  .day-blk { position: absolute; top: 6px; height: 26px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-ink); font-size: 12px; font-weight: 600; padding: 0 8px; display: flex; align-items: center; overflow: hidden; white-space: nowrap; text-decoration: none; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); animation: rs-grow var(--dur-enter) var(--ease-settle) both; animation-delay: calc(var(--delay-enter) + var(--i, 0) * var(--stagger)); transform-origin: left center; }
-  .day-blk span { overflow: hidden; text-overflow: ellipsis; }
-  .day-blk.k-incident { background: var(--red-soft); color: var(--red-ink); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--red) 45%, transparent); }
-  .day-blk.k-lab { background: var(--violet-soft); color: var(--violet-ink); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--violet-ink) 35%, transparent); }
-  .day-blk.k-visit { background: var(--amber-soft); color: var(--amber-ink); top: 34px; height: 8px; padding: 0; font-size: 0; box-shadow: none; }
-  .day-blk.blocked { background: var(--surface-3); color: var(--text-2); box-shadow: inset 0 0 0 1px var(--line-strong); }
-  .day-now { position: absolute; top: 0; bottom: 14px; transform: translateX(-50%); display: grid; justify-items: center; gap: 2px; z-index: 2; pointer-events: none; }
-  .day-now i { display: block; width: 2px; flex: 1; height: 100%; background: var(--red); border-radius: 1px; }
-  .day-now b { font: 700 10px/1 var(--font-sans); color: var(--red-ink); background: var(--surface); padding: 2px 4px; border-radius: 4px; }
-  .day-list { list-style: none; margin: 0; padding: 0; }
-  .day-i a { display: grid; grid-template-columns: 64px 8px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 9px 4px; border-top: var(--border-rule); color: inherit; text-decoration: none; transition: background var(--dur-hover); }
-  .day-i:first-child a { border-top: 0; }
-  .day-i a:hover { background: var(--surface-2); }
-  .day-t b { display: block; font: 600 13px/1.2 var(--font-mono); } .day-t small { color: var(--text-3); font-size: 11.5px; }
-  .day-k { width: 8px; height: 28px; border-radius: 4px; background: var(--accent); }
-  .day-k.k-incident { background: var(--red); } .day-k.k-lab { background: var(--violet-ink); } .day-k.k-visit { background: var(--amber, #d8a200); }
-  .day-b b { display: block; font-size: 14.5px; } .day-b small { display: block; color: var(--text-2); font-size: 12.5px; }
-  .day-arrow { color: var(--text-3); }
-
-  /* Next up and Next device: the picture, then the words. */
-  .next { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 16px; align-items: center; color: inherit; text-decoration: none; padding: 6px; border-radius: var(--radius); transition: background var(--dur-hover); }
-  .next:hover { background: var(--surface-2); }
-  .next-plan { display: block; padding: 6px; border-radius: var(--radius); background: var(--surface-2); }
-  .next-plan.next-none { aspect-ratio: 3 / 2; }
-  .next-k { display: block; font: 700 var(--overline-size, 11px)/1.2 var(--font-sans); letter-spacing: var(--overline-track, .1em); text-transform: uppercase; color: var(--text-3); margin-bottom: 4px; }
-  .next-b b { display: block; font-size: 18px; line-height: 1.25; } .next-b small { display: block; color: var(--text-2); font-size: 13px; margin-top: 4px; }
-  .next-go { display: inline-block; margin-top: 8px; font-size: 13.5px; font-weight: 600; color: var(--accent-ink); }
-
-  .mini-list { display: grid; }
-  .mini-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 9px 4px; border-top: var(--border-rule); color: inherit; text-decoration: none; font-size: 14px; }
-  .mini-row:first-of-type { border-top: 0; }
-  .mini-row small { display: block; color: var(--text-2); font-size: 12.5px; }
-  .mini-row:hover { background: var(--surface-2); }
-  .mini-row[hidden] { display: none; }
-  .mr-arrow { color: var(--text-3); }
-  .prio { font: 700 11px/1 var(--font-mono); padding: 4px 6px; border-radius: 5px; background: var(--surface-3); }
-  .prio.p1, .prio.p2 { background: var(--red-soft); color: var(--red-ink); }
-  .gate-d { font: 600 13px/1.2 var(--font-mono); white-space: nowrap; }
-  .gate-d.soon { color: var(--amber-ink, #8a6100); } .gate-d.late { color: var(--red-ink); }
-
-  .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-  .tiles[hidden] { display: none; }
-  .tile { display: grid; gap: 2px; padding: 12px; border-radius: var(--radius); background: var(--surface-2); color: inherit; text-decoration: none; transition: background var(--dur-hover); }
-  .tile:hover { background: var(--surface-3); }
-  .tile b { font-size: 24px; line-height: 1.1; } .tile span { font-size: 12.5px; color: var(--text-2); }
-  .tile.t-warn b { color: var(--amber-ink, #8a6100); }
-
-  .inbox { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-  .inbox .ib { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 12px 14px; border-radius: var(--radius); background: var(--surface-2); animation: rs-ib-in var(--dur-enter, 440ms) var(--ease-settle) both; animation-delay: calc(var(--i, 0) * var(--stagger)); transition: opacity var(--dur-state), background var(--dur-state); }
-  .inbox .ib-urgent { background: color-mix(in srgb, var(--red-soft) 55%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--red) 45%, transparent); }
-  /* The inbox mark is the health glyph's shape (base.css masks): urgent a fault, firmware and proposals to review. */
-  .inbox .ib-dot { width: 12px; height: 12px; margin-top: 5px; background: var(--h-off); -webkit-mask: var(--hg-mask-off) center / contain no-repeat; mask: var(--hg-mask-off) center / contain no-repeat; }
-  .inbox .ib-urgent .ib-dot { background: var(--h-fault); -webkit-mask-image: var(--hg-mask-fault); mask-image: var(--hg-mask-fault); }
-  .inbox .ib-firmware .ib-dot, .inbox .ib-change .ib-dot { background: var(--h-review); -webkit-mask-image: var(--hg-mask-review); mask-image: var(--hg-mask-review); }
-  .inbox .ib-top { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 2px; font-size: 12.5px; }
-  .inbox .ib-kind { font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
-  .inbox .ib-urgent .ib-kind { color: var(--red-ink); }
-  .inbox .ib-body b { display: block; font-size: 15px; }
-  .inbox .ib-body p:not(.ib-top) { margin: 2px 0 4px; font-size: 13.5px; color: var(--text-2); }
-  .inbox .ib-link { font-size: 13px; }
-  .inbox .ib-taken { opacity: .6; }
-  .inbox .ib-new { box-shadow: inset 0 0 0 1px var(--accent); }
-
-  /* The task list */
-  .tasks-home { display: grid; gap: 6px; }
-  .tg[hidden] { display: none; }
-  .tg-h { display: flex; align-items: baseline; gap: 8px; margin: 10px 0 2px; font: 700 var(--overline-size, 11px)/1.2 var(--font-sans); letter-spacing: var(--overline-track, .1em); text-transform: uppercase; color: var(--text-3); }
-  .tg-h small { font: 600 12px/1 var(--font-mono); color: var(--text-3); }
-  .tg:first-child .tg-h { margin-top: 0; }
-  .tg-list { list-style: none; margin: 0; padding: 0; }
-  .th { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 8px 6px; border-top: var(--border-rule); border-radius: 8px; transition: background var(--dur-state) var(--ease-settle); }
-  .stagger .th { animation: rs-th-in var(--dur-enter) var(--ease-settle) both; animation-delay: calc(var(--delay-enter) + min(var(--i, 0), 12) * var(--stagger)); }
-  .th:first-child { border-top: 0; }
-  .th:hover { background: var(--surface-2); }
-  .th.st-done { background: color-mix(in srgb, var(--green-soft) 70%, var(--surface)); }
-  .th.st-done .th-main b { text-decoration: line-through; color: var(--text-2); }
-  .th-none { grid-template-columns: 1fr; color: var(--text-2); font-size: 14px; }
-  .th-main { display: block; min-width: 0; color: inherit; text-decoration: none; }
-  .th-main b { display: block; font-size: 14.5px; }
-  .th-main small { display: block; font-size: 12.5px; color: var(--text-2); }
-  .th-due { font-size: 13px; color: var(--text-2); white-space: nowrap; }
-  .th-due.soon { color: var(--amber-ink, #8a6100); font-weight: 700; }
-  .th-due.late { color: var(--red-ink); font-weight: 700; }
-  .st-done .th-due { color: var(--text-3); font-weight: 400; }
-  .tbox { width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--line-strong); background: var(--surface); color: transparent; display: grid; place-items: center; padding: 0; cursor: pointer; transition: background var(--dur-state) var(--ease-settle), border-color var(--dur-state), color var(--dur-state); }
-  .tbox:hover { border-color: var(--green, #2f7a4f); }
-  .tbox[aria-pressed="true"] { background: var(--green, #2f7a4f); border-color: var(--green, #2f7a4f); color: #fff; }
-  .tbox svg { transition: transform var(--dur-state) var(--ease-settle); transform: scale(.4); }
-  .tbox[aria-pressed="true"] svg { transform: none; }
-  .st-doing .tbox { border-color: var(--accent); background: linear-gradient(90deg, var(--accent) 50%, var(--surface) 50%); }
-  .st-doing .tbox[aria-pressed="true"] { background: var(--green, #2f7a4f); }
-  .st-blocked .tbox { border-color: var(--red); background: var(--red-soft); }
-  .tbox.k { border: 0; background: var(--surface-3); color: var(--text-2); font: 700 10px/1 var(--font-mono); cursor: default; width: 26px; }
-  .k-incident .tbox.k { background: var(--red-soft); color: var(--red-ink); }
-  .pill.st-blocked { background: var(--red-soft); color: var(--red-ink); }
-  .tick-toast { position: sticky; bottom: 12px; margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 8px 8px 14px; border-radius: var(--radius); background: var(--ink); color: var(--surface); font-size: 13.5px; opacity: 0; transform: translateY(6px); transition: opacity var(--dur-state) var(--ease-settle), transform var(--dur-state) var(--ease-settle); z-index: 3; }
-  .tick-toast.on { opacity: 1; transform: none; }
-  .tick-toast[hidden] { display: none; }
-  .tick-toast .btn { color: inherit; border-color: color-mix(in srgb, var(--surface) 40%, transparent); }
-  .hp-tasks .livebar { margin-top: 12px; }
-
-  .proj-mini { display: grid; }
-  .pm-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 9px 4px; border-top: var(--border-rule); color: inherit; text-decoration: none; }
-  .pm-row:first-child { border-top: 0; }
-  .pm-row:hover { background: var(--surface-2); }
-  .pm-row[hidden] { display: none; }
-  .pm-lights { display: inline-flex; gap: 4px; }
-  .pm-name b { display: block; font-size: 14.5px; } .pm-name small { color: var(--text-2); font-size: 12.5px; }
-  .pm-word { font-size: 13px; font-weight: 600; white-space: nowrap; color: var(--text-2); }
-
-  .reg-t { width: 100%; border-collapse: collapse; font-size: 14px; }
-  .reg-t th, .reg-t td { text-align: left; padding: 8px 4px; border-top: var(--border-rule); }
-  .reg-t thead th { border-top: 0; font: 700 var(--overline-size, 11px)/1.2 var(--font-sans); letter-spacing: var(--overline-track, .1em); text-transform: uppercase; color: var(--text-3); }
-  .reg-t td a { font-weight: 600; }
-  .team-rows { display: grid; }
-  .team-row { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 8px 4px; border-top: var(--border-rule); color: inherit; text-decoration: none; }
-  .team-row:first-child { border-top: 0; }
-  .team-row:hover { background: var(--surface-2); }
-  .team-n b { display: block; font-size: 14px; } .team-n small { color: var(--text-2); font-size: 12px; }
-  .team-p { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; white-space: nowrap; }
-  .team-w { font-size: 12.5px; white-space: nowrap; }
-  .av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-3); font: 700 11px/1 var(--font-mono); }
-  .fw-grid { margin-top: 4px; }
-
-  .tour { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto auto; gap: 14px; align-items: center; padding: 12px 12px 12px 16px; background: color-mix(in srgb, var(--accent-soft) 45%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent); }
-  .tour[hidden] { display: none; }
-  .tour-ic { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--accent); color: var(--on-accent); }
-  .tour-t b { display: block; font-size: 15px; } .tour-t small { display: block; font-size: 13px; color: var(--text-2); }
-  .tour .btn { white-space: nowrap; }
-
-  .home-more summary { list-style: none; display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; cursor: pointer; }
-  .home-more summary::-webkit-details-marker { display: none; }
-  .home-more summary b { display: block; font-size: 16px; } .home-more summary small { color: var(--text-2); font-size: 13px; }
-  .home-more summary svg { transition: transform var(--dur-state) var(--ease-settle); }
-  .home-more[open] summary svg { transform: rotate(90deg); }
-  .site-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; padding: 0 20px 20px; }
-  .site-tile { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); color: inherit; text-decoration: none; transition: transform var(--dur-state) var(--ease-settle), border-color var(--dur-state); }
-  .site-tile:hover { transform: translateY(-2px); border-color: var(--accent); }
-  .site-tile small { color: var(--text-2); font-size: 12.5px; }
-
-  /* Narrow shapes, by the width the block has (L10). */
-  @container content (max-width: 839px) {
-    .hp-row > .s-7, .hp-row > .s-5 { grid-column: 1 / -1; }
-  }
-  @container content (max-width: 699px) {
-    .th { grid-template-columns: 24px minmax(0, 1fr) auto; } .th .pill { display: none; }
-    .pm-row { grid-template-columns: auto minmax(0, 1fr) auto; } .pm-word { display: none; }
-    .team-row { grid-template-columns: 32px minmax(0, 1fr); } .team-p, .team-w { grid-column: 2; }
-    .tiles { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
-    .tour { grid-template-columns: 40px minmax(0, 1fr) auto; } .tour .btn { grid-column: 2 / 4; justify-self: start; grid-row: 2; } .tour-x { grid-column: 3; grid-row: 1; }
-    .day-i a { grid-template-columns: 56px 8px minmax(0, 1fr); } .day-arrow { display: none; }
-  }
-  @container content (max-width: 559px) {
-    .next { grid-template-columns: 1fr; } .next-plan { max-width: 200px; }
-    .day-bar { height: 50px; } .day-tick:nth-child(even) { display: none; }
-    .hp-h .aside { margin-left: 0; width: 100%; }
-    .th { grid-template-columns: 24px minmax(0, 1fr); } .th-due { grid-column: 2; margin-top: -4px; }
-  }
-  @media (prefers-reduced-motion: reduce) { .inbox .ib, .day-blk, .stagger .th { animation: none; } .hp-lede > span, .tick-toast, .th, .tbox { transition: none; } }
-  }
-</style>
-<!-- Which blocks each role sees comes last, so it wins over the hidden default above. -->
-<style is:global set:html={panelCss}></style>
+<style is:global set:html={pmCss}></style>

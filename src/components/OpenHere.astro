@@ -1,0 +1,94 @@
+---
+/* OpenHere: the boundary between two layers of a page, and the depth control (UI-V2 §8.8; UX-V2 §5.2; rule P11 in
+   docs/rules/platform.md). A hairline with the layer's name on the left and, right-aligned in --text-3, "Open pages
+   like this here". Pressing it makes this layer where every page of this kind opens for this person; the words
+   change to "Spaces now open here · Undo" at once and go back after --dur-linger (MOTION-V2 4.27).
+   A page of that kind then opens scrolled straight to the layer (no scroll animation). The address wins: #band,
+   #summary, #record or #raw opens there whatever the default; Back keeps the scroll it had.
+   Props:  kind    the kind of page: home, space, device, job, service, project, office, vendor
+           layer   the layer that starts here: summary, record or raw
+           label   the layer's name on screen (default: Summary, Record or Raw)
+   Stored per person in this browser (rs6-depth, src/lib/depth.mjs). Settings has "Open everything at the band again". */
+import { LAYER_NAME } from '../lib/depth.mjs';
+interface Props { kind: string; layer: 'summary' | 'record' | 'raw'; label?: string }
+const { kind, layer, label } = Astro.props;
+---
+<div class="oh" id={layer} data-oh data-oh-kind={kind} data-oh-layer={layer} data-layer-start={layer}>
+  <span class="oh-name overline">{label ?? LAYER_NAME[layer]}</span>
+  <span class="oh-rule" aria-hidden="true"></span>
+  <span class="oh-say" aria-live="polite">
+    <button type="button" class="oh-b" data-oh-set data-help="depth.open-here">Open pages like this here</button>
+  </span>
+</div>
+
+<script>
+  import { store, openingLayer, confirmWords, KIND_WORDS } from '../lib/depth.mjs';
+  const W = window as any;
+  const S = () => store((() => { try { return localStorage; } catch { return null; } })());
+  const who = () => (W.rsWhoId ? W.rsWhoId() : 'aoife');
+  let navType = 'push';
+  document.addEventListener('astro:before-preparation', (e: any) => { navType = e.navigationType || 'push'; });
+  const linger = () => { const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dur-linger')); return Number.isNaN(v) ? 4000 : v; };
+
+  // Say where this person opens pages of this kind, on every boundary of the page.
+  function label(el: HTMLElement) {
+    const kind = el.dataset.ohKind!, layer = el.dataset.ohLayer!, cur = S().depth(who(), kind);
+    const b = el.querySelector<HTMLButtonElement>('[data-oh-set]')!;
+    if ((el as any).__ohBusy) return;
+    b.textContent = cur === layer ? `${KIND_WORDS[kind] ?? 'Pages like this'} open${kind === 'home' ? 's' : ''} here · Open at the band` : 'Open pages like this here';
+    b.dataset.ohOn = cur === layer ? '1' : '';
+  }
+  function press(el: HTMLElement) {
+    const kind = el.dataset.ohKind!, layer = el.dataset.ohLayer!, s = S(), before = s.depth(who(), kind);
+    const b = el.querySelector<HTMLButtonElement>('[data-oh-set]')!;
+    if (before === layer) { s.setDepth(who(), kind, null); (el as any).__ohBusy = false; document.querySelectorAll<HTMLElement>('[data-oh]').forEach(label); return; }
+    s.setDepth(who(), kind, layer);
+    document.querySelectorAll<HTMLElement>('[data-oh]').forEach((x) => { if (x !== el) label(x); });
+    (el as any).__ohBusy = true;
+    const say = el.querySelector('.oh-say')!;
+    say.innerHTML = `<span class="oh-done">${confirmWords(kind)}</span><button type="button" class="oh-b oh-undo" data-oh-undo>Undo</button>`;
+    say.querySelector('[data-oh-undo]')!.addEventListener('click', () => {
+      s.setDepth(who(), kind, before);
+      clearTimeout((el as any).__ohT); (el as any).__ohBusy = false; say.innerHTML = ''; say.appendChild(b); label(el); b.focus();
+    });
+    clearTimeout((el as any).__ohT);
+    (el as any).__ohT = setTimeout(() => { (el as any).__ohBusy = false; say.innerHTML = ''; say.appendChild(b); label(el); }, linger());
+  }
+  // Open at the person's layer: straight there, no scroll animation. Called on arrival and by pages that draw late.
+  function open() {
+    const first = document.querySelector<HTMLElement>('[data-oh]'); if (!first) return;
+    if (navType === 'traverse') return;
+    const layer = openingLayer(location.hash, S().depth(who(), first.dataset.ohKind!));
+    if (!layer || layer === 'band') return;
+    const at = document.querySelector<HTMLElement>(`[data-layer-start="${layer}"]`); if (!at) return;
+    const top = at.getBoundingClientRect().top + scrollY - (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mast-h')) || 52) - 12;
+    window.scrollTo({ top, behavior: 'instant' as ScrollBehavior });
+  }
+  W.rsDepthOpen = open;
+  W.rsDepthLabels = () => document.querySelectorAll<HTMLElement>('[data-oh]').forEach(label);
+  function init() {
+    document.querySelectorAll<HTMLElement>('[data-oh]').forEach((el) => {
+      label(el);
+      if ((el as any).__oh) return; (el as any).__oh = true;
+      el.addEventListener('click', (e) => { if ((e.target as HTMLElement).closest('[data-oh-set]')) press(el); });
+    });
+    requestAnimationFrame(open);
+  }
+  document.addEventListener('astro:page-load', init);
+  document.addEventListener('rs:demo-change', () => W.rsDepthLabels());
+</script>
+
+<style is:global>
+  .oh { display: flex; align-items: center; gap: 12px; min-height: 28px; scroll-margin-top: calc(var(--mast-h, 52px) + 12px); }
+  .oh-name { flex: none; font: 500 10.5px/1.2 var(--font-mono); letter-spacing: .09em; color: var(--text-3); }
+  .oh-rule { flex: 1; height: 1px; background: var(--line); min-width: 24px; }
+  .oh-say { display: inline-flex; align-items: center; gap: 8px; flex: none; font-size: 12.5px; color: var(--text-3); }
+  .oh-b { appearance: none; border: 0; background: none; padding: 6px 8px; margin: -6px -8px; border-radius: var(--radius); font: 450 12.5px/1.3 var(--font-sans); color: var(--text-3); cursor: pointer; transition: color var(--dur-hover) var(--ease-settle), background-color var(--dur-hover) var(--ease-settle); }
+  .oh-b:hover { color: var(--text); background: var(--surface-2); }
+  .oh-b:active { transform: scale(.97); }
+  .oh-b[data-oh-on="1"] { color: var(--text-2); }
+  .oh-done { color: var(--text-2); }
+  .oh-undo { margin: -6px -8px -6px 0; color: var(--accent-ink); font-weight: 550; }
+  @media (pointer: coarse) { .oh-b { padding: 12px 8px; margin: -12px -8px; } }
+  @container main (max-width: 599px) { .oh-say .oh-b:not(.oh-undo) { max-width: 60vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } }
+</style>

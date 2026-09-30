@@ -1,0 +1,132 @@
+---
+/* SmallMultiples: a set of identical cards, each the same tiny floor plan at one scale (UI-V2 §8.7). The largest floor
+   in the set sets the scale; smaller ones sit centred, never enlarged, so sizes compare honestly. Each space carries
+   its health glyph at 12 px in place, with no word (the Key sits once, below the set). Fine glyphs are drawn in
+   --quiet (the dark cockpit): on a good day the set is all neutral rings, and one broken ring is the whole story.
+   Hover or focus on a glyph shows a peek with the space's state and who has it; a space that is not fine can be
+   reached with Tab. Used on Home (the office's floors, the estate), region pages and leadership (V6, V7).
+   Props:  cards   [{ key, site, floor, title, sub?, to? }]: one card per floor plan
+           health  { <space id>: { h: 'fault' | 'review', why, who? } }: spaces that are not fine
+           people  { <id>: first name } for "With Liam"
+           min     the smallest card width in px (default 220)
+           label   what the set shows, for screen readers ("The Dublin office's floors")
+           legend  false leaves out the Key (when another set on the page already shows it)
+   Motion: nothing moves. The glyphs come on in turn once (M8), a state change eases in place; when the feed is not
+   reporting, the fine rings turn dashed (MOTION-V2 4.14) and come back when it reports again. */
+import { building } from '../lib/floors.mjs';
+import { href } from '../lib/data.mjs';
+import HealthGlyph from './HealthGlyph.astro';
+import HealthKey from './HealthKey.astro';
+interface Card { key: string; site: string; floor: string; title: string; sub?: string; to?: string; figure?: string }
+interface Props { cards: Card[]; health?: Record<string, { h: string; why?: string; who?: string | null }>; people?: Record<string, string>; min?: number; label?: string; legend?: boolean }
+const { cards, health = {}, people = {}, min = 220, label = 'Floor plans', legend = true } = Astro.props;
+const models = new Map<string, any>();
+const model = (s: string) => { if (!models.has(s)) models.set(s, building(s)); return models.get(s); };
+const plans = cards.map((c) => {
+  const M = model(c.site), F = M?.floors.find((f: any) => f.id === c.floor);
+  if (!F) return null;
+  const xs = F.outline.map((p: number[]) => p[0]), ys = F.outline.map((p: number[]) => p[1]);
+  return { c, M, F, W: Math.max(...xs), H: Math.max(...ys), rooms: Object.values(M.rooms).filter((r: any) => r.floor === c.floor && r.rect) as any[] };
+}).filter(Boolean) as any[];
+const W = Math.max(...plans.map((p) => p.W), 1), H = Math.max(...plans.map((p) => p.H), 1);
+const pad = 1;
+const WORD: Record<string, string> = { fault: 'Fault', review: 'To review', fine: 'Fine' };
+---
+<div class="sm" data-sm style={`--sm-min:${min}px`} role="group" aria-label={label}>
+  <ul class="sm-grid">
+    {plans.map(({ c, F, W: w, H: h, rooms }) => {
+      const ox = (W - w) / 2 + pad, oy = (H - h) / 2 + pad, VW = W + pad * 2, VH = H + pad * 2;
+      const Y = (y: number) => h - y;
+      const bad = rooms.filter((r) => health[r.id]);
+      return (
+        <li class="sm-card" data-sm-card={c.key} data-site={c.site}>
+          <div class="sm-plan" style={`aspect-ratio:${VW.toFixed(2)} / ${VH.toFixed(2)}`}>
+            <svg viewBox={`0 0 ${VW.toFixed(2)} ${VH.toFixed(2)}`} aria-hidden="true" focusable="false" preserveAspectRatio="xMidYMid meet">
+              <g transform={`translate(${ox.toFixed(2)} ${oy.toFixed(2)})`}>
+                <polygon class="sm-out" points={F.outline.map(([x, y]: number[]) => `${x},${Y(y)}`).join(' ')} />
+                {F.core.map((k: any) => <rect class="sm-core" x={k.rect[0]} y={Y(k.rect[3])} width={k.rect[2] - k.rect[0]} height={k.rect[3] - k.rect[1]} />)}
+                {rooms.map((r) => (
+                  <rect class:list={['sm-room', { 'sm-bank': r.count > 1, 'sm-comms': ['mdf', 'idf'].includes(r.space_type) }]} data-h={health[r.id]?.h} x={r.rect[0]} y={Y(r.rect[3])} width={r.rect[2] - r.rect[0]} height={r.rect[3] - r.rect[1]} />
+                ))}
+              </g>
+            </svg>
+            {rooms.filter((r) => r.count <= 1).map((r) => {
+              const st = health[r.id], s = st?.h ?? 'fine', name = `${r.number ? `${r.number} ` : ''}${r.name}`;
+              const left = ((ox + (r.rect[0] + r.rect[2]) / 2) / VW) * 100, top = ((oy + Y((r.rect[1] + r.rect[3]) / 2)) / VH) * 100;
+              const who = st?.who ? people[st.who] ?? st.who : null;
+              return (
+                <span class="sm-g" style={`left:${left.toFixed(2)}%;top:${top.toFixed(2)}%`} data-peek data-sm-g={r.id} data-sm-name={name} data-sm-why={st?.why ?? ''} data-sm-who={who ?? ''} tabindex={st ? 0 : -1} role="button" aria-label={`${name}: ${WORD[s]}${st?.why ? `, ${st.why}` : ''}${who ? `, with ${who}` : ''}`}>
+                  <HealthGlyph state={s} size={12} quiet />
+                </span>
+              );
+            })}
+          </div>
+          <div class="sm-foot">
+            {c.to ? <a class="sm-name" href={href(c.to)}>{c.title}</a> : <b class="sm-name">{c.title}</b>}
+            <span class="sm-fig" data-sm-fig>{c.figure ?? (bad.length ? `${bad.length} not fine` : `${rooms.filter((r) => r.count <= 1).length} spaces`)}</span>
+            {c.sub && <span class="sm-sub">{c.sub}</span>}
+          </div>
+        </li>
+      );
+    })}
+  </ul>
+  {legend && <HealthKey only={['fine', 'review', 'fault', 'stale']} />}
+</div>
+
+<script>
+  import { setGlyph, WORD } from '../lib/health.mjs';
+  // The peek for a glyph, made when it is first pointed at (hundreds of spaces, one small card each time).
+  const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as any)[c]);
+  function fill(el: HTMLElement) {
+    if (el.querySelector('template')) return;
+    const g = el.querySelector<HTMLElement>('.hg'), s = g?.dataset.state ?? 'fine';
+    const t = document.createElement('template'); t.setAttribute('data-peek-body', '');
+    const why = el.dataset.smWhy, who = el.dataset.smWho;
+    t.innerHTML = `<b class="peek-h">${esc(el.dataset.smName ?? '')}</b><small>${esc((WORD as any)[s] ?? s)}${why ? ` · ${esc(why)}` : s === 'fine' ? ' · nothing open' : ''}${who ? ` · With ${esc(who)}` : ''}</small>`;
+    el.appendChild(t);
+  }
+  const prime = (e: Event) => { const el = (e.target as HTMLElement).closest?.('[data-sm-g]') as HTMLElement | null; if (el) fill(el); };
+  // When the feed stops reporting, nothing can be called fine: the quiet rings turn dashed, once, and back later.
+  function feed(stale: boolean) {
+    document.querySelectorAll<HTMLElement>('[data-sm] [data-sm-g] .hg').forEach((g) => {
+      if (stale && g.dataset.state === 'fine') { g.dataset.wasFine = '1'; setGlyph(g, 'stale', { title: 'Not reporting' }); }
+      else if (!stale && g.dataset.wasFine) { delete g.dataset.wasFine; setGlyph(g, 'fine', { title: '' }); }
+      g.parentElement?.querySelector('template')?.remove();
+    });
+  }
+  if (!(window as any).__rsSmHook) {
+    (window as any).__rsSmHook = true;
+    document.addEventListener('pointerover', prime, true);
+    document.addEventListener('focusin', prime, true);
+    document.addEventListener('rs:feed', (e: any) => feed(!!e.detail?.stale));
+  }
+  document.addEventListener('astro:page-load', () => { if (document.documentElement.hasAttribute('data-stale')) feed(true); });
+</script>
+
+<style is:global>
+  .sm { display: grid; gap: 12px; container: sm / inline-size; }
+  .sm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(var(--sm-min, 220px), 100%), 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+  .sm-card { display: grid; grid-template-rows: auto 1fr; gap: 8px; min-width: 0; padding: 10px 12px 10px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); transition: border-color var(--dur-hover) var(--ease-settle); }
+  .sm-card:hover { border-color: var(--line-strong); }
+  .sm-card[hidden] { display: none; }
+  .sm-plan { position: relative; width: 100%; }
+  .sm-plan svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; }
+  .sm-out { fill: var(--surface-2); stroke: var(--line-strong); stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .sm-core { fill: var(--surface-3); stroke: none; }
+  .sm-room { fill: var(--surface); stroke: var(--line-strong); stroke-width: 1; vector-effect: non-scaling-stroke; transition: fill var(--dur-state) var(--ease-settle), stroke var(--dur-state) var(--ease-settle); }
+  .sm-bank { fill: none; stroke-dasharray: 2 2; }
+  .sm-comms { fill: var(--surface-3); }
+  .sm-room[data-h="fault"] { fill: var(--h-fault-soft); stroke: var(--h-fault); }
+  .sm-room[data-h="review"] { fill: var(--h-review-soft); stroke: color-mix(in srgb, var(--h-review) 70%, var(--line-strong)); }
+  .sm-g { position: absolute; display: grid; place-items: center; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; cursor: default; outline-offset: 0; }
+  .sm-g:hover, .sm-g.peek-on { background: color-mix(in srgb, var(--surface) 70%, transparent); }
+  .sm-g:focus-visible { outline: 2px solid var(--focus); }
+  .sm-g .hg { pointer-events: none; }
+  @media (pointer: coarse) { .sm-g::after { content: ""; position: absolute; inset: -11px; } }
+  .sm-foot { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; min-width: 0; }
+  .sm-name { font-size: var(--name-size, 14px); font-weight: var(--weight-name, 550); color: var(--text); text-decoration: none; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  a.sm-name:hover { color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
+  .sm-fig { margin-left: auto; font: 500 12.5px/1.3 var(--font-mono); color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sm-sub { flex-basis: 100%; font-size: var(--support-size, 13px); color: var(--text-2); }
+  .sm .hkey { justify-self: start; }
+</style>

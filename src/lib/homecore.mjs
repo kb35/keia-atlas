@@ -109,3 +109,135 @@ export function dueWords(it, today, fmt = (d) => d) {
 
 // A working day near today (the Schedule's next working day), for links that need a weekday.
 export const nextWorkingDay = (d) => { let x = d; while (isWeekend(x)) x = addDays(x, 1); return x; };
+
+// ==== v2: the dark cockpit (UX-V2 §3, UI-V2 §3.1) ================================================================
+// One Home skeleton for every role: the band answers "is it all right?" in one sentence, four figures say how many
+// need you, and the sections follow in the role's order. Role changes what comes first, never what exists.
+// cockpit() is pure: the page passes the Home blob (src/lib/home.mjs), who has each job now (the base plus the live
+// layer's changes, src/lib/ownership.mjs records) and the viewer; it returns the words, the figures and the lists.
+
+export const ROLE_KIND = {
+  tech: 'field', delivery: 'field', network: 'field', innovation: 'field', desk: 'desk', 'sm-av': 'owner', 'sm-infra': 'owner',
+  pm: 'pm', programme: 'pm', head: 'lead', vendor: 'vendor', 'service-vendor': 'vendor',
+  'delivery-manager': 'manager', 'eng-manager': 'manager', 'pm-manager': 'manager', 'tech-manager': 'manager',
+};
+// The sections per kind of role, in order, in two layers: Summary (the figures opened) and Record (the rest).
+// "work" is the row With you | To review. Every section exists for everyone; the order is the role's.
+export const LAYOUT = {
+  field: { summary: ['ready', 'day', 'work', 'floors'], record: ['quiet', 'tasks', 'device', 'provision', 'lab'] },
+  desk: { summary: ['ready', 'queue', 'work', 'estate'], record: ['quiet', 'tasks'] },
+  owner: { summary: ['ready', 'approval', 'work', 'estate'], record: ['quiet', 'tasks', 'firmware', 'lab'] },
+  pm: { summary: ['ready', 'projects', 'work'], record: ['quiet', 'tasks', 'gates', 'blocked'] },
+  lead: { summary: ['estate', 'work', 'projects'], record: ['quiet', 'stuck', 'regions', 'across'] },
+  vendor: { summary: ['ready', 'work', 'install'], record: ['tasks', 'vnext'] },
+  manager: { summary: ['ready', 'team', 'work'], record: ['quiet', 'tasks'] },
+  everyone: { summary: ['estate', 'work', 'projects'], record: ['quiet', 'stuck', 'regions', 'across'] },
+};
+export const JOB_KINDS = new Set(['incident', 'task', 'lab', 'inbox']);
+const ORDER_S = { ready: 0, with: 1, parked: 2, waiting: 3 };
+const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** A job's health on a row: a fault for a P1 to P3 incident nobody has fixed, In progress while someone has it. */
+export function rowState(it, own) {
+  if (it.kind === 'incident' && own?.s !== 'waiting' && (it.prio ?? 9) <= 3 && own?.s === 'ready') return 'fault';
+  if (own?.s === 'waiting') return 'review';
+  if (own?.s === 'with' || own?.s === 'parked') return 'progress';
+  if (own?.s === 'ready') return it.kind === 'incident' ? 'fault' : 'planned';
+  return 'off';
+}
+
+/** Is a job offered to the viewer something to do now (Ready for you)? Incidents and reports are live; a task or
+    Lab test counts when it is due today or overdue. */
+export function readyNow(it, today) {
+  if (it.kind === 'incident' || it.kind === 'inbox') return true;
+  return bucketOf({ ...it, status: 'todo' }, today) === 'today';
+}
+
+const jobOrder = (ownOf) => (a, b) => {
+  const oa = ownOf(a.id), ob = ownOf(b.id);
+  return (a.kind === 'incident' ? 0 : 1) - (b.kind === 'incident' ? 0 : 1) || (a.prio ?? 9) - (b.prio ?? 9)
+    || (ORDER_S[oa?.s] ?? 9) - (ORDER_S[ob?.s] ?? 9) || (a.end ?? '9').localeCompare(b.end ?? '9') || a.title.localeCompare(b.title);
+};
+
+/** The whole cockpit for one viewer. `H` is the Home blob, `ownOf(id)` who has a job now, `who` the viewer. */
+export function cockpit(H, ownOf, who) {
+  const C = H.cockpit, today = H.today, all = who === 'everyone';
+  const p = all ? null : H.people[who];
+  const kind = all ? 'everyone' : ROLE_KIND[p?.roleId] ?? 'field';
+  const items = Object.values(H.items).filter((it) => JOB_KINDS.has(it.kind));
+  const own = (it) => ownOf(it.id);
+  const sort = jobOrder(ownOf);
+  // Ready for you: offered to you and due now. The service desk's is every new incident nobody has taken yet.
+  const ready = items.filter((it) => { const o = own(it); if (!o || o.s !== 'ready') return false; if (kind === 'desk' && it.kind === 'incident') return true; return o.to === who && readyNow(it, today); }).sort(sort);
+  // With you: taken, parked or waiting on something outside.
+  const withYou = items.filter((it) => { const o = own(it); return o && o.to === who && ['with', 'parked', 'waiting'].includes(o.s); }).sort(sort);
+  const review = all ? [] : C.review[who] ?? [];
+  const todayN = all ? 0 : planDay(Object.values(H.items), who, today).length;
+  // The service desk's queue: every open incident, worst first (priority, then nobody on it, then past target, then oldest).
+  const incs = items.filter((it) => it.kind === 'incident' && own(it) && own(it).s !== 'done');
+  const queue = [...incs].sort((a, b) => (a.prio ?? 9) - (b.prio ?? 9) || (own(a).s === 'ready' ? 0 : 1) - (own(b).s === 'ready' ? 0 : 1)
+    || (C.inc[b.id]?.past ? 1 : 0) - (C.inc[a.id]?.past ? 1 : 0) || (C.inc[a.id]?.opened ?? '').localeCompare(C.inc[b.id]?.opened ?? ''));
+  const past = incs.filter((it) => C.inc[it.id]?.past).length;
+  const waiting = incs.filter((it) => own(it).s === 'waiting').length;
+  const newToday = incs.filter((it) => C.inc[it.id]?.newToday).length;
+  const faultReady = ready.some((it) => it.kind === 'incident' && (it.prio ?? 9) <= 3);
+  // Spaces: at the viewer's office, and across the estate.
+  const office = p?.office && C.siteHealth[p.office] && !H.sites[p.office]?.remote ? p.office : null;
+  const sh = office ? C.siteHealth[office] : null;
+  const estate = C.offices.reduce((a, s) => ({ n: a.n + C.siteHealth[s].n, fault: a.fault + C.siteHealth[s].fault.length, review: a.review + C.siteHealth[s].review.length }), { n: 0, fault: 0, review: 0 });
+  const X = all ? {} : C.extra[who] ?? {};
+  const N = all ? [] : H.numbers[who] ?? [];
+  const num = (id) => N.find((x) => x.id === id)?.n ?? 0;
+  const F = (id, n, label, to, extra = {}) => ({ id, n, label, to, ...extra });
+  const officeName = office ? H.sites[office].name.replace(/ office$/, '') : '';
+  let figures, answer;
+  switch (kind) {
+    case 'field':
+      figures = [F('ready', ready.length, 'Ready for you', '#ready', { tone: faultReady ? 'bad' : '' }), F('with', withYou.length, 'With you', '#with'), F('today', todayN, 'Today', '#day'), F('review', review.length, 'To review', '#review')];
+      answer = sh
+        ? `${officeName}: ${sh.fault.length ? `${plural(sh.fault.length, 'space')} with a fault · ` : ''}${sh.n - sh.fault.length - sh.review.length} spaces ready`
+        : `${ready.length ? `${ready.length} ready for you` : 'Nothing new for you'} · ${withYou.length} with you · ${todayN} today`;
+      break;
+    case 'desk':
+      figures = [F('ready', ready.length, 'Ready for you', '#queue', { tone: faultReady ? 'bad' : '' }), F('waiting', waiting, 'Waiting on', '/incidents/?state=on-hold'), F('past', past, 'Past target', '#queue', { tone: past ? 'bad' : '' }), F('new', newToday, 'New today', '#queue')];
+      answer = `${ready.length ? `${plural(ready.length, 'new job')} ready to take` : 'Nothing waiting for you'} · ${waiting} waiting on something outside`;
+      break;
+    case 'owner': {
+      const approval = num('approval');
+      figures = [F('approval', approval, 'For your approval', '#approval', { tone: approval ? 'warn' : '' }), F('within', `${incs.length - past} of ${incs.length}`, 'Within target', `/incidents/?state=${H.openInc}`), F('past', past, 'Past target', `/incidents/?state=${H.openInc}`, { tone: past ? 'bad' : '' }), F('inc', incs.length, 'Open incidents', `/incidents/?state=${H.openInc}`)];
+      answer = `${p.roleId === 'sm-infra' ? 'IT' : 'AV'}: ${past ? `${past} past target` : 'every job within target'} · ${approval ? `${approval} for your approval` : 'nothing for your approval'}`;
+      break;
+    }
+    case 'pm':
+      figures = [F('gates', X.gatesWeek ?? 0, 'Gates this week', '#review'), F('late', X.late ?? 0, 'Past due tasks', '#blocked', { tone: X.late ? 'bad' : '' }), F('waiting', num('blocked'), 'Waiting on', '#blocked'), F('risks', X.risks ?? 0, 'Open risks', '#review')];
+      answer = `${X.onPlan ?? 0} of ${plural(X.projects ?? 0, 'project')} on plan · ${X.gatesWeek ? `${plural(X.gatesWeek, 'gate')} this week` : 'no gate this week'}`;
+      break;
+    case 'lead': case 'everyone':
+      figures = [F('spaces', `${estate.n - estate.fault} of ${estate.n}`, 'Spaces working', '/rooms/'), F('inc', incs.length, 'Open incidents', `/incidents/?state=${H.openInc}`), F('past', past, 'Past target', `/incidents/?state=${H.openInc}`, { tone: past ? 'bad' : '' }), F('off', X.off ?? 0, 'Projects off plan', '#review')];
+      answer = `${estate.fault ? `${plural(estate.fault, 'space')} with a fault across ${C.offices.length} offices` : `All ${C.offices.length} offices running`} · ${past ? `${past} past target` : 'every job within target'}`;
+      break;
+    case 'vendor':
+      figures = [F('with', withYou.length, 'With you', '#with'), F('waiting', withYou.filter((it) => own(it).s === 'waiting').length, 'Waiting on the client', '#with'), F('late', X.vendorLate ?? 0, 'Past the date', '#with', { tone: X.vendorLate ? 'bad' : '' }), F('spaces', X.vendorSpaces ?? 0, 'Spaces you can open', '/vendor/')];
+      answer = `${plural(withYou.length, 'job')} with you · ${X.vendorLate ? `${X.vendorLate} past the date` : 'none past the date'}`;
+      break;
+    default:
+      figures = N.map((n) => F(n.id, n.n, n.label, n.to, { tone: n.tone ?? '' }));
+      answer = `${num('tasks')} open tasks in your team · ${num('blocked') ? `${num('blocked')} waiting on something` : 'nothing waiting on anyone'}`;
+  }
+  return { kind, layout: LAYOUT[kind], office, ready, withYou, review, todayN, queue, figures, answer, signal: ready.length > 0 || !!sh?.fault.length };
+}
+
+/** Welcome back (UX-V2 §4.3): the band and four figures while the person has not started the day yet. */
+export function welcomeBand(w, person) {
+  const first = person?.first ?? person?.name ?? '';
+  return {
+    title: `Welcome back, ${first}`,
+    answer: `${w.days === 14 ? 'Two weeks' : `${w.days} days`} away · here is what changed`,
+    figures: [
+      { id: 'yours', n: w.open.length, label: 'Yours now', to: '#welcome' },
+      { id: 'handled', n: w.handled.length, label: 'Handled while away', to: '#welcome' },
+      { id: 'changed', n: w.changed.length, label: 'Changed on your projects', to: '#welcome' },
+      { id: 'rules', n: w.rules.length, label: 'Done automatically', to: '#welcome' },
+    ],
+  };
+}
