@@ -30,7 +30,7 @@ const body = engineRaw
 const engine = `if(!window.KeiaSearch){(function(){\n${body}\nwindow.KeiaSearch={${API.map((k) => `${k}:${k}`).join(',')}};})();}`;
 // The verbs, the same way (src/lib/verbs.mjs, exports stripped).
 const verbsBody = verbsRaw.replace(/^export \{[^}]*\};?\s*$/m, '').split('\n').filter((l) => !/^\s*\/\//.test(l) && l.trim()).map((l) => l.trim()).join('\n');
-const verbsJs = `if(!window.KeiaVerbs){(function(){\n${verbsBody}\nwindow.KeiaVerbs={VERBS:VERBS,verbRows:verbRows,matchVerbs:matchVerbs,paletteMode:paletteMode};})();}`;
+const verbsJs = `if(!window.KeiaVerbs){(function(){\n${verbsBody}\nwindow.KeiaVerbs={VERBS:VERBS,verbRows:verbRows,matchVerbs:matchVerbs,matchPeople:matchPeople,paletteMode:paletteMode};})();}`;
 // Ask mode also offers the method pages (/method/): the method in one screen, then one page per idea.
 const METHOD_PAGES = [{ t: 'The Keia Method', s: plain(METHOD.sentence), u: 'method/' }, ...IDEAS.map((i) => ({ t: plain(i.name), s: plain(i.line), u: `method/${i.slug}/` }))];
 const ASK_EXAMPLES = ['who is on site in APAC', 'EMEA spaces with X52', 'displays older than 7 years', 'what is a known error'];
@@ -222,13 +222,21 @@ const EXAMPLES = ['EMEA spaces with X52', 'x52 in Dublin', 'retired codecs', 'se
           if (!verbs.length) verbs = pageVerbs();
           var rows = V.matchVerbs(verbs, q);
           chipsEl.innerHTML = ''; chipsEl.hidden = true; empty.hidden = true;
-          note.innerHTML = rows.length ? '' : 'No verb on this page matches. Type > on its own to see them all.'; note.hidden = !!rows.length;
-          list.innerHTML = rows.length ? group('On this page', rows.map(function (r, i) {
+          // View as someone by name (">liam", ">view as priya"): each row presses that person's button in the
+          // View as picker (src/components/ViewAs.astro), so it does only what the picker does.
+          var who = palette && window.rsViewAs && V.matchPeople ? V.matchPeople(window.rsViewAs.people(), q).slice(0, 6) : [];
+          var any = rows.length + who.length;
+          note.innerHTML = any ? '' : 'No verb on this page matches. Type > on its own to see them all.'; note.hidden = !!any;
+          list.innerHTML = (rows.length ? group('On this page', rows.map(function (r, i) {
             return '<button type="button" class="ks-row ks-verb" role="option" id="' + root.id + '-o' + i + '" data-i="' + i + '" data-verb-row="' + verbs.indexOf(r) + '">' +
               '<span class="ks-ic">' + lib.icon('verb') + '</span><span class="ks-tx"><b>' + esc(r.label) + '</b><small>' + esc(r.hint || '') + '</small></span></button>';
-          }).join('')) : '';
+          }).join('')) : '') + (who.length ? group('View as', who.map(function (p, j) {
+            var i = rows.length + j;
+            return '<button type="button" class="ks-row ks-verb" role="option" id="' + root.id + '-o' + i + '" data-i="' + i + '" data-who-row="' + esc(p.id) + '">' +
+              '<span class="ks-ic ks-av">' + esc(p.initials) + '</span><span class="ks-tx"><b>View as ' + esc(p.name) + '</b><small>' + esc(p.role + (p.id === 'everyone' ? '' : ' · ' + p.where)) + '</small></span></button>';
+          }).join('')) : '');
           if (countEl) countEl.textContent = '';
-          setActive(rows.length ? 0 : -1);
+          setActive(any ? 0 : -1);
         }
         function runAsk(q) {
           var t = q.trim(), html = '', i = 0;
@@ -375,6 +383,13 @@ const EXAMPLES = ['EMEA spaces with X52', 'x52 in Dublin', 'retired codecs', 'se
             var ref = verbs[+vr.getAttribute('data-verb-row')] && verbs[+vr.getAttribute('data-verb-row')].ref;
             if (opts.onOpen) opts.onOpen();
             if (ref) setTimeout(function () { ref.click(); if (ref.focus) ref.focus({ preventScroll: true }); }, 0);
+            return;
+          }
+          var wr = t.closest('[data-who-row]');
+          if (wr) {
+            if (opts.onOpen) opts.onOpen();
+            var id = wr.getAttribute('data-who-row');
+            setTimeout(function () { if (window.rsViewAs) window.rsViewAs.pick(id); }, 0);
             return;
           }
           var rowEl = t.closest('.ks-row'); if (rowEl) { if (!palette || V.paletteMode(input.value).mode === 'find') lib.recent.add(input.value); if (opts.onOpen) opts.onOpen(); }
@@ -536,6 +551,7 @@ const EXAMPLES = ['EMEA spaces with X52', 'x52 in Dublin', 'retired codecs', 'se
   @keyframes ks-row { from { opacity: 0; transform: translateY(4px); } }
   .ks-ic { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; background: var(--surface-2); color: var(--text-2); }
   .ks-row[aria-selected="true"] .ks-ic { background: var(--surface); color: var(--accent-ink); }
+  .ks-ic.ks-av { border-radius: 50%; font: 650 10.5px/1 var(--font-sans); }
   .ks-tx { min-width: 0; }
   .ks-tx b { display: block; font-weight: 600; font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ks-tx b::first-letter { text-transform: uppercase; }
