@@ -80,6 +80,10 @@ const PAGES = [
   ['vendors', '/vendors/', 'other'], ['vendor-record', '/vendors/keystone/', 'other'], ['vendors-access', '/vendors/access/', 'other'], ['vendor-job', '/vendor/jobs/inc0041214/', 'other'],
   ['usage', '/usage/', 'other'],
   ['learn', '/learn/', 'other'],
+  // The capabilities (src/lib/modules.mjs): their own pages, and the space and unit pages that carry their cards
+  ['cap-licences', '/assets/licences/'], ['cap-checks', '/work/checks/'], ['cap-alerts', '/support/alerts/'], ['cap-alert', '/support/alerts/ar-01/'],
+  ['cap-certificates', '/assets/certificates/'], ['cap-flaws', '/assets/security-flaws/'], ['cap-backups', '/assets/config-backups/'], ['cap-quality', '/usage/quality/'],
+  ['cap-out-of-service', '/rooms/dub-4-01/'], ['cap-upkeep', '/rooms/nyc-20-05/'], ['cap-unit', '/device/?tag=AG-000335'],
   // The front door and the method pages
   ['welcome', '/welcome/'],
   ['method', '/method/'], ['method-building', '/method/start-from-the-building/'], ['method-capture', '/method/capture-dont-ask/'],

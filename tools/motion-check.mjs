@@ -95,10 +95,10 @@ const FLOWS = [
     await key(page, 'Escape'); await settle(page, 400);
   }],
   // A capability off and on again (src/lib/modules.mjs): what it marks collapses and grows back through rsChange.
-  ['capability', '/rooms/dub-3-09/', async (page) => {
+  ['capability', '/rooms/dub-4-01/', async (page) => {
     const gear = page.locator('[data-open-settings]:visible').first();
     await gear.click(); await settle(page, 400);
-    for (const [id, v] of [['licences', 'off'], ['licences', 'on'], ['maintenance', 'off'], ['maintenance', 'on']]) {
+    for (const [id, v] of [['licences', 'off'], ['licences', 'on'], ['maintenance', 'off'], ['meeting-quality', 'off'], ['out-of-service', 'off'], ['out-of-service', 'on'], ['maintenance', 'on'], ['meeting-quality', 'connected']]) {
       await page.locator(`input[name="cap-${id}"][value="${v}"]`).evaluate((i) => i.closest('label').click()); await settle(page);
     }
     await page.locator('input[name="mod-assets"][value="off"]').evaluate((i) => i.closest('label').click()); await settle(page);
