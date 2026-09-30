@@ -51,9 +51,9 @@ The mark moves only when something is happening, and never loops unless somethin
 
 | State | What it does |
 | --- | --- |
-| Arrival | Once per page: it turns 135° from rest, settles into its resting angle, then the ring draws closed. 1.25 s. |
+| Arrival | Once per visit, on the first page (page changes after that leave it still): it turns 135° from rest, settles into its resting angle, then the ring draws closed. 1.25 s. |
 | Leaving | When you go to another page: a 70° turn that gathers speed as it fades. 0.4 s. |
-| Loading | Only if a page takes longer than about 300 ms: the ring lifts and the slab eases into a slow, steady turn. When the page lands it slows to rest (never a hard stop) and the ring closes. |
+| Loading | Only if a page takes longer than about 900 ms: the ring lifts and the slab eases into a slow, steady turn. When the page lands it slows to rest (never a hard stop) and the ring closes. |
 | Hover | A small 20° turn, and it settles back. |
 | Idle | Still. |
 

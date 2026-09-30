@@ -1,8 +1,8 @@
 // Keia Atlas v11: the mark's motion (ported from the signed-off v11 runtime.js). The still mark is drawn on the server
 // by src/components/BrandMark.astro; this binds to every svg[data-keia-mark] and redraws it for the angle it is at.
-//   enter   once per page load or view transition: spins up, turns 135°, settles, then the ring closes
-//   leave   when a navigation starts: gathers speed through a partial turn and fades
-//   loading while a navigation is pending past ~300 ms: eases into a turntable, and eases out to rest when the page lands
+//   enter   once per visit (the first page): spins up, turns 135°, settles, then the ring closes
+//   leave   kept for the docs and the review page; not played on ordinary page changes (too busy)
+//   loading only while a navigation is genuinely slow (past ~900 ms): eases into a turntable, and eases out to rest when the page lands
 //   hover   a small turn, and it settles back
 //   idle    still. Nothing loops unless something is loading.
 // Reduced motion, Motion Off and Keep things still (window.rsReducedNow, html[data-still="on"]) all mean a still mark.
@@ -135,20 +135,23 @@ export class KeiaMark {
 
 // Wiring: one KeiaMark per svg (kept on the element, so a mark that persists across view transitions keeps its state).
 const marks = () => [...document.querySelectorAll('svg[data-keia-mark]')].map((el) => el.__km || (el.__km = new KeiaMark(el)));
-const LOAD_AFTER = 300;
+// Calm by default (Keith, 30 Sept): no spin on every click. The mark arrives once per visit, and turns only when a page
+// is genuinely slow to arrive; ordinary page changes leave it still.
+const LOAD_AFTER = 900;
 let pending = 0, navigating = false;
 
 if (W && !W.__rsBrandMark) {
   W.__rsBrandMark = true;
   document.addEventListener('astro:before-preparation', () => {
     navigating = true;
-    marks().forEach((m) => m.leave());
     clearTimeout(pending);
     pending = setTimeout(() => { if (navigating) marks().forEach((m) => m.load()); }, LOAD_AFTER);
   });
   const land = () => {
     clearTimeout(pending); navigating = false;
-    marks().forEach((m) => (m.spin ? m.done() : m.enter()));
+    let first = false;
+    try { first = !sessionStorage.getItem('rs-brand-entered'); sessionStorage.setItem('rs-brand-entered', '1'); } catch (_) {}
+    marks().forEach((m) => { if (m.spin) m.done(); else if (first) m.enter(); });
   };
   document.addEventListener('astro:page-load', land);
   // Keep things still, or motion switched off mid-page: settle every mark to its still frame at once.
