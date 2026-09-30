@@ -100,6 +100,14 @@ const answer = infra
   ? `${matching} of ${usingCount} match the ${HOUSE_NETWORK.name} standard · ${shortOf ? `${shortOf} short of what ${shortOf === 1 ? 'it serves' : 'they serve'}` : 'none short of what they serve'}`
   : usingCount ? `${plural(usingCount, 'space')} built to it · ${openHere ? plural(openHere, 'open incident') : 'no open incidents'}` : 'No spaces built to it yet';
 const PART_RULE = { 'access-switch': 'one per 48 ports needed, with 20 percent headroom', 'core-switch': 'a pair, for every floor comms room', firewall: 'a pair in Shadow Mode', 'av-switch': 'one per floor, for Dante and Q-SYS', codec: 'when the floor has a large space' };
+// Sizes of one kind of space, smallest first: a picker above the build options moves between them, and the
+// drawing morphs from one room into the next (src/lib/scene-client.mjs, motion.md row 55).
+const LADDERS = [
+  { label: 'Meeting rooms by size', ids: ['huddle-room-small', 'huddle-room', 'conference-room-small', 'conference-room-medium', 'conference-room-large'], short: { 'huddle-room-small': 'Huddle, small', 'huddle-room': 'Huddle', 'conference-room-small': 'Small', 'conference-room-medium': 'Medium', 'conference-room-large': 'Large' } },
+  { label: 'Pantries by size', ids: ['pantry', 'pantry-expanded'], short: { pantry: 'Pantry', 'pantry-expanded': 'Large pantry' } },
+];
+const ladder = LADDERS.find((l) => l.ids.includes(id) && l.ids.every((x) => spaceTypes[x]));
+const seatsOf = (x) => { const c = spaceTypes[x].keia_atlas.capacity; return c ? (c.min === c.max ? `${c.min}` : `${c.min} to ${c.max}`) : null; };
 const nParts = infra ? current.equipment.reduce((k, e) => k + (typeof e.quantity === 'number' ? e.quantity : 1), 0) : 0;
 ---
 <Shell vendorOk about={{ kind: infra ? 'comms' : 'space type', label: t.profile.name }} title={t.profile.name} section="types" crumbs={[{ label: 'Space types', to: '/room-profiles/' }, { label: t.profile.name }]}>
@@ -193,6 +201,16 @@ const nParts = infra ? current.equipment.reduce((k, e) => k + (typeof e.quantity
         </Section>
       </div>
     ) : (
+    <>
+    {ladder && (
+      <nav class="rt-sizes" aria-label={ladder.label} data-help="profile.sizes">
+        {ladder.ids.map((x) => (
+          <a class="rt-size" href={href(`/room-profiles/${x}/`)} data-room-pick aria-current={x === id ? 'page' : undefined} title={spaceTypes[x].profile.name}>
+            <b>{ladder.short[x]}</b>{seatsOf(x) && <small>{seatsOf(x)}</small>}
+          </a>
+        ))}
+      </nav>
+    )}
     <DetailTabs label="Build option" tabs={options.map((o) => ({ id: o.id, label: o.name }))}>
       {options.map((opt, i) => {
         const built = builtAll.filter((s) => s.option?.id === opt.id);
@@ -248,11 +266,21 @@ const nParts = infra ? current.equipment.reduce((k, e) => k + (typeof e.quantity
         );
       })}
     </DetailTabs>
+    </>
     )}
   </div>
 </Shell>
 
 <style is:global>
+  /* The size picker: the same kind of space, smallest first. It stays put between its pages (M5) while the
+     drawing below morphs from one room into the next. */
+  .rt-sizes { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; view-transition-name: rt-sizes; }
+  .rt-size { display: inline-flex; align-items: baseline; gap: 6px; padding: 6px 12px; border-radius: var(--pill-radius); border: 1px solid var(--line); background: var(--surface); color: var(--text-2); font-size: 13px; line-height: 1.2; text-decoration: none; transition: background-color var(--dur-state) var(--ease-settle), border-color var(--dur-state) var(--ease-settle), color var(--dur-state) var(--ease-settle); }
+  .rt-size b { font-weight: var(--fw-name); color: inherit; }
+  .rt-size small { font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; transition: color var(--dur-state) var(--ease-settle); }
+  @media (hover: hover) { .rt-size:hover { border-color: var(--line-strong); color: var(--text); } }
+  .rt-size[aria-current="page"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent, #fff); }
+  .rt-size[aria-current="page"] small { color: color-mix(in srgb, var(--on-accent, #fff) 80%, transparent); }
   .rt-opt { display: grid; gap: 28px; min-width: 0; }
   .rt-one .dt-list { display: none; }
   .rt-sum { margin: 0; font-size: var(--fs-body); line-height: 1.45; color: var(--text-2); max-width: 90ch; }

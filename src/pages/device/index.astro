@@ -53,6 +53,10 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
   <template data-glyph-review><HealthGlyph state="review" size={16} /></template>
   <Arrive />
 
+  <script>
+    // The borrowed room drawing's behaviour: focus on the unit, the layers (src/components/RoomScene.astro).
+    import '../../lib/scene-client.mjs';
+  </script>
   <script is:inline data-astro-rerun slot="end">
     (function () {
       var root = document.querySelector('[data-dv]'); if (!root) return;
@@ -176,20 +180,18 @@ const dims = (id) => { const d = mm(id); return d?.width ? [d.width, d.height, d
             // The drawing's styles and its pointing script, once per visit.
             var have = Array.prototype.map.call(document.querySelectorAll('style, link[rel="stylesheet"]'), sig);
             doc.querySelectorAll('style, link[rel="stylesheet"]').forEach(function (st) { if (have.indexOf(sig(st)) < 0) document.head.appendChild(document.importNode(st, true)); });
-            if (!window.__rsSceneHook) doc.querySelectorAll('script').forEach(function (sc) {
-              if (sc.textContent.indexOf('__rsSceneHook') < 0) return;
-              var n = document.createElement('script'); n.textContent = sc.textContent; document.body.appendChild(n);
-            });
+            // Its behaviour (focus, layers) is src/lib/scene-client.mjs, loaded by this page's own script below.
             var sc = document.importNode(src, true);
-            sc.classList.add('focus'); if (bad) sc.classList.add('tone-bad');
+            sc.classList.add('focus', 'sticky', 'pin-on'); if (bad) sc.classList.add('tone-bad');
             sc.dataset.pin = key;
-            sc.querySelectorAll('[data-sk="' + e + '"]').forEach(function (h) { h.classList.add('hit', 'pin'); if (h.classList.contains('hid')) sc.classList.add('focus-hid'); });
+            sc.querySelectorAll('[data-sk="' + e + '"]').forEach(function (h) { h.classList.add('hit', 'sel', 'pin'); if (h.classList.contains('hid')) sc.classList.add('focus-hid'); });
             sc.querySelectorAll('.cab[data-a="' + e + '"], .cab[data-b="' + e + '"], .pt[data-dev="' + e + '"]').forEach(function (c) { c.classList.add('hit'); });
             var cap = document.createElement('p');
             cap.className = 'dv-cap';
             cap.textContent = roomLabel(r) + ' to scale, this ' + u.pos.role.toLowerCase() + ' lit. No drawing of ' + (m ? 'the ' + m.name : 'its model') + ' yet.';
             slot.classList.remove('generic'); slot.classList.add('dv-scene');
             slot.replaceChildren(sc, cap);
+            if (window.rsSceneInit) window.rsSceneInit(sc);
           }).catch(function () {});
       }
       function show(u) {

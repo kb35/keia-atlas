@@ -3,7 +3,8 @@
    animate. It opens pages in a browser set to reduced motion, does what a person does on them (zoom into a space
    on the floor plan and back out with [ and ], open the palette in each of its modes, switch a module off and on
    in Settings, choose a port on a unit, press a space and a floor on a Home thumbnail; open and close a disclosure, filter a list, scroll sections and charts into
-   view, switch a project's phase, hover a card), and fails when any Element.animate() call asks for a duration above 0.
+   view, switch a project's phase, hover a card; on a room drawing, turn Cables on and off, focus two devices, Show everything, switch a
+   build option and move to another size of room), and fails when any Element.animate() call asks for a duration above 0.
    It runs every flow twice: once with the system set to reduced motion, and once with the system at full motion but
    the site's own switch on (html data-motion="off"), which must win.
    CSS transitions and animations are checked by motion.css's own reduce rules, not here.
@@ -155,6 +156,19 @@ const FLOWS = [
   ['phase', '/projects/prj-09/', async (page) => {
     const tabs = page.locator('.ptl-row[data-phx]:visible, .pr-step[data-phx]:visible');
     if (await tabs.count() > 1) { await tabs.first().click(); await settle(page); await tabs.last().click(); await settle(page); }
+  }],
+  // The room drawing (motion.md rows 55 to 58): a layer on and off, focus on a device and on another, Show
+  // everything, a build-option tab (the in-page morph), and another size of room (the morph between pages).
+  ['scene', '/room-profiles/huddle-room/', async (page) => {
+    await page.click('.scene-wrap:visible [data-layer="cables"]'); await settle(page);
+    await page.click('.scene-wrap:visible [data-layer="cables"]'); await settle(page);
+    await page.locator('.scene-wrap:visible .scene .no:not(.tag)').first().click(); await settle(page);
+    await page.locator('.dt-panel:not([hidden]) .rk-row[data-sk] .rk-no').nth(1).click(); await settle(page);   // another device, from the Key
+    await page.click('.scene-wrap:visible [data-scene-all]'); await settle(page);
+    const tabs = page.locator('[data-dt-tab]');
+    if (await tabs.count() > 1) { await tabs.nth(1).click(); await settle(page); }
+    await page.click('.rt-size[href*="conference-room-large"]');
+    await page.waitForURL(/conference-room-large/, { waitUntil: 'commit' }); await settle(page, 900);
   }],
   ['lift', '/locations/offices/', async (page) => {
     await page.locator('main .card.oc').first().hover(); await settle(page, 400);
