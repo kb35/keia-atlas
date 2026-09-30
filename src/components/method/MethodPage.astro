@@ -1,23 +1,35 @@
 ---
 // One method page: an Atlas page about Atlas (FRONT-DOOR section 1). The band names the page, its level and its
 // place in the method text, with one action, "Try it in the demo". Then the page's own content, the thing to try,
-// and where the page sits in the method. The level is shown on every page.
+// and where the page sits in the method. The level is shown on every page; a page in a part after the levels
+// (How it fits) names its part too.
+//
+// Motion (docs/rules/motion.md, M13 rows 41 to 45; all from the motion library and the tokens):
+//   - blocks below the fold settle in once as they enter the view (opacity and 8 px, --dur-enter);
+//   - each idea's picture (IdeaArt) plays its point once when it comes into view, one after another;
+//   - on a mapping table, an idea's chip and its rows light together on hover or focus (--dur-state);
+//   - the navigation's marker slides from the page you came from to this one (rsZoom, the zero-bounce spring);
+//   - "Try it" links zoom into the demo (the Shell's zoom-in page move, from the link).
+// Reduced motion (the system setting, the page's own switch, or html[data-motion="off" | "reduced"]): every block,
+// picture and marker is simply in its final place, and "Try it" cross-fades like any page.
 import Shell from '../../layouts/Shell.astro';
 import PageBand from '../PageBand.astro';
 import TryIt from './TryIt.astro';
 import MethodNav from './MethodNav.astro';
 import { href } from '../../lib/data.mjs';
 interface Props {
-  slug: string; title: string; lede: string; level: number; num?: string;
+  slug: string; title: string; lede: string; level: number; num?: string; part?: string;
+  parent?: { label: string; to: string };
   try: { to: string; as?: string; label: string; steps: string[] };
 }
-const { slug, title, lede, level, num, try: t } = Astro.props;
-const crumbs = slug === 'level1' ? [{ label: 'The Keia Method' }] : [{ label: 'The Keia Method', to: '/method/' }, { label: title }];
+const { slug, title, lede, level, num, part, parent, try: t } = Astro.props;
+const crumbs = slug === 'level1' ? [{ label: 'The Keia Method' }]
+  : [{ label: 'The Keia Method', to: '/method/' }, ...(parent ? [parent] : []), { label: title }];
 ---
 <Shell title={slug === 'level1' ? title : `${title} · The Keia Method`} section="method" crumbs={crumbs} about={{ kind: 'page', label: `${title} (the Keia Method)` }}>
   <PageBand overline="Keia Method" title={title} lede={lede}>
-    <span slot="overline" class="mp-level">· Level {level}{num ? ` · ${num}` : ''}</span>
-    <a slot="action" class="btn primary" href={href(t.to)} data-as={t.as}>Try it in the demo</a>
+    <span slot="overline" class="mp-level">· Level {level}{part ? ` · ${part}` : ''}{num ? ` · ${num}` : ''}</span>
+    <a slot="action" class="btn primary" href={href(t.to)} data-as={t.as} data-try>Try it in the demo</a>
   </PageBand>
   <div class="content method">
     <slot />
@@ -38,6 +50,115 @@ const crumbs = slug === 'level1' ? [{ label: 'The Keia Method' }] : [{ label: 'T
     else { try { sessionStorage.setItem('rs5-who', id); localStorage.setItem('rs4-who', id); } catch (_) { /* storage blocked: the demo opens as the default person */ } }
   }
   if (!(window as any).__mpViewAs) { (window as any).__mpViewAs = true; document.addEventListener('click', viewAs, true); }
+
+  import km from '../../lib/motion-library.js';
+  const W = window as any, D = document, R = D.documentElement;
+  // Still when the person asked for reduced motion (system or the page's switch), or a Motion setting says so.
+  const still = () => km.reduced() || /^(off|reduced)$/.test(R.dataset.motion || '');
+  const inView = (els: Element[], fn: (batch: Element[]) => void) => {
+    if (!('IntersectionObserver' in window)) { fn(els); return; }
+    const io = new IntersectionObserver((es) => {
+      const batch = es.filter((e) => e.isIntersecting).map((e) => e.target);
+      batch.forEach((el) => io.unobserve(el));
+      if (batch.length) fn(batch);
+    }, { threshold: 0, rootMargin: '0px 0px -12% 0px' });
+    els.forEach((el) => io.observe(el));
+  };
+
+  // Blocks below the fold wait, then settle in once as they enter the view. What is already on screen arrives
+  // with the page (the Shell's page move), so it does not move twice.
+  function settle(root: HTMLElement) {
+    if (still()) return;
+    const fold = innerHeight * 0.9;
+    const blocks = Array.from(root.children).filter((el) => el.getBoundingClientRect().top > fold) as HTMLElement[];
+    blocks.forEach((b) => b.classList.add('mp-wait'));
+    inView(blocks, (batch) => batch.forEach((b) => b.classList.add('mp-in')));
+  }
+
+  // Each idea's picture plays its point once, one after another when several arrive together (--dur-state apart).
+  function pictures(root: HTMLElement) {
+    const arts = Array.from(root.querySelectorAll('.idea-art')) as SVGElement[];
+    if (!arts.length || still()) return;
+    inView(arts, (batch) => batch.forEach((a, i) => { (a as any).style.setProperty('--ia-n', String(i)); km.play(a as any); }));
+  }
+
+  // A mapping table: an idea's chip and every row that carries the same idea light together.
+  function mapping(root: HTMLElement) {
+    root.querySelectorAll<HTMLElement>('[data-fit-map]').forEach((box) => {
+      if ((box as any).__fit) return; (box as any).__fit = true;
+      const all = () => Array.from(box.querySelectorAll<HTMLElement>('[data-idea]'));
+      const light = (id: string | null) => {
+        box.classList.toggle('is-lit', !!id);
+        all().forEach((el) => el.classList.toggle('is-on', !!id && el.dataset.idea === id));
+      };
+      const pick = (e: Event) => { const el = (e.target as Element)?.closest?.('[data-idea]') as HTMLElement | null; light(el ? el.dataset.idea! : null); };
+      box.addEventListener('pointerover', pick);
+      box.addEventListener('focusin', pick);
+      box.addEventListener('pointerleave', () => light(null));
+      box.addEventListener('focusout', (e) => { if (!box.contains((e as FocusEvent).relatedTarget as Node)) light(null); });
+    });
+  }
+
+  // The navigation's marker sits behind this page's link. Arriving from another method page, it slides from that
+  // page's link to this one once the navigation is in view (rsZoom: the zero-bounce spring, retargetable).
+  const FROM = 'rs-method-from';
+  function marker(root: HTMLElement) {
+    const nav = root.querySelector<HTMLElement>('[data-mn-pages]');
+    const mark = nav?.querySelector<HTMLElement>('.mn-mark');
+    const here = nav?.querySelector<HTMLElement>('a[aria-current="page"]');
+    if (!nav || !mark || !here) return;
+    const place = () => {
+      const a = nav.getBoundingClientRect(), b = here.getBoundingClientRect();
+      Object.assign(mark.style, { left: `${b.left - a.left - 8}px`, top: `${b.top - a.top}px`, width: `${b.width + 16}px`, height: `${b.height}px` });
+      mark.classList.add('on');
+    };
+    place();
+    if (W.ResizeObserver) new ResizeObserver(place).observe(nav);
+    let from: string | null = null;
+    try { from = sessionStorage.getItem(FROM); sessionStorage.removeItem(FROM); } catch (_) { /* storage blocked: the marker is simply there */ }
+    const prev = from && from !== nav.dataset.mnHere ? nav.querySelector<HTMLElement>(`a[data-mn="${from}"]`) : null;
+    if (!prev || still() || !W.rsZoom) return;
+    inView([nav], () => {
+      const p = prev.getBoundingClientRect();
+      W.rsZoom(mark, { left: p.left - 8, top: p.top, width: p.width + 16, height: p.height });
+    });
+  }
+
+  function boot() {
+    const root = D.querySelector<HTMLElement>('.content.method');
+    if (!root || (root as any).__mp) return;
+    (root as any).__mp = true;
+    settle(root); pictures(root); mapping(root); marker(root);
+  }
+  boot();
+  D.addEventListener('astro:page-load', boot);
+
+  if (!W.__mpNav) {
+    W.__mpNav = true;
+    // Leaving a method page: remember which, so the next method page's marker can slide from it.
+    D.addEventListener('astro:before-preparation', (e: any) => {
+      const here = D.querySelector<HTMLElement>('[data-mn-here]')?.dataset.mnHere;
+      const toMethod = /\/method\//.test(e.to?.pathname || '');
+      try { if (here && toMethod) sessionStorage.setItem(FROM, here); else sessionStorage.removeItem(FROM); } catch (_) { /* storage blocked */ }
+      // "Try it" zooms into the demo: the page grows away from the link (nav.css, zoom-in), as a space opens from
+      // its floor plan. Reduced motion: the Shell's cross-fade.
+      const src = e.sourceElement?.closest?.('a[data-try]');
+      if (!src || still()) return;
+      const m = D.querySelector('main'), r = src.getBoundingClientRect();
+      if (m) {
+        const b = m.getBoundingClientRect();
+        const pc = (v: number, lo: number, len: number) => `${Math.min(100, Math.max(0, Math.round(((v - lo) / Math.max(1, len)) * 100)))}%`;
+        W.__mpZoom = [pc(r.left + r.width / 2, b.left, b.width), pc(r.top + r.height / 2, b.top, b.height)];
+      }
+      W.__rsNavDir = 'zoom-in';
+      R.setAttribute('data-nav-dir', 'zoom-in');
+    });
+    D.addEventListener('astro:after-swap', () => {
+      const o = W.__mpZoom; if (!o) return;
+      W.__mpZoom = null;
+      R.style.setProperty('--zx', o[0]); R.style.setProperty('--zy', o[1]);
+    });
+  }
 </script>
 
 <style is:global>
@@ -59,8 +180,13 @@ const crumbs = slug === 'level1' ? [{ label: 'The Keia Method' }] : [{ label: 'T
   .method .mp-pic > h2, .method .mp-side h3 { font: 600 15px/1.3 var(--font-sans); }
   .method .mp-side { display: grid; gap: 12px; align-content: start; }
   .method .mp-side p { margin: 0; font-size: 14px; line-height: 1.55; }
+  .method .mp-art { max-width: 200px; }
   .method .mp-example { padding: 10px 12px; border-radius: 8px; background: var(--surface-2); font-size: 14px; }
   @container content (max-width: 700px) {
     .method .mp-parts div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   }
+  /* Settling in (M13 row 41): only blocks the script marked wait, so a page without scripts shows everything. */
+  .method > .mp-wait { opacity: 0; transform: translateY(8px); }
+  .method > .mp-wait.mp-in { opacity: 1; transform: none; transition: opacity var(--km-enter) var(--ease-settle), transform var(--km-enter) var(--ease-settle); }
+  @media print { .method > .mp-wait { opacity: 1; transform: none; } }
 </style>
