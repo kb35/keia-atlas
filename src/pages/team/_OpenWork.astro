@@ -1,0 +1,226 @@
+---
+// Team: who has the open work, by role and kind (it was "Who does what" on the Support overview; REVIEW-SITE fix 10
+// moved it here, beside the people who hold the roles). A count in each square on a heat scale. Every count, kind
+// and total opens that work in the Work list with its role and kind in the address (rule P10), and the list shows
+// the same number: both count src/lib/openwork.mjs. Hover a count to look at the work. A role's name opens its row
+// to say who holds it, what it owns, what it decides and what it hands on. Narrower than 1040 px, each role becomes a
+// card listing only the kinds of work it has; on a phone, eight roles, then Show all.
+import Section from '../../components/Section.astro';
+import Icon from '../../components/Icon.astro';
+import { COLS, GROUPS, ROWS, countWork, level } from '../../lib/openwork.mjs';
+import { href, fmtDate } from '../../lib/data.mjs';
+import { PEOPLE } from '../../lib/demo.mjs';
+
+const P = Object.fromEntries(PEOPLE.map((p) => [p.id, p]));
+const C = countWork();
+const listTo = (q = {}) => { const u = new URLSearchParams(Object.entries(q).filter(([, v]) => v)); return href(`/work/list/${u.toString() ? `?${u}` : ''}`); };
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const fd = (d) => (d ? fmtDate(d, { day: 'numeric', month: 'short' }) : '');
+// The peek: the first six pieces of work in a square, who has them and when.
+const peek = (r, c, rows) => `<b>${esc(r.name)}: ${esc(c.label.toLowerCase())}</b><small>${rows.length} open. Select to open ${rows.length === 1 ? 'it' : 'them'} in the Work list.</small>`
+  + `<ul class="ov-peek">${rows.slice(0, 6).map((it) => `<li><span>${esc(it.title)}</span><small>${esc(it.who.map((w) => P[w]?.name ?? w).join(', ') || 'Nobody yet')}${it.start ? ` · ${esc(fd(it.start))}` : ''}</small></li>`).join('')}</ul>`
+  + (rows.length > 6 ? `<small>And ${rows.length - 6} more.</small>` : '');
+const nobody = C.row.none ?? 0;
+const aside = `${C.all.toLocaleString('en-IE')} open pieces of work${nobody ? ` · ${nobody} not given to anyone` : ''}`;
+---
+<Section title="Who has the open work" id="open-work" help="team.openwork" aside={aside} rows={8} rowsAt="phone" data-sa-noun="roles">
+  <div class="card ow-card">
+    <p class="ow-lede faint">Open work by role and kind. Hover a number to look; select it to open that work in the Work list. Select a role for who holds it and what it owns.</p>
+    <div class="mx-wrap">
+      <table class="mx" data-ow>
+        <colgroup><col class="mx-c-role" />{COLS.map(() => <col />)}<col class="mx-c-tot" /></colgroup>
+        <thead>
+          <tr class="mx-gr">
+            <th class="mx-corner" rowspan="2" scope="col"><span class="overline">Role</span></th>
+            {GROUPS.map((g) => <th colspan={g.n} scope="colgroup" class={`mx-g g-${g.g}`}><span>{g.label}</span></th>)}
+            <th rowspan="2" scope="col" class="mx-th-tot">All</th>
+          </tr>
+          <tr class="mx-ch">
+            {COLS.map((c) => (
+              <th scope="col" data-col={c.k} class={`g-${c.g}`}>
+                <a class="mx-col" data-help="overview.kind" data-help-name={c.label} href={listTo({ kind: c.k })} data-vt-rec="dd-work-list" title={c.note ? `${c.label}: ${c.note}. Select to open it all in the Work list.` : `${c.label}. Select to open it all in the Work list.`}><i class={`k-${c.k}`} aria-hidden="true"></i>{c.label}</a>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody data-items>
+          {ROWS.map((r) => (
+            <>
+              <tr data-row={r.id} class:list={[{ 'mx-none': r.id === 'none' }]}>
+                <th scope="row">
+                  {r.role
+                    ? <button type="button" class="mx-role" data-help="team.openwork-role" data-help-name={r.name} data-ow-role={r.id} aria-expanded="false"><b>{r.name}</b><small>{r.sub}</small></button>
+                    : <a class="mx-role" data-help="overview.nobody" href={listTo({ role: 'none' })} data-vt-rec="dd-work-list"><b>{r.name}</b><small>{r.sub}</small></a>}
+                </th>
+                {COLS.map((c) => {
+                  const n = C.cell[`${r.id}|${c.k}`] ?? 0;
+                  return (
+                    <td data-col={c.k}>
+                      <a class={`mx-cell k-${c.k}`} data-help={n ? 'overview.cell' : undefined} data-peek={n ? '' : undefined} data-label={c.label} data-lv={level(n)} data-zero={n ? undefined : ''} href={n ? listTo({ role: r.id, kind: c.k }) : undefined} data-vt-rec="dd-work-list" aria-label={`${r.name}, ${c.label}: ${n}`}>
+                        <span>{n || ''}</span>{n > 0 && <template data-peek-body set:html={peek(r, c, C.list[`${r.id}|${c.k}`])}></template>}
+                      </a>
+                    </td>
+                  );
+                })}
+                <td class="mx-tot" data-label="All"><a class="mx-tl" data-help="overview.total" data-help-name={`${r.name}, all kinds`} href={listTo({ role: r.id })} data-vt-rec="dd-work-list">{C.row[r.id] ?? 0}</a></td>
+              </tr>
+              {r.role && (
+                <tr class="mx-detail" data-ow-detail={r.id} hidden>
+                  <td colspan={COLS.length + 2}>
+                    <div class="mx-dt">
+                      <div class="dt-people">
+                        <p class="overline">Who</p>
+                        {r.people.map((p) => (
+                          <a class="dt-p" data-help="overview.person" href={href('/')} data-see-as={p.id} title={`Open Home as ${p.name}`}>
+                            <span class="ov-av" aria-hidden="true">{p.initials}</span><span><b>{p.name}</b><small>{p.where}</small></span>
+                          </a>
+                        ))}
+                      </div>
+                      <div><p class="overline">Owns</p><ul>{r.role.owns.map((x) => <li>{x}</li>)}</ul></div>
+                      <div><p class="overline">Decides</p><ul>{r.role.decides.map((x) => <li>{x}</li>)}</ul></div>
+                      <div class="dt-hands">
+                        <p class="overline">Hands on</p><p>{r.role.hands}</p>
+                        {r.people[0] && <a class="btn primary small" href={href('/')} data-see-as={r.people[0].id}><Icon name="home" size={16} />Open their Home</a>}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <th scope="row">All roles</th>
+            {COLS.map((c) => <td data-col={c.k}><a class="mx-tl" data-help="overview.total" data-help-name={`${c.label}, all roles`} href={listTo({ kind: c.k })} data-vt-rec="dd-work-list">{C.col[c.k] ?? 0}</a></td>)}
+            <td class="mx-tot"><a class="mx-tl" data-help="overview.total" data-help-name="All open work" href={listTo()} data-vt-rec="dd-work-list">{C.all}</a></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <footer class="mx-key">
+      <span class="mx-scale" data-help="overview.scale"><span>Fewer</span>{[1, 2, 3, 4, 5].map((l) => <i data-lv={l}></i>)}<span>More</span></span>
+      <span class="faint">Shared work counts once for each role on it. “All” counts each piece once.</span>
+    </footer>
+  </div>
+</Section>
+
+<script is:inline data-astro-rerun>
+  (function () {
+    var t = document.querySelector('[data-ow]'); if (!t || t.__ow) return; t.__ow = true;
+    var M = function () { return window.rsMotion ? window.rsMotion() : { reduced: true }; };
+    // A role's name opens its row: who holds it, what it owns and decides, what it hands on. One at a time.
+    t.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-ow-role]'); if (!b) return;
+      var id = b.dataset.owRole, open = b.getAttribute('aria-expanded') !== 'true', y0 = b.getBoundingClientRect().top;
+      t.querySelectorAll('[data-ow-role]').forEach(function (x) { x.setAttribute('aria-expanded', String(open && x === b)); x.closest('tr').classList.toggle('on', open && x === b); });
+      t.querySelectorAll('[data-ow-detail]').forEach(function (tr) {
+        var show = open && tr.dataset.owDetail === id;
+        if (tr.hidden === show) { tr.hidden = !show; if (show && !M().reduced) tr.querySelector('.mx-dt').classList.add('m-in'); }
+      });
+      // What opens or closes above the role stays out from under the pointer (M6).
+      var dy = b.getBoundingClientRect().top - y0; if (Math.abs(dy) > 1) window.scrollBy(0, dy);
+    });
+    // "Open their Home": view Keia Atlas as that person, then go Home.
+    t.addEventListener('click', function (e) {
+      var s = e.target.closest('[data-see-as]'); if (!s) return;
+      var W = window;
+      if (W.rsSetWho) W.rsSetWho(s.dataset.seeAs); else try { localStorage.setItem('rs4-who', s.dataset.seeAs); } catch (_) {}
+      if (W.rsApplyTheme) W.rsApplyTheme(); if (W.rsSyncDemo) W.rsSyncDemo();
+      document.dispatchEvent(new CustomEvent('rs:demo-change'));
+    });
+  })();
+</script>
+
+<style>
+  .ow-card { padding: 16px 20px 14px; display: grid; gap: 12px; min-width: 0; }
+  .ow-lede { margin: 0; font-size: var(--fs-body); }
+  /* The matrix is a table while its card is at least 1040 px wide, so no heading is ever squashed or broken
+     inside a word. Narrower, each role becomes a card listing only the kinds of work it has (container mx). */
+  .mx-wrap { min-width: 0; container: mx / inline-size; }
+  .mx { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 3px; font-family: var(--font-sans); font-variant-numeric: tabular-nums; }
+  .mx th, .mx td { white-space: normal; }
+  .mx-c-role { width: 184px; }
+  .mx-c-tot { width: 44px; }
+  .mx th { font-weight: 600; text-align: center; vertical-align: bottom; padding: 0; border: 0; background: none; letter-spacing: 0; text-transform: none; color: var(--text); font-size: var(--fs-support); }
+  .mx td { border: 0; vertical-align: middle; padding: 0; }
+  .mx-corner { text-align: left !important; vertical-align: bottom; padding: 0 0 8px 12px !important; }
+  .mx-g { padding: 0 2px 6px; }
+  .mx-g span { display: block; padding-bottom: 5px; border-bottom: 2px solid var(--line); font: 600 var(--overline-size, 11px)/1.2 var(--font-sans); letter-spacing: var(--overline-track, .08em); text-transform: var(--overline-case, uppercase); color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mx-th-tot { font: var(--fw-title) var(--fs-code)/1.2 var(--font-sans); color: var(--text-3); padding-bottom: 8px; }
+  .mx-col { text-decoration: none; display: grid; justify-items: center; gap: 5px; width: 100%; min-height: 48px; align-content: end; padding: 4px 0 6px; border-radius: 8px; color: var(--text-2); font: 600 var(--fs-mark)/1.2 var(--font-sans); letter-spacing: -.01em; hyphens: manual; transition: background var(--dur-hover) var(--ease-settle), color var(--dur-hover) var(--ease-settle); }
+  .mx-col i { width: 18px; height: 4px; border-radius: 2px; background: var(--kc, var(--grey)); }
+  .mx-col:hover { background: var(--surface-2); color: var(--text); }
+  .mx-role { appearance: none; display: grid; gap: 1px; width: 100%; min-height: 36px; padding: 5px 12px; border: 1px solid transparent; border-radius: 10px; background: none; color: var(--text); cursor: pointer; font: 400 var(--fs-body)/1.3 var(--font-sans); text-align: left; text-decoration: none; transition: background var(--dur-hover) var(--ease-settle), border-color var(--dur-hover) var(--ease-settle), color var(--dur-hover) var(--ease-settle); }
+  .mx-role b { font-size: var(--fs-body); line-height: 1.25; }
+  .mx-role small { font-size: var(--fs-mark); color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mx-role:hover { background: var(--surface-2); border-color: var(--line); color: var(--text); }
+  .mx-role[aria-expanded=true] { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); color: var(--accent-ink); }
+  .mx-role[aria-expanded=true] small { color: var(--accent-ink); }
+  .mx tbody th { padding: 0; }
+  .mx-none .mx-role b { font-weight: 600; color: var(--text-2); }
+  .mx-cell { text-decoration: none; display: grid; place-items: center; width: 100%; height: 36px; border-radius: 7px; background: color-mix(in srgb, var(--text) 3%, var(--surface)); color: var(--text); font: var(--fw-title) var(--fs-body)/1 var(--font-sans);
+    transition: background var(--dur-state) var(--ease-settle), color var(--dur-state) var(--ease-settle), box-shadow var(--dur-hover) var(--ease-settle); }
+  .mx-cell[data-zero] { pointer-events: none; background: none; }
+  .mx-cell[data-zero]::after { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--line-strong); opacity: .7; }
+  .mx-cell:hover, .mx-cell:global(.peek-on) { box-shadow: 0 0 0 2px var(--text); }
+  .mx-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  [data-lv="1"] { background: color-mix(in srgb, var(--accent) 13%, var(--surface)); }
+  [data-lv="2"] { background: color-mix(in srgb, var(--accent) 26%, var(--surface)); }
+  [data-lv="3"] { background: color-mix(in srgb, var(--accent) 42%, var(--surface)); }
+  [data-lv="4"] { background: color-mix(in srgb, var(--accent) 64%, var(--surface)); color: var(--on-accent); }
+  [data-lv="5"] { background: var(--accent); color: var(--on-accent); }
+  .mx-tot { text-align: center; font: var(--fw-title) var(--fs-support)/1 var(--font-sans); color: var(--text-2); }
+  .mx-tl { display: inline-block; min-width: 28px; padding: 4px 6px; border-radius: 6px; color: inherit; text-decoration: none; transition: background var(--dur-hover) var(--ease-settle); }
+  .mx-tl:hover { background: var(--surface-2); color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+  .mx tfoot th { text-align: right; padding: 8px 12px 0 0; font: 600 var(--fs-code)/1.2 var(--font-sans); color: var(--text-3); }
+  .mx tfoot td { text-align: center; padding-top: 8px; font: var(--fw-title) var(--fs-support)/1 var(--font-sans); color: var(--text-2); border-top: 1px solid var(--line); }
+  .mx-detail td { padding: 2px 0 10px; }
+  .mx-dt { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr); gap: 16px 22px; padding: 14px 16px; border-radius: 12px; background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); text-align: left; }
+  .mx-dt.m-in { animation: ow-open var(--dur-enter) var(--ease-settle) both; transform-origin: top center; }
+  @keyframes ow-open { from { opacity: 0; transform: translateY(-6px) scaleY(.96); } }
+  .mx-dt .overline { margin: 0 0 6px; }
+  .mx-dt ul { margin: 0; padding-left: 16px; display: grid; gap: 4px; font-size: var(--fs-body); }
+  .mx-dt p:not(.overline) { margin: 0 0 12px; font-size: var(--fs-body); }
+  .dt-people { display: grid; gap: 4px; align-content: start; }
+  .dt-p { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 8px; align-items: center; padding: 4px 6px; margin-left: -6px; border-radius: 8px; color: inherit; text-decoration: none; transition: background var(--dur-hover) var(--ease-settle); }
+  .dt-p:hover { background: var(--surface); }
+  .dt-p b { display: block; font-size: var(--fs-body); } .dt-p small { display: block; font-size: var(--fs-code); color: var(--text-2); }
+  .dt-hands .btn { display: inline-flex; gap: 6px; align-items: center; }
+  .ov-av { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--surface-3); color: var(--text); font: 500 10px/1 var(--font-mono); box-shadow: 0 0 0 2px var(--surface); flex: none; }
+  .mx-key { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; font-size: var(--fs-code); }
+  .mx-scale { display: inline-flex; align-items: center; gap: 3px; color: var(--text-3); }
+  .mx-scale i { width: 18px; height: 12px; border-radius: 3px; }
+  .mx-scale span { margin: 0 4px; }
+  .k-provision { --kc: var(--violet); } .k-install { --kc: var(--amber); } .k-configure { --kc: var(--blue); } .k-commission { --kc: var(--green); }
+  .k-task { --kc: var(--grey); } .k-visit { --kc: var(--accent); } .k-incident { --kc: var(--red); } .k-lab { --kc: var(--violet); }
+  .k-refresh { --kc: var(--amber); } .k-time-off { --kc: var(--grey); } .k-plan { --kc: var(--blue); } .k-inbox { --kc: var(--ink); }
+
+  @container mx (max-width: 1039px) {
+    .mx, .mx tbody, .mx thead, .mx thead tr { display: block; }
+    .mx colgroup, .mx thead tr.mx-ch, .mx thead th.mx-g, .mx thead th.mx-th-tot, .mx tfoot, .mx-corner { display: none; }
+    .mx tbody { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 8px; }
+    .mx tbody tr[data-row] { display: flex; flex-wrap: wrap; align-content: flex-start; align-items: center; gap: 6px; padding: 8px 10px 10px; border: 1px solid var(--line); border-radius: 12px; }
+    .mx tbody tr[data-row] > th { order: 0; flex: 1 1 calc(100% - 70px); min-width: 0; text-align: left; }
+    .mx tbody tr[data-row] > .mx-tot { order: 1; flex: none; padding: 0 4px; font-size: var(--fs-code); }
+    .mx tbody tr[data-row] > .mx-tot::before { content: attr(data-label) " "; font-weight: 600; color: var(--text-3); }
+    .mx tbody tr[data-row] > td[data-col] { order: 2; }
+    .mx tbody td[data-col]:has(> .mx-cell[data-zero]) { display: none; }
+    .mx-role { padding: 4px 8px; margin-left: -8px; }
+    .mx-cell { display: inline-flex; align-items: center; gap: 8px; width: auto; height: 32px; padding: 0 10px 0 8px; font-size: var(--fs-body); }
+    .mx-cell::before { content: attr(data-label); font: 600 var(--fs-code)/1 var(--font-sans); }
+    .mx tr.mx-detail { grid-column: 1 / -1; display: block; }
+    .mx tr.mx-detail[hidden] { display: none; }
+    .mx tr.mx-detail > td { display: block; }
+    .mx-dt { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
+    .mx tr[data-row]:not(:has(td[data-col] > .mx-cell:not([data-zero]))) .mx-role small { white-space: normal; }
+  }
+  @container content (max-width: 559px) { .ow-card { padding: 14px 14px 12px; } }
+  @media (prefers-reduced-motion: reduce) { .mx-dt.m-in { animation: none; } }
+</style>
+<style is:global>
+  /* The peek card's list of work (Peek lives on <body>). */
+  .ov-peek { list-style: none; margin: 8px 0 4px; padding: 0; display: grid; gap: 6px; max-width: 340px; }
+  .ov-peek li span { display: block; font-size: var(--fs-support); font-weight: 600; line-height: 1.3; }
+  .ov-peek li small { display: block; font-size: var(--fs-code); color: var(--text-3); }
+</style>

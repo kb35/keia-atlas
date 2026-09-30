@@ -1,0 +1,21 @@
+---
+// The space a unit sits in, drawn to scale, for the unit page's picture when its model has no traced drawing
+// (UI-V2 §2: a device draws its product; REVIEW-SITE fix 8: without one, the space with the unit lit). Not a page
+// to visit: the unit page (src/pages/device/index.astro) reads the drawing and its styles from here, lights the
+// unit and puts it in its picture slot. Only spaces that hold such a unit get one.
+import RoomScene from '../../../components/RoomScene.astro';
+import { spaces } from '../../../lib/data.mjs';
+import { artParts } from '../../../lib/art.mjs';
+
+export function getStaticPaths() {
+  const drawn = new Map();
+  const traced = (m) => { if (!m) return false; if (!drawn.has(m)) drawn.set(m, Boolean(artParts(m))); return drawn.get(m); };
+  return Object.values(spaces)
+    .filter((s) => [...s.positions, ...s.olderKit].some((p) => p.units.some((u) => !traced(u.model ?? p.model))))
+    .map((s) => ({ params: { room: s.id } }));
+}
+const s = spaces[Astro.params.room];
+---
+<meta name="robots" content="noindex" />
+<title>{s.name}: the space drawn to scale</title>
+<RoomScene option={s.option} type={s.space_type} fitted={s.fitted} space={s} uid={`dv-${s.id}`} label={`${s.name}, drawn to scale`} />
