@@ -1,0 +1,194 @@
+---
+/* LeadershipHome: the sections of Claire's Home that answer "are we OK, and what does it cost?" (UX-V2 §4.7, BUILD-PLAN
+   V7 H3). Home places them by role (src/lib/homecore.mjs LAYOUT.lead); every section exists for everyone.
+     part="summary"  What it costs (four figures, each with a 12-month strip and its source and time) and To review
+     part="record"   How we will know it works (the pilot measures from ROADMAP) and The case: cost and value (the model,
+                     its inputs shown and changeable, each marked Sourced or Assumption)
+   Nothing here names or ranks a person: an owner sits in its own field, never in a line with a number
+   (tests/no-rankings.test.mjs). Every figure is simulated; the band of Home carries the heartbeat. */
+import FigureTile from './FigureTile.astro';
+import HealthGlyph from './HealthGlyph.astro';
+import SourceMark from './SourceMark.astro';
+import { href } from '../lib/data.mjs';
+import { SOURCES, eur } from '../lib/costs.mjs';
+interface Props { part: 'summary' | 'record'; L: any }
+const { part, L } = Astro.props;
+const KIND = { sourced: 'Sourced', assumption: 'Assumption', demo: 'From the demo' };
+const unitOf = (i: any) => (i.unit === '€' ? '' : i.unit);
+const M = L.model;
+---
+{part === 'summary' ? (
+  <>
+    <section class="ck card ld-costs" data-sec="costs" id="costs" aria-labelledby="h-costs" hidden>
+      <header class="ck-h"><h2 id="h-costs" data-help="home.costs">What it costs</h2><span class="ck-n faint">this month, with the last 12 months</span><a class="aside" href="#model">The case: cost and value <span aria-hidden="true">→</span></a></header>
+      <div class="g12 ld-tiles">
+        {L.costs.map((c: any) => (
+          <FigureTile class="s-3" id={`cost-${c.id}`} label={c.label} value={c.value} spark={c.strip} span="12 months" fmt={c.id === 'visits' ? '%' : c.id === 'energy' ? '' : 'eur'} sub={c.sub} source={c.source} to={c.to} help="home.cost-figure" />
+        ))}
+      </div>
+      <p class="ck-p ld-note">Every figure names where it came from and when. Money comes from the finance connector. All of it is simulated for the demo.</p>
+    </section>
+
+    <section class="ck card" data-sec="lreview" id="lreview" aria-labelledby="h-lreview" hidden>
+      <header class="ck-h"><h2 id="h-lreview" data-help="home.lead-review">To review</h2><span class="ck-n" data-nr>{L.review.length}</span></header>
+      {L.review.length ? (
+        <ol class="rv ld-rv">
+          {L.review.map((r: any) => (
+            <li class="rv-i">
+              <span class="rv-g"><HealthGlyph state="review" size={16} /></span>
+              <span class="rv-b"><a href={href(r.to)}>{r.text}</a>{r.owner && <small class="ld-own">Owner: {r.owner}</small>}</span>
+            </li>
+          ))}
+        </ol>
+      ) : <p class="ck-p">Nothing to review. Contracts ending soon and work behind the standard show here.</p>}
+    </section>
+  </>
+) : (
+  <>
+    <section class="ck card" data-sec="pilot" id="pilot" aria-labelledby="h-pilot" hidden>
+      <header class="ck-h"><h2 id="h-pilot" data-help="home.pilot">How we will know it works</h2><span class="ck-n faint">the pilot measures, from the roadmap</span></header>
+      <div class="tablewrap ld-tw"><table class="to-cards ld-pilot">
+        <thead><tr><th>Measure</th><th>At the start</th><th>Now</th><th>From</th></tr></thead>
+        <tbody>
+          {L.pilot.map((p: any) => (
+            <tr>
+              <td data-label=""><b>{p.label}</b></td>
+              <td data-label="At the start" class="num">{p.base}</td>
+              <td data-label="Now" class="num">{p.now}</td>
+              <td data-label="From"><SourceMark from={p.from} at="08:00" /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table></div>
+      <p class="ck-p">Measured the same way before and during the pilot, per space and per service, never per person. The figures are simulated.</p>
+    </section>
+
+    <section class="ck card ld-model" data-sec="model" id="model" aria-labelledby="h-model" data-ld-model hidden>
+      <header class="ck-h"><h2 id="h-model" data-help="home.model">The case: cost and value</h2><span class="ck-n faint">an estimate a year, not a finding</span></header>
+      <p class="ck-p">Change any input and the estimate follows. Sourced inputs are published figures (with their strength); assumptions are ours, to replace with your own.</p>
+      <div class="ld-out" aria-live="polite">
+        <dl class="ld-sum">
+          <div><dt>Value a year</dt><dd class="num" data-out="value">{eur(M.value)}</dd></div>
+          <div><dt>Running Keia Atlas a year</dt><dd class="num" data-out="run">{eur(M.run)}</dd></div>
+          <div><dt>Net a year</dt><dd class="num" data-out="net">{eur(M.net)}</dd></div>
+          <div><dt>Pays for itself in</dt><dd class="num" data-out="payback">{M.payback == null ? 'Not at these inputs' : `${Math.max(1, Math.round(M.payback))} months`}</dd></div>
+        </dl>
+        <ol class="ld-lines">
+          {M.lines.map((l: any) => (
+            <li data-line={l.id}>
+              <span class="ld-ll"><b>{l.label}</b><small data-how>{l.how}</small></span>
+              <span class="ld-lv"><span class="num" data-today>{eur(l.today)}</span><small>a year today</small></span>
+              <span class="ld-lv"><span class="num" data-value>{eur(l.value)}</span><small>value a year</small></span>
+            </li>
+          ))}
+        </ol>
+      </div>
+      <details class="ld-in" data-help="home.model-inputs">
+        <summary><span>The inputs</span><small class="faint">{L.inputs.filter((i: any) => i.kind === 'sourced').length} sourced · {L.inputs.filter((i: any) => i.kind !== 'sourced').length} assumptions to replace</small></summary>
+        <ol class="ld-inputs">
+          {L.inputs.map((i: any) => (
+            <li class={`ld-i k-${i.kind}`}>
+              <label class="ld-il" for={`in-${i.id}`}>{i.label}</label>
+              <span class="ld-iv">{i.unit === '€' && <span class="ld-cur" aria-hidden="true">€</span>}<input id={`in-${i.id}`} type="number" inputmode="decimal" min="0" step={i.step} value={i.value} data-in={i.id} data-default={i.value} />{unitOf(i) && <span class="ld-unit">{unitOf(i)}</span>}</span>
+              <span class="ld-ik"><span class={`ld-kind k-${i.kind}`}>{KIND[i.kind as keyof typeof KIND]}</span>{i.source && <a href={SOURCES[i.source].url} target="_blank" rel="noopener" title={SOURCES[i.source].cite}>{SOURCES[i.source].cite.split(',')[0]} ↗</a>}{i.source && <small>Strength {SOURCES[i.source].strength}</small>}</span>
+              <small class="ld-note">{i.note}</small>
+            </li>
+          ))}
+        </ol>
+        <p class="ld-foot"><button type="button" class="btn small" data-ld-reset>Put back the starting inputs</button><span class="faint">Your changes stay in this browser only.</span></p>
+      </details>
+    </section>
+  </>
+)}
+
+{part === 'record' && (
+  <script>
+    import { valueModel, eur } from '../lib/costs.mjs';
+    // The model follows its inputs as you type; the words change in place, nothing moves (M9). The inputs a person
+    // changed are kept in this browser only (a convenience; the starting figures are always one press away).
+    const KEY = 'rs7-costs';
+    function init() {
+      const box = document.querySelector<HTMLElement>('[data-ld-model]');
+      if (!box || (box as any).__ld) return;
+      (box as any).__ld = true;
+      const inputs = [...box.querySelectorAll<HTMLInputElement>('[data-in]')];
+      let saved: Record<string, number> = {};
+      try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch { saved = {}; }
+      inputs.forEach((i) => { const v = saved[i.dataset.in!]; if (Number.isFinite(v)) i.value = String(v); });
+      const paint = () => {
+        const a: Record<string, number> = {};
+        inputs.forEach((i) => { const v = parseFloat(i.value); if (Number.isFinite(v) && v >= 0) a[i.dataset.in!] = v; });
+        const M = valueModel(a);
+        const put = (k: string, t: string) => { const el = box.querySelector(`[data-out="${k}"]`); if (el && el.textContent !== t) el.textContent = t; };
+        put('value', eur(M.value)); put('run', eur(M.run)); put('net', eur(M.net));
+        put('payback', M.payback == null ? 'Not at these inputs' : `${Math.max(1, Math.round(M.payback))} months`);
+        M.lines.forEach((l) => {
+          const li = box.querySelector(`[data-line="${l.id}"]`); if (!li) return;
+          li.querySelector('[data-how]')!.textContent = l.how;
+          li.querySelector('[data-today]')!.textContent = eur(l.today);
+          li.querySelector('[data-value]')!.textContent = eur(l.value);
+        });
+        inputs.forEach((i) => i.closest('.ld-i')?.classList.toggle('changed', String(parseFloat(i.value)) !== String(parseFloat(i.dataset.default!))));
+        const keep: Record<string, number> = {};
+        inputs.forEach((i) => { const v = parseFloat(i.value); if (Number.isFinite(v) && String(v) !== String(parseFloat(i.dataset.default!))) keep[i.dataset.in!] = v; });
+        try { localStorage.setItem(KEY, JSON.stringify(keep)); } catch { /* this browser keeps nothing */ }
+      };
+      box.addEventListener('input', (e) => { if ((e.target as HTMLElement).matches('[data-in]')) paint(); });
+      box.querySelector('[data-ld-reset]')?.addEventListener('click', () => { inputs.forEach((i) => { i.value = i.dataset.default!; }); paint(); });
+      paint();
+    }
+    document.addEventListener('astro:page-load', init);
+  </script>
+)}
+
+<style is:global>
+  .ld-tiles .ft { background: var(--surface); }
+  .home .ld-costs { gap: 12px; }
+  .ld-note { font-size: var(--fs-code); }
+  .ld-own { color: var(--text-3); }
+  .ld-pilot td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ld-tw { box-shadow: none; min-width: 0; }
+  .ld-pilot .srcm { white-space: normal; height: auto; min-height: 20px; padding-block: 3px; line-height: 1.3; }
+  .ld-pilot td.num { white-space: normal; }
+  /* The model: the sum first, then how each line is worked out, then the inputs (folded). */
+  .ld-model { gap: 12px; }
+  .ld-out { display: grid; gap: 12px; }
+  .ld-sum { margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .ld-sum div { display: grid; gap: 4px; padding: 12px 14px; border-radius: var(--radius); background: var(--surface-2); min-width: 0; }
+  .ld-sum dt { font-size: var(--fs-code); color: var(--text-2); }
+  .ld-sum dd { margin: 0; font: var(--fw-title) 22px/1.1 var(--font-sans); color: var(--text); font-variant-numeric: tabular-nums; }
+  .ld-lines { list-style: none; margin: 0; padding: 0; display: grid; }
+  .ld-lines li { display: grid; grid-template-columns: minmax(0, 1fr) 130px 130px; gap: 4px 16px; align-items: start; padding: 10px 0; border-top: 1px solid var(--line); }
+  .ld-ll { display: grid; gap: 2px; min-width: 0; }
+  .ld-ll b { font-size: var(--fs-body); font-weight: var(--fw-name, 550); }
+  .ld-ll small, .ld-lv small { font-size: var(--fs-code); color: var(--text-3); line-height: 1.4; }
+  .ld-lv { display: grid; gap: 2px; justify-items: end; text-align: right; }
+  .ld-lv .num { font-size: var(--fs-body); font-variant-numeric: tabular-nums; }
+  .ld-in { border-top: 1px solid var(--line); padding-top: 10px; }
+  .ld-in summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; cursor: pointer; font-weight: 600; font-size: var(--fs-body); }
+  .ld-in summary small { font-weight: 400; font-size: var(--fs-code); }
+  .ld-inputs { list-style: none; margin: 10px 0 0; padding: 0; display: grid; }
+  .ld-i { display: grid; grid-template-columns: minmax(0, 1.3fr) 170px minmax(0, 1fr); grid-template-areas: "l v k" "n n n"; gap: 4px 16px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+  .ld-il { grid-area: l; font-size: var(--fs-body); }
+  .ld-iv { grid-area: v; display: flex; align-items: center; gap: 6px; }
+  .ld-iv input { width: 100%; min-width: 0; max-width: 120px; font: 500 16px/1.2 var(--font-mono); padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); font-variant-numeric: tabular-nums; }
+  .ld-iv input:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
+  .ld-i.changed input { border-color: var(--accent); }
+  .ld-cur, .ld-unit { font-size: var(--fs-code); color: var(--text-3); white-space: nowrap; }
+  .ld-ik { grid-area: k; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: var(--fs-code); min-width: 0; }
+  .ld-ik a { color: var(--link, var(--accent-ink)); overflow-wrap: anywhere; }
+  .ld-ik small { color: var(--text-3); }
+  .ld-kind { font: 600 var(--fs-mark)/1 var(--font-sans); padding: 3px 7px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--text-2); white-space: nowrap; }
+  .ld-kind.k-assumption { border-style: dashed; }
+  .ld-i .ld-note { grid-area: n; font-size: var(--fs-code); color: var(--text-3); line-height: 1.4; }
+  .ld-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 12px 0 0; font-size: var(--fs-code); }
+  @container content (max-width: 839px) {
+    .ld-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ld-i { grid-template-columns: minmax(0, 1fr) 150px; grid-template-areas: "l v" "k k" "n n"; }
+  }
+  @container content (max-width: 559px) {
+    .ld-lines li { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .ld-lines .ld-ll { grid-column: 1 / -1; } .ld-lines .ld-lv { justify-items: start; text-align: left; }
+    .ld-i { grid-template-columns: minmax(0, 1fr); grid-template-areas: "l" "v" "k" "n"; }
+  }
+</style>

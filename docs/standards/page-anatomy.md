@@ -216,6 +216,8 @@ A live page keeps its sentence current with `window.rsAnswer(text)` from the sam
 | IT stores, a store, cables | "{n} stores below minimum · {n} stores due a count"; "{n} models below minimum · {n} spare units"; "{n} spare lines below minimum · {n} patched lines recorded" |
 | Usage, equipment usage | "{n} spaces with an open incident · {n}% of the week occupied"; "{n} devices with an open incident · {n} flagged to review" |
 | Team, vendors, vendor portal | "{n} of {n} staff on site today · {n} away"; "{n} snag open · {n} contract ending within 6 months"; "{n} devices to record · {n} waiting on Aigna's review" |
+| A vendor, access register, a partner's job | "{n} jobs with them · {n} past the contract clock"; "{n} open grants, each tied to a job · no standing access"; the contract clock, "Response due 13:40 · 1 h 40 min left" or "Clock paused, waiting on {what} · {time} past" |
+| Home, leadership and partner | leadership "All services within target · {n} to review"; a partner "{n} jobs with you · {n} past the contract clock" |
 | About, decisions, rule book, Learn, fields, Search | reference pages: what they hold ("{n} rules in {n} chapters · {n} known gaps still open", "Accepted {date} · in force") |
 | Room guide | "Everything in this space is working", or "We know about a problem here, and someone has it" |
 

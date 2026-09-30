@@ -25,6 +25,8 @@ import HealthGlyph from '../components/HealthGlyph.astro';
 import HandoverCard from '../components/HandoverCard.astro';
 import OpenHere from '../components/OpenHere.astro';
 import SmallMultiples from '../components/SmallMultiples.astro';
+import LeadershipHome from '../components/LeadershipHome.astro';
+import PartnerHome from '../components/PartnerHome.astro';
 import '../styles/withchip.css';
 import '../styles/handover.css';
 import '../styles/home.css';
@@ -37,8 +39,32 @@ import {
 } from '../lib/data.mjs';
 import { PEOPLE, person, INBOX_SEED } from '../lib/demo.mjs';
 import { PATHS } from './learn/_lessons.mjs';
+import { vendors as VENDORS } from '../lib/data.mjs';
+import { serviceModel } from '../lib/services-view.mjs';
+import { experience, serviceLevels } from '../lib/experience.mjs';
+import { SERVICE_ORDER } from '../lib/services.mjs';
+import { leadership } from '../lib/costs.mjs';
+import { partnerBand } from '../lib/vendors.mjs';
+import { sparkSvg } from '../lib/spark.mjs';
 
 const H = homeData();
+// Leadership (V7): "are we OK, and what does it cost?" The AV service's experience across every office (the same figures
+// as the AV service page), the finance connector's month, and what is to review (src/lib/costs.mjs; all simulated).
+const FIRST_NAME = Object.fromEntries(PEOPLE.map((p) => [p.id, p.name.split(' ')[0]]));
+const avM = serviceModel('av');
+const LEAD = leadership({
+  vendors: Object.values(VENDORS), experience: experience('av', avM.sites.map((s) => ({ id: s.id, weight: Math.max(1, siteStats[s.id]?.spaces.length ?? s.units.length) }))),
+  behind: avM.behind, today: DEMO_TODAY, servicesWithin: SERVICE_ORDER.every((s) => serviceLevels(s).every((r) => r.kept)), owners: FIRST_NAME,
+});
+const SPARK_FMT = { '%': (x) => `${Math.round(x)}%`, min: (x) => `${Math.round(x)} min`, eur: (x) => `€${Math.round(x).toLocaleString('en-IE')}` };
+const LEAD_TO = { ontime: '/services/av/#experience', first: '/services/av/#experience', lost: '/services/av/#experience', cost: '#costs' };
+H.cockpit.lead = {
+  answer: LEAD.answer,
+  figures: LEAD.figures.map((f) => ({ id: f.id, n: f.n, label: f.label, to: LEAD_TO[f.id], title: `${f.title} · from ${f.source.from}, ${f.source.at}`,
+    spark: sparkSvg(f.spark, { state: f.state, fmt: SPARK_FMT[f.fmt], span: f.id === 'cost' ? '12 months' : '30 days' }) })),
+};
+// Partners (V7): the jobs handed to each partner's company, with the contract clock (src/lib/vendors.mjs; simulated).
+H.cockpit.partner = Object.fromEntries(PEOPLE.filter((p) => p.vendor).map((p) => { const B = partnerBand(p.id); return [p.id, { withYou: B.withYou, waiting: B.waiting, past: B.past, spaces: B.spaces, answer: B.answer }]; }));
 // Welcome back is shown for Aoife (the demo switch in Settings); keep the blob to the people who need it.
 H.cockpit.welcome = { aoife: H.cockpit.welcome.aoife };
 const json = JSON.stringify(H).replace(/</g, '\\u003c');
@@ -201,6 +227,10 @@ const pmCss = pms.map((pm) => `:root[data-who="${pm.id}"] [data-pm]:not([data-pm
         <SmallMultiples cards={estateCards} health={health} people={FIRST} min={200} label="Every office, one card each" />
       </section>
 
+      <!-- Leadership: what it costs, and what is to review (V7). Partners: the jobs with their company (V7). -->
+      <LeadershipHome part="summary" L={LEAD} />
+      <PartnerHome />
+
       <!-- Vendors: only their installation. -->
       <section class="ck card" data-sec="install" id="install" aria-labelledby="h-vend" hidden>
         <header class="ck-h" data-help="home.vendor"><h2 id="h-vend">Your installation</h2></header>
@@ -212,6 +242,7 @@ const pmCss = pms.map((pm) => `:root[data-who="${pm.id}"] [data-pm]:not([data-pm
     <OpenHere kind="home" layer="record" />
 
     <div class="layer" data-layer="record" id="record-layer">
+      <LeadershipHome part="record" L={LEAD} />
       <!-- Quiet by design: what was done for you, and what moved while you were not looking. Folded; one press opens. -->
       <section class="ck card quiet" data-sec="quiet" id="quiet" aria-label="Done automatically, changed overnight, knowledge to review">
         <details class="qd" data-q="auto"><summary data-help="home.auto"><span class="qd-t">Done automatically today</span><span class="qd-n" data-qn="auto"></span><Icon name="arrow" size={14} /></summary><ol class="qd-list" data-ql="auto"></ol></details>
