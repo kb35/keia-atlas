@@ -4,7 +4,7 @@ How Keia Atlas moves, lays out a page, draws a device or a space, and words thin
 
 ## The book on one page
 
-**Motion.** Every duration and curve is a token. Four moves: persist (moves into place), enter (grows from its centre), exit (shrinks to its centre), state (colour eases in place). Between pages what both share stays put and a clicked record flies into its page. Nothing overshoots or blocks a click, the page never jumps, and reduced motion turns it all off.
+**Motion.** Motion explains a change. Every duration, curve and spring is a token. Five moves: persist (moves into place), enter (grows from its centre), exit (shrinks to its centre), state (eases in place, once) and transform (a card becomes its page). Every interaction is one row of one table, with its reduced-motion equivalent. Nothing loops, overshoots or blocks a click, data never animates, and the page never jumps.
 
 **Layout.** Every page has the same slots in the same order: path, place tabs, band, filter bar, main area, sections. The top of the page is the answer in priority order; the page then scrolls as one, and nothing scrolls inside it. Cards line up on one grid, and deep pages show a path you can climb. Every hover has a click. Phones never scroll sideways.
 

@@ -17,6 +17,11 @@ export function motion() {
     state: ms(cs, '--dur-state', 300), chip: ms(cs, '--dur-chip', 320), zoom: ms(cs, '--dur-zoom', 360),
     page: ms(cs, '--dur-page', 420), enter: ms(cs, '--dur-enter', 440), morph: ms(cs, '--dur-morph', 520),
     flash: ms(cs, '--dur-flash', 800), stagger: ms(cs, '--stagger', 24),
+    springEase: cs.getPropertyValue('--ease-spring').trim() || 'cubic-bezier(.22, 1, .36, 1)',
+    press: ms(cs, '--dur-press', 80), theme: ms(cs, '--dur-theme', 360), replay: ms(cs, '--replay-step', 600),
+    linger: ms(cs, '--dur-linger', 4000), springSettle: ms(cs, '--spring-settle', 360), springSnap: ms(cs, '--spring-snap', 200),
+    peekRest: ms(cs, '--peek-rest', 200), skeletonMax: ms(cs, '--skeleton-max', 400), skeletonSkip: ms(cs, '--skeleton-skip', 100),
+    toast: ms(cs, '--toast-stay', 4000),
   };
 }
 

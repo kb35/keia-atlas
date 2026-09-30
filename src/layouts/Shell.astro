@@ -647,7 +647,14 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         ease: cs.getPropertyValue('--ease-settle').trim() || 'cubic-bezier(.22,1,.36,1)',
         morph: ms('--dur-morph', 520), enter: ms('--dur-enter', 440), exit: ms('--dur-exit', 240), page: ms('--dur-page', 420),
         state: ms('--dur-state', 300), hover: ms('--dur-hover', 140), pop: ms('--dur-pop', 200), flash: ms('--dur-flash', 800),
-        delay: ms('--delay-enter', 120), stagger: ms('--stagger', 24),
+        delay: ms('--delay-enter', 24), stagger: ms('--stagger', 24),
+        /* v2 (MOTION-V2 section 2): the exit curve, press, zoom, chip, theme, Replay, the springs and the interaction layer. */
+        exitEase: cs.getPropertyValue('--ease-exit').trim() || 'cubic-bezier(.4,0,1,1)',
+        springEase: cs.getPropertyValue('--ease-spring').trim() || 'cubic-bezier(.22,1,.36,1)',
+        press: ms('--dur-press', 80), zoom: ms('--dur-zoom', 360), chip: ms('--dur-chip', 320), theme: ms('--dur-theme', 360),
+        replay: ms('--replay-step', 600), linger: ms('--dur-linger', 4000),
+        springSettle: ms('--spring-settle', 360), springSnap: ms('--spring-snap', 200),
+        peekRest: ms('--peek-rest', 200), skeletonMax: ms('--skeleton-max', 400), skeletonSkip: ms('--skeleton-skip', 100), toast: ms('--toast-stay', 4000),
       };
     };
     /* The box keeps its height through the swap (so the scroll cannot jump), then eases down to its new
@@ -872,7 +879,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
         pins.forEach(function (p) { p.el.style.left = (p.b.left - p.r.left) + 'px'; p.el.style.top = (p.b.top - p.r.top) + 'px'; });
         var undos = pins.map(function (p) {
           var o = originOf(p.b), k = bigBox(p.b) ? [{ opacity: 1 }, { opacity: 0 }] : [{ opacity: 1, transform: 'none', transformOrigin: o }, { opacity: 0, transform: 'scale(0)', transformOrigin: o }];
-          var an = p.el.animate(k, { duration: m.exit, easing: m.ease, fill: 'forwards' }), gone = false;
+          var an = p.el.animate(k, { duration: m.exit, easing: m.exitEase || m.ease, fill: 'forwards' }), gone = false;
           var undo = function () { if (gone) return; gone = true; an.cancel(); if (p.saved == null) p.el.removeAttribute('style'); else p.el.setAttribute('style', p.saved); };
           an.onfinish = undo;
           return undo;
@@ -918,7 +925,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
             out.style.left = '0px'; out.style.top = '0px'; out.style.overflow = 'clip'; out.style.pointerEvents = 'none'; out.style.zIndex = '2';
             var r = out.getBoundingClientRect();
             out.style.left = (b.left - r.left) + 'px'; out.style.top = (b.top - r.top) + 'px';
-            anims.push(out.animate([{ opacity: 1 }, { opacity: 0 }], { duration: m.exit, easing: m.ease, fill: 'forwards' }));
+            anims.push(out.animate([{ opacity: 1 }, { opacity: 0 }], { duration: m.exit, easing: m.exitEase || m.ease, fill: 'forwards' }));
           }
           var from = opts.dir ? { opacity: 0, transform: 'translateX(' + (opts.dir * 24) + 'px)' } : { opacity: 0 };
           anims.push(newEl.animate([from, { opacity: 1, transform: 'none' }], { duration: m.enter, delay: m.exit / 2, easing: m.ease, fill: 'backwards' }));
@@ -974,7 +981,7 @@ const pageTitle = title ? `${title} · Keia Atlas` : 'Keia Atlas';
       W.rsPopOut = function (el, from, done) {
         var m = M(); if (m.reduced || !el.animate) { done(); return; }
         var o = originAt(el, from);
-        el.animate([{ opacity: 1, transform: 'none', transformOrigin: o }, { opacity: 0, transform: 'scale(' + popScale() + ')', transformOrigin: o }], { duration: m.exit, easing: m.ease, fill: 'forwards' }).onfinish = function (e) { done(); if (e && e.target) e.target.cancel(); };
+        el.animate([{ opacity: 1, transform: 'none', transformOrigin: o }, { opacity: 0, transform: 'scale(' + popScale() + ')', transformOrigin: o }], { duration: m.exit, easing: m.exitEase || m.ease, fill: 'forwards' }).onfinish = function (e) { done(); if (e && e.target) e.target.cancel(); };
       };
 
       /* The demo settings, each as one smooth moment. */
