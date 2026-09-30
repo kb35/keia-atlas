@@ -1,0 +1,61 @@
+---
+// Where this page sits in the method: the four levels, every page in reading order with this one marked, and the
+// previous and next page. A person who arrives at Level 3 by accident can always step back up (FRONT-DOOR 4).
+import { href } from '../../lib/data.mjs';
+import { PAGES, LEVELS } from '../../pages/method/_pages.mjs';
+interface Props { current: string }
+const { current } = Astro.props;
+const order = [{ slug: 'level1', to: '/method/', title: 'Level 1: one screen', level: 1 }, ...PAGES];
+const i = order.findIndex((p) => p.slug === current);
+const prev = i > 0 ? order[i - 1] : null, next = i >= 0 && i < order.length - 1 ? order[i + 1] : null;
+const level = order[i]?.level ?? 1;
+---
+<nav class="card pad mn" aria-label="The Keia Method: every page" data-help="method.nav">
+  <ol class="mn-levels" aria-label="Levels">
+    {LEVELS.map((l) => (
+      <li class:list={{ 'is-here': l.n === level }} aria-current={l.n === level ? 'step' : undefined}>
+        <span class="mn-n">Level {l.n}</span><span>{l.name}</span><small>{l.time}</small>
+      </li>
+    ))}
+  </ol>
+  <div class="mn-pages">
+    <div>
+      <p class="mn-h">Level 1</p>
+      <ul><li><a href={href('/method/')} aria-current={current === 'level1' ? 'page' : undefined}>One screen: the whole method</a></li></ul>
+    </div>
+    <div>
+      <p class="mn-h">Level 2: the practices</p>
+      <ul>{PAGES.filter((p) => p.level === 2).map((p) => <li><a href={href(p.to)} aria-current={p.slug === current ? 'page' : undefined}><span class="mn-num">{p.num}</span> {p.title}</a></li>)}</ul>
+    </div>
+    <div>
+      <p class="mn-h">Level 3: the reference</p>
+      <ul>{PAGES.filter((p) => p.level === 3).map((p) => <li><a href={href(p.to)} aria-current={p.slug === current ? 'page' : undefined}><span class="mn-num">{p.num}</span> {p.title}</a></li>)}</ul>
+    </div>
+  </div>
+  <div class="mn-step">
+    {prev ? <a href={href(prev.to)} rel="prev">← {prev.title}</a> : <span />}
+    {next && <a href={href(next.to)} rel="next">{next.title} →</a>}
+  </div>
+</nav>
+
+<style>
+  .mn { display: grid; gap: 16px; container: mn / inline-size; }
+  .mn-levels { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .mn-levels li { display: grid; gap: 1px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); font-size: 13px; color: var(--text-2); }
+  .mn-levels li.is-here { border-color: var(--accent); color: var(--text); }
+  .mn-n { font: 500 10.5px/1.3 var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); }
+  .mn-levels small { font-size: 12px; color: var(--text-3); }
+  .mn-pages { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 16px; }
+  .mn-h { margin: 0 0 6px; font: 500 10.5px/1.3 var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); }
+  .mn-pages ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .mn-pages a { display: inline-flex; gap: 6px; align-items: baseline; min-height: 32px; padding: 4px 0; font-size: 13.5px; text-decoration: none; color: var(--text); }
+  .mn-pages a:hover { text-decoration: underline; color: var(--text); }
+  .mn-pages a[aria-current="page"] { color: var(--accent); font-weight: 550; }
+  .mn-num { font: 500 11.5px/1 var(--font-mono); color: var(--text-3); }
+  .mn-step { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 12px; }
+  .mn-step a { font-size: 14px; min-height: 44px; display: inline-flex; align-items: center; }
+  @container mn (max-width: 700px) {
+    .mn-levels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .mn-pages { grid-template-columns: minmax(0, 1fr); }
+  }
+</style>

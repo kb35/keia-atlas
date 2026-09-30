@@ -1,0 +1,49 @@
+---
+// Level 3: the reference. Every on-screen word with its plain meaning and what it maps to in ITIL, PMI and ISO
+// (section 3.1); the standards and regulations the record supports (3.2); what sits underneath (3.3); and what is
+// under consideration (3.4). A table is a table: no picture, no motion.
+import MethodPage from '../../components/method/MethodPage.astro';
+import Section from '../../components/Section.astro';
+import { SECTIONS, WORDS, STANDARDS, md } from '../../lib/method.mjs';
+import { pageBySlug } from './_pages.mjs';
+const page = pageBySlug('words');
+const lede = WORDS.intro.split(/(?<=\.)\s/)[0];
+const under = SECTIONS['3.3'], later = SECTIONS['3.4'];
+---
+<MethodPage slug="words" title={page.title} lede={lede} level={3} num={page.num} try={page.try}>
+  <Section title={`${WORDS.rows.length} rows: the word on screen, what it means, what it maps to`}>
+    <div class="mp-prose"><p set:html={md(WORDS.intro)} /></div>
+    <div class="tablewrap card" data-help="method.words">
+      <table class="mp-table to-cards">
+        <thead><tr>{WORDS.head.map((h) => <th>{h}</th>)}</tr></thead>
+        <tbody>{WORDS.rows.map((r) => <tr>{r.map((c) => <td set:html={md(c)} />)}</tr>)}</tbody>
+      </table>
+    </div>
+  </Section>
+  <Section title={STANDARDS.title}>
+    <div class="mp-prose"><p set:html={md(STANDARDS.intro)} /></div>
+    <div class="tablewrap card">
+      <table class="mp-table to-cards">
+        <thead><tr>{STANDARDS.head.map((h) => <th>{h}</th>)}</tr></thead>
+        <tbody>{STANDARDS.rows.map((r) => <tr>{r.map((c) => <td set:html={md(c)} />)}</tr>)}</tbody>
+      </table>
+    </div>
+  </Section>
+  {under && (
+    <Section title={under.title}>
+      <div class="mp-prose">{under.paras.map((p) => <p set:html={md(p)} />)}</div>
+    </Section>
+  )}
+  {later && (
+    <Section title={later.title}>
+      <div class="mp-prose">
+        {later.paras.map((p) => <p set:html={md(p)} />)}
+        <ol class="w-later">{(later.lists[0] ?? []).map((x) => <li set:html={md(x)} />)}</ol>
+      </div>
+    </Section>
+  )}
+</MethodPage>
+
+<style>
+  .w-later { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
+</style>
