@@ -353,7 +353,7 @@ function start() {
     },
     reapply(uid) {
       pending.add(uid); paint();
-      later(1200, () => { pending.delete(uid); setU(uid, 'drift', null, `${first(myName())} reapplied the profile; read back: matches`, 'keia_atlas'); });
+      later(1200, () => { pending.delete(uid); setU(uid, 'drift', null, `${first(myName())} reapplied the setup guide; read back: matches`, 'keia_atlas'); });
     },
   };
 

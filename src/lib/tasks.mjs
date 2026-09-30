@@ -81,7 +81,7 @@ const STEPS = {
   ],
   review: [
     'Collect what was learned on each task.',
-    'Propose changes to the playbook, profiles or setup guides; the owner approves them.',
+    'Propose changes to the playbook, device types or setup guides; the owner approves them.',
   ],
   budget: [
     'Set the scope: which spaces and which units.',

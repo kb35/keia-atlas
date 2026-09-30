@@ -33,7 +33,7 @@ const open = list.filter((p) => p.phase !== 'closed');
 const blocked = list.reduce((n, p) => n + count(p, 'blocked'), 0);
 // The answer: projects past target on schedule, cost or scope first, then tasks waiting on something.
 const pastTarget = open.filter((p) => { const L = lights(p); return [L.schedule, L.cost, L.scope].some((l) => l.state === 'bad'); }).length;
-const ANSWER = `${open.length} open projects · ${pastTarget ? `${pastTarget} past target` : 'none past target'}${blocked ? ` · ${blocked} tasks waiting on something` : ''}`;
+const ANSWER = `${open.length} open projects · ${pastTarget ? `${pastTarget} past target` : 'none past target'}${blocked ? ` · ${blocked} waiting on something` : ''}`;
 // Each figure opens what it counts (rule P10): open projects here, blocked tasks in the Work list.
 const NUMBERS = [
   { n: open.length, label: 'Open projects', to: `?phase=${[...new Set(open.map((p) => p.phase))].join(',')}` },
@@ -51,7 +51,7 @@ const lightsLabel = (p) => lightsOf(p).map(([k, l]) => `${k} ${LIGHT[l.state]}: 
 const taskLabel = (p) => ['done', 'doing', 'blocked', 'todo'].map((st) => `${count(p, st)} ${TASK_STATUS[st].toLowerCase()}`).join(', ');
 ---
 <Shell title="Projects" section="projects" minStage={3} crumbs={[{ label: 'Projects' }]}>
-  <PageBand overline="Work" title="Projects" rec="dd-projects" answer={ANSWER} lede="Delivery work at each site: refreshes, fit-outs and custom designs, each following a playbook." sim numbers={NUMBERS}>
+  <PageBand overline="Work" title="Projects" rec="dd-projects" answer={ANSWER} lede="Delivery work at each office: refreshes, fit-outs and custom designs, each following a playbook." sim numbers={NUMBERS}>
     <a slot="action" class="btn primary" href={href('/edit/?kind=project')}><Icon name="plus" size={16} />New project</a>
   </PageBand>
   <div class="content projects">

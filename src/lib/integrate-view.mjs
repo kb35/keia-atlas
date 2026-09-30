@@ -102,7 +102,7 @@ export function integrateModel(plan, io) {
       if (s.fwOk === false) out.push({ kind: 'fw', t: `Firmware ${u.oldFw}; the standard is ${u.fw}`, fix: 'Update it before you configure it, so the settings land on the right version.', act: stage() >= 4 ? 'update' : 'recheck', field: 'fwOk' });
     }
     if (step === 'install' && s.offline) out.push({ kind: 'offline', t: `Offline: last seen on ${u.port}`, fix: `Check the cable and power at ${u.port}, then recheck.`, act: 'recheck', field: 'online' });
-    if (step === 'configure' && s.drift) out.push({ kind: 'drift', t: s.drift, fix: stage() >= 4 ? 'Reapply the profile to this unit.' : `Set it back by hand in ${b?.via ?? 'device management'}, then recheck.`, act: stage() >= 4 ? 'reapply' : 'recheck', field: 'drift' });
+    if (step === 'configure' && s.drift) out.push({ kind: 'drift', t: s.drift, fix: stage() >= 4 ? 'Reapply the setup guide to this unit.' : `Set it back by hand in ${b?.via ?? 'device management'}, then recheck.`, act: stage() >= 4 ? 'reapply' : 'recheck', field: 'drift' });
     return out;
   }
   const issueOf = (u, step) => issuesOf(u, step)[0] ?? null;
@@ -363,14 +363,14 @@ export function sharedHtml(M, bid) {
     if (left.length) acts = `<button type="button" class="btn primary" data-help="integrate.confirm-all" data-act="confirm" data-id="${esc(bid)}">Confirm all ${left.length} set</button>`;
   } else if (st.applied) {
     const seen = b.units.filter((id) => ['verified', 'done'].includes(M.stepOf(id, 'configure').st)).length;
-    status = `<p class="sh-st">${glyph(seen === b.units.length ? 'done' : 'doing')}<span><b>Profile applied</b> through ${esc(b.via)}. Read back from ${seen} of ${b.units.length}${reachable < b.units.length ? `; the other ${b.units.length - reachable} ${b.units.length - reachable === 1 ? 'takes it' : 'take it'} when ${b.units.length - reachable === 1 ? 'it' : 'they'} can be reached` : ''}.</span></p>`;
+    status = `<p class="sh-st">${glyph(seen === b.units.length ? 'done' : 'doing')}<span><b>Setup guide applied</b> through ${esc(b.via)}. Read back from ${seen} of ${b.units.length}${reachable < b.units.length ? `; the other ${b.units.length - reachable} ${b.units.length - reachable === 1 ? 'takes it' : 'take it'} when ${b.units.length - reachable === 1 ? 'it' : 'they'} can be reached` : ''}.</span></p>`;
   } else if (agents && st.prepared) {
     status = `<div class="sh-agent" data-help="integrate.agent"><p class="sh-ah">Prepared by the setup guide agent</p><p>One run for all ${plural(b.units.length, 'unit')} through ${esc(b.via)}: ${b.settings ? `${b.settings.set} settings to set and ${b.settings.verify} to check` : 'its settings'}, plus each unit's own name and address. Nothing has changed on any unit yet.</p><p class="faint">Agents only propose. A person applies it, then accepts what Keia Atlas reads back.</p></div>`;
     acts = `<button type="button" class="btn primary" data-help="integrate.apply-agent" data-act="apply" data-id="${esc(bid)}" data-via="agent">Apply the prepared run</button><button type="button" class="btn ghost" data-act="discard" data-id="${esc(bid)}">Discard</button>`;
   } else if (agents && st.handed) {
     status = `<p class="sh-st">${glyph('doing')}<span><b>With the setup guide agent</b>. It is preparing the run; nothing changes until a person applies it.</span></p>`;
   } else {
-    status = `<p class="sh-st">${glyph('todo')}<span><b>Not applied yet.</b> One profile sets the shared settings on all ${b.units.length}${reachable < b.units.length ? `; ${reachable} can take it now, the rest when they can be reached` : ''}.</span></p>`;
+    status = `<p class="sh-st">${glyph('todo')}<span><b>Not applied yet.</b> One setup guide sets the shared settings on all ${b.units.length}${reachable < b.units.length ? `; ${reachable} can take it now, the rest when they can be reached` : ''}.</span></p>`;
     acts = `<button type="button" class="btn primary" data-help="integrate.apply" data-act="apply" data-id="${esc(bid)}" data-via="${M.stage() >= 4 ? 'push' : 'hand'}">${M.stage() >= 4 ? `Apply to all ${b.units.length}` : 'I have applied it'}</button>` +
       (agents ? `<button type="button" class="btn ghost" data-help="integrate.hand" data-act="handoff" data-id="${esc(bid)}">Hand to the agent</button>` : '');
   }
@@ -436,7 +436,7 @@ export function describe(M, e) {
   else if (f === 'photo') t = `Photo added: ${on}`;
   else if (/^x-/.test(f)) { const st = f.slice(2), v = on?.v; t = v === true ? `Marked ${(M.DONE_W[st] ?? st).toLowerCase()}${on.n ? `: ${on.n}` : ''}` : v === false ? `Unticked ${(M.LABEL[st] ?? st).toLowerCase()}${on.n ? `: ${on.n}` : ''}` : `Cleared the tick on ${(M.LABEL[st] ?? st).toLowerCase()}`; }
   else if (/^su-/.test(f)) { const b = kind === 'batch' ? M.B.get(id) : u ? M.B.get(u.batch) : null; const s = b?.setup.find((x) => `su-${x.id}` === f); t = `${on ? 'Ticked' : 'Unticked'} setup step "${s?.t ?? f.slice(3)}"${kind === 'batch' ? ' on every unit' : ''}`; }
-  else if (f === 'applied') t = on ? 'Applied the profile' : 'Took back the profile';
+  else if (f === 'applied') t = on ? 'Applied the setup guide' : 'Took back the setup guide';
   else if (f === 'handed') t = on ? 'Handed to the setup guide agent' : 'Took it back from the agent';
   else if (f === 'prepared') t = on ? 'The setup guide agent prepared the run' : 'Discarded the prepared run';
   else if (f === 'tests') t = 'Room test results';

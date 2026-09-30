@@ -1,0 +1,101 @@
+---
+/* PillSelect: the house control for picking one thing from a list (REVIEW-SITE #15; docs/rules/words.md W6 bans a
+   native <select> for choices). Add <PillSelect /> to a page, then mark any <select> with data-pill:
+     <label><span>Your role</span><select data-pill aria-label="Your role">...</select></label>
+   The select stays in the page, hidden, as the one source of truth (forms, scripts and "change" listeners keep
+   working). A pill shows the current choice; it opens a list that grows from the pill and closes on a pick, on
+   Escape or on a click elsewhere. Options in an <optgroup> sit under the group's name.
+   A script that sets select.value can call select.pmRefresh() so the pill follows.
+   Keys: Enter, Space or Arrow Down opens; Up and Down move; Home and End jump; Enter picks; Esc closes. */
+---
+<script>
+  const CHEV = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+  const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
+  let uid = 0;
+
+  function enhance(sel: HTMLSelectElement) {
+    if ((sel as any).pmBound) return;
+    (sel as any).pmBound = true;
+    const wrap = document.createElement('span');
+    wrap.className = 'pm';
+    sel.parentNode!.insertBefore(wrap, sel);
+    wrap.appendChild(sel);
+    sel.classList.add('pm-native');
+    sel.tabIndex = -1;
+    sel.setAttribute('aria-hidden', 'true');
+    const id = `pm-${++uid}`;
+    const name = sel.getAttribute('aria-label') || sel.closest('label')?.querySelector('span')?.textContent?.trim() || 'Choose one';
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'pm-btn'; btn.setAttribute('aria-haspopup', 'listbox'); btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-controls', id);
+    const list = document.createElement('div');
+    list.className = 'pm-list'; list.id = id; list.setAttribute('role', 'listbox'); list.setAttribute('aria-label', name); list.hidden = true;
+    wrap.append(btn, list);
+
+    const options = () => Array.from(sel.options);
+    const label = () => sel.selectedOptions[0]?.textContent?.trim() ?? '';
+    function paintBtn() { btn.innerHTML = `<span class="pm-v">${esc(label())}</span>${CHEV}`; btn.setAttribute('aria-label', `${name}: ${label()}`); }
+    function build() {
+      let html = '', group: Element | null = null;
+      options().forEach((o, i) => {
+        const g = o.parentElement instanceof HTMLOptGroupElement ? o.parentElement : null;
+        if (g && g !== group) html += `<p class="pm-g" role="presentation">${esc(g.label)}</p>`;
+        group = g;
+        html += `<button type="button" class="pm-o" role="option" data-i="${i}" aria-selected="${o.selected}" tabindex="-1"><span>${esc(o.textContent!.trim())}</span></button>`;
+      });
+      list.innerHTML = html;
+    }
+    const opts = () => Array.from(list.querySelectorAll<HTMLElement>('.pm-o'));
+    function open() {
+      build(); list.hidden = false; wrap.classList.add('open'); btn.setAttribute('aria-expanded', 'true');
+      const cur = opts().find((b) => b.getAttribute('aria-selected') === 'true') ?? opts()[0];
+      cur?.focus({ preventScroll: true }); cur?.scrollIntoView({ block: 'nearest' });
+    }
+    function close(refocus = true) { if (list.hidden) return; list.hidden = true; wrap.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); if (refocus) btn.focus({ preventScroll: true }); }
+    function pick(i: number) {
+      const changed = sel.selectedIndex !== i;
+      sel.selectedIndex = i; paintBtn(); close();
+      if (changed) { sel.dispatchEvent(new Event('input', { bubbles: true })); sel.dispatchEvent(new Event('change', { bubbles: true })); }
+    }
+    btn.addEventListener('click', () => (list.hidden ? open() : close()));
+    btn.addEventListener('keydown', (e) => { if (['ArrowDown', 'ArrowUp'].includes(e.key)) { e.preventDefault(); open(); } });
+    list.addEventListener('click', (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>('.pm-o'); if (b) pick(Number(b.dataset.i)); });
+    list.addEventListener('keydown', (e) => {
+      const all = opts(), at = all.indexOf(document.activeElement as HTMLElement);
+      const go = (n: number) => { const b = all[Math.max(0, Math.min(all.length - 1, n))]; b?.focus({ preventScroll: true }); b?.scrollIntoView({ block: 'nearest' }); };
+      if (e.key === 'ArrowDown') { e.preventDefault(); go(at + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); go(at - 1); }
+      else if (e.key === 'Home') { e.preventDefault(); go(0); }
+      else if (e.key === 'End') { e.preventDefault(); go(all.length - 1); }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
+      else if (e.key === 'Tab') close(false);
+    });
+    document.addEventListener('click', (e) => { if (!list.hidden && !wrap.contains(e.target as Node)) close(false); });
+    (sel as any).pmRefresh = () => paintBtn();
+    sel.addEventListener('change', paintBtn);
+    paintBtn();
+  }
+  const run = () => document.querySelectorAll<HTMLSelectElement>('select[data-pill]').forEach(enhance);
+  run();
+  document.addEventListener('astro:page-load', run);
+</script>
+
+<style is:global>
+  .pm { position: relative; display: inline-block; max-width: 100%; }
+  .pm-native { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  .pm-btn { appearance: none; display: inline-flex; align-items: center; gap: 8px; max-width: 100%; height: 38px; padding: 0 12px 0 14px; border-radius: var(--pill-radius, 999px); border: 1px solid var(--line-strong, var(--line)); background: var(--surface); color: var(--text); font: 600 var(--fs-body)/1 var(--font-sans); cursor: pointer; text-align: left; transition: border-color var(--dur-state) var(--ease-settle), background var(--dur-state) var(--ease-settle); }
+  .pm-btn:hover { background: var(--surface-2); }
+  .pm-btn:focus-visible, .pm-o:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .pm-v { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pm-btn svg { flex: none; color: var(--text-3); transition: transform var(--dur-state) var(--ease-settle); }
+  .pm.open .pm-btn svg { transform: rotate(180deg); }
+  .pm-list { position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; min-width: 100%; width: max-content; max-width: min(360px, calc(100vw - 32px)); max-height: min(340px, 50vh); overflow: auto; display: grid; gap: 2px; padding: 6px; border-radius: var(--radius-lg); border: var(--border-card); background: var(--surface); box-shadow: var(--shadow-lg); animation: pm-in var(--dur-pop) var(--ease-settle) both; transform-origin: top left; }
+  .pm-list[hidden] { display: none; }
+  @keyframes pm-in { from { opacity: 0; transform: scale(var(--pop-scale, .94)); } }
+  .pm-g { margin: 6px 10px 2px; font: 500 var(--fs-mark, 11px)/1.2 var(--font-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); }
+  .pm-g:first-child { margin-top: 2px; }
+  .pm-o { appearance: none; display: block; padding: 8px 10px 8px 30px; position: relative; border: 0; border-radius: var(--radius); background: none; color: var(--text); font: 550 var(--fs-body)/1.25 var(--font-sans); text-align: left; cursor: pointer; }
+  .pm-o:hover, .pm-o:focus { background: var(--surface-2); }
+  .pm-o::before { content: '\2713'; position: absolute; left: 10px; top: 8px; font-weight: var(--fw-title); opacity: 0; }
+  .pm-o[aria-selected="true"]::before { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { .pm-list { animation: none; } }
+</style>

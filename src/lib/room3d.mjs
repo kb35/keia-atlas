@@ -335,7 +335,7 @@ const LAYOUTS = {
     return { W, D, area: 7, chairs: 0, notes: ['Printer footprint 37.1 × 46.4 in plus 20 in for the feeder'] };
   },
   cafeteria(b) {
-    const W = 10, D = 9; // size varies by site; 90 m2 chosen
+    const W = 10, D = 9; // size varies by office; 90 m2 chosen
     b.box(0, 1.2, 0, 0.7, 6.8, 0.92, 'counter', { label: 'Servery counter' });
     b.box(0, 1.2, 0.92, 0.7, 6.8, 0.96, 'stone');
     for (const [x, y] of [[2.6, 2.6], [5.0, 2.6], [7.4, 2.6], [2.6, 5.0], [5.0, 5.0], [7.4, 5.0]]) {
@@ -348,7 +348,7 @@ const LAYOUTS = {
     door(b, 'left', 7.3, 8.8);
     b.anchors.wall = { cx: 5.0, signage: true };
     b.anchors.wallPlate = { x: 6.6, y: 0.02, z: 0.45 };
-    return { W, D, area: 90, chairs: 36, notes: ['Space size varies by site; 10 × 9 m shown', 'Signage display 43 to 85 in, 65 in shown'] };
+    return { W, D, area: 90, chairs: 36, notes: ['Space size varies by office; 10 × 9 m shown', 'Signage display 43 to 85 in, 65 in shown'] };
   },
   pantry(b) { return pantryLike(b, false); },
   'pantry-expanded'(b) { return pantryLike(b, true); },
@@ -368,7 +368,7 @@ const LAYOUTS = {
     door(b, 'left', 1.4, 2.8);
     b.anchors.wall = { cx: 4.95, signage: true, zc: 1.7 };
     b.anchors.wallPlate = { x: 4.95, y: 0.02, z: 0.45 };
-    return { W, D, area: 30, chairs: 4, notes: ['Space size varies by site; 6 × 5 m shown', 'Desk for one or two, lounge seating, signage 65 in shown'] };
+    return { W, D, area: 30, chairs: 4, notes: ['Space size varies by office; 6 × 5 m shown', 'Desk for one or two, lounge seating, signage 65 in shown'] };
   },
   'remote-home'(b) {
     const W = 3.0, D = 2.6;

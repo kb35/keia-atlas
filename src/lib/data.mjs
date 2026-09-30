@@ -237,7 +237,7 @@ export const ADV_ORDER = ['do-not-install', 'act', 'check', 'info'];
 export const ADV_LEVEL = { 'do-not-install': 'Do not install', act: 'Action needed', check: 'Check', info: 'Good to know' };
 export const FW_STATUS = { standard: 'Standard', lab: 'In the Lab', blocked: 'Do not install', superseded: 'Superseded', available: 'Available' };
 export const MODEL_STATUS = { standard: 'In the standard', legacy: 'Legacy', candidate: 'Candidate', 'under-review': 'Under review' };
-export const LAYER_LABEL = { profile: 'Profile default', model: 'Model', country: 'Country', 'naming-network': 'Naming and network', 'room-type': 'Space type', exception: 'Exception' };
+export const LAYER_LABEL = { profile: 'Device type default', model: 'Model', country: 'Country', 'naming-network': 'Naming and network', 'room-type': 'Space type', exception: 'Exception' };
 export const src = (id) => (id ? sources[id] ?? null : null);
 
 // Comms rooms and racks. A room reaches the internet through its floor's IDF (or the MDF when the

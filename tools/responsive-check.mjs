@@ -75,6 +75,7 @@ const PAGES = [
   ['unit', '/device/?tag=AG-000028', 'other'],
   ['profiles', '/profiles/', 'other'],
   ['models', '/models/', 'other'],
+  ['model', '/models/poly-studio-x52/', 'other'], ['room', '/rooms/chi-12-01/', 'other'],
   ['team', '/team/', 'other'],
   ['vendors', '/vendors/', 'other'], ['vendor-record', '/vendors/keystone/', 'other'], ['vendors-access', '/vendors/access/', 'other'], ['vendor-job', '/vendor/jobs/inc0041214/', 'other'],
   ['usage', '/usage/', 'other'],

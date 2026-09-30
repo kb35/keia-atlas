@@ -273,7 +273,7 @@ function buildVocab(I) {
   }
   for (const [ids, words] of PROFILE_GROUPS) {
     const v = ids.filter((id) => I.rps[id]); if (!v.length) continue;
-    for (const w of words) reg(w, { t: 'profile', v, label: `${w.replace(/^./, (c) => c.toUpperCase())}s (${v.length} profiles)`, q: w });
+    for (const w of words) reg(w, { t: 'profile', v, label: `${w.replace(/^./, (c) => c.toUpperCase())}s (${v.length} space types)`, q: w });
   }
   for (const [id, name] of Object.entries(I.classes)) {
     const e = { t: 'class', v: [id], label: name, q: name };

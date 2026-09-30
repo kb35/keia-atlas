@@ -36,7 +36,7 @@ const incs = incidentsOfRule(r.id);
 const lastBad = last && (last.result === 'unable' || last.result === 'halted');
 const ANSWER = lastBad
   ? `Unable to complete at ${at(last.at, DEMO_TODAY)}, rolled back · ${incs.some((i) => i.state !== 'resolved') ? `incident with ${personName(r.owner).split(' ')[0]}` : 'nothing left half done'}`
-  : `Every run in ${strip.runs.length > 20 ? 'three weeks' : 'the record'} read back and matched${back.length ? `, ${back.length} put back by a person` : ''}`;
+  : `Every run ${strip.runs.length > 20 ? 'in three weeks ' : ''}read back and matched${back.length ? ` · ${back.length} put back by a person` : ''}`;
 const NUMBERS = [
   { n: strip.runs.length, label: 'Runs recorded', to: '#runs' },
   { n: unable.length, label: 'Unable to complete', to: '#runs', tone: unable.length ? 'bad' : undefined },
@@ -58,7 +58,8 @@ const logHere = LOG.filter((e) => e.rule === r.id).slice(0, 12);
     <RulesData />
     <p class="rr-state" data-rule-state role="status" aria-live="polite" hidden></p>
     <div class="g12 top">
-      <section class="card pad s-7 rr-runs" aria-labelledby="rr-runs-h">
+      <div class="s-7 rr-left">
+      <section class="card pad rr-runs" aria-labelledby="rr-runs-h">
         <header class="rr-h"><h2 id="rr-runs-h">Runs, one square each</h2><span class="faint">oldest on the left</span></header>
         <RunStrip rule={r.id} runs={strip.runs} words={strip.words} size="large" to="page" />
         <ul class="rr-key" aria-label="Key">
@@ -68,6 +69,12 @@ const logHere = LOG.filter((e) => e.rule === r.id).slice(0, 12);
         </ul>
         {last && <p class="rr-last"><HealthGlyph state={RESULT[last.result]?.glyph ?? 'fine'} size={16} word={RESULT[last.result]?.word} /> <span>{at(last.at, DEMO_TODAY)} · {last.did}</span>{!last.quiet && <> · <HowCard run={last.id} /></>}</p>}
       </section>
+      <Section title="Checked before every run" id="conditions" aside="In this order; the first that fails stops the run before it touches anything" help="rule.conditions">
+        <ol class="card pad rr-cond">
+          {r.conditions.map((c, i) => <li><span class="rr-n mono">{i + 1}</span><span>{c}</span></li>)}
+        </ol>
+      </Section>
+      </div>
       <SidePanel class="s-5" title="The rule" meta={`version ${r.approved.version ?? 1}`} help="rule.facts">
         <dl class="rr-f">
           <div><dt>What it does</dt><dd>{r.title}</dd></div>
@@ -82,11 +89,6 @@ const logHere = LOG.filter((e) => e.rule === r.id).slice(0, 12);
     </div>
 
     <OpenHere kind="rule" layer="record" />
-    <Section title="Checked before every run" id="conditions" aside="In this order; the first that fails stops the run before it touches anything" help="rule.conditions">
-      <ol class="card pad rr-cond">
-        {r.conditions.map((c, i) => <li><span class="rr-n mono">{i + 1}</span><span>{c}</span></li>)}
-      </ol>
-    </Section>
 
     <Section title="How a run goes" id="steps" aside="Read, write, read back: a write that does not read back as intended is Unable to complete" help="rule.steps">
       <ol class="rr-steps">
@@ -192,6 +194,7 @@ const logHere = LOG.filter((e) => e.rule === r.id).slice(0, 12);
   .rule-page { gap: 24px; padding-top: 18px; }
   .rr-state { margin: 0; display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: var(--radius); background: var(--surface-2); font-size: var(--fs-body); }
   .rr-state[hidden] { display: none; }
+  .rr-left { display: grid; gap: var(--gutter); align-content: start; }   /* the left column carries the runs and the checks, so it runs as long as the facts beside it */
   .rr-runs { display: grid; gap: 14px; align-content: start; }
   .rr-h { display: flex; align-items: baseline; gap: 10px; }
   .rr-h h2 { margin: 0; font-size: var(--fs-h3); }

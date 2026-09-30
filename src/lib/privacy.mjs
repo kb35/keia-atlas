@@ -20,7 +20,7 @@ export const SENSING_CLASSES = ['camera', 'microphone', 'video-bar', 'codec', 'd
 export const isSensing = (cls) => SENSING_CLASSES.includes(cls);
 
 export const CAPTURE_LABEL = { video: 'Video', audio: 'Sound', 'people-count': 'How many people (a number)', presence: 'Whether anyone is there', 'badge-id': 'Badge number' };
-export const PROCESSING_LABEL = { 'on-device': 'On the device', cloud: 'In the maker\'s cloud', 'on-device-and-cloud': 'On the device, then the maker\'s cloud' };
+export const PROCESSING_LABEL = { 'on-device': 'On the device', cloud: 'In the manufacturer\'s cloud', 'on-device-and-cloud': 'On the device, then the manufacturer\'s cloud' };
 
 // The record that covers a unit of this class at this site, or null. `records` is { id: record }.
 export function recordFor(records, cls, site) {

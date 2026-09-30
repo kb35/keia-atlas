@@ -87,7 +87,7 @@ function roomUsage(s) {
   if ((occupied >= 0.62 && typical / cap >= 0.8) || occupied >= 0.78) {
     flag = 'over';
     why = typical >= cap ? `In use ${Math.round(occupied * 100)}% of the working week, usually with ${typical} people in ${cap} seats.` : `In use ${Math.round(occupied * 100)}% of the working week: people struggle to find it free.`;
-    act = 'A candidate for more space: a larger space, or another space of this profile on the floor. Protect it in any cut.';
+    act = 'A candidate for more space: a larger space, or another space of this space type on the floor. Protect it in any cut.';
   } else if (noShow >= 0.3) {
     flag = 'ghost';
     why = `Booked ${Math.round(bookH)} hours a week, but nobody turns up for ${Math.round(noShow * 100)}% of them.`;

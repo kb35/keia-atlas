@@ -239,7 +239,7 @@ a.row:hover { background: var(--surface-2); color: inherit; }
 .kv > div { display: flex; justify-content: space-between; gap: 12px; border-bottom: var(--border-rule); padding-bottom: 10px; }
 .kv > div:last-child { border-bottom: 0; padding-bottom: 0; }
 .kv dt { color: var(--text-2); font-size: 13.5px; }
-.kv dd { margin: 0; font-weight: 700; text-align: right; font-size: 13.5px; }
+.kv dd { margin: 0; font-weight: 700; text-align: right; font-size: 13.5px; min-width: 0; overflow-wrap: anywhere; }
 .facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 18px 24px; margin: 0; }
 .facts div { display: grid; gap: 4px; }
 .facts dt { font-size: 13px; color: var(--text-3); }
@@ -373,6 +373,24 @@ td small { display: block; color: var(--text-2); margin-top: 2px; }
   table.to-cards td:first-child { flex: 1 1 100%; font-size: 14px; }
   table.to-cards td[data-label]:not([data-label=""]):not(:first-child)::before { content: attr(data-label) " "; color: var(--text-3); font-size: 12px; }
   table.to-cards td small { display: inline; }
+}
+
+/* A table that stacks on a phone (REVIEW-SITE #5): mark it class="stack-sm". Under 520 px of content each row is
+   a block: the row's first cell (a row heading, or the first value) on top, then every other cell on its own line
+   with its column's name in front (Shell.astro fills data-label from the heading; a cell may set its own). An empty
+   cell is left out. Nothing clips and nothing scrolls sideways. */
+@container content (max-width: 519px) {
+  .tablewrap:has(> table.stack-sm) { overflow: visible; }
+  table.stack-sm, .tablewrap > table.stack-sm { min-width: 0; }
+  table.stack-sm, table.stack-sm tbody, table.stack-sm tfoot { display: block; }
+  table.stack-sm thead { display: none; }
+  table.stack-sm tr { display: block; padding: 12px 16px; border-bottom: var(--border-rule); }
+  table.stack-sm tr:last-child { border-bottom: 0; }
+  table.stack-sm td, table.stack-sm tbody th { display: block; width: auto !important; padding: 2px 0; border: 0; text-align: left; font-size: 13px; white-space: normal !important; overflow-wrap: anywhere; }
+  table.stack-sm tbody th[scope="row"] { padding-bottom: 6px; font-size: 14px !important; }
+  table.stack-sm td:empty { display: none; }
+  table.stack-sm td[data-label]:not([data-label=""])::before { content: attr(data-label) ": "; color: var(--text-3); font-size: 12px; }
+  table.stack-sm td small { display: inline; }
 }
 
 /* ---------- Device drawings ---------- */
