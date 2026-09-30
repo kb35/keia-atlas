@@ -1,0 +1,60 @@
+---
+/* LensStrip: the lenses on a floor plan (UI-V2 §8.9, UX-V2 §2.5). Word pills inside the picture card's top edge; the
+   chosen one is filled with a sliding marker (M12 segmented switch). A lens shows only while its module is On or
+   Connected (Settings › Modules; src/lib/modules.mjs): CSS hides a pill whose module is Off, and the page's script
+   (src/lib/lens-client.mjs) moves off a lens whose module goes Off. Under 520 px of content the pills fold into one
+   "Lens: Health" pill (a native select, so it works by touch and keyboard).
+   The page's script does the switching: [data-lens-pick] buttons, the [data-lens-select] select, the `L` key and
+   ?lens= in the address.
+   Props:  lens   the lens to draw chosen (the script corrects it from the address before first paint of the plan)
+   Slots:  end    controls at the right end of the strip (Replay) */
+import { LENSES, lensOf } from '../lib/lenses.mjs';
+import { MODULES } from '../lib/modules.mjs';
+interface Props { lens?: string }
+const { lens = 'health' } = Astro.props;
+const offCss = MODULES.map((m) => `:root[data-off~="${m.id}"] [data-lens-mod="${m.id}"]{display:none!important}`).join('');
+---
+<div class="ls-wrap">
+  <div class="ls" data-lens-strip data-help="lens.strip">
+    <span class="ls-l" id="ls-label">Lens</span>
+    <div class="ls-pills" role="group" aria-labelledby="ls-label" data-lens-pills>
+      {LENSES.map((l) => (
+        <button type="button" class="ls-p" data-lens-pick={l.id} data-lens-mod={l.module} aria-pressed={l.id === lens ? 'true' : 'false'} title={l.says}>{l.label}</button>
+      ))}
+    </div>
+    <label class="ls-sel">
+      <span>Lens:</span>
+      <select data-lens-select aria-label="Lens">
+        {LENSES.map((l) => <option value={l.id} data-lens-mod={l.module} selected={l.id === lens}>{l.label}</option>)}
+      </select>
+    </label>
+    <span class="ls-end"><slot name="end" /></span>
+  </div>
+  <p class="ls-says" data-lens-says>{lensOf(lens).says}. Simulated.</p>
+</div>
+<style is:global set:html={offCss}></style>
+
+<style is:global>
+  .ls-wrap { container: ls / inline-size; display: grid; gap: 4px; min-width: 0; }
+  .ls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; min-width: 0; }
+  .ls-l { font-size: var(--fs-code); color: var(--text-2); }
+  .ls-pills { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border-radius: var(--pill-radius, 999px); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
+  .ls-p { appearance: none; border: 0; background: transparent; color: var(--text-2); font: var(--fw-name, 550) var(--fs-support)/1 var(--font-sans); padding: 7px 12px; min-height: 32px; border-radius: var(--pill-radius, 999px); cursor: pointer; transition: color var(--dur-hover) var(--ease-settle), background-color var(--dur-hover) var(--ease-settle), transform var(--dur-press) var(--ease-settle); }
+  .ls-p:hover { color: var(--text); }
+  .ls-p:active { transform: scale(var(--press-scale, .97)); }
+  .ls-p[aria-pressed="true"] { color: var(--surface); }
+  .ls-p[aria-disabled="true"] { cursor: default; opacity: .55; }
+  .ls-pills:not(.rs-marked) .ls-p[aria-pressed="true"] { background: var(--ink); }
+  .ls-p:focus-visible { outline: 2px solid var(--focus, var(--accent)); outline-offset: 1px; }
+  .ls-sel { display: none; align-items: center; gap: 6px; padding: 0 4px 0 12px; min-height: 36px; border-radius: var(--pill-radius, 999px); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); font-size: var(--fs-support); color: var(--text-2); }
+  .ls-sel select { appearance: none; -webkit-appearance: none; border: 0; background: transparent; color: var(--text); font: var(--fw-name, 550) var(--fs-support)/1 var(--font-sans); padding: 8px 22px 8px 2px; min-height: 36px; cursor: pointer; background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%); background-position: calc(100% - 11px) 55%, calc(100% - 7px) 55%; background-size: 4px 4px; background-repeat: no-repeat; }
+  .ls-sel:focus-within { outline: 2px solid var(--focus, var(--accent)); outline-offset: 1px; }
+  .ls-end { margin-left: auto; display: inline-flex; gap: 8px; align-items: center; }
+  .ls-says { margin: 0; font-size: var(--fs-code); color: var(--text-3, var(--text-2)); }
+  @container ls (max-width: 519px) {
+    .ls-pills, .ls-l { display: none; }
+    .ls-sel { display: inline-flex; }
+  }
+  @media (pointer: coarse) { .ls-p { min-height: 44px; } }
+  @media (prefers-reduced-motion: reduce) { .ls-p { transition: none; } .ls-p:active { transform: none; } }
+</style>

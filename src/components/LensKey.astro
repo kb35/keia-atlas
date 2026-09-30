@@ -1,0 +1,35 @@
+---
+/* LensKey: "Key" under a plan with lenses (UX-V2 §2.5: the legend on the back, closed by default, one tap to open).
+   It lists the states the chosen lens uses, each with its ring and its words in that lens (src/lib/lenses.mjs
+   LENS_KEY); the page's script shows the list for the lens in use ([data-lens-key]). The kinds of space (meeting
+   rooms, stores...) keep their own key inside the plan (FloorMap).
+   Props:  lens   the lens shown first */
+import HealthGlyph from './HealthGlyph.astro';
+import { LENSES, LENS_KEY } from '../lib/lenses.mjs';
+interface Props { lens?: string }
+const { lens = 'health' } = Astro.props;
+---
+<details class="hkey lk" data-help="lens.key">
+  <summary>Key <span class="lk-for" data-lens-key-name>{LENSES.find((l) => l.id === lens)?.label}</span></summary>
+  {LENSES.map((l) => (
+    <ul data-lens-key={l.id} hidden={l.id !== lens}>
+      {LENS_KEY[l.id].map((k) => <li><HealthGlyph state={k.h} size={16} /><b>{k.word}</b><span>{k.says}</span></li>)}
+    </ul>
+  ))}
+</details>
+
+<style is:global>
+  .lk { font-size: var(--fs-support); color: var(--text-2); }
+  .lk > summary { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; list-style: none; font-size: var(--fs-code); color: var(--text-2); border-radius: var(--radius); padding: 2px 4px; margin-left: -4px; min-height: 28px; }
+  .lk > summary::-webkit-details-marker { display: none; }
+  .lk > summary::after { content: ""; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); transition: transform var(--dur-hover) var(--ease-settle); }
+  .lk[open] > summary::after { transform: translateY(1px) rotate(-135deg); }
+  .lk > summary:hover { color: var(--text); }
+  .lk-for { color: var(--text-3, var(--text-2)); }
+  .lk ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 16px; }
+  .lk ul[hidden] { display: none; }
+  .lk li { display: grid; grid-template-columns: 16px auto minmax(0, 1fr); align-items: center; gap: 8px; }
+  .lk li b { font-weight: 550; color: var(--text); white-space: nowrap; }
+  .lk li span:last-child { color: var(--text-3, var(--text-2)); font-size: var(--fs-code); }
+  @media (prefers-reduced-motion: reduce) { .lk > summary::after { transition: none; } }
+</style>
