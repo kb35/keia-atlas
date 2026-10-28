@@ -43,7 +43,7 @@ RUN test -f dist/404.html || printf '%s' \
 # The "unprivileged" nginx image runs as a non-root user (nginx, uid 101) and
 # listens on 8080 rather than 80.
 # Pinned by digest (multi-arch index). Tag: nginxinc/nginx-unprivileged:stable-alpine
-FROM nginxinc/nginx-unprivileged:stable-alpine@sha256:ed04ec1ff34502c339ee5c3ae3f855442398edc1d05591e2b98981dcbbd20b1e
+FROM nginxinc/nginx-unprivileged:stable-alpine@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03
 
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 
